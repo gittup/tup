@@ -19,14 +19,6 @@ int write_fsdep(const char *file, const char *depends_on)
 	 */
 	static char tupd[MAXPATHLEN];
 
-	if(strcmp(file, depends_on) == 0) {
-		DEBUGP("File '%s' dependent on itself - ignoring.\n", file);
-		/* Ignore dependencies of a file on itself (ie: the file is
-		 * opened for both read and write).
-		 */
-		return 0;
-	}
-
 	if(snprintf(tupd, sizeof(tupd), ".tup/%s.tupd/%s", depends_on, file) >=
 	   (signed)sizeof(tupd)) {
 		fprintf(stderr, "Filename (.tup/%s.tupd/%s) too long\n",

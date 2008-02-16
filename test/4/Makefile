@@ -1,4 +1,4 @@
-WRAPPER := /home/mjs/tup/wrapper
+WRAPPER := /home/marf/tup/wrapper
 
 all: build/prog/main build/prog2/main
 

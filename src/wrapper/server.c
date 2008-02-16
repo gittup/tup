@@ -50,7 +50,7 @@ int start_server(void)
 
 	setenv(SERVER_NAME, addr.sun_path, 1);
 	/* TODO: Permanent-ize this somehow? same directory as wrapper? */
-	setenv("LD_PRELOAD", "/home/mjs/tup/ldpreload.so", 1);
+	setenv("LD_PRELOAD", "/home/marf/tup/ldpreload.so", 1);
 	DEBUGP("Started server '%s'\n", addr.sun_path);
 
 	return 0;

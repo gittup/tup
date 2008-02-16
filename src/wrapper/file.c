@@ -1,7 +1,7 @@
 #include "file.h"
 #include "access_event.h"
 #include "debug.h"
-#include "fsdep.h"
+#include "sha1dep.h"
 #include "list.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +65,12 @@ int write_files(void)
 	list_for_each_entry(w, &write_list, list) {
 		DEBUGP("Write deps for file: %s.\n", w->file);
 		list_for_each_entry(r, &read_list, list) {
-			if(write_fsdep(w->file, r->file) < 0)
+			if(strcmp(w->file, r->file) == 0) {
+				DEBUGP("File '%s' dependent on itself - "
+				       "ignoring.\n", w->file);
+				continue;
+			}
+			if(write_sha1dep(w->file, r->file) < 0)
 				return -1;
 		}
 	}

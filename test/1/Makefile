@@ -1,4 +1,4 @@
-WRAPPER := /home/mjs/tup/wrapper
+WRAPPER := /home/marf/tup/wrapper
 main: main.o lib.a
 	$(WRAPPER) gcc -o $@ $< lib.a
 
