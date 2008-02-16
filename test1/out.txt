@@ -1,0 +1,482 @@
+[31mMARF[0xb7f79ae7]: Init 7038[0m
+execve("/usr/bin/gcc", ["gcc", "-c", "main.c"], [/* 59 vars */]) = 0
+brk(0)                                  = 0x804c000
+open("/home/mjs/tup/ldpreload/ldpreload.so", O_RDONLY) = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\260\6\0\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0775, st_size=11854, ...}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7fa3000
+mmap2(NULL, 12360, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7f9f000
+mmap2(0xb7fa1000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7fa1000
+close(3)                                = 0
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+open("/etc/ld.so.cache", O_RDONLY)      = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=60316, ...}) = 0
+mmap2(NULL, 60316, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7f90000
+close(3)                                = 0
+open("/lib/libc.so.6", O_RDONLY)        = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0@a\1\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0755, st_size=1237276, ...}) = 0
+mmap2(NULL, 1242576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7e60000
+mmap2(0xb7f8a000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12a) = 0xb7f8a000
+mmap2(0xb7f8d000, 9680, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb7f8d000
+close(3)                                = 0
+open("/lib/libdl.so.2", O_RDONLY)       = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0p\n\0\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0755, st_size=9612, ...}) = 0
+mmap2(NULL, 12412, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7e5c000
+mmap2(0xb7e5e000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7e5e000
+close(3)                                = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7e5b000
+set_thread_area({entry_number:-1 -> 6, base_addr:0xb7e5b6c0, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+mprotect(0xb7e5e000, 4096, PROT_READ)   = 0
+mprotect(0xb7f8a000, 8192, PROT_READ)   = 0
+mprotect(0xb7fa1000, 4096, PROT_READ)   = 0
+mprotect(0x804a000, 4096, PROT_READ)    = 0
+mprotect(0xb7fbf000, 4096, PROT_READ)   = 0
+munmap(0xb7f90000, 60316)               = 0
+getpid()                                = 7039
+write(2, "\33[31mMARF[0xb7f9fae7]: Init 7039"..., 37[31mMARF[0xb7f9fae7]: Init 7039[0m
+) = 37
+brk(0)                                  = 0x804c000
+brk(0x806d000)                          = 0x806d000
+stat64("/usr/local/bin/gcc", 0xbf9d6750) = -1 ENOENT (No such file or directory)
+stat64("/usr/bin/gcc", {st_mode=S_IFREG|0755, st_size=9576, ...}) = 0
+stat64("/bin/gcc", 0xbf9d6750)          = -1 ENOENT (No such file or directory)
+stat64("/opt/bin/gcc", 0xbf9d6750)      = -1 ENOENT (No such file or directory)
+stat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.1/gcc", 0xbf9d6750) = -1 ENOENT (No such file or directory)
+stat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", {st_mode=S_IFREG|0755, st_size=131908, ...}) = 0
+execve("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", ["/usr/i686-pc-linux-gnu/gcc-bin/4"..., "-c"..., "main.c"...], [/* 59 vars */]) = 0
+brk(0)                                  = 0x8069000
+open("/home/mjs/tup/ldpreload/ldpreload.so", O_RDONLY) = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\260\6\0\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0775, st_size=11854, ...}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f06000
+mmap2(NULL, 12360, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7f02000
+mmap2(0xb7f04000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7f04000
+close(3)                                = 0
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+open("/etc/ld.so.cache", O_RDONLY)      = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=60316, ...}) = 0
+mmap2(NULL, 60316, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7ef3000
+close(3)                                = 0
+open("/lib/libc.so.6", O_RDONLY)        = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0@a\1\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0755, st_size=1237276, ...}) = 0
+mmap2(NULL, 1242576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7dc3000
+mmap2(0xb7eed000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12a) = 0xb7eed000
+mmap2(0xb7ef0000, 9680, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb7ef0000
+close(3)                                = 0
+open("/lib/libdl.so.2", O_RDONLY)       = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0p\n\0\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0755, st_size=9612, ...}) = 0
+mmap2(NULL, 12412, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7dbf000
+mmap2(0xb7dc1000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7dc1000
+close(3)                                = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7dbe000
+set_thread_area({entry_number:-1 -> 6, base_addr:0xb7dbe6c0, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+mprotect(0xb7dc1000, 4096, PROT_READ)   = 0
+mprotect(0xb7eed000, 8192, PROT_READ)   = 0
+mprotect(0xb7f04000, 4096, PROT_READ)   = 0
+mprotect(0xb7f22000, 4096, PROT_READ)   = 0
+munmap(0xb7ef3000, 60316)               = 0
+getpid()                                = 7039
+write(2, "\33[31mMARF[0xb7f02ae7]: Init 7039"..., 37[31mMARF[0xb7f02ae7]: Init 7039[0m
+) = 37
+brk(0)                                  = 0x8069000
+open("/usr/lib/locale/locale-archive", O_RDONLY|O_LARGEFILE) = -1 ENOENT (No such file or directory)
+brk(0x808a000)                          = 0x808a000
+open("/usr/share/locale/locale.alias", O_RDONLY) = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=2586, ...}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f01000
+read(3, "# Locale name alias data base.\n#"..., 4096) = 2586
+read(3, "", 4096)                       = 0
+close(3)                                = 0
+munmap(0xb7f01000, 4096)                = 0
+open("/usr/lib/locale/en_US/LC_CTYPE", O_RDONLY) = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=220460, ...}) = 0
+mmap2(NULL, 220460, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7d88000
+close(3)                                = 0
+open("/usr/lib/locale/en_US/LC_MESSAGES", O_RDONLY) = 3
+fstat64(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+close(3)                                = 0
+open("/usr/lib/locale/en_US/LC_MESSAGES/SYS_LC_MESSAGES", O_RDONLY) = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=57, ...}) = 0
+mmap2(NULL, 57, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7f01000
+close(3)                                = 0
+open("/usr/share/gcc-data/i686-pc-linux-gnu/4.1.2/locale/en_US/LC_MESSAGES/gcc.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+open("/usr/share/gcc-data/i686-pc-linux-gnu/4.1.2/locale/en/LC_MESSAGES/gcc.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+rt_sigaction(SIGINT, {SIG_IGN}, {SIG_DFL}, 8) = 0
+rt_sigaction(SIGINT, {0x804e1c2, [INT], SA_RESTART}, {SIG_IGN}, 8) = 0
+rt_sigaction(SIGHUP, {SIG_IGN}, {SIG_DFL}, 8) = 0
+rt_sigaction(SIGHUP, {0x804e1c2, [HUP], SA_RESTART}, {SIG_IGN}, 8) = 0
+rt_sigaction(SIGTERM, {SIG_IGN}, {SIG_DFL}, 8) = 0
+rt_sigaction(SIGTERM, {0x804e1c2, [TERM], SA_RESTART}, {SIG_IGN}, 8) = 0
+rt_sigaction(SIGPIPE, {SIG_IGN}, {SIG_DFL}, 8) = 0
+rt_sigaction(SIGPIPE, {0x804e1c2, [PIPE], SA_RESTART}, {SIG_IGN}, 8) = 0
+rt_sigaction(SIGCHLD, {SIG_DFL}, {SIG_DFL}, 8) = 0
+lstat64("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", {st_mode=S_IFLNK|0777, st_size=21, ...}) = 0
+readlink("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", "i686-pc-linux-gnu-gcc", 4096) = 21
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/i686-pc-linux-gnu-gcc", {st_mode=S_IFREG|0755, st_size=131908, ...}) = 0
+lstat64("/usr", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", {st_mode=S_IFLNK|0777, st_size=21, ...}) = 0
+readlink("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/gcc", "i686-pc-linux-gnu-gcc", 4096) = 21
+lstat64("/usr/i686-pc-linux-gnu/gcc-bin/4.1.2/i686-pc-linux-gnu-gcc", {st_mode=S_IFREG|0755, st_size=131908, ...}) = 0
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/", X_OK) = 0
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/", X_OK) = 0
+access("main.c", F_OK)                  = 0
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/specs", R_OK) = -1 ENOENT (No such file or directory)
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/specs", R_OK) = -1 ENOENT (No such file or directory)
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/lib/i686-pc-linux-gnu/4.1.2/specs", R_OK) = -1 ENOENT (No such file or directory)
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/lib/specs", R_OK) = -1 ENOENT (No such file or directory)
+access("/usr/lib/gcc/i686-pc-linux-gnu/specs", R_OK) = -1 ENOENT (No such file or directory)
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/", X_OK) = 0
+access("/tmp", R_OK|W_OK|X_OK)          = 0
+gettimeofday({1202351913, 602547}, NULL) = 0
+open("/tmp/ccmh2ewS.s", O_RDWR|O_CREAT|O_EXCL, 0600) = 3
+close(3)                                = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/cc1", {st_mode=S_IFREG|0755, st_size=4729564, ...}) = 0
+access("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/cc1", X_OK) = 0
+vfork(Process 7040 attached (waiting for parent)
+Process 7040 resumed (parent 7039 ready)
+)                                 = 7040
+[pid  7039] waitpid(7040, Process 7039 suspended
+ <unfinished ...>
+[pid  7040] execve("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/cc1", ["/usr/libexec/gcc/i686-pc-linux-g"..., "-quiet"..., "main.c"..., "-quiet"..., "-dumpbase"..., "main.c"..., "-march=i686"..., "-auxbase"..., "main"..., "-o"..., "/tmp/ccmh2ewS.s"...], [/* 61 vars */]) = 0
+[pid  7040] brk(0)                      = 0x854b000
+[pid  7040] open("/home/mjs/tup/ldpreload/ldpreload.so", O_RDONLY) = 3
+[pid  7040] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\260\6\0\0004\0\0\0"..., 512) = 512
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0775, st_size=11854, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f14000
+[pid  7040] mmap2(NULL, 12360, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7f10000
+[pid  7040] mmap2(0xb7f12000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7f12000
+[pid  7040] close(3)                    = 0
+[pid  7040] access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+[pid  7040] open("/etc/ld.so.cache", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0644, st_size=60316, ...}) = 0
+[pid  7040] mmap2(NULL, 60316, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7f01000
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/lib/libc.so.6", O_RDONLY) = 3
+[pid  7040] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0@a\1\0004\0\0\0"..., 512) = 512
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0755, st_size=1237276, ...}) = 0
+[pid  7040] mmap2(NULL, 1242576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7dd1000
+[pid  7040] mmap2(0xb7efb000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12a) = 0xb7efb000
+[pid  7040] mmap2(0xb7efe000, 9680, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb7efe000
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/lib/libdl.so.2", O_RDONLY) = 3
+[pid  7040] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0p\n\0\0004\0\0\0"..., 512) = 512
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0755, st_size=9612, ...}) = 0
+[pid  7040] mmap2(NULL, 12412, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7dcd000
+[pid  7040] mmap2(0xb7dcf000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7dcf000
+[pid  7040] close(3)                    = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7dcc000
+[pid  7040] set_thread_area({entry_number:-1 -> 6, base_addr:0xb7dcc6c0, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+[pid  7040] mprotect(0xb7dcf000, 4096, PROT_READ) = 0
+[pid  7040] mprotect(0xb7efb000, 8192, PROT_READ) = 0
+[pid  7040] mprotect(0xb7f12000, 4096, PROT_READ) = 0
+[pid  7040] mprotect(0xb7f30000, 4096, PROT_READ) = 0
+[pid  7040] munmap(0xb7f01000, 60316)   = 0
+[pid  7040] getpid()                    = 7040
+[pid  7040] write(2, "\33[31mMARF[0xb7f10ae7]: Init 7040"..., 37[31mMARF[0xb7f10ae7]: Init 7040[0m
+) = 37
+[pid  7040] brk(0)                      = 0x854b000
+[pid  7040] open("/usr/lib/locale/locale-archive", O_RDONLY|O_LARGEFILE) = -1 ENOENT (No such file or directory)
+[pid  7040] brk(0x856c000)              = 0x856c000
+[pid  7040] open("/usr/share/locale/locale.alias", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0644, st_size=2586, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0f000
+[pid  7040] read(3, "# Locale name alias data base.\n#"..., 4096) = 2586
+[pid  7040] read(3, "", 4096)           = 0
+[pid  7040] close(3)                    = 0
+[pid  7040] munmap(0xb7f0f000, 4096)    = 0
+[pid  7040] open("/usr/lib/locale/en_US/LC_CTYPE", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0644, st_size=220460, ...}) = 0
+[pid  7040] mmap2(NULL, 220460, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7d96000
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/usr/lib/locale/en_US/LC_MESSAGES", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/usr/lib/locale/en_US/LC_MESSAGES/SYS_LC_MESSAGES", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0644, st_size=57, ...}) = 0
+[pid  7040] mmap2(NULL, 57, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7f0f000
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/usr/share/gcc-data/i686-pc-linux-gnu/4.1.2/locale/en_US/LC_MESSAGES/gcc.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7040] open("/usr/share/gcc-data/i686-pc-linux-gnu/4.1.2/locale/en/LC_MESSAGES/gcc.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7040] rt_sigaction(SIGSEGV, {0x830f733, [SEGV], SA_RESTART}, {SIG_DFL}, 8) = 0
+[pid  7040] rt_sigaction(SIGILL, {0x830f733, [ILL], SA_RESTART}, {SIG_DFL}, 8) = 0
+[pid  7040] rt_sigaction(SIGBUS, {0x830f733, [BUS], SA_RESTART}, {SIG_DFL}, 8) = 0
+[pid  7040] rt_sigaction(SIGABRT, {0x830f733, [ABRT], SA_RESTART}, {SIG_DFL}, 8) = 0
+[pid  7040] rt_sigaction(SIGFPE, {0x830f733, [FPE], SA_RESTART}, {SIG_DFL}, 8) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0e000
+[pid  7040] mmap2(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c96000
+[pid  7040] mmap2(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0c000
+[pid  7040] open("/proc/meminfo", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0b000
+[pid  7040] read(3, "MemTotal:      2074832 kB\nMemFre"..., 1024) = 728
+[pid  7040] close(3)                    = 0
+[pid  7040] munmap(0xb7f0b000, 4096)    = 0
+[pid  7040] getrlimit(RLIMIT_AS, {rlim_cur=RLIM_INFINITY, rlim_max=RLIM_INFINITY}) = 0
+[pid  7040] open("/proc/meminfo", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0b000
+[pid  7040] read(3, "MemTotal:      2074832 kB\nMemFre"..., 1024) = 728
+[pid  7040] close(3)                    = 0
+[pid  7040] munmap(0xb7f0b000, 4096)    = 0
+[pid  7040] getrlimit(RLIMIT_AS, {rlim_cur=RLIM_INFINITY, rlim_max=RLIM_INFINITY}) = 0
+[pid  7040] getrlimit(RLIMIT_RSS, {rlim_cur=RLIM_INFINITY, rlim_max=RLIM_INFINITY}) = 0
+[pid  7040] open("/proc/meminfo", O_RDONLY) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0b000
+[pid  7040] read(3, "MemTotal:      2074832 kB\nMemFre"..., 1024) = 728
+[pid  7040] close(3)                    = 0
+[pid  7040] munmap(0xb7f0b000, 4096)    = 0
+[pid  7040] getrlimit(RLIMIT_AS, {rlim_cur=RLIM_INFINITY, rlim_max=RLIM_INFINITY}) = 0
+[pid  7040] brk(0x858d000)              = 0x858d000
+[pid  7040] gettimeofday({1202351913, 614238}, NULL) = 0
+[pid  7040] access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/", X_OK) = 0
+[pid  7040] stat64("/usr/lib/oracle/10.1.0.5/client/include", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+[pid  7040] stat64("/usr/local/include", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+[pid  7040] stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/include", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+[pid  7040] stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/include", 0xbf8f9d40) = -1 ENOENT (No such file or directory)
+[pid  7040] stat64("/usr/include", {st_mode=S_IFDIR|0755, st_size=12288, ...}) = 0
+[pid  7040] stat64("main.c.gch", 0xbf8f9d40) = -1 ENOENT (No such file or directory)
+[pid  7040] open("main.c", O_RDONLY|O_NOCTTY) = 3
+[pid  7040] write(2, "MARF[0xb7f10ae7]: File \'main.c\' "..., 52MARF[0xb7f10ae7]: File 'main.c' in mode 0 from open
+) = 52
+[pid  7040] write(2, "LIst:\n", 6LIst:
+)      = 6
+[pid  7040] write(2, " File: main.c\n", 14 File: main.c
+) = 14
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0664, st_size=56, ...}) = 0
+[pid  7040] read(3, "#include \"lib.h\"\n\nint main(void)"..., 56) = 56
+[pid  7040] close(3)                    = 0
+[pid  7040] open("/tmp/ccmh2ewS.s", O_RDWR|O_CREAT|O_TRUNC, 0666) = 3
+[pid  7040] fstat64(3, {st_mode=S_IFREG|0600, st_size=0, ...}) = 0
+[pid  7040] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f0b000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f03000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c8e000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c86000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c7e000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c76000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c6e000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c66000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c5e000
+[pid  7040] mmap2(NULL, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c56000
+[pid  7040] open("main.gcda", O_RDWR)   = -1 ENOENT (No such file or directory)
+[pid  7040] stat64("lib.h.gch", 0xbf8f9b10) = -1 ENOENT (No such file or directory)
+[pid  7040] open("lib.h", O_RDONLY|O_NOCTTY) = 4
+[pid  7040] write(2, "MARF[0xb7f10ae7]: File \'lib.h\' i"..., 51MARF[0xb7f10ae7]: File 'lib.h' in mode 0 from open
+) = 51
+[pid  7040] write(2, "LIst:\n", 6LIst:
+)      = 6
+[pid  7040] write(2, " File: lib.h\n", 13 File: lib.h
+) = 13
+[pid  7040] write(2, " File: main.c\n", 14 File: main.c
+) = 14
+[pid  7040] fstat64(4, {st_mode=S_IFREG|0664, st_size=19, ...}) = 0
+[pid  7040] read(4, "int libfunc(void);\n", 19) = 19
+[pid  7040] close(4)                    = 0
+[pid  7040] write(3, "\t.file\t\"main.c\"\n\t.text\n.globl ma"..., 358) = 358
+[pid  7040] close(3)                    = 0
+[pid  7040] munmap(0xb7f0b000, 4096)    = 0
+[pid  7040] write(2, "Write files.\n", 13Write files.
+) = 13
+[pid  7040] write(2, "\33[31mMARF[0xb7f10ae7]: Exit\33[0m\n", 32[31mMARF[0xb7f10ae7]: Exit[0m
+) = 32
+[pid  7040] exit_group(0)               = ?
+Process 7039 resumed
+Process 7040 detached
+<... waitpid resumed> [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 7040
+--- SIGCHLD (Child exited) @ 0 (0) ---
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/i686-pc-linux-gnu/4.1.2/as", 0xbfe10190) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/as", {st_mode=S_IFREG|0755, st_size=260912, ...}) = 0
+access("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/as", X_OK) = 0
+vfork(Process 7041 attached (waiting for parent)
+Process 7041 resumed (parent 7039 ready)
+)                                 = 7041
+[pid  7039] waitpid(7041, Process 7039 suspended
+ <unfinished ...>
+[pid  7041] execve("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/as", ["/usr/lib/gcc/i686-pc-linux-gnu/4"..., "-Qy"..., "-o"..., "main.o"..., "/tmp/ccmh2ewS.s"...], [/* 61 vars */]) = 0
+[pid  7041] brk(0)                      = 0x809d000
+[pid  7041] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7f54000
+[pid  7041] open("/home/mjs/tup/ldpreload/ldpreload.so", O_RDONLY) = 3
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\260\6\0\0004\0\0\0"..., 512) = 512
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0775, st_size=11854, ...}) = 0
+[pid  7041] mmap2(NULL, 12360, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7f50000
+[pid  7041] mmap2(0xb7f52000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7f52000
+[pid  7041] close(3)                    = 0
+[pid  7041] access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/i686/sse2/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/i686/sse2", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/i686/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/i686", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/sse2/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/sse2", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/tls", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/i686/sse2/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/i686/sse2", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/i686/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/i686", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/sse2/libopcodes-2.18.so", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] stat64("/usr/lib/binutils/i686-pc-linux-gnu/2.18/sse2", 0xbfe99464) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/libopcodes-2.18.so", O_RDONLY) = 3
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0@\234\0\0004\0\0\0"..., 512) = 512
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0755, st_size=192460, ...}) = 0
+[pid  7041] mmap2(NULL, 192148, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7f21000
+[pid  7041] mmap2(0xb7f34000, 114688, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x13) = 0xb7f34000
+[pid  7041] close(3)                    = 0
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/libbfd-2.18.so", O_RDONLY) = 3
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\220A\1\0004\0\0\0"..., 512) = 512
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0755, st_size=748584, ...}) = 0
+[pid  7041] mmap2(NULL, 768368, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7e65000
+[pid  7041] mmap2(0xb7f14000, 36864, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xae) = 0xb7f14000
+[pid  7041] mmap2(0xb7f1d000, 14704, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb7f1d000
+[pid  7041] close(3)                    = 0
+[pid  7041] open("/usr/lib/binutils/i686-pc-linux-gnu/2.18/libc.so.6", O_RDONLY) = -1 ENOENT (No such file or directory)
+[pid  7041] open("/etc/ld.so.cache", O_RDONLY) = 3
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0644, st_size=60316, ...}) = 0
+[pid  7041] mmap2(NULL, 60316, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7e56000
+[pid  7041] close(3)                    = 0
+[pid  7041] open("/lib/libc.so.6", O_RDONLY) = 3
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0@a\1\0004\0\0\0"..., 512) = 512
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0755, st_size=1237276, ...}) = 0
+[pid  7041] mmap2(NULL, 1242576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7d26000
+[pid  7041] mmap2(0xb7e50000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12a) = 0xb7e50000
+[pid  7041] mmap2(0xb7e53000, 9680, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb7e53000
+[pid  7041] close(3)                    = 0
+[pid  7041] open("/lib/libdl.so.2", O_RDONLY) = 3
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0p\n\0\0004\0\0\0"..., 512) = 512
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0755, st_size=9612, ...}) = 0
+[pid  7041] mmap2(NULL, 12412, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7d22000
+[pid  7041] mmap2(0xb7d24000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1) = 0xb7d24000
+[pid  7041] close(3)                    = 0
+[pid  7041] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7d21000
+[pid  7041] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7d20000
+[pid  7041] set_thread_area({entry_number:-1 -> 6, base_addr:0xb7d206c0, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+[pid  7041] mprotect(0xb7d24000, 4096, PROT_READ) = 0
+[pid  7041] mprotect(0xb7e50000, 8192, PROT_READ) = 0
+[pid  7041] mprotect(0xb7f52000, 4096, PROT_READ) = 0
+[pid  7041] mprotect(0xb7f70000, 4096, PROT_READ) = 0
+[pid  7041] munmap(0xb7e56000, 60316)   = 0
+[pid  7041] getpid()                    = 7041
+[pid  7041] write(2, "\33[31mMARF[0xb7f50ae7]: Init 7041"..., 37[31mMARF[0xb7f50ae7]: Init 7041[0m
+) = 37
+[pid  7041] getrusage(RUSAGE_SELF, {ru_utime={0, 0}, ru_stime={0, 1999}, ...}) = 0
+[pid  7041] brk(0)                      = 0x809d000
+[pid  7041] brk(0x80be000)              = 0x80be000
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7cdf000
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c9e000
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c5d000
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7c1c000
+[pid  7041] stat64("main.o", {st_mode=S_IFREG|0664, st_size=776, ...}) = 0
+[pid  7041] lstat64("main.o", {st_mode=S_IFREG|0664, st_size=776, ...}) = 0
+[pid  7041] unlink("main.o")            = 0
+[pid  7041] open("main.o", O_RDWR|O_CREAT|O_TRUNC|O_LARGEFILE, 0666) = 3
+[pid  7041] write(2, "MARF[0xb7f50ae7]: File \'main.o\' "..., 55MARF[0xb7f50ae7]: File 'main.o' in mode 1 from fopen64
+) = 55
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7bdb000
+[pid  7041] brk(0x80df000)              = 0x80df000
+[pid  7041] mmap2(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7b9a000
+[pid  7041] open("/tmp/ccmh2ewS.s", O_RDONLY) = 4
+[pid  7041] fstat64(4, {st_mode=S_IFREG|0600, st_size=358, ...}) = 0
+[pid  7041] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7e64000
+[pid  7041] read(4, "\t.file\t\"main.c\"\n\t.text\n.globl ma"..., 4096) = 358
+[pid  7041] read(4, "", 4096)           = 0
+[pid  7041] read(4, "", 4096)           = 0
+[pid  7041] read(4, "", 4096)           = 0
+[pid  7041] close(4)                    = 0
+[pid  7041] munmap(0xb7e64000, 4096)    = 0
+[pid  7041] fstat64(3, {st_mode=S_IFREG|0664, st_size=0, ...}) = 0
+[pid  7041] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7e64000
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "", 744)            = 0
+[pid  7041] _llseek(3, 744, [744], SEEK_CUR) = 0
+[pid  7041] write(3, "\0main.c\0main\0libfunc\0", 21) = 21
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 765
+[pid  7041] _llseek(3, -713, [52], SEEK_CUR) = 0
+[pid  7041] write(3, "\215L$\4\203\344\360\377q\374U\211\345Q\203\354\4\350\374\377\377\377\203\304\4Y]\215a\374\303", 31) = 31
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 765
+[pid  7041] _llseek(3, -681, [84], SEEK_CUR) = 0
+[pid  7041] write(3, "\0GCC: (GNU) 4.1.2 (Gentoo 4.1.2 "..., 40) = 40
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 765
+[pid  7041] _llseek(3, 3, [768], SEEK_CUR) = 0
+[pid  7041] write(3, "\22\0\0\0\2\10\0\0", 8) = 8
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 776
+[pid  7041] _llseek(3, -176, [600], SEEK_CUR) = 0
+[pid  7041] write(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1\0\0\0\0\0\0\0\0\0\0\0\4\0\361\377"..., 144) = 144
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 776
+[pid  7041] _llseek(3, -652, [124], SEEK_CUR) = 0
+[pid  7041] write(3, "\0.symtab\0.strtab\0.shstrtab\0.rel."..., 73) = 73
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] write(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0\3\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 52) = 52
+[pid  7041] _llseek(3, 0, [0], SEEK_SET) = 0
+[pid  7041] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0\3\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 776
+[pid  7041] _llseek(3, -576, [200], SEEK_CUR) = 0
+[pid  7041] write(3, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 400) = 400
+[pid  7041] close(3)                    = 0
+[pid  7041] munmap(0xb7e64000, 4096)    = 0
+[pid  7041] write(2, "Write files.\n", 13Write files.
+) = 13
+[pid  7041] write(2, "Write files: main.o.\n", 21Write files: main.o.
+) = 21
+[pid  7041] write(2, "\33[31mMARF[0xb7f50ae7]: Exit\33[0m\n", 32[31mMARF[0xb7f50ae7]: Exit[0m
+) = 32
+[pid  7041] exit_group(0)               = ?
+Process 7039 resumed
+Process 7041 detached
+<... waitpid resumed> [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0) = 7041
+--- SIGCHLD (Child exited) @ 0 (0) ---
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/collect2", {st_mode=S_IFREG|0755, st_size=100008, ...}) = 0
+access("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/collect2", X_OK) = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/libexec/gcc/i686-pc-linux-gnu/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/i686-pc-linux-gnu/4.1.2/.", 0xbfe101c0) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/bin/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/lib/i686-pc-linux-gnu/4.1.2/.", 0xbfe101c0) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../../i686-pc-linux-gnu/lib/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../i686-pc-linux-gnu/4.1.2/.", 0xbfe101e0) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/gcc/i686-pc-linux-gnu/4.1.2/../../../.", {st_mode=S_IFDIR|0755, st_size=53248, ...}) = 0
+stat64("/lib/i686-pc-linux-gnu/4.1.2/.", 0xbfe10210) = -1 ENOENT (No such file or directory)
+stat64("/lib/.", {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+stat64("/usr/lib/i686-pc-linux-gnu/4.1.2/.", 0xbfe10200) = -1 ENOENT (No such file or directory)
+stat64("/usr/lib/.", {st_mode=S_IFDIR|0755, st_size=53248, ...}) = 0
+stat64("/tmp/ccmh2ewS.s", {st_mode=S_IFREG|0600, st_size=358, ...}) = 0
+unlink("/tmp/ccmh2ewS.s")               = 0
+write(2, "Write files.\n", 13Write files.
+)          = 13
+write(2, "\33[31mMARF[0xb7f02ae7]: Exit\33[0m\n", 32[31mMARF[0xb7f02ae7]: Exit[0m
+) = 32
+exit_group(0)                           = ?
+Write files.
+[31mMARF[0xb7f79ae7]: Exit[0m

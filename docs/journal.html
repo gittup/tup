@@ -7,8 +7,12 @@
 <a href="proposal.html">Proposal</a><br>
 <a href="..">Main page</a><br>
 <h3>Milestones</h3>
+<h4>Complete:</h4>
 <ul>
-  <li>Monitor - 2008/02/01?</li>
+  <li>Monitor - 2008/02/03</li>
+</ul>
+<h4>Upcoming:</h4>
+<ul>
   <li>Dependency generator (modify gcc, LD_PRELOAD, or ...?) - 2008/02/15?
   <li>Reverse dependency file structure, Updater - 2008/03/15?</li>
   <li>Handle configuration files (eg: linux/.config) - 2008/04/01?</li>
@@ -24,6 +28,7 @@
 <h3>Weekly Status</h3>
 <ul>
   <li><b>Pre-Jan 20</b>: Investigated using <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> for the Monitor program. Initial results look promising, though there is a limit of 8192 watches that can be created. The number of watches is configurable by writing to a file in /proc, but the Monitor program won't know ahead of time whether or not this limit will be reached. For the initial implementation, 8192 will be sufficient for testing purposes (assuming 1 watch per directory). Currently the Monitor recursively watches a given directory, and displays file update notifications to the screen.</li>
+  <li><b>Jan 27</b>: Monitor program finalized. Some simple tests were run, such as creating new directories and files, then deleting and re-creating them. The Monitor program is able to catch all file and directory modifications. Also started to work on the reverse dependency generator using the LD_PRELOAD method. This method works by loading a shared library before the invocation of gcc to intercept gcc's own filesystem calls (eg: fopen(), open(), creat()) to determine which files are being read/written to. Currently the shared library displays the files being accessed to the screen, as well as the mode (read or write). An initial test compiling a dummy C file that included one header shows the .c and .h file being read, and the .o file being written. Files in /tmp and files that are non-existent are ignored. The next step is to write out reverse dependency information (and possibly regular dependencies, as well?) to the disk. The first attempt at writing out reverse dependency information will be to use filesystem links (symlinks?) in directories.</li>
 </ul>
 </body>
 </html>

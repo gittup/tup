@@ -1,13 +1,14 @@
+#define _LARGEFILE64_SOURCE
 #include <stdio.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <unistd.h>
 #define __USE_GNU
 #include <dlfcn.h>
 
-#define HANDLE_FILE(f, rw) handle_file(f, rw, __func__);
+#include "file.h"
 
-/* 'file' is the full filename, rw is 1 for write, 0 for read */
-static void handle_file(const char *file, int rw, const char *func);
+#define HANDLE_FILE(f, rw) handle_file(f, rw, __func__);
 
 int open(const char *pathname, int flags, ...)
 {
@@ -90,10 +91,23 @@ int creat(const char *pathname, mode_t mode)
 	return rc;
 }
 
-static void handle_file(const char *file, int rw, const char *func)
+int rename(const char *old, const char *new)
 {
-	if(strncmp(file, "/tmp/", 5) == 0) {
-		return;
-	}
-	fprintf(stderr, "MARF: File '%s' in mode %i from %s\n", file, rw, func);
+	int rc;
+	int (*s_rename)(const char*, const char*) = dlsym(RTLD_NEXT, "rename");
+
+	rc = s_rename(old, new);
+	if(rc == 0)
+		fprintf(stderr, "RENAMED %s to %s\n", old, new);
+	return rc;
+}
+
+int execve(const char *filename, char *const argv[], char *const envp[])
+{
+	int rc;
+	int (*s_execve)(const char *, char *const[], char *const[]) = dlsym(RTLD_NEXT, "execve");
+
+	fprintf(stderr, "EXECVE '%s'\n", filename);
+	rc = s_execve(filename, argv, envp);
+	return rc;
 }

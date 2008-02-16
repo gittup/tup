@@ -27,6 +27,7 @@
 
 static int isdir(const char *file);
 static int watch_path(int fd, const char *path, const char *file);
+static int events_same(struct inotify_event *a, struct inotify_event *b);
 
 int main(int argc, char **argv)
 {
@@ -56,14 +57,26 @@ int main(int argc, char **argv)
 	}
 
 	gettimeofday(&t2, NULL);
-	printf("Initialized in %f seconds.\n", (double)(t2.tv_sec - t1.tv_sec) +
-	       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+	fprintf(stderr, "Initialized in %f seconds.\n",
+		(double)(t2.tv_sec - t1.tv_sec) +
+		(double)(t2.tv_usec - t1.tv_usec)/1e6);
 
 	while((x = read(fd, buf, sizeof(buf))) > 0) {
 		int offset = 0;
+		struct inotify_event last;
 
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
+
+			/* Remove duplicate events (ie: for a program writing
+			 * to a file, the IN_MODIFY event will be received
+			 * multiple times).
+			 */
+			if(events_same(&last, e) == 0)
+				goto next_event;
+
+			memcpy(&last, e, sizeof(*e) + e->len);
+
 			if(e->len > 0) {
 				printf("%08x:%s%s\n", e->mask,
 				       dircache_lookup(e->wd), e->name);
@@ -75,10 +88,11 @@ int main(int argc, char **argv)
 				if(e->mask & IN_CREATE)
 					watch_path(fd, dircache_lookup(e->wd),
 						   e->name);
-				else if(e->mask & IN_DELETE) {
-					dircache_del(e->wd);
-				}
 			}
+			if(e->mask & IN_IGNORED) {
+				dircache_del(e->wd);
+			}
+next_event:
 			offset += sizeof(*e) + e->len;
 		}
 	}
@@ -117,7 +131,6 @@ static int watch_path(int fd, const char *path, const char *file)
 	strcat(fullpath, "/");
 
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
-/*	printf("Add watch: %s\n", fullpath);*/
 	wd = inotify_add_watch(fd, fullpath, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
@@ -131,4 +144,18 @@ static int watch_path(int fd, const char *path, const char *file)
 		watch_path(fd, fullpath, f.filename);
 	}
 	return 0;
+}
+
+static int events_same(struct inotify_event *a, struct inotify_event *b)
+{
+	if(a->wd == b->wd &&
+	   a->mask == b->mask &&
+	   a->len == b->len) {
+		if(a->len > 0) {
+			return strcmp(a->name, b->name);
+		}
+		return 0;
+	}
+
+	return -1;
 }
