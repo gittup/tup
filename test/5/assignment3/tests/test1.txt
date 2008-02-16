@@ -1,0 +1,82 @@
+int g()
+{
+	return 3;
+}
+
+void recursive(void)
+{
+	recursive();
+}
+
+void f()
+{
+}
+
+int h(int hobs, int narf);
+
+int main()
+{
+	int x, y[3];
+	if(x > g() && y[1] < 1) {
+		int y;
+		read(y);
+	}
+	f();
+	h(1, y[3]);
+	return 0;
+}
+
+int h(int hobs, int narf)
+{
+	int y[1];
+	return y[g() + hobs / narf];
+}
+
+void foo();
+int foo(void)
+{
+	return 7;
+}
+
+void voidfunc()
+{
+}
+
+void bar(int x);
+void bar(int x, int y)
+{
+	int z;
+	int z;
+	int x;
+	int arr[3];
+
+	while(x + y > 3) {
+		write(z);
+		if(x > 3) {
+			break;
+		} else {
+			continue;
+		}
+	}
+	if(y < 3) {
+		break;
+	} else {
+		continue;
+	}
+	arr[7] = 3;
+	x[y + arr] = 3;
+	funcnotdeclared();
+	x = x + voidfunc() + varnotdeclared + foo + arr;
+	y = y + voidfunc(1) + h(3);
+	return 3;
+}
+
+int badintfunc()
+{
+	return;
+}
+
+void bar(int x, int y)
+{
+	int z;
+}
