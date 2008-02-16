@@ -11,6 +11,7 @@
 #define __USE_GNU
 #include <dlfcn.h>
 #include "access_event.h"
+#include "debug.h"
 
 #define HANDLE_FILE(f, at) handle_file(f, at, __func__);
 
@@ -119,8 +120,8 @@ int rename(const char *old, const char *new)
 
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		fprintf(stderr, "tup-preload.so[%i]: RENAMED %s to %s\n",
-			getpid(), old, new);
+		DEBUGP("tup-preload.so[%i]: Renamed %s to %s\n",
+		       getpid(), old, new);
 		handle_rename_file(old, new);
 	}
 	return rc;
@@ -131,8 +132,8 @@ static void handle_file(const char *file, int at, const char *funcname)
 	if(ignore_file(file))
 		return;
 	pthread_mutex_lock(&lock);
-	fprintf(stderr, "tup-preload.so[%i]: Send file '%s' mode %i from func %s\n",
-		getpid(), file, at, funcname);
+	DEBUGP("tup-preload.so[%i]: Send file '%s' mode %i from func %s\n",
+	       getpid(), file, at, funcname);
 
 	send_event.at = at;
 	send_event.pid = 0;
@@ -180,10 +181,14 @@ static void ldpre_init(void)
 {
 	char *path;
 
-	path = getenv("tup_master");
+	if(getenv(TUP_DEBUG) != NULL) {
+		debug_enable("tup_ldpreload.so");
+	}
+
+	path = getenv(SERVER_NAME);
 	if(!path) {
-		fprintf(stderr, "tup.ldpreload: Unable to get 'tup_master' "
-			"path from the environment.\n");
+		fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
+			"path from the environment.\n", SERVER_NAME);
 		exit(1);
 	}
 	strncpy(addr.sun_path, path, sizeof(addr.sun_path));

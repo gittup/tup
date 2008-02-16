@@ -1,8 +1,8 @@
-srcs := $(wildcard src/*/*.c)
+srcs := $(wildcard src/*/*.c) src/debug.c benchmark.c
 objs := $(srcs:.c=.o)
 deps := $(srcs:.c=.d)
 
-PROGS := monitor wrapper
+PROGS := monitor wrapper benchmark
 SHLIBS := ldpreload.so
 
 all: $(PROGS) $(SHLIBS)
@@ -13,14 +13,19 @@ wrapper: LDFLAGS := -lpthread
 ldpreload.so: CCFLAGS := -fpic
 ldpreload.so: LDFLAGS := -ldl
 
-wrapper: $(patsubst %.c,%.o,$(wildcard src/wrapper/*.c))
+# Explicitly set this, since it doesn't get picked up from the ldpreload.so
+# dependency
+src/debug.o: CCFLAGS := -fpic
+
+wrapper: $(patsubst %.c,%.o,$(wildcard src/wrapper/*.c)) src/debug.o
 monitor: $(patsubst %.c,%.o,$(wildcard src/monitor/*.c))
+benchmark: benchmark.o
 
 $(PROGS):
 	$Qecho "  LD      $@";\
 	gcc -o $@ $^ $(LDFLAGS)
 
-ldpreload.so: $(filter src/ldpreload/%,$(objs))
+ldpreload.so: $(filter src/ldpreload/%,$(objs)) src/debug.o
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 

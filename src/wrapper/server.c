@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include "access_event.h"
+#include "debug.h"
 #include "file.h"
 
 static int sd = -1;
@@ -50,7 +51,7 @@ int start_server(void)
 	setenv(SERVER_NAME, addr.sun_path, 1);
 	/* TODO: Permanent-ize this somehow? same directory as wrapper? */
 	setenv("LD_PRELOAD", "/home/mjs/tup/ldpreload.so", 1);
-	fprintf(stderr, "Started server '%s'\n", addr.sun_path);
+	DEBUGP("Started server '%s'\n", addr.sun_path);
 
 	return 0;
 }
@@ -59,7 +60,7 @@ void stop_server(void)
 {
 	if(sd != -1) {
 		enum access_type at = ACCESS_STOP_SERVER;
-		fprintf(stderr, "Stopping server '%s'\n", addr.sun_path);
+		DEBUGP("Stopping server '%s'\n", addr.sun_path);
 		/* TODO: ok to reuse sd here? */
 		sendto(sd, &at, sizeof(at), 0, (void*)&addr, sizeof(addr));
 		pthread_join(tid, NULL);

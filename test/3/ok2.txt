@@ -1,0 +1,110 @@
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.240s
+user    0m0.189s
+sys     0m0.048s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.242s
+user    0m0.172s
+sys     0m0.066s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.241s
+user    0m0.174s
+sys     0m0.063s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.239s
+user    0m0.178s
+sys     0m0.057s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.249s
+user    0m0.181s
+sys     0m0.060s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.243s
+user    0m0.182s
+sys     0m0.056s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.240s
+user    0m0.181s
+sys     0m0.055s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.238s
+user    0m0.176s
+sys     0m0.061s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.240s
+user    0m0.175s
+sys     0m0.061s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+gcc  -o prog/main.o -c prog/main.c -I.
+gcc  -o lib/lib.o -c lib/lib.c -I.
+ar cru lib/lib.a lib/lib.o
+gcc  -o prog/main prog/main.o lib/lib.a
+gcc  -o prog2/main.o -c prog2/main.c -I.
+gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.249s
+user    0m0.185s
+sys     0m0.059s
+

@@ -11,11 +11,14 @@ foreach $dir (@dirs) {
 	$dirbase = $dir;
 	$dirbase =~ s/\.\/(.*)\.tupd/\1/;
 	&add_file($dirbase);
-	@files = `ls $dir`;
+	@files = `find $dir -type f`;
 	foreach $file (@files) {
+		my ($tmp);
 		chomp($file);
-		&add_file($file);
-		print &dotify($file) . " -> " . &dotify($dirbase) . "\n";
+		$tmp = $file;
+		$tmp =~ s/$dir\///;
+		&add_file($tmp);
+		print &dotify($tmp) . " -> " . &dotify($dirbase) . "\n";
 	}
 }
 print "}\n";
@@ -35,6 +38,6 @@ sub dotify
 {
 	my ($tmp);
 	$tmp = $_[0];
-	$tmp =~ s/\./_/g;
+	$tmp =~ s#[./]#_#g;
 	return $tmp;
 }

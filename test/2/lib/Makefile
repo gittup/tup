@@ -1,8 +1,8 @@
 lib.a: lib.o
-	ar cru $@ $<
+	$(WRAPPER) ar cru $@ $<
 
 %.o: %.c
-	gcc -o $@ -c $<
+	$(WRAPPER) gcc -o $@ -c $<
 
 clean:
-	rm -f lib.o lib.a
+	rm -rf lib.o lib.a *.tupd

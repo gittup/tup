@@ -1,2 +1,6 @@
 add in test case projects, analysis of make/ant
 real-world times?
+
+speedups:
+	- in ldpreload, don't do sendto() in same thread as open? (eg: buffer accesses, send in a different thread so the main process can continue working? or would this allow for the main process to exit before the send thread gets to run? - maybe have a ring of 10 file names that can be allocated up front, and use a producer/consumer model)
+	- in mkdirhier, check backwards instead of forwards? as it is, if we make 1/2/3/4.txt and 1/2/3/5.txt, we always check 1/, 1/2/, 1/2/3/, then write the file - maybe more efficient to check if 1/2/3/ already exists, since it would in the second (and all future) files?

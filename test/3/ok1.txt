@@ -1,0 +1,111 @@
+in prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.266s
+user    0m0.189s
+sys     0m0.072s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.267s
+user    0m0.186s
+sys     0m0.072s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.273s
+user    0m0.188s
+sys     0m0.080s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.269s
+user    0m0.186s
+sys     0m0.079s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.270s
+user    0m0.192s
+sys     0m0.074s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.267s
+user    0m0.191s
+sys     0m0.072s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.292s
+user    0m0.196s
+sys     0m0.075s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.273s
+user    0m0.200s
+sys     0m0.067s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.268s
+user    0m0.194s
+sys     0m0.070s
+rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+/home/mjs/tup/wrapper gcc  -o prog/main.o -c prog/main.c -I.
+/home/mjs/tup/wrapper gcc  -o lib/lib.o -c lib/lib.c -I.
+/home/mjs/tup/wrapper ar cru lib/lib.a lib/lib.o
+/home/mjs/tup/wrapper gcc  -o prog/main prog/main.o lib/lib.a
+/home/mjs/tup/wrapper gcc  -o prog2/main.o -c prog2/main.c -I.
+/home/mjs/tup/wrapper gcc  -o prog2/main prog2/main.o lib/lib.a
+
+real    0m0.271s
+user    0m0.193s
+sys     0m0.071s
+
