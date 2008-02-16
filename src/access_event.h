@@ -2,6 +2,7 @@
 #define access_event_h
 
 #include <sys/param.h>
+#include <string.h>
 
 /** The environment variable used to pass the name of the UNIX socket server
  * to subprocesses.

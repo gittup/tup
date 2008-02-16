@@ -5,11 +5,11 @@ use strict;
 my (@dirs, @files, $dir, $dirbase, $file, %file_hash);
 
 print "digraph g {\n";
-@dirs = `find . -name "*.tupd" -type d`;
+@dirs = `find .tup -name "*.tupd" -type d`;
 foreach $dir (@dirs) {
 	chomp($dir);
 	$dirbase = $dir;
-	$dirbase =~ s/\.\/(.*)\.tupd/\1/;
+	$dirbase =~ s/\.tup\/(.*)\.tupd/\1/;
 	&add_file($dirbase);
 	@files = `find $dir -type f`;
 	foreach $file (@files) {

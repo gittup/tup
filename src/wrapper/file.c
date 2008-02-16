@@ -1,13 +1,10 @@
 #include "file.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include "access_event.h"
 #include "debug.h"
+#include "fsdep.h"
 #include "list.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 struct file_entry {
 	char *file;
@@ -19,10 +16,6 @@ static struct file_entry *new_entry(const struct access_event *event);
 static int handle_rename_to(const struct access_event *event);
 static int __handle_rename_to(struct file_entry *rfrom,
 			      const struct access_event *event);
-static int write_dep(const char *file, const char *depends_on);
-static int create_file(char *filename);
-static int mkdirhier(char *filename);
-static int __mkdirhier(char *dirname);
 
 static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
@@ -72,7 +65,7 @@ int write_files(void)
 	list_for_each_entry(w, &write_list, list) {
 		DEBUGP("Write deps for file: %s.\n", w->file);
 		list_for_each_entry(r, &read_list, list) {
-			if(write_dep(w->file, r->file) < 0)
+			if(write_fsdep(w->file, r->file) < 0)
 				return -1;
 		}
 	}
@@ -137,110 +130,6 @@ static int __handle_rename_to(struct file_entry *rfrom,
 			if(!fent->file)
 				return -1;
 			strcpy(fent->file, event->file);
-		}
-	}
-	return 0;
-}
-
-static int write_dep(const char *file, const char *depends_on)
-{
-	/* In make this would be written as:
-	 *  file: depends_on
-	 * eg:
-	 *  foo.o: foo.c
-	 */
-	static char tupd[MAXPATHLEN];
-
-	if(strcmp(file, depends_on) == 0) {
-		DEBUGP("File '%s' dependent on itself - ignoring.\n", file);
-		/* Ignore dependencies of a file on itself (ie: the file is
-		 * opened for both read and write).
-		 */
-		return 0;
-	}
-
-	if(snprintf(tupd, sizeof(tupd), "%s.tupd/%s", depends_on, file) >=
-	   (signed)sizeof(tupd)) {
-		fprintf(stderr, "Filename (%s.tupd/%s) too long\n",
-			depends_on, file);
-		return -1;
-	}
-
-	create_file(tupd);
-	return 0;
-}
-
-static int create_file(char *filename)
-{
-	struct stat buf;
-	int rc;
-	int fd;
-
-	DEBUGP("Create file: '%s'\n", filename);
-
-	/* Quick check to see if the file already exists. */
-	rc = stat(filename, &buf);
-	if(rc == 0) {
-		if(S_ISREG(buf.st_mode)) {
-			return 0;
-		} else {
-			fprintf(stderr, "Error: '%s' exists and is not a "
-				"regular file.\n", filename);
-			return -1;
-		}
-	}
-
-	if(mkdirhier(filename) < 0) {
-		return -1;
-	}
-
-	fd = creat(filename, 0666);
-	if(fd < 0) {
-		perror("creat");
-		return -1;
-	}
-	close(fd);
-	return 0;
-}
-
-static int mkdirhier(char *filename)
-{
-	int rc = 0;
-	char *slash;
-	char *tmp;
-
-	tmp = filename;
-	do {
-		slash = strchr(tmp, '/');
-		if(slash == NULL)
-			break;
-
-		tmp = slash+1;
-		*slash = 0;
-		rc = __mkdirhier(filename);
-		*slash = '/';
-	} while(rc == 0);
-
-	return rc;
-}
-
-static int __mkdirhier(char *dirname)
-{
-	int rc;
-	struct stat buf;
-
-	DEBUGP("Mkdirhier: '%s'\n", dirname);
-	rc = stat(dirname, &buf);
-	if(rc == 0) {
-		if(!S_ISDIR(buf.st_mode)) {
-			fprintf(stderr, "Error: '%s' is not a directory.\n",
-				dirname);
-			return -1;
-		}
-	} else {
-		if(mkdir(dirname, 0777) < 0) {
-			perror("mkdir");
-			return -1;
 		}
 	}
 	return 0;

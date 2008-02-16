@@ -15,6 +15,6 @@ lib/lib.a: lib/lib.o
 	$(WRAPPER) gcc $(CCFLAGS) -o $@ -c $< -I.
 
 clean:
-	rm -rf lib/lib.o lib/lib.a lib/*.tupd prog/main prog/main.o prog/*.tupd prog2/main prog2/main.o prog2/*.tupd
+	rm -rf .tup lib/lib.o lib/lib.a prog/main prog/main.o prog2/main prog2/main.o
 
 .PHONY: all clean
