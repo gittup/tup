@@ -1,0 +1,15 @@
+digraph g {
+	rankdir=LR;
+	maino [label="main.o"];
+	mainc [label="main.c"];
+	libo [label="lib.o" color="grey"];
+	libc [label="lib.c" color="grey"];
+	libh [label="lib.h" color="grey"];
+	liba [label="lib.a" color="grey"];
+	main -> maino [dir=back];
+	main -> liba [color="grey" dir=back];
+	maino -> mainc [dir=back];
+	maino -> libh [color="grey" dir=back];
+	libo -> {libc libh} [color="grey" dir=back];
+	liba -> libo [color="grey" dir=back];
+};
