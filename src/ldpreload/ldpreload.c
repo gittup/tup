@@ -12,9 +12,11 @@
 #include <dlfcn.h>
 #include "access_event.h"
 
-#define HANDLE_FILE(f, rw) handle_file(f, rw, __func__);
+#define HANDLE_FILE(f, at) handle_file(f, at, __func__);
 
-static void handle_file(const char *file, int rw, const char *funcname);
+static void handle_file(const char *file, int at, const char *funcname);
+static void handle_rename_file(const char *old, const char *new);
+static int ignore_file(const char *file);
 static void ldpre_init(void) __attribute__((constructor));
 static int sd;
 static struct sockaddr_un addr;
@@ -114,28 +116,64 @@ int rename(const char *old, const char *new)
 	int rc;
 	int (*s_rename)(const char*, const char*) = dlsym(RTLD_NEXT, "rename");
 
+
 	rc = s_rename(old, new);
-	if(rc == 0)
-		fprintf(stderr, "RENAMED %s to %s\n", old, new);
+	if(rc == 0) {
+		fprintf(stderr, "tup-preload.so[%i]: RENAMED %s to %s\n",
+			getpid(), old, new);
+		handle_rename_file(old, new);
+	}
 	return rc;
 }
 
-static void handle_file(const char *file, int rw, const char *funcname)
+static void handle_file(const char *file, int at, const char *funcname)
+{
+	if(ignore_file(file))
+		return;
+	pthread_mutex_lock(&lock);
+	fprintf(stderr, "tup-preload.so[%i]: Send file '%s' mode %i from func %s\n",
+		getpid(), file, at, funcname);
+
+	send_event.at = at;
+	send_event.pid = 0;
+	strcpy(send_event.file, file);
+	sendto(sd, &send_event, access_event_size(&send_event), 0,
+	       (void*)&addr, sizeof(addr));
+
+	pthread_mutex_unlock(&lock);
+}
+
+static void handle_rename_file(const char *old, const char *new)
+{
+	if(ignore_file(old) || ignore_file(new))
+		return;
+	pthread_mutex_lock(&lock);
+
+	send_event.at = ACCESS_RENAME_FROM;
+	send_event.pid = getpid();
+	strcpy(send_event.file, old);
+	sendto(sd, &send_event, access_event_size(&send_event), 0,
+	       (void*)&addr, sizeof(addr));
+
+	send_event.at = ACCESS_RENAME_TO;
+	send_event.pid = getpid();
+	strcpy(send_event.file, new);
+	sendto(sd, &send_event, access_event_size(&send_event), 0,
+	       (void*)&addr, sizeof(addr));
+
+	pthread_mutex_unlock(&lock);
+}
+
+static int ignore_file(const char *file)
 {
 	if(strncmp(file, "/tmp/", 5) == 0) {
-		return;
+		return 1;
 	}
-	pthread_mutex_lock(&lock);
-	fprintf(stderr, "MARF: Received file '%s' mode %i from %s\n",
-		file, rw, funcname);
-
-	send_event.rw = rw;
-	strcpy(send_event.filename, file);
-
-	/* TODO: Fix size calculation? */
-	sendto(sd, &send_event, sizeof(send_event.rw) + strlen(file) + 1, 0,
-	       (void*)&addr, sizeof(addr));
-	pthread_mutex_unlock(&lock);
+	if(file[0] == '/') {
+		/* TODO always ignore global file? */
+		return 1;
+	}
+	return 0;
 }
 
 static void ldpre_init(void)

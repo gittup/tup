@@ -2,8 +2,8 @@
 #define file_h
 
 struct access_event;
-void handle_file(const struct access_event *event);
-void write_files(void);
+int handle_file(const struct access_event *event);
+int write_files(void);
 
 #define SERVER_NAME "tup_master"
 

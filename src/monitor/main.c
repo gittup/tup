@@ -19,11 +19,10 @@
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/param.h>
 #include <unistd.h>
 #include "dircache.h"
 #include "flist.h"
-
-#define MAXPATHLEN 1024
 
 static int isdir(const char *file);
 static int watch_path(int fd, const char *path, const char *file);
@@ -120,7 +119,7 @@ static int watch_path(int fd, const char *path, const char *file)
 	int wd;
 	uint32_t mask;
 	struct flist f;
-	char fullpath[MAXPATHLEN];
+	static char fullpath[MAXPATHLEN];
 
 	/* TODO: crappy strings */
 	strcpy(fullpath, path);

@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include "server.h"
+#include "file.h"
 
 int main(int argc, char **argv)
 {
@@ -20,6 +21,7 @@ int main(int argc, char **argv)
 	}
 	wait(NULL);
 	stop_server();
+	write_files();
 
 	return 0;
 }

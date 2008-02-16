@@ -23,12 +23,110 @@
 <ul>
   <li>Reverse dependency files contain filenames dependent on the file in question. (eg: foo.hd contains the string "foo.c" if foo.c includes foo.h). When building foo.c, need to update foo.hd to make sure it contains one instance of "foo.c". Similarly, if foo.c is deleted, need to make sure "foo.c" is removed from foo.hd. Essentially need some sort of hash table that works efficiently in files (using open/read/write/seek).
     <ul><li>Alternative - make foo.hd a directory, and put a link to foo.c in the directory?</li></ul>
+    <ul><li><b>Feb 10 update</b>: The directory alternative seems to work quite well so far, with the added benefit that it is very easy to see the dependency 'database'. Still remains to be seen if it will work well with multiple sub-directories.</li></ul>
   <li>During compilation, need to update reverse dependency files of all included files. For a file that includes a large number of headers, this implies a large number of writes. How much does this adversely affect compilation?</li>
 </ul>
 <h3>Weekly Status</h3>
 <ul>
   <li><b>Pre-Jan 20</b>: Investigated using <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> for the Monitor program. Initial results look promising, though there is a limit of 8192 watches that can be created. The number of watches is configurable by writing to a file in /proc, but the Monitor program won't know ahead of time whether or not this limit will be reached. For the initial implementation, 8192 will be sufficient for testing purposes (assuming 1 watch per directory). Currently the Monitor recursively watches a given directory, and displays file update notifications to the screen.</li>
-  <li><b>Jan 27</b>: Monitor program finalized. Some simple tests were run, such as creating new directories and files, then deleting and re-creating them. The Monitor program is able to catch all file and directory modifications. Also started to work on the reverse dependency generator using the LD_PRELOAD method. This method works by loading a shared library before the invocation of gcc to intercept gcc's own filesystem calls (eg: fopen(), open(), creat()) to determine which files are being read/written to. Currently the shared library displays the files being accessed to the screen, as well as the mode (read or write). An initial test compiling a dummy C file that included one header shows the .c and .h file being read, and the .o file being written. Files in /tmp and files that are non-existent are ignored. The next step is to write out reverse dependency information (and possibly regular dependencies, as well?) to the disk. The first attempt at writing out reverse dependency information will be to use filesystem links (symlinks?) in directories.</li>
+  <br>
+  <li><b>Jan 27 - Feb 2</b>: Monitor program finalized. Some simple tests were run, such as creating new directories and files, then deleting and re-creating them. The Monitor program is able to catch all file and directory modifications. Also started to work on the reverse dependency generator using the LD_PRELOAD method. This method works by loading a shared library before the invocation of gcc to intercept gcc's own filesystem calls (eg: fopen(), open(), creat()) to determine which files are being read/written to. Currently the shared library displays the files being accessed to the screen, as well as the mode (read or write). An initial test compiling a dummy C file that included one header shows the .c and .h file being read, and the .o file being written. Files in /tmp and files that are non-existent are ignored. The next step is to write out reverse dependency information (and possibly regular dependencies, as well?) to the disk. The first attempt at writing out reverse dependency information will be to use filesystem links (symlinks?) in directories.</li>
+  <br>
+  <li><b>Feb 3 - Feb 9</b>: Using the preloaded library to write out dependencies proved more difficult than initially anticipated after last weeks results. Last week I was testing by preloading the library and compiling a simple C file:
+  <pre>
+  #include "lib.h"
+
+  int main(void)
+  {
+     return libfunc();
+  }
+  </pre>
+  By preloading the library I got the following output:
+  <pre>
+  $ LD_PRELOAD=/home/mjs/tup/ldpreload.so gcc -c main.c
+  tup: Access file 'main.c' mode 0 from func open
+  tup: Access file 'lib.h' mode 0 from func open
+  tup: Access file 'main.o' mode 1 from func fopen64
+  </pre>
+  In theory at this point I could save the file accesses in a list, and then write out the reverse dependencies (eg: main.c and lib.h cause main.o to be updated). When I tried this, it seemed that the file accesses were going into separate lists. It turns out this is due to the fact that gcc spawns multiple sub-processes to handle the various tasks (pre-processing, compilation, and assembly). Each sub-process preloads its own version of the library, so the library is in fact initialized multiple times. This is evident after putting a constructor function in the library, and printing out the current PID with each file access:
+  <pre>
+  $ LD_PRELOAD=/home/mjs/tup/ldpreload.so gcc -c main.c
+  Library init.
+  Library init.
+  Library init.
+  tup[9162]: Access file 'main.c' mode 0 from func open
+  tup[9162]: Access file 'lib.h' mode 0 from func open
+  Library init.
+  tup[9163]: Access file 'main.o' mode 1 from func fopen64
+  </pre>
+  As you can see, the files are read in one process and written to in another. In order to accumulate all the files in one process to write out the dep files, it would seem ideal to have a server process of some kind, and then all other invocations of the preloaded library could send their file accesses to the server. Then when the server quits, it could write out all of the dependencies. This is a bit difficult to do with just LD_PRELOAD, since gcc's use of execv() causes the library's destructor functions to not be called in all cases. A much simpler approach is to use a wrapper program that can setup the server and the LD_PRELOAD environment, call gcc, and then on shutdown write out the dependencies. The wrapper program output for the same example looks as follows:
+  <pre>
+  $ /home/mjs/tup/wrapper gcc -c main.c
+  Started server '/tmp/tup-19142'
+  tup-preload.so[19145]: Send file 'main.c' mode 0 from func open
+  tup-server[19142]: Received file 'main.c' in mode 0
+  tup-preload.so[19145]: Send file 'lib.h' mode 0 from func open
+  tup-server[19142]: Received file 'lib.h' in mode 0
+  tup-preload.so[19146]: Send file 'main.o' mode 1 from func fopen64
+  tup-server[19142]: Received file 'main.o' in mode 1
+  Stopping server '/tmp/tup-19142'
+  </pre>
+  Now even though the files are read in one process (19145) and written to in another (19146), they are all sent through the socket to the main wrapper process (19142) and accumulated in a list.</li>
+  <br>
+  <li><b>Feb 10 - Feb 16</b>: There are still a few more tricks involved in getting the dependency information out. I extended the test case to include a lib.c file which also includes lib.h. This file is compiled and then archived into lib.a, and then both lib.a and main.o are built into the main executable (this is the same example from my <a href="proposal.html">proposal</a>). After the first run of using the list of files in the wrapper program to generate symlinks for dependencies, I ended up with the following file structure (and corresponding depgraph that was generated from a perl script):
+  <p><table border=1><tr>
+  <td><pre>
+  $ ls *.tupd
+  lib.a.tupd:
+  lib.a  main  stdKBDfV
+
+  lib.c.tupd:
+  lib.o
+
+  lib.h.tupd:
+  lib.o  main.o
+
+  lib.o.tupd:
+  lib.a  stdKBDfV
+
+  main.c.tupd:
+  main.o
+
+  main.o.tupd:
+  main
+
+  main.tupd:
+  main
+  </pre></td>
+  <td><img src="depgraph-1.png"></td>
+  </tr></table></p>
+  <p>There are a few obvious issues - first, some files are both read and written to in certain cases (such as linking) which causes files to be dependent on themselves (eg: 'main'). Further, even though the preloaded library ignores files in /tmp, there are still some temporary files created in the current directory by certain programs (in this case, 'ar'). Getting rid of the links for files dependent on themselves was a trivial strcmp(), but the temporary file issue was more difficult.</p>
+  <p>What happens is 'ar' will write to the temporary file, and then issue a <em>rename()</em> call to move it to its final location (here, lib.a). Ideally the dependencies would be represented on disk without the intermediate temporary file. In other words, the process [read lib.o, write stdKBDfV, rename stdKBDfV to lib.a] should look the same as [read lib.o, write lib.a]. This is accomplished in the wrapper program handling rename events. The rename() libc call is wrapped by the preloader, similar to open() and fopen(). Instead of sending a single file event to the server, however, two file events are sent. This instructs the wrapper server to rename any existing files in its list to the new name. Then when the files are written out, all traces of the temporary file are gone. After these fixes, the following file structure and graph are obtained:</p>
+  <p><table border=1><tr>
+  <td><pre>
+  $ ls *.tupd
+  lib.a.tupd:
+  main
+
+  lib.c.tupd:
+  lib.o
+
+  lib.h.tupd:
+  lib.o  main.o
+
+  lib.o.tupd:
+  lib.a
+
+  main.c.tupd:
+  main.o
+
+  main.o.tupd:
+  main
+  </pre></td>
+  <td><img src="depgraph-2.png"></td>
+  </tr></table></p>
+  <p>Note that although this graph is what we would expect to get if we were using standard gcc/make dependencies, they are in fact written in the opposite order, wherein the output file is listed in the input file's dependency directory. So if 'main.c' is changed, we can easily look in main.c.tupd to see that main.o needs to be updated. Similarly, we can look in main.o.tupd and see that main needs to be re-linked. No mention of any lib.* files are made in these directories, so they could be ignored in this case.</p>
+
 </ul>
 </body>
 </html>
