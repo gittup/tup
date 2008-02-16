@@ -1,0 +1,52 @@
+# Screen dump from when I was typing around. I thought of making a distro
+# called "Teh Uber Linux", then tup followed
+  INSTALL sound/core/snd-pcm.ko
+  INSTALL sound/core/snd-rawmidi.ko
+  INSTALL sound/core/snd-rtctimer.ko
+  INSTALL sound/core/snd-timer.ko
+  INSTALL sound/core/snd.ko
+  INSTALL sound/pci/ac97/snd-ac97-codec.ko
+  INSTALL sound/pci/ca0106/snd-ca0106.ko
+  INSTALL sound/pci/emu10k1/snd-emu10k1-synth.ko
+  INSTALL sound/pci/emu10k1/snd-emu10k1.ko
+  INSTALL sound/pci/emu10k1/snd-emu10k1x.ko
+  INSTALL sound/pci/hda/snd-hda-intel.ko
+  INSTALL sound/synth/emux/snd-emux-synth.ko
+  INSTALL sound/synth/snd-util-mem.ko
+if [ -r System.map -a -x /sbin/depmod ]; then /sbin/depmod -ae -F System.map  2.6.22-gentoo-r9; fi
+[root@captainfalcon linux-2.6.22-gentoo-r9]# ls
+COPYING        Makefile        arch     include  mm           sound
+CREDITS        Module.symvers  block    init     net          usr
+Documentation  README          crypto   ipc      patches.txt  vmlinux
+Kbuild         REPORTING-BUGS  drivers  kernel   scripts
+MAINTAINERS    System.map      fs       lib      security
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tul
+bash: tul: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tul
+bash: tul: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tutp
+bash: tutp: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# tup
+bash: tup: command not found
+[root@captainfalcon linux-2.6.22-gentoo-r9]# 
+

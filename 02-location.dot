@@ -1,0 +1,14 @@
+digraph g {
+	rankdir=LR;
+	shape=box;
+	maino [label="main.o"];
+	mainc [label="main.c"];
+	libo [label="lib.o"];
+	libc [label="lib.c"];
+	libh [label="lib.h"];
+	liba [label="lib.a"];
+	main -> {maino liba} [color="red" label="main/Makefile"];
+	maino -> {mainc libh} [color="blue" label="main/main.d"];
+	libo -> {libc libh} [color="green" label="lib/lib.d"];
+	liba -> libo [color="#FF33FF" label="lib/Makefile"];
+};

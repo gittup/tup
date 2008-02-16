@@ -1,0 +1,26 @@
+digraph g {
+	rankdir=LR;
+	shape=box;
+	maino [label="main.o"];
+	mainc [label="main.c"];
+	libo [label="lib.o"];
+	libc [label="lib.c"];
+	libh [label="lib.h"];
+	liba [label="lib.a"];
+	main -> {maino liba} [color="red" label="main/Makefile"];
+	maino -> {mainc libh} [color="blue" label="main/main.d"];
+	libo -> {libc libh} [color="green" label="lib/lib.d"];
+	liba -> libo [color="#FF33FF" label="lib/Makefile"];
+
+	all -> main [label="main/Makefile" color="red"];
+	all -> exe1 [label="exe1/Makefile" color="#BBBB33"];
+	all -> exe2 [label="exe2/Makefile"];
+	all -> dotdot [label=".../Makefile"];
+	all -> exeN [label="exeN/Makefile"];
+	exe1o [label="exe1.o"];
+	exe1c [label="exe1.c"];
+	dotdot [label="..."];
+	barh [label="bar.h"];
+	exe1 -> {exe1o liba} [color="#BBBB33" label="exe1/Makefile"];
+	exe1o -> {exe1c barh libh} [color="#BB8866" label="exe1/exe1.d"];
+};

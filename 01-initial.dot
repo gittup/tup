@@ -1,0 +1,13 @@
+digraph g {
+	rankdir=LR;
+	maino [label="main.o"];
+	mainc [label="main.c"];
+	libo [label="lib.o"];
+	libc [label="lib.c"];
+	libh [label="lib.h"];
+	liba [label="lib.a"];
+	main -> {maino liba}
+	maino -> {mainc libh}
+	libo -> {libc libh}
+	liba -> libo;
+};
