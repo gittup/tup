@@ -19,6 +19,11 @@ int write_sha1dep(const char *file, const char *depends_on)
 	int rc;
 	char depfilename[] = ".tup/" SHA1_X "/" SHA1_X;
 
+	if(file[0] && file[1] && memcmp(file, "./", 2) == 0)
+		file += 2;
+	if(depends_on[0] && depends_on[1] && memcmp(depends_on, "./", 2) == 0)
+		depends_on += 2;
+
 	if(test_and_set_index(file) < 0)
 		return -1;
 	if(test_and_set_index(depends_on) < 0)
