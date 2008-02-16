@@ -1,0 +1,29 @@
+<html>
+<head>
+<title>CS798 - Journal</title>
+</head>
+<body>
+<h2>CS798 - Journal</h2>
+<a href="proposal.html">Proposal</a><br>
+<a href="..">Main page</a><br>
+<h3>Milestones</h3>
+<ul>
+  <li>Monitor - 2008/02/01?</li>
+  <li>Dependency generator (modify gcc, LD_PRELOAD, or ...?) - 2008/02/15?
+  <li>Reverse dependency file structure, Updater - 2008/03/15?</li>
+  <li>Handle configuration files (eg: linux/.config) - 2008/04/01?</li>
+  <li>Build small linux system with real source packages - 2008/04/20?</li>
+  <li>Final presentation - 2008/04/30?</li>
+</ul>
+<h3>Current Issues</h3>
+<ul>
+  <li>Reverse dependency files contain filenames dependent on the file in question. (eg: foo.hd contains the string "foo.c" if foo.c includes foo.h). When building foo.c, need to update foo.hd to make sure it contains one instance of "foo.c". Similarly, if foo.c is deleted, need to make sure "foo.c" is removed from foo.hd. Essentially need some sort of hash table that works efficiently in files (using open/read/write/seek).
+    <ul><li>Alternative - make foo.hd a directory, and put a link to foo.c in the directory?</li></ul>
+  <li>During compilation, need to update reverse dependency files of all included files. For a file that includes a large number of headers, this implies a large number of writes. How much does this adversely affect compilation?</li>
+</ul>
+<h3>Weekly Status</h3>
+<ul>
+  <li><b>Pre-Jan 20</b>: Investigated using <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> for the Monitor program. Initial results look promising, though there is a limit of 8192 watches that can be created. The number of watches is configurable by writing to a file in /proc, but the Monitor program won't know ahead of time whether or not this limit will be reached. For the initial implementation, 8192 will be sufficient for testing purposes (assuming 1 watch per directory). Currently the Monitor recursively watches a given directory, and displays file update notifications to the screen.</li>
+</ul>
+</body>
+</html>

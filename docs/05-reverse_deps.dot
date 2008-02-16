@@ -1,0 +1,16 @@
+digraph g {
+	rankdir=LR;
+	shape=box;
+	maino [label="main.o"];
+	mainc [label="main.c"];
+	libo [label="lib.o"];
+	libc [label="lib.c"];
+	libh [label="lib.h"];
+	liba [label="lib.a"];
+	main -> maino [color="red" label="main/main.od" dir=back];
+	main -> liba [color="blue" label="lib/lib.ad" dir=back];
+	maino -> mainc [color="#BB8866" label="main/main.cd" dir=back];
+	{libo maino} -> libh [color="green" label="lib/lib.hd" dir=back];
+	libo -> libc [color="#33DDDD" label="lib/lib.cd" dir=back];
+	liba -> libo [color="#FF33FF" label="lib/lib.od" dir=back];
+};

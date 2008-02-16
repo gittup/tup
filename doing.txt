@@ -1,2 +1,0 @@
-emerge -uDpv --newuse world
-try to use truetype font in dot
