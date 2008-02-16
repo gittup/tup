@@ -1,14 +1,32 @@
 #define _LARGEFILE64_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 #define __USE_GNU
 #include <dlfcn.h>
-
-#include "file.h"
+#include "access_event.h"
 
 #define HANDLE_FILE(f, rw) handle_file(f, rw, __func__);
+
+static void handle_file(const char *file, int rw, const char *funcname);
+static void ldpre_init(void) __attribute__((constructor));
+static int sd;
+static struct sockaddr_un addr;
+
+/* Buffer used to send the file access data. It is a large buffer (since the
+ * paths can be MAXPATHLEN large), so we only create one of them and protect
+ * its use with the lock below.
+ */
+static struct access_event send_event;
+
+/* Lock protects use of the send_event buffer */
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 int open(const char *pathname, int flags, ...)
 {
@@ -102,12 +120,41 @@ int rename(const char *old, const char *new)
 	return rc;
 }
 
-int execve(const char *filename, char *const argv[], char *const envp[])
+static void handle_file(const char *file, int rw, const char *funcname)
 {
-	int rc;
-	int (*s_execve)(const char *, char *const[], char *const[]) = dlsym(RTLD_NEXT, "execve");
+	if(strncmp(file, "/tmp/", 5) == 0) {
+		return;
+	}
+	pthread_mutex_lock(&lock);
+	fprintf(stderr, "MARF: Received file '%s' mode %i from %s\n",
+		file, rw, funcname);
 
-	fprintf(stderr, "EXECVE '%s'\n", filename);
-	rc = s_execve(filename, argv, envp);
-	return rc;
+	send_event.rw = rw;
+	strcpy(send_event.filename, file);
+
+	/* TODO: Fix size calculation? */
+	sendto(sd, &send_event, sizeof(send_event.rw) + strlen(file) + 1, 0,
+	       (void*)&addr, sizeof(addr));
+	pthread_mutex_unlock(&lock);
+}
+
+static void ldpre_init(void)
+{
+	char *path;
+
+	path = getenv("tup_master");
+	if(!path) {
+		fprintf(stderr, "tup.ldpreload: Unable to get 'tup_master' "
+			"path from the environment.\n");
+		exit(1);
+	}
+	strncpy(addr.sun_path, path, sizeof(addr.sun_path));
+	addr.sun_path[sizeof(addr.sun_path) - 1] = 0;
+	addr.sun_family = AF_UNIX;
+
+	sd = socket(PF_UNIX, SOCK_DGRAM, 0);
+	if(sd < 0) {
+		perror("tup.ldpreload: socket");
+		exit(1);
+	}
 }
