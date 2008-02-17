@@ -11,6 +11,7 @@ int main(int argc, char **argv)
 {
 	int pid;
 	int arg_start = 1;
+	int status;
 
 	if(argc < 2) {
 		fprintf(stderr, "Usage: %s cmd [args]\n", argv[0]);
@@ -29,9 +30,13 @@ int main(int argc, char **argv)
 		perror("execlp");
 		return 1;
 	}
-	wait(NULL);
+	wait(&status);
 	stop_server();
 	write_files();
 
-	return 0;
+	if(WIFEXITED(status)) {
+		return WEXITSTATUS(status);
+	}
+	fprintf(stderr, "Program terminated abnormally (%i)\n", status);
+	return 1;
 }
