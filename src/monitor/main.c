@@ -14,7 +14,11 @@
         Step 5.  For any CREATE_SUBDIR event on bar, if a watch is
                  not yet created on bar, repeat step 1 on bar.
 #endif
+
+/* _GNU_SOURCE for asprintf */
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
 #include <sys/stat.h>
@@ -23,6 +27,7 @@
 #include <unistd.h>
 #include "dircache.h"
 #include "flist.h"
+#include "debug.h"
 
 static int isdir(const char *file);
 static int watch_path(int fd, const char *path, const char *file);
@@ -33,15 +38,22 @@ int main(int argc, char **argv)
 	int fd;
 	int x;
 	int rc = 0;
-	char buf[(sizeof(struct inotify_event) + 16) * 1024];
 	struct timeval t1, t2;
-	const char *path;
+	const char *path = NULL;
+	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
+	static char last[sizeof(struct inotify_event) + MAXPATHLEN];
 
-	if(argc < 2) {
-		fprintf(stderr, "Usage: %s path_to_watch\n", argv[0]);
+	for(x=1; x<argc; x++) {
+		if(strcmp(argv[x], "-d") == 0) {
+			debug_enable("monitor");
+		} else {
+			path = argv[x];
+		}
+	}
+	if(!path) {
+		fprintf(stderr, "Usage: %s [-d] path_to_watch\n", argv[0]);
 		return 1;
 	}
-	path = argv[1];
 
 	gettimeofday(&t1, NULL);
 	fd = inotify_init();
@@ -62,7 +74,6 @@ int main(int argc, char **argv)
 
 	while((x = read(fd, buf, sizeof(buf))) > 0) {
 		int offset = 0;
-		struct inotify_event last;
 
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
@@ -71,10 +82,16 @@ int main(int argc, char **argv)
 			 * to a file, the IN_MODIFY event will be received
 			 * multiple times).
 			 */
-			if(events_same(&last, e) == 0)
+			if(events_same((struct inotify_event*)last, e) == 0)
 				goto next_event;
 
-			memcpy(&last, e, sizeof(*e) + e->len);
+			if(sizeof(*e) + e->len < sizeof(last)) {
+				memcpy(last, e, sizeof(*e) + e->len);
+			} else {
+				fprintf(stderr, "Error: last event size is "
+					"to small.\n");
+				return -1;
+			}
 
 			if(e->len > 0) {
 				printf("%08x:%s%s\n", e->mask,
@@ -109,7 +126,6 @@ static int isdir(const char *file)
 			return 1;
 		return 0;
 	} else {
-		perror("stat");
 		return 0;
 	}
 }
@@ -117,23 +133,33 @@ static int isdir(const char *file)
 static int watch_path(int fd, const char *path, const char *file)
 {
 	int wd;
+	int rc = 0;
 	uint32_t mask;
 	struct flist f;
-	static char fullpath[MAXPATHLEN];
+	char *fullpath;
 
-	/* TODO: crappy strings */
-	strcpy(fullpath, path);
-	strcat(fullpath, file);
+	/* Skip our own directory */
+	if(strcmp(file, ".tup") == 0) {
+		return 0;
+	}
+
+	asprintf(&fullpath, "%s%s/", path, file);
+	if(!fullpath) {
+		perror("asprintf");
+		return -1;
+	}
 
 	if(!isdir(fullpath))
-		return 0;
-	strcat(fullpath, "/");
+		goto out_free;
+
+	DEBUGP("Add watch: '%s'\n", fullpath);
 
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(fd, fullpath, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
-		return -1;
+		rc = -1;
+		goto out_free;
 	}
 	dircache_add(wd, fullpath);
 	flist_foreach(&f, fullpath) {
@@ -142,7 +168,12 @@ static int watch_path(int fd, const char *path, const char *file)
 			continue;
 		watch_path(fd, fullpath, f.filename);
 	}
+	/* dircache assumes ownership of fullpath memory */
 	return 0;
+
+out_free:
+	free(fullpath);
+	return rc;
 }
 
 static int events_same(struct inotify_event *a, struct inotify_event *b)

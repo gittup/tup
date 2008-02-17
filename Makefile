@@ -19,7 +19,7 @@ ldpreload.so: LDFLAGS := -ldl
 $(BUILD)src/debug.o: CCFLAGS := -fpic
 
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) $(BUILD)src/debug.o $(BUILD)src/wrapper/mozilla-sha1/sha1.o
-monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c))
+monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) $(BUILD)src/debug.o
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 
 $(PROGS):

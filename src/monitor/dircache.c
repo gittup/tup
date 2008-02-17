@@ -1,4 +1,5 @@
 #include "dircache.h"
+#include "debug.h"
 #include "list.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,7 @@ struct dircache {
 
 static LIST_HEAD(dclist);
 
-void dircache_add(int wd, const char *path)
+void dircache_add(int wd, char *path)
 {
 	struct dircache *dc = malloc(sizeof *dc);
 	if(!dc) {
@@ -20,26 +21,23 @@ void dircache_add(int wd, const char *path)
 		return;
 	}
 
+	DEBUGP("add %i:'%s'\n", wd, path);
+
 	dc->wd = wd;
-	dc->path = malloc(strlen(path) + 1);
-	if(!dc->path) {
-		fprintf(stderr, "Out of memory.\n");
-		goto err_path;
-	}
-	strcpy(dc->path, path);
+	dc->path = path;
 	list_add(&dc->list, &dclist);
 	return;
-
-err_path:
-	free(dc);
 }
 
 void dircache_del(int wd)
 {
 	struct dircache *dc;
+	DEBUGP("del %i\n", wd);
 	list_for_each_entry(dc, &dclist, list) {
 		if(dc->wd == wd) {
 			list_del(&dc->list);
+			free(dc->path);
+			free(dc);
 			return;
 		}
 	}
@@ -48,7 +46,7 @@ void dircache_del(int wd)
 
 const char *dircache_lookup(int wd)
 {
-	/* TODO: Make efficient */
+	/* TODO: Make efficient: use same hash algorithm in wrapper? */
 	struct dircache *dc;
 	list_for_each_entry(dc, &dclist, list) {
 		if(dc->wd == wd)
