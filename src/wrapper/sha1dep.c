@@ -29,7 +29,7 @@ int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 		}
 	}
 
-	DEBUGP("Create dependency: %s\n", depfilename);
+	DEBUGP("create dependency: %s\n", depfilename);
 	mkdirhier(depfilename);
 
 	rc = creat(depfilename, 0666);

@@ -152,7 +152,7 @@ static int watch_path(const char *path, const char *file)
 		goto out_free;
 	}
 
-	DEBUGP("Add watch: '%s'\n", fullpath);
+	DEBUGP("add watch: '%s'\n", fullpath);
 
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, fullpath, mask);
@@ -178,7 +178,7 @@ out_free:
 
 static void handle_event(struct inotify_event *e)
 {
-	DEBUGP("Event: wd=%i, name='%s'\n", e->wd, e->name);
+	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
 	/* TODO: Handle MOVED_FROM/MOVED_TO events */
 	if(e->len > 0) {
@@ -224,7 +224,7 @@ static int create_tup_file(const char *file)
 
 	file = tupid_from_filename(tupfilename + 5, file);
 
-	DEBUGP("Create tup file '%s' containing '%s'.\n", tupfilename, file);
+	DEBUGP("create tup file '%s' containing '%s'.\n", tupfilename, file);
 	if(mkdirhier(tupfilename) < 0)
 		return -1;
         fd = open(tupfilename, O_RDONLY);

@@ -36,7 +36,7 @@ static int create_file(char *filename)
 	int rc;
 	int fd;
 
-	DEBUGP("Create file: '%s'\n", filename);
+	DEBUGP("create file: '%s'\n", filename);
 
 	/* Quick check to see if the file already exists. */
 	rc = stat(filename, &buf);

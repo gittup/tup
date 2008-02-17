@@ -51,7 +51,7 @@ int start_server(void)
 	setenv(SERVER_NAME, addr.sun_path, 1);
 	/* TODO: Permanent-ize this somehow? same directory as wrapper? */
 	setenv("LD_PRELOAD", "/home/marf/tup/ldpreload.so", 1);
-	DEBUGP("Started server '%s'\n", addr.sun_path);
+	DEBUGP("started server '%s'\n", addr.sun_path);
 
 	return 0;
 }
@@ -60,7 +60,7 @@ void stop_server(void)
 {
 	if(sd != -1) {
 		enum access_type at = ACCESS_STOP_SERVER;
-		DEBUGP("Stopping server '%s'\n", addr.sun_path);
+		DEBUGP("stopping server '%s'\n", addr.sun_path);
 		/* TODO: ok to reuse sd here? */
 		sendto(sd, &at, sizeof(at), 0, (void*)&addr, sizeof(addr));
 		pthread_join(tid, NULL);

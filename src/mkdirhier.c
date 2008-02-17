@@ -33,7 +33,7 @@ static int __mkdirhier(char *dirname)
 	int rc;
 	struct stat buf;
 
-	DEBUGP("Mkdirhier: '%s'\n", dirname);
+	DEBUGP("mkdirhier: '%s'\n", dirname);
 	rc = stat(dirname, &buf);
 	if(rc == 0) {
 		if(!S_ISDIR(buf.st_mode)) {
