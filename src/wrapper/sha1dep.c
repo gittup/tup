@@ -1,36 +1,30 @@
 #include "sha1dep.h"
 #include "mkdirhier.h"
-#include "tupid.h"
+#include "tup-compat.h"
+#include "debug.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 
 /** Enough space for the sha1 hash in ascii hex */
 #define SHA1_X "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
+/* TODO: Move to monitor */
+#if 0
 static int test_and_set_index(const char *file);
+#endif
 
-int write_sha1dep(const char *file, const char *depends_on)
+int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 {
 	struct stat buf;
 	int rc;
 	char depfilename[] = ".tup/" SHA1_X "/" SHA1_X;
 
-	if(file[0] && file[1] && memcmp(file, "./", 2) == 0)
-		file += 2;
-	if(depends_on[0] && depends_on[1] && memcmp(depends_on, "./", 2) == 0)
-		depends_on += 2;
-
-	if(test_and_set_index(file) < 0)
-		return -1;
-	if(test_and_set_index(depends_on) < 0)
-		return -1;
-
-	tupid_from_filename(depfilename + 5, depends_on);
-	tupid_from_filename(depfilename + 46, file);
+	memcpy(depfilename + 5, depends_on, sizeof(tupid_t));
+	memcpy(depfilename + 46, file, sizeof(tupid_t));
 
 	rc = stat(depfilename, &buf);
 	if(rc == 0) {
@@ -43,6 +37,9 @@ int write_sha1dep(const char *file, const char *depends_on)
 		}
 	}
 
+	DEBUGP("Create dependency: %s\n", depfilename);
+	mkdirhier(depfilename);
+
 	rc = creat(depfilename, 0666);
 	if(rc < 0) {
 		perror("creat");
@@ -52,13 +49,14 @@ int write_sha1dep(const char *file, const char *depends_on)
 	return 0;
 }
 
+#if 0
 static int test_and_set_index(const char *file)
 {
 	/* TODO: Not multi-process safe since multiple procs may try to read/
 	 * write to tup.name simultaneously? maybe write to tup.name.pid? or
 	 * put a lock in .tup/lock or somesuch?
 	 */
-	static char read_filename[MAXPATHLEN];
+	static char read_filename[PATH_MAX];
 	int fd;
 	int rc;
 	int len;
@@ -101,3 +99,4 @@ static int test_and_set_index(const char *file)
 	close(fd);
 	return 0;
 }
+#endif

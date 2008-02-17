@@ -5,9 +5,11 @@
 #define SHA1_HASH_SIZE 20
 
 /** Size of the tupid_t type, which is the sha1 hash written out in a hex
- * string (including nul-terminator)
+ * string.
+ *
+ * NOTE: Does *NOT* include nul-terminator. Careful when printing.
  */
-#define TUPID_SIZE SHA1_HASH_SIZE * 2 + 1
+#define TUPID_SIZE SHA1_HASH_SIZE * 2
 
 typedef char tupid_t[TUPID_SIZE];
 

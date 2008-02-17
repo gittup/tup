@@ -8,6 +8,9 @@ void tupid_from_filename(tupid_t tupid, const char *filename)
 	unsigned int x;
 	SHA_CTX ctx;
 
+	if(filename[0] && filename[1] && memcmp(filename, "./", 2) == 0)
+		filename += 2;
+
 	SHA1_Init(&ctx);
 	SHA1_Update(&ctx, filename, strlen(filename));
 	SHA1_Final(hash, &ctx);

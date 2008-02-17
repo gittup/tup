@@ -5,16 +5,17 @@
 #include "list.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct file_entry {
-	char *file;
+	tupid_t tupid;
 	int pid;
 	struct list_head list;
 };
 
 static struct file_entry *new_entry(const struct access_event *event);
 static int handle_rename_to(const struct access_event *event);
-static int __handle_rename_to(struct file_entry *rfrom,
+static int __handle_rename_to(struct file_entry *from,
 			      const struct access_event *event);
 
 static LIST_HEAD(read_list);
@@ -26,8 +27,8 @@ int handle_file(const struct access_event *event)
 	struct file_entry *fent;
 	int rc = 0;
 
-	DEBUGP("tup-server[%i]: Received file '%s' in mode %i\n",
-	       getpid(), event->file, event->at);
+	DEBUGP("received tupid '%.*s' in mode %i\n",
+	       sizeof(event->tupid), event->tupid, event->at);
 
 	if(event->at == ACCESS_RENAME_TO) {
 		return handle_rename_to(event);
@@ -63,14 +64,16 @@ int write_files(void)
 	struct file_entry *r;
 
 	list_for_each_entry(w, &write_list, list) {
-		DEBUGP("Write deps for file: %s.\n", w->file);
+		DEBUGP("Write deps for tupid: %.*s.\n",
+		       sizeof(w->tupid), w->tupid);
 		list_for_each_entry(r, &read_list, list) {
-			if(strcmp(w->file, r->file) == 0) {
-				DEBUGP("File '%s' dependent on itself - "
-				       "ignoring.\n", w->file);
+			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0) {
+				DEBUGP("tupid '%.*s' dependent on itself - "
+				       "ignoring.\n",
+				       sizeof(w->tupid), w->tupid);
 				continue;
 			}
-			if(write_sha1dep(w->file, r->file) < 0)
+			if(write_sha1dep(w->tupid, r->tupid) < 0)
 				return -1;
 		}
 	}
@@ -79,32 +82,26 @@ int write_files(void)
 
 static struct file_entry *new_entry(const struct access_event *event)
 {
-	struct file_entry *tmp;
+	struct file_entry *fent;
 
-	tmp = malloc(sizeof *tmp);
-	if(!tmp) {
+	fent = malloc(sizeof *fent);
+	if(!fent) {
 		perror("malloc");
 		return NULL;
 	}
 
-	tmp->file = malloc(strlen(event->file) + 1);
-	if(!tmp->file) {
-		perror("malloc");
-		free(tmp);
-		return NULL;
-	}
-	strcpy(tmp->file, event->file);
-	tmp->pid = event->pid;
-	return tmp;
+	memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
+	fent->pid = event->pid;
+	return fent;
 }
 
 static int handle_rename_to(const struct access_event *event)
 {
-	struct file_entry *rfrom;
+	struct file_entry *from;
 
-	list_for_each_entry(rfrom, &rename_list, list) {
-		if(rfrom->pid == event->pid) {
-			return __handle_rename_to(rfrom, event);
+	list_for_each_entry(from, &rename_list, list) {
+		if(from->pid == event->pid) {
+			return __handle_rename_to(from, event);
 		}
 	}
 	fprintf(stderr, "Error: ACCESS_RENAME_TO event corresponding to pid %i "
@@ -112,29 +109,21 @@ static int handle_rename_to(const struct access_event *event)
 	return -1;
 }
 
-static int __handle_rename_to(struct file_entry *rfrom,
+static int __handle_rename_to(struct file_entry *from,
 			      const struct access_event *event)
 {
 	struct file_entry *fent;
 
-	list_del(&rfrom->list);
+	list_del(&from->list);
 
 	list_for_each_entry(fent, &write_list, list) {
-		if(strcmp(fent->file, rfrom->file) == 0) {
-			free(fent->file);
-			fent->file = malloc(strlen(event->file) + 1);
-			if(!fent->file)
-				return -1;
-			strcpy(fent->file, event->file);
+		if(memcmp(fent->tupid, from->tupid, sizeof(fent->tupid)) == 0) {
+			memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
 		}
 	}
 	list_for_each_entry(fent, &read_list, list) {
-		if(strcmp(fent->file, rfrom->file) == 0) {
-			free(fent->file);
-			fent->file = malloc(strlen(event->file) + 1);
-			if(!fent->file)
-				return -1;
-			strcpy(fent->file, event->file);
+		if(memcmp(fent->tupid, from->tupid, sizeof(fent->tupid)) == 0) {
+			memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
 		}
 	}
 	return 0;

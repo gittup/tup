@@ -1,35 +1,28 @@
 #define _LARGEFILE64_SOURCE
+#define _GNU_SOURCE
+#include "access_event.h"
+#include "debug.h"
+#include "tupid.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <sys/un.h>
 #include <sys/socket.h>
-#define __USE_GNU
 #include <dlfcn.h>
-#include "access_event.h"
-#include "debug.h"
 
 #define HANDLE_FILE(f, at) handle_file(f, at, __func__);
 
-static void handle_file(const char *file, int at, const char *funcname);
+static void handle_file(const char *file, int at, const char *func);
 static void handle_rename_file(const char *old, const char *new);
 static int ignore_file(const char *file);
 static void ldpre_init(void) __attribute__((constructor));
 static int sd;
 static struct sockaddr_un addr;
-
-/* Buffer used to send the file access data. It is a large buffer (since the
- * paths can be MAXPATHLEN large), so we only create one of them and protect
- * its use with the lock below.
- */
-static struct access_event send_event;
-
-/* Lock protects use of the send_event buffer */
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static int my_pid;
 
 int open(const char *pathname, int flags, ...)
 {
@@ -120,8 +113,7 @@ int rename(const char *old, const char *new)
 
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		DEBUGP("tup-preload.so[%i]: Renamed %s to %s\n",
-		       getpid(), old, new);
+		DEBUGP("renamed %s to %s\n", old, new);
 		handle_rename_file(old, new);
 	}
 	return rc;
@@ -129,40 +121,25 @@ int rename(const char *old, const char *new)
 
 static void handle_file(const char *file, int at, const char *funcname)
 {
+	struct access_event event;
+
 	if(ignore_file(file))
 		return;
-	pthread_mutex_lock(&lock);
-	DEBUGP("tup-preload.so[%i]: Send file '%s' mode %i from func %s\n",
-	       getpid(), file, at, funcname);
+	DEBUGP("send file '%s' mode %i from func %s\n", file, at, funcname);
 
-	send_event.at = at;
-	send_event.pid = 0;
-	strcpy(send_event.file, file);
-	sendto(sd, &send_event, access_event_size(&send_event), 0,
-	       (void*)&addr, sizeof(addr));
-
-	pthread_mutex_unlock(&lock);
+	event.at = at;
+	event.pid = my_pid;
+	tupid_from_filename(event.tupid, file);
+	sendto(sd, &event, sizeof(event), 0, (void*)&addr, sizeof(addr));
 }
 
 static void handle_rename_file(const char *old, const char *new)
 {
 	if(ignore_file(old) || ignore_file(new))
 		return;
-	pthread_mutex_lock(&lock);
 
-	send_event.at = ACCESS_RENAME_FROM;
-	send_event.pid = getpid();
-	strcpy(send_event.file, old);
-	sendto(sd, &send_event, access_event_size(&send_event), 0,
-	       (void*)&addr, sizeof(addr));
-
-	send_event.at = ACCESS_RENAME_TO;
-	send_event.pid = getpid();
-	strcpy(send_event.file, new);
-	sendto(sd, &send_event, access_event_size(&send_event), 0,
-	       (void*)&addr, sizeof(addr));
-
-	pthread_mutex_unlock(&lock);
+	HANDLE_FILE(old, ACCESS_RENAME_FROM);
+	HANDLE_FILE(new, ACCESS_RENAME_TO);
 }
 
 static int ignore_file(const char *file)
@@ -181,6 +158,7 @@ static void ldpre_init(void)
 {
 	char *path;
 
+	my_pid = getpid();
 	if(getenv(TUP_DEBUG) != NULL) {
 		debug_enable("tup_ldpreload.so");
 	}

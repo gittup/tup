@@ -23,11 +23,11 @@
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/param.h>
 #include <unistd.h>
 #include "dircache.h"
 #include "flist.h"
 #include "debug.h"
+#include "tup-compat.h"
 
 static int isdir(const char *file);
 static int watch_path(int fd, const char *path, const char *file);
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 	struct timeval t1, t2;
 	const char *path = NULL;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
-	static char last[sizeof(struct inotify_event) + MAXPATHLEN];
+	static char last[sizeof(struct inotify_event) + PATH_MAX];
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {

@@ -73,7 +73,7 @@ void stop_server(void)
 
 static void *message_thread(void *arg)
 {
-	static struct access_event event;
+	struct access_event event;
 	int rc;
 	if(arg) {/* unused */}
 
