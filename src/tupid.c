@@ -2,7 +2,7 @@
 #include "mozilla-sha1/sha1.h"
 #include <string.h>
 
-void tupid_from_filename(tupid_t tupid, const char *filename)
+const char *tupid_from_filename(tupid_t tupid, const char *filename)
 {
 	unsigned char hash[SHA1_HASH_SIZE];
 	unsigned int x;
@@ -31,4 +31,5 @@ void tupid_from_filename(tupid_t tupid, const char *filename)
 		tupid[x<<1] = c1;
 		tupid[(x<<1) + 1] = c2;
 	}
+	return filename;
 }

@@ -43,6 +43,9 @@ static int __mkdirhier(char *dirname)
 		}
 	} else {
 		if(mkdir(dirname, 0777) < 0) {
+			/* TODO: Check EEXIST errno in case multiple processes
+			 * are trying to create the same dir at the same time?
+			 */
 			perror("mkdir");
 			return -1;
 		}

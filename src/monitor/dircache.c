@@ -11,6 +11,7 @@ struct dircache {
 	char *path;
 };
 
+static void dump_dircache(void);
 static LIST_HEAD(dclist);
 
 void dircache_add(int wd, char *path)
@@ -26,6 +27,8 @@ void dircache_add(int wd, char *path)
 	dc->wd = wd;
 	dc->path = path;
 	list_add(&dc->list, &dclist);
+
+	dump_dircache();
 	return;
 }
 
@@ -38,6 +41,7 @@ void dircache_del(int wd)
 			list_del(&dc->list);
 			free(dc->path);
 			free(dc);
+			dump_dircache();
 			return;
 		}
 	}
@@ -53,4 +57,15 @@ const char *dircache_lookup(int wd)
 			return dc->path;
 	}
 	return NULL;
+}
+
+static void dump_dircache(void)
+{
+	struct dircache *dc;
+
+	printf("Dircache:\n");
+	list_for_each_entry(dc, &dclist, list) {
+		printf("  %i: %s\n", dc->wd, dc->path);
+	}
+	printf("\n");
 }

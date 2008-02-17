@@ -20,8 +20,8 @@ $(BUILD)src/debug.o: CCFLAGS := -fpic
 $(BUILD)src/tupid.o: CCFLAGS := -fpic
 $(BUILD)src/mozilla-sha1/sha1.o: CCFLAGS := -fpic
 
-wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o
-monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o
+wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o $(BUILD)src/mkdirhier.o
+monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o $(BUILD)src/mkdirhier.o
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 
 $(PROGS):
