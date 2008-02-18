@@ -10,29 +10,33 @@
 <h4>Complete:</h4>
 <ul>
   <li>Monitor - 2008/02/03</li>
+  <li>Dependency generator (wrapper program and LD_PRELOAD library) 2008/02/13</li>
+  <li>Reverse dependency file structure (SHA1 hash directories) 2008/02/17</li>
 </ul>
 <h4>Upcoming:</h4>
 <ul>
-  <li>Dependency generator (modify gcc, LD_PRELOAD, or ...?) - 2008/02/15?
-  <li>Reverse dependency file structure, Updater - 2008/03/15?</li>
+  <li>Updater - 2008/03/15?</li>
   <li>Handle configuration files (eg: linux/.config) - 2008/04/01?</li>
   <li>Build small linux system with real source packages - 2008/04/20?</li>
-  <li>Final presentation - 2008/04/30?</li>
+  <li>Final presentation - 2008/04/30 - 10:30AM room 430A</li>
 </ul>
 <h3>Current Issues</h3>
 <ul>
   <li>Reverse dependency files contain filenames dependent on the file in question. (eg: foo.hd contains the string "foo.c" if foo.c includes foo.h). When building foo.c, need to update foo.hd to make sure it contains one instance of "foo.c". Similarly, if foo.c is deleted, need to make sure "foo.c" is removed from foo.hd. Essentially need some sort of hash table that works efficiently in files (using open/read/write/seek).
-    <ul><li>Alternative - make foo.hd a directory, and put a link to foo.c in the directory?</li></ul>
-    <ul><li><b>Feb 10 update</b>: The directory alternative seems to work quite well so far, with the added benefit that it is very easy to see the dependency 'database'. Still remains to be seen if it will work well with multiple sub-directories.</li></ul>
+    <ul>
+       <li>Alternative - make foo.hd a directory, and put a link to foo.c in the directory?</li>
+       <li><b>Feb 10 update</b>: The directory alternative seems to work quite well so far, with the added benefit that it is very easy to see the dependency 'database'. Still remains to be seen if it will work well with multiple sub-directories.</li>
+        <li><b>Feb 17 update</b>: With a multiple subdirectory test (eg: with all source files in various 7-layer subdirectories), performance seemed to suffer. However, the directory structure can be flattened by using the SHA1 hash of the filename to generate a unique token. This prevents the reverse-dependency file structure from duplicating the entire program file structure multiple times, so fewer directories need to be created. Some readability is lost in that the dependencies can't easily be determined by doing 'ls' or 'find', but some simple scripts can be used to divine this information instead by reading the 'name' files in each hash directory, which effectively point back to the original filename.</li>
+    </ul>
   <li>During compilation, need to update reverse dependency files of all included files. For a file that includes a large number of headers, this implies a large number of writes. How much does this adversely affect compilation?</li>
+  <li>Is there a way to prove (by induction?) that the updater will work on all graphs, given that it works for some sample graphs (eg: a diamond, a chain, etc).</li>
 </ul>
 <h3>Weekly Status</h3>
 <ul>
-  <li><b>Pre-Jan 20</b>: Investigated using <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> for the Monitor program. Initial results look promising, though there is a limit of 8192 watches that can be created. The number of watches is configurable by writing to a file in /proc, but the Monitor program won't know ahead of time whether or not this limit will be reached. For the initial implementation, 8192 will be sufficient for testing purposes (assuming 1 watch per directory). Currently the Monitor recursively watches a given directory, and displays file update notifications to the screen.</li>
-  <br>
-  <li><b>Jan 27 - Feb 2</b>: Monitor program finalized. Some simple tests were run, such as creating new directories and files, then deleting and re-creating them. The Monitor program is able to catch all file and directory modifications. Also started to work on the reverse dependency generator using the LD_PRELOAD method. This method works by loading a shared library before the invocation of gcc to intercept gcc's own filesystem calls (eg: fopen(), open(), creat()) to determine which files are being read/written to. Currently the shared library displays the files being accessed to the screen, as well as the mode (read or write). An initial test compiling a dummy C file that included one header shows the .c and .h file being read, and the .o file being written. Files in /tmp and files that are non-existent are ignored. The next step is to write out reverse dependency information (and possibly regular dependencies, as well?) to the disk. The first attempt at writing out reverse dependency information will be to use filesystem links (symlinks?) in directories.</li>
-  <br>
-  <li><b>Feb 3 - Feb 9</b>: Using the preloaded library to write out dependencies proved more difficult than initially anticipated after last weeks results. Last week I was testing by preloading the library and compiling a simple C file:
+  <li><b>Pre-Jan 20</b>: <p>Investigated using <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> for the Monitor program. Initial results look promising, though there is a limit of 8192 watches that can be created. The number of watches is configurable by writing to a file in /proc, but the Monitor program won't know ahead of time whether or not this limit will be reached. For the initial implementation, 8192 will be sufficient for testing purposes (assuming 1 watch per directory). Currently the Monitor recursively watches a given directory, and displays file update notifications to the screen.</p></li>
+
+  <li><b>Jan 27 - Feb 2</b>: <p>Monitor program finalized. Some simple tests were run, such as creating new directories and files, then deleting and re-creating them. The Monitor program is able to catch all file and directory modifications. Also started to work on the reverse dependency generator using the LD_PRELOAD method. This method works by loading a shared library before the invocation of gcc to intercept gcc's own filesystem calls (eg: fopen(), open(), creat()) to determine which files are being read/written to. Currently the shared library displays the files being accessed to the screen, as well as the mode (read or write). An initial test compiling a dummy C file that included one header shows the .c and .h file being read, and the .o file being written. Files in /tmp and files that are non-existent are ignored. The next step is to write out reverse dependency information (and possibly regular dependencies, as well?) to the disk. The first attempt at writing out reverse dependency information will be to use filesystem links (symlinks?) in directories.</p></li>
+  <li><b>Feb 3 - Feb 9</b>: <p>Using the preloaded library to write out dependencies proved more difficult than initially anticipated after last weeks results. Last week I was testing by preloading the library and compiling a simple C file:</p>
   <pre>
   #include "lib.h"
 
@@ -71,9 +75,9 @@
   tup-server[19142]: Received file 'main.o' in mode 1
   Stopping server '/tmp/tup-19142'
   </pre>
-  Now even though the files are read in one process (19145) and written to in another (19146), they are all sent through the socket to the main wrapper process (19142) and accumulated in a list.</li>
-  <br>
-  <li><b>Feb 10 - Feb 16</b>: There are still a few more tricks involved in getting the dependency information out. I extended the test case to include a lib.c file which also includes lib.h. This file is compiled and then archived into lib.a, and then both lib.a and main.o are built into the main executable (this is the same example from my <a href="proposal.html">proposal</a>). After the first run of using the list of files in the wrapper program to generate symlinks for dependencies, I ended up with the following file structure (and corresponding depgraph that was generated from a perl script):
+  <p>Now even though the files are read in one process (19145) and written to in another (19146), they are all sent through the socket to the main wrapper process (19142) and accumulated in a list.</p></li>
+
+  <li><b>Feb 10 - Feb 16</b>: <p>There are still a few more tricks involved in getting the dependency information out. I extended the test case to include a lib.c file which also includes lib.h. This file is compiled and then archived into lib.a, and then both lib.a and main.o are built into the main executable (this is the same example from my <a href="proposal.html">proposal</a>). After the first run of using the list of files in the wrapper program to generate symlinks for dependencies, I ended up with the following file structure (and corresponding depgraph that was generated from a perl script):</p>
   <p><table border=1><tr>
   <td><pre>
   $ ls *.tupd
@@ -126,6 +130,48 @@
   <td><img src="depgraph-2.png"></td>
   </tr></table></p>
   <p>Note that although this graph is what we would expect to get if we were using standard gcc/make dependencies, they are in fact written in the opposite order, wherein the output file is listed in the input file's dependency directory. So if 'main.c' is changed, we can easily look in main.c.tupd to see that main.o needs to be updated. Similarly, we can look in main.o.tupd and see that main needs to be re-linked. No mention of any lib.* files are made in these directories, so they could be ignored in this case.</p>
+
+  <li><b>Feb 17 - Feb 23</b>: <p>Per suggestion from Professor Lien, I constructed a test-case generator script that can generate random test cases. As input it takes the number of files to create, the number of headers the files should include, and the min/max directory hierarchy size. Currently all generated files are linked into a final executable (ie: there are no libraries here). One thing I tested with this script is the difference between having all files in a single directory, and all files in different directories that are 7 levels deep. Since the dependencies are stored using the paths of both objects, that means the dependency files would be 15 levels deep (1 extra for the filename itself). Using my benchmark program I compared the difference between using standard make with no dependency output and make using my wrapper program to generate dependencies. In each case there are 100.c files, each of which includes 7 other header files. I compared the amount of overhead in terms of execution time, as well as the disk space required. The execution time is measured by the factor increase over make without dependencies (so 1.05 means 5% extra time required).</p>
+  <table border=1>
+  <caption><i>Using the filenames to store dependencies vs. make with no dependency information.</i></caption>
+  <tr>
+     <td></td>
+     <td bgcolor="#bbffff"><b>Single Directory</b></td>
+     <td bgcolor="#bbffff"><b>7-Layers Deep</b></td>
+  </tr>
+  <tr>
+     <td bgcolor="#bbffff"><b>Factor</b></td>
+     <td>1.097951</td>
+     <td>1.293445</td>
+  </tr>
+  <tr>
+     <td bgcolor="#bbffff"><b>Disk blocks (du -sk)</b></td>
+     <td>1208</td>
+     <td>25004</td>
+  </tr>
+  </table>
+  <p>As you can see, the number of directories severely impacts the performance of the wrapper. This is because the wrapper program must create large directory hierarchies, many of which are essentially duplicates of each other. This takes a long time to stat() and mkdir() each level of the directory. Also, the large number of empty directories consumes a lot of disk space.</p>
+  <p>I recently started to use <a href="http://git.or.cz/">git</a> as a version control system for this project. Although I am still learning it, one of the things I found interesting is how it represents all kinds of objects (files, commits, etc) as SHA1 hashes in its database (which is also the filesystem). Using a similar approach here, instead of storing the dependency of a/b/foo.o on d/e/bar.h as ".tup/<font color="green"><b>d/e/bar.h</b></font>.tupd/<font color="blue"><b>a/b/foo.o</b></font>" I can take the SHA1 hash of the filenames to generate a unique ID for each file, and make that the directory. So here I would get ".tup/<font color="green"><b>4ebc353d14ff5a5bddd3fa79741ae7cc06719fd4</b></font>/<font color="blue"><b>0bc5dcc8490ad3f03010233ded74871358c9d349</b></font>". Although this is a bit more unreadable upon casual perusal (eg: using 'ls' or 'find'), it does have some nice properties. First, the depth of the dependency file tree is constant. Second, the objects in memory can easily be referenced by their 40-byte handle (20-byte SHA1 hash expanded as ASCII hex), instead of their filenames of arbitrary length (up to MAXPATHLEN, or 4096). This cuts down on the memory usage, since it is easier to allocate these objects on the stack. Using the same tests as before, I ran the benchmark program to determine the effect of using the SHA1 hash approach.</p>
+  <table border=1>
+  <caption><i>Using the SHA1-hash of the filename to store dependencies vs. make with no dependency information.</i></caption>
+  <tr>
+     <td></td>
+     <td bgcolor="#bbffff"><b>Single Directory</b></td>
+     <td bgcolor="#bbffff"><b>7-Layers Deep</b></td>
+  </tr>
+  <tr>
+     <td bgcolor="#bbffff"><b>Factor</b></td>
+     <td>1.116010</td>
+     <td>1.141484</td>
+  </tr>
+  <tr>
+     <td bgcolor="#bbffff"><b>Disk blocks (du -sk)</b></td>
+     <td>1216</td>
+     <td>1216</td>
+  </tr>
+  </table>
+  <p>Although in the single directory case we can see a slight degredation in performance as compared to the direct filename approach, it is apparent that the SHA1 approach offers more consistent behavior regardless of the file structure of the program. In particular, note that the filespace required is exactly the same in both cases (that is not a copy/paste error!) This is much more desirable than the 20-times increase in disk space required by the direct filename approach when using sub-directories.</p>
+  <p>Of course since the hash is a one-way algorithm, we need someway to get back from the hash name to the actual filename. In other words, convert the 0bc5d... name above into the filename "a/b/foo.o". This is currently done by creating a file called "name" in the corresponding 0bc5d... directory that contains the text "a/b/foo.o".</p>
 
 </ul>
 </body>

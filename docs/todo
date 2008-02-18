@@ -16,3 +16,21 @@ speedups:
 	include/dir/file.h
 	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/tup.name
 	path/to/prog/dir/file.c
+	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/tup.list
+	f9dcb764fea0f992af34b7ddb34a01363d6319b0
+	
+	- read in use tup.list (above) before writing out dependencies to remove old deps? eg: foreach wlist {
+		read wlist.tup.list
+			foreach wlist.tup.list {
+				if in rlist {
+					create link
+				} else {
+					remove link
+				}
+			}
+	}
+
+create_tup_file() won't work in subdirectory? (paste dircache_lookup.e->name instead of just e->name)
+ - use extra character in filename as newline?
+
+ change 'tup.name' to 'name' - also have 'cmd' and 'deps'?
