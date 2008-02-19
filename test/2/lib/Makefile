@@ -5,4 +5,4 @@ lib.a: lib.o
 	$(WRAPPER) gcc -o $@ -c $<
 
 clean:
-	rm -rf lib.o lib.a *.tupd
+	rm -rf lib.o lib.a .tup

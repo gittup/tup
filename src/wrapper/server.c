@@ -9,12 +9,16 @@
 #include "access_event.h"
 #include "debug.h"
 #include "file.h"
+#include "getexecwd.h"
+#include "tup-compat.h"
+
+static void *message_thread(void *arg);
+static void sighandler(int sig);
 
 static int sd = -1;
 static struct sockaddr_un addr;
 static pthread_t tid;
-static void *message_thread(void *arg);
-static void sighandler(int sig);
+static char ldpreload_path[PATH_MAX];
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
@@ -22,6 +26,13 @@ static struct sigaction sigact = {
 
 int start_server(void)
 {
+	if(snprintf(ldpreload_path, sizeof(ldpreload_path), "%s/ldpreload.so",
+		    getexecwd()) >= (signed)sizeof(ldpreload_path)) {
+		fprintf(stderr, "Error: path for ldpreload.so library is too "
+			"long.\n");
+		return -1;
+	}
+
 	sd = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if(sd < 0) {
 		perror("socket");
@@ -49,8 +60,7 @@ int start_server(void)
 	}
 
 	setenv(SERVER_NAME, addr.sun_path, 1);
-	/* TODO: Permanent-ize this somehow? same directory as wrapper? */
-	setenv("LD_PRELOAD", "/home/marf/tup/ldpreload.so", 1);
+	setenv("LD_PRELOAD", ldpreload_path, 1);
 	DEBUGP("started server '%s'\n", addr.sun_path);
 
 	return 0;

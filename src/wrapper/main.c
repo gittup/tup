@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include "server.h"
 #include "file.h"
+#include "getexecwd.h"
 #include "debug.h"
 
 int main(int argc, char **argv)
@@ -21,6 +22,12 @@ int main(int argc, char **argv)
 		setenv(TUP_DEBUG, "1", 1);
 		debug_enable("tup_wrapper");
 		arg_start++;
+	}
+
+	if(init_getexecwd(argv[0]) < 0) {
+		fprintf(stderr, "Error: Unable to determine wrapper program's "
+			"execution directory.\n");
+		return 1;
 	}
 
 	start_server();

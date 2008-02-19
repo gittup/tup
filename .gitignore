@@ -1,5 +1,5 @@
-benchmark
-build
-ldpreload.so
-monitor
-wrapper
+/benchmark
+/build
+/ldpreload.so
+/monitor
+/wrapper

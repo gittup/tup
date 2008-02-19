@@ -5,4 +5,4 @@ main: main.o ../lib/lib.a
 	$(WRAPPER) gcc -o $@ -c $< -I..
 
 clean:
-	rm -rf main.o main *.tupd
+	rm -rf main.o main .tup
