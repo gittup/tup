@@ -1,8 +1,7 @@
 #ifndef access_event_h
 #define access_event_h
 
-#include <sys/param.h>
-#include <string.h>
+#include "tupid.h"
 
 /** The environment variable used to pass the name of the UNIX socket server
  * to subprocesses.
@@ -18,9 +17,7 @@ enum access_type {
 };
 
 /** Structure sent across the unix socket to notify the main wrapper of any
- * file accesses. Note that not all of the bytes in the file array are sent -
- * only up to (and including) the nul terminator are sent. Any changes to this
- * structure should be reflected in the access_event_size() function below.
+ * file accesses.
  *
  * Also note that the wrapper server relies on only being able to send the
  * access_type set to ACCESS_STOP_SERVER and no additional data.
@@ -40,21 +37,10 @@ struct access_event {
 	 */
 	int pid;
 
-	/** The filename corresponding to the event. Not needed for the
+	/** The tupid corresponding to this event. Not needed for the
 	 * ACCESS_STOP_SERVER event.
 	 */
-	char file[MAXPATHLEN];
+	tupid_t tupid;
 };
-
-/** Calculate the size 'on the wire' of an access_event structure. The entire
- * 'file' field is not sent for efficiency purposes. Note this just calculates
- * the entire size of the structure except the 'file' field, and then adds in
- * the length of the file string including the nul-terminator.
- */
-static inline int access_event_size(struct access_event *e)
-{
-	return (sizeof(struct access_event) - sizeof(e->file)) +
-		strlen(e->file) + 1;
-}
 
 #endif

@@ -1,4 +1,4 @@
-WRAPPER := /home/marf/tup/wrapper
+WRAPPER := ../../wrapper
 all: prog
 prog: ; @$(WRAPPER) gcc -o $@ $^
 objs :=

@@ -59,7 +59,7 @@ for($x=0; $x<$num_files; $x++) {
 
 open MAKEFILE, ">Makefile" or die "Can't open Makefile for write\n";
 
-print MAKEFILE "WRAPPER := /home/marf/tup/wrapper\n";
+print MAKEFILE "WRAPPER := ../../wrapper\n";
 print MAKEFILE "all: prog\n";
 print MAKEFILE "prog: ; \@\$(WRAPPER) gcc -o \$@ \$^\n";
 print MAKEFILE "objs :=\n";

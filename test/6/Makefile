@@ -1,4 +1,4 @@
-WRAPPER := /home/marf/tup/wrapper
+WRAPPER := ../../wrapper
 
 CFLAGS ?= -O2 -pipe
 

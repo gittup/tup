@@ -33,7 +33,7 @@ static int __mkdirhier(char *dirname)
 	int rc;
 	struct stat buf;
 
-	DEBUGP("Mkdirhier: '%s'\n", dirname);
+	DEBUGP("mkdirhier: '%s'\n", dirname);
 	rc = stat(dirname, &buf);
 	if(rc == 0) {
 		if(!S_ISDIR(buf.st_mode)) {
@@ -43,6 +43,9 @@ static int __mkdirhier(char *dirname)
 		}
 	} else {
 		if(mkdir(dirname, 0777) < 0) {
+			/* TODO: Check EEXIST errno in case multiple processes
+			 * are trying to create the same dir at the same time?
+			 */
 			perror("mkdir");
 			return -1;
 		}

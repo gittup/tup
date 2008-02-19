@@ -1,4 +1,4 @@
-WRAPPER := /home/marf/tup/wrapper
+WRAPPER := ../../wrapper
 
 all: build/prog/main build/prog2/main
 

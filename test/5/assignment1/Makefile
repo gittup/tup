@@ -1,4 +1,4 @@
-WRAPPER := /home/mjs/tup/wrapper
+WRAPPER := ../../../wrapper
 
 a.out: lex.yy.c
 	$(WRAPPER) gcc $<

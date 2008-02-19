@@ -1,4 +1,4 @@
-WRAPPER := /home/marf/tup/wrapper
+WRAPPER := ../../wrapper
 main: main.o lib.a
 	$(WRAPPER) gcc -o $@ $< lib.a
 

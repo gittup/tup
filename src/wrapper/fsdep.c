@@ -1,11 +1,11 @@
 #include "fsdep.h"
 #include "mkdirhier.h"
 #include "debug.h"
+#include "tup-compat.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 
 static int create_file(char *filename);
@@ -17,7 +17,7 @@ int write_fsdep(const char *file, const char *depends_on)
 	 * eg:
 	 *  foo.o: foo.c
 	 */
-	static char tupd[MAXPATHLEN];
+	static char tupd[PATH_MAX];
 
 	if(snprintf(tupd, sizeof(tupd), ".tup/%s.tupd/%s", depends_on, file) >=
 	   (signed)sizeof(tupd)) {
@@ -36,7 +36,7 @@ static int create_file(char *filename)
 	int rc;
 	int fd;
 
-	DEBUGP("Create file: '%s'\n", filename);
+	DEBUGP("create file: '%s'\n", filename);
 
 	/* Quick check to see if the file already exists. */
 	rc = stat(filename, &buf);

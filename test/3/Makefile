@@ -1,4 +1,4 @@
-WRAPPER := /home/mjs/tup/wrapper
+WRAPPER := ../../wrapper
 
 all: prog/main prog2/main
 

@@ -1,4 +1,4 @@
-export WRAPPER = /home/mjs/tup/wrapper
+export WRAPPER = $(PWD)/../../wrapper
 
 all:
 	$(MAKE) -C lib &&\
