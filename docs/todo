@@ -12,9 +12,9 @@ speedups:
 	$ echo path/to/prog/dir/file.c | sha1sum
 	51bc59150b346cbb1e9f9b5c636ccb117976e09f  -
 	.tup/f9dcb764fea0f992af34b7ddb34a01363d6319b0/51bc59150b346cbb1e9f9b5c636ccb117976e09f
-	$ cat .tup/f9dcb764fea0f992af34b7ddb34a01363d6319b0/tup.name
+	$ cat .tup/f9dcb764fea0f992af34b7ddb34a01363d6319b0/name
 	include/dir/file.h
-	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/tup.name
+	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/name
 	path/to/prog/dir/file.c
 	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/tup.list
 	f9dcb764fea0f992af34b7ddb34a01363d6319b0
@@ -33,4 +33,8 @@ speedups:
 create_tup_file() won't work in subdirectory? (paste dircache_lookup.e->name instead of just e->name)
  - use extra character in filename as newline?
 
- change 'tup.name' to 'name' - also have 'cmd' and 'deps'?
+ in addition to name - also have 'cmd' and 'deps'?
+ hash command lines?
+
+only add created monitor files to the create list if 'name' doesn't already exist?
+

@@ -6,7 +6,7 @@ my (@files, $file, %name_hash, $from, $to);
 
 print "digraph g {\n";
 
-@files = `ls .tup/*/tup.name 2>/dev/null`;
+@files = `ls .tup/*/name 2>/dev/null`;
 foreach $file (@files) {
 	chomp($file);
 	$from = $file;

@@ -39,9 +39,11 @@ int main(int argc, char **argv)
 	}
 	wait(&status);
 	stop_server();
-	write_files();
 
 	if(WIFEXITED(status)) {
+		if(WEXITSTATUS(status) == 0) {
+			write_files();
+		}
 		return WEXITSTATUS(status);
 	}
 	fprintf(stderr, "Program terminated abnormally (%i)\n", status);

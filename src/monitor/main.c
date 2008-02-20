@@ -219,7 +219,7 @@ static int create_tup_file(const char *file)
 	int fd;
 	int rc;
 	int len;
-	char tupfilename[] = ".tup/" SHA1_X "/tup.name";
+	char tupfilename[] = ".tup/" SHA1_X "/name";
 	static char read_filename[PATH_MAX];
 
 	file = tupid_from_filename(tupfilename + 5, file);
