@@ -40,6 +40,8 @@ static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int events_same(struct inotify_event *a, struct inotify_event *b);
 static int create_tup_file(const char *file);
+static int create_tup_file2(const char *path, const char *file);
+static int write_all(int fd, const void *buf, int size, const char *filename);
 
 static int inot_fd;
 
@@ -192,7 +194,7 @@ static void handle_event(struct inotify_event *e)
 		if(e->mask & IN_ISDIR) {
 			watch_path(dircache_lookup(e->wd), e->name);
 		} else {
-			create_tup_file(e->name);
+			create_tup_file2(dircache_lookup(e->wd), e->name);
 		}
 	}
 	if(e->mask & IN_IGNORED) {
@@ -216,15 +218,21 @@ static int events_same(struct inotify_event *a, struct inotify_event *b)
 
 static int create_tup_file(const char *file)
 {
+	return create_tup_file2(file, "");
+}
+
+static int create_tup_file2(const char *path, const char *file)
+{
 	int fd;
-	int rc;
+	int rc = -1;
 	int len;
 	char tupfilename[] = ".tup/" SHA1_X "/name";
 	static char read_filename[PATH_MAX];
 
-	file = tupid_from_filename(tupfilename + 5, file);
+	path = tupid_from_path_filename(tupfilename + 5, path, file);
 
-	DEBUGP("create tup file '%s' containing '%s'.\n", tupfilename, file);
+	DEBUGP("create tup file '%s' containing '%s%s'.\n",
+	       tupfilename, path, file);
 	if(mkdirhier(tupfilename) < 0)
 		return -1;
         fd = open(tupfilename, O_RDONLY);
@@ -234,30 +242,46 @@ static int create_tup_file(const char *file)
                         perror("open");
                         return -1;
                 }
-                len = strlen(file);
-                rc = write(fd, file, len);
-                if(rc < 0) {
-                        perror("write");
-                        return -1;
-                }
-                if(rc != len) {
-                        fprintf(stderr, "Unable to write all %i bytes to %s.\n",
-                                len, tupfilename);
-                }
+		if(write_all(fd, path, strlen(path), tupfilename) < 0)
+			goto err_out;
+		if(write_all(fd, file, strlen(file), tupfilename) < 0)
+			goto err_out;
         } else {
-                rc = read(fd, read_filename, sizeof(read_filename) - 1);
-                if(rc < 0) {
+		int pathlen = strlen(path);
+
+                len = read(fd, read_filename, sizeof(read_filename) - 1);
+                if(len < 0) {
                         perror("read");
-                        return -1;
+			goto err_out;
                 }
-                read_filename[rc] = 0;
-                if(strcmp(read_filename, file) != 0) {
+                read_filename[len] = 0;
+
+		if(memcmp(read_filename, path, pathlen) != 0 ||
+		   memcmp(read_filename+pathlen, file, strlen(file)) != 0) {
                         fprintf(stderr, "Gak! SHA1 collision? Requested "
                                 "file '%s' doesn't match stored file '%s' for "
                                 "in '%s'\n", file, read_filename, tupfilename);
-                        return -1;
+			goto err_out;
                 }
         }
+	rc = 0;
+err_out:
         close(fd);
-        return 0;
+        return rc;
+}
+
+static int write_all(int fd, const void *buf, int size, const char *filename)
+{
+	int rc;
+	rc = write(fd, buf, size);
+	if(rc < 0) {
+		perror("write");
+		return -1;
+	}
+	if(rc != size) {
+		fprintf(stderr, "Unable to write all %i bytes to %s\n",
+			size, filename);
+		return -1;
+	}
+	return 0;
 }

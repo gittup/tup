@@ -2,10 +2,11 @@
 #include "mozilla-sha1/sha1.h"
 #include <string.h>
 
+static void tupid_from_hash(tupid_t tupid, const unsigned char *hash);
+
 const char *tupid_from_filename(tupid_t tupid, const char *filename)
 {
 	unsigned char hash[SHA1_HASH_SIZE];
-	unsigned int x;
 	SHA_CTX ctx;
 
 	if(filename[0] && filename[1] && memcmp(filename, "./", 2) == 0)
@@ -15,7 +16,34 @@ const char *tupid_from_filename(tupid_t tupid, const char *filename)
 	SHA1_Update(&ctx, filename, strlen(filename));
 	SHA1_Final(hash, &ctx);
 
-	for(x=0; x<sizeof(hash); x++) {
+	tupid_from_hash(tupid, hash);
+
+	return filename;
+}
+
+const char *tupid_from_path_filename(tupid_t tupid, const char *path,
+				     const char *filename)
+{
+	unsigned char hash[SHA1_HASH_SIZE];
+	SHA_CTX ctx;
+
+	if(path[0] && path[1] && memcmp(path, "./", 2) == 0)
+		path += 2;
+	SHA1_Init(&ctx);
+	SHA1_Update(&ctx, path, strlen(path));
+	SHA1_Update(&ctx, filename, strlen(filename));
+	SHA1_Final(hash, &ctx);
+
+	tupid_from_hash(tupid, hash);
+
+	return path;
+}
+
+static void tupid_from_hash(tupid_t tupid, const unsigned char *hash)
+{
+	unsigned int x;
+
+	for(x=0; x<SHA1_HASH_SIZE; x++) {
 		unsigned char c1 = (hash[x] & 0xf0) >> 4;
 		unsigned char c2 = (hash[x] & 0x0f);
 
@@ -31,5 +59,4 @@ const char *tupid_from_filename(tupid_t tupid, const char *filename)
 		tupid[x<<1] = c1;
 		tupid[(x<<1) + 1] = c2;
 	}
-	return filename;
 }
