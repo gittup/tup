@@ -10,7 +10,7 @@ print "digraph g {\n";
 foreach $file (@files) {
 	chomp($file);
 	$from = $file;
-	$from =~ s#\.tup/([0-9a-f]*)/tup\.name#\1#;
+	$from =~ s#\.tup/([0-9a-f]*)/name#\1#;
 	open FILE, "$file" or die "Can't open $file\n";
 	$name_hash{$from} = <FILE>;
 	print "tup$from [label=\"$name_hash{$from}\"];\n";
@@ -20,7 +20,7 @@ foreach $file (@files) {
 @files = `ls .tup/*/*`;
 foreach $file (@files) {
 	chomp($file);
-	if($file =~ /\/tup\.name/) {
+	if($file =~ /\/name/) {
 		next;
 	}
 	($from, $to) = $file =~ m#\.tup/([0-9a-f]*)/([0-9a-f]*)#;

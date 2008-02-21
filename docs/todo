@@ -2,20 +2,8 @@ add in test case projects, analysis of make/ant
 real-world times?
 
 speedups:
-	- in ldpreload, don't do sendto() in same thread as open? (eg: buffer accesses, send in a different thread so the main process can continue working? or would this allow for the main process to exit before the send thread gets to run? - maybe have a ring of 10 file names that can be allocated up front, and use a producer/consumer model)
-
 	- in mkdirhier, check backwards instead of forwards? as it is, if we make 1/2/3/4.txt and 1/2/3/5.txt, we always check 1/, 1/2/, 1/2/3/, then write the file - maybe more efficient to check if 1/2/3/ already exists, since it would in the second (and all future) files?
 
-	- instead of .tup/include/dir/file.h.tupd/path/to/prog/dir/file.c, maybe do sha1sum of names to avoid having a bunch of sudirs? eg: .tup/0123456789abcdef/9876543210fdecba. This may obviate the need of the previous speedup, as well. Maybe store the dependency filename in the 9876543210fdecba directory somehow so we know which file it actually is? eg:
-	$ echo include/dir/file.h | sha1sum
-	f9dcb764fea0f992af34b7ddb34a01363d6319b0  -
-	$ echo path/to/prog/dir/file.c | sha1sum
-	51bc59150b346cbb1e9f9b5c636ccb117976e09f  -
-	.tup/f9dcb764fea0f992af34b7ddb34a01363d6319b0/51bc59150b346cbb1e9f9b5c636ccb117976e09f
-	$ cat .tup/f9dcb764fea0f992af34b7ddb34a01363d6319b0/name
-	include/dir/file.h
-	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/name
-	path/to/prog/dir/file.c
 	$ cat .tup/51bc59150b346cbb1e9f9b5c636ccb117976e09f/tup.list
 	f9dcb764fea0f992af34b7ddb34a01363d6319b0
 	
@@ -36,6 +24,8 @@ speedups:
  hash command lines?
 
 only add created monitor files to the create list if 'name' doesn't already exist?
+
+any way to wrap make so that all sub-procs are wrapped?
 
 
  - split monitor into at least event.c, main.c

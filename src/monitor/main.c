@@ -35,7 +35,6 @@
 #include "mkdirhier.h"
 #include "tup-compat.h"
 
-static int isdir(const char *file);
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int events_same(struct inotify_event *a, struct inotify_event *b);
@@ -112,19 +111,7 @@ next_event:
 
 close_inot:
 	close(inot_fd);
-	return 0;
-}
-
-static int isdir(const char *file)
-{
-	struct stat buf;
-	if(stat(file, &buf) == 0) {
-		if(buf.st_mode & S_IFDIR)
-			return 1;
-		return 0;
-	} else {
-		return 0;
-	}
+	return rc;
 }
 
 static int watch_path(const char *path, const char *file)
@@ -134,6 +121,7 @@ static int watch_path(const char *path, const char *file)
 	int len;
 	uint32_t mask;
 	struct flist f;
+	struct stat buf;
 	char *fullpath;
 
 	/* Skip our own directory */
@@ -147,12 +135,24 @@ static int watch_path(const char *path, const char *file)
 		return -1;
 	}
 
-	if(!isdir(fullpath)) {
-		/* Remove trailing / */
-		fullpath[len-1] = 0;
+	/* Remove trailing / temporarily-ish */
+	fullpath[len-1] = 0;
+	if(stat(fullpath, &buf) != 0) {
+		perror(fullpath);
+		rc = -1;
+		goto out_free;
+	}
+	if(S_ISREG(buf.st_mode)) {
 		create_tup_file(fullpath);
 		goto out_free;
 	}
+	if(!S_ISDIR(buf.st_mode)) {
+		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
+			fullpath);
+		rc = -1;
+		goto out_free;
+	}
+	fullpath[len-1] = '/';
 
 	DEBUGP("add watch: '%s'\n", fullpath);
 
