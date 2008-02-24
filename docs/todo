@@ -27,5 +27,8 @@ only add created monitor files to the create list if 'name' doesn't already exis
 
 any way to wrap make so that all sub-procs are wrapped?
 
+get rid of mkdirhier by creating directories (eg: .tup/attrib) up front and
+just giving an error if it doesn't exist? also create up front for deps?
+
 
  - split monitor into at least event.c, main.c

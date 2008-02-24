@@ -27,22 +27,28 @@
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/file.h>
+#include <errno.h>
 #include <unistd.h>
 #include "dircache.h"
 #include "flist.h"
 #include "debug.h"
 #include "tupid.h"
 #include "mkdirhier.h"
+#include "fileio.h"
 #include "tup-compat.h"
 
+static int make_tup_filesystem(void);
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int events_same(struct inotify_event *a, struct inotify_event *b);
-static int create_tup_file(const char *file);
-static int create_tup_file2(const char *path, const char *file);
+static int create_name_file(const char *file);
+static int create_name_file2(const char *path, const char *file);
+static int create_tup_file(const char *path, const char *file, const char *tup);
 static int write_all(int fd, const void *buf, int size, const char *filename);
 
 static int inot_fd;
+static int lock_fd;
 
 int main(int argc, char **argv)
 {
@@ -66,6 +72,11 @@ int main(int argc, char **argv)
 	}
 
 	gettimeofday(&t1, NULL);
+	if(make_tup_filesystem() < 0) {
+		fprintf(stderr, "Unable to create tup filesystem hierarchy.\n");
+		return 1;
+	}
+
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
 		perror("inotify_init");
@@ -111,7 +122,31 @@ next_event:
 
 close_inot:
 	close(inot_fd);
+	close(lock_fd);
 	return rc;
+}
+
+static int make_tup_filesystem(void)
+{
+	unsigned int x;
+	char pathnames[][13] = {
+		".tup/attrib/",
+		".tup/modify/",
+		".tup/object/",
+	};
+	for(x=0; x<sizeof(pathnames) / sizeof(pathnames[0]); x++) {
+		printf("PATH: '%s'\n", pathnames[x]);
+		if(mkdirhier(pathnames[x]) < 0) {
+			return -1;
+		}
+	}
+
+	lock_fd = open(TUP_LOCK, O_RDONLY | O_CREAT, 0666);
+	if(lock_fd < 0) {
+		perror(TUP_LOCK);
+		return -1;
+	}
+	return 0;
 }
 
 static int watch_path(const char *path, const char *file)
@@ -143,7 +178,7 @@ static int watch_path(const char *path, const char *file)
 		goto out_free;
 	}
 	if(S_ISREG(buf.st_mode)) {
-		create_tup_file(fullpath);
+		create_name_file(fullpath);
 		goto out_free;
 	}
 	if(!S_ISDIR(buf.st_mode)) {
@@ -182,7 +217,7 @@ static void handle_event(struct inotify_event *e)
 {
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
-	/* TODO: Handle MOVED_FROM/MOVED_TO events */
+	/* TODO: Handle MOVED_FROM/MOVED_TO, DELETE events */
 	if(e->len > 0) {
 		printf("%08x:%s%s\n", e->mask,
 		       dircache_lookup(e->wd), e->name);
@@ -190,12 +225,19 @@ static void handle_event(struct inotify_event *e)
 		printf("%08x:%s\n", e->mask,
 		       dircache_lookup(e->wd));
 	}
+
 	if(e->mask & IN_CREATE) {
 		if(e->mask & IN_ISDIR) {
 			watch_path(dircache_lookup(e->wd), e->name);
 		} else {
-			create_tup_file2(dircache_lookup(e->wd), e->name);
+			create_name_file2(dircache_lookup(e->wd), e->name);
 		}
+	}
+	if(e->mask & IN_MODIFY) {
+		create_tup_file(dircache_lookup(e->wd), e->name, "modify");
+	}
+	if(e->mask & IN_ATTRIB) {
+		create_tup_file(dircache_lookup(e->wd), e->name, "attrib");
 	}
 	if(e->mask & IN_IGNORED) {
 		dircache_del(e->wd);
@@ -216,20 +258,20 @@ static int events_same(struct inotify_event *a, struct inotify_event *b)
 	return -1;
 }
 
-static int create_tup_file(const char *file)
+static int create_name_file(const char *file)
 {
-	return create_tup_file2(file, "");
+	return create_name_file2(file, "");
 }
 
-static int create_tup_file2(const char *path, const char *file)
+static int create_name_file2(const char *path, const char *file)
 {
 	int fd;
 	int rc = -1;
 	int len;
-	char tupfilename[] = ".tup/" SHA1_X "/name";
+	char tupfilename[] = ".tup/object/" SHA1_X "/name";
 	static char read_filename[PATH_MAX];
 
-	path = tupid_from_path_filename(tupfilename + 5, path, file);
+	path = tupid_from_path_filename(tupfilename + 12, path, file);
 
 	DEBUGP("create tup file '%s' containing '%s%s'.\n",
 	       tupfilename, path, file);
@@ -268,6 +310,28 @@ static int create_tup_file2(const char *path, const char *file)
 err_out:
         close(fd);
         return rc;
+}
+
+static int create_tup_file(const char *path, const char *file, const char *tup)
+{
+	int rc;
+	char filename[] = ".tup/XXXXXX/" SHA1_X;
+
+	if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+		/* tup must be running a wrapped command */
+		if(errno == EWOULDBLOCK)
+			return 0;
+		/* or some other error occurred */
+		perror("flock");
+		return -1;
+	}
+	memcpy(filename + 5, tup, 6);
+	path = tupid_from_path_filename(filename + 12, path, file);
+
+	DEBUGP("create %s file: %s\n", tup, filename);
+	rc = create_if_not_exist(filename);
+	flock(lock_fd, LOCK_UN);
+	return rc;
 }
 
 static int write_all(int fd, const void *buf, int size, const char *filename)
