@@ -170,8 +170,38 @@
      <td>1216</td>
   </tr>
   </table>
-  <p>Although in the single directory case we can see a slight degredation in performance as compared to the direct filename approach, it is apparent that the SHA1 approach offers more consistent behavior regardless of the file structure of the program. In particular, note that the filespace required is exactly the same in both cases (that is not a copy/paste error!) This is much more desirable than the 20-times increase in disk space required by the direct filename approach when using sub-directories.</p>
+  <p>Although in the single directory case we can see a slight degradation in performance as compared to the direct filename approach, it is apparent that the SHA1 approach offers more consistent behavior regardless of the file structure of the program. In particular, note that the filespace required is exactly the same in both cases (that is not a copy/paste error!) This is much more desirable than the 20-times increase in disk space required by the direct filename approach when using sub-directories.</p>
   <p>Of course since the hash is a one-way algorithm, we need someway to get back from the hash name to the actual filename. In other words, convert the 0bc5d... name above into the filename "a/b/foo.o". This is currently done by creating a file called "name" in the corresponding 0bc5d... directory that contains the text "a/b/foo.o".</p>
+  </li>
+
+  <li><b>Feb 24 - Feb 30</b>: <p>I started work on the Updater portion of the build system. This required some modifications to the Monitor to get it to output changed file hashes to a special directory. For example, if you issue a "touch foo.c" command, the monitor will create a file called ".tup/attrib/e55780...". This is because 'touch' only affects file attributes (the timestamps). If the file is actually written to, it will go in the .tup/modify/ directory. I am not sure if the attrib directory will actually be necessary, but for now it is useful because I am used to doing 'touch foo.c; make' in order to test Makefiles, so I can do a similar test here.</p>
+  <p>For now I have started to write the Updater as a Perl script, since it is easy to test several different approaches before I get into the memory management issues associated with C. The Updater currently only handles files being touched or modified, so it does not yet work if files are created, deleted or renamed. Note that although the Wrapper program handles when programs use rename() internally (such as ar), the Monitor and Updater will also need to be rename/delete aware (for example, if the user issues 'mv foo.c bar.c' or 'rm foo.c'. This has not yet been addressed.</p>
+  <p>The algorithm used by the Updater is basically a depth-first search, using the nodes in the attrib/ and modify/ directories as the start nodes. The first stage of the algorithm walks the dependency graph stored in the filesystem to determine which nodes need to be updated (and abort if there is a circular dependency). The second stage walks the partial graph (again with DFS) to rebuild the nodes in their topological order.</p>
+  <p>In order to see this in action, I modified the grapher script to display nodes that would be updated in red, with the rest of the graph in black. The updater script only reads the nodes in red. I also created a new script that can generate a random graph. Its input is the number of nodes and number of edges, and then it randomly picks two nodes and assigns an edge between them. The names of the nodes are picked randomly from words in /usr/share/dict/words. Here is one such generated graph, where the 'bioplasmic' file was touched:</p>
+  <p><table border=1><caption><i>Randomly generated graph: Node 'bioplasmic' has been updated.</i></caption><tr><td><img src="depgraph-3.png"></td></tr></table></p>
+  <p>The graph as seen by the Updater contains only the red nodes. All subtrees in black are not visited at all. Here is the graph generated from the Updater script:</p>
+  <p><table border=1><caption><i>Partial DAG formed by the Updater</i></caption><tr><td><img src="depgraph-4.png"></td></tr></table></p>
+  <p>The Updater program also outputs the commands that would run in order to update the tree. The files were generated using a simple test program called 'create_dep' which reads in N files, and writes to 1 file. When used with the wrapper, it essentially creates the edges of the graph in the .tup directory. The last argument is the file that is written - this can be seen as the file being "updated":</p>
+  <pre>
+  6713836dd56d9f3986dba8956c1774b11f04977c
+  Visit: 6713836dd56d9f3986dba8956c1774b11f04977c
+  Visit: 4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1
+  Visit: cbdb3db4b2645d5429755e26348aec5e7be16fad
+  Visit: e2f3af40b23c178d018db610121a6e5723a7eed9
+  Visit: adf3787e8363817082b2f720e7909a5895772f9d
+  Visit: eb51fc12bda245d93ac07adcb045d0b6bafec313
+  No cmd for .tup
+  No cmd for 6713836dd56d9f3986dba8956c1774b11f04977c
+  Skipping 4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 - count &gt;0
+  Execute ../../create_dep foreknowing bioplasmic depressant
+  Execute ../../create_dep depressant coquet stickwater
+  Execute ../../create_dep bioplasmic stickwater conspecies
+  Execute ../../create_dep stickwater spiketop
+  Execute ../../create_dep bioplasmic pinchpenny finikin
+  </pre>
+  <p>So essentially what happens is it prints the start node (671383... = 'bioplasmic'), and then the nodes that it visits while building the partial DAG. During this construction phase, each node is assigned a count that describes the number of incoming edges. The second phase starts at the virtual ".tup" node, which has edges to each of the start nodes (here, there's only one). For each edge, it decrements the destination node's count by 1. If its count reaches 0, the command to update the destination node is executed, and it is recursively parsed. For example, since 'conspecies' has two incoming edges, the first time it is visited it is skipped (which is what the "Skipping ..." line means). Then the nodes are updated in the following order: 'depressant', 'stickwater', 'conspecies', 'spiketop', and 'finikin'.</p>
+  <p>The Updater still needs to handle the other file changes (create/delete/move), and handle errors (eg: if updating a node fails, the Updater should be able to pick up where it left off).</p>
+  </li>
 
 </ul>
 </body>

@@ -1,0 +1,22 @@
+digraph g {
+tupe2f3af40b23c178d018db610121a6e5723a7eed9 -> tup0f35e44490ffc8bbd1a66a8982bd23828ddfc5e1 [dir=back];
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back];
+tupcbdb3db4b2645d5429755e26348aec5e7be16fad -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back];
+tupeb51fc12bda245d93ac07adcb045d0b6bafec313 -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back];
+tupe2f3af40b23c178d018db610121a6e5723a7eed9 -> tupcbdb3db4b2645d5429755e26348aec5e7be16fad [dir=back];
+tupcbdb3db4b2645d5429755e26348aec5e7be16fad -> tupcc7ce20643120287f4e6737e87d05538f5877b47 [dir=back];
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 -> tupe2f3af40b23c178d018db610121a6e5723a7eed9 [dir=back];
+tupadf3787e8363817082b2f720e7909a5895772f9d -> tupe2f3af40b23c178d018db610121a6e5723a7eed9 [dir=back];
+tup978285304b6def504573bafe2c06baf7ed013ad4 -> tupf878ab35ee7f9121b3568de8f879db7f12a3f74d [dir=back];
+tupeb51fc12bda245d93ac07adcb045d0b6bafec313 -> tupf878ab35ee7f9121b3568de8f879db7f12a3f74d [dir=back];
+tupcc7ce20643120287f4e6737e87d05538f5877b47 [label="foreknowing"];
+tupf878ab35ee7f9121b3568de8f879db7f12a3f74d [label="pinchpenny"];
+tup978285304b6def504573bafe2c06baf7ed013ad4 [label="Russolatry"];
+tup0f35e44490ffc8bbd1a66a8982bd23828ddfc5e1 [label="coquet"];
+tupe2f3af40b23c178d018db610121a6e5723a7eed9 [label="stickwater" color="red"];
+tupcbdb3db4b2645d5429755e26348aec5e7be16fad [label="depressant" color="red"];
+tupeb51fc12bda245d93ac07adcb045d0b6bafec313 [label="finikin" color="red"];
+tupadf3787e8363817082b2f720e7909a5895772f9d [label="spiketop" color="red"];
+tup6713836dd56d9f3986dba8956c1774b11f04977c [label="bioplasmic" color="red"];
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 [label="conspecies" color="red"];
+}

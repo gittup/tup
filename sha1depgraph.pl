@@ -54,13 +54,6 @@ sub follow_chain
 	$f = $_[0];
 	push(@circ_list, $f);
 
-	if(-f ".tup/object/$f/cmd") {
-		my ($cmd);
-		$cmd = `cat .tup/object/$f/cmd`;
-		chomp($cmd);
-		print STDERR "Execute command: $cmd\n";
-	}
-
 	if($stack{$f} == 1) {
 		print STDERR "Error: Circular dependency detected:\n";
 		foreach $f (@circ_list) {

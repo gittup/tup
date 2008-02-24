@@ -1,0 +1,16 @@
+digraph G {
+tupdir [label=".tup"];
+tup6713836dd56d9f3986dba8956c1774b11f04977c [label="bioplasmic"];
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 [label="conspecies"];
+tupcbdb3db4b2645d5429755e26348aec5e7be16fad [label="depressant"];
+tupe2f3af40b23c178d018db610121a6e5723a7eed9 [label="stickwater"];
+tupadf3787e8363817082b2f720e7909a5895772f9d [label="spiketop"];
+tupeb51fc12bda245d93ac07adcb045d0b6bafec313 [label="finikin"];
+tup6713836dd56d9f3986dba8956c1774b11f04977c -> tupdir [dir=back]
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back]
+tupcbdb3db4b2645d5429755e26348aec5e7be16fad -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back]
+tupe2f3af40b23c178d018db610121a6e5723a7eed9 -> tupcbdb3db4b2645d5429755e26348aec5e7be16fad [dir=back]
+tup4292086f7b6bf5c87ec0d5dc39774b534c9ed9c1 -> tupe2f3af40b23c178d018db610121a6e5723a7eed9 [dir=back]
+tupadf3787e8363817082b2f720e7909a5895772f9d -> tupe2f3af40b23c178d018db610121a6e5723a7eed9 [dir=back]
+tupeb51fc12bda245d93ac07adcb045d0b6bafec313 -> tup6713836dd56d9f3986dba8956c1774b11f04977c [dir=back]
+}
