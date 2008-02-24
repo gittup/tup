@@ -8,3 +8,4 @@ Test directories:
 6 - dhcpcd
 7 - generated test where all files exist in 7 levels of directories
 8 - generated test where all files exist in the top directory
+9 - circular dependency tests

@@ -7,4 +7,11 @@
  */
 int create_if_not_exist(const char *filename);
 
+/** Basically write(), but returns -1 if the write fails or if the length
+ * returned doesn't equal the 'size' argument.
+ *
+ * The 'filename' parameter is only used for error messages.
+ */
+int write_all(int fd, const void *buf, int size, const char *filename);
+
 #endif

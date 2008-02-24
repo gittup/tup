@@ -1,4 +1,5 @@
 #include "file.h"
+#include "fileio.h"
 #include "access_event.h"
 #include "debug.h"
 #include "sha1dep.h"
@@ -6,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 struct file_entry {
 	tupid_t tupid;
@@ -17,6 +19,7 @@ static struct file_entry *new_entry(const struct access_event *event);
 static int handle_rename_to(const struct access_event *event);
 static int __handle_rename_to(struct file_entry *from,
 			      const struct access_event *event);
+static int write_command(const tupid_t tupid, int argc, char **argv);
 
 static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
@@ -58,12 +61,13 @@ int handle_file(const struct access_event *event)
 	return rc;
 }
 
-int write_files(void)
+int write_files(int argc, char **argv)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 
 	list_for_each_entry(w, &write_list, list) {
+		write_command(w->tupid, argc, argv);
 		DEBUGP("Write deps for tupid: %.*s.\n",
 		       sizeof(w->tupid), w->tupid);
 		list_for_each_entry(r, &read_list, list) {
@@ -127,4 +131,32 @@ static int __handle_rename_to(struct file_entry *from,
 		}
 	}
 	return 0;
+}
+
+static int write_command(const tupid_t tupid, int argc, char **argv)
+{
+	int fd;
+	int x;
+	int rc = -1;
+	char filename[] = ".tup/object/" SHA1_X "/cmd";
+
+	memcpy(filename + 12, tupid, sizeof(tupid_t));
+	fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if(fd < 0) {
+		perror(filename);
+		return -1;
+	}
+	for(x=0; x<argc; x++) {
+		if(write_all(fd, argv[x], strlen(argv[x]), filename) < 0) {
+			goto err_out;
+		}
+		if(write_all(fd, x != argc-1 ? " " : "\n", 1, filename) < 0) {
+			goto err_out;
+		}
+	}
+	rc = 0;
+
+err_out:
+	close(fd);
+	return rc;
 }

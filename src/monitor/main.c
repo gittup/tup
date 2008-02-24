@@ -41,11 +41,9 @@
 static int make_tup_filesystem(void);
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
-static int events_same(struct inotify_event *a, struct inotify_event *b);
 static int create_name_file(const char *file);
 static int create_name_file2(const char *path, const char *file);
 static int create_tup_file(const char *path, const char *file, const char *tup);
-static int write_all(int fd, const void *buf, int size, const char *filename);
 
 static int inot_fd;
 static int lock_fd;
@@ -57,7 +55,6 @@ int main(int argc, char **argv)
 	struct timeval t1, t2;
 	const char *path = NULL;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
-	static char last[sizeof(struct inotify_event) + PATH_MAX];
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -99,23 +96,7 @@ int main(int argc, char **argv)
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
 
-			/* Skip duplicate events (ie: for a program writing to
-			 * a file, the IN_MODIFY event will be received
-			 * multiple times).
-			 */
-			if(events_same((struct inotify_event*)last, e) == 0)
-				goto next_event;
-
-			if(sizeof(*e) + e->len < sizeof(last)) {
-				memcpy(last, e, sizeof(*e) + e->len);
-			} else {
-				fprintf(stderr, "Error: last event size is "
-					"to small.\n");
-				return -1;
-			}
-
 			handle_event(e);
-next_event:
 			offset += sizeof(*e) + e->len;
 		}
 	}
@@ -244,20 +225,6 @@ static void handle_event(struct inotify_event *e)
 	}
 }
 
-static int events_same(struct inotify_event *a, struct inotify_event *b)
-{
-	if(a->wd == b->wd &&
-	   a->mask == b->mask &&
-	   a->len == b->len) {
-		if(a->len > 0) {
-			return strcmp(a->name, b->name);
-		}
-		return 0;
-	}
-
-	return -1;
-}
-
 static int create_name_file(const char *file)
 {
 	return create_name_file2(file, "");
@@ -287,6 +254,8 @@ static int create_name_file2(const char *path, const char *file)
 		if(write_all(fd, path, strlen(path), tupfilename) < 0)
 			goto err_out;
 		if(write_all(fd, file, strlen(file), tupfilename) < 0)
+			goto err_out;
+		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
         } else {
 		int pathlen = strlen(path);
@@ -332,20 +301,4 @@ static int create_tup_file(const char *path, const char *file, const char *tup)
 	rc = create_if_not_exist(filename);
 	flock(lock_fd, LOCK_UN);
 	return rc;
-}
-
-static int write_all(int fd, const void *buf, int size, const char *filename)
-{
-	int rc;
-	rc = write(fd, buf, size);
-	if(rc < 0) {
-		perror("write");
-		return -1;
-	}
-	if(rc != size) {
-		fprintf(stderr, "Unable to write all %i bytes to %s\n",
-			size, filename);
-		return -1;
-	}
-	return 0;
 }
