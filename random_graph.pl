@@ -16,14 +16,20 @@ open DICTIONARY, "/usr/share/dict/words" or die "Can't open dictionary!\n";
 @words = <DICTIONARY>;
 close DICTIONARY;
 
+# Get the lock to prevent the touch commands from generating attrib
+# notifications.
+open LOCK, ".tup/lock" or die "Can't open lock!\n";
+flock LOCK, 1;
 for($x=0; $x<$N; $x++) {
 	my ($node);
 	$node = $words[int(rand($#words + 1))];
 	chomp($node);
 	print STDERR "touch $node\n";
-	system("../../wrapper touch $node");
+	system("touch $node");
 	push @nodes, $node;
 }
+flock LOCK, 8;
+close LOCK;
 
 for($x=0; $x<$E; $x++) {
 	my ($from, $to);
