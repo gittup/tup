@@ -1,0 +1,13 @@
+digraph G {
+	lib_a [label="lib.a"];
+	lib_o [label="lib.o"];
+	lib_c [label="lib.c"];
+	lib_h [label="lib.h"];
+	main_o [label="main.o"];
+	main_c [label="main.c"];
+	stdKBDfV -> {lib_a lib_o};
+	lib_a -> {lib_a lib_o};
+	lib_o -> {lib_c lib_h};
+	main -> {main lib_a main_o};
+	main_o -> {main_c lib_h};
+}
