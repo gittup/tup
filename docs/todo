@@ -32,3 +32,6 @@ just giving an error if it doesn't exist? also create up front for deps?
 
 
  - split monitor into at least event.c, main.c
+
+ make .tup/attrib and .tup/modify into their own objects? main clean up updater/main.c
+ rename 'name' and 'cmd' to '.name', and '.cmd' so it's easier to just remove out anything with a leading .?

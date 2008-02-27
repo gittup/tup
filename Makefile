@@ -3,7 +3,7 @@ srcs := $(wildcard src/*.c src/*/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-PROGS := monitor wrapper benchmark create_dep
+PROGS := monitor wrapper benchmark create_dep updater
 SHLIBS := ldpreload.so
 
 all: $(PROGS) $(SHLIBS)
@@ -21,6 +21,7 @@ $(BUILD)src/tupid.o: CCFLAGS := -fpic
 $(BUILD)src/mozilla-sha1/sha1.o: CCFLAGS := -fpic
 
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o $(BUILD)src/mkdirhier.o $(BUILD)src/fileio.o
+updater: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/updater/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o
 monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) $(BUILD)src/debug.o $(BUILD)src/tupid.o $(BUILD)src/mozilla-sha1/sha1.o $(BUILD)src/mkdirhier.o $(BUILD)src/fileio.o
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c))

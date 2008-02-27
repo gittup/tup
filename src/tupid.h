@@ -7,6 +7,9 @@
 /** Enough space for the sha1 hash in ascii hex */
 #define SHA1_X "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
+/** SHA1 hash of ".tup" */
+#define TUPDIR_HASH "9692fbc94cb1bc4ed7650fc86f47d0f73436bcf6"
+
 /** Size of the tupid_t type, which is the sha1 hash written out in a hex
  * string.
  *
