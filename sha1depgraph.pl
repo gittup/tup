@@ -4,7 +4,9 @@ use strict;
 
 my (@files, $file, %name_hash, $from, $to, %color_hash, @circ_list, %visited, %stack);
 
-print "digraph g {\n";
+open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
+
+print GRAPH "digraph g {\n";
 
 @files = `ls .tup/object/*/name 2>/dev/null`;
 foreach $file (@files) {
@@ -24,7 +26,7 @@ foreach $file (@files) {
 		next;
 	}
 	($from, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)#;
-	print "tup$to -> tup$from [dir=back];\n";
+	print GRAPH "tup$to -> tup$from [dir=back];\n";
 }
 
 @files = `ls .tup/attrib/* .tup/modify/* 2>/dev/null`;
@@ -39,13 +41,14 @@ foreach $file (@files) {
 
 foreach $from (keys %name_hash) {
 	if($color_hash{$from}) {
-		print "tup$from [label=\"$name_hash{$from}\" color=\"$color_hash{$from}\"];\n";
+		print GRAPH "tup$from [label=\"$name_hash{$from}\" color=\"$color_hash{$from}\"];\n";
 	} else {
-		print "tup$from [label=\"$name_hash{$from}\"];\n";
+		print GRAPH "tup$from [label=\"$name_hash{$from}\"];\n";
 	}
 }
 
-print "}\n";
+print GRAPH "}\n";
+close GRAPH;
 
 sub follow_chain
 {

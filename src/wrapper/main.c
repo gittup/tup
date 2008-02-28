@@ -45,9 +45,13 @@ int main(int argc, char **argv)
 
 	start_server();
 	pid = fork();
+	if(pid < 0) {
+		perror("fork");
+		return 1;
+	}
 	if(pid == 0) {
 		execvp(argv[arg_start], &argv[arg_start]);
-		perror("execlp");
+		perror("execvp");
 		return 1;
 	}
 	wait(&status);

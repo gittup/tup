@@ -5,14 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-static LIST_HEAD(node_list);
+static void dump_node(FILE *f, struct node *n);
 
-struct node *find_node(const tupid_t tupid)
+struct node *find_node(const struct graph *g, const tupid_t tupid)
 {
 	struct node *n;
 
 	/* TODO: Use hash */
-	list_for_each_entry(n, &node_list, list) {
+	list_for_each_entry(n, &g->node_list, list) {
+		if(memcmp(n->tupid, tupid, sizeof(n->tupid)) == 0)
+			return n;
+	}
+	list_for_each_entry(n, &g->plist, list) {
 		if(memcmp(n->tupid, tupid, sizeof(n->tupid)) == 0)
 			return n;
 	}
@@ -28,8 +32,6 @@ struct node *create_node(const tupid_t tupid)
 		perror("malloc");
 		return NULL;
 	}
-	list_add(&n->list, &node_list);
-	INIT_LIST_HEAD(&n->processing);
 	n->edges = NULL;
 	memcpy(n->tupid, tupid, sizeof(n->tupid));
 	n->incoming_count = 0;
@@ -39,7 +41,6 @@ struct node *create_node(const tupid_t tupid)
 void remove_node(struct node *n)
 {
 	list_del(&n->list);
-	list_del(&n->processing);
 	if(n->edges) {
 		DEBUGP("Warning: Node %.*s still has edges.\n", 8, n->tupid);
 	}
@@ -78,7 +79,7 @@ struct edge *remove_edge(struct edge *e)
 	return tmp;
 }
 
-void dump_graph(const char *filename)
+void dump_graph(const struct graph *g, const char *filename)
 {
 	static int count = 0;
 	struct node *n;
@@ -96,19 +97,27 @@ void dump_graph(const char *filename)
 		return;
 	}
 	fprintf(f, "digraph G {\n");
-	list_for_each_entry(n, &node_list, list) {
-		struct edge *e;
-		fprintf(f, "tup%.*s [label=\"%.*s (%i)\"];\n",
-			sizeof(tupid_t), n->tupid,
-			8, n->tupid,
-			n->incoming_count);
-		/* TODO: slist_for_each? */
-		for(e=n->edges; e; e=e->next) {
-			fprintf(f, "tup%.*s -> tup%.*s [dir=back];\n",
-				sizeof(tupid_t), e->dest->tupid,
-				sizeof(tupid_t), n->tupid);
-		}
+	list_for_each_entry(n, &g->node_list, list) {
+		dump_node(f, n);
+	}
+	list_for_each_entry(n, &g->plist, list) {
+		dump_node(f, n);
 	}
 	fprintf(f, "}\n");
 	fclose(f);
+}
+
+static void dump_node(FILE *f, struct node *n)
+{
+	struct edge *e;
+	fprintf(f, "tup%.*s [label=\"%.*s (%i)\"];\n",
+		sizeof(tupid_t), n->tupid,
+		8, n->tupid,
+		n->incoming_count);
+	/* TODO: slist_for_each? */
+	for(e=n->edges; e; e=e->next) {
+		fprintf(f, "tup%.*s -> tup%.*s [dir=back];\n",
+			sizeof(tupid_t), e->dest->tupid,
+			sizeof(tupid_t), n->tupid);
+	}
 }
