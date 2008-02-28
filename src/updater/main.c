@@ -9,7 +9,7 @@
 
 static int build_graph(void);
 static int add_file(const tupid_t tupid, struct node *src, struct list_head *p);
-static int process_file(struct node *n, struct list_head *p);
+static int find_deps(struct node *n, struct list_head *p);
 static int execute_graph(struct node *root);
 
 int main(void)
@@ -30,7 +30,6 @@ static int build_graph(void)
 	struct node *root;
 	struct node *cur;
 	char add_pathnames[][13] = {
-		".tup/attrib/",
 		".tup/modify/",
 	};
 
@@ -53,8 +52,8 @@ static int build_graph(void)
 
 	while(!list_empty(&plist)) {
 		cur = list_entry(plist.next, struct node, processing);
-		DEBUGP("Processing node: %.*s\n", sizeof(tupid_t), cur->tupid);
-		if(process_file(cur, &plist) < 0)
+		DEBUGP("find deps for node: %.*s\n", 8, cur->tupid);
+		if(find_deps(cur, &plist) < 0)
 			return -1;
 		list_del(&cur->processing);
 		INIT_LIST_HEAD(&cur->processing);
@@ -76,7 +75,7 @@ static int add_file(const tupid_t tupid, struct node *src, struct list_head *p)
 	if(!n)
 		return -1;
 
-	DEBUGP("Created node: %.*s\n", sizeof(tupid_t), tupid);
+	DEBUGP("create node: %.*s\n", 8, tupid);
 	if(list_empty(&n->processing))
 		list_add_tail(&n->processing, p);
 
@@ -86,7 +85,7 @@ edge_create:
 	return 0;
 }
 
-static int process_file(struct node *n, struct list_head *p)
+static int find_deps(struct node *n, struct list_head *p)
 {
 	int rc = 0;
 	struct flist f;
@@ -110,19 +109,19 @@ static int execute_graph(struct node *root)
 {
 	LIST_HEAD(plist);
 
-	DEBUGP("Root is: %.*s\n", 8, root->tupid);
+	DEBUGP("root node: %.*s\n", 8, root->tupid);
 	list_add(&root->processing, &plist);
 
 	while(!list_empty(&plist)) {
 		struct node *n;
 		n = list_entry(plist.next, struct node, processing);
-		DEBUGP("N is: %.*s\n", 8, n->tupid);
+		DEBUGP("cur node: %.*s\n", 8, n->tupid);
 		if(n->incoming_count) {
 			list_del(&n->processing);
 			INIT_LIST_HEAD(&n->processing);
 			continue;
 		}
-		DEBUGP("Run command for %.*s\n", 8, n->tupid);
+		DEBUGP("update %.*s\n", 8, n->tupid);
 		while(n->edges) {
 			struct edge *e;
 			e = n->edges;

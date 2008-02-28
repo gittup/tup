@@ -111,8 +111,9 @@ static int make_tup_filesystem(void)
 {
 	unsigned int x;
 	char pathnames[][13] = {
-		".tup/attrib/",
+		".tup/create/",
 		".tup/modify/",
+		".tup/delete/",
 		".tup/object/",
 	};
 	for(x=0; x<sizeof(pathnames) / sizeof(pathnames[0]); x++) {
@@ -214,11 +215,11 @@ static void handle_event(struct inotify_event *e)
 			create_name_file2(dircache_lookup(e->wd), e->name);
 		}
 	}
-	if(e->mask & IN_MODIFY) {
+	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
 		create_tup_file(dircache_lookup(e->wd), e->name, "modify");
 	}
-	if(e->mask & IN_ATTRIB) {
-		create_tup_file(dircache_lookup(e->wd), e->name, "attrib");
+	if(e->mask & IN_DELETE) {
+		create_tup_file(dircache_lookup(e->wd), e->name, "delete");
 	}
 	if(e->mask & IN_IGNORED) {
 		dircache_del(e->wd);
@@ -257,6 +258,7 @@ static int create_name_file2(const char *path, const char *file)
 			goto err_out;
 		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
+		create_tup_file(path, file, "create");
         } else {
 		int pathlen = strlen(path);
 
