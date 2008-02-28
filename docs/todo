@@ -35,3 +35,6 @@ just giving an error if it doesn't exist? also create up front for deps?
 
  make .tup/attrib and .tup/modify into their own objects? main clean up updater/main.c
  rename 'name' and 'cmd' to '.name', and '.cmd' so it's easier to just remove out anything with a leading .?
+
+ slab: use a free hunk (unlinked memory array), and a free list (object freed is put in the free list)
+	alloc can get one from free list if available, if not then free hunk, and if not there then allocate another slab

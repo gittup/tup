@@ -123,13 +123,14 @@ static int execute_graph(struct node *root)
 			continue;
 		}
 		DEBUGP("Run command for %.*s\n", 8, n->tupid);
-		while(!list_empty(&n->edges)) {
+		while(n->edges) {
 			struct edge *e;
-			e = list_entry(n->edges.next, struct edge, list);
+			e = n->edges;
 			if(list_empty(&e->dest->processing)) {
 				list_add_tail(&e->dest->processing, &plist);
 			}
-			remove_edge(e);
+			/* TODO: slist_del? */
+			n->edges = remove_edge(e);
 		}
 		remove_node(n);
 		dump_graph(GRAPH_NAME);

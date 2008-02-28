@@ -11,7 +11,7 @@ int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 	char depfilename[] = ".tup/object/" SHA1_X "/" SHA1_X;
 
 	memcpy(depfilename + 12, depends_on, sizeof(tupid_t));
-	memcpy(depfilename + 53, file, sizeof(tupid_t));
+	memcpy(depfilename + 13+sizeof(tupid_t), file, sizeof(tupid_t));
 
 	DEBUGP("create dependency: %s\n", depfilename);
 

@@ -30,10 +30,9 @@ struct node *create_node(const tupid_t tupid)
 	}
 	list_add(&n->list, &node_list);
 	INIT_LIST_HEAD(&n->processing);
-	INIT_LIST_HEAD(&n->edges);
+	n->edges = NULL;
 	memcpy(n->tupid, tupid, sizeof(n->tupid));
 	n->incoming_count = 0;
-	n->visited = 0;
 	return n;
 }
 
@@ -41,7 +40,7 @@ void remove_node(struct node *n)
 {
 	list_del(&n->list);
 	list_del(&n->processing);
-	if(!list_empty(&n->edges)) {
+	if(n->edges) {
 		DEBUGP("Warning: Node %.*s still has edges.\n", 8, n->tupid);
 	}
 	/* TODO: block pool */
@@ -60,17 +59,23 @@ int create_edge(struct node *n1, struct node *n2)
 	}
 
 	e->dest = n2;
-	list_add(&e->list, &n1->edges);
+
+	/* TODO: slist add? */
+	e->next = n1->edges;
+	n1->edges = e;
+
 	n2->incoming_count++;
 	return 0;
 }
 
-void remove_edge(struct edge *e)
+struct edge *remove_edge(struct edge *e)
 {
+	struct edge *tmp;
+	tmp = e->next;
 	e->dest->incoming_count--;
-	list_del(&e->list);
 	/* TODO: block pool */
 	free(e);
+	return tmp;
 }
 
 void dump_graph(const char *filename)
@@ -97,7 +102,8 @@ void dump_graph(const char *filename)
 			sizeof(tupid_t), n->tupid,
 			8, n->tupid,
 			n->incoming_count);
-		list_for_each_entry(e, &n->edges, list) {
+		/* TODO: slist_for_each? */
+		for(e=n->edges; e; e=e->next) {
 			fprintf(f, "tup%.*s -> tup%.*s [dir=back];\n",
 				sizeof(tupid_t), e->dest->tupid,
 				sizeof(tupid_t), n->tupid);
