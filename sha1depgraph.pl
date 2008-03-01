@@ -2,18 +2,21 @@
 
 use strict;
 
-my (@files, $file, %name_hash, $from, $to, %color_hash, @circ_list, %visited, %stack);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack);
 
 open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
 
 print GRAPH "digraph g {\n";
 
-@files = `ls .tup/object/*/name 2>/dev/null`;
+@files = `ls .tup/object/*/.name 2>/dev/null`;
 foreach $file (@files) {
+	my (@stats);
 	chomp($file);
 	$from = $file;
-	$from =~ s#\.tup/object/([0-9a-f]*)/name#\1#;
+	$from =~ s#\.tup/object/([0-9a-f]*)/.name#\1#;
 	open FILE, "$file" or die "Can't open $file\n";
+	@stats = stat FILE;
+	$incoming_hash{$from} = $stats[3]; # num hard links
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
@@ -22,9 +25,6 @@ foreach $file (@files) {
 @files = `ls .tup/object/*/*`;
 foreach $file (@files) {
 	chomp($file);
-	if($file =~ /\/name/ || $file =~ /\/cmd/) {
-		next;
-	}
 	($from, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)#;
 	print GRAPH "tup$to -> tup$from [dir=back];\n";
 }
@@ -41,9 +41,9 @@ foreach $file (@files) {
 
 foreach $from (keys %name_hash) {
 	if($color_hash{$from}) {
-		print GRAPH "tup$from [label=\"$name_hash{$from}\" color=\"$color_hash{$from}\"];\n";
+		print GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"$color_hash{$from}\"];\n";
 	} else {
-		print GRAPH "tup$from [label=\"$name_hash{$from}\"];\n";
+		print GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\"];\n";
 	}
 }
 
@@ -77,9 +77,6 @@ sub follow_chain
 	$color_hash{$f} = "red";
 	@list = `ls .tup/object/$f/* 2>/dev/null`;
 	foreach $dep (@list) {
-		if($dep =~ /\/name/ || $dep =~ /\/cmd/) {
-			next;
-		}
 		($dep) = $dep =~ m#\.tup/object/$f/([0-9a-f]*)#;
 		&follow_chain($dep);
 	}

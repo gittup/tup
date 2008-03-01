@@ -33,6 +33,7 @@ struct node *create_node(const tupid_t tupid)
 		return NULL;
 	}
 	n->edges = NULL;
+	n->type = 0;
 	memcpy(n->tupid, tupid, sizeof(n->tupid));
 	n->incoming_count = 0;
 	return n;
@@ -79,6 +80,18 @@ struct edge *remove_edge(struct edge *e)
 	return tmp;
 }
 
+int create_graph(struct graph *g, const tupid_t root)
+{
+	INIT_LIST_HEAD(&g->node_list);
+	INIT_LIST_HEAD(&g->plist);
+
+	g->root = create_node(root);
+	if(!g->root)
+		return -1;
+	list_add(&g->root->list, &g->node_list);
+	return 0;
+}
+
 void dump_graph(const struct graph *g, const char *filename)
 {
 	static int count = 0;
@@ -110,10 +123,17 @@ void dump_graph(const struct graph *g, const char *filename)
 static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
-	fprintf(f, "tup%.*s [label=\"%.*s (%i)\"];\n",
+	int color = 0;
+	if(n->type & TYPE_CREATE)
+		color |= 0x00bb00;
+	if(n->type & TYPE_DELETE)
+		color |= 0xff0000;
+	if(n->type & TYPE_MODIFY)
+		color |= 0x0000ff;
+	fprintf(f, "tup%.*s [label=\"%.*s (%i)\",color=\"#%06x\"];\n",
 		sizeof(tupid_t), n->tupid,
 		8, n->tupid,
-		n->incoming_count);
+		n->incoming_count, color);
 	/* TODO: slist_for_each? */
 	for(e=n->edges; e; e=e->next) {
 		fprintf(f, "tup%.*s -> tup%.*s [dir=back];\n",

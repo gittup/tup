@@ -7,6 +7,9 @@
  */
 int create_if_not_exist(const char *filename);
 
+/** Creates a hard link from src to dest, unless dest already exists */
+int link_if_not_exist(const char *src, const char *dest);
+
 /** Basically write(), but returns -1 if the write fails or if the length
  * returned doesn't equal the 'size' argument.
  *

@@ -1,0 +1,9 @@
+.tup/ - root directory (not processed by the monitor)
+     object/ - storage for objects
+            <SHA1-hash>/ - an object
+                        .name - name of the object
+                        <SHA1-hash> - hard link to another object's .name file
+     create/ - for storing objects whose contents have changed
+     modify/ - for storing objects whose contents have changed
+     delete/ - for storing objects whose contents have changed
+     update/ - for storing the progress of the updater in case it dies unexpectedly?

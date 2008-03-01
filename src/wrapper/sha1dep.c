@@ -9,9 +9,12 @@
 int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 {
 	char depfilename[] = ".tup/object/" SHA1_X "/" SHA1_X;
+	char linkfilename[] = ".tup/object/" SHA1_X "/.name";
 
 	memcpy(depfilename + 12, depends_on, sizeof(tupid_t));
-	memcpy(depfilename + 13+sizeof(tupid_t), file, sizeof(tupid_t));
+	memcpy(depfilename + 13 + sizeof(tupid_t), file, sizeof(tupid_t));
+
+	memcpy(linkfilename + 12, file, sizeof(tupid_t));
 
 	DEBUGP("create dependency: %s\n", depfilename);
 
@@ -19,5 +22,5 @@ int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 		return -1;
 	}
 
-	return create_if_not_exist(depfilename);
+	return link_if_not_exist(linkfilename, depfilename);
 }

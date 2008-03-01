@@ -212,9 +212,7 @@ static void handle_event(struct inotify_event *e)
 		if(e->mask & IN_ISDIR) {
 			watch_path(dircache_lookup(e->wd), e->name);
 		} else {
-			const char *path = dircache_lookup(e->wd);
-			create_name_file2(path, e->name);
-			create_tup_file(path, e->name, "create");
+			create_name_file2(dircache_lookup(e->wd), e->name);
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
@@ -238,7 +236,7 @@ static int create_name_file2(const char *path, const char *file)
 	int fd;
 	int rc = -1;
 	int len;
-	char tupfilename[] = ".tup/object/" SHA1_X "/name";
+	char tupfilename[] = ".tup/object/" SHA1_X "/.name";
 	static char read_filename[PATH_MAX];
 
 	path = tupid_from_path_filename(tupfilename + 12, path, file);
@@ -260,6 +258,7 @@ static int create_name_file2(const char *path, const char *file)
 			goto err_out;
 		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
+		create_tup_file(path, file, "create");
         } else {
 		int pathlen = strlen(path);
 
