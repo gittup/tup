@@ -22,12 +22,9 @@ struct node {
 	struct edge *edges;
 	tupid_t tupid;
 	int incoming_count;
-	char state;
 
-	/* The TYPE_ flags that indicate whether this node was created/deleted/
-	 * and/or modified. Must be a char (<256)
-	 */
-	char type;
+	char state;
+	char type; /* Must be char (<256) */
 	char unused1;
 	char unused2;
 };

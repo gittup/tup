@@ -5,29 +5,58 @@
 #include <sys/stat.h>
 #include "graph.h"
 #include "tup/flist.h"
+#include "tup/fileio.h"
 #include "tup/tupid.h"
 #include "tup/debug.h"
 
 #define GRAPH_NAME "/home/marf/test%03i.dot"
 
+static int process_create_nodes(void);
 static int build_graph(struct graph *g);
 static int process_tup_dir(const char *dir, struct graph *g, int type);
 static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 		    int type);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
-static int update(struct node *n);
-static void remove_if_exists(const char *path, const char *tupid);
+static int update(const tupid_t tupid, char type);
 
 int main(void)
 {
 	struct graph g;
 
 	debug_enable("tup.updater");
+	if(process_create_nodes() < 0)
+		return 1;
 	if(build_graph(&g) < 0)
 		return 1;
 	if(execute_graph(&g) < 0)
 		return 1;
+	return 0;
+}
+
+static int process_create_nodes(void)
+{
+	struct flist f;
+	int found = 1;
+	int create_num;
+
+	while(found) {
+		found = 0;
+		DEBUGP("processing create nodes (%i)\n", create_num);
+		flist_foreach(&f, ".tup/create/") {
+			if(f.filename[0] == '.')
+				continue;
+			if(strlen(f.filename) != sizeof(tupid_t)) {
+				fprintf(stderr, "Error: invalid file '%s' in "
+					".tup/create/\n", f.filename);
+				return -1;
+			}
+			found = 1;
+			update(f.filename, TYPE_CREATE);
+			if(move_tup_file(f.filename, "create", "modify") < 0)
+				return -1;
+		}
+	}
 	return 0;
 }
 
@@ -41,8 +70,6 @@ static int build_graph(struct graph *g)
 	/* First attach all nodes in the relevant .tup directories to the
 	 * root.
 	 */
-	if(process_tup_dir(".tup/create/", g, TYPE_CREATE) < 0)
-		return -1;
 	if(process_tup_dir(".tup/modify/", g, TYPE_MODIFY) < 0)
 		return -1;
 
@@ -72,6 +99,11 @@ static int process_tup_dir(const char *dir, struct graph *g, int type)
 	flist_foreach(&f, dir) {
 		if(f.filename[0] == '.')
 			continue;
+		if(strlen(f.filename) != sizeof(tupid_t)) {
+			fprintf(stderr, "Error: invalid file '%s' in %s\n",
+				f.filename, dir);
+			return -1;
+		}
 		if(add_file(g, f.filename, g->root, type) < 0)
 			return -1;
 	}
@@ -121,6 +153,11 @@ static int find_deps(struct graph *g, struct node *n)
 	flist_foreach(&f, object_dir) {
 		if(f.filename[0] == '.')
 			continue;
+		if(strlen(f.filename) != sizeof(tupid_t)) {
+			fprintf(stderr, "Error: invalid file '%s' in %s\n",
+				f.filename, object_dir);
+			return -1;
+		}
 		if((rc = add_file(g, f.filename, n, n->type)) < 0)
 			break;
 	};
@@ -146,7 +183,7 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(update(n) < 0)
+			if(update(n->tupid, n->type) < 0)
 				return -1;
 		}
 		while(n->edges) {
@@ -160,9 +197,11 @@ static int execute_graph(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
+#if 0
 		if(n->type & TYPE_CREATE) {
 			remove_if_exists("create", n->tupid);
 		}
+#endif
 		remove_node(n);
 		dump_graph(g, GRAPH_NAME);
 	}
@@ -173,7 +212,7 @@ static int execute_graph(struct graph *g)
 	return 0;
 }
 
-static int update(struct node *n)
+static int update(const tupid_t tupid, char type)
 {
 	int pid;
 	int status;
@@ -186,12 +225,12 @@ static int update(struct node *n)
 	if(pid == 0) {
 		char tupid_str[sizeof(tupid_t)+1];
 		char tstr[3];
-		if(snprintf(tstr, sizeof(tstr), "%02x", n->type) >=
+		if(snprintf(tstr, sizeof(tstr), "%02x", type) >=
 		   (signed)sizeof(tstr)) {
 			fprintf(stderr, "Error: type didn't fit in string.\n");
 			exit(1);
 		}
-		memcpy(tupid_str, n->tupid, sizeof(tupid_t));
+		memcpy(tupid_str, tupid, sizeof(tupid_t));
 		tupid_str[sizeof(tupid_str)-1] = 0;
 		execl("/usr/bin/perl", "perl", "build", tstr, tupid_str, NULL);
 		perror("execl");
@@ -207,17 +246,4 @@ static int update(struct node *n)
 	}
 	fprintf(stderr, "Error: Update process didn't return.\n");
 	return -1;
-}
-
-static void remove_if_exists(const char *path, const char *tupid)
-{
-	struct stat buf;
-	char filename[] = ".tup/XXXXXX/" SHA1_X;
-
-	memcpy(filename + 5, path, 6);
-	memcpy(filename + 12, tupid, sizeof(tupid_t));
-	if(stat(filename, &buf) < 0)
-		return;
-	if(S_ISREG(buf.st_mode))
-		unlink(filename);
 }

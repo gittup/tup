@@ -22,7 +22,7 @@ foreach $file (@files) {
 	close FILE;
 }
 
-@files = `ls .tup/object/*/*`;
+@files = `ls .tup/object/*/* 2>/dev/null`;
 foreach $file (@files) {
 	chomp($file);
 	($from, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)#;
