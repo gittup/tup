@@ -38,7 +38,7 @@ static int process_create_nodes(void)
 {
 	struct flist f;
 	int found = 1;
-	int create_num;
+	int create_num = 0;
 
 	while(found) {
 		found = 0;
@@ -56,6 +56,7 @@ static int process_create_nodes(void)
 			if(move_tup_file(f.filename, "create", "modify") < 0)
 				return -1;
 		}
+		create_num++;
 	}
 	return 0;
 }
@@ -197,11 +198,9 @@ static int execute_graph(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-#if 0
-		if(n->type & TYPE_CREATE) {
-			remove_if_exists("create", n->tupid);
+		if(n->type & TYPE_MODIFY) {
+			remove_tup_file("modify", n->tupid);
 		}
-#endif
 		remove_node(n);
 		dump_graph(g, GRAPH_NAME);
 	}

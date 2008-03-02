@@ -13,7 +13,8 @@ int move_tup_file(const tupid_t tupid, const char *tupsrc, const char *tupdst)
 	memcpy(newfilename + 5, tupdst, 6);
 	memcpy(newfilename + 12, tupid, sizeof(tupid_t));
 	memcpy(oldfilename + 12, tupid, sizeof(tupid_t));
-	DEBUGP("move tup file '%s' to '%s'\n", oldfilename, newfilename);
+	DEBUGP("move tup file '%s/%.*s' to '%s/%.*s'\n",
+	       tupsrc, 8, tupid, tupdst, 8, tupid);
 
 	if(rename(oldfilename, newfilename) < 0) {
 		fprintf(stderr, "Error renaming '%s' to '%s': %s\n",
