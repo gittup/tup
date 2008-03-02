@@ -6,9 +6,9 @@
 #include <sys/file.h>
 #include "server.h"
 #include "file.h"
-#include "getexecwd.h"
-#include "debug.h"
-#include "tup-compat.h"
+#include "tup/getexecwd.h"
+#include "tup/debug.h"
+#include "tup/tup-compat.h"
 
 int main(int argc, char **argv)
 {

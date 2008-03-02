@@ -1,7 +1,5 @@
-#include "sha1dep.h"
-#include "debug.h"
 #include "fileio.h"
-#include "mkdirhier.h"
+#include "debug.h"
 
 #include <stdio.h>
 #include <string.h>

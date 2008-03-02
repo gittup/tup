@@ -31,12 +31,11 @@
 #include <errno.h>
 #include <unistd.h>
 #include "dircache.h"
-#include "flist.h"
-#include "debug.h"
-#include "tupid.h"
-#include "mkdirhier.h"
-#include "fileio.h"
-#include "tup-compat.h"
+#include "tup/flist.h"
+#include "tup/debug.h"
+#include "tup/tupid.h"
+#include "tup/fileio.h"
+#include "tup/tup-compat.h"
 
 static int make_tup_filesystem(void);
 static int watch_path(const char *path, const char *file);

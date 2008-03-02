@@ -1,6 +1,6 @@
 #define _GNU_SOURCE /* TODO: For asprintf */
 #include "graph.h"
-#include "debug.h"
+#include "tup/debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

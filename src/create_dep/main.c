@@ -1,34 +1,24 @@
-/* Test program to create dependencies by opening N files for read and one file
- * for write. This should be wrapped by the wrapper program.
+/* Utility to create an edge in the graph.
  */
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "tup/tupid.h"
+#include "tup/fileio.h"
 
 int main(int argc, char **argv)
 {
-	int fd1;
-	int fd2;
-	int x;
+	tupid_t a;
+	tupid_t b;
 
 	if(argc < 3) {
 		fprintf(stderr, "Usage: %s read_file write_file\n", argv[0]);
 		return 1;
 	}
 
-	for(x=1; x<argc-1; x++) {
-		fd1 = open(argv[x], O_RDONLY);
-		if(fd1 < 0) {
-			perror(argv[x]);
-			return 1;
-		}
-		close(fd1);
-	}
-	fd2 = open(argv[argc-1], O_WRONLY);
-	if(fd2 < 0) {
-		perror(argv[argc-1]);
+	tupid_from_filename(a, argv[1]);
+	tupid_from_filename(b, argv[2]);
+	if(write_sha1dep(b, a) < 0)
 		return 1;
-	}
-	close(fd2);
 	return 0;
 }

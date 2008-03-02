@@ -1,4 +1,9 @@
 #include "server.h"
+#include "file.h"
+#include "tup/access_event.h"
+#include "tup/debug.h"
+#include "tup/getexecwd.h"
+#include "tup/tup-compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -6,11 +11,6 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include "access_event.h"
-#include "debug.h"
-#include "file.h"
-#include "getexecwd.h"
-#include "tup-compat.h"
 
 static void *message_thread(void *arg);
 static void sighandler(int sig);

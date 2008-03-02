@@ -1,8 +1,8 @@
 #define _LARGEFILE64_SOURCE
 #define _GNU_SOURCE
-#include "access_event.h"
-#include "debug.h"
-#include "tupid.h"
+#include "tup/access_event.h"
+#include "tup/debug.h"
+#include "tup/tupid.h"
 
 #include <stdio.h>
 #include <stdlib.h>

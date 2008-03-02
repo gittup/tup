@@ -1,6 +1,6 @@
 #include "dircache.h"
-#include "debug.h"
-#include "list.h"
+#include "tup/debug.h"
+#include "tup/list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

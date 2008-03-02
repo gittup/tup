@@ -1,9 +1,8 @@
 #include "file.h"
-#include "fileio.h"
-#include "access_event.h"
-#include "debug.h"
-#include "sha1dep.h"
-#include "list.h"
+#include "tup/fileio.h"
+#include "tup/access_event.h"
+#include "tup/debug.h"
+#include "tup/list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,8 +1,8 @@
 #ifndef graph_h
 #define graph_h
 
-#include "list.h"
-#include "tupid.h"
+#include "tup/list.h"
+#include "tup/tupid.h"
 
 struct edge {
 	struct edge *next;

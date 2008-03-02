@@ -29,14 +29,14 @@ foreach $file (@files) {
 	print GRAPH "tup$to -> tup$from [dir=back];\n";
 }
 
-@files = `ls .tup/attrib/* .tup/modify/* 2>/dev/null`;
+@files = `ls .tup/modify/* 2>/dev/null`;
 foreach $file (@files) {
 	chomp($file);
 	($from) = $file =~ m#\.tup/....../([0-9a-f]*)#;
 	%visited = ();
 	%stack = ();
 	@circ_list = ();
-	&follow_chain($from);
+	&follow_chain($from, "0x0000ff");
 }
 
 foreach $from (keys %name_hash) {
@@ -52,9 +52,10 @@ close GRAPH;
 
 sub follow_chain
 {
-	my ($f, @list, $dep);
+	my ($f, @list, $dep, $c);
 
 	$f = $_[0];
+	$c = $_[1];
 	push(@circ_list, $f);
 
 	if($stack{$f} == 1) {
@@ -74,7 +75,8 @@ sub follow_chain
 	$visited{$f} = 1;
 	$stack{$f} = 1;
 
-	$color_hash{$f} = "red";
+	$color_hash{$f} = 0x000000;
+	$color_hash{$f} |= $c;
 	@list = `ls .tup/object/$f/* 2>/dev/null`;
 	foreach $dep (@list) {
 		($dep) = $dep =~ m#\.tup/object/$f/([0-9a-f]*)#;

@@ -3,10 +3,10 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include "flist.h"
 #include "graph.h"
-#include "tupid.h"
-#include "debug.h"
+#include "tup/flist.h"
+#include "tup/tupid.h"
+#include "tup/debug.h"
 
 #define GRAPH_NAME "/home/marf/test%03i.dot"
 
