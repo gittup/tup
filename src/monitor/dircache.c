@@ -5,12 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct dircache {
-	struct list_head list;
-	int wd;
-	char *path;
-};
-
 static void dump_dircache(void);
 static LIST_HEAD(dclist);
 
@@ -32,29 +26,22 @@ void dircache_add(int wd, char *path)
 	return;
 }
 
-void dircache_del(int wd)
+void dircache_del(struct dircache *dc)
 {
-	struct dircache *dc;
-	DEBUGP("del %i\n", wd);
-	list_for_each_entry(dc, &dclist, list) {
-		if(dc->wd == wd) {
-			list_del(&dc->list);
-			free(dc->path);
-			free(dc);
-			dump_dircache();
-			return;
-		}
-	}
-	fprintf(stderr, "dircache_del: entry not found.\n");
+	DEBUGP("del %i\n", dc->wd);
+	list_del(&dc->list);
+	free(dc->path);
+	free(dc);
+	dump_dircache();
 }
 
-const char *dircache_lookup(int wd)
+struct dircache *dircache_lookup(int wd)
 {
 	/* TODO: Make efficient: use same hash algorithm in wrapper? */
 	struct dircache *dc;
 	list_for_each_entry(dc, &dclist, list) {
 		if(dc->wd == wd)
-			return dc->path;
+			return dc;
 	}
 	return NULL;
 }

@@ -22,7 +22,7 @@ int create_if_not_exist(const char *filename)
 
 	rc = creat(filename, 0666);
 	if(rc < 0) {
-		perror("creat");
+		perror(filename);
 		return -1;
 	}
 	close(rc);

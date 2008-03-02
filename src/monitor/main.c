@@ -40,9 +40,6 @@
 static int make_tup_filesystem(void);
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
-static int create_name_file(const char *file);
-static int create_name_file2(const char *path, const char *file);
-static int create_tup_file(const char *path, const char *file, const char *tup);
 
 static int inot_fd;
 static int lock_fd;
@@ -159,7 +156,7 @@ static int watch_path(const char *path, const char *file)
 		goto out_free;
 	}
 	if(S_ISREG(buf.st_mode)) {
-		create_name_file(fullpath);
+		create_name_file(fullpath, lock_fd);
 		goto out_free;
 	}
 	if(!S_ISDIR(buf.st_mode)) {
@@ -196,110 +193,37 @@ out_free:
 
 static void handle_event(struct inotify_event *e)
 {
+	struct dircache *dc;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
+
+	dc = dircache_lookup(e->wd);
+	if(!dc) {
+		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
+			e->wd);
+		return;
+	}
 
 	/* TODO: Handle MOVED_FROM/MOVED_TO, DELETE events */
 	if(e->len > 0) {
-		printf("%08x:%s%s\n", e->mask,
-		       dircache_lookup(e->wd), e->name);
+		printf("%08x:%s%s\n", e->mask, dc->path, e->name);
 	} else {
-		printf("%08x:%s\n", e->mask,
-		       dircache_lookup(e->wd));
+		printf("%08x:%s\n", e->mask, dc->path);
 	}
 
 	if(e->mask & IN_CREATE) {
 		if(e->mask & IN_ISDIR) {
-			watch_path(dircache_lookup(e->wd), e->name);
+			watch_path(dc->path, e->name);
 		} else {
-			create_name_file2(dircache_lookup(e->wd), e->name);
+			create_name_file2(dc->path, e->name, lock_fd);
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		create_tup_file(dircache_lookup(e->wd), e->name, "modify");
+		create_tup_file(dc->path, e->name, "modify", lock_fd);
 	}
 	if(e->mask & IN_DELETE) {
-		create_tup_file(dircache_lookup(e->wd), e->name, "delete");
+		create_tup_file(dc->path, e->name, "delete", lock_fd);
 	}
 	if(e->mask & IN_IGNORED) {
-		dircache_del(e->wd);
+		dircache_del(dc);
 	}
-}
-
-static int create_name_file(const char *file)
-{
-	return create_name_file2(file, "");
-}
-
-static int create_name_file2(const char *path, const char *file)
-{
-	int fd;
-	int rc = -1;
-	int len;
-	char tupfilename[] = ".tup/object/" SHA1_X "/.name";
-	static char read_filename[PATH_MAX];
-
-	path = tupid_from_path_filename(tupfilename + 12, path, file);
-
-	DEBUGP("create tup file '%s' containing '%s%s'.\n",
-	       tupfilename, path, file);
-	if(mkdirhier(tupfilename) < 0)
-		return -1;
-        fd = open(tupfilename, O_RDONLY);
-        if(fd < 0) {
-                fd = open(tupfilename, O_WRONLY | O_CREAT, 0666);
-                if(fd < 0) {
-                        perror("open");
-                        return -1;
-                }
-		if(write_all(fd, path, strlen(path), tupfilename) < 0)
-			goto err_out;
-		if(write_all(fd, file, strlen(file), tupfilename) < 0)
-			goto err_out;
-		if(write_all(fd, "\n", 1, tupfilename) < 0)
-			goto err_out;
-		create_tup_file(path, file, "create");
-        } else {
-		int pathlen = strlen(path);
-
-                len = read(fd, read_filename, sizeof(read_filename) - 1);
-                if(len < 0) {
-                        perror("read");
-			goto err_out;
-                }
-                read_filename[len] = 0;
-
-		if(memcmp(read_filename, path, pathlen) != 0 ||
-		   memcmp(read_filename+pathlen, file, strlen(file)) != 0) {
-                        fprintf(stderr, "Gak! SHA1 collision? Requested "
-                                "file '%s' doesn't match stored file '%s' for "
-                                "in '%s'\n", file, read_filename, tupfilename);
-			goto err_out;
-                }
-        }
-	rc = 0;
-err_out:
-        close(fd);
-        return rc;
-}
-
-static int create_tup_file(const char *path, const char *file, const char *tup)
-{
-	int rc;
-	char filename[] = ".tup/XXXXXX/" SHA1_X;
-
-	if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
-		/* tup must be running a wrapped command */
-		if(errno == EWOULDBLOCK)
-			return 0;
-		/* or some other error occurred */
-		perror("flock");
-		return -1;
-	}
-	memcpy(filename + 5, tup, 6);
-	path = tupid_from_path_filename(filename + 12, path, file);
-
-	DEBUGP("create %s file: %s\n", tup, filename);
-	rc = create_if_not_exist(filename);
-	flock(lock_fd, LOCK_UN);
-	return rc;
 }

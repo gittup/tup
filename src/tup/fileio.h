@@ -35,4 +35,9 @@ int write_sha1dep(const tupid_t file, const tupid_t depends_on);
  */
 int mkdirhier(char *filename);
 
+int create_tup_file(const char *path, const char *file, const char *tup,
+		    int lock_fd);
+int create_name_file(const char *file, int lock_fd);
+int create_name_file2(const char *path, const char *file, int lock_fd);
+
 #endif
