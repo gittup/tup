@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-int remove_if_exists(const char *path)
+int delete_if_exists(const char *path)
 {
 	struct stat buf;
 

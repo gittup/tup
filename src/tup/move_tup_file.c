@@ -4,7 +4,7 @@
 #include <string.h>
 #include <errno.h>
 
-int move_tup_file(const tupid_t tupid, const char *tupsrc, const char *tupdst)
+int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid)
 {
 	char oldfilename[] = ".tup/XXXXXX/" SHA1_X;
 	char newfilename[] = ".tup/XXXXXX/" SHA1_X;

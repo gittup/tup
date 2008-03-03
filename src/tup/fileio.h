@@ -13,7 +13,7 @@ int create_if_not_exist(const char *filename);
 int link_if_not_exist(const char *src, const char *dest);
 
 /** Removes a file if it exists */
-int remove_if_exists(const char *path);
+int delete_if_exists(const char *path);
 
 /** Basically write(), but returns -1 if the write fails or if the length
  * returned doesn't equal the 'size' argument.
@@ -38,11 +38,16 @@ int write_sha1dep(const tupid_t file, const tupid_t depends_on);
  */
 int mkdirhier(char *filename);
 
-int create_tup_file(const char *path, const char *file, const char *tup,
+int create_tup_file(const char *tup, const char *path, const char *file,
 		    int lock_fd);
+int create_tup_file_tupid(const char *tup, const tupid_t tupid, int lock_fd);
 int create_name_file(const char *file, int lock_fd);
 int create_name_file2(const char *path, const char *file, int lock_fd);
-int remove_tup_file(const char *tup, const tupid_t tupid);
-int move_tup_file(const tupid_t tupid, const char *tupsrc, const char *tupdst);
+int delete_tup_file(const char *tup, const tupid_t tupid);
+int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid);
+int tup_lock(int lock_fd);
+int tup_unlock(int lock_fd);
+int num_dependencies(const tupid_t tupid);
+int delete_name_file(const tupid_t tupid);
 
 #endif

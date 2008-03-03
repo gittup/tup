@@ -23,7 +23,7 @@ int init_getexecwd(const char *argv0)
 		/* Relative and absolute paths */
 		curfd = open(".", O_RDONLY);
 		if(curfd < 0) {
-			perror("open");
+			perror(".");
 			return -1;
 		}
 		*slash = 0;

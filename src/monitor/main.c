@@ -40,6 +40,7 @@
 static int make_tup_filesystem(void);
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
+static int handle_delete(const char *path, const char *file);
 
 static int inot_fd;
 static int lock_fd;
@@ -218,12 +219,23 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		create_tup_file(dc->path, e->name, "modify", lock_fd);
+		create_tup_file("modify", dc->path, e->name, lock_fd);
 	}
 	if(e->mask & IN_DELETE) {
-		create_tup_file(dc->path, e->name, "delete", lock_fd);
+		handle_delete(dc->path, e->name);
 	}
 	if(e->mask & IN_IGNORED) {
 		dircache_del(dc);
 	}
+}
+
+static int handle_delete(const char *path, const char *file)
+{
+	tupid_t tupid;
+
+	path = tupid_from_path_filename(tupid, path, file);
+	create_tup_file_tupid("delete", tupid, lock_fd);
+	delete_tup_file("create", tupid);
+	delete_tup_file("modify", tupid);
+	return 0;
 }

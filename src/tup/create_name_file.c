@@ -29,7 +29,7 @@ int create_name_file2(const char *path, const char *file, int lock_fd)
         if(fd < 0) {
                 fd = open(tupfilename, O_WRONLY | O_CREAT, 0666);
                 if(fd < 0) {
-                        perror("open");
+                        perror(tupfilename);
                         return -1;
                 }
 		if(write_all(fd, path, strlen(path), tupfilename) < 0)
@@ -38,7 +38,7 @@ int create_name_file2(const char *path, const char *file, int lock_fd)
 			goto err_out;
 		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
-		if(create_tup_file(path, file, "create", lock_fd) < 0)
+		if(create_tup_file_tupid("create", tupfilename+12, lock_fd) < 0)
 			goto err_out;
         } else {
 		int pathlen = strlen(path);
@@ -58,6 +58,8 @@ int create_name_file2(const char *path, const char *file, int lock_fd)
 			goto err_out;
                 }
         }
+	if(delete_tup_file("delete", tupfilename+12) < 0)
+		goto err_out;
 	rc = 0;
 err_out:
         close(fd);

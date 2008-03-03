@@ -53,7 +53,7 @@ static int process_create_nodes(void)
 			}
 			found = 1;
 			update(f.filename, TYPE_CREATE);
-			if(move_tup_file(f.filename, "create", "modify") < 0)
+			if(move_tup_file("create", "modify", f.filename) < 0)
 				return -1;
 		}
 		create_num++;
@@ -72,6 +72,8 @@ static int build_graph(struct graph *g)
 	 * root.
 	 */
 	if(process_tup_dir(".tup/modify/", g, TYPE_MODIFY) < 0)
+		return -1;
+	if(process_tup_dir(".tup/delete/", g, TYPE_DELETE) < 0)
 		return -1;
 
 	while(!list_empty(&g->plist)) {
@@ -184,8 +186,35 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(update(n->tupid, n->type) < 0)
-				return -1;
+			if(n->type & TYPE_DELETE) {
+				int ndeps;
+				ndeps = num_dependencies(n->tupid);
+				if(ndeps < 0)
+					return -1;
+				if(ndeps == 0) {
+					DEBUGP("delete orphaned node %.*s\n",
+					       8, n->tupid);
+					if(delete_name_file(n->tupid) < 0)
+						return -1;
+				} else {
+					int rc;
+					DEBUGP("deleted node %.*s still has %i "
+					       "incoming edges: rebuild\n",
+					       8, n->tupid, ndeps);
+					rc = update(n->tupid, TYPE_DELETE);
+					/* TODO: better way than returning a 
+					 * special error code
+					 */
+					if(rc == -7 && delete_name_file(n->tupid) < 0)
+						return -1;
+					if(rc < 0)
+						return -1;
+				}
+			}
+			if(n->type & TYPE_MODIFY) {
+				if(update(n->tupid, TYPE_MODIFY) < 0)
+					return -1;
+			}
 		}
 		while(n->edges) {
 			struct edge *e;
@@ -199,7 +228,7 @@ static int execute_graph(struct graph *g)
 			n->edges = remove_edge(e);
 		}
 		if(n->type & TYPE_MODIFY) {
-			remove_tup_file("modify", n->tupid);
+			delete_tup_file("modify", n->tupid);
 		}
 		remove_node(n);
 		dump_graph(g, GRAPH_NAME);

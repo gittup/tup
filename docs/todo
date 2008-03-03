@@ -24,3 +24,5 @@ just giving an error if it doesn't exist? also create up front for deps?
 	alloc can get one from free list if available, if not then free hunk, and if not there then allocate another slab
 
 wrapper fails if monitor is not running - always create object directory? what about if wrapper and monitor try to create at the same time?
+
+combine create/, modify/, and delete/ and use perm flags somehow? may simplify updater to not have to go through the graph multiple times, also atomic updates to file perms?
