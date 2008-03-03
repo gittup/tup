@@ -26,3 +26,6 @@ just giving an error if it doesn't exist? also create up front for deps?
 wrapper fails if monitor is not running - always create object directory? what about if wrapper and monitor try to create at the same time?
 
 combine create/, modify/, and delete/ and use perm flags somehow? may simplify updater to not have to go through the graph multiple times, also atomic updates to file perms?
+
+what if file.c #includes "foobar.h", then is edited to not include it? won't foobar.h still point to file.c? would seem silly to re-compile file.c if foobar.h is changed
+ - possibly unlink/relink file.c's .name, and see if foobar.h's dep is the same link as .name - if not, remove spurious link?

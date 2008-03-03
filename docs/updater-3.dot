@@ -1,0 +1,20 @@
+digraph g {
+tupb28b7af69320201d1cf206ebf28373980add1451 -> tup073b2dd67c0d080775429f1950ccb00eca67abb8 [dir=back];
+tup073b2dd67c0d080775429f1950ccb00eca67abb8 -> tup406e031b8824ea26ae0bf4d7579a1d89e3fb5906 [dir=back];
+tupb28b7af69320201d1cf206ebf28373980add1451 -> tup4ab0ef4117b239faf8a62e5ab48981a4cecd60b6 [dir=back];
+tup4ab0ef4117b239faf8a62e5ab48981a4cecd60b6 -> tup6a8809d4d9279d10f4891c2bc3a9e94b6f9e6bf5 [dir=back];
+tup073b2dd67c0d080775429f1950ccb00eca67abb8 -> tup76857b23e431da872f75d9c0d5c1f76241da1534 [dir=back];
+tup4ab0ef4117b239faf8a62e5ab48981a4cecd60b6 -> tup76857b23e431da872f75d9c0d5c1f76241da1534 [dir=back];
+tupb28b7af69320201d1cf206ebf28373980add1451 -> tupb309277fe2201344a4f5289f1d5b5d6fe8c5c562 [dir=back];
+tupb309277fe2201344a4f5289f1d5b5d6fe8c5c562 -> tupe55780e6340b6e110e51e79f077052cb086292a3 [dir=back];
+tupe55780e6340b6e110e51e79f077052cb086292a3 [label="foo.c (0)" color="#ff0000"];
+tup073b2dd67c0d080775429f1950ccb00eca67abb8 [label="main.o (2)" color="#000000"];
+tup8aba54e78f22a04fe086427d767240dbdbdac04b [label="clean.sh (0)" color="#000000"];
+tup76857b23e431da872f75d9c0d5c1f76241da1534 [label="other.h (0)" color="#000000"];
+tup4ab0ef4117b239faf8a62e5ab48981a4cecd60b6 [label="other.o (2)" color="#000000"];
+tup6a8809d4d9279d10f4891c2bc3a9e94b6f9e6bf5 [label="other.c (0)" color="#000000"];
+tup80754af91bfb6d1073585b046fe0a474ce868509 [label="build (0)" color="#000000"];
+tup406e031b8824ea26ae0bf4d7579a1d89e3fb5906 [label="main.c (0)" color="#000000"];
+tupb28b7af69320201d1cf206ebf28373980add1451 [label="main (3)" color="#ff0000"];
+tupb309277fe2201344a4f5289f1d5b5d6fe8c5c562 [label="foo.o (1)" color="#ff0000"];
+}

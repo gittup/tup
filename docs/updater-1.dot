@@ -1,0 +1,7 @@
+digraph g {
+tup80754af91bfb6d1073585b046fe0a474ce868509 [label="build (0)" color="#00ff00"];
+tup406e031b8824ea26ae0bf4d7579a1d89e3fb5906 [label="main.c (0)" color="#00ff00"];
+tup8aba54e78f22a04fe086427d767240dbdbdac04b [label="clean.sh (0)" color="#00ff00"];
+tup76857b23e431da872f75d9c0d5c1f76241da1534 [label="other.h (0)" color="#00ff00"];
+tup6a8809d4d9279d10f4891c2bc3a9e94b6f9e6bf5 [label="other.c (0)" color="#00ff00"];
+}
