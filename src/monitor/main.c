@@ -37,7 +37,9 @@
 #include "tup/fileio.h"
 #include "tup/tup-compat.h"
 
+#if 0
 static int make_tup_filesystem(void);
+#endif
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int handle_delete(const char *path, const char *file);
@@ -66,10 +68,17 @@ int main(int argc, char **argv)
 	}
 
 	gettimeofday(&t1, NULL);
+	lock_fd = open(TUP_LOCK, O_RDONLY);
+	if(lock_fd < 0) {
+		perror(TUP_LOCK);
+		return -1;
+	}
+#if 0
 	if(make_tup_filesystem() < 0) {
 		fprintf(stderr, "Unable to create tup filesystem hierarchy.\n");
 		return 1;
 	}
+#endif
 
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
@@ -104,6 +113,7 @@ close_inot:
 	return rc;
 }
 
+#if 0
 static int make_tup_filesystem(void)
 {
 	unsigned int x;
@@ -127,6 +137,7 @@ static int make_tup_filesystem(void)
 	}
 	return 0;
 }
+#endif
 
 static int watch_path(const char *path, const char *file)
 {
@@ -157,7 +168,7 @@ static int watch_path(const char *path, const char *file)
 		goto out_free;
 	}
 	if(S_ISREG(buf.st_mode)) {
-		create_name_file(fullpath, lock_fd);
+		create_name_file(fullpath);
 		goto out_free;
 	}
 	if(!S_ISDIR(buf.st_mode)) {
@@ -195,6 +206,7 @@ out_free:
 static void handle_event(struct inotify_event *e)
 {
 	struct dircache *dc;
+	int lock_mask = IN_MODIFY | IN_ATTRIB | IN_DELETE | IN_MOVE;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
 	dc = dircache_lookup(e->wd);
@@ -211,19 +223,33 @@ static void handle_event(struct inotify_event *e)
 		printf("%08x:%s\n", e->mask, dc->path);
 	}
 
-	if(e->mask & IN_CREATE) {
+	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
 			watch_path(dc->path, e->name);
 		} else {
-			create_name_file2(dc->path, e->name, lock_fd);
+			create_name_file2(dc->path, e->name);
+		}
+	}
+
+	if(e->mask & lock_mask) {
+		if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+			if(errno == EWOULDBLOCK)
+				goto nolock;
+			perror("flock");
+			return;
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		create_tup_file("modify", dc->path, e->name, lock_fd);
+		create_tup_file("modify", dc->path, e->name);
 	}
-	if(e->mask & IN_DELETE) {
+	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
 		handle_delete(dc->path, e->name);
 	}
+	if(e->mask & lock_mask) {
+		flock(lock_fd, LOCK_UN);
+	}
+
+nolock:
 	if(e->mask & IN_IGNORED) {
 		dircache_del(dc);
 	}
@@ -234,7 +260,7 @@ static int handle_delete(const char *path, const char *file)
 	tupid_t tupid;
 
 	path = tupid_from_path_filename(tupid, path, file);
-	create_tup_file_tupid("delete", tupid, lock_fd);
+	create_tup_file_tupid("delete", tupid);
 	delete_tup_file("create", tupid);
 	delete_tup_file("modify", tupid);
 	return 0;

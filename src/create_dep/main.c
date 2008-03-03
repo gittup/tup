@@ -29,9 +29,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if(create_name_file(argv[1], lock_fd) < 0)
+	if(create_name_file(argv[1]) < 0)
 		return 1;
-	if(create_name_file(argv[2], lock_fd) < 0)
+	if(create_name_file(argv[2]) < 0)
 		return 1;
 
 	tupid_from_filename(a, argv[1]);

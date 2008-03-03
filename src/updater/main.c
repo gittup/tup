@@ -187,6 +187,8 @@ static int execute_graph(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type & TYPE_DELETE) {
+				int rc;
+#if 0
 				int ndeps;
 				ndeps = num_dependencies(n->tupid);
 				if(ndeps < 0)
@@ -197,21 +199,28 @@ static int execute_graph(struct graph *g)
 					if(delete_name_file(n->tupid) < 0)
 						return -1;
 				} else {
-					int rc;
 					DEBUGP("deleted node %.*s still has %i "
 					       "incoming edges: rebuild\n",
 					       8, n->tupid, ndeps);
-					rc = update(n->tupid, TYPE_DELETE);
-					/* TODO: better way than returning a 
-					 * special error code
-					 */
-					if(rc == -7 && delete_name_file(n->tupid) < 0)
-						return -1;
-					if(rc < 0)
-						return -1;
 				}
-			}
-			if(n->type & TYPE_MODIFY) {
+				rc = update(n->tupid, TYPE_DELETE);
+				/* TODO: better way than returning a
+				 * special error code
+				 */
+				if(rc == -7 && delete_name_file(n->tupid) < 0)
+					return -1;
+				if(rc < 0)
+					return -1;
+#endif
+				rc = update(n->tupid, TYPE_DELETE);
+				/* TODO: better way than returning a
+				 * special error code
+				 */
+				if(rc == -7 && delete_name_file(n->tupid) < 0)
+					return -1;
+				if(rc < 0 && rc != -7)
+					return -1;
+			} else if(n->type & TYPE_MODIFY) {
 				if(update(n->tupid, TYPE_MODIFY) < 0)
 					return -1;
 			}
@@ -229,6 +238,9 @@ static int execute_graph(struct graph *g)
 		}
 		if(n->type & TYPE_MODIFY) {
 			delete_tup_file("modify", n->tupid);
+		}
+		if(n->type & TYPE_DELETE) {
+			delete_tup_file("delete", n->tupid);
 		}
 		remove_node(n);
 		dump_graph(g, GRAPH_NAME);

@@ -1,0 +1,58 @@
+#! /usr/bin/perl
+use strict;
+
+my($cmd);
+
+if($#ARGV < 0) {
+	&usage();
+}
+
+$cmd = $ARGV[0];
+if($cmd eq "init") {
+	if(-f ".tup/lock") {
+		print ".tup repository already exists.\n";
+		exit 0;
+	}
+	if(!-d ".tup") {
+		mkdir ".tup" or die "Can't create .tup/";
+	}
+	if(!-d ".tup/create") {
+		mkdir ".tup/create" or die "Can't create .tup/create/";
+	}
+	if(!-d ".tup/modify") {
+		mkdir ".tup/modify" or die "Can't create .tup/modify/";
+	}
+	if(!-d ".tup/delete") {
+		mkdir ".tup/delete" or die "Can't create .tup/delete/";
+	}
+	if(!-f ".tup/lock") {
+		open FILE, ">.tup/lock" or die "Can't create .tup/lock";
+		close FILE;
+	}
+	print ".tup repository initialized.\n";
+} elsif($cmd eq "startmon") {
+	exec("monitor . &");
+} elsif($cmd eq "stopmon") {
+	exec("killall -9 monitor");
+} elsif("update" =~ /^$cmd/ || $cmd eq "tup") {
+	exec("updater");
+} elsif("graph" =~ /^$cmd/) {
+	exec("sha1depgraph.pl");
+} else {
+	print "Unknown command: $cmd\n";
+}
+
+sub usage
+{
+	print STDERR <<HERE
+Usage: tup command [args]
+Where command is:
+  init		Initialize the tup dependency hierarchy (.tup/etc)
+  startmon	Start the file monitor daemon
+  stopmon	Stop the file monitor daemon
+  update	Update/delete all files that require changes
+  graph		Draw a graph of the depfs
+HERE
+;
+	die;
+}

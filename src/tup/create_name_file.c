@@ -6,12 +6,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-int create_name_file(const char *file, int lock_fd)
+int create_name_file(const char *file)
 {
-	return create_name_file2(file, "", lock_fd);
+	return create_name_file2(file, "");
 }
 
-int create_name_file2(const char *path, const char *file, int lock_fd)
+int create_name_file2(const char *path, const char *file)
 {
 	int fd;
 	int rc = -1;
@@ -38,7 +38,7 @@ int create_name_file2(const char *path, const char *file, int lock_fd)
 			goto err_out;
 		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
-		if(create_tup_file_tupid("create", tupfilename+12, lock_fd) < 0)
+		if(create_tup_file_tupid("create", tupfilename+12) < 0)
 			goto err_out;
         } else {
 		int pathlen = strlen(path);
