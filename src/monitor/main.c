@@ -37,9 +37,6 @@
 #include "tup/fileio.h"
 #include "tup/tup-compat.h"
 
-#if 0
-static int make_tup_filesystem(void);
-#endif
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int handle_delete(const char *path, const char *file);
@@ -73,12 +70,10 @@ int main(int argc, char **argv)
 		perror(TUP_LOCK);
 		return -1;
 	}
-#if 0
-	if(make_tup_filesystem() < 0) {
-		fprintf(stderr, "Unable to create tup filesystem hierarchy.\n");
-		return 1;
+	if(flock(lock_fd, LOCK_EX) < 0) {
+		perror("flock");
+		return -1;
 	}
-#endif
 
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
@@ -91,6 +86,10 @@ int main(int argc, char **argv)
 		goto close_inot;
 	}
 
+	if(flock(lock_fd, LOCK_UN) < 0) {
+		perror("flock (un)");
+		return -1;
+	}
 	gettimeofday(&t2, NULL);
 	fprintf(stderr, "Initialized in %f seconds.\n",
 		(double)(t2.tv_sec - t1.tv_sec) +
@@ -112,32 +111,6 @@ close_inot:
 	close(lock_fd);
 	return rc;
 }
-
-#if 0
-static int make_tup_filesystem(void)
-{
-	unsigned int x;
-	char pathnames[][13] = {
-		".tup/create/",
-		".tup/modify/",
-		".tup/delete/",
-		".tup/object/",
-	};
-	for(x=0; x<sizeof(pathnames) / sizeof(pathnames[0]); x++) {
-		printf("PATH: '%s'\n", pathnames[x]);
-		if(mkdirhier(pathnames[x]) < 0) {
-			return -1;
-		}
-	}
-
-	lock_fd = open(TUP_LOCK, O_RDONLY | O_CREAT, 0666);
-	if(lock_fd < 0) {
-		perror(TUP_LOCK);
-		return -1;
-	}
-	return 0;
-}
-#endif
 
 static int watch_path(const char *path, const char *file)
 {
@@ -217,11 +190,13 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	/* TODO: Handle MOVED_FROM/MOVED_TO, DELETE events */
+#if 0
 	if(e->len > 0) {
 		printf("%08x:%s%s\n", e->mask, dc->path, e->name);
 	} else {
 		printf("%08x:%s\n", e->mask, dc->path);
 	}
+#endif
 
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {

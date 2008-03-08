@@ -16,10 +16,12 @@ int create_name_file2(const char *path, const char *file)
 	int fd;
 	int rc = -1;
 	int len;
-	char tupfilename[] = ".tup/object/" SHA1_X "/.name";
+	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
 	static char read_filename[PATH_MAX];
+	tupid_t tupid;
 
-	path = tupid_from_path_filename(tupfilename + 12, path, file);
+	path = tupid_from_path_filename(tupid, path, file);
+	tupid_to_xd(tupfilename + 12, tupid);
 
 	DEBUGP("create tup file '%s' containing '%s%s'.\n",
 	       tupfilename, path, file);
@@ -38,7 +40,7 @@ int create_name_file2(const char *path, const char *file)
 			goto err_out;
 		if(write_all(fd, "\n", 1, tupfilename) < 0)
 			goto err_out;
-		if(create_tup_file_tupid("create", tupfilename+12) < 0)
+		if(create_tup_file_tupid("create", tupid) < 0)
 			goto err_out;
         } else {
 		int pathlen = strlen(path);
@@ -58,7 +60,7 @@ int create_name_file2(const char *path, const char *file)
 			goto err_out;
                 }
         }
-	if(delete_tup_file("delete", tupfilename+12) < 0)
+	if(delete_tup_file("delete", tupid) < 0)
 		goto err_out;
 	rc = 0;
 err_out:

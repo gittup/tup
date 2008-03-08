@@ -9,6 +9,7 @@ if($#ARGV < 0) {
 
 $cmd = $ARGV[0];
 if($cmd eq "init") {
+	my ($x);
 	if(-f ".tup/lock") {
 		print ".tup repository already exists.\n";
 		exit 0;
@@ -24,6 +25,16 @@ if($cmd eq "init") {
 	}
 	if(!-d ".tup/delete") {
 		mkdir ".tup/delete" or die "Can't create .tup/delete/";
+	}
+	if(!-d ".tup/object") {
+		mkdir ".tup/object" or die "Can't create .tup/object/";
+	}
+	for($x=0; $x<256; $x++) {
+		my ($str);
+		$str = sprintf "%02x", $x;
+		if(!-d ".tup/object/$str") {
+			mkdir ".tup/object/$str" or die "Can't create .tup/object/$str";
+		}
 	}
 	if(!-f ".tup/lock") {
 		open FILE, ">.tup/lock" or die "Can't create .tup/lock";

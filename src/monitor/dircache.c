@@ -21,8 +21,6 @@ void dircache_add(int wd, char *path)
 	dc->wd = wd;
 	dc->path = path;
 	list_add(&dc->list, &dclist);
-
-	dump_dircache();
 	return;
 }
 
@@ -32,7 +30,8 @@ void dircache_del(struct dircache *dc)
 	list_del(&dc->list);
 	free(dc->path);
 	free(dc);
-	dump_dircache();
+	if(0)
+		dump_dircache();
 }
 
 struct dircache *dircache_lookup(int wd)

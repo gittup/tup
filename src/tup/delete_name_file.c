@@ -9,15 +9,17 @@
 int delete_name_file(const tupid_t tupid)
 {
 	struct flist f;
-	char tupfilename[] = ".tup/object/" SHA1_X "/.name";
+	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
 
 	DEBUGP("delete name file: %.*s\n", 8, tupid);
-	memcpy(tupfilename + 12, tupid, sizeof(tupid_t));
+	tupid_to_xd(tupfilename + 12, tupid);
 	if(delete_if_exists(tupfilename) < 0)
 		return -1;
 
-	/* Change last / to nul to get dir name */
-	tupfilename[12 + sizeof(tupid_t)] = 0;
+	/* Change last / to nul to get dir name (13 accounts for '/' in
+	 * SHA1_XD)
+	 */
+	tupfilename[13 + sizeof(tupid_t)] = 0;
 	flist_foreach(&f, tupfilename) {
 		if(f.filename[0] != '.') {
 			DEBUGP("  move object %.*s to delete\n", 8, f.filename);

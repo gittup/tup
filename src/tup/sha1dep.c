@@ -6,13 +6,13 @@
 
 int write_sha1dep(const tupid_t file, const tupid_t depends_on)
 {
-	char depfilename[] = ".tup/object/" SHA1_X "/" SHA1_X;
-	char linkfilename[] = ".tup/object/" SHA1_X "/.name";
+	char depfilename[] = ".tup/object/" SHA1_XD "/" SHA1_X;
+	char linkfilename[] = ".tup/object/" SHA1_XD "/.name";
 
-	memcpy(depfilename + 12, depends_on, sizeof(tupid_t));
-	memcpy(depfilename + 13 + sizeof(tupid_t), file, sizeof(tupid_t));
+	tupid_to_xd(depfilename + 12, depends_on);
+	memcpy(depfilename + 14 + sizeof(tupid_t), file, sizeof(tupid_t));
 
-	memcpy(linkfilename + 12, file, sizeof(tupid_t));
+	tupid_to_xd(linkfilename + 12, file);
 
 	DEBUGP("create dependency: %s\n", depfilename);
 

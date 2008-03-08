@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include "graph.h"
 #include "tup/flist.h"
 #include "tup/fileio.h"
 #include "tup/tupid.h"
 #include "tup/debug.h"
+#include "tup/tup-compat.h"
 
 #define GRAPH_NAME "/home/marf/test%03i.dot"
 
@@ -23,14 +26,27 @@ static int update(const tupid_t tupid, char type);
 int main(void)
 {
 	struct graph g;
+	int lock_fd;
 
-	debug_enable("tup.updater");
+	lock_fd = open(TUP_LOCK, O_RDONLY);
+	if(lock_fd < 0) {
+		perror(TUP_LOCK);
+		return 1;
+	}
+	if(flock(lock_fd, LOCK_SH) < 0) {
+		perror("flock");
+		return 1;
+	}
+
+/*	debug_enable("tup.updater"); TODO*/
 	if(process_create_nodes() < 0)
 		return 1;
 	if(build_graph(&g) < 0)
 		return 1;
 	if(execute_graph(&g) < 0)
 		return 1;
+	flock(lock_fd, LOCK_UN);
+	close(lock_fd);
 	return 0;
 }
 
@@ -52,11 +68,17 @@ static int process_create_nodes(void)
 				return -1;
 			}
 			found = 1;
-			update(f.filename, TYPE_CREATE);
+			if(update(f.filename, TYPE_CREATE) < 0)
+				return -1;
 			if(move_tup_file("create", "modify", f.filename) < 0)
 				return -1;
 		}
 		create_num++;
+		if(create_num > 50) {
+			fprintf(stderr, "Error: in create loop for 50 "
+				"iterations - possible circular dependency?\n");
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -150,9 +172,9 @@ static int find_deps(struct graph *g, struct node *n)
 {
 	int rc = 0;
 	struct flist f;
-	char object_dir[] = ".tup/object/" SHA1_X;
+	char object_dir[] = ".tup/object/" SHA1_XD;
 
-	memcpy(object_dir + 12, n->tupid, sizeof(tupid_t));
+	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
 		if(f.filename[0] == '.')
 			continue;

@@ -8,12 +8,12 @@ open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
 
 print GRAPH "digraph g {\n";
 
-@files = `ls .tup/object/*/.name 2>/dev/null`;
+@files = `ls .tup/object/*/*/.name 2>/dev/null`;
 foreach $file (@files) {
 	my (@stats);
 	chomp($file);
 	$from = $file;
-	$from =~ s#\.tup/object/([0-9a-f]*)/.name#\1#;
+	$from =~ s#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/.name#\1\2#;
 	open FILE, "$file" or die "Can't open $file\n";
 	@stats = stat FILE;
 	$color_hash{$from} = 0x000000;
@@ -23,10 +23,12 @@ foreach $file (@files) {
 	close FILE;
 }
 
-@files = `ls .tup/object/*/* 2>/dev/null`;
+@files = `ls .tup/object/*/*/* 2>/dev/null`;
 foreach $file (@files) {
+	my ($from2);
 	chomp($file);
-	($from, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)#;
+	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
+	$from .= $from2;
 	print GRAPH "tup$to -> tup$from [dir=back];\n";
 }
 

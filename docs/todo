@@ -29,3 +29,5 @@ combine create/, modify/, and delete/ and use perm flags somehow? may simplify u
 
 what if file.c #includes "foobar.h", then is edited to not include it? won't foobar.h still point to file.c? would seem silly to re-compile file.c if foobar.h is changed
  - possibly unlink/relink file.c's .name, and see if foobar.h's dep is the same link as .name - if not, remove spurious link?
+
+ use link for stuff in create/ modify/ and delete/? will be easy to cat to see what it is, and probably take up less space

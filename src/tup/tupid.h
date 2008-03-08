@@ -1,11 +1,14 @@
 #ifndef tupid_h
 #define tupid_h
 
-/** Size of the SHA1 hash */
+#include <string.h>
+
 #define SHA1_HASH_SIZE 20
 
 /** Enough space for the sha1 hash in ascii hex */
 #define SHA1_X "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+#define SHA1_XD "xx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+#define SHA1_XD_SEP 2
 
 /** SHA1 hash of ".tup" */
 #define TUPDIR_HASH "9692fbc94cb1bc4ed7650fc86f47d0f73436bcf6"
@@ -32,5 +35,12 @@ const char *tupid_from_filename(tupid_t tupid, const char *filename);
  */
 const char *tupid_from_path_filename(tupid_t tupid, const char *path,
 				     const char *filename);
+
+static inline void tupid_to_xd(char *xd, const tupid_t tupid)
+{
+	memcpy(xd, tupid, SHA1_XD_SEP);
+	memcpy(xd + SHA1_XD_SEP + 1, tupid + SHA1_XD_SEP,
+	       sizeof(tupid_t) - SHA1_XD_SEP);
+}
 
 #endif

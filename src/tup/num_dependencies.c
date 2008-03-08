@@ -6,9 +6,9 @@
 int num_dependencies(const tupid_t tupid)
 {
 	struct stat buf;
-	char tupfilename[] = ".tup/object/" SHA1_X "/.name";
+	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
 
-	memcpy(tupfilename + 12, tupid, sizeof(tupid_t));
+	tupid_to_xd(tupfilename + 12, tupid);
 	if(stat(tupfilename, &buf) < 0) {
 		perror(tupfilename);
 		return -1;

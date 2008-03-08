@@ -9,7 +9,9 @@
 
 int main(int argc, char **argv)
 {
+#if 0
 	int lock_fd;
+#endif
 
 	tupid_t a;
 	tupid_t b;
@@ -19,6 +21,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+#if 0
 	lock_fd = open(TUP_LOCK, O_RDONLY);
 	if(lock_fd < 0) {
 		perror(TUP_LOCK);
@@ -28,6 +31,7 @@ int main(int argc, char **argv)
 		perror("flock");
 		return 1;
 	}
+#endif
 
 	if(create_name_file(argv[1]) < 0)
 		return 1;
@@ -39,6 +43,8 @@ int main(int argc, char **argv)
 	if(write_sha1dep(b, a) < 0)
 		return 1;
 
+#if 0
 	close(lock_fd);
+#endif
 	return 0;
 }
