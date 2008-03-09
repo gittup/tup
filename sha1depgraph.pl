@@ -58,10 +58,12 @@ sub tup_directory
 
 sub follow_chain
 {
-	my ($f, @list, $dep, $c);
+	my ($f, @list, $dep, $c, $f1, $f2);
 
 	$f = $_[0];
 	$c = $_[1];
+	$f1 = substr($f, 0, 2);
+	$f2 = substr($f, 2);
 	push(@circ_list, $f);
 
 	if($stack{$f} == 1) {
@@ -82,9 +84,9 @@ sub follow_chain
 	$stack{$f} = 1;
 
 	$color_hash{$f} |= $c;
-	@list = `ls .tup/object/$f/* 2>/dev/null`;
+	@list = `ls .tup/object/$f1/$f2/* 2>/dev/null`;
 	foreach $dep (@list) {
-		($dep) = $dep =~ m#\.tup/object/$f/([0-9a-f]*)#;
+		($dep) = $dep =~ m#\.tup/object/$f1/$f2/([0-9a-f]*)#;
 		&follow_chain($dep, $c);
 	}
 	$stack{$f} = 0;

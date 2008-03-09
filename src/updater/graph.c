@@ -99,6 +99,7 @@ void dump_graph(const struct graph *g, const char *filename)
 	char *realfile;
 	FILE *f;
 
+	fprintf(stderr, "Dumping graph '%s'\n", filename);
 	if(asprintf(&realfile, filename, count) < 0) {
 		perror("asprintf");
 		return;
@@ -124,11 +125,11 @@ static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
 	int color = 0;
-	if(n->type & TYPE_CREATE)
+	if(n->type & TUP_CREATE)
 		color |= 0x00bb00;
-	if(n->type & TYPE_DELETE)
+	if(n->type & TUP_DELETE)
 		color |= 0xff0000;
-	if(n->type & TYPE_MODIFY)
+	if(n->type & TUP_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%.*s [label=\"%.*s (%i)\",color=\"#%06x\"];\n",
 		sizeof(tupid_t), n->tupid,

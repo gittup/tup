@@ -4,10 +4,12 @@ mkdir .run_test
 cd .run_test
 niter=10
 ../gen-test-case.pl "$@" || exit 1
+sync
 cd tmake
 find . -type f | while read i; do cat $i > /dev/null; done
 echo "make: initial"
 time -p make > /dev/null
+sync
 cfile=`find . -name 0.c`;
 hfile=`find . -name 0.h`;
 
@@ -33,7 +35,9 @@ find . -type f | while read i; do cat $i > /dev/null; done
 tup init > /dev/null
 echo "tup: initial"
 tup startmon
+sleep 1
 time -p tup update > /dev/null
+sync
 cfile=`find . -name 0.c`;
 hfile=`find . -name 0.h`;
 

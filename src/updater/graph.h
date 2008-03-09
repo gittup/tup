@@ -13,10 +13,6 @@ struct edge {
 #define STATE_PROCESSING 1
 #define STATE_FINISHED 2
 
-#define TYPE_CREATE 0x001
-#define TYPE_DELETE 0x002
-#define TYPE_MODIFY 0x004
-
 struct node {
 	struct list_head list;
 	struct edge *edges;

@@ -68,7 +68,7 @@ static int process_create_nodes(void)
 				return -1;
 			}
 			found = 1;
-			if(update(f.filename, TYPE_CREATE) < 0)
+			if(update(f.filename, TUP_CREATE) < 0)
 				return -1;
 			if(move_tup_file("create", "modify", f.filename) < 0)
 				return -1;
@@ -93,9 +93,9 @@ static int build_graph(struct graph *g)
 	/* First attach all nodes in the relevant .tup directories to the
 	 * root.
 	 */
-	if(process_tup_dir(".tup/modify/", g, TYPE_MODIFY) < 0)
+	if(process_tup_dir(".tup/modify/", g, TUP_MODIFY) < 0)
 		return -1;
-	if(process_tup_dir(".tup/delete/", g, TYPE_DELETE) < 0)
+	if(process_tup_dir(".tup/delete/", g, TUP_DELETE) < 0)
 		return -1;
 
 	while(!list_empty(&g->plist)) {
@@ -113,7 +113,7 @@ static int build_graph(struct graph *g)
 		}
 	}
 
-	dump_graph(g, GRAPH_NAME);
+/*	dump_graph(g, GRAPH_NAME); TODO */
 	return 0;
 }
 
@@ -208,7 +208,7 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(n->type & TYPE_DELETE) {
+			if(n->type & TUP_DELETE) {
 				int rc;
 #if 0
 				int ndeps;
@@ -225,7 +225,7 @@ static int execute_graph(struct graph *g)
 					       "incoming edges: rebuild\n",
 					       8, n->tupid, ndeps);
 				}
-				rc = update(n->tupid, TYPE_DELETE);
+				rc = update(n->tupid, TUP_DELETE);
 				/* TODO: better way than returning a
 				 * special error code
 				 */
@@ -234,7 +234,7 @@ static int execute_graph(struct graph *g)
 				if(rc < 0)
 					return -1;
 #endif
-				rc = update(n->tupid, TYPE_DELETE);
+				rc = update(n->tupid, TUP_DELETE);
 				/* TODO: better way than returning a
 				 * special error code
 				 */
@@ -242,8 +242,8 @@ static int execute_graph(struct graph *g)
 					return -1;
 				if(rc < 0 && rc != -7)
 					return -1;
-			} else if(n->type & TYPE_MODIFY) {
-				if(update(n->tupid, TYPE_MODIFY) < 0)
+			} else if(n->type & TUP_MODIFY) {
+				if(update(n->tupid, TUP_MODIFY) < 0)
 					return -1;
 			}
 		}
@@ -258,14 +258,14 @@ static int execute_graph(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-		if(n->type & TYPE_MODIFY) {
+		if(n->type & TUP_MODIFY) {
 			delete_tup_file("modify", n->tupid);
 		}
-		if(n->type & TYPE_DELETE) {
+		if(n->type & TUP_DELETE) {
 			delete_tup_file("delete", n->tupid);
 		}
 		remove_node(n);
-		dump_graph(g, GRAPH_NAME);
+/*		dump_graph(g, GRAPH_NAME); TODO */
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
 		fprintf(stderr, "Error: Graph is not empty after execution.\n");
@@ -294,7 +294,7 @@ static int update(const tupid_t tupid, char type)
 		}
 		memcpy(tupid_str, tupid, sizeof(tupid_t));
 		tupid_str[sizeof(tupid_str)-1] = 0;
-		execl("/usr/bin/perl", "perl", "build", tstr, tupid_str, NULL);
+		execl("/home/marf/tup/builder", "builder", tstr, tupid_str, NULL);
 		perror("execl");
 		exit(1);
 	}

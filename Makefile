@@ -3,7 +3,7 @@ srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-PROGS := monitor wrapper benchmark create_dep updater
+PROGS := monitor wrapper benchmark builder create_dep updater
 SHLIBS := ldpreload.so
 
 all: $(PROGS) $(SHLIBS)
@@ -18,6 +18,7 @@ libtup.a: CCFLAGS := -fpic
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) libtup.a
 updater: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/updater/*.c)) libtup.a
 monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) libtup.a
+builder: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/builder/*.c)) libtup.a
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c)) libtup.a
 

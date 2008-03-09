@@ -22,6 +22,10 @@
 
 typedef char tupid_t[TUPID_SIZE];
 
+#define TUP_CREATE 0x001
+#define TUP_DELETE 0x002
+#define TUP_MODIFY 0x004
+
 /** Get the tupid from the filename. Result is *not* nul-terminated. Also
  * returns the true start of filename, since it may have been bumped up to
  * remove the "./". The actual filename array is not modified, of course.
