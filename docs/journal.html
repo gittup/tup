@@ -10,12 +10,12 @@
 <h4>Complete:</h4>
 <ul>
   <li>Monitor - 2008/02/03</li>
-  <li>Dependency generator (wrapper program and LD_PRELOAD library) 2008/02/13</li>
-  <li>Reverse dependency file structure (SHA1 hash directories) 2008/02/17</li>
+  <li>Dependency generator (wrapper program and LD_PRELOAD library) - 2008/02/13</li>
+  <li>Reverse dependency file structure (SHA1 hash directories) - 2008/02/17</li>
+  <li>Updater - 2008-03-09</li>
 </ul>
 <h4>Upcoming:</h4>
 <ul>
-  <li>Updater - 2008/03/15?</li>
   <li>Handle configuration files (eg: linux/.config) - 2008/04/01?</li>
   <li>Build small linux system with real source packages - 2008/04/20?</li>
   <li>Final presentation - 2008/04/30 - 10:30AM room 430A</li>
@@ -330,6 +330,121 @@
   <p>When the Updater runs, it will go through the partial DAG and issue delete commands to the build script for each file. The build script ignores the .c file since it is already removed. When it receives a delete request for foo.o, we make a check. If foo.c exists, we try to re-compile. Otherwise, we delete foo.o. Again, this knowledge is specific to this particular build environment, so it is kept in the build script. Currently it just removes the file and exits with a special return code to let the Updater know that it can remove the object from the tup filesystem. The Updater also issues the delete request to the build script for the main executable. The build script also issues a check here. If there are still objects in the directory, it will try to link them. If not, it will delete main. In this particular case, after foo.c is deleted and the Updater runs we have the following:</p>
   <table border=1><tr><td><img src="updater-4.png"></td></tr></table>
   <p>So it seems that creating and deleting files can be handled by the Updater. Moving files is handled by doing both a delete on the old file and a create on the new file (this is handled by the Monitor, which picks up such events). Still to come is a lot of testing (for example, deleting one node and modifying another, or creating a node and deleting it before running the Updater).</p>
+
+  <li><b>Mar 9 - Mar 15</b>: <p>Since the Updater is largely complete (aside from probably a few corner cases), Professor Lien suggested that I get an initial comparison of the time to build a project using the Updater versus building the same project with make. I am using GNU make v3.81 in these tests. This is different from my comparison in February, which was done largely to determine the overhead of using the Wrapper program. Now that the Updater and build script are functional, I can get a more direct comparison between make (using gcc -MMD for dependencies) and my set of programs.</p>
+  <p>I am re-using the test program from before, where I generate .c/.h file pairs, and put them in a random directory hierarchy. The files go in directories anywhere from 0 to 7 layers deep. Each C file includes 7 headers (so 0.c includes 0.h, 1.h, 2.h, ... 6.h). I modified the program slightly so that each directory of C files is compiled into a separate executable. The program also generates two copies of the same tree - one with a Makefile, and one with my Perl build script that is used with the Updater. I compared the execution time (using the real value of 'time' in the shell) of the two in the following categories:</p>
+  <ul>
+    <li>Initial build time (that is, time to generate all objects and programs)</li>
+    <li>Changed C file build (touch 0.c, and rebuild)</li>
+    <li>Changed header file build (touch 0.h, and rebuild). Note this actually rebuilds 7 .c files, and re-links them into their executables.</li>
+    <li>No files changed</li>
+  </ul>
+  <p>In order to make sure both programs were running in a fair environment, I made sure the disk was synced before running. I also attempted to pre-load the cache in both cases by doing a 'cat' on each file before the initial build. After the initial build, I again ran sync to make sure everything was written out before doing other tests. The four categories of testing were done over the following input sizes: 1, 10, 100, 1000, and 10000. For example, at size=100 there are files 0.c - 99.c, and 0.h - 99.h scattered about the hierarchy. 10000 would be about the size of a large project (such as the Linux kernel, or Firefox). The initial build time test was done only once (since it takes a while to do), and the change file/no-op tests were done 10 times each and averaged.</p>
+  <p>I ran into a few issues with the Updater while trying the 10000 node case. First, the Monitor quickly hit the 8192 directory limit of inotify. I increased this by doing:</p>
+  <pre>
+  echo 65536 &gt; /proc/sys/fs/inotify/max_user_watches
+  </pre>
+  <p>This was done before running any tests (not just the 10000 node case). Another issue I encountered was that I hit the limit of the maximum number of files in a directory. Specifically, the .tup/object/ directory filled up. I worked around this using the same method as git. Git creates 256 sub-directories for its objects (00, 01, 02...ff) and uses the first byte of the hash to determine which directory it goes in. This effectively cuts down the number of objects in a single directory by a factor of 256. With these changes in place, I was able to build the 10000 node case using the Updater.</p>
+  <p>Here are the results for the initial build times. Note that in this graph (and the next few), both axes are logarithmic.</p>
+  <table>
+  <caption><i>Initial build times (Perl builder vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Updater (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.02</td><td>0.06</td></tr>
+  <tr><td>10</td><td>0.2</td><td>0.55</td></tr>
+  <tr><td>100</td><td>2.06</td><td>5.41</td></tr>
+  <tr><td>1000</td><td>21.61</td><td>56.56</td></tr>
+  <tr><td>10000</td><td>222.92</td><td>854.54</td></tr>
+  </table>
+  </td><td>
+  <img src="perl-plot-initial.png">
+  </td></tr></table>
+  <p>In all cases, the Updater requires about 2.5 - 4.0 times more time during the initial build. It seems to scale at the same rate as make, except in the last case where the time spikes a bit. This might be because the large number of files written by the Updater no longer fits in the cache, causing things to be written out early. However, this investment seems worthwhile when considering the update times. First consider a single C file touched:</p>
+  <table>
+  <caption><i>C file changed (Perl builder vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Updater (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.02</td><td>0.04</td></tr>
+  <tr><td>10</td><td>0.03</td><td>0.04</td></tr>
+  <tr><td>100</td><td>0.111</td><td>0.04</td></tr>
+  <tr><td>1000</td><td>1.134</td><td>0.04</td></tr>
+  <tr><td>10000</td><td>18.77</td><td>0.042</td></tr>
+  </table>
+  </td><td>
+  <img src="perl-plot-c_file.png">
+  </td></tr></table>
+  <p>Although the Updater performs worse when dealing with small numbers of files, it quickly catches up to make after a sample size of about 20. It also gives nearly constant performance, with a slight increase in the 10000 node case. This is probably due to increased seek time when reading the .tup/object/ directory with a large number of files.</p>
+  <p>Next we touch a single header file, and update. This builds 7 .c files (which are randomly scattered in various directories), and re-links their binaries. This could be seen as updating the interface to a library, for example. Here are the build results:</p>
+  <table>
+  <caption><i>Header file changed (Perl builder vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Updater (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.02</td><td>0.04</td></tr>
+  <tr><td>10</td><td>0.15</td><td>0.23</td></tr>
+  <tr><td>100</td><td>0.24</td><td>0.24</td></tr>
+  <tr><td>1000</td><td>1.258</td><td>0.24</td></tr>
+  <tr><td>10000</td><td>18.877</td><td>0.28</td></tr>
+  </table>
+  </td><td>
+  <img src="perl-plot-h_file.png">
+  </td></tr></table>
+  <p>This is similar to the C file case. The only extra anomaly here is from 1 node to 10 nodes, since in the 1-node case, touching the header obviously only updates 1 file. In the 10-node case (and all other cases) 7 files are re-compiled. This is useful to see that the Updater scales with respect to the number of files that need to be updated (ie: the size of the partial DAG) rather than the size of the entire project, as make does. Finally we consider the time to "do nothing". Basically this is the time to run make or the updater after a complete build.</p>
+  <table>
+  <caption><i>No files changed (Perl builder vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Updater (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0</td><td>0</td></tr>
+  <tr><td>10</td><td>0.01</td><td>0</td></tr>
+  <tr><td>100</td><td>0.09</td><td>0</td></tr>
+  <tr><td>1000</td><td>1.111</td><td>0</td></tr>
+  <tr><td>10000</td><td>18.736</td><td>0</td></tr>
+  </table>
+  </td><td>
+  <img src="perl-plot-nothing.png">
+  </td></tr></table>
+  <p>The Updater doesn't register any time using the 'time' shell command. All it really does in this case is look in the create/, modify/, and delete/ directories, and then quit because there are no hashes there. In contrast, make reads in all of its dependency files, builds the entire DAG, and then does a stat() on every file in the DAG in order to compare timestamps.</p>
+  <p>With these results, it is pretty clear that the initial investment for using the Updater is significant. So from a build-once and throw away perspective, it is not worthwhile. However, during a development cycle where a developer focuses only on a small part of a larger program, the time savings from not having to constantly build the entire DAG could be useful.</p>
+  <p>In order to try to improve the initial build results of the Updater, I looked into removing the use of the Perl script for the build portion. This is because for each file in the directory, I do a fork(), then exec Perl, which may eventually exec gcc or ld. Instead I tried implementing the build portion in C to skip the extra step of going to Perl. This still does a fork() for each file in the create phase, but does not invoke the Perl interpreter for each one. Here is a comparison between using the Perl builder and the C builder, along with the previous make results:</p>
+  <table>
+  <caption><i>Perl builder vs. C builder</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Perl builder (time in s)</b></td>
+    <td align=center><b>C builder (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.02</td><td>0.06</td><td>0.03</td></tr>
+  <tr><td>10</td><td>0.21</td><td>0.55</td><td>0.29</td></tr>
+  <tr><td>100</td><td>2.07</td><td>5.41</td><td>2.89</td></tr>
+  <tr><td>1000</td><td>20.44</td><td>56.56</td><td>31.07</td></tr>
+  <tr><td>10000</td><td>219.01</td><td>854.54</td><td>551.34</td></tr>
+  </table>
+  </td><td>
+  <img src="cbuilder-vs-perl-vs-make.png">
+  </td></tr></table>
+  <p>The C builder results are slightly improved, yielding a 1.5 factor increase over make in the small cases, and a 2.5 factor in the 10000 node case. Again this increase in the last case is probably because of the sheer volume of files that need to be created. I may investigate using a shared library plugin instead of a separate C program to avoid process creation overhead (except when running gcc), though I don't think this will be enough to overcome the time to create all the files that the Updater uses.</p>
 
 </ul>
 </body>

@@ -3,4 +3,4 @@ if [ $# -lt 1 ]; then
 	echo "Usage: $0 plot_type" 1>&2;
 	exit 1;
 fi
-(echo "set logscale"; echo "plot \"$1\" using 1:2 title 'make' with linespoints, \"$1\" using 1:3 title 'tup' with linespoints") | gnuplot -persist
+(echo "set logscale"; echo "set key top left"; echo "set term png size 320,240"; echo "plot \"$1\" using 1:2 title 'make' with linespoints, \"$1\" using 1:3 title 'tup' with linespoints") | gnuplot -persist
