@@ -3,8 +3,8 @@ srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-PROGS := monitor wrapper benchmark builder create_dep updater
-SHLIBS := ldpreload.so
+PROGS := monitor wrapper benchmark create_dep updater
+SHLIBS := ldpreload.so builder.so
 
 all: $(PROGS) $(SHLIBS)
 
@@ -14,11 +14,14 @@ wrapper: LDFLAGS := -lpthread
 ldpreload.so: CCFLAGS := -fpic
 ldpreload.so: LDFLAGS := -ldl
 libtup.a: CCFLAGS := -fpic
+updater: LDFLAGS := -ldl
+builder.so: CCFLAGS := -fpic
 
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) libtup.a
 updater: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/updater/*.c)) libtup.a
 monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) libtup.a
-builder: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/builder/*.c)) libtup.a
+builder.so: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/builder/*.c)) libtup.a
+ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c)) libtup.a
 
@@ -26,7 +29,7 @@ $(PROGS):
 	$Qecho "  LD      $@";\
 	gcc -o $@ $^ $(LDFLAGS)
 
-ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
+$(SHLIBS): %.so:
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 

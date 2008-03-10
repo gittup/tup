@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -21,12 +22,14 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 		    int type);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
-static int update(const tupid_t tupid, char type);
+/*static int update(const tupid_t tupid, char type);*/
+int (*update)(const tupid_t tupid, char type);
 
 int main(void)
 {
 	struct graph g;
 	int lock_fd;
+	void *handle;
 
 	lock_fd = open(TUP_LOCK, O_RDONLY);
 	if(lock_fd < 0) {
@@ -35,6 +38,19 @@ int main(void)
 	}
 	if(flock(lock_fd, LOCK_SH) < 0) {
 		perror("flock");
+		return 1;
+	}
+
+	/* TODO: real path */
+	handle = dlopen("/home/marf/tup/builder.so", RTLD_LAZY);
+	if(!handle) {
+		fprintf(stderr, "Error: Unable to load builder.so\n");
+		return 1;
+	}
+	update = dlsym(handle, "update");
+	if(!update) {
+		fprintf(stderr, "Error: Couldn't find 'update' symbol in "
+			"builder.\n");
 		return 1;
 	}
 
@@ -274,6 +290,7 @@ static int execute_graph(struct graph *g)
 	return 0;
 }
 
+#if 0
 static int update(const tupid_t tupid, char type)
 {
 	int pid;
@@ -309,3 +326,4 @@ static int update(const tupid_t tupid, char type)
 	fprintf(stderr, "Error: Update process didn't return.\n");
 	return -1;
 }
+#endif

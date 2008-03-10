@@ -33,3 +33,5 @@ what if file.c #includes "foobar.h", then is edited to not include it? won't foo
  use link for stuff in create/ modify/ and delete/? will be easy to cat to see what it is, and probably take up less space
 
  modify 'tup graph' to be able to take in start node ids, to trim output
+
+ compare open/mmap to open/read/malloc?
