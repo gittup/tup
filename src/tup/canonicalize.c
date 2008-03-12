@@ -27,7 +27,15 @@ int canonicalize(const char *path, const char *file, char *out, int len)
 			return -1;
 		}
 	} else {
-		sz = snprintf(out, len, "%s/%s/%s", get_sub_dir(), path, file);
+		const char *dir = get_sub_dir();
+		if(dir[0]) {
+			sz = snprintf(out, len, "%s/%s/%s", dir, path, file);
+		} else {
+			if(path[0])
+				sz = snprintf(out, len, "%s/%s", path, file);
+			else
+				sz = snprintf(out, len, "%s", file);
+		}
 		if(sz >= len) {
 			fprintf(stderr, "Out of room for file '%s/%s/%s'\n",
 				get_sub_dir(), path, file);
@@ -40,10 +48,20 @@ int canonicalize(const char *path, const char *file, char *out, int len)
 			if(out[x] == '/' && out[x-1] == '/') {
 				memmove(out+x, out+x+1, sz-x);
 				sz--;
+				x--;
 			}
 		}
 	}
 	for(x=0; x<sz; x++) {
+		if(x >= 1) {
+			if(out[x-0] == '/' &&
+			   out[x-1] == '.' &&
+			   (x == 1 || out[x-2] == '/')) {
+				memmove(out+x-1, out+x+1, sz-x);
+				sz -= 2;
+				x--;
+			}
+		}
 		if(x >= 3) {
 			int slash;
 			if(out[x-0] == '/' &&
@@ -53,11 +71,13 @@ int canonicalize(const char *path, const char *file, char *out, int len)
 				for(slash = x - 4; slash >= 0; slash--) {
 					if(out[slash] == '/') {
 						memmove(out+slash, out+x, sz-x+1);
+						sz -= x-slash;
 						x = slash;
 						goto done;
 					}
 				}
 				memmove(out, out+x+1, sz-x);
+				sz -= (x + 1);
 				x = 0;
 done:
 				;
