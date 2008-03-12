@@ -35,3 +35,16 @@ what if file.c #includes "foobar.h", then is edited to not include it? won't foo
  modify 'tup graph' to be able to take in start node ids, to trim output
 
  compare open/mmap to open/read/malloc?
+
+put configuration options in .tup/config or something. would be nice to do 'tup cfg' to see what the config is, or 'tup cfg keepgoing=1' to always run tup in 'keep going' mode. when changing cfg, print new config with keepgoing in green, or something, if it changed
+
+add a 'tup touch/modify', 'tup delete', and tup 'create' commands (maybe tup touch should do a create if it doesn't exist in .tup/object). Also allow to do a 'tup touch foo.c' in directory a/, and it will create the object for a/foo.c if .tup and a/ are on the same level.
+
+options/features:
+ - progress bar
+ - color output
+ - keep going
+ - parallel
+
+
+in updater/graph.h - make edge have a node *src, and edge *next for both src and dest? that way when updating the destination, it could know the names of the source nodes? would that be useful?

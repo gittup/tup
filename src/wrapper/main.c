@@ -8,7 +8,7 @@
 #include "file.h"
 #include "tup/getexecwd.h"
 #include "tup/debug.h"
-#include "tup/tup-compat.h"
+#include "tup/compat.h"
 
 int main(int argc, char **argv)
 {

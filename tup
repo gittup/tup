@@ -7,7 +7,7 @@ if($#ARGV < 0) {
 	&usage();
 }
 
-$cmd = $ARGV[0];
+$cmd = shift;
 if($cmd eq "init") {
 	my ($x);
 	if(-f ".tup/lock") {
@@ -48,7 +48,9 @@ if($cmd eq "init") {
 } elsif("update" =~ /^$cmd/ || $cmd eq "tup") {
 	exec("updater");
 } elsif("graph" =~ /^$cmd/) {
-	exec("sha1depgraph.pl");
+	exec("sha1depgraph.pl @ARGV");
+} elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
+	exec("config @ARGV");
 } else {
 	print "Unknown command: $cmd\n";
 }

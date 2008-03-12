@@ -6,12 +6,13 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/file.h>
-#include "graph.h"
+#include "tup/graph.h"
 #include "tup/flist.h"
 #include "tup/fileio.h"
 #include "tup/tupid.h"
 #include "tup/debug.h"
-#include "tup/tup-compat.h"
+#include "tup/config.h"
+#include "tup/compat.h"
 
 #define GRAPH_NAME "/home/marf/test%03i.dot"
 
@@ -28,6 +29,7 @@ int (*update)(const tupid_t tupid, char type);
 int main(void)
 {
 	struct graph g;
+	struct tup_config cfg;
 	int lock_fd;
 	void *handle;
 
@@ -41,10 +43,13 @@ int main(void)
 		return 1;
 	}
 
-	/* TODO: real path */
-	handle = dlopen("/home/marf/tup/builder.so", RTLD_LAZY);
+	if(load_tup_config(&cfg) < 0) {
+		return 1;
+	}
+
+	handle = dlopen(cfg.build_so, RTLD_LAZY);
 	if(!handle) {
-		fprintf(stderr, "Error: Unable to load builder.so\n");
+		fprintf(stderr, "Error: Unable to load %s\n", cfg.build_so);
 		return 1;
 	}
 	update = dlsym(handle, "update");

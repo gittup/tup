@@ -1,5 +1,5 @@
-#ifndef fileio_h
-#define fileio_h
+#ifndef tup_fileio_h
+#define tup_fileio_h
 
 #include "tup/tupid.h"
 

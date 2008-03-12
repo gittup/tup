@@ -1,5 +1,5 @@
-#ifndef debug_h
-#define debug_h
+#ifndef tup_debug_h
+#define tup_debug_h
 
 #include <unistd.h>
 

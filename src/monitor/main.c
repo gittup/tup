@@ -35,7 +35,7 @@
 #include "tup/debug.h"
 #include "tup/tupid.h"
 #include "tup/fileio.h"
-#include "tup/tup-compat.h"
+#include "tup/compat.h"
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);

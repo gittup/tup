@@ -1,6 +1,6 @@
 #include "fileio.h"
 #include "debug.h"
-#include "tup-compat.h"
+#include "compat.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>

@@ -1,5 +1,5 @@
-#ifndef tupid_h
-#define tupid_h
+#ifndef tup_tupid_h
+#define tup_tupid_h
 
 #include <string.h>
 

@@ -5,7 +5,7 @@
 #include <sys/file.h>
 #include "tup/tupid.h"
 #include "tup/fileio.h"
-#include "tup/tup-compat.h"
+#include "tup/compat.h"
 
 int main(int argc, char **argv)
 {

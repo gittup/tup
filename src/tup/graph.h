@@ -1,5 +1,5 @@
-#ifndef graph_h
-#define graph_h
+#ifndef tup_graph_h
+#define tup_graph_h
 
 #include "tup/list.h"
 #include "tup/tupid.h"

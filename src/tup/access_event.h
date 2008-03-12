@@ -1,5 +1,5 @@
-#ifndef access_event_h
-#define access_event_h
+#ifndef tup_access_event_h
+#define tup_access_event_h
 
 #include "tupid.h"
 

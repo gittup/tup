@@ -7,3 +7,5 @@
 /updater
 /libtup.a
 /builder.so
+/depgraph
+/config

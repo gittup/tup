@@ -1,5 +1,5 @@
-#ifndef getexecwd_h
-#define getexecwd_h
+#ifndef tup_getexecwd_h
+#define tup_getexecwd_h
 
 /** Initialize the executable's working directory path (the location of the
  * actual executable.

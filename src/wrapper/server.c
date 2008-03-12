@@ -3,7 +3,7 @@
 #include "tup/access_event.h"
 #include "tup/debug.h"
 #include "tup/getexecwd.h"
-#include "tup/tup-compat.h"
+#include "tup/compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>

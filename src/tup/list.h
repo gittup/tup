@@ -1,8 +1,8 @@
 /*
  * Simple doubly linked list implementation from linux/include/linux/list.h
  */
-#ifndef list_h
-#define list_h
+#ifndef tup_list_h
+#define tup_list_h
 
 struct list_head {
 	struct list_head *next, *prev;
