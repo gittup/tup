@@ -90,23 +90,27 @@ int update(const tupid_t tupid, char type)
 			printf("Ignore create: '%s'\n", name);
 		}
 	}
-	if(type & TUP_DELETE) {
-		fprintf(stderr, "Error: delete unsupported.\n");
-		return -1;
-	}
-	if(type & TUP_MODIFY) {
+	if(type & TUP_MODIFY || type & TUP_DELETE) {
 		const char *ext;
 		ext = file_ext(name, buf.st_size);
 		if(strcmp(ext, "o") == 0) {
 			int pid;
 			int status;
 			char *cfile;
+			struct stat st;
 			cfile = strdup(name);
 			if(!cfile) {
 				perror("strdup");
 				return -1;
 			}
 			cfile[buf.st_size - 2] = 'c';
+			if(stat(cfile, &st) < 0 || !S_ISREG(st.st_mode)) {
+				if(!(type & TUP_DELETE)) {
+					fprintf(stderr, "Warning: C file '%s' is missing and no delete flag is set!\n", cfile);
+				}
+				unlink(name);
+				return -77;
+			}
 			printf("  CC      %s\n", cfile);
 			pid = fork();
 			if(pid < 0) {
@@ -164,6 +168,13 @@ int update(const tupid_t tupid, char type)
 				   f.filename[len-1] == 'o') {
 					count++;
 				}
+			}
+			if(!count) {
+				if(!(type & TUP_DELETE)) {
+					fprintf(stderr, "Warning: No objects are present and delete flag is not set!\n");
+				}
+				unlink(name);
+				return -77;
 			}
 			objects = malloc(sizeof(*objects) * (count + 6));
 			if(!objects) {

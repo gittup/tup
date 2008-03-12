@@ -48,3 +48,5 @@ options/features:
 
 
 in updater/graph.h - make edge have a node *src, and edge *next for both src and dest? that way when updating the destination, it could know the names of the source nodes? would that be useful?
+
+instead of update(hash, flags), do update(hash) and create(hash), where update is a combo of modify/delete?

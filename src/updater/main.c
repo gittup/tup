@@ -229,7 +229,7 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(n->type & TUP_DELETE) {
+			if(n->type & TUP_DELETE || n->type & TUP_MODIFY) {
 				int rc;
 #if 0
 				int ndeps;
@@ -255,16 +255,13 @@ static int execute_graph(struct graph *g)
 				if(rc < 0)
 					return -1;
 #endif
-				rc = update(n->tupid, TUP_DELETE);
+				rc = update(n->tupid, n->type);
 				/* TODO: better way than returning a
 				 * special error code
 				 */
-				if(rc == -7 && delete_name_file(n->tupid) < 0)
+				if(rc == -77 && delete_name_file(n->tupid) < 0)
 					return -1;
-				if(rc < 0 && rc != -7)
-					return -1;
-			} else if(n->type & TUP_MODIFY) {
-				if(update(n->tupid, TUP_MODIFY) < 0)
+				if(rc < 0 && rc != -77)
 					return -1;
 			}
 		}

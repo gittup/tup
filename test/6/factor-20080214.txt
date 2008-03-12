@@ -1,3 +1,0 @@
-Using wrapper:  5.038224
-Standard build: 4.970926
-Factor: 1.013538
