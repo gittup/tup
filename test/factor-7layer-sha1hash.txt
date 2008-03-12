@@ -1,5 +1,0 @@
-
-Using wrapper:  2.148572
-Standard build: 1.882263
-Factor: 1.141484
-
