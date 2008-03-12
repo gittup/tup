@@ -51,8 +51,37 @@ if($cmd eq "init") {
 	exec("sha1depgraph.pl @ARGV");
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
+} elsif("create" =~ /^$cmd/) {
+	my ($hash);
+	if($#ARGV < 0) {
+		die "Usage: create file [file...]\n";
+	}
+	$hash = `echo -n $ARGV[0] | sha1sum | awk '{print \$1}'`;
+	chomp($hash);
+	&create($ARGV[0], $hash);
+} elsif("touch" =~ /^$cmd/ || "modify" =~ /^$cmd"/) {
+	my ($hash, $a, $b);
+	if($#ARGV < 0) {
+		die "Usage: [touch/modify] file [file...]\n";
+	}
+	$hash = `echo -n $ARGV[0] | sha1sum | awk '{print \$1}'`;
+	($a, $b) = $hash =~ /([0-9a-f][0-9a-f])([0-9a-f]+)/;
+	chomp($hash);
+	if(! -d ".tup/object/$a/$b") {
+		&create($ARGV[0], $hash);
+	} else {
+		system("touch .tup/modify/$hash");
+	}
+} elsif("delete" =~ /^$cmd/ || $cmd eq "rm") {
+	my ($hash);
+	if($#ARGV < 0) {
+		die "Usage: delete file [file...]\n";
+	}
+	$hash = `echo -n $ARGV[0] | sha1sum | awk '{print \$1}'`;
+	chomp($hash);
+	system("touch .tup/delete/$hash");
 } else {
-	print "Unknown command: $cmd\n";
+	print STDERR "Unknown command: $cmd\n";
 }
 
 sub usage
@@ -65,7 +94,22 @@ Where command is:
   stopmon	Stop the file monitor daemon
   update	Update/delete all files that require changes
   graph		Draw a graph of the depfs
+  config	Show / modify configuration
+  create	Put a file hash in the create/ directory
+  touch/modify	Put a file hash in the create/ or modify/ directory, as req'd
+  delete/rm	Put a file hash in the delete/ directory
 HERE
 ;
 	die;
+}
+
+sub create
+{
+	my ($a, $b);
+	($a, $b) = $_[1] =~ /([0-9a-f][0-9a-f])([0-9a-f]+)/;
+	mkdir ".tup/object/$a/$b/" or die "Can't make object directory!\n";
+	open FILE, ">.tup/object/$a/$b/.name" or die "Can't open name file for write!\n";
+	print FILE "$_[0]\n";
+	close FILE;
+	system("touch .tup/create/$_[1]");
 }
