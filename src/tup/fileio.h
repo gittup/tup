@@ -46,5 +46,6 @@ int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid);
 int num_dependencies(const tupid_t tupid);
 int delete_name_file(const tupid_t tupid);
+int canonicalize(const char *path, const char *file, char *out, int len);
 
 #endif

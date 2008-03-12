@@ -33,6 +33,10 @@ int main(void)
 	int lock_fd;
 	void *handle;
 
+	if(find_tup_dir() < 0) {
+		return 1;
+	}
+
 	lock_fd = open(TUP_LOCK, O_RDONLY);
 	if(lock_fd < 0) {
 		perror(TUP_LOCK);
