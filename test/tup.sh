@@ -9,7 +9,7 @@ check_empty_tupdirs()
 	fi
 }
 
-object_check()
+sym_check()
 {
 	f=$1
 	shift
@@ -69,4 +69,14 @@ tup_object_no_exist()
 		fi
 		shift
 	done
+}
+
+tup_dep_no_exist()
+{
+	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
+	dep=`echo -n $2 | sha1sum | awk '{print $1}'`
+	if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/$dep" ]; then
+		echo "Dependency from $1 -> $2 exists when it shouldn't" 1>&2
+		exit 1
+	fi
 }

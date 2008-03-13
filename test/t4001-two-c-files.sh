@@ -8,8 +8,8 @@ echo "void bar1(void) {}" > bar.c
 tup touch foo.c bar.c
 tup upd
 check_empty_tupdirs
-object_check foo.o foo1
-object_check bar.o bar1
+sym_check foo.o foo1
+sym_check bar.o bar1
 
 # Verify only foo is compiled if foo.c is touched
 echo "void foo2(void) {}" >> foo.c
@@ -18,7 +18,7 @@ tup touch foo.c
 tup upd
 check_empty_tupdirs
 check_not_exist bar.o
-object_check foo.o foo1 foo2
+sym_check foo.o foo1 foo2
 
 # Verify both are compiled if both are touched, but only linked once
 rm foo.o
@@ -29,5 +29,5 @@ else
 	echo "Program should have only been linked once." 1>&2
 fi
 check_empty_tupdirs
-object_check foo.o foo1 foo2
-object_check bar.o bar1
+sym_check foo.o foo1 foo2
+sym_check bar.o bar1
