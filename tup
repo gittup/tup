@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 use strict;
 
-my($cmd, $path);
+my($cmd);
 
 if($#ARGV < 0) {
 	&usage();
@@ -44,19 +44,6 @@ if($cmd eq "init") {
 	exit 0;
 }
 
-#$path = "";
-#while(! -d ".tup/") {
-#	my ($n);
-#	$n = `pwd`;
-#	chomp($n);
-#	if($n eq "/") {
-#		die ".tup/ not found! Run 'tup init' to create dependency filesystem.\n";
-#	}
-#	$n =~ s#.*/##;
-#	$path = "$n/";
-#	chdir "..";
-#}
-
 if($cmd eq "startmon") {
 	exec("monitor . &");
 } elsif($cmd eq "stopmon") {
@@ -68,34 +55,21 @@ if($cmd eq "startmon") {
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
 } elsif("create" =~ /^$cmd/) {
-	my ($hash);
 	if($#ARGV < 0) {
 		die "Usage: create file [file...]\n";
 	}
-	$hash = `echo -n $path$ARGV[0] | sha1sum | awk '{print \$1}'`;
-	chomp($hash);
-	&create($path.$ARGV[0], $hash);
+	exec("tuptouch create $ARGV[0]");
 } elsif("touch" =~ /^$cmd/ || "modify" =~ /^$cmd"/) {
-	my ($hash, $a, $b);
 	if($#ARGV < 0) {
 		die "Usage: [touch/modify] file [file...]\n";
 	}
-	$hash = `echo -n $path$ARGV[0] | sha1sum | awk '{print \$1}'`;
-	($a, $b) = $hash =~ /([0-9a-f][0-9a-f])([0-9a-f]+)/;
-	chomp($hash);
-	if(! -d ".tup/object/$a/$b") {
-		&create($path.$ARGV[0], $hash);
-	} else {
-		system("touch .tup/modify/$hash");
-	}
+	exec("tuptouch modify $ARGV[0]");
 } elsif("delete" =~ /^$cmd/ || $cmd eq "rm") {
 	my ($hash);
 	if($#ARGV < 0) {
 		die "Usage: delete file [file...]\n";
 	}
-	$hash = `echo -n $path$ARGV[0] | sha1sum | awk '{print \$1}'`;
-	chomp($hash);
-	system("touch .tup/delete/$hash");
+	exec("tuptouch delete $ARGV[0]");
 } else {
 	print STDERR "Unknown command: $cmd\n";
 }
@@ -117,15 +91,4 @@ Where command is:
 HERE
 ;
 	die;
-}
-
-sub create
-{
-	my ($a, $b);
-	($a, $b) = $_[1] =~ /([0-9a-f][0-9a-f])([0-9a-f]+)/;
-	mkdir ".tup/object/$a/$b/" or die "Can't make object directory!\n";
-	open FILE, ">.tup/object/$a/$b/.name" or die "Can't open name file for write!\n";
-	print FILE "$_[0]\n";
-	close FILE;
-	system("touch .tup/create/$_[1]");
 }
