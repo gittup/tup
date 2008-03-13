@@ -20,11 +20,10 @@ int canonicalize(const char *path, const char *file, char *out, int len)
 				path);
 			return -1;
 		}
-		sz = snprintf(out, len, "%s/%s", path + ttl + 1, file);
-		if(sz >= len) {
-			fprintf(stderr, "Out of room for file '%s/%s'\n",
-				path, file);
-			return -1;
+		if(file[0]) {
+			sz = snprintf(out, len, "%s/%s", path + ttl + 1, file);
+		} else {
+			sz = snprintf(out, len, "%s", path + ttl + 1);
 		}
 	} else {
 		const char *dir = get_sub_dir();
@@ -36,11 +35,10 @@ int canonicalize(const char *path, const char *file, char *out, int len)
 			else
 				sz = snprintf(out, len, "%s", file);
 		}
-		if(sz >= len) {
-			fprintf(stderr, "Out of room for file '%s/%s/%s'\n",
-				get_sub_dir(), path, file);
-			return -1;
-		}
+	}
+	if(sz >= len) {
+		fprintf(stderr, "No room for file '%s', '%s'\n", path, file);
+		return -1;
 	}
 
 	for(x=0; x<sz; x++) {
