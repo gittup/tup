@@ -58,18 +58,18 @@ if($cmd eq "startmon") {
 	if($#ARGV < 0) {
 		die "Usage: create file [file...]\n";
 	}
-	exec("tuptouch create $ARGV[0]");
+	exec("tuptouch create @ARGV");
 } elsif("touch" =~ /^$cmd/ || "modify" =~ /^$cmd"/) {
 	if($#ARGV < 0) {
 		die "Usage: [touch/modify] file [file...]\n";
 	}
-	exec("tuptouch modify $ARGV[0]");
+	exec("tuptouch modify @ARGV");
 } elsif("delete" =~ /^$cmd/ || $cmd eq "rm") {
 	my ($hash);
 	if($#ARGV < 0) {
 		die "Usage: delete file [file...]\n";
 	}
-	exec("tuptouch delete $ARGV[0]");
+	exec("tuptouch delete @ARGV");
 } else {
 	print STDERR "Unknown command: $cmd\n";
 }

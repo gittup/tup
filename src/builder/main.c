@@ -229,6 +229,8 @@ int update(const tupid_t tupid, char type)
 			return -1;
 		} else {
 			printf("Ignore modify: '%s'\n", name);
+			if(type & TUP_DELETE)
+				return -77;
 		}
 	}
 

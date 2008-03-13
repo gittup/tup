@@ -5,8 +5,9 @@
 
 int main(int argc, char **argv)
 {
-	static char filename[PATH_MAX];
+	static char out[PATH_MAX];
 	char *path;
+	int x;
 
 	if(argc < 3) {
 		fprintf(stderr, "Usage: %s type filename\n", argv[0]);
@@ -16,17 +17,20 @@ int main(int argc, char **argv)
 	if(find_tup_dir() < 0) {
 		return 1;
 	}
-	path = argv[2];
-	if(path[0] == '/') {
-		if(canonicalize(path, "", filename, sizeof(filename)) < 0)
+
+	for(x=2; x<argc; x++) {
+		path = argv[x];
+		if(path[0] == '/') {
+			if(canonicalize(path, "", out, sizeof(out)) < 0)
+				return 1;
+		} else {
+			if(canonicalize("", path, out, sizeof(out)) < 0)
+				return 1;
+		}
+		if(create_name_file(out) < 0)
 			return 1;
-	} else {
-		if(canonicalize("", path, filename, sizeof(filename)) < 0)
+		if(create_tup_file(argv[1], out, "") < 0)
 			return 1;
 	}
-	if(create_name_file(filename) < 0)
-		return 1;
-	if(create_tup_file(argv[1], filename, "") < 0)
-		return 1;
 	return 0;
 }

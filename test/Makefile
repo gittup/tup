@@ -6,7 +6,7 @@ all: $(T)
 $(T):
 	@n=$(call num,$@); \
 	echo ;\
-	echo " *** Run $@ ***"; \
+	echo "[34m --- Run $@ ---[0m"; \
 	dir=$$PWD; \
 	rm -rf tuptesttmp-$$n; \
 	mkdir tuptesttmp-$$n; \
