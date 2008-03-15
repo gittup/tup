@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino, %secondary_ino);
 
 open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
 
@@ -10,7 +10,7 @@ print GRAPH "digraph g {\n";
 
 @files = `ls .tup/object/*/*/.name 2>/dev/null`;
 foreach $file (@files) {
-	my (@stats);
+	my (@stats, $tmp);
 	chomp($file);
 	$from = $file;
 	$from =~ s#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/.name#\1\2#;
@@ -19,6 +19,10 @@ foreach $file (@files) {
 	$color_hash{$from} = 0x000000;
 	$incoming_hash{$from} = $stats[3] - 1; # num hard links
 	$ino{$from} = $stats[1]; # inode
+	$tmp = $file;
+	$tmp =~ s/\.name/.secondary/;
+	@stats = stat $tmp;
+	$secondary_ino{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
@@ -31,8 +35,11 @@ foreach $file (@files) {
 	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
-	$color = "000000";
-	if($stats[1] != $ino{$to}) {
+	if($stats[1] == $ino{$to}) {
+		$color = "000000";
+	} elsif($stats[1] == $secondary_ino{$to}) {
+		$color = "888888";
+	} else {
 		$color = "ff0000";
 	}
 	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\"];\n";

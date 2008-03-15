@@ -4,7 +4,7 @@ objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
 PROGS := monitor wrapper benchmark create_dep updater depgraph config tuptouch
-SHLIBS := ldpreload.so builder.so
+SHLIBS := ldpreload.so builder.so make.so
 
 all: $(PROGS) $(SHLIBS)
 
@@ -16,11 +16,13 @@ ldpreload.so: LDFLAGS := -ldl
 libtup.a: CCFLAGS := -fpic
 updater: LDFLAGS := -ldl
 builder.so: CCFLAGS := -fpic
+make.so: CCFLAGS := -fpic
 
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) libtup.a
 updater: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/updater/*.c)) libtup.a
 monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) libtup.a
 builder.so: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/builder/*.c)) libtup.a
+make.so: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/make/*.c)) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
 benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c)) libtup.a

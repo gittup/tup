@@ -11,7 +11,8 @@ if [ ! -f ".tup/create/e55780e6340b6e110e51e79f077052cb086292a3" ]; then
 	exit 1
 fi
 
-if find .tup/object/ -type f | wc -l | grep 1 > /dev/null; then
+# 2 files: .name and .secondary
+if find .tup/object/ -type f | wc -l | grep 2 > /dev/null; then
 	:
 else
 	echo "Only one object expected in .tup/object/ !" 1>&2

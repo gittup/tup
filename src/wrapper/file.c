@@ -75,7 +75,7 @@ int write_files(void)
 				       sizeof(w->tupid), w->tupid);
 				continue;
 			}
-			if(write_sha1dep(w->tupid, r->tupid) < 0)
+			if(create_secondary_link(r->tupid, w->tupid) < 0)
 				return -1;
 		}
 	}

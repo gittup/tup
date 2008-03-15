@@ -54,6 +54,10 @@ if($cmd eq "startmon") {
 	exec("sha1depgraph.pl @ARGV");
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
+} elsif("dep" =~ /^$cmd/ || "link" =~ /^$cmd/) {
+	exec("create_dep @ARGV");
+} elsif("wrapper" =~ /^$cmd/) {
+	exec("wrapper @ARGV");
 } elsif("create" =~ /^$cmd/) {
 	if($#ARGV < 0) {
 		die "Usage: create file [file...]\n";
@@ -85,6 +89,7 @@ Where command is:
   update	Update/delete all files that require changes
   graph		Draw a graph of the depfs
   config	Show / modify configuration
+  dep/link	Link the first file to the second
   create	Put a file hash in the create/ directory
   touch/modify	Put a file hash in the create/ or modify/ directory, as req'd
   delete/rm	Put a file hash in the delete/ directory

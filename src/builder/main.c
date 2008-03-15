@@ -51,7 +51,7 @@ int update(const tupid_t tupid, char type)
 			if(create_name_file(name) < 0)
 				return -1;
 			tupid_from_filename(obj_tupid, name);
-			if(write_sha1dep(obj_tupid, tupid) < 0)
+			if(create_primary_link(tupid, obj_tupid) < 0)
 				return -1;
 		} else if(strcmp(ext, "o") == 0) {
 			const char *slash;
@@ -84,7 +84,7 @@ int update(const tupid_t tupid, char type)
 			if(create_name_file(prog_name) < 0)
 				return -1;
 			tupid_from_filename(prog_tupid, prog_name);
-			if(write_sha1dep(prog_tupid, tupid) < 0)
+			if(create_primary_link(tupid, prog_tupid) < 0)
 				return -1;
 		} else {
 			printf("Ignore create: '%s'\n", name);

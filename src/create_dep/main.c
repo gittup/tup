@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
 	tupid_from_filename(a, argv[1]);
 	tupid_from_filename(b, argv[2]);
-	if(write_sha1dep(b, a) < 0)
+	if(create_primary_link(a, b) < 0)
 		return 1;
 
 #if 0

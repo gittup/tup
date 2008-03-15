@@ -19,12 +19,16 @@ int delete_if_exists(const char *path);
  */
 int write_all(int fd, const void *buf, int size, const char *filename);
 
-/** Write the dependency relation "file: depends_on" using the sha1 hashes
- * in the filesystem.
- *
- * Note: *not* thread safe.
+/** Creates a primary link (responsible for detecting deletions). This link
+ * goes in the object directory of 'a' and links to the .name file of 'b'
  */
-int write_sha1dep(const tupid_t file, const tupid_t depends_on);
+int create_primary_link(const tupid_t a, const tupid_t b);
+
+/** Creates a secondary link, which allows for updates but does nothing for
+ * deletions. This link goes in the object directory of 'a' and links to the
+ * .secondary file of 'b'
+ */
+int create_secondary_link(const tupid_t a, const tupid_t b);
 
 /** Make a directory hierarchy to support the given filename. For example,
  * if given a/b/c/foo.txt, this makes sure the directories a/, a/b/, and a/b/c/

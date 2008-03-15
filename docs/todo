@@ -53,3 +53,7 @@ instead of update(hash, flags), do update(hash) and create(hash), where update i
 
 portability:
  mac osx may have trouble with unlink() inside a flist_foreach()?
+
+ if a file doesn't exist and is created as part of a command, make sure the
+ link created is a primary link? ie: if a prog creates two files but only one
+ specified by create()
