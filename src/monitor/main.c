@@ -189,29 +189,20 @@ static void handle_event(struct inotify_event *e)
 		return;
 	}
 
-	/* TODO: Handle MOVED_FROM/MOVED_TO, DELETE events */
-#if 0
-	if(e->len > 0) {
-		printf("%08x:%s%s\n", e->mask, dc->path, e->name);
-	} else {
-		printf("%08x:%s\n", e->mask, dc->path);
-	}
-#endif
-
-	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
-		if(e->mask & IN_ISDIR) {
-			watch_path(dc->path, e->name);
-		} else {
-			create_name_file2(dc->path, e->name);
-		}
-	}
-
 	if(e->mask & lock_mask) {
 		if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
 			if(errno == EWOULDBLOCK)
 				goto nolock;
 			perror("flock");
 			return;
+		}
+	}
+
+	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
+		if(e->mask & IN_ISDIR) {
+			watch_path(dc->path, e->name);
+		} else {
+			create_name_file2(dc->path, e->name);
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {

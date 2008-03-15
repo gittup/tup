@@ -23,7 +23,6 @@ sym_check bar.o bar1 ~x
 # Now the tricky part - we touch foo.h (which has refs to both .o files) and
 # see if only foo.c is re-compiled. Also, the foo.h->bar.o link should be gone
 rm foo.o bar.o
-echo "hey"
 tup touch foo.h
 tup upd
 sym_check foo.o foo1 x

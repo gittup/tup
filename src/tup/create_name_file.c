@@ -5,6 +5,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 int create_name_file(const char *file)
 {
@@ -15,51 +17,41 @@ int create_name_file2(const char *path, const char *file)
 {
 	int fd;
 	int rc = -1;
-	int len;
 	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
-	static char read_filename[PATH_MAX];
 	tupid_t tupid;
 
 	path = tupid_from_path_filename(tupid, path, file);
 	tupid_to_xd(tupfilename + 12, tupid);
 
-	DEBUGP("create tup file '%s' containing '%s%s'.\n",
+	DEBUGP("create name file '%s' containing '%s%s'.\n",
 	       tupfilename, path, file);
-	if(mkdirhier(tupfilename) < 0)
-		return -1;
-        fd = open(tupfilename, O_RDONLY);
-        if(fd < 0) {
-                fd = open(tupfilename, O_WRONLY | O_CREAT, 0666);
-                if(fd < 0) {
-                        perror(tupfilename);
-                        return -1;
-                }
-		if(write_all(fd, path, strlen(path), tupfilename) < 0)
-			goto err_out;
-		if(write_all(fd, file, strlen(file), tupfilename) < 0)
-			goto err_out;
-		if(write_all(fd, "\n", 1, tupfilename) < 0)
-			goto err_out;
+
+	tupfilename[13 + sizeof(tupid_t)] = 0;
+	if(mkdir(tupfilename, 0777) < 0) {
+		/* If the dir already exists, we assume we're just overwriting
+		 * the name file, so we don't make the 'create' link.
+		 */
+		if(errno != EEXIST) {
+			perror("mkdir");
+			return -1;
+		}
+	} else {
 		if(create_tup_file_tupid("create", tupid) < 0)
-			goto err_out;
-        } else {
-		int pathlen = strlen(path);
+			return -1;
+	}
+	tupfilename[13 + sizeof(tupid_t)] = '/';
 
-                len = read(fd, read_filename, sizeof(read_filename) - 1);
-                if(len < 0) {
-                        perror("read");
-			goto err_out;
-                }
-                read_filename[len] = 0;
-
-		if(memcmp(read_filename, path, pathlen) != 0 ||
-		   memcmp(read_filename+pathlen, file, strlen(file)) != 0) {
-                        fprintf(stderr, "Gak! SHA1 collision? Requested "
-                                "file '%s' doesn't match stored file '%s' for "
-                                "in '%s'\n", file, read_filename, tupfilename);
-			goto err_out;
-                }
-        }
+	fd = open(tupfilename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if(fd < 0) {
+		perror(tupfilename);
+		return -1;
+	}
+	if(write_all(fd, path, strlen(path), tupfilename) < 0)
+		goto err_out;
+	if(write_all(fd, file, strlen(file), tupfilename) < 0)
+		goto err_out;
+	if(write_all(fd, "\n", 1, tupfilename) < 0)
+		goto err_out;
 	if(delete_tup_file("delete", tupid) < 0)
 		goto err_out;
 	rc = 0;

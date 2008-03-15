@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino);
 
 open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
 
@@ -18,6 +18,7 @@ foreach $file (@files) {
 	@stats = stat FILE;
 	$color_hash{$from} = 0x000000;
 	$incoming_hash{$from} = $stats[3] - 1; # num hard links
+	$ino{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
@@ -25,11 +26,16 @@ foreach $file (@files) {
 
 @files = `ls .tup/object/*/*/* 2>/dev/null`;
 foreach $file (@files) {
-	my ($from2);
+	my ($from2, $color, @stats);
 	chomp($file);
+	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
-	print GRAPH "tup$to -> tup$from [dir=back];\n";
+	$color = "000000";
+	if($stats[1] != $ino{$to}) {
+		$color = "ff0000";
+	}
+	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\"];\n";
 }
 
 &tup_directory("modify", 0x0000ff);

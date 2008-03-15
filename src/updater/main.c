@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +24,6 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 		    int type);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
-/*static int update(const tupid_t tupid, char type);*/
 int (*update)(const tupid_t tupid, char type);
 
 int main(void)
@@ -198,6 +198,8 @@ static int find_deps(struct graph *g, struct node *n)
 	int rc = 0;
 	struct flist f;
 	char object_dir[] = ".tup/object/" SHA1_XD;
+	char namefile[] = ".tup/object/" SHA1_XD "/.name";
+	struct stat st;
 
 	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
@@ -207,6 +209,17 @@ static int find_deps(struct graph *g, struct node *n)
 			fprintf(stderr, "Error: invalid file '%s' in %s\n",
 				f.filename, object_dir);
 			return -1;
+		}
+		tupid_to_xd(namefile + 12, f.filename);
+		if(stat(namefile, &st) < 0) {
+			perror(namefile);
+			return -1;
+		}
+		if(st.st_ino != f._ent->d_ino) {
+			DEBUGP("Removing obsolete link %.*s -> %.*s\n",
+			       8, n->tupid, 8, f.filename);
+			unlinkat(f.dirfd, f.filename, 0);
+			continue;
 		}
 		if((rc = add_file(g, f.filename, n, n->type)) < 0)
 			break;
@@ -235,30 +248,6 @@ static int execute_graph(struct graph *g)
 		if(n != root) {
 			if(n->type & TUP_DELETE || n->type & TUP_MODIFY) {
 				int rc;
-#if 0
-				int ndeps;
-				ndeps = num_dependencies(n->tupid);
-				if(ndeps < 0)
-					return -1;
-				if(ndeps == 0) {
-					DEBUGP("delete orphaned node %.*s\n",
-					       8, n->tupid);
-					if(delete_name_file(n->tupid) < 0)
-						return -1;
-				} else {
-					DEBUGP("deleted node %.*s still has %i "
-					       "incoming edges: rebuild\n",
-					       8, n->tupid, ndeps);
-				}
-				rc = update(n->tupid, TUP_DELETE);
-				/* TODO: better way than returning a
-				 * special error code
-				 */
-				if(rc == -7 && delete_name_file(n->tupid) < 0)
-					return -1;
-				if(rc < 0)
-					return -1;
-#endif
 				rc = update(n->tupid, n->type);
 				/* TODO: better way than returning a
 				 * special error code
@@ -295,41 +284,3 @@ static int execute_graph(struct graph *g)
 	}
 	return 0;
 }
-
-#if 0
-static int update(const tupid_t tupid, char type)
-{
-	int pid;
-	int status;
-
-	pid = fork();
-	if(pid < 0) {
-		perror("fork");
-		return -1;
-	}
-	if(pid == 0) {
-		char tupid_str[sizeof(tupid_t)+1];
-		char tstr[3];
-		if(snprintf(tstr, sizeof(tstr), "%02x", type) >=
-		   (signed)sizeof(tstr)) {
-			fprintf(stderr, "Error: type didn't fit in string.\n");
-			exit(1);
-		}
-		memcpy(tupid_str, tupid, sizeof(tupid_t));
-		tupid_str[sizeof(tupid_str)-1] = 0;
-		execl("/home/marf/tup/builder", "builder", tstr, tupid_str, NULL);
-		perror("execl");
-		exit(1);
-	}
-	wait(&status);
-	if(WIFEXITED(status)) {
-		if(WEXITSTATUS(status) == 0)
-			return 0;
-		fprintf(stderr, "Error: Update process failed with %i\n",
-			WEXITSTATUS(status));
-		return -WEXITSTATUS(status);
-	}
-	fprintf(stderr, "Error: Update process didn't return.\n");
-	return -1;
-}
-#endif

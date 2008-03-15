@@ -9,9 +9,6 @@
  */
 int create_if_not_exist(const char *filename);
 
-/** Creates a hard link from src to dest, unless dest already exists */
-int link_if_not_exist(const char *src, const char *dest);
-
 /** Removes a file if it exists */
 int delete_if_exists(const char *path);
 
@@ -42,6 +39,7 @@ int create_tup_file(const char *tup, const char *path, const char *file);
 int create_tup_file_tupid(const char *tup, const tupid_t tupid);
 int create_name_file(const char *file);
 int create_name_file2(const char *path, const char *file);
+int recreate_name_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid);
 int num_dependencies(const tupid_t tupid);
