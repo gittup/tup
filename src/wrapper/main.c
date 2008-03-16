@@ -59,7 +59,9 @@ int main(int argc, char **argv)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			write_files();
+			if(write_files() < 0)
+				return 1;
+			return 0;
 		}
 		return WEXITSTATUS(status);
 	}

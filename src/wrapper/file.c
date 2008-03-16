@@ -67,7 +67,8 @@ int write_files(void)
 	list_for_each_entry(w, &write_list, list) {
 		DEBUGP("Write deps for tupid: %.*s.\n",
 		       sizeof(w->tupid), w->tupid);
-		recreate_name_file(w->tupid);
+		if(recreate_name_file(w->tupid) < 0)
+			return -1;
 		list_for_each_entry(r, &read_list, list) {
 			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0) {
 				DEBUGP("tupid '%.*s' dependent on itself - "
