@@ -24,9 +24,16 @@ static int sd;
 static struct sockaddr_un addr;
 static int my_pid;
 
+static int (*s_open)(const char *, int, ...);
+static int (*s_open64)(const char *, int, ...);
+static FILE *(*s_fopen)(const char *, const char *);
+static FILE *(*s_fopen64)(const char *, const char *);
+static FILE *(*s_freopen)(const char *, const char *, FILE *);
+static int (*s_creat)(const char *, mode_t);
+static int (*s_rename)(const char*, const char*);
+
 int open(const char *pathname, int flags, ...)
 {
-	int (*s_open)(const char *, int, ...) = dlsym(RTLD_NEXT, "open");
 	int rc;
 
 	mode_t mode = 0;
@@ -45,7 +52,6 @@ int open(const char *pathname, int flags, ...)
 
 int open64(const char *pathname, int flags, ...)
 {
-	int (*s_open64)(const char *, int, ...) = dlsym(RTLD_NEXT, "open64");
 	int rc;
 
 	mode_t mode = 0;
@@ -63,7 +69,6 @@ int open64(const char *pathname, int flags, ...)
 
 FILE *fopen(const char *path, const char *mode)
 {
-	FILE *(*s_fopen)(const char *, const char *) = dlsym(RTLD_NEXT, "fopen");
 	FILE *f;
 
 	f = s_fopen(path, mode);
@@ -74,7 +79,6 @@ FILE *fopen(const char *path, const char *mode)
 
 FILE *fopen64(const char *path, const char *mode)
 {
-	FILE *(*s_fopen64)(const char *, const char *) = dlsym(RTLD_NEXT, "fopen64");
 	FILE *f;
 
 	f = s_fopen64(path, mode);
@@ -86,7 +90,6 @@ FILE *fopen64(const char *path, const char *mode)
 FILE *freopen(const char *path, const char *mode, FILE *stream)
 {
 	FILE *f;
-	FILE *(*s_freopen)(const char *, const char *, FILE *) = dlsym(RTLD_NEXT, "freopen");
 
 	f = s_freopen(path, mode, stream);
 	if(f)
@@ -97,7 +100,6 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 int creat(const char *pathname, mode_t mode)
 {
 	int rc;
-	int (*s_creat)(const char *, mode_t) = dlsym(RTLD_NEXT, "creat");
 
 	rc = s_creat(pathname, mode);
 	if(rc >= 0)
@@ -108,8 +110,6 @@ int creat(const char *pathname, mode_t mode)
 int rename(const char *old, const char *new)
 {
 	int rc;
-	int (*s_rename)(const char*, const char*) = dlsym(RTLD_NEXT, "rename");
-
 
 	rc = s_rename(old, new);
 	if(rc == 0) {
@@ -157,6 +157,18 @@ static int ignore_file(const char *file)
 static void ldpre_init(void)
 {
 	char *path;
+	s_open = dlsym(RTLD_NEXT, "open");
+	s_open64 = dlsym(RTLD_NEXT, "open64");
+	s_fopen = dlsym(RTLD_NEXT, "fopen");
+	s_fopen64 = dlsym(RTLD_NEXT, "fopen64");
+	s_freopen = dlsym(RTLD_NEXT, "freopen");
+	s_creat = dlsym(RTLD_NEXT, "creat");
+	s_rename = dlsym(RTLD_NEXT, "rename");
+	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
+	   !s_creat || !s_rename) {
+		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
+		exit(1);
+	}
 
 	my_pid = getpid();
 	if(getenv(TUP_DEBUG) != NULL) {
