@@ -28,3 +28,9 @@ tup upd
 sym_check foo.o foo1 x
 check_not_exist bar.o
 tup_dep_no_exist foo.h bar.o
+
+# Make sure the foo.h->foo.c still exists and wasn't marked obsolete for some
+# reason.
+tup touch foo.h
+tup upd
+tup_dep_exist foo.h foo.o

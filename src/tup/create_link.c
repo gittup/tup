@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 int create_primary_link(const tupid_t a, const tupid_t b)
 {
@@ -25,6 +26,7 @@ int create_primary_link(const tupid_t a, const tupid_t b)
 
 int create_secondary_link(const tupid_t a, const tupid_t b)
 {
+	struct stat st;
 	char depfilename[] = ".tup/object/" SHA1_XD "/" SHA1_X;
 	char namefile[] = ".tup/object/" SHA1_XD "/.secondary";
 
@@ -32,6 +34,14 @@ int create_secondary_link(const tupid_t a, const tupid_t b)
 	memcpy(depfilename + 14 + sizeof(tupid_t), b, sizeof(tupid_t));
 
 	tupid_to_xd(namefile + 12, b);
+
+	/* Unlink the dependency if it's already a secondary dependency, since
+	 * the .secondary file will have been re-created. Note we know if it's
+	 * a secondary dep because the size will be zero.
+	 */
+	if(stat(depfilename, &st) == 0 && st.st_size == 0) {
+		unlink(depfilename);
+	}
 	DEBUGP("create secondary link: %.*s -> %.*s\n", 8, a, 8, b);
 	if(link(namefile, depfilename) < 0 && errno != EEXIST) {
 		perror(depfilename);
