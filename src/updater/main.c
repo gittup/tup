@@ -253,18 +253,18 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(n->type & TUP_DELETE || n->type & TUP_MODIFY) {
-				int rc;
-				rc = update(n->tupid, n->type);
-				/* TODO: better way than returning a
-				 * special error code
-				 */
-				if(rc == -77 && delete_name_file(n->tupid) < 0)
-					return -1;
-				if(rc < 0 && rc != -77)
-					return -1;
+			int rc;
+			if(n->type & TUP_DELETE) {
+				if(num_dependencies(n->tupid) == 0) {
+					delete_name_file(n->tupid);
+					goto processed;
+				}
 			}
+			rc = update(n->tupid, n->type);
+			if(rc < 0)
+				return -1;
 		}
+processed:
 		while(n->edges) {
 			struct edge *e;
 			e = n->edges;

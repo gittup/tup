@@ -97,20 +97,12 @@ int update(const tupid_t tupid, char type)
 			int pid;
 			int status;
 			char *cfile;
-			struct stat st;
 			cfile = strdup(name);
 			if(!cfile) {
 				perror("strdup");
 				return -1;
 			}
 			cfile[buf.st_size - 2] = 'c';
-			if(stat(cfile, &st) < 0 || !S_ISREG(st.st_mode)) {
-				if(!(type & TUP_DELETE)) {
-					fprintf(stderr, "Warning: C file '%s' is missing and no delete flag is set!\n", cfile);
-				}
-				unlink(name);
-				return -77;
-			}
 			printf("  CC      %s\n", cfile);
 			pid = fork();
 			if(pid < 0) {
@@ -160,7 +152,6 @@ int update(const tupid_t tupid, char type)
 				}
 			}
 
-			printf("Path: '%s'\n", path);
 			flist_foreach(&f, path) {
 				int len = strlen(f.filename);
 				if(len > 2 &&
@@ -168,13 +159,6 @@ int update(const tupid_t tupid, char type)
 				   f.filename[len-1] == 'o') {
 					count++;
 				}
-			}
-			if(!count) {
-				if(!(type & TUP_DELETE)) {
-					fprintf(stderr, "Warning: No objects are present and delete flag is not set!\n");
-				}
-				unlink(name);
-				return -77;
 			}
 			objects = malloc(sizeof(*objects) * (count + 6));
 			if(!objects) {
