@@ -3,6 +3,7 @@
 #include "tup/access_event.h"
 #include "tup/debug.h"
 #include "tup/tupid.h"
+#include "tup/config.h"
 #include "tup/fileio.h"
 
 #include <stdio.h>
@@ -168,6 +169,9 @@ static void ldpre_init(void)
 	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
 	   !s_creat || !s_rename) {
 		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
+		exit(1);
+	}
+	if(find_tup_dir() < 0) {
 		exit(1);
 	}
 

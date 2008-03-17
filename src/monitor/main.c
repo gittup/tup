@@ -141,6 +141,7 @@ static int watch_path(const char *path, const char *file)
 		goto out_free;
 	}
 	if(S_ISREG(buf.st_mode)) {
+		canonicalize_string(fullpath, len-1);
 		create_name_file(fullpath);
 		goto out_free;
 	}

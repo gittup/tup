@@ -1,5 +1,6 @@
 #include "fileio.h"
 #include "config.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -14,7 +15,6 @@ int canonicalize(const char *path, char *out, int len)
 int canonicalize2(const char *path, const char *file, char *out, int len)
 {
 	int sz;
-	int x;
 
 	if(path[0] == '/') {
 		int ttl = get_tup_top_len();
@@ -23,9 +23,8 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 		 * have a trailing slash, make sure the path has that too.
 		 */
 		if(strncmp(path, get_tup_top(), ttl) != 0 || path[ttl] != '/') {
-			fprintf(stderr, "Error: Cannot canonicalize path '%s' "
-				"since it is not in the .tup hierarchy.\n",
-				path);
+			DEBUGP("Cannot canonicalize path '%s' since it is not "
+			       "in the .tup hierarchy.\n", path);
 			return -1;
 		}
 		if(file[0]) {
@@ -34,6 +33,9 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 			sz = snprintf(out, len, "%s", path + ttl + 1);
 		}
 	} else {
+		/* If it's a relative path, prepend the subdirectory that the
+		 * user invoked the command in relative to where .tup/ exists.
+		 */
 		const char *dir = get_sub_dir();
 		if(dir[0]) {
 			sz = snprintf(out, len, "%s/%s/%s", dir, path, file);
@@ -49,51 +51,58 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 		return -1;
 	}
 
-	for(x=0; x<sz; x++) {
+	canonicalize_string(out, sz);
+	if(strncmp(out, "../", 3) == 0) {
+		DEBUGP("Relative path '%s' is outside the tup hierarchy.\n",
+		       out);
+		return -1;
+	}
+	return 0;
+}
+
+void canonicalize_string(char *str, int len)
+{
+	int x;
+
+	for(x=0; x<len; x++) {
 		if(x) {
-			if(out[x] == '/' && out[x-1] == '/') {
-				memmove(out+x, out+x+1, sz-x);
-				sz--;
+			if(str[x] == '/' && str[x-1] == '/') {
+				memmove(str+x, str+x+1, len-x);
+				len--;
 				x--;
 			}
 		}
 	}
-	for(x=0; x<sz; x++) {
+	for(x=0; x<len; x++) {
 		if(x >= 1) {
-			if(out[x-0] == '/' &&
-			   out[x-1] == '.' &&
-			   (x == 1 || out[x-2] == '/')) {
-				memmove(out+x-1, out+x+1, sz-x);
-				sz -= 2;
+			if(str[x-0] == '/' &&
+			   str[x-1] == '.' &&
+			   (x == 1 || str[x-2] == '/')) {
+				memmove(str+x-1, str+x+1, len-x);
+				len -= 2;
 				x--;
 			}
 		}
 		if(x >= 3) {
-			int slash;
-			if(out[x-0] == '/' &&
-			   out[x-1] == '.' &&
-			   out[x-2] == '.' &&
-			   out[x-3] == '/') {
-				for(slash = x - 4; slash >= 0; slash--) {
-					if(out[slash] == '/') {
-						memmove(out+slash, out+x, sz-x+1);
-						sz -= x-slash;
-						x = slash;
+			int sl;
+			if(str[x-0] == '/' &&
+			   str[x-1] == '.' &&
+			   str[x-2] == '.' &&
+			   str[x-3] == '/') {
+				for(sl = x - 4; sl >= 0; sl--) {
+					if(str[sl] == '/') {
+						memmove(str+sl, str+x, len-x+1);
+						len -= x-sl;
+						x = sl;
 						goto done;
 					}
 				}
-				memmove(out, out+x+1, sz-x);
-				sz -= (x + 1);
+				memmove(str, str+x+1, len-x);
+				len -= (x + 1);
 				x = 0;
 done:
 				;
 			}
 		}
 	}
-	if(strncmp(out, "../", 3) == 0) {
-		fprintf(stderr, "Error: Relative path '%s' is outside the tup "
-			"hierarchy.\n", out);
-		return -1;
-	}
-	return 0;
 }

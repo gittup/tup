@@ -18,8 +18,11 @@ int main(int argc, char **argv)
 	}
 
 	for(x=2; x<argc; x++) {
-		if(canonicalize(argv[x], cname, sizeof(cname)) < 0)
+		if(canonicalize(argv[x], cname, sizeof(cname)) < 0) {
+			fprintf(stderr, "Unable to canonicalize '%s'\n",
+				argv[x]);
 			return 1;
+		}
 		if(create_name_file(cname) < 0)
 			return 1;
 		if(create_tup_file(argv[1], cname) < 0)

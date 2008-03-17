@@ -46,5 +46,6 @@ int num_dependencies(const tupid_t tupid);
 int delete_name_file(const tupid_t tupid);
 int canonicalize(const char *path, char *out, int len);
 int canonicalize2(const char *path, const char *file, char *out, int len);
+void canonicalize_string(char *str, int len);
 
 #endif
