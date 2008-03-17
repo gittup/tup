@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -14,8 +15,6 @@
 #include "tup/debug.h"
 #include "tup/config.h"
 #include "tup/compat.h"
-
-#define GRAPH_NAME "/home/marf/test%03i.dot"
 
 static int process_create_nodes(void);
 static int build_graph(struct graph *g);
@@ -30,7 +29,8 @@ int main(int argc, char **argv)
 {
 	struct graph g;
 	struct tup_config cfg;
-	int lock_fd;
+	int obj_lock;
+	int upd_lock;
 	void *handle;
 	int x;
 
@@ -43,15 +43,31 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	lock_fd = open(TUP_LOCK, O_RDONLY);
-	if(lock_fd < 0) {
-		perror(TUP_LOCK);
+	obj_lock = open(TUP_OBJECT_LOCK, O_RDONLY);
+	if(obj_lock < 0) {
+		perror(TUP_OBJECT_LOCK);
 		return 1;
 	}
-	if(flock(lock_fd, LOCK_SH) < 0) {
+	if(flock(obj_lock, LOCK_SH) < 0) {
 		perror("flock");
 		return 1;
 	}
+
+	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
+	if(upd_lock < 0) {
+		perror(TUP_UPDATE_LOCK);
+		return 1;
+	}
+	if(flock(upd_lock, LOCK_EX|LOCK_NB) < 0) {
+		if(errno == EWOULDBLOCK) {
+			printf("Waiting for lock...\n");
+			if(flock(upd_lock, LOCK_EX) == 0)
+				goto lock_success;
+		}
+		perror("flock");
+		return 1;
+	}
+lock_success:
 
 	if(load_tup_config(&cfg) < 0) {
 		return 1;
@@ -75,8 +91,11 @@ int main(int argc, char **argv)
 		return 1;
 	if(execute_graph(&g) < 0)
 		return 1;
-	flock(lock_fd, LOCK_UN);
-	close(lock_fd);
+
+	flock(upd_lock, LOCK_UN);
+	close(upd_lock);
+	flock(obj_lock, LOCK_UN);
+	close(obj_lock);
 	return 0;
 }
 
@@ -143,7 +162,6 @@ static int build_graph(struct graph *g)
 		}
 	}
 
-/*	dump_graph(g, GRAPH_NAME); TODO */
 	return 0;
 }
 
@@ -285,7 +303,6 @@ processed:
 			delete_tup_file("delete", n->tupid);
 		}
 		remove_node(n);
-/*		dump_graph(g, GRAPH_NAME); TODO */
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
 		fprintf(stderr, "Error: Graph is not empty after execution.\n");

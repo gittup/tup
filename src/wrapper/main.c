@@ -33,9 +33,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	lock_fd = open(TUP_LOCK, O_RDONLY);
+	lock_fd = open(TUP_OBJECT_LOCK, O_RDONLY);
 	if(lock_fd < 0) {
-		perror(TUP_LOCK);
+		perror(TUP_OBJECT_LOCK);
 		return 1;
 	}
 	if(flock(lock_fd, LOCK_SH) < 0) {

@@ -37,6 +37,4 @@ portability:
  link created is a primary link? ie: if a prog creates two files but only one
  specified by create()
 
-lock to prevent multiple updaters from running simultaneously?
-
 when making a better 'tup' wrapper, be sure to call find_tup_dir, getexecwd(), and the confg init thing, except in the 'tup init' case.

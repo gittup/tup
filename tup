@@ -10,7 +10,7 @@ if($#ARGV < 0) {
 $cmd = shift;
 if($cmd eq "init") {
 	my ($x);
-	if(-f ".tup/lock") {
+	if(-d ".tup") {
 		print ".tup repository already exists.\n";
 		exit 0;
 	}
@@ -35,10 +35,6 @@ if($cmd eq "init") {
 		if(!-d ".tup/object/$str") {
 			mkdir ".tup/object/$str" or die "Can't create .tup/object/$str";
 		}
-	}
-	if(!-f ".tup/lock") {
-		open FILE, ">.tup/lock" or die "Can't create .tup/lock";
-		close FILE;
 	}
 	print ".tup repository initialized.\n";
 	exit 0;
