@@ -25,3 +25,10 @@ sym_check prog_ foo1 bar1 ~baz1
 
 tup_object_exist foo.c foo.o bar.c bar.o prog_
 tup_object_no_exist baz.c baz.o
+
+rm foo.c bar.c
+tup delete foo.c bar.c
+tup upd
+check_empty_tupdirs
+check_not_exist foo.o bar.o prog_
+tup_object_no_exist foo.c foo.o bar.c bar.o prog_
