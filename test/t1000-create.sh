@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -e
 
 tup touch foo.c
 if [ ! -d ".tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3" ]; then

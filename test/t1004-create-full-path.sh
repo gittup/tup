@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -e
 
 mkdir foo
 tup touch $PWD/foo/bar.c

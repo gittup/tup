@@ -1,4 +1,3 @@
-#! /bin/sh
 tupdir=$PWD
 check_empty_tupdirs()
 {

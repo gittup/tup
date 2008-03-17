@@ -1,8 +1,8 @@
-#! /bin/sh
+#! /bin/sh -e
 
 . ../tup.sh
 
-# Verify both files are compiled
+# Verify all files are compiled
 echo "void foo1(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
 echo "void baz1(void) {}" > baz.c

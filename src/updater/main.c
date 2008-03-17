@@ -219,14 +219,11 @@ static int find_deps(struct graph *g, struct node *n)
 		}
 		tupid_to_xd(namefile + 12, f.filename);
 		tupid_to_xd(depfile + 12, f.filename);
-		if(stat(namefile, &st) < 0) {
-			perror(namefile);
-			return -1;
-		}
-		if(stat(depfile, &st2) < 0) {
-			perror(depfile);
-			return -1;
-		}
+		if(stat(namefile, &st) < 0)
+			st.st_ino = -1;
+		if(stat(depfile, &st2) < 0)
+			st2.st_ino = -1;
+
 		if(f._ent->d_ino != st.st_ino && f._ent->d_ino != st2.st_ino) {
 			DEBUGP("Removing obsolete link %.*s -> %.*s\n",
 			       8, n->tupid, 8, f.filename);

@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -e
 
 for i in object delete modify create; do
 	if [ ! -d ".tup/$i" ]; then
