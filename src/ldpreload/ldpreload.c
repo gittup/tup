@@ -134,8 +134,8 @@ static void handle_file(const char *file, int at, const char *funcname)
 	if(canonicalize(file, cname, sizeof(cname)) < 0)
 		return;
 	tupid_from_filename(event.tupid, cname);
-	pthread_mutex_unlock(&lock);
 	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
+	pthread_mutex_unlock(&lock);
 
 	event.at = at;
 	event.pid = my_pid;
