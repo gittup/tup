@@ -89,6 +89,7 @@ int create_graph(struct graph *g, const tupid_t root)
 	if(!g->root)
 		return -1;
 	list_add(&g->root->list, &g->node_list);
+	g->num_nodes = 0;
 	return 0;
 }
 

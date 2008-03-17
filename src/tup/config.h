@@ -7,6 +7,7 @@
 
 struct tup_config {
 	char *build_so;
+	int show_progress;
 };
 
 int find_tup_dir(void);

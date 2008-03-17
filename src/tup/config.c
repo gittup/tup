@@ -17,6 +17,7 @@ static int get_value_pair(struct buf *file, int *pos,
 static int skip_whitespace(struct buf *file, int *pos);
 
 static char default_build_so[] = "builder.so";
+static int default_show_progress = 1;
 static char tup_wd[PATH_MAX];
 static int tup_wd_offset;
 static int tup_top_len;
@@ -119,6 +120,8 @@ int save_tup_config(const struct tup_config *cfg)
 	}
 	if(cfg->build_so != default_build_so)
 		fprintf(f, "build_so = %s\n", cfg->build_so);
+	if(cfg->show_progress != default_show_progress)
+		fprintf(f, "show_progress = %i\n", cfg->show_progress);
 
 	fclose(f);
 	return 0;
@@ -135,6 +138,14 @@ void print_tup_config(const struct tup_config *cfg, const char *key)
 	else
 		color = 0;
 	printf("[%im  build_so: '%s'[0m\n", color, cfg->build_so);
+
+	if(key && strcmp(key, "show_progress") == 0)
+		color = 32;
+	else if(cfg->show_progress != default_show_progress)
+		color = 34;
+	else
+		color = 0;
+	printf("[%im  show_progress: %i[0m\n", color, cfg->show_progress);
 }
 
 int tup_config_set_param(struct tup_config *cfg, struct buf *lval,
@@ -152,6 +163,15 @@ int tup_config_set_param(struct tup_config *cfg, struct buf *lval,
 			if(!cfg->build_so)
 				return -1;
 		}
+	} else if(buf_cmp(lval, "show_progress") == 0) {
+		if(def) {
+			cfg->show_progress = default_show_progress;
+		} else {
+			if(rval->len > 0 && rval->s[0] == '0')
+				cfg->show_progress = 0;
+			else
+				cfg->show_progress = 1;
+		}
 	}
 	return 0;
 }
@@ -159,6 +179,7 @@ int tup_config_set_param(struct tup_config *cfg, struct buf *lval,
 static void init_default_config(struct tup_config *cfg)
 {
 	cfg->build_so = default_build_so;
+	cfg->show_progress = default_show_progress;
 }
 
 static int get_value_pair(struct buf *file, int *pos,

@@ -29,6 +29,7 @@ struct graph {
 	struct list_head node_list;
 	struct list_head plist;
 	struct node *root;
+	int num_nodes;
 };
 
 struct node *find_node(const struct graph *g, const tupid_t tupid);

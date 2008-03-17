@@ -23,12 +23,14 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 		    int type);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
-int (*update)(const tupid_t tupid, char type);
+static void show_progress(int n, int tot);
+
+static int (*update)(const tupid_t tupid, char type);
+static struct tup_config cfg;
 
 int main(int argc, char **argv)
 {
 	struct graph g;
-	struct tup_config cfg;
 	int obj_lock;
 	int upd_lock;
 	void *handle;
@@ -199,6 +201,7 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 	if(!n)
 		return -1;
 
+	g->num_nodes++;
 	DEBUGP("create node: %.*s (0x%x)\n", 8, tupid, type);
 	list_add(&n->list, &g->plist);
 	n->state = STATE_INITIALIZED;
@@ -258,11 +261,13 @@ static int find_deps(struct graph *g, struct node *n)
 static int execute_graph(struct graph *g)
 {
 	struct node *root;
+	int num_processed = 0;
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %.*s\n", 8, root->tupid);
 	list_move(&root->list, &g->plist);
 
+	show_progress(num_processed, g->num_nodes);
 	while(!list_empty(&g->plist)) {
 		struct node *n;
 		n = list_entry(g->plist.next, struct node, list);
@@ -283,8 +288,10 @@ static int execute_graph(struct graph *g)
 			rc = update(n->tupid, n->type);
 			if(rc < 0)
 				return -1;
-		}
 processed:
+			num_processed++;
+			show_progress(num_processed, g->num_nodes);
+		}
 		while(n->edges) {
 			struct edge *e;
 			e = n->edges;
@@ -309,4 +316,29 @@ processed:
 		return -1;
 	}
 	return 0;
+}
+
+static void show_progress(int n, int tot)
+{
+	if(cfg.show_progress && tot) {
+		int x, a, b;
+		const int max = 40;
+		char c = '=';
+		if(tot > max) {
+			a = n * max / tot;
+			b = max;
+			c = '#';
+		} else {
+			a = n;
+			b = tot;
+		}
+		printf("[");
+		for(x=0; x<a; x++) {
+			printf("%c", c);
+		}
+		for(x=a; x<b; x++) {
+			printf(" ");
+		}
+		printf("] %i/%i (%i%%)\n", n, tot, n*100/tot);
+	}
 }
