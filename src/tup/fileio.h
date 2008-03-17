@@ -7,7 +7,7 @@
  * the given path if it doesn't already exist. Returns 0 on success, -1 on
  * failure.
  */
-int create_if_not_exist(const char *filename);
+int create_if_not_exist(const char *path);
 
 /** Removes a file if it exists */
 int delete_if_exists(const char *path);
@@ -39,10 +39,9 @@ int create_secondary_link(const tupid_t a, const tupid_t b);
  */
 int mkdirhier(char *filename);
 
-int create_tup_file(const char *tup, const char *path, const char *file);
+int create_tup_file(const char *tup, const char *path);
 int create_tup_file_tupid(const char *tup, const tupid_t tupid);
-int create_name_file(const char *file);
-int create_name_file2(const char *path, const char *file);
+int create_name_file(const char *path);
 int recreate_name_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid);
@@ -54,6 +53,7 @@ int num_dependencies(const tupid_t tupid);
  * Note: *not* thread safe.
  */
 int delete_name_file(const tupid_t tupid);
-int canonicalize(const char *path, const char *file, char *out, int len);
+int canonicalize(const char *path, char *out, int len);
+int canonicalize2(const char *path, const char *file, char *out, int len);
 
 #endif

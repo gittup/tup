@@ -26,19 +26,8 @@ typedef char tupid_t[TUPID_SIZE];
 #define TUP_DELETE 0x002
 #define TUP_MODIFY 0x004
 
-/** Get the tupid from the filename. Result is *not* nul-terminated. Also
- * returns the true start of filename, since it may have been bumped up to
- * remove the "./". The actual filename array is not modified, of course.
- */
-const char *tupid_from_filename(tupid_t tupid, const char *filename);
-
-/** Same as above, only the path and filename are separate arguments and are
- * essentially concatenated, though without the use of a temporary buffer to
- * actually do that. The return value is the true start of the path argument.
- * The filename is assumed to not have "./" in front.
- */
-const char *tupid_from_path_filename(tupid_t tupid, const char *path,
-				     const char *filename);
+/** Get the tupid from the filename. The tupid is *not* nul-terminated. */
+void tupid_from_filename(tupid_t tupid, const char *path);
 
 static inline void tupid_to_xd(char *xd, const tupid_t tupid)
 {

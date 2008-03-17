@@ -3,6 +3,7 @@
 #include "tup/access_event.h"
 #include "tup/debug.h"
 #include "tup/tupid.h"
+#include "tup/fileio.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,15 +122,19 @@ int rename(const char *old, const char *new)
 
 static void handle_file(const char *file, int at, const char *funcname)
 {
+	/* TODO: mutex again? */
 	struct access_event event;
+	static char cname[PATH_MAX];
 
 	if(ignore_file(file))
 		return;
-	DEBUGP("send file '%s' mode %i from func %s\n", file, at, funcname);
+	if(canonicalize(file, cname, sizeof(cname)) < 0)
+		return;
+	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
 
 	event.at = at;
 	event.pid = my_pid;
-	tupid_from_filename(event.tupid, file);
+	tupid_from_filename(event.tupid, cname);
 	sendto(sd, &event, sizeof(event), 0, (void*)&addr, sizeof(addr));
 }
 
@@ -145,10 +150,6 @@ static void handle_rename_file(const char *old, const char *new)
 static int ignore_file(const char *file)
 {
 	if(strncmp(file, "/tmp/", 5) == 0) {
-		return 1;
-	}
-	if(file[0] == '/') {
-		/* TODO always ignore global file? */
 		return 1;
 	}
 	return 0;

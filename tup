@@ -49,7 +49,7 @@ if($cmd eq "startmon") {
 } elsif($cmd eq "stopmon") {
 	exec("killall -9 monitor");
 } elsif("update" =~ /^$cmd/ || $cmd eq "tup") {
-	exec("updater");
+	exec("updater @ARGV");
 } elsif("graph" =~ /^$cmd/) {
 	exec("sha1depgraph.pl @ARGV");
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {

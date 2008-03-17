@@ -90,3 +90,14 @@ tup_dep_no_exist()
 		exit 1
 	fi
 }
+
+update()
+{
+	if tup upd; then
+		:
+	else
+		echo "Failed to update!"
+		exit 1
+	fi
+	check_empty_tupdirs
+}

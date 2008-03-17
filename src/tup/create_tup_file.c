@@ -7,13 +7,13 @@
 
 /* TODO: Revisit these - they're almost identical */
 
-int create_tup_file(const char *tup, const char *path, const char *file)
+int create_tup_file(const char *tup, const char *path)
 {
 	int rc;
 	char filename[] = ".tup/XXXXXX/" SHA1_X;
 
 	memcpy(filename + 5, tup, 6);
-	path = tupid_from_path_filename(filename + 12, path, file);
+	tupid_from_filename(filename + 12, path);
 
 	DEBUGP("create tup file: %s\n", filename);
 	rc = create_if_not_exist(filename);

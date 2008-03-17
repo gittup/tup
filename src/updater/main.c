@@ -26,13 +26,19 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 int (*update)(const tupid_t tupid, char type);
 
-int main(void)
+int main(int argc, char **argv)
 {
 	struct graph g;
 	struct tup_config cfg;
 	int lock_fd;
 	void *handle;
+	int x;
 
+	for(x=1; x<argc; x++) {
+		if(strcmp(argv[x], "-d") == 0) {
+			debug_enable("tup.updater");
+		}
+	}
 	if(find_tup_dir() < 0) {
 		return 1;
 	}
@@ -63,7 +69,6 @@ int main(void)
 		return 1;
 	}
 
-/*	debug_enable("tup.updater"); TODO*/
 	if(process_create_nodes() < 0)
 		return 1;
 	if(build_graph(&g) < 0)

@@ -4,25 +4,25 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-int create_if_not_exist(const char *filename)
+int create_if_not_exist(const char *path)
 {
 	struct stat buf;
 	int rc;
 
-	rc = stat(filename, &buf);
+	rc = stat(path, &buf);
 	if(rc == 0) {
 		if(S_ISREG(buf.st_mode)) {
 			return 0;
 		} else {
 			fprintf(stderr, "Error: '%s' exists and is not a "
-				"regular file.\n", filename);
+				"regular file.\n", path);
 			return -1;
 		}
 	}
 
-	rc = creat(filename, 0666);
+	rc = creat(path, 0666);
 	if(rc < 0) {
-		perror(filename);
+		perror(path);
 		return -1;
 	}
 	close(rc);

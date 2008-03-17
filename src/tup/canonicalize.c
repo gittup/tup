@@ -3,7 +3,15 @@
 #include <stdio.h>
 #include <string.h>
 
-int canonicalize(const char *path, const char *file, char *out, int len)
+int canonicalize(const char *path, char *out, int len)
+{
+	if(path[0] == '/')
+		return canonicalize2(path, "", out, len);
+	else
+		return canonicalize2("", path, out, len);
+}
+
+int canonicalize2(const char *path, const char *file, char *out, int len)
 {
 	int sz;
 	int x;

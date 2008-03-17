@@ -4,39 +4,16 @@
 
 static void tupid_from_hash(tupid_t tupid, const unsigned char *hash);
 
-const char *tupid_from_filename(tupid_t tupid, const char *filename)
+void tupid_from_filename(tupid_t tupid, const char *path)
 {
 	unsigned char hash[SHA1_HASH_SIZE];
 	SHA_CTX ctx;
 
-	if(filename[0] && filename[1] && memcmp(filename, "./", 2) == 0)
-		filename += 2;
-
-	SHA1_Init(&ctx);
-	SHA1_Update(&ctx, filename, strlen(filename));
-	SHA1_Final(hash, &ctx);
-
-	tupid_from_hash(tupid, hash);
-
-	return filename;
-}
-
-const char *tupid_from_path_filename(tupid_t tupid, const char *path,
-				     const char *filename)
-{
-	unsigned char hash[SHA1_HASH_SIZE];
-	SHA_CTX ctx;
-
-	if(path[0] && path[1] && memcmp(path, "./", 2) == 0)
-		path += 2;
 	SHA1_Init(&ctx);
 	SHA1_Update(&ctx, path, strlen(path));
-	SHA1_Update(&ctx, filename, strlen(filename));
 	SHA1_Final(hash, &ctx);
 
 	tupid_from_hash(tupid, hash);
-
-	return path;
 }
 
 static void tupid_from_hash(tupid_t tupid, const unsigned char *hash)

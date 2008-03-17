@@ -2,9 +2,15 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino, %secondary_ino);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino, %secondary_ino, $ofile);
 
-open GRAPH, "| dot -Tpng | xv -" or die "Can't open graph pipe\n";
+if($#ARGV < 0) {
+	$ofile = "| xv -";
+} else {
+	$ofile = "> $ARGV[0]";
+}
+
+open GRAPH, "| dot -Tpng $ofile" or die "Can't open graph pipe\n";
 
 print GRAPH "digraph g {\n";
 

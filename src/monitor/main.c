@@ -39,7 +39,7 @@
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
-static int handle_delete(const char *path, const char *file);
+static int handle_delete(const char *path);
 
 static int inot_fd;
 static int lock_fd;
@@ -178,6 +178,7 @@ out_free:
 
 static void handle_event(struct inotify_event *e)
 {
+	static char cname[PATH_MAX];
 	struct dircache *dc;
 	int lock_mask = IN_MODIFY | IN_ATTRIB | IN_DELETE | IN_MOVE;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
@@ -198,18 +199,20 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 
+	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
+		return;
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
 			watch_path(dc->path, e->name);
 		} else {
-			create_name_file2(dc->path, e->name);
+			create_name_file(cname);
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		create_tup_file("modify", dc->path, e->name);
+		create_tup_file("modify", cname);
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
-		handle_delete(dc->path, e->name);
+		handle_delete(cname);
 	}
 	if(e->mask & lock_mask) {
 		flock(lock_fd, LOCK_UN);
@@ -221,11 +224,11 @@ nolock:
 	}
 }
 
-static int handle_delete(const char *path, const char *file)
+static int handle_delete(const char *path)
 {
 	tupid_t tupid;
 
-	path = tupid_from_path_filename(tupid, path, file);
+	tupid_from_filename(tupid, path);
 	create_tup_file_tupid("delete", tupid);
 	delete_tup_file("create", tupid);
 	delete_tup_file("modify", tupid);

@@ -8,24 +8,19 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-int create_name_file(const char *file)
-{
-	return create_name_file2(file, "");
-}
-
-int create_name_file2(const char *path, const char *file)
+int create_name_file(const char *path)
 {
 	int fd;
 	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
 	char depfilename[] = ".tup/object/" SHA1_XD "/.secondary";
 	tupid_t tupid;
 
-	path = tupid_from_path_filename(tupid, path, file);
+	tupid_from_filename(tupid, path);
 	tupid_to_xd(tupfilename + 12, tupid);
 	tupid_to_xd(depfilename + 12, tupid);
 
-	DEBUGP("create name file '%s' containing '%s%s'.\n",
-	       tupfilename, path, file);
+	DEBUGP("create name file '%s' containing '%s'.\n",
+	       tupfilename, path);
 
 	tupfilename[13 + sizeof(tupid_t)] = 0;
 	if(mkdir(tupfilename, 0777) < 0) {
@@ -48,8 +43,6 @@ int create_name_file2(const char *path, const char *file)
 		return -1;
 	}
 	if(write_all(fd, path, strlen(path), tupfilename) < 0)
-		goto err_out;
-	if(write_all(fd, file, strlen(file), tupfilename) < 0)
 		goto err_out;
 	if(write_all(fd, "\n", 1, tupfilename) < 0)
 		goto err_out;

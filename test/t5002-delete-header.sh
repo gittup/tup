@@ -6,8 +6,7 @@
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
 echo "" > foo.h
 tup touch foo.c bar.c foo.h
-tup upd
-check_empty_tupdirs
+update
 sym_check foo.o foo1
 sym_check bar.o bar1
 sym_check prog_ foo1 bar1
@@ -18,7 +17,6 @@ rm foo.h bar.o foo.o
 tup delete foo.h
 echo "void foo1(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
-tup upd
-check_empty_tupdirs
+update
 sym_check foo.o foo1
 sym_check bar.o bar1

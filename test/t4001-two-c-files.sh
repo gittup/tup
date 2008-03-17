@@ -6,8 +6,7 @@
 echo "void foo1(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
 tup touch foo.c bar.c
-tup upd
-check_empty_tupdirs
+update
 sym_check foo.o foo1
 sym_check bar.o bar1
 
@@ -15,8 +14,7 @@ sym_check bar.o bar1
 echo "void foo2(void) {}" >> foo.c
 rm foo.o bar.o
 tup touch foo.c
-tup upd
-check_empty_tupdirs
+update
 check_not_exist bar.o
 sym_check foo.o foo1 foo2
 
