@@ -1,44 +1,23 @@
 add in test case projects, analysis of make/ant
 real-world times?
 
-speedups:
-	- in mkdirhier, check backwards instead of forwards? as it is, if we make 1/2/3/4.txt and 1/2/3/5.txt, we always check 1/, 1/2/, 1/2/3/, then write the file - maybe more efficient to check if 1/2/3/ already exists, since it would in the second (and all future) files?
-
- - use extra character in filename as newline?
-
  hash command lines?
 
 only add created monitor files to the create list if 'name' doesn't already exist?
 
 any way to wrap make so that all sub-procs are wrapped?
 
-get rid of mkdirhier by creating directories (eg: .tup/attrib) up front and
-just giving an error if it doesn't exist? also create up front for deps?
-
-
- - split monitor into at least event.c, main.c
-
- make .tup/attrib and .tup/modify into their own objects? may clean up updater/main.c
-
  slab: use a free hunk (unlinked memory array), and a free list (object freed is put in the free list)
 	alloc can get one from free list if available, if not then free hunk, and if not there then allocate another slab
 
 wrapper fails if monitor is not running - always create object directory? what about if wrapper and monitor try to create at the same time?
-
-combine create/, modify/, and delete/ and use perm flags somehow? may simplify updater to not have to go through the graph multiple times, also atomic updates to file perms?
-
-what if file.c #includes "foobar.h", then is edited to not include it? won't foobar.h still point to file.c? would seem silly to re-compile file.c if foobar.h is changed
- - possibly unlink/relink file.c's .name, and see if foobar.h's dep is the same link as .name - if not, remove spurious link?
-
- use link for stuff in create/ modify/ and delete/? will be easy to cat to see what it is, and probably take up less space
+ - actually, with create logic in place, wrapper fails if output fails do not match expected outputs given during the create phase. Still, same applies - always create objects in wrapper?
 
  modify 'tup graph' to be able to take in start node ids, to trim output
 
  compare open/mmap to open/read/malloc?
 
 put configuration options in .tup/config or something. would be nice to do 'tup cfg' to see what the config is, or 'tup cfg keepgoing=1' to always run tup in 'keep going' mode. when changing cfg, print new config with keepgoing in green, or something, if it changed
-
-add a 'tup touch/modify', 'tup delete', and tup 'create' commands (maybe tup touch should do a create if it doesn't exist in .tup/object). Also allow to do a 'tup touch foo.c' in directory a/, and it will create the object for a/foo.c if .tup and a/ are on the same level.
 
 options/features:
  - progress bar

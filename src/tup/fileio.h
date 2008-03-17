@@ -30,15 +30,6 @@ int create_primary_link(const tupid_t a, const tupid_t b);
  */
 int create_secondary_link(const tupid_t a, const tupid_t b);
 
-/** Make a directory hierarchy to support the given filename. For example,
- * if given a/b/c/foo.txt, this makes sure the directories a/, a/b/, and a/b/c/
- * exist - if not, it creates them.
- *
- * The data pointed to by 'filename' is temporarily modified, but left
- * unchanged upon.
- */
-int mkdirhier(char *filename);
-
 int create_tup_file(const char *tup, const char *path);
 int create_tup_file_tupid(const char *tup, const tupid_t tupid);
 int create_name_file(const char *path);
