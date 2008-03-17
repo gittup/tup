@@ -15,6 +15,7 @@
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #define HANDLE_FILE(f, at) handle_file(f, at, __func__);
 
@@ -123,19 +124,21 @@ int rename(const char *old, const char *new)
 
 static void handle_file(const char *file, int at, const char *funcname)
 {
-	/* TODO: mutex again? */
 	struct access_event event;
 	static char cname[PATH_MAX];
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 	if(ignore_file(file))
 		return;
+	pthread_mutex_lock(&lock);
 	if(canonicalize(file, cname, sizeof(cname)) < 0)
 		return;
+	tupid_from_filename(event.tupid, cname);
+	pthread_mutex_unlock(&lock);
 	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
 
 	event.at = at;
 	event.pid = my_pid;
-	tupid_from_filename(event.tupid, cname);
 	sendto(sd, &event, sizeof(event), 0, (void*)&addr, sizeof(addr));
 }
 
