@@ -90,6 +90,33 @@ tup_dep_no_exist()
 	fi
 }
 
+tup_create_exist()
+{
+	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
+	if [ ! -f ".tup/create/$sum" ]; then
+		echo "$1 doesn't exist in .tup/create/"
+		exit 1
+	fi
+}
+
+tup_modify_exist()
+{
+	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
+	if [ ! -f ".tup/modify/$sum" ]; then
+		echo "$1 doesn't exist in .tup/modify/"
+		exit 1
+	fi
+}
+
+tup_delete_exist()
+{
+	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
+	if [ ! -f ".tup/delete/$sum" ]; then
+		echo "$1 doesn't exist in .tup/delete/"
+		exit 1
+	fi
+}
+
 update()
 {
 	if tup upd; then

@@ -3,7 +3,7 @@
 #include "tup/flist.h"
 #include "tup/slurp.h"
 #include <stdio.h>
-#include <stdlib.h> /* TODO */
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -28,12 +28,14 @@ int update(const tupid_t tupid, char type)
 		return -1;
 	}
 	if(pid == 0) {
+		clearenv();
+		setenv("PATH", "/bin:/usr/bin:/home/marf/tup", 1); /* TODO */
 		if(type & TUP_CREATE) {
-			execl("/usr/bin/make", "make", "TUP_CREATE=1", name.s, NULL);
+			execl("/usr/bin/make", "make", "--no-print-directory", "-r", "-R", "TUP_CREATE=1", name.s, NULL);
 			perror("execl");
 			exit(1);
 		}
-		execl("/usr/bin/make", "make", name.s, NULL);
+		execl("/usr/bin/make", "make", "--no-print-directory", "-r", "-R", name.s, NULL);
 		perror("execl");
 		exit(1);
 	}

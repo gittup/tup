@@ -38,3 +38,25 @@ portability:
  specified by create()
 
 when making a better 'tup' wrapper, be sure to call find_tup_dir, getexecwd(), and the confg init thing, except in the 'tup init' case.
+
+generate performance scripts, separate from test scripts. eg:
+ - time to 'tup create' 1000 files (+ disk space)
+ - time to add 1000 links (+ disk space)
+ - time to update 1000 C files in create/
+ - time to 'tup touch' 1000 C files
+ - time to update 1000 C files in modify/
+ - time to 'tup delete' 1000 C files
+ - time to update and remove all 1000 .o files and objects
+ - time for monitor to initialize with 1000's of directories/files
+
+support for test automation?
+
+tup:
+ generate multiple files
+ eg:
+  foo -> a, b
+  now:
+  foo -> a, c
+  must modify, a, delete b, create/modify c?
+ if monitor is not used (eg: modify touch to do a 'tup touch foo.c' as well) -
+  when rebuilding foo.c, should stat foo.h and compare against .tup/objects/foo.h/.name to see if timestamp is different? maybe have a timestamp option (part of the tup configuration) to perform this check, and if out of date add foo.h to modify list as well. That way if foo.h is modified but 'tup touch foo.h' wasn't executed, the build won't be inconsistent.

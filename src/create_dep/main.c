@@ -9,42 +9,33 @@
 
 int main(int argc, char **argv)
 {
-#if 0
-	int lock_fd;
-#endif
-
 	tupid_t a;
 	tupid_t b;
+	static char cname[PATH_MAX];
 
 	if(argc < 3) {
 		fprintf(stderr, "Usage: %s read_file write_file\n", argv[0]);
 		return 1;
 	}
 
-#if 0
-	lock_fd = open(TUP_OBJECT_LOCK, O_RDONLY);
-	if(lock_fd < 0) {
-		perror(TUP_OBJECT_LOCK);
+	if(canonicalize(argv[1], cname, sizeof(cname)) < 0) {
+		fprintf(stderr, "Unable to canonicalize '%s'\n", argv[1]);
 		return 1;
 	}
-	if(flock(lock_fd, LOCK_EX) < 0) {
-		perror("flock");
+	if(create_name_file(cname) < 0)
+		return 1;
+	tupid_from_filename(a, cname);
+
+	if(canonicalize(argv[2], cname, sizeof(cname)) < 0) {
+		fprintf(stderr, "Unable to canonicalize '%s'\n", argv[2]);
 		return 1;
 	}
-#endif
-
-	if(create_name_file(argv[1]) < 0)
+	if(create_name_file(cname) < 0)
 		return 1;
-	if(create_name_file(argv[2]) < 0)
-		return 1;
+	tupid_from_filename(b, cname);
 
-	tupid_from_filename(a, argv[1]);
-	tupid_from_filename(b, argv[2]);
 	if(create_primary_link(a, b) < 0)
 		return 1;
 
-#if 0
-	close(lock_fd);
-#endif
 	return 0;
 }
