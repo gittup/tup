@@ -31,8 +31,7 @@ $B: clearmarks
 	rm -rf tupbenchtmp-$$n; \
 	mkdir tupbenchtmp-$$n; \
 	cd tupbenchtmp-$$n; \
-	tup init > /dev/null; \
-	t=`((time -p ../$@ $(NUM) > /dev/null 2>&3; echo -n MARF$$?FRAM 1>&4) 2>&1 | grep ^real | awk '{print $$2}') 3>&1 4>&1 | sed 's/MARF0FRAM//'`; \
+	t=`((time -p (tup init > /dev/null; ../$@ $(NUM) > /dev/null 2>&3); echo -n MARF$$?FRAM 1>&4) 2>&1 | grep ^real | awk '{print $$2}') 3>&1 4>&1 | sed 's/MARF0FRAM//'`; \
 	if echo "$$t" | grep MARF > /dev/null; then echo $$t; exit 1; fi; \
 	d=`du -sk .tup | awk '{print $$1}'`; \
 	cd $$dir; \

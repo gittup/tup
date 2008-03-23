@@ -460,7 +460,7 @@
   <pre>
   #include "../bar.h"
   </pre>
-  <p>This would cause the ldpreload library to hash "../bar.h" instead of "bar.h" (in whichever directory it actually exists), so the wrapper would not write out the correct dependencies. I had to write my own canonicalize() function, since the realpath() function that exists in libc assumes the file exists, but in my case I may be trying to create a link to a file that does not exist yet. The canonlicalize() function I wrote removes duplicate /'s, any ./'s, and ../'s where appropriate. So ./foo/.//bar/../baz.c would canonicalize to foo/baz.c</p>
+  <p>This would cause the ldpreload library to hash "../bar.h" instead of "bar.h" (in whichever directory it actually exists), so the wrapper would not write out the correct dependencies. I had to write my own canonicalize() function, since the realpath() function that exists in libc assumes the file exists, but in my case I may be trying to create a link to a file that does not exist yet. The canonicalize() function I wrote removes duplicate /'s, any ./'s, and ../'s where appropriate. So ./foo/.//bar/../baz.c would canonicalize to foo/baz.c</p>
   <p>Another problem I had was with the dangling header reference. Specifically, suppose both foo.c and bar.c include foo.h:</p>
   <table border=1><tr><td><img src="dangling1.png"></td></tr></table>
   <p>Now if bar.c is modified and no longer includes foo.h, the Updater will see bar.c in the modify/ directory, and so it will re-compile bar.o and re-link the executable. However, its partial DAG will not include the header since it was not changed. Therefore the link from foo.h-&gt;bar.o still exists:</p>

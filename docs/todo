@@ -60,3 +60,10 @@ tup:
   must modify, a, delete b, create/modify c?
  if monitor is not used (eg: modify touch to do a 'tup touch foo.c' as well) -
   when rebuilding foo.c, should stat foo.h and compare against .tup/objects/foo.h/.name to see if timestamp is different? maybe have a timestamp option (part of the tup configuration) to perform this check, and if out of date add foo.h to modify list as well. That way if foo.h is modified but 'tup touch foo.h' wasn't executed, the build won't be inconsistent.
+
+maybe:
+ - during create, just run a 'create' on each Makefile in each directory
+ - monitor can just care about the directory an even occurs in - re-run 'create' on the Makefile in that directory
+ - compare new links generated vs old links generate from Makefile, take appropriate action
+ - still requires separate link objects, I think
+ - commands as objects?
