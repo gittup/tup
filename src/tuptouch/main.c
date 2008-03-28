@@ -13,9 +13,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, " where 'type' is one of 'create', 'delete', or 'modify'\n");
 		return 1;
 	}
-	if(find_tup_dir() < 0) {
+	if(find_tup_dir() < 0)
 		return 1;
-	}
 
 	for(x=2; x<argc; x++) {
 		if(canonicalize(argv[x], cname, sizeof(cname)) < 0) {

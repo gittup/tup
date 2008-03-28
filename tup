@@ -51,7 +51,7 @@ if($cmd eq "startmon") {
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
 } elsif("dep" =~ /^$cmd/ || "link" =~ /^$cmd/) {
-	exec("create_dep @ARGV");
+	exec("create_dep", "create_dep", @ARGV);
 } elsif("wrapper" =~ /^$cmd/) {
 	exec("wrapper @ARGV");
 } elsif("create" =~ /^$cmd/) {
@@ -70,6 +70,8 @@ if($cmd eq "startmon") {
 		die "Usage: delete file [file...]\n";
 	}
 	exec("tuptouch delete @ARGV");
+} elsif("command" =~ /^$cmd/) {
+	exec("tupcmd \"@ARGV\"");
 } else {
 	print STDERR "Unknown command: $cmd\n";
 }

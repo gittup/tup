@@ -73,7 +73,9 @@ int get_tup_top_len(void)
 
 const char *get_sub_dir(void)
 {
-	return tup_wd + tup_wd_offset;
+	if(tup_wd[tup_wd_offset])
+		return tup_wd + tup_wd_offset;
+	return ".";
 }
 
 int get_sub_dir_len(void)

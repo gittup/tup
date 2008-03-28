@@ -17,6 +17,7 @@
 #include "tup/compat.h"
 
 static int process_create_nodes(void);
+static int move_create_links(const tupid_t tupid);
 static int build_graph(struct graph *g);
 static int process_tup_dir(const char *dir, struct graph *g, int type);
 static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
@@ -25,7 +26,8 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int (*update)(const tupid_t tupid, char type);
+static int (*create)(const tupid_t tupid);
+static int (*update)(const tupid_t tupid, int type);
 static struct tup_config cfg;
 
 int main(int argc, char **argv)
@@ -80,6 +82,12 @@ lock_success:
 		fprintf(stderr, "Error: Unable to load %s\n", cfg.build_so);
 		return 1;
 	}
+	create = dlsym(handle, "create");
+	if(!create) {
+		fprintf(stderr, "Error: Couldn't find 'create' symbol in "
+			"builder.\n");
+		return 1;
+	}
 	update = dlsym(handle, "update");
 	if(!update) {
 		fprintf(stderr, "Error: Couldn't find 'update' symbol in "
@@ -119,15 +127,41 @@ static int process_create_nodes(void)
 				return -1;
 			}
 			found = 1;
-			if(update(f.filename, TUP_CREATE) < 0)
+
+			if(move_create_links(f.filename) < 0)
 				return -1;
-			if(move_tup_file("create", "modify", f.filename) < 0)
+			if(create(f.filename) < 0)
 				return -1;
+			unlinkat(f.dirfd, f.filename, 0);
 		}
 		create_num++;
 		if(create_num > 50) {
 			fprintf(stderr, "Error: in create loop for 50 "
 				"iterations - possible circular dependency?\n");
+			return -1;
+		}
+	}
+	return -1; /* TODO */
+	return 0;
+}
+
+static int move_create_links(const tupid_t tupid)
+{
+	struct flist f;
+	char objdir[] = ".tup/object/" SHA1_XD;
+	char oldfile[] = ".tup/object/" SHA1_XD "/" SHA1_X;
+	char newfile[] = ".tup/delete/" SHA1_X;
+
+	tupid_to_xd(objdir+12, tupid);
+	tupid_to_xd(oldfile+12, tupid);
+	flist_foreach(&f, objdir) {
+		if(f.filename[0] == '.')
+			continue;
+		memcpy(oldfile+14+sizeof(tupid_t), f.filename, sizeof(tupid_t));
+		memcpy(newfile+12, f.filename, sizeof(tupid_t));
+		unlink(newfile);
+		if(rename(oldfile, newfile) < 0) {
+			perror(newfile);
 			return -1;
 		}
 	}

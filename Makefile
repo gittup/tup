@@ -3,7 +3,7 @@ srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-PROGS := monitor wrapper benchmark create_dep updater depgraph config tuptouch
+PROGS := monitor wrapper benchmark create_dep updater depgraph config tuptouch tupcmd
 SHLIBS := ldpreload.so builder.so make.so
 
 all: $(PROGS) $(SHLIBS)
@@ -29,6 +29,7 @@ create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c)) libtup.a
 depgraph: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/depgraph/*.c)) libtup.a
 config: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/config/*.c)) libtup.a
 tuptouch: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tuptouch/*.c)) libtup.a
+tupcmd: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tupcmd/*.c)) libtup.a
 
 $(PROGS):
 	$Qecho "  LD      $@";\

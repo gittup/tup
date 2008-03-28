@@ -30,6 +30,7 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <unistd.h>
+#include <libgen.h> /* TODO */
 #include "dircache.h"
 #include "tup/flist.h"
 #include "tup/debug.h"
@@ -233,5 +234,19 @@ static int handle_delete(const char *path)
 	create_tup_file_tupid("delete", tupid);
 	delete_tup_file("create", tupid);
 	delete_tup_file("modify", tupid);
+	{
+		/* TODO */
+		char *p2;
+		char *dir;
+		p2 = strdup(path);
+		if(!p2) {
+			perror("strdup");
+			return -1;
+		}
+		dir = dirname(p2);
+		if(create_dir_file(dir) < 0)
+			return -1;
+		free(p2);
+	}
 	return 0;
 }
