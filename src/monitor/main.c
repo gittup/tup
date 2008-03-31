@@ -123,8 +123,8 @@ static int watch_path(const char *path, const char *file)
 	struct stat buf;
 	char *fullpath;
 
-	/* Skip our own directory */
-	if(strcmp(file, ".tup") == 0) {
+	/* Skip hidden directories */
+	if(file[0] == '.') {
 		return 0;
 	}
 
@@ -185,6 +185,10 @@ static void handle_event(struct inotify_event *e)
 	int lock_mask = IN_MODIFY | IN_ATTRIB | IN_DELETE | IN_MOVE;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
+	/* Skip hidden files */
+	if(e->name[0] == '.')
+		return;
+
 	dc = dircache_lookup(e->wd);
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
@@ -201,6 +205,14 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 
+	if(strcmp(e->name, "Makefile") == 0) {
+		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
+			return;
+		if(cname[0] == 0)
+			create_dir_file(".");
+		else
+			create_dir_file(cname);
+	}
 	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
 		return;
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {

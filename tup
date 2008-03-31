@@ -50,8 +50,10 @@ if($cmd eq "startmon") {
 	exec("sha1depgraph.pl @ARGV");
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
-} elsif("dep" =~ /^$cmd/ || "link" =~ /^$cmd/) {
-	exec("create_dep", "create_dep", @ARGV);
+} elsif("input" =~ /^$cmd/) {
+	exec("create_dep", "input", @ARGV);
+} elsif("output" =~ /^$cmd/) {
+	exec("create_dep", "output", @ARGV);
 } elsif("wrapper" =~ /^$cmd/) {
 	exec("wrapper @ARGV");
 } elsif("create" =~ /^$cmd/) {

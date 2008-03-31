@@ -69,3 +69,24 @@ int create_command_link(const tupid_t a, const tupid_t b)
 	}
 	return 0;
 }
+
+#if 0
+int create_link_link(const tupid_t a, const tupid_t b)
+{
+	char depfilename[] = ".tup/object/" SHA1_XD "/" SHA1_X;
+	char namefile[] = ".tup/object/" SHA1_XD "/.link";
+
+	tupid_to_xd(depfilename + 12, a);
+	memcpy(depfilename + 14 + sizeof(tupid_t), b, sizeof(tupid_t));
+
+	tupid_to_xd(namefile + 12, b);
+	DEBUGP("create link link: %.*s -> %.*s\n", 8, a, 8, b);
+	unlink(depfilename);
+	if(link(namefile, depfilename) < 0) {
+		fprintf(stderr, "link %s -> %s: %s\n",
+			namefile, depfilename, strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+#endif

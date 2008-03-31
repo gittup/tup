@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, %ino, %secondary_ino, $ofile);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash);
 
 if($#ARGV < 0) {
 	$ofile = "| xv -";
@@ -16,7 +16,7 @@ print GRAPH "digraph g {\n";
 
 @files = `ls .tup/object/*/*/.name 2>/dev/null`;
 foreach $file (@files) {
-	my (@stats, $tmp);
+	my (@stats);
 	chomp($file);
 	$from = $file;
 	$from =~ s#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/.name#\1\2#;
@@ -24,14 +24,26 @@ foreach $file (@files) {
 	@stats = stat FILE;
 	$color_hash{$from} = 0x000000;
 	$incoming_hash{$from} = $stats[3] - 1; # num hard links
-	$ino{$from} = $stats[1]; # inode
-	$tmp = $file;
-	$tmp =~ s/\.name/.secondary/;
-	@stats = stat $tmp;
-	$secondary_ino{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
+	$shape_hash{$from} = "ellipse";
+}
+
+@files = `ls .tup/object/*/*/.cmd 2>/dev/null`;
+foreach $file (@files) {
+	my (@stats);
+	chomp($file);
+	$from = $file;
+	$from =~ s#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/.cmd#\1\2#;
+	open FILE, "$file" or die "Can't open $file\n";
+	@stats = stat FILE;
+	$color_hash{$from} = 0x000000;
+	$incoming_hash{$from} = $stats[3] - 1; # num hard links
+	$name_hash{$from} = <FILE>;
+	chomp($name_hash{$from});
+	close FILE;
+	$shape_hash{$from} = "rectangle";
 }
 
 @files = `ls .tup/object/*/*/* 2>/dev/null`;
@@ -41,12 +53,9 @@ foreach $file (@files) {
 	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
-	if($stats[1] == $ino{$to}) {
-		$color = "000000";
-	} elsif($stats[1] == $secondary_ino{$to}) {
-		$color = "888888";
-	} else {
-		$color = "ff0000";
+	$color = "000000";
+	if(-f ".tup/object/".substr($to,0,2)."/".substr($to,2)."/.link") {
+		next;
 	}
 	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\"];\n";
 }
@@ -56,7 +65,7 @@ foreach $file (@files) {
 &tup_directory("delete", 0xff0000);
 
 foreach $from (keys %name_hash) {
-	printf GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"#%06x\"];\n", $color_hash{$from};
+	printf GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"#%06x\" shape=\"%s\"];\n", $color_hash{$from}, $shape_hash{$from};
 }
 
 print GRAPH "}\n";

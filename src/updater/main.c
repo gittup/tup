@@ -12,6 +12,7 @@
 #include "tup/flist.h"
 #include "tup/fileio.h"
 #include "tup/tupid.h"
+#include "tup/slurp.h"
 #include "tup/debug.h"
 #include "tup/config.h"
 #include "tup/compat.h"
@@ -27,7 +28,7 @@ static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
 static int (*create)(const tupid_t tupid);
-static int (*update)(const tupid_t tupid, int type);
+static int update(const tupid_t tupid, int type);
 static struct tup_config cfg;
 
 int main(int argc, char **argv)
@@ -88,15 +89,10 @@ lock_success:
 			"builder.\n");
 		return 1;
 	}
-	update = dlsym(handle, "update");
-	if(!update) {
-		fprintf(stderr, "Error: Couldn't find 'update' symbol in "
-			"builder.\n");
-		return 1;
-	}
 
 	if(process_create_nodes() < 0)
 		return 1;
+	sleep(10);
 	if(build_graph(&g) < 0)
 		return 1;
 	if(execute_graph(&g) < 0)
@@ -141,7 +137,6 @@ static int process_create_nodes(void)
 			return -1;
 		}
 	}
-	return -1; /* TODO */
 	return 0;
 }
 
@@ -258,10 +253,6 @@ static int find_deps(struct graph *g, struct node *n)
 	int rc = 0;
 	struct flist f;
 	char object_dir[] = ".tup/object/" SHA1_XD;
-	char namefile[] = ".tup/object/" SHA1_XD "/.name";
-	char depfile[] = ".tup/object/" SHA1_XD "/.secondary";
-	struct stat st;
-	struct stat st2;
 
 	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
@@ -272,19 +263,7 @@ static int find_deps(struct graph *g, struct node *n)
 				f.filename, object_dir);
 			return -1;
 		}
-		tupid_to_xd(namefile + 12, f.filename);
-		tupid_to_xd(depfile + 12, f.filename);
-		if(stat(namefile, &st) < 0)
-			st.st_ino = -1;
-		if(stat(depfile, &st2) < 0)
-			st2.st_ino = -1;
 
-		if(f._ent->d_ino != st.st_ino && f._ent->d_ino != st2.st_ino) {
-			DEBUGP("Removing obsolete link %.*s -> %.*s\n",
-			       8, n->tupid, 8, f.filename);
-			unlinkat(f.dirfd, f.filename, 0);
-			continue;
-		}
 		if((rc = add_file(g, f.filename, n, n->type)) < 0)
 			break;
 	};
@@ -349,6 +328,24 @@ processed:
 		fprintf(stderr, "Error: Graph is not empty after execution.\n");
 		return -1;
 	}
+	return 0;
+}
+
+static int update(const tupid_t tupid, int type)
+{
+	struct buf b;
+	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
+
+	if(type) {/* TODO */}
+
+	tupid_to_xd(cmdfile+12, tupid);
+	if(slurp(cmdfile, &b) < 0)
+		return 0;
+
+	/* Overwrite newline */
+	b.s[b.len-1] = 0;
+	if(system(b.s) != 0)
+		return -1;
 	return 0;
 }
 

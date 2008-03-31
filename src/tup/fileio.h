@@ -31,11 +31,13 @@ int create_primary_link(const tupid_t a, const tupid_t b);
 int create_secondary_link(const tupid_t a, const tupid_t b);
 
 int create_command_link(const tupid_t a, const tupid_t b);
+/*int create_link_link(const tupid_t a, const tupid_t b);*/
 
 int create_tup_file(const char *tup, const char *path);
 int create_tup_file_tupid(const char *tup, const tupid_t tupid);
 int create_name_file(const char *path);
 int create_command_file(const char *cmd);
+/*int create_link_file(const char *link);*/
 int create_dir_file(const char *path);
 int recreate_name_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);

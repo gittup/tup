@@ -97,8 +97,10 @@ int load_tup_config(struct tup_config *cfg)
 	fd = open(TUP_CONFIG, O_RDONLY);
 	if(fd < 0)
 		return 0; /* No config is ok */
-	if(fslurp(fd, &cfg_file) < 0)
+	if(fslurp(fd, &cfg_file) < 0) {
+		perror("fslurp");
 		goto out;
+	}
 
 	while((rc = get_value_pair(&cfg_file, &pos, &lval, &rval)) > 0) {
 		if(tup_config_set_param(cfg, &lval, &rval) < 0)
