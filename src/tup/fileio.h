@@ -31,6 +31,7 @@ int create_primary_link(const tupid_t a, const tupid_t b);
 int create_secondary_link(const tupid_t a, const tupid_t b);
 
 int create_command_link(const tupid_t a, const tupid_t b);
+int delete_link(const tupid_t a, const tupid_t b);
 /*int create_link_link(const tupid_t a, const tupid_t b);*/
 
 int create_tup_file(const char *tup, const char *path);

@@ -28,7 +28,8 @@ static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
 static int (*create)(const tupid_t tupid);
-static int update(const tupid_t tupid, int type);
+static int update(const tupid_t tupid);
+static int delete(const tupid_t tupid);
 static struct tup_config cfg;
 
 int main(int argc, char **argv)
@@ -92,7 +93,6 @@ lock_success:
 
 	if(process_create_nodes() < 0)
 		return 1;
-	sleep(10);
 	if(build_graph(&g) < 0)
 		return 1;
 	if(execute_graph(&g) < 0)
@@ -218,6 +218,8 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 		    int type)
 {
 	struct node *n;
+	struct stat st;
+	char namefile[] = ".tup/object/" SHA1_XD "/.name";
 
 	if((n = find_node(g, tupid)) != NULL) {
 		if(!(n->type & type)) {
@@ -230,7 +232,13 @@ static int add_file(struct graph *g, const tupid_t tupid, struct node *src,
 	if(!n)
 		return -1;
 
-	g->num_nodes++;
+	tupid_to_xd(namefile+12, tupid);
+	if(stat(namefile, &st) == 0) {
+		n->node = NODE_FILE;
+	} else {
+		n->node = NODE_CMD;
+		g->num_nodes++;
+	}
 	DEBUGP("create node: %.*s (0x%x)\n", 8, tupid, type);
 	list_add(&n->list, &g->plist);
 	n->state = STATE_INITIALIZED;
@@ -253,6 +261,8 @@ static int find_deps(struct graph *g, struct node *n)
 	int rc = 0;
 	struct flist f;
 	char object_dir[] = ".tup/object/" SHA1_XD;
+	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
+	struct stat st;
 
 	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
@@ -262,6 +272,18 @@ static int find_deps(struct graph *g, struct node *n)
 			fprintf(stderr, "Error: invalid file '%s' in %s\n",
 				f.filename, object_dir);
 			return -1;
+		}
+		if(n->node == NODE_FILE) {
+			tupid_to_xd(cmdfile+12, f.filename);
+			if(stat(cmdfile, &st) < 0)
+				st.st_ino = -1;
+
+			if(f._ent->d_ino != st.st_ino) {
+				DEBUGP("Removing obsolete link %.*s -> %.*s\n",
+				       8, n->tupid, 8, f.filename);
+				unlinkat(f.dirfd, f.filename, 0);
+				continue;
+			}
 		}
 
 		if((rc = add_file(g, f.filename, n, n->type)) < 0)
@@ -291,19 +313,22 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			int rc;
-			if(n->type & TUP_DELETE) {
+			if(n->node == NODE_FILE && (n->type & TUP_DELETE)) {
 				if(num_dependencies(n->tupid) == 0) {
 					delete_name_file(n->tupid);
-					goto processed;
 				}
 			}
-			rc = update(n->tupid, n->type);
-			if(rc < 0)
-				return -1;
-processed:
-			num_processed++;
-			show_progress(num_processed, g->num_nodes);
+			if(n->node == NODE_CMD) {
+				if(n->type & TUP_DELETE) {
+					if(delete(n->tupid) < 0)
+						return -1;
+				} else {
+					if(update(n->tupid) < 0)
+						return -1;
+				}
+				num_processed++;
+				show_progress(num_processed, g->num_nodes);
+			}
 		}
 		while(n->edges) {
 			struct edge *e;
@@ -331,21 +356,51 @@ processed:
 	return 0;
 }
 
-static int update(const tupid_t tupid, int type)
+static int update(const tupid_t tupid)
 {
 	struct buf b;
 	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
 
-	if(type) {/* TODO */}
-
 	tupid_to_xd(cmdfile+12, tupid);
-	if(slurp(cmdfile, &b) < 0)
-		return 0;
+	if(slurp(cmdfile, &b) < 0) {
+		perror(cmdfile);
+		return -1;
+	}
 
 	/* Overwrite newline */
 	b.s[b.len-1] = 0;
+	printf("%s\n", b.s);
 	if(system(b.s) != 0)
 		return -1;
+	return 0;
+}
+
+static int delete(const tupid_t tupid)
+{
+	struct flist f;
+	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
+
+	printf("[31mDelete %.*s[0m\n", 8, tupid);
+	tupid_to_xd(cmdfile+12, tupid);
+	if(delete_if_exists(cmdfile) < 0)
+		return -1;
+
+	/* Change last / to nul to get dir name */
+	cmdfile[13 + sizeof(tupid_t)] = 0;
+	flist_foreach(&f, cmdfile) {
+		if(f.filename[0] != '.') {
+			if(create_tup_file_tupid("delete", f.filename) < 0)
+				return -1;
+			if(unlinkat(f.dirfd, f.filename, 0) < 0) {
+				perror(f.filename);
+				return -1;
+			}
+		}
+	}
+	if(rmdir(cmdfile) < 0) {
+		perror(cmdfile);
+		return -1;
+	}
 	return 0;
 }
 
@@ -370,6 +425,8 @@ static void show_progress(int n, int tot)
 		for(x=a; x<b; x++) {
 			printf(" ");
 		}
-		printf("] %i/%i (%i%%)\n", n, tot, n*100/tot);
+		printf("] %i/%i (%i%%)\t", n, tot, n*100/tot);
+		if(n == tot)
+			printf("\n");
 	}
 }

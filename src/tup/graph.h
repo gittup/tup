@@ -13,6 +13,9 @@ struct edge {
 #define STATE_PROCESSING 1
 #define STATE_FINISHED 2
 
+#define NODE_FILE 0
+#define NODE_CMD 1
+
 struct node {
 	struct list_head list;
 	struct edge *edges;
@@ -20,8 +23,8 @@ struct node {
 	int incoming_count;
 
 	char state;
-	char type; /* Must be char (<256) */
-	char unused1;
+	char type; /* One of TUP_*, must be char (<256) */
+	char node; /* One of NODE_* */
 	char unused2;
 };
 
