@@ -35,12 +35,7 @@ int main(int argc, char **argv)
 		if(create_tup_file(type, cname) < 0)
 			return 1;
 		if(strcmp(argv[1], "delete") == 0) {
-			char *slash;
 			char *dir;
-			slash = strrchr(cname, '/');
-			if(slash) {
-				*slash = 0;
-			}
 			dir = dirname(cname);
 			if(create_dir_file(dir) < 0)
 				return 1;

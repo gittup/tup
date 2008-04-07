@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <libgen.h> /* TODO: dirname */
 #include <sys/file.h>
 
 /* TODO: Revisit these - they're almost identical */
@@ -12,6 +13,14 @@ int create_tup_file(const char *tup, const char *path)
 	int rc;
 	char filename[] = ".tup/XXXXXX/" SHA1_X;
 
+	/* TODO: Don't hardcode, make sure it only matches the end? */
+	if(strstr(path, "Makefile") != NULL) {
+		char *dir;
+		dir = strdup(path);
+		dir = dirname(dir);
+		if(create_dir_file(dir) < 0)
+			return 1;
+	}
 	memcpy(filename + 5, tup, 6);
 	tupid_from_filename(filename + 12, path);
 
