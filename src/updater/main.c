@@ -268,6 +268,7 @@ static int find_deps(struct graph *g, struct node *n)
 
 	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
+		int type;
 		if(f.filename[0] == '.')
 			continue;
 		if(strlen(f.filename) != sizeof(tupid_t)) {
@@ -292,7 +293,15 @@ static int find_deps(struct graph *g, struct node *n)
 			}
 		}
 
-		if((rc = add_file(g, f.filename, n, n->type)) < 0)
+		/* Deleting a file doesn't mean the command should also be
+		 * deleted. We just mark the command as modified so it will
+		 * be re-executed.
+		 */
+		type = n->type;
+		if(n->node == NODE_FILE)
+			type = TUP_MODIFY;
+
+		if((rc = add_file(g, f.filename, n, type)) < 0)
 			break;
 	};
 

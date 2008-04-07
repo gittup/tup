@@ -14,7 +14,7 @@ sym_check bar.o bar1
 sym_check baz.o baz1
 sym_check prog main bar1 baz1
 
-# When baz.c is deleted, baz.o should be deleted as well, and prog_ should be
+# When baz.c is deleted, baz.o should be deleted as well, and prog should be
 # re-linked. The baz.[co] objects should be removed from .tup
 rm baz.c
 tup delete baz.c

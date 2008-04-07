@@ -34,6 +34,7 @@ int delete_name_file(const tupid_t tupid)
 	filename[nb-1] = 0;
 	close(fd);
 
+	printf("[31mDelete: %s[0m\n", filename);
 	if(delete_if_exists(filename) < 0)
 		return -1;
 	if(delete_if_exists(tupfilename) < 0)
