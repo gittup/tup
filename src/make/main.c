@@ -31,18 +31,23 @@ int create(const tupid_t tupid)
 	if(pid == 0) {
 		clearenv();
 		setenv("PATH", "/bin:/usr/bin:/home/marf/tup", 1); /* TODO */
+		setenv("TUPWD", name.s, 1);
 		execl("/usr/bin/make", "make", "--no-print-directory", "-r", "-R", "-C", name.s, NULL);
 		perror("execl");
 		exit(1);
 	}
 	wait(&status);
 	if(WIFEXITED(status)) {
-		if(WEXITSTATUS(status) == 0)
+		if(WEXITSTATUS(status) == 0) {
+			free(name.s);
 			return 0;
-		fprintf(stderr, "Error: Update process failed with %i\n",
-			WEXITSTATUS(status));
-		return -WEXITSTATUS(status);
+		}
+		fprintf(stderr, "Error: Update process failed with %i in %s/\n",
+			WEXITSTATUS(status), name.s);
+	} else {
+		fprintf(stderr, "Error: Update process didn't return at %s/\n",
+			name.s);
 	}
-	fprintf(stderr, "Error: Update process didn't return.\n");
+	free(name.s);
 	return -1;
 }

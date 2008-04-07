@@ -30,8 +30,9 @@ rm oldbar.o
 sym_check foo.o main x
 tup_dep_no_exist foo.h bar.o
 
-# Make sure the foo.h->cmd link still exists and wasn't marked obsolete for
+# Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
 # some reason.
 tup touch foo.h
 update
 tup_dep_exist foo.h "tup wrap gcc -c foo.c -o foo.o"
+tup_dep_exist "tup wrap gcc -c foo.c -o foo.o" foo.o
