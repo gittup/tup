@@ -30,7 +30,7 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <unistd.h>
-#include <libgen.h> /* TODO */
+#include <libgen.h> /* TODO: dirname */
 #include "dircache.h"
 #include "tup/flist.h"
 #include "tup/debug.h"

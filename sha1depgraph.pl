@@ -27,6 +27,7 @@ foreach $file (@files) {
 	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
+	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
 	$shape_hash{$from} = "ellipse";
 }
@@ -44,6 +45,7 @@ foreach $file (@files) {
 	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
+	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
 	
 	$file =~ s/\.cmd/.secondary/;

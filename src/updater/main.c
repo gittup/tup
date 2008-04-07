@@ -29,7 +29,7 @@ static void show_progress(int n, int tot);
 
 static int (*create)(const tupid_t tupid);
 static int update(const tupid_t tupid);
-static int delete(const tupid_t tupid);
+static int delete_cmd(const tupid_t tupid);
 static struct tup_config cfg;
 
 int main(int argc, char **argv)
@@ -326,7 +326,7 @@ static int execute_graph(struct graph *g)
 			}
 			if(n->node == NODE_CMD) {
 				if(n->type & TUP_DELETE) {
-					if(delete(n->tupid) < 0)
+					if(delete_cmd(n->tupid) < 0)
 						return -1;
 				} else {
 					if(update(n->tupid) < 0)
@@ -381,14 +381,18 @@ static int update(const tupid_t tupid)
 	return 0;
 }
 
-static int delete(const tupid_t tupid)
+static int delete_cmd(const tupid_t tupid)
 {
 	struct flist f;
 	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
+	char depfile[] = ".tup/object/" SHA1_XD "/.secondary";
 
 	printf("[31mDelete %.*s[0m\n", 8, tupid);
 	tupid_to_xd(cmdfile+12, tupid);
+	tupid_to_xd(depfile+12, tupid);
 	if(delete_if_exists(cmdfile) < 0)
+		return -1;
+	if(delete_if_exists(depfile) < 0)
 		return -1;
 
 	/* Change last / to nul to get dir name */
@@ -431,7 +435,7 @@ static void show_progress(int n, int tot)
 		for(x=a; x<b; x++) {
 			printf(" ");
 		}
-		printf("] %i/%i (%i%%)\t", n, tot, n*100/tot);
+		printf("] %i/%i (%3i%%) ", n, tot, n*100/tot);
 		if(n == tot)
 			printf("\n");
 	}

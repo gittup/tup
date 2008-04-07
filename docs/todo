@@ -67,3 +67,6 @@ maybe:
  - compare new links generated vs old links generate from Makefile, take appropriate action
  - still requires separate link objects, I think
  - commands as objects?
+
+test:
+ make sure when a directory is deleted (eg: rm -rf bar), then the 'bar' directory object is deleted after update

@@ -88,6 +88,9 @@ int create_command_file(const char *cmd)
 			perror(tupfilename);
 			return -1;
 		}
+	} else {
+		if(create_tup_file("modify", cmd) < 0)
+			return -1;
 	}
 	tupfilename[13 + sizeof(tupid_t)] = '/';
 
