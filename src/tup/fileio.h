@@ -42,7 +42,7 @@ int create_command_file(const char *cmd);
 int create_dir_file(const char *path);
 int recreate_name_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
-int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid); /*TODO: Remove?*/
+int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
 int num_dependencies(const tupid_t tupid);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also

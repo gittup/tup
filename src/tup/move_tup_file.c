@@ -3,9 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 
-int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid)
+int move_tup_file_if_exists(const char *tupsrc, const char *tupdst,
+			    const tupid_t tupid)
 {
+	struct stat st;
 	char oldfilename[] = ".tup/XXXXXX/" SHA1_X;
 	char newfilename[] = ".tup/XXXXXX/" SHA1_X;
 
@@ -16,6 +19,8 @@ int move_tup_file(const char *tupsrc, const char *tupdst, const tupid_t tupid)
 	DEBUGP("move tup file '%s/%.*s' to '%s/%.*s'\n",
 	       tupsrc, 8, tupid, tupdst, 8, tupid);
 
+	if(stat(oldfilename, &st) != 0)
+		return 0;
 	if(rename(oldfilename, newfilename) < 0) {
 		fprintf(stderr, "Error renaming '%s' to '%s': %s\n",
 			oldfilename, newfilename, strerror(errno));

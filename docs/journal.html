@@ -539,6 +539,36 @@ $(objs): %.o: %.c
   <p>At this point what will probably happen is the Updater will delete the objects for "gcc foo.o ok.o -o prog" and "prog", as well as the actual file "prog". This would leave the links to "gcc foo.o ok.o -o prog" as dangling references, which could be lazily cleaned up as done previously for header links. The Updater would of course also run the new command and generate the new "mainexe" executable. However, I don't actually have that implemented yet. I also still have to change the wrapper program to generate links to the command object instead of the output file. (For instance, "foo.h" would be linked to "foo.o" instead of the gcc command). After those details are worked out, I will be able to revisit the test cases to see if all the old functionality is maintained.</p>
   </li>
 
+  <li><a name="12"><b>Apr 6 - Apr 12</b></a>: <p>I got almost all of the test cases working again using the new command objects. This involved updating the Wrapper program to output dependencies to and from the command object, and some additional logic in the Updater to delete the correct objects and files when necessary. The only exception is the test case for deleting output files. The test involves building a program, then deleting one of the object files (eg: 'rm foo.o'). This puts the hash for foo.o in the delete/ directory. When the Updater runs, ideally I would like to have the object file re-created and the program re-linked. This is what the test previously checked (and successfully worked under the old system). The reason this worked before is because the partial DAG that was loaded would have the 'foo.o' and 'prog' nodes in memory, so it would be re-compiled and re-linked. Now, however, I have the 'foo.o' node, the command for linking, and the 'prog' output node. I don't have the command node that creates foo.o in the partial DAG, because none of its inputs were modified. Here is the view of the DAG after bar.o is deleted, and the create phase completes:</p>
+  <table border=1><tr><td><img src="cmd-delete1.png"></td></tr></table>
+  <p>The nodes that the Updater sees in the partial DAG have the blue outline. Since the Updater no longer passes the filenames on to a separate program, when the bar.o node is processed it will not be re-made. Then when the Updater tries to execute the command node, it will fail because bar.o is not present. In this situation it may be possible to create a backward link from the file to the command that generated. Since there is only ever one incoming link to a file node, this may be a reasonable solution.</p>
+  <p>Part of the changes to the Wrapper program involved accounting for the dangling references. Previously, every object had the ".secondary" file that could be used to keep track of dangling references. Now only the command objects have this file. This graph shows how the dangling reference test looks with command objects:</p>
+  <table border=1><tr><td><img src="cmd-dangling1.png"></td></tr></table>
+  <p>This test works as before - only foo.c is re-compiled, and the dangling reference (the red link) is removed from the .tup hierarchy.</p>
+  <p>The interesting part is that now we can change the configuration file (Makefile) and get some better results. I added some special logic to make sure the create/ object is made for the directory the Makefile is in when it gets modified. (Normally the create/ object is created only when files are added or removed to a directory, not when existing files are modified). This forces the Updater to re-run the Makefile and generate all the commands for that directory, so they can be compared against the previous invocation. This is the same example as last week, where I build everything, then modify the Makefile to change the target and run the Updater. Here is the graph after the Makefile is modified and the create phase runs:</p>
+  <table border=1><tr><td><img src="cmd-target1.png"></td></tr></table>
+  <p>This shows that the old target 'prog' should be deleted, while 'mainexe' needs to be created. After running the Updater, this is the result:</p>
+  <table border=1><tr><td><img src="cmd-target2.png"></td></tr></table>
+  <p>Note that foo.o and ok.o now have dangling references to the deleted command node. If one of these object files is re-created at a later point, the dangling reference will be cleaned up as usual. The nice part is that the old target 'prog' is deleted automatically by the Updater, so a user could just make a change to their configuration file and be sure that things are in their correct state (ie: in the same state as if the Makefile originally targeted 'mainexe'). The only difference are the dangling references lying around, but they aren't actually visible to the user unless they go digging through the .tup/object/ directory. This shows the shell session of what a user would see:</p>
+  <pre>
+   $ ls
+   Makefile  foo.c  foo.h  foo.o  ok.c  ok.o  prog
+   $ &lt;update Makefile&gt;
+   $ tup upd
+   Compile 'foo.c' into 'foo.o'
+   Compile 'ok.c' into 'ok.o'
+   Link 'foo.o ok.o' into 'mainexe'
+   [  ] 0/2 (  0%) tup wrap gcc foo.o ok.o -o mainexe
+   [= ] 1/2 ( 50%) Delete 71db4c4e
+   [==] 2/2 (100%) 
+   Delete: prog
+   $ ls
+   Makefile  foo.c  foo.h  foo.o  mainexe  ok.c  ok.o
+  </pre>
+  <p>The lines that start with "Compile" and "Link" are displayed by the Makefile during the create phase. As before, this just runs 'tup command', 'tup input', and 'tup output' to setup the appropriate objects. The lines with the progress bars are displayed by the Updater, along with the commands it runs.</p>
+  <p>Depending on the time left in the semester, the next thing to try is to conditionally compile files based on some feature setting. For example, the command object to compile foo.c would only be created if ENABLE_FOO was set. This would involve finding a place to set the flags, and then setting up dependencies so a directory's create phase can run when a flag it uses is changed.</p>
+  </li>
+
 </ul>
 </body>
 </html>

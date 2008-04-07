@@ -58,7 +58,7 @@ int create_name_file(const char *path)
 		goto err_out;
 	if(write_all(fd, "\n", 1, tupfilename) < 0)
 		goto err_out;
-	if(delete_tup_file("delete", tupid) < 0)
+	if(move_tup_file_if_exists("delete", "modify", tupid) < 0)
 		goto err_out;
 	close(fd);
 	return 0;
