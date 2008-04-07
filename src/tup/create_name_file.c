@@ -14,12 +14,10 @@ int create_name_file(const char *path)
 {
 	int fd;
 	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
-	char depfilename[] = ".tup/object/" SHA1_XD "/.secondary";
 	tupid_t tupid;
 
 	tupid_from_filename(tupid, path);
 	tupid_to_xd(tupfilename + 12, tupid);
-	tupid_to_xd(depfilename + 12, tupid);
 
 	DEBUGP("create name file '%s' containing '%s'.\n",
 	       tupfilename, path);
@@ -63,12 +61,6 @@ int create_name_file(const char *path)
 	if(delete_tup_file("delete", tupid) < 0)
 		goto err_out;
 	close(fd);
-	fd = open(depfilename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-	if(fd < 0) {
-		perror(depfilename);
-		return -1;
-	}
-	close(fd);
 	return 0;
 
 err_out:
@@ -80,10 +72,12 @@ int create_command_file(const char *cmd)
 {
 	int fd;
 	char tupfilename[] = ".tup/object/" SHA1_XD "/.cmd";
+	char depfilename[] = ".tup/object/" SHA1_XD "/.secondary";
 	tupid_t tupid;
 
 	tupid_from_filename(tupid, cmd);
 	tupid_to_xd(tupfilename + 12, tupid);
+	tupid_to_xd(depfilename + 12, tupid);
 
 	DEBUGP("create command file '%s' containing '%s'.\n",
 	       tupfilename, cmd);
@@ -108,6 +102,12 @@ int create_command_file(const char *cmd)
 		goto err_out;
 	if(delete_tup_file("delete", tupid) < 0)
 		goto err_out;
+	close(fd);
+	fd = open(depfilename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	if(fd < 0) {
+		perror(depfilename);
+		return -1;
+	}
 	close(fd);
 	return 0;
 

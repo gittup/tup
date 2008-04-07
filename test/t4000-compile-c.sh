@@ -1,13 +1,14 @@
 #! /bin/sh -e
 
 . ../tup.sh
+cp ../testMakefile Makefile
 
-echo "void foo1(void) {}" > foo.c
+echo "int main(void) {}" > foo.c
 tup touch foo.c
 update
-sym_check foo.o foo1
+sym_check foo.o main
 
 echo "void foo2(void) {}" >> foo.c
 tup touch foo.c
 update
-sym_check foo.o foo1 foo2
+sym_check foo.o main foo2

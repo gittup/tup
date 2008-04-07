@@ -127,3 +127,13 @@ update()
 	fi
 	check_empty_tupdirs
 }
+
+check_same_link()
+{
+	if stat $* | grep Inode | awk 'BEGIN{x=-1} {if(x == -1) {x=$4} if(x != $4) {exit 1}}'; then
+		:
+	else
+		echo "Files '$*' are not the same inode."
+		exit 1
+	fi
+}

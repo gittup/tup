@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %secondary_hash);
 
 if($#ARGV < 0) {
 	$ofile = "| xv -";
@@ -24,6 +24,7 @@ foreach $file (@files) {
 	@stats = stat FILE;
 	$color_hash{$from} = 0x000000;
 	$incoming_hash{$from} = $stats[3] - 1; # num hard links
+	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
@@ -40,9 +41,14 @@ foreach $file (@files) {
 	@stats = stat FILE;
 	$color_hash{$from} = 0x000000;
 	$incoming_hash{$from} = $stats[3] - 1; # num hard links
+	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
 	close FILE;
+	
+	$file =~ s/\.cmd/.secondary/;
+	@stats = stat $file;
+	$secondary_hash{$from} = $stats[1]; #inode
 	$shape_hash{$from} = "rectangle";
 }
 
@@ -53,7 +59,13 @@ foreach $file (@files) {
 	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
-	$color = "000000";
+	if($stats[1] == $ino_hash{$to}) {
+		$color = "000000";
+	} elsif($stats[1] == $secondary_hash{$to}) {
+		$color = "aaaaaa";
+	} else {
+		$color = "ff0000";
+	}
 	if(-f ".tup/object/".substr($to,0,2)."/".substr($to,2)."/.link") {
 		next;
 	}
@@ -103,7 +115,7 @@ sub follow_chain
 				print STDERR "  $f\n";
 			}
 		}
-		die;
+		return;
 	}
 	if($visited{$f} == 1) {
 		return;

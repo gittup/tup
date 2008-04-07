@@ -9,6 +9,7 @@
 #include "tup/getexecwd.h"
 #include "tup/debug.h"
 #include "tup/compat.h"
+#include "tup/tupid.h"
 
 int main(int argc, char **argv)
 {
@@ -59,7 +60,24 @@ int main(int argc, char **argv)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			if(write_files() < 0)
+			void *handle;
+			int x;
+			tupid_t cmdid;
+
+			handle = tupid_init();
+			if(!handle)
+				return 1;
+
+			/* TODO: re-use from perl script somehow? */
+			tupid_update(handle, "tup wrap ");
+			for(x=arg_start; x<argc; x++) {
+				tupid_update(handle, argv[x]);
+				if(x != argc-1)
+					tupid_update(handle, " ");
+			}
+			tupid_final(cmdid, handle);
+
+			if(write_files(cmdid) < 0)
 				return 1;
 			return 0;
 		}

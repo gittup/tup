@@ -59,26 +59,28 @@ int handle_file(const struct access_event *event)
 	return rc;
 }
 
-int write_files(void)
+int write_files(tupid_t cmdid)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 
+	if(recreate_name_file(cmdid) < 0)
+		return 1;
+
 	list_for_each_entry(w, &write_list, list) {
-		DEBUGP("Write deps for tupid: %.*s.\n",
-		       sizeof(w->tupid), w->tupid);
-		if(recreate_name_file(w->tupid) < 0)
+		struct file_entry *tmp;
+
+		if(create_primary_link(cmdid, w->tupid) < 0)
 			return -1;
-		list_for_each_entry(r, &read_list, list) {
-			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0) {
-				DEBUGP("tupid '%.*s' dependent on itself - "
-				       "ignoring.\n",
-				       sizeof(w->tupid), w->tupid);
-				continue;
-			}
-			if(create_secondary_link(r->tupid, w->tupid) < 0)
-				return -1;
+		list_for_each_entry_safe(r, tmp, &read_list, list) {
+			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0)
+				list_del(&r->list);
 		}
+	}
+
+	list_for_each_entry(r, &read_list, list) {
+		if(create_secondary_link(r->tupid, cmdid) < 0)
+			return -1;
 	}
 	return 0;
 }

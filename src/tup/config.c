@@ -16,7 +16,7 @@ static int get_value_pair(struct buf *file, int *pos,
 			  struct buf *lval, struct buf *rval);
 static int skip_whitespace(struct buf *file, int *pos);
 
-static char default_build_so[] = "builder.so";
+static char default_build_so[] = "make.so";
 static int default_show_progress = 1;
 static char tup_wd[PATH_MAX];
 static int tup_wd_offset;

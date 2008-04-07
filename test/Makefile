@@ -45,4 +45,4 @@ clearmarks: ; @echo "" > tupbenchtmps.t; echo "" > tupbenchtmps.d
 ifneq (,$(filter bench,$(MAKECMDGOALS)))
 .NOTPARALLEL:
 endif
-.PHONY: all bench clearmarks$T $B
+.PHONY: all bench clearmarks $T $B

@@ -28,6 +28,9 @@ typedef char tupid_t[TUPID_SIZE];
 
 /** Get the tupid from the filename. The tupid is *not* nul-terminated. */
 void tupid_from_filename(tupid_t tupid, const char *path);
+void *tupid_init(void);
+void tupid_update(void *handle, const char *s);
+void tupid_final(tupid_t tupid, void *handle);
 
 static inline void tupid_to_xd(char *xd, const tupid_t tupid)
 {

@@ -1,5 +1,7 @@
 #include "tupid.h"
 #include "mozilla-sha1/sha1.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void tupid_from_hash(tupid_t tupid, const unsigned char *hash);
@@ -14,6 +16,33 @@ void tupid_from_filename(tupid_t tupid, const char *path)
 	SHA1_Final(hash, &ctx);
 
 	tupid_from_hash(tupid, hash);
+}
+
+void *tupid_init(void)
+{
+	SHA_CTX *ctx;
+
+	ctx = malloc(sizeof *ctx);
+	if(!ctx) {
+		perror("malloc");
+		return NULL;
+	}
+	SHA1_Init(ctx);
+	return ctx;
+}
+
+void tupid_update(void *handle, const char *s)
+{
+	SHA1_Update(handle, s, strlen(s));
+}
+
+void tupid_final(tupid_t tupid, void *handle)
+{
+	unsigned char hash[SHA1_HASH_SIZE];
+	SHA1_Final(hash, handle);
+
+	tupid_from_hash(tupid, hash);
+	free(handle);
 }
 
 static void tupid_from_hash(tupid_t tupid, const unsigned char *hash)

@@ -3,9 +3,9 @@
 . ../tup.sh
 tup touch foo.c
 tup_object_exist foo.c
-tup_create_exist foo.c
+tup_create_exist .
 
-# 2 files: .name and .secondary
+# 2 files: .name for foo.c, plus .name for "."
 if find .tup/object/ -type f | wc -l | grep 2 > /dev/null; then
 	:
 else
