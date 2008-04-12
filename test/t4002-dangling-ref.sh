@@ -28,7 +28,7 @@ update
 check_same_link bar.o oldbar.o
 rm oldbar.o
 sym_check foo.o main x
-tup_dep_no_exist foo.h bar.o
+tup_dep_no_exist foo.h "tup wrap gcc -c bar.c -o bar.o"
 
 # Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
 # some reason.

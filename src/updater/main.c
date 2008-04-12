@@ -262,9 +262,7 @@ static int find_deps(struct graph *g, struct node *n)
 	struct flist f;
 	char object_dir[] = ".tup/object/" SHA1_XD;
 	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
-	char depfile[] = ".tup/object/" SHA1_XD "/.secondary";
 	struct stat st;
-	struct stat st2;
 
 	tupid_to_xd(object_dir + 12, n->tupid);
 	flist_foreach(&f, object_dir) {
@@ -278,14 +276,10 @@ static int find_deps(struct graph *g, struct node *n)
 		}
 		if(n->node == NODE_FILE) {
 			tupid_to_xd(cmdfile+12, f.filename);
-			tupid_to_xd(depfile+12, f.filename);
 			if(stat(cmdfile, &st) < 0)
 				st.st_ino = -1;
-			if(stat(depfile, &st2) < 0)
-				st2.st_ino = -1;
 
-			if(f._ent->d_ino != st.st_ino &&
-			   f._ent->d_ino != st2.st_ino) {
+			if(f._ent->d_ino != st.st_ino) {
 				DEBUGP("Removing obsolete link %.*s -> %.*s\n",
 				       8, n->tupid, 8, f.filename);
 				unlinkat(f.dirfd, f.filename, 0);
@@ -394,14 +388,10 @@ static int delete_cmd(const tupid_t tupid)
 {
 	struct flist f;
 	char cmdfile[] = ".tup/object/" SHA1_XD "/.cmd";
-	char depfile[] = ".tup/object/" SHA1_XD "/.secondary";
 
-	printf("[31mDelete %.*s[0m\n", 8, tupid);
+	printf("[35mDelete %.*s[0m\n", 8, tupid);
 	tupid_to_xd(cmdfile+12, tupid);
-	tupid_to_xd(depfile+12, tupid);
 	if(delete_if_exists(cmdfile) < 0)
-		return -1;
-	if(delete_if_exists(depfile) < 0)
 		return -1;
 
 	/* Change last / to nul to get dir name */

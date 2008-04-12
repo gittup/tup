@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 			if(create_command_link(t, cmdid) < 0)
 				return 1;
 		} else {
-			if(create_primary_link(cmdid, t) < 0)
+			if(create_link(cmdid, t) < 0)
 				return 1;
 		}
 	}

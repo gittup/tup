@@ -64,13 +64,13 @@ int write_files(tupid_t cmdid)
 	struct file_entry *w;
 	struct file_entry *r;
 
-	if(recreate_name_file(cmdid) < 0)
+	if(recreate_cmd_file(cmdid) < 0)
 		return 1;
 
 	list_for_each_entry(w, &write_list, list) {
 		struct file_entry *tmp;
 
-		if(create_primary_link(cmdid, w->tupid) < 0)
+		if(create_link(cmdid, w->tupid) < 0)
 			return -1;
 		list_for_each_entry_safe(r, tmp, &read_list, list) {
 			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0)
@@ -79,7 +79,7 @@ int write_files(tupid_t cmdid)
 	}
 
 	list_for_each_entry(r, &read_list, list) {
-		if(create_secondary_link(r->tupid, cmdid) < 0)
+		if(create_command_link(r->tupid, cmdid) < 0)
 			return -1;
 	}
 	return 0;

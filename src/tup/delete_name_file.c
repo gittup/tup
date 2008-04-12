@@ -13,12 +13,10 @@ int delete_name_file(const tupid_t tupid)
 	int nb;
 	struct flist f;
 	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
-	char depfilename[] = ".tup/object/" SHA1_XD "/.secondary";
 	static char filename[PATH_MAX];
 
 	DEBUGP("delete name file: %.*s\n", 8, tupid);
 	tupid_to_xd(tupfilename + 12, tupid);
-	tupid_to_xd(depfilename + 12, tupid);
 
 	fd = open(tupfilename, O_RDONLY);
 	if(fd < 0) {
@@ -34,12 +32,10 @@ int delete_name_file(const tupid_t tupid)
 	filename[nb-1] = 0;
 	close(fd);
 
-	printf("[31mDelete: %s[0m\n", filename);
+	printf("[35mDelete: %s[0m\n", filename);
 	if(delete_if_exists(filename) < 0)
 		return -1;
 	if(delete_if_exists(tupfilename) < 0)
-		return -1;
-	if(delete_if_exists(depfilename) < 0)
 		return -1;
 
 	/* Change last / to nul to get dir name (13 accounts for '/' in

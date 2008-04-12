@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %secondary_hash);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %secondary_hash, %filetype_hash);
 
 if($#ARGV < 0) {
 	$ofile = "| xv -";
@@ -27,6 +27,8 @@ foreach $file (@files) {
 	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
+	@stats = stat $name_hash{$from};
+	$filetype_hash{$from} = $stats[2] & 040000; # is a directory
 	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
 	$shape_hash{$from} = "ellipse";
@@ -61,7 +63,9 @@ foreach $file (@files) {
 	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
-	if($stats[1] == $ino_hash{$to}) {
+	if($filetype_hash{$from}) {
+		$color = "008800";
+	} elsif($stats[1] == $ino_hash{$to}) {
 		$color = "000000";
 	} elsif($stats[1] == $secondary_hash{$to}) {
 		$color = "aaaaaa";
