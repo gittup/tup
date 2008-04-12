@@ -50,10 +50,6 @@ if($cmd eq "startmon") {
 	exec("sha1depgraph.pl @ARGV");
 } elsif("config" =~ /^$cmd/ || $cmd eq "cfg") {
 	exec("config @ARGV");
-} elsif("input" =~ /^$cmd/) {
-	exec("create_dep", "input", @ARGV);
-} elsif("output" =~ /^$cmd/) {
-	exec("create_dep", "output", @ARGV);
 } elsif("wrapper" =~ /^$cmd/) {
 	exec("wrapper @ARGV");
 } elsif("create" =~ /^$cmd/) {
@@ -72,8 +68,6 @@ if($cmd eq "startmon") {
 		die "Usage: delete file [file...]\n";
 	}
 	exec("tuptouch delete @ARGV");
-} elsif("command" =~ /^$cmd/) {
-	exec("tupcmd \"@ARGV\"");
 } else {
 	print STDERR "Unknown command: $cmd\n";
 }

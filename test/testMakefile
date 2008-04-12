@@ -6,17 +6,16 @@ prog := prog
 # a / appended
 d := $(if $(filter .,$(TUPWD)),,$(TUPWD)/)
 
+ifneq (,$(strip $(objs)))
 $(prog): $(objs)
-	@if [ "x$^" != "x" ]; then \
-	echo "Link '$(patsubst %,$d%,$^)' into '$d$@'"; \
-	tup command "tup wrap gcc $(patsubst %,$d%,$^) -o $d$@" && \
-	$(foreach f,$^,tup input $f "tup wrap gcc $(patsubst %,$d%,$^) -o $d$@" &&) \
-	tup output "tup wrap gcc $(patsubst %,$d%,$^) -o $d$@" $@; \
-	fi
+	@echo "Link '$(patsubst %,$d%,$^)' into '$d$@'"; \
+	create_dep "tup wrap gcc $(patsubst %,$d%,$^) -o $d$@" $(foreach f,$^,-i$f) -o$@
+endif
+
 $(objs): %.o: %.c
 	@echo "Compile '$d$<' into '$d$@'"; \
-	tup command "tup wrap gcc -c $d$< -o $d$@" && \
-	tup input $< "tup wrap gcc -c $d$< -o $d$@" && \
-	tup output "tup wrap gcc -c $d$< -o $d$@" $@
+	create_dep "tup wrap gcc -c $d$< -o $d$@" -i$< -o$@
 
-.PHONY: $(prog) $(srcs) $(objs)
+default: ; @true
+
+.PHONY: $(prog) $(srcs) $(objs) default

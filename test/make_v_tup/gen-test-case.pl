@@ -2,7 +2,7 @@
 
 use strict;
 
-my ($num_files, $num_deps, $hier_depth_min, $hier_depth_max, %path_names, $x, $y);
+my ($num_files, $num_deps, $hier_depth_min, $hier_depth_max, %path_names, $x, $y, %dir_names, %mains);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
 
 if($#ARGV < 0) {
@@ -62,6 +62,11 @@ for($x=0; $x<$num_files; $x++) {
 		system("mkdir -p tmake/$path_names{$x}");
 		system("mkdir -p ttup/$path_names{$x}");
 	}
+	if($dir_names{$path_names{$x}} != 1) {
+		$dir_names{$path_names{$x}} = 1;
+		$mains{$x} = 1;
+		system("cp ../testMakefile ttup/$path_names{$x}/Makefile");
+	}
 }
 
 open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
@@ -85,7 +90,7 @@ for($x=0; $x<$num_files; $x++) {
 		print FILE "#include \"$path_names{$tmp}$tmp.h\"\n";
 	}
 	print FILE "void func_$x(void) {}\n";
-	if($x == 0) {
+	if($mains{$x}) {
 		print FILE "int main(void) {return 0;}\n";
 	}
 	close FILE;
@@ -100,7 +105,7 @@ print MAKEFILE "progs := \$(sort \$(progs))\n";
 print MAKEFILE "all: \$(progs)\n";
 print MAKEFILE "deps := \$(objs:.o=.d)\n";
 print MAKEFILE "-include \$(deps)\n";
-print MAKEFILE "\$(progs): %: ; \$Qld -r -o \$@ \$^\n";
+print MAKEFILE "\$(progs): %: ; \$Qgcc -o \$@ \$^\n";
 print MAKEFILE "%.o: %.c\n\t\$Qgcc -MMD -I. -c \$< -o \$@\n";
 print MAKEFILE "clean: ; \@rm -rf \$(objs) \$(deps) \$(progs)\n";
 print MAKEFILE ".PHONY: clean all\n";
