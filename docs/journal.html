@@ -13,10 +13,11 @@
   <li>Dependency generator (wrapper program and LD_PRELOAD library) - 2008/02/13</li>
   <li>Reverse dependency file structure (SHA1 hash directories) - 2008/02/17</li>
   <li>Updater - 2008-03-09</li>
+  <li>Command-based Updater - 2008-04-06</li>
+  <li>Configuration options - 2008-04-13</li>
 </ul>
 <h4>Upcoming:</h4>
 <ul>
-  <li>Handle configuration files (eg: linux/.config) - 2008/04/01?</li>
   <li>Build small linux system with real source packages - 2008/04/20?</li>
   <li>Final presentation - 2008/04/30 - 10:30AM room 430A</li>
 </ul>
@@ -568,6 +569,70 @@ $(objs): %.o: %.c
   <p>The lines that start with "Compile" and "Link" are displayed by the Makefile during the create phase. As before, this just runs 'tup command', 'tup input', and 'tup output' to setup the appropriate objects. The lines with the progress bars are displayed by the Updater, along with the commands it runs.</p>
   <p>Depending on the time left in the semester, the next thing to try is to conditionally compile files based on some feature setting. For example, the command object to compile foo.c would only be created if ENABLE_FOO was set. This would involve finding a place to set the flags, and then setting up dependencies so a directory's create phase can run when a flag it uses is changed.</p>
   </li>
+
+  <li><a name="13"><b>Apr 13 - Apr 19</b></a>: <p>With the command-based Updater working, I tried to see how it would work by using configuration options. Basically this just entailed setting a variable in the Makefile, and deciding whether or not to build certain files based on its value. In this example, I'm building two C files - one of them (bar.c) is always built, while the other (foo.c) is conditionally compiled based on the value of CONFIG_FOO. This is similar to how the Linux kernel determines which source files to build. For example, if CONFIG_INPUT_JOYDEV is set, then the joydev.c file is compiled and linked into the kernel. Although I am currently setting the configuration variable directly in the Makefile, in the future it may be done in a separate file (similar to .config for the kernel). Here is the Makefile I am using:</p>
+  <pre>
+   CONFIG_FOO := 1
+
+   srcs := bar.c
+   ifeq (1,$(CONFIG_FOO))
+   srcs += foo.c
+   endif
+
+   objs := $(srcs:.c=.o)
+   prog := prog
+
+   # Change the directory "." to nothing - all other actual directory names get
+   # a / appended
+   d := $(if $(filter .,$(TUPWD)),,$(TUPWD)/)
+
+   ifneq (,$(strip $(objs)))
+   $(prog): $(objs)
+           @echo "Link '$(patsubst %,$d%,$^)' into '$d$@'"; \
+           create_dep "tup wrap gcc $(patsubst %,$d%,$^) -o $d$@" $(foreach f,$^,-i$f) -o$@
+   endif
+
+   $(objs): %.o: %.c
+           @echo "Compile '$d$&lt;' into '$d$@'"; \
+           create_dep "tup wrap gcc -c $d$&lt; -o $d$@" -i$&lt; -o$@
+
+   default: ; @true
+
+   .PHONY: $(prog) $(srcs) $(objs) default
+  </pre>
+  <p>This is nearly identical to the Makefile I have been using (in comparison to the previous version posted, this version works in subdirectories, and also generates the whole command object and input/output links in a single command invocation). The additions to support configuration variables are just at the type in the definition of the <em>srcs</em> variable. If CONFIG_FOO is set to 1, then the foo.c file is added to the list. When built in this configuration, both foo.c and bar.c are compiled and linked into the executable. If the Makefile is later updated to set CONFIG_FOO to 0, then the command to build foo.c is no longer generated. This is a similar case to when the target name changed, since the command object will be moved to the delete/ directory. The Updater will then delete the command object as well as the output file, foo.o. The program will be re-linked with only the bar.o object. Here is the dependency graph after the create phase runs:</p>
+  <table border=1><tr><td><img src="config_option_changed.png"></td></tr></table>
+  <p>Since we turned off the CONFIG_FOO variable, that side of the dependency tree is removed from the system, and the foo.o file that was created is removed. This leaves the system in a state that is almost identical to what it would be in if the option was initially off and the entire program was built (the only difference would be the dangling link from bar.o to the old linking command, which will be silently removed when the opportunity arises). Here is the output from the Updater during this process:</p>
+  <pre>
+  Compile 'bar.c' into 'bar.o'
+  Link 'bar.o' into 'prog'
+  [   ] 0/3 (  0%) tup wrap gcc bar.o -o prog
+  [=  ] 1/3 ( 33%) Delete 91ce14a6
+  [== ] 2/3 ( 66%) Delete: foo.o
+  Delete d64ac38d
+  [===] 3/3 (100%) 
+  </pre>
+  <p>Some other notes about the graph: first, the use of the .secondary links in order to detect dangling references is no longer required. Since the only time the deletion of files is triggered when command objects are removed, we don't need to identify particular files as "primary" or "secondary". The links that indicate the creation of a command are colored in green. As before, the Updater only sees the colored nodes (it does not need to process any nodes in black).</p>
+  <p>Now that the command object structure is fairly stabilized, I re-ran the benchmarks comparing tup vs. make. Unfortunately this change slowed down the initialization phase further, as seen in the following data:</p>
+  <table>
+  <caption><i>Command-based builder vs. make</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>Make (time in s)</b></td>
+    <td align=center><b>Command builder (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.05</td><td>0.07</td></tr>
+  <tr><td>10</td><td>0.48</td><td>0.72</td></tr>
+  <tr><td>100</td><td>4.2</td><td>6.78</td></tr>
+  <tr><td>1000</td><td>39.19</td><td>66.28</td></tr>
+  <tr><td>10000</td><td>386.57</td><td>1413.63</td></tr>
+  </table>
+  </td><td>
+  <img src="cmdbuilder-vs-make.png">
+  </td></tr></table>
+  <p>The other cases (C-file updated, header file updated, no files changed) are almost identical to before. In the future I will have to profile the initialization phase to see if there are redundant or unnecessary file accesses being performed that slow tup down.</p>
 
 </ul>
 </body>

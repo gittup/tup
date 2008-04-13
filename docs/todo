@@ -1,8 +1,6 @@
 add in test case projects, analysis of make/ant
 real-world times?
 
- hash command lines?
-
 only add created monitor files to the create list if 'name' doesn't already exist?
 
 any way to wrap make so that all sub-procs are wrapped?
@@ -25,31 +23,12 @@ options/features:
  - keep going
  - parallel
 
-
-in updater/graph.h - make edge have a node *src, and edge *next for both src and dest? that way when updating the destination, it could know the names of the source nodes? would that be useful?
-
-instead of update(hash, flags), do update(hash) and create(hash), where update is a combo of modify/delete?
-
 portability:
  mac osx may have trouble with unlink() inside a flist_foreach()?
 
- if a file doesn't exist and is created as part of a command, make sure the
- link created is a primary link? ie: if a prog creates two files but only one
- specified by create()
-
 when making a better 'tup' wrapper, be sure to call find_tup_dir, getexecwd(), and the confg init thing, except in the 'tup init' case.
 
-generate performance scripts, separate from test scripts. eg:
- - time to 'tup create' 1000 files (+ disk space)
- - time to add 1000 links (+ disk space)
- - time to update 1000 C files in create/
- - time to 'tup touch' 1000 C files
- - time to update 1000 C files in modify/
- - time to 'tup delete' 1000 C files
- - time to update and remove all 1000 .o files and objects
- - time for monitor to initialize with 1000's of directories/files
-
-support for test automation?
+support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
 
 tup:
  generate multiple files
@@ -60,13 +39,6 @@ tup:
   must modify, a, delete b, create/modify c?
  if monitor is not used (eg: modify touch to do a 'tup touch foo.c' as well) -
   when rebuilding foo.c, should stat foo.h and compare against .tup/objects/foo.h/.name to see if timestamp is different? maybe have a timestamp option (part of the tup configuration) to perform this check, and if out of date add foo.h to modify list as well. That way if foo.h is modified but 'tup touch foo.h' wasn't executed, the build won't be inconsistent.
-
-maybe:
- - during create, just run a 'create' on each Makefile in each directory
- - monitor can just care about the directory an even occurs in - re-run 'create' on the Makefile in that directory
- - compare new links generated vs old links generate from Makefile, take appropriate action
- - still requires separate link objects, I think
- - commands as objects?
 
 test:
  make sure when a directory is deleted (eg: rm -rf bar), then the 'bar' directory object is deleted after update
