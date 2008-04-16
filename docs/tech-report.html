@@ -1,0 +1,212 @@
+<html>
+<head>
+<title>CS798 - Technical Report</title>
+</head>
+<body>
+<h2>CS798 - Technical Report</h2>
+<a href="proposal.html">Proposal</a><br>
+<a href="journal.html">Journal</a><br>
+<a href="..">Main page</a><br>
+
+<h3>Abstract</h3>
+<p>This document describes the background and implementation of a set of programs used for dependency management that function as a replacement for the ubiquitous <em>make(1)</em> program common on UNIX and Linux operating systems. Whereas <em>make</em> and its derivatives generally operate in linear time with respect to the size of the project, the proposed programs (collectively known as "tup", which is short for "The UPdater") can perform near-constant time updates after paying a cost in the initialization phase. As a secondary benefit, some enhancements to the correctness of the build in certain cases (such as deleting files) are attained as well.</p>
+
+<h3>Introduction</h3>
+<p>For a software project, a build system generally servers two purposes. First, it allows an end-user to download the source code of the project and build it in a consistent fashion (such as making sure a library is built before a program tries to link it in). Second, the build system allows the developer to re-build parts of a project that are out of date with respect some modifications that were made to the source tree. This update operation can occur many times during development, as a developer may make frequent changes during a typical edit/compile/test cycle. In this paper, the primary focus is on this update operation. Ideally the time to perform the update operation would scale with the magnitude of the changes that are required, rather than the size of the entire source tree (which may contain files that are unrelated to the recent modifications).</p>
+<p>The common UNIX program <em>make</em> is a build tool that allows a developer to specify dependencies, and commands to rebuild targets. When executed, <em>make</em> will perform two main functions: 1) construct a DAG (directed acyclic graph) of all dependencies, and 2) traverse the graph starting at the requested target, rebuilding only those targets that are out of date with respect to their dependencies. In this way <em>make</em> can be used to build an entire project from scratch, or build only the portions of the project that have been affected by changes.</p>
+<p>Unfortunately, <em>make</em> does not scale well for large projects when building only the parts of the project that are affected by changes. Specifically, the update operation is at best an O(n) algorithm, where <em>n</em> is the number of dependencies. This is undesirable, because unrelated pieces of the project affect the build time of the part of the project we may be working on. Consider just the effect of reading an increasing number of dependency files. A Makefile that includes all of these dependency files and simply checks if the files are up-to-date (without building anything) results in the build times shown in the following table. Notice how it scales in a mostly linear fashion, until cache effects start to dominate the large number of files. </p>
+<table border=1>
+<tr><td bgcolor="#BBFFFF"><b># Files</b></td>
+<td>1</td>
+<td>2</td>
+<td>4</td>
+<td>8</td>
+<td>16</td>
+<td>32</td>
+<td>64</td>
+<td>128</td>
+<td>256</td>
+<td>512</td>
+<td>1024</td>
+<td>2048</td>
+<td>4096</td>
+<td>8192</td>
+<td>16384</td>
+<td>32768</td>
+<td>65536</td>
+</tr>
+<tr><td bgcolor="#BBFFFF"><b>Time</b></td>
+<td>0.004s</td>
+<td>0.005s</td>
+<td>0.006s</td>
+<td>0.008s</td>
+<td>0.012s</td>
+<td>0.019s</td>
+<td>0.035s</td>
+<td>0.064s</td>
+<td>0.128s</td>
+<td>0.257s</td>
+<td>0.528s</td>
+<td>1.093s</td>
+<td>2.434s</td>
+<td>5.554s</td>
+<td>16.035s</td>
+<td>1m21.539s</td>
+<td>5m53.272s</td>
+</tr>
+</table>
+<p></p>
+<table border=1><tr><td><img src="make-dependencies-graph.png"></td></tr></table>
+
+<p>This behavior is not specific to <em>make</em>. There are several complaints (some legitimate, some not) with <em>make</em> or its Makefiles, such as the fact that: Makefiles are their own sort of language (as opposed to something already known like Perl or Python), automatic dependency handling is not builtin to the program, or it is difficult maintaining a project across multiple directories. As a result, a number of alternatives to <em>make</em> have been created. For example, <a href="http://www.dsmit.com/cons/">CONS</a>, <a href="http://www.scons.org/">SCONS</a>, <a href="http://www.perforce.com/jam/jam.html">JAM</a>, <a href="http://www.a-a-p.org/">A-A-P</a>, and <a href="http://omake.metaprl.org/index.html">OMake</a>, among others. All of these programs suffer from the same linear update time. Ideally, the time to process an update would be proportional to the amount of changes required. The current linear behavior is actually a result of three separate factors:
+<ol>
+  <li><em>make</em> always reads the entire DAG before rebuilding anything.</li>
+  <li><em>make</em> does not know which files have been updated before-hand; instead, it considers each target and checks to see if it is out-of-date with respect to its dependencies.</li>
+  <li>The storage of the dependencies in the filesystem (as generated by gcc's <em>-MD</em> option, or older equivalents such as <em>makedepend</em>) makes it necessary that any program must read every dependency file before updating.</li>
+</ol>
+
+<p>We will now consider each of these factors in more detail. First, <em>make</em> always reads in the entire DAG before updating anything. Since each edge must be added to the DAG, it is easy to see that even if we ignore any other processing, constructing the DAG is at best a linear operation. As such, any build program that could hope to improve on a linear time algorithm must not rely on the entire DAG. Instead, it should construct only the portion of the graph that it needs based on the changes to the system. This is difficult because of the second and third factors mentioned above.</p>
+<p>When performing an update, the <em>make</em> program essentially starts with a single target (such as 'all'), and asks the question <i>Do I need to update this target?</i>. This question can only be answered by checking the timestamps of each of its dependencies, and each of their dependencies, and so on through the DAG. (Other build programs may use MD5 sums or other hashes instead of timestamps, but this is irrelevant to the complexity of the algorithm). Again, this is at best a linear operation. While developing in a project, however, we don't really care if 'all' is updated or not. What we care about is that anything dependent on the immediate changes we have made (such as a .c file we modified) is updated. A better question to ask is: <i>What files need to be updated given that these files have changed?</i> Answering this question assumes we had a list of files that were changed up front. This is not currently provided to the build program.</p>
+<p>Even if we had a list of files that were changed up front, any build tool is again limited to a linear-time algorithm because of the way the dependencies are structured in the filesystem. Consider the following minimal example:</p>
+
+<pre>
+Makefile
+main/
+    main.c
+    Makefile
+lib/
+    lib.c
+    lib.h
+    Makefile
+</pre>
+<p>Such a program may have the following dependency information:</p>
+<table border=1><caption><i>Figure 1: Simple Program Dependencies</i></caption><tr><td><img src="01-initial.png"></td></tr></table>
+
+<p>The dependencies are actually stored in several different places. The two dependencies on the header file are output by gcc (using the <em>-MD</em> or similar option) the first time the program is built. This information can be used on subsequent builds to re-build both main.o and lib.o if the header changes. The edges from the .o to the .c files are generally written in the Makefiles as implicit rules (such as <em>%.o: %.c</em>). These dependencies are also written by gcc in the .d file. The following graph shows the same program along with where the actual edges are found:</p>
+<table border=1><caption><i>Figure 2: Dependencies File Locations</i></caption><tr><td><img src="02-location.png"></td></tr></table>
+
+<p>Dependencies that are from the same file are shown in the same color. This will be explained later. For now, consider we are developing the interaction between the main program and the library. This will likely include changing the lib.h file. When this file is changed, both lib.o and main.o must be rebuilt, the archive must be re-created, and ultimately the main executable must be linked. Now let's assume that this is actually a small part of a much larger project:</p>
+
+<table border=1><caption><i>Figure 3: Large Dependency Graph</i></caption><tr><td><img src="03-large.png"></td></tr></table>
+
+<p>Suppose we are still only developing the interaction between the main program and the library. However, now any changes we make to the library must also cause a rebuild of another (or possibly multiple) other binaries. In order to determine which pieces must be rebuilt, the build tool must read in all of the dependency files and find the dependencies on lib.h. Notice how the incident edges to the lib.h node are all separate colors. This indicates that they are all stored in separate files. So if we try to answer the basic question <i>What files must be updated given that lib.h has changed?</i>, the program must necessarily read in every dependency file, since we have no way of knowing which ones might contain an edge to lib.h. This means if we specify dependencies in this manner, no matter what program we use, we will be forced to use at best a linear update algorithm. The consequence of this fact is that any build program that relies on the output of gcc's dependency mechanism can perform no better than a linear-time update.</p>
+
+<h3>Dependency Management Using "tup"</h3>
+<p>The primary feature of tup is to introduce a well-defined structure for managing dependencies. The set programs that are described here all interact with this structure, but this set is by no means exclusive; where possible, alternative methods for interacting with the dependency information will be suggested. Before describing each program's interaction with the dependency structure, we must first look at the structure itself.</p>
+<p>All dependency information in tup is stored at the top-level of the project in a directory called ".tup". This subdirectory stores information about every file in the project, the commands used to generate other files, and the dependency relationships between them. Essentially it functions as a dependency database, and is implemented using the underlying filesystem. There are two fundamental concepts in the tup hierarchy, which are "objects" and "links". These naturally mirror the definitions of nodes and edges for a DAG. An object in tup can represent a file (such as "foo.c"), or a command (such as "tup wrap gcc -c foo.c -o foo.o" - the "tup wrap" porition will be explained later). Abstract concepts that are typically represented by PHONY targets in make could also be considered objects, though to date this has not been tried. A sub-directory in .tup/object/ is used to represent each object. Using a technique largely borrowed from <a href="http://git.or.cz/">git</a>, the SHA1 hash of the filename or commandline is used as the object's unique identifier. For example, the SHA1 hash of "foo.c" is e55780e6340b6e110e51e79f077052cb086292a3. This would be represented in tup as follows:</p>
+<pre>
+.tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3/.name
+</pre>
+<p>The hash is used as the directory name, and the ".name" file is used as the mapping of the object back to the actual filename. In this example, the ".name" file contains the string "foo.c". A command object is similar, though it uses a ".cmd" file instead of a ".name" file to distinguish it as an object that can be executed. This will become apparent later when the Updater is discussed.</p>
+<p>The reason an object is stored as a directory is because any object can have multiple links (outgoing dependencies). For example, multiple C files can include the same header, or a command could create multiple output files. A link is represented by a file, which is named after the dependent object. For example, if we wish to represent the dependency "a -&gt; b", the hash for "b" would exist in object "a"'s directory. Here is an example with two file objects (foo.c and foo.o), and one command object ("tup wrap gcc -c foo.c -o foo.o"). Note that foo.c links to the command, and the command links to foo.o:</p>
+<pre>
+.tup/object/91/ce14a6d690751cdccf21ddc6d19de5bf5ae15c/.cmd
+.tup/object/91/ce14a6d690751cdccf21ddc6d19de5bf5ae15c/b309277fe2201344a4f5289f1d5b5d6fe8c5c562
+.tup/object/b3/09277fe2201344a4f5289f1d5b5d6fe8c5c562/.name
+.tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3/.name
+.tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3/91ce14a6d690751cdccf21ddc6d19de5bf5ae15c
+
+$ cat .tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3/.name 
+foo.c
+$ cat .tup/object/91/ce14a6d690751cdccf21ddc6d19de5bf5ae15c/.cmd 
+tup wrap gcc -c foo.c -o foo.o
+$ cat .tup/object/b3/09277fe2201344a4f5289f1d5b5d6fe8c5c562/.name 
+foo.o
+</pre>
+<p>That is the extent of the complexity of the tup object hierarchy. There are a few other directories at the top of the ".tup" directory. These are the "create", "delete", and "modify" directories, and are used as locations for tracking the modifications made to the source tree. Each directory can contain a list of object hashes for objects that were created, deleted, or modified, respectively. These will be discussed in more detail for the programs that use them.</p>
+
+<h4>Description of Primary tup Programs</h4>
+<ol>
+  <li><b>monitor:</b> Perhaps the simplest program in tup is the Monitor program. The Monitor runs as a background process and is used in order to provide the list of files that have changed up front, which is necessary to construct the partial DAG. Essentially all it does is recursively setup <a href="http://en.wikipedia.org/wiki/Inotify">inotify</a> watches to monitor any file changes. A list of these changes is stored in the form of object hashes in the "create", "delete", and "modify" directories. For example, if the foo.c file is modified (the user adds a new function, for example), then a file is created named "e55780e6340b6e110e51e79f077052cb086292a3" in the .tup/modify directory. Similarly, if foo.c is deleted, the hash is placed in the delete directory. The create directory is somewhat unique - instead of storing the hash of the file that is created, it instead stores the has of the directory name containing the file. Essentially it is a list of "directories that have been modified". A directory hash can also be stored in the create list if a file was deleted from the directory. (The filename hash itself is stored in the delete directory). This distinction is used by the Updater during its two phases of operation.
+  <p>An alternative to using the Monitor program is to make the programs used to edit source files "tup-aware". For example, the editor used to create and edit source files could write the appropriate hashes into the .tup hierarchy whenever a file is saved. Similarly, the base tools (such as "cp", "rm", etc) could be modified to do the same (or aliased to commands to perform this option). While this would also work, the Monitor was developed as a catch-all that can be used regardless of what tools modify the source tree. The downside is the user must remember to start the Monitor before changing files, otherwise notification of those changes could be lost.</p>
+  </li>
+  <li><b>create_dep:</b> The create_dep program is used to create a command object, as well as its expected inputs and outputs. It is generally called during the create phase of the Updater. The following command represents our familiar example:
+  <pre>
+  create_dep "tup wrap gcc -c foo.c -o foo.o" -ifoo.c -ofoo.o
+  </pre>
+  <p>Note that headers are not explicitly mentioned here, since they are handled by the wrapper program, which is described later. This program creates the command object (given as the first argument), and stores the string in the ".cmd" file. All -i arguments are the input files, so the hash of the command object is stored in each of these object's directories. The -o arguments are output files - the hashes of all of these objects are stored in the command object's directory.</p>
+  <p>Aside from the objects explictly mentioned on the command-line, create_dep also creates an object for the directory it was executed in. A link is stored in this object to the command object that was created, so the origin of the command can be tracked. This can be used to delete files if they are no longer generated by the system.</p>
+  </li>
+  <li><b>wrapper:</b> As mentioned in the Introduction, the dependency output of gcc's -MMD option is not sufficient for use by tup. Further, other programs such as ld and ar do not support any kind of dependency generation at all. The wrapper (executed as "tup wrap &lt;cmd&gt;") was developed as another sort of catch-all program, and it can be used to wrap the execution of any well-behaved command. The LD_PRELOAD environment variable is used to dynamically load a shared library that wraps certain libc functions (such as open(), fopen(), rename(), etc) before the wrapped program (eg: gcc) is called. This allows all file accesses to be captured by the wrapper program, so the appropriate dependencies can be written into the .tup hierarchy. For the examples considered here, the wrapper program functions to add the links for the header files.
+  <p>Similar to the Monitor, an alternative to the wrapper program is to make the commands "tup-aware". This may even be required for instances where the wrapper does not adequately capture the dependencies of the command. For example, gcc could be modified to provide a "-tup" option that would cause it to generate the appropriate links in the .tup directory. The wrapper does work for at least gcc (both compiling and linking), as we as ar, so it is sufficient for the time being. I suspect javac would not work correctly with the wrapper, because it may create class files not specified on the command line.</p>
+  </li>
+  <li><b>updater:</b> The Updater is considered the main program of tup as it is the program that is directly executed instead of make. There are two phases to the Updater, which are known as the "create phase" and the "update phase". The create phase processes all of the object references in the .tup/create directory. These hashes point to file objects that are the names of directories that need to be updated. For example, if a new file was created in a directory, then that directory's hash will be in the create directory. The Updater will run the configuration file in that directory (which is currently actually a Makefile and executed by make). This will create the command objects and their expected input/output links. Any new command objects that were created since the last run of this particular configuration file are put in the .tup/modify directory. Any command objects that had previously been created by the configuration file but now aren't are put in the .tup/delete directory (for example, when a source file is deleted, the command used to compile it will no longer be generated).
+  <p>The update phase then reads in the objects referenced by the modify and delete directories. These objects are the start nodes used for building the partial DAG. Here we can take advantage of the filesystem structure of the dependencies in the .tup directory and only read those entries needed for this particular update. This means if there is an unrelated portion of the dependency tree, the Updater does not need to read it in or parse it in any fashion. Using the example from before, suppose the hash for foo.c was in the modify directory. We could take this hash and look in the directory ".tup/object/e5/5780e6340b6e110e51e79f077052cb086292a3/" and see the hash for the gcc command. Similarly, we would then follow the hash for the gcc command to find the output file. Construction of the partial DAG continues in this manner until there are no new nodes to read in. At this point the Updater has a partial DAG in memory representing exactly the files that need to be updated, as well as the commands that need to be executed to re-construct those files. The DAG can be processed by a simple depth-first search. Whenever a file node is reached, no action is taken by the Updater. Whenever a command node is reached, that command is executed.</p>
+  </li>
+  <p>TODO: describe operation during Update, show full/partial DAGs</p>
+</ol>
+
+<h3>Results</h3>
+<h4>Timing Comparison</h4>
+<p>Here we compare tup against a standard set of Makefiles. The test setup generates a set of C/header file pairs (numbered 0 to n) in a random directory hierarchy that is anywhere from 0 to 7 layers deep. Each C file includes its corresponding header file, as well as the next 6 headers in numerical order (wrapping around as necessary). So, file 0.c will include 0.h, 1.h, 2.h, ... 6.h. All C files that are in the same directory are linked into an executable, and the first C file in each directory is chosen to have the main() function. The execution times, as measured by the "real" field of the "time" shell command, are tested in each of the following categories:</p>
+  <ul>
+    <li>Initial build time (that is, time to generate all objects and programs)</li>
+    <li>Changed C file build (touch 0.c, and rebuild)</li>
+    <li>Changed header file build (touch 0.h, and rebuild). Note this actually rebuilds 7 .c files, and re-links them into their executables.</li>
+    <li>No files changed</li>
+  </ul>
+<p>In order to make sure both programs were running in a fair environment, the disk was synced before running. An attempt was made to pre-load the cache in both cases by doing a 'cat' on each file before the initial build. After the initial build, the filesystem was again synced to make sure everything was written out before doing other tests. The four categories of testing were done over the following input sizes: 1, 10, 100, 1000, and 10000. For example, at size=100 there are files 0.c - 99.c, and 0.h - 99.h scattered about the hierarchy. 10000 would be about the size of a large project (such as the Linux kernel, or Firefox). The initial build time test was done only once (since it takes a while to do), and the change file/no-op tests were done 10 times each and averaged.</p>
+  <table>
+  <caption><i>Initial build times (tup vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>make (time in s)</b></td>
+    <td align=center><b>tup (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.05</td><td>0.07</td></tr>
+  <tr><td>10</td><td>0.48</td><td>0.72</td></tr>
+  <tr><td>100</td><td>4.2</td><td>6.78</td></tr>
+  <tr><td>1000</td><td>39.19</td><td>66.28</td></tr>
+  <tr><td>10000</td><td>386.57</td><td>1413.63</td></tr>
+  </table>
+  </td><td>
+  <img src="cmdbuilder-vs-make.png">
+  </td></tr></table>
+<p>In all cases, tup requires about 1.4x - 3.7x the amount of time as make during the initialization phase. This is likely due to the large number of files that must be written into the .tup hierarchy as each file is compiled for the first time. It is possible there are still some inefficiencies in the implementation (since it is largely a proof-of-concept at this point), but it is unlikely that any speed improvements will result in tup outperforming make in the initialization phase. This is the up-front cost that must be paid in order to attain the benefits of tup. These benefits should be evident when analyzing the time it takes to update the source tree when a single C file is updated using the "touch" command:</p>
+  <table>
+  <caption><i>C file changed (tup vs. make)</i></caption>
+  <tr><td>
+  <table border=1>
+  <tr>
+    <td align=center><b>Size</b></td>
+    <td align=center><b>make (time in s)</b></td>
+    <td align=center><b>tup (time in s)</b></td>
+  </tr>
+  <tr><td>1</td><td>0.05</td><td>0.06</td></tr>
+  <tr><td>10</td><td>0.052</td><td>0.06</td></tr>
+  <tr><td>100</td><td>0.141</td><td>0.06</td></tr>
+  <tr><td>1000</td><td>1.163</td><td>0.07</td></tr>
+  <tr><td>10000</td><td>18.803</td><td>0.074</td></tr>
+  </table>
+  </td><td>
+  <img src="cmdbuilder-vs-make-c_file.png">
+  </td></tr></table>
+  TODO: Header, no build
+  TODO: tup vs. oracle (shell script)?
+
+<h4>Feature Comparison</h4>
+TODO: Delete files, change config options
+
+<h3>Conclusion</h3>
+<p></p>
+
+<h3>Limitations</h3>
+<p>To date, tup has only been tested with C programs. Although it should work as a general purpose build system for any programs that can be described as a set of inputs that go into a command to produce a set of outputs, there are likely certain cases that will be difficult.</p>
+
+<h4>Commands that don't wrap well</h4>
+<p>The wrapper program writes dependencies based on the wrapped program's file access patterns. It is very simple by design, and only really works in cases where the program performs the same function everytime. The javac compiler does not necessarily perform the same function everytime. For example, suppose there are two java files: A.java and B.java, where class A uses something from class B. If neither class file exists and the command "javac A.java" is executed, *both* A.class and B.class will be written. If this command is executed again, *only* A.class will be written, since B.class already exists and is up-to-date. This behavior would likely cause the tup dependency database to be inaccurate - at best, it may cause things to be updated unnecessarily. At worst, it could introduce a circular dependency. In cases such as this, it would be beneficial to make the command itself "tup-aware" so it can write the appropriate links.</p>
+
+<h4>Commands with indeterminate outputs</h4>
+<p>The update phase generally expects all outputs of commands to be properly listed before the command actually runs. For C programs this is simple, since there is typically only one output file. However, for Java programs there may be multiple class files generated for a single .java file. For example, if one class has several inner classes, each inner class is written to a separate .class file. It may be unreasonable to expect the user to update the configuration file every time a new inner class is added, instead favoring an automatic solution. However, if all class files are put into a .jar file at the end, it would be difficult to determine this command ahead of time since not all inputs (the .class files) are known.</p>
+
+<h3>Future Work</h3>
+<p>Although the core of tup is likely stable, there is still a large amount of work to be done on the usability front in order to make tup user-friendly, as well as better testing for error cases and the like. It would be useful to add well-defined support for configuration options, as well as dependency support at the configuration file level (so a configuration file can properly include another, for example). Long-term it will be interesting to see if tup can be used to build an actual large-scale system, such as an entire Linux distribution.</p>
+
+<h3>References</h3>
+TODO: recursive make harmful, omake, purely top-down
+
+</ul>
+</body>
+</html>

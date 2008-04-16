@@ -1,0 +1,2 @@
+all:
+-include $(wildcard *.d)
