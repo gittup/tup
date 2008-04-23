@@ -42,3 +42,10 @@ tup:
 
 test:
  make sure when a directory is deleted (eg: rm -rf bar), then the 'bar' directory object is deleted after update
+
+remove echos from Makefile, use config file - rerun timing tests
+
+sometimes delete/ isn't empty after successful update?
+using vi to edit a file with the monitor running causes the MAkefile update to run (create/delete temp files shouldn't cause dir to go in create/ ?)
+
+using ar with the monitor running - the temp file created ends up putting the directory in create/, and the temp file in modify/ - at worst, the temp file should be in delete/, and the dir should not be in delete/

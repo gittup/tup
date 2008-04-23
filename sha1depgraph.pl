@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %secondary_hash, %filetype_hash);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %filetype_hash);
 
 if($#ARGV < 0) {
 	$ofile = "| xv -";
@@ -10,7 +10,7 @@ if($#ARGV < 0) {
 	$ofile = "> $ARGV[0]";
 }
 
-open GRAPH, "| dot -Tpng $ofile" or die "Can't open graph pipe\n";
+open GRAPH, "| dot -Nfontsize=9 -Efontsize=9 -Tpng $ofile" or die "Can't open graph pipe\n";
 
 print GRAPH "digraph g {\n";
 
@@ -27,6 +27,19 @@ foreach $file (@files) {
 	$ino_hash{$from} = $stats[1]; # inode
 	$name_hash{$from} = <FILE>;
 	chomp($name_hash{$from});
+
+# Special Makefile processing - actually put reference there?
+	if($name_hash{$from} =~ /Makefile$/) {
+		my ($dir, $dhash);
+		$dir = $name_hash{$from};
+		$dir =~ s/\/?Makefile//;
+		if($dir eq "") {
+			$dir = ".";
+		}
+		$dhash = `echo -n $dir | sha1sum | awk '{print \$1}'`;
+		print GRAPH "tup$dhash -> tup$from [dir=back];\n";
+	}
+
 	@stats = stat $name_hash{$from};
 	$filetype_hash{$from} = $stats[2] & 040000; # is a directory
 	$name_hash{$from} .= "\\n".substr($from,0,8);
@@ -49,10 +62,6 @@ foreach $file (@files) {
 	chomp($name_hash{$from});
 	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
-	
-	$file =~ s/\.cmd/.secondary/;
-	@stats = stat $file;
-	$secondary_hash{$from} = $stats[1]; #inode
 	$shape_hash{$from} = "rectangle";
 }
 
@@ -67,8 +76,6 @@ foreach $file (@files) {
 		$color = "008800";
 	} elsif($stats[1] == $ino_hash{$to}) {
 		$color = "000000";
-	} elsif($stats[1] == $secondary_hash{$to}) {
-		$color = "aaaaaa";
 	} else {
 		$color = "ff0000";
 	}
@@ -78,9 +85,9 @@ foreach $file (@files) {
 	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\"];\n";
 }
 
-&tup_directory("modify", 0x0000ff);
-&tup_directory("create", 0x00ff00);
-&tup_directory("delete", 0xff0000);
+&tup_directory("modify", 0x0000ff, 1);
+&tup_directory("create", 0x00ff00, 0);
+&tup_directory("delete", 0xff0000, 1);
 
 foreach $from (keys %name_hash) {
 	printf GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"#%06x\" shape=\"%s\"];\n", $color_hash{$from}, $shape_hash{$from};
@@ -95,10 +102,14 @@ sub tup_directory
 	foreach $file (@files) {
 		chomp($file);
 		($from) = $file =~ m#\.tup/....../([0-9a-f]*)#;
-		%visited = ();
-		%stack = ();
-		@circ_list = ();
-		&follow_chain($from, $_[1]);
+		if($_[2] == 1) {
+			%visited = ();
+			%stack = ();
+			@circ_list = ();
+			&follow_chain($from, $_[1]);
+		} else {
+			$color_hash{$from} |= $_[1];
+		}
 	}
 }
 

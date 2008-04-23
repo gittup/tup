@@ -105,4 +105,8 @@ done:
 			}
 		}
 	}
+	while(len > 0 && str[len-1] == '/') {
+		str[len-1] = 0;
+		len--;
+	}
 }
