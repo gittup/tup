@@ -7,8 +7,8 @@ digraph g {
 	libc [label="lib.c"];
 	libh [label="lib.h"];
 	liba [label="lib.a"];
-	main -> {maino liba} [color="red" label="main/Makefile"];
-	maino -> {mainc libh} [color="blue" label="main/main.d"];
-	libo -> {libc libh} [color="green" label="lib/lib.d"];
+	main -> {maino liba} [color="red" label="main/Makefile" style=dotted];
+	maino -> {mainc libh} [color="blue" label="main/main.d" style=dashed];
+	libo -> {libc libh} [color="green" label="lib/lib.d" style=bold];
 	liba -> libo [color="#FF33FF" label="lib/Makefile"];
 };

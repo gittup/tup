@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %ino_hash, %filetype_hash);
+my (@files, $file, %name_hash, %incoming_hash, $from, $to, %color_hash, @circ_list, %visited, %stack, $ofile, %shape_hash, %style_hash, %ino_hash, %filetype_hash);
 
 if($#ARGV < 0) {
 	$ofile = "| xv -";
@@ -45,6 +45,7 @@ foreach $file (@files) {
 	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
 	$shape_hash{$from} = "ellipse";
+	$style_hash{$from} = "solid";
 }
 
 @files = `ls .tup/object/*/*/.cmd 2>/dev/null`;
@@ -63,34 +64,38 @@ foreach $file (@files) {
 	$name_hash{$from} .= "\\n".substr($from,0,8);
 	close FILE;
 	$shape_hash{$from} = "rectangle";
+	$style_hash{$from} = "solid";
 }
 
 @files = `ls .tup/object/*/*/* 2>/dev/null`;
 foreach $file (@files) {
-	my ($from2, $color, @stats);
+	my ($from2, $color, @stats, $style);
 	chomp($file);
 	@stats = stat $file;
 	($from, $from2, $to) = $file =~ m#\.tup/object/([0-9a-f]*)/([0-9a-f]*)/([0-9a-f]*)#;
 	$from .= $from2;
 	if($filetype_hash{$from}) {
 		$color = "008800";
+		$style = "bold";
 	} elsif($stats[1] == $ino_hash{$to}) {
 		$color = "000000";
+		$style = "solid";
 	} else {
 		$color = "ff0000";
+		$style = "dotted";
 	}
 	if(-f ".tup/object/".substr($to,0,2)."/".substr($to,2)."/.link") {
 		next;
 	}
-	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\"];\n";
+	print GRAPH "tup$to -> tup$from [dir=back,color=\"#$color\",style=\"$style\"];\n";
 }
 
-&tup_directory("modify", 0x0000ff, 1);
+&tup_directory("modify", 0x0000ff, 1, "dashed");
 &tup_directory("create", 0x00ff00, 0);
-&tup_directory("delete", 0xff0000, 1);
+&tup_directory("delete", 0xff0000, 1, "dotted");
 
 foreach $from (keys %name_hash) {
-	printf GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"#%06x\" shape=\"%s\"];\n", $color_hash{$from}, $shape_hash{$from};
+	printf GRAPH "tup$from [label=\"$name_hash{$from} ($incoming_hash{$from})\" color=\"#%06x\" shape=\"%s\" style=\"%s\"];\n", $color_hash{$from}, $shape_hash{$from}, $style_hash{$from};
 }
 
 print GRAPH "}\n";
@@ -106,7 +111,7 @@ sub tup_directory
 			%visited = ();
 			%stack = ();
 			@circ_list = ();
-			&follow_chain($from, $_[1]);
+			&follow_chain($from, $_[1], $_[3]);
 		} else {
 			$color_hash{$from} |= $_[1];
 		}
@@ -115,10 +120,11 @@ sub tup_directory
 
 sub follow_chain
 {
-	my ($f, @list, $dep, $c, $f1, $f2);
+	my ($f, @list, $dep, $c, $f1, $f2, $style);
 
 	$f = $_[0];
 	$c = $_[1];
+	$style = $_[2];
 	$f1 = substr($f, 0, 2);
 	$f2 = substr($f, 2);
 	push(@circ_list, $f);
@@ -141,10 +147,13 @@ sub follow_chain
 	$stack{$f} = 1;
 
 	$color_hash{$f} |= $c;
+	if($style ne "dotted" || $style_hash{$f} eq "solid") {
+		$style_hash{$f} = $style;
+	}
 	@list = `ls .tup/object/$f1/$f2/* 2>/dev/null`;
 	foreach $dep (@list) {
 		($dep) = $dep =~ m#\.tup/object/$f1/$f2/([0-9a-f]*)#;
-		&follow_chain($dep, $c);
+		&follow_chain($dep, $c, $style);
 	}
 	$stack{$f} = 0;
 }

@@ -46,6 +46,18 @@ test:
 remove echos from Makefile, use config file - rerun timing tests
 
 sometimes delete/ isn't empty after successful update?
-using vi to edit a file with the monitor running causes the MAkefile update to run (create/delete temp files shouldn't cause dir to go in create/ ?)
+using vi to edit a file with the monitor running causes the Makefile update to run (create/delete temp files shouldn't cause dir to go in create/ ?)
 
 using ar with the monitor running - the temp file created ends up putting the directory in create/, and the temp file in modify/ - at worst, the temp file should be in delete/, and the dir should not be in delete/
+ - also, the temp file stays in .tup/object, when it should be removed (because wrapper handles rename()? )
+
+- sometimes directory link to command has different inode?
+ - maybe just remove hard links entirely
+
+what if I change a create_dep line by changing a -i or -o flag, but keeping the command string the same?
+
+- add ability to group high-level programs into your own category?
+  - eg: create a cs773 category, and all software I use for that class is
+  - linked there. Then I can delete cs773 after the semester to uninstall it all
+
+move directory with subdirectories
