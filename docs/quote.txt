@@ -1,0 +1,33 @@
+23.4.14.1. Do I need to re-make the world for every change?
+
+There is no easy answer to this one, as it depends on the nature of the change. For example, if you just ran CVSup, and it has shown the following files as being updated:
+
+src/games/cribbage/instr.c
+src/games/sail/pl_main.c
+src/release/sysinstall/config.c
+src/release/sysinstall/media.c
+src/share/mk/bsd.port.mk
+
+it probably is not worth rebuilding the entire world. You could just go to the appropriate sub-directories and make all install, and that's about it. But if something major changed, for example src/lib/libc/stdlib then you should either re-make the world, or at least those parts of it that are statically linked (as well as anything else you might have added that is statically linked).
+
+At the end of the day, it is your call. You might be happy re-making the world every fortnight say, and let changes accumulate over that fortnight. Or you might want to re-make just those things that have changed, and be confident you can spot all the dependencies.
+ - http://64.233.169.104/search?q=cache:9Z-s2h_UBcoJ:www.freebsd.org/doc/en/books/handbook/makeworld.html+freebsd+make+world&hl=en&ct=clnk&cd=1&gl=us
+#
+ [»]  Re: A coindience?
+ by smithdev - Jul 5th 2003 18:14:40
+
+ I'll chip in for the fairly sophisticated user who is new to the autotools.
+
+ I've the goat book, the potto book (that O'Reilly one) and a couple of
+ others. I've read the info bits.
+
+ I couldn't even get started until I found the autoproject script here on
+ Freshmeat.
+
+ I think that the best thing that could reasonably happen is cribbing an idea
+ from the kernel community: a make menuconfig to streamline the process.
+
+ -- 
+ gentoo is all that
+
+  - http://freshmeat.net/articles/view/889/
