@@ -38,9 +38,7 @@ if($cmd eq "init") {
 	}
 	print ".tup repository initialized.\n";
 	exit 0;
-}
-
-if($cmd eq "startmon") {
+} elsif($cmd eq "startmon") {
 	exec("monitor @ARGV . &");
 } elsif($cmd eq "stopmon") {
 	exec("killall -9 monitor");
@@ -68,6 +66,10 @@ if($cmd eq "startmon") {
 		die "Usage: delete file [file...]\n";
 	}
 	exec("tuptouch delete @ARGV");
+} elsif($cmd eq "--help") {
+	&usage();
+} elsif($cmd eq "--version") {
+	print "tup version 0.1\n";
 } else {
 	print STDERR "Unknown command: $cmd\n";
 }
