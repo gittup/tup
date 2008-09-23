@@ -36,12 +36,26 @@ sym_check()
 	done
 }
 
+check_exist()
+{
+	while [ $# -gt 0 ]; do
+		if [ ! -f $1 ]; then
+			echo "File '$1' does not exist when it should" 1>&2
+			exit 1
+		fi
+		shift
+	done
+}
+
 check_not_exist()
 {
-	if [ -f $1 ]; then
-		echo "File '$1' exists when it shouldn't" 1>&2
-		exit 1
-	fi
+	while [ $# -gt 0 ]; do
+		if [ -f $1 ]; then
+			echo "File '$1' exists when it shouldn't" 1>&2
+			exit 1
+		fi
+		shift
+	done
 }
 
 tup_object_exist()

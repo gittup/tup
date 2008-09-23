@@ -41,7 +41,7 @@ if($cmd eq "init") {
 }
 
 if($cmd eq "startmon") {
-	exec("monitor . &");
+	exec("monitor @ARGV . &");
 } elsif($cmd eq "stopmon") {
 	exec("killall -9 monitor");
 } elsif("update" =~ /^$cmd/ || $cmd eq "tup") {

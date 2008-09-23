@@ -1,5 +1,7 @@
-add in test case projects, analysis of make/ant
-real-world times?
+when restarting monitor - compare file timestamps to the last time the monitor
+ shutdown? that way no file changes are missed
+
+can we update a server file (like httpd.c) and restart apache? (eg: like incrontab program)
 
 only add created monitor files to the create list if 'name' doesn't already exist?
 
