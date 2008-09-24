@@ -44,11 +44,13 @@ static int handle_delete(const char *path);
 
 static int inot_fd;
 static int lock_fd;
+static int lock_wd;
 
 int main(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
+	int locked = 0;
 	struct timeval t1, t2;
 	const char *path = NULL;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
@@ -87,6 +89,13 @@ int main(int argc, char **argv)
 		goto close_inot;
 	}
 
+	lock_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
+	if(lock_wd < 0) {
+		perror("inotify_add_watch");
+		rc = -1;
+		goto close_inot;
+	}
+
 	if(flock(lock_fd, LOCK_UN) < 0) {
 		perror("flock (un)");
 		return -1;
@@ -102,7 +111,35 @@ int main(int argc, char **argv)
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
 
-			handle_event(e);
+			/* If the lock file is opened, assume we are now
+			 * locked out. When the file is closed, check to see
+			 * if the lock is available again. We can't just
+			 * assume the lock is available when the file is closed
+			 * because multiple processes can have the lock shared
+			 * at once. Also, we can't count the number of opens
+			 * and closes because inotify sometimes slurps some
+			 * duplicate events.
+			 *
+			 * TODO: Reduce duplicate flocking here and in
+			 * handle_event()?
+			 */
+			if(e->wd == lock_wd) {
+				if(e->mask & IN_OPEN)
+					locked = 1;
+				if(e->mask & IN_CLOSE) {
+					if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+						if(errno != EWOULDBLOCK)
+							perror("flock");
+					} else {
+						locked = 0;
+						flock(lock_fd, LOCK_UN);
+					}
+				}
+			} else {
+				if(!locked)
+					handle_event(e);
+			}
+
 			offset += sizeof(*e) + e->len;
 		}
 	}
