@@ -18,6 +18,7 @@
  *                 not yet created on bar, repeat step 1 on bar.
  */
 
+#include "monitor.h"
 /* _GNU_SOURCE for asprintf */
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -32,11 +33,11 @@
 #include <unistd.h>
 #include <libgen.h> /* TODO: dirname */
 #include "dircache.h"
-#include "tup/flist.h"
-#include "tup/debug.h"
-#include "tup/tupid.h"
-#include "tup/fileio.h"
-#include "tup/compat.h"
+#include "flist.h"
+#include "debug.h"
+#include "tupid.h"
+#include "fileio.h"
+#include "compat.h"
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
@@ -46,25 +47,18 @@ static int inot_fd;
 static int lock_fd;
 static int lock_wd;
 
-int main(int argc, char **argv)
+int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
 	int locked = 0;
 	struct timeval t1, t2;
-	const char *path = NULL;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("monitor");
-		} else {
-			path = argv[x];
 		}
-	}
-	if(!path) {
-		fprintf(stderr, "Usage: %s [-d] path_to_watch\n", argv[0]);
-		return 1;
 	}
 
 	gettimeofday(&t1, NULL);
@@ -84,7 +78,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if(watch_path(path, "") < 0) {
+	if(watch_path(".", "") < 0) {
 		rc = -1;
 		goto close_inot;
 	}

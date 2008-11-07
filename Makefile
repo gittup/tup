@@ -1,15 +1,16 @@
 BUILD := build/
-srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c)
+srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c src/tup/tup/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-PROGS := monitor wrapper benchmark create_dep updater depgraph config tuptouch
+PROGS := tup wrapper config
 SHLIBS := ldpreload.so make.so
 
 all: $(PROGS) $(SHLIBS)
 
 Q=@
 
+tup: LDFLAGS := -lsqlite3
 wrapper: LDFLAGS := -lpthread
 ldpreload.so: CCFLAGS := -fpic
 ldpreload.so: LDFLAGS := -ldl
@@ -17,14 +18,12 @@ libtup.a: CCFLAGS := -fpic
 updater: LDFLAGS := -ldl
 make.so: CCFLAGS := -fpic
 
+tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
 wrapper: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/wrapper/*.c)) libtup.a
 updater: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/updater/*.c)) libtup.a
-monitor: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/monitor/*.c)) libtup.a
 make.so: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/make/*.c)) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
-benchmark: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/benchmark/*.c))
 create_dep: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/create_dep/*.c)) libtup.a
-depgraph: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/depgraph/*.c)) libtup.a
 config: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/config/*.c)) libtup.a
 tuptouch: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tuptouch/*.c)) libtup.a
 

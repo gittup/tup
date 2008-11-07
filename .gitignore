@@ -1,4 +1,3 @@
-/benchmark
 /build
 /ldpreload.so
 /monitor
@@ -6,7 +5,7 @@
 /create_dep
 /updater
 /libtup.a
-/depgraph
 /config
 /tuptouch
 /make.so
+/tup
