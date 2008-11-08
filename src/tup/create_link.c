@@ -3,18 +3,37 @@
 #include "db.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+
+static int link_cb(void *id, int argc, char **argv, char **col);
 
 int create_link(const new_tupid_t a, const new_tupid_t b)
 {
+	new_tupid_t id = -1;
 	int rc;
-	char *errmsg;
 
-	rc = tup_db_exec(&errmsg,
-			 "insert into link(from_id, to_id) values(%lli, %lli)",
+	rc = tup_db_select(link_cb, &id,
+			   "select from_id from link where from_id=%lli and to_id=%lli", a, b);
+	if(rc == 0 && id != -1)
+		return 0;
+
+	rc = tup_db_exec("insert into link(from_id, to_id) values(%lli, %lli)",
 			 a, b);
 	if(rc == 0)
 		return 0;
+	return -1;
+}
 
-	fprintf(stderr, "SQL insert error: %s\n", errmsg);
+static int link_cb(void *id, int argc, char **argv, char **col)
+{
+	int x;
+	new_tupid_t *iptr = id;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(col[x], "from_id") == 0) {
+			*iptr = atoll(argv[x]);
+			return 0;
+		}
+	}
 	return -1;
 }

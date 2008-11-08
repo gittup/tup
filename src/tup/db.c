@@ -1,7 +1,7 @@
 #include "db.h"
 #include <stdio.h>
 
-sqlite3 *tup_db;
+sqlite3 *tup_db = NULL;
 
 int tup_open_db(void)
 {
@@ -30,35 +30,55 @@ int tup_create_db(void)
 	return rc;
 }
 
-int tup_db_exec(char **errmsg, const char *sql, ...)
+int tup_db_exec(const char *sql, ...)
 {
 	va_list ap;
 	int rc;
 	char *buf;
+	char *errmsg;
+
+	if(!tup_db) {
+		fprintf(stderr, "Error: tup_db not opened.\n");
+		return -1;
+	}
 
 	va_start(ap, sql);
 	buf = sqlite3_vmprintf(sql, ap);
 	va_end(ap);
 
-	printf("exec: %s\n", buf);
-	rc = sqlite3_exec(tup_db, buf, NULL, NULL, errmsg);
+	rc = sqlite3_exec(tup_db, buf, NULL, NULL, &errmsg);
+	if(rc != 0) {
+		fprintf(stderr, "SQL exec error: %s\nQuery was: %s\n",
+			errmsg, buf);
+		sqlite3_free(errmsg);
+	}
 	sqlite3_free(buf);
 	return rc;
 }
 
-int tup_db_select(char **errmsg, int (*callback)(void *, int, char **, char **),
+int tup_db_select(int (*callback)(void *, int, char **, char **),
 		  void *arg, const char *sql, ...)
 {
 	va_list ap;
 	int rc;
 	char *buf;
+	char *errmsg;
+
+	if(!tup_db) {
+		fprintf(stderr, "Error: tup_db not opened.\n");
+		return -1;
+	}
 
 	va_start(ap, sql);
 	buf = sqlite3_vmprintf(sql, ap);
 	va_end(ap);
 
-	printf("select: %s\n", buf);
-	rc = sqlite3_exec(tup_db, buf, callback, arg, errmsg);
+	rc = sqlite3_exec(tup_db, buf, callback, arg, &errmsg);
+	if(rc != 0) {
+		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+			errmsg, buf);
+		sqlite3_free(errmsg);
+	}
 	sqlite3_free(buf);
 	return rc;
 }

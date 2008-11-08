@@ -12,7 +12,7 @@ Q=@
 
 tup: LDFLAGS := -lsqlite3 -ldl
 ldpreload.so: CCFLAGS := -fpic
-ldpreload.so: LDFLAGS := -ldl
+ldpreload.so: LDFLAGS := -ldl -lsqlite3
 libtup.a: CCFLAGS := -fpic
 make.so: CCFLAGS := -fpic
 

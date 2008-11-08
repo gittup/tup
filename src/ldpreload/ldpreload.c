@@ -5,6 +5,7 @@
 #include "tup/tupid.h"
 #include "tup/config.h"
 #include "tup/fileio.h"
+#include "tup/db.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,9 +132,11 @@ static void handle_file(const char *file, int at, const char *funcname)
 	if(ignore_file(file))
 		return;
 	pthread_mutex_lock(&lock);
-	if(canonicalize(file, cname, sizeof(cname)) < 0)
+	if(canonicalize(file, cname, sizeof(cname)) < 0) {
+		pthread_mutex_unlock(&lock);
 		return;
-	tupid_from_filename(event.tupid, cname);
+	}
+	event.tupid = create_name_file(cname);
 	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
 	pthread_mutex_unlock(&lock);
 
@@ -153,9 +156,12 @@ static void handle_rename_file(const char *old, const char *new)
 
 static int ignore_file(const char *file)
 {
-	if(strncmp(file, "/tmp/", 5) == 0) {
+	if(strncmp(file, "/tmp/", 5) == 0)
 		return 1;
-	}
+	if(strncmp(file, "/dev/", 5) == 0)
+		return 1;
+	if(strstr(file, TUP_DB_FILE) != NULL)
+		return 1;
 	return 0;
 }
 
@@ -175,6 +181,10 @@ static void ldpre_init(void)
 		exit(1);
 	}
 	if(find_tup_dir() < 0) {
+		exit(1);
+	}
+
+	if(tup_open_db() < 0) {
 		exit(1);
 	}
 

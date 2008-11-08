@@ -1,6 +1,7 @@
 #define _GNU_SOURCE /* TODO: For asprintf */
 #include "graph.h"
-#include "tup/debug.h"
+#include "debug.h"
+#include "db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,11 +132,11 @@ static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
 	int color = 0;
-	if(n->flags & TUP_CREATE)
+	if(n->flags & TUP_FLAGS_CREATE)
 		color |= 0x00bb00;
-	if(n->flags & TUP_DELETE)
+	if(n->flags & TUP_FLAGS_DELETE)
 		color |= 0xff0000;
-	if(n->flags & TUP_MODIFY)
+	if(n->flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%lli [label=\"%s (%i)\",color=\"#%06x\"];\n",
 		n->tupid, n->name, n->incoming_count, color);

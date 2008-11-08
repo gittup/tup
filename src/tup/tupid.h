@@ -18,12 +18,13 @@
  */
 #define TUPID_SIZE SHA1_HASH_SIZE * 2
 
+/* Environment variable passed to updater programs to know where to write
+ * links to/from.
+ */
+#define TUP_CMD_ID "TUP_CMD_ID"
+
 typedef char tupid_t[TUPID_SIZE];
 typedef sqlite3_int64 new_tupid_t;
-
-#define TUP_CREATE 0x001
-#define TUP_DELETE 0x002
-#define TUP_MODIFY 0x004
 
 /** Get the tupid from the filename. The tupid is *not* nul-terminated. */
 void tupid_from_filename(tupid_t tupid, const char *path);

@@ -39,6 +39,7 @@ char make_so[] = "make.so";
 struct name_list {
 	struct list_head list;
 	char *name;
+	new_tupid_t tupid;
 };
 
 int updater(int argc, char **argv)
@@ -101,7 +102,6 @@ lock_success:
 		return 1;
 	if(build_graph(&g) < 0)
 		return 1;
-	return 0; /**/
 	if(execute_graph(&g) < 0)
 		return 1;
 
@@ -115,8 +115,6 @@ lock_success:
 static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 {
 	int x;
-	int rc;
-	char *errmsg;
 	char *name;
 	struct list_head *list = arg;
 	struct name_list *nl;
@@ -138,12 +136,8 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.
 	 */
-	rc = tup_db_exec(&errmsg, "update node set flags=%i where id in (select to_id from link where from_id=%lli)", TUP_FLAGS_DELETE, id);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
-		sqlite3_free(errmsg);
+	if(tup_db_exec("update node set flags=%i where id in (select to_id from link where from_id=%lli)", TUP_FLAGS_DELETE, id) != 0)
 		return -1;
-	}
 
 	nl = malloc(sizeof *nl);
 	if(!nl) {
@@ -156,6 +150,7 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 		perror("strdup");
 		return -1;
 	}
+	nl->tupid = id;
 
 	list_add(&nl->list, list);
 
@@ -164,24 +159,21 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 
 static int process_create_nodes(void)
 {
-	char *errmsg;
-	int rc;
 	struct name_list *nl;
 	LIST_HEAD(namelist);
 
 	/* TODO: Do in while loop in case it creates more create nodes? */
-	rc = tup_db_select(&errmsg, create_flag_cb, &namelist,
-			   "select id, name from node where type=%i",
-			   TUP_FLAGS_CREATE);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
-		sqlite3_free(errmsg);
+	if(tup_db_select(create_flag_cb, &namelist,
+			 "select id, name from node where flags=%i",
+			 TUP_FLAGS_CREATE) != 0)
 		return -1;
-	}
 
 	while(!list_empty(&namelist)) {
 		nl = list_entry(namelist.next, struct name_list, list);
 		if(create(nl->name) < 0)
+			return -1;
+		if(tup_db_exec("update node set flags=%i where id=%lli",
+			       TUP_FLAGS_NONE, nl->tupid) != 0)
 			return -1;
 		list_del(&nl->list);
 		free(nl->name);
@@ -217,8 +209,6 @@ static int md_flag_cb(void *arg, int argc, char **argv, char **col)
 
 static int build_graph(struct graph *g)
 {
-	int rc;
-	char *errmsg;
 	struct node *cur;
 
 	if(create_graph(g) < 0)
@@ -226,17 +216,13 @@ static int build_graph(struct graph *g)
 
 	g->cur = g->root;
 	g->root->flags = TUP_FLAGS_MODIFY;
-	rc = tup_db_select(&errmsg, md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_MODIFY);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_MODIFY) != 0)
 		return -1;
-	}
+
 	g->root->flags = TUP_FLAGS_DELETE;
-	rc = tup_db_select(&errmsg, md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_DELETE);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_DELETE) != 0)
 		return -1;
-	}
+
 	g->root->flags = TUP_FLAGS_NONE;
 
 	while(!list_empty(&g->plist)) {
@@ -308,17 +294,12 @@ edge_create:
 
 static int find_deps(struct graph *g, struct node *n)
 {
-	int rc;
-	char *errmsg;
 
 	g->cur = n;
-	rc = tup_db_select(&errmsg, md_flag_cb, g,
-			   "select * from node where id in (select to_id from link where from_id=%lli)", n->tupid);
-	if(rc < 0) {
-		fprintf(stderr, "SQL Error: %s\n", errmsg);
-	}
-
-	return rc;
+	if(tup_db_select(md_flag_cb, g,
+			 "select * from node where id in (select to_id from link where from_id=%lli)", n->tupid) != 0)
+		return -1;
+	return 0;
 }
 
 static int execute_graph(struct graph *g)
@@ -341,7 +322,8 @@ static int execute_graph(struct graph *g)
 			continue;
 		}
 		if(n != root) {
-			if(n->type == TUP_NODE_FILE && (n->flags & TUP_DELETE)) {
+			if(n->type == TUP_NODE_FILE &&
+			   (n->flags & TUP_FLAGS_DELETE)) {
 #if 0
 				TODO
 				if(num_dependencies(n->tupid) == 0) {
@@ -350,7 +332,7 @@ static int execute_graph(struct graph *g)
 #endif
 			}
 			if(n->type == TUP_NODE_CMD) {
-				if(n->flags & TUP_DELETE) {
+				if(n->flags & TUP_FLAGS_DELETE) {
 					if(delete_cmd(n->tupid) < 0)
 						return -1;
 				} else {
@@ -372,14 +354,9 @@ static int execute_graph(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-		if(n->flags & TUP_MODIFY) {
-			/* TODO: remove flag */
-			/*delete_tup_file("modify", n->tupid);*/
-		}
-		if(n->flags & TUP_DELETE) {
-			/* TODO: remove flag */
-/*			delete_tup_file("delete", n->tupid);*/
-		}
+		if(tup_db_exec("update node set flags=%i where id=%lli",
+			       TUP_FLAGS_NONE, n->tupid) != 0)
+			return -1;
 		remove_node(n);
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
@@ -391,29 +368,34 @@ static int execute_graph(struct graph *g)
 
 static int update(struct node *n)
 {
-	printf("Run update: %s\n", n->name);
-	/*if(system(b.s) != 0)
-		return -1;*/
+	int rc;
+	char s[32];
+
+	if(snprintf(s, sizeof(s), "%lli", n->tupid) >= (signed)sizeof(s)) {
+		fprintf(stderr, "Buffer size error in update()\n");
+		return -1;
+	}
+
+	if(setenv(TUP_CMD_ID, s, 1) < 0) {
+		perror("setenv");
+		return -1;
+	}
+	printf("%s\n", n->name);
+	rc = system(n->name);
+	unsetenv(TUP_CMD_ID);
+	if(rc != 0)
+		return -1;
 	return 0;
 }
 
 static int delete_cmd(new_tupid_t tupid)
 {
-	int rc;
-	char *errmsg;
-
-	rc = tup_db_exec(&errmsg, "delete from node where id=%lli", tupid);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_exec("delete from node where id=%lli", tupid) != 0)
 		return -1;
-	}
 
 	/* TODO: Do we want to delete all links? I assume so */
-	rc = tup_db_exec(&errmsg, "delete from link where from_id=%lli or to_id=%lli", tupid, tupid);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_exec("delete from link where from_id=%lli or to_id=%lli", tupid, tupid) != 0)
 		return -1;
-	}
 
 	return 0;
 }

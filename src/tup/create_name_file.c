@@ -41,20 +41,16 @@ static new_tupid_t create_node(const char *name, int type, int flags)
 {
 	new_tupid_t id = -1;
 	int rc;
-	char *errmsg;
 
-	rc = tup_db_select(&errmsg, node_cb, &id,
+	rc = tup_db_select(node_cb, &id,
 			   "select id from node where name='%q'", name);
 	if(rc == 0 && id != -1) {
 		return id;
 	}
 
-	rc = tup_db_exec(&errmsg,
-			 "insert into node(name, type, flags) values('%q', %i, %i)",
+	rc = tup_db_exec("insert into node(name, type, flags) values('%q', %i, %i)",
 			 name, type, flags);
 	if(rc == 0)
 		return sqlite3_last_insert_rowid(tup_db);
-
-	fprintf(stderr, "SQL node insertion error: %s\n", errmsg);
 	return -1;
 }

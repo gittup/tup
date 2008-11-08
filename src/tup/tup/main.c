@@ -7,10 +7,12 @@
 #include "tup/config.h"
 #include "tup/compat.h"
 #include "tup/db.h"
+#include "tup/getexecwd.h"
 #include "tup/monitor.h"
 #include "tup/tupid.h"
 #include "tup/fileio.h"
 #include "tup/updater.h"
+#include "tup/wrap.h"
 
 #define ARRAY_SIZE(n) ((signed)(sizeof(n) / sizeof(n[0])))
 
@@ -43,6 +45,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if(init_getexecwd(argv[0]) < 0) {
+		fprintf(stderr, "Error: Unable to determine tup's "
+			"execution directory for shared libs.\n");
+		return 1;
+	}
+
 	if(tup_open_db() != 0) {
 		return 1;
 	}
@@ -58,8 +66,10 @@ int main(int argc, char **argv)
 		return mlink(argc, argv);
 	} else if(strcmp(cmd, "upd") == 0) {
 		return updater(argc, argv);
+	} else if(strcmp(cmd, "wrap") == 0) {
+		return wrap(argc, argv);
 	} else {
-		fprintf(stderr, "Unknown command: %s\n", argv[1]);
+		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		return 1;
 	}
 	return 0;

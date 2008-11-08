@@ -6,12 +6,12 @@
 #include <sys/file.h>
 #include "server.h"
 #include "file.h"
-#include "tup/getexecwd.h"
-#include "tup/debug.h"
-#include "tup/compat.h"
-#include "tup/tupid.h"
+#include "debug.h"
+#include "compat.h"
+#include "tupid.h"
+#include "wrap.h"
 
-int main(int argc, char **argv)
+int wrap(int argc, char **argv)
 {
 	int pid;
 	int arg_start = 1;
@@ -26,12 +26,6 @@ int main(int argc, char **argv)
 		setenv(TUP_DEBUG, "1", 1);
 		debug_enable("tup_wrapper");
 		arg_start++;
-	}
-
-	if(init_getexecwd(argv[0]) < 0) {
-		fprintf(stderr, "Error: Unable to determine wrapper program's "
-			"execution directory.\n");
-		return 1;
 	}
 
 	lock_fd = open(TUP_OBJECT_LOCK, O_RDONLY);
@@ -60,23 +54,9 @@ int main(int argc, char **argv)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			void *handle;
-			int x;
-			tupid_t cmdid;
+			new_tupid_t cmdid;
 
-			handle = tupid_init();
-			if(!handle)
-				return 1;
-
-			/* TODO: re-use from perl script somehow? */
-			tupid_update(handle, "tup wrap ");
-			for(x=arg_start; x<argc; x++) {
-				tupid_update(handle, argv[x]);
-				if(x != argc-1)
-					tupid_update(handle, " ");
-			}
-			tupid_final(cmdid, handle);
-
+			cmdid = atoll(getenv(TUP_CMD_ID));
 			if(write_files(cmdid) < 0)
 				return 1;
 			return 0;

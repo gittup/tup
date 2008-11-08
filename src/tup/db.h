@@ -15,19 +15,15 @@ enum TUP_NODE_TYPE {
 
 enum TUP_FLAGS_TYPE {
 	TUP_FLAGS_NONE=0,
-	TUP_FLAGS_MODIFY,
-	TUP_FLAGS_CREATE,
-	TUP_FLAGS_DELETE,
+	TUP_FLAGS_MODIFY=1,
+	TUP_FLAGS_CREATE=2,
+	TUP_FLAGS_DELETE=4,
 };
 
 int tup_open_db(void);
 int tup_create_db(void);
-
-/** Not thread safe */
-int tup_db_exec(char **errmsg, const char *sql, ...);
-
-/** Not thread safe */
-int tup_db_select(char **errmsg, int (*callback)(void *, int, char **, char **),
-		  void *arg, const char *sql, ...);
+int tup_db_exec(const char *sql, ...);
+int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
+		  const char *sql, ...);
 
 #endif

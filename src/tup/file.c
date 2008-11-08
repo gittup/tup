@@ -9,7 +9,7 @@
 #include <fcntl.h>
 
 struct file_entry {
-	tupid_t tupid;
+	new_tupid_t tupid;
 	int pid;
 	struct list_head list;
 };
@@ -28,8 +28,7 @@ int handle_file(const struct access_event *event)
 	struct file_entry *fent;
 	int rc = 0;
 
-	DEBUGP("received tupid '%.*s' in mode %i\n",
-	       sizeof(event->tupid), event->tupid, event->at);
+	DEBUGP("received tupid '%lli' in mode %i\n", event->tupid, event->at);
 
 	if(event->at == ACCESS_RENAME_TO) {
 		return handle_rename_to(event);
@@ -59,13 +58,14 @@ int handle_file(const struct access_event *event)
 	return rc;
 }
 
-int write_files(tupid_t cmdid)
+int write_files(new_tupid_t cmdid)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 
-	if(recreate_cmd_file(cmdid) < 0)
-		return 1;
+	/* TODO: Not necessary? */
+/*	if(recreate_cmd_file(cmdid) < 0)
+		return 1;*/
 
 	list_for_each_entry(w, &write_list, list) {
 		struct file_entry *tmp;
@@ -73,13 +73,13 @@ int write_files(tupid_t cmdid)
 		if(create_link(cmdid, w->tupid) < 0)
 			return -1;
 		list_for_each_entry_safe(r, tmp, &read_list, list) {
-			if(memcmp(w->tupid, r->tupid, sizeof(w->tupid)) == 0)
+			if(w->tupid == r->tupid)
 				list_del(&r->list);
 		}
 	}
 
 	list_for_each_entry(r, &read_list, list) {
-		if(create_command_link(r->tupid, cmdid) < 0)
+		if(create_link(r->tupid, cmdid) < 0)
 			return -1;
 	}
 	return 0;
@@ -95,7 +95,7 @@ static struct file_entry *new_entry(const struct access_event *event)
 		return NULL;
 	}
 
-	memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
+	fent->tupid = event->tupid;
 	fent->pid = event->pid;
 	return fent;
 }
@@ -122,13 +122,13 @@ static int __handle_rename_to(struct file_entry *from,
 	list_del(&from->list);
 
 	list_for_each_entry(fent, &write_list, list) {
-		if(memcmp(fent->tupid, from->tupid, sizeof(fent->tupid)) == 0) {
-			memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
+		if(fent->tupid == from->tupid) {
+			fent->tupid = event->tupid;
 		}
 	}
 	list_for_each_entry(fent, &read_list, list) {
-		if(memcmp(fent->tupid, from->tupid, sizeof(fent->tupid)) == 0) {
-			memcpy(fent->tupid, event->tupid, sizeof(fent->tupid));
+		if(fent->tupid == from->tupid) {
+			fent->tupid = event->tupid;
 		}
 	}
 	return 0;
