@@ -1,11 +1,6 @@
 /build
 /ldpreload.so
-/monitor
-/wrapper
-/create_dep
-/updater
 /libtup.a
-/config
-/tuptouch
 /make.so
 /tup
+*.swp

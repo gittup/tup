@@ -26,4 +26,8 @@ int tup_create_db(void);
 /** Not thread safe */
 int tup_db_exec(char **errmsg, const char *sql, ...);
 
+/** Not thread safe */
+int tup_db_select(char **errmsg, int (*callback)(void *, int, char **, char **),
+		  void *arg, const char *sql, ...);
+
 #endif

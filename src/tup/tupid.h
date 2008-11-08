@@ -2,6 +2,7 @@
 #define tup_tupid_h
 
 #include <string.h>
+#include <sqlite3.h>
 
 #define SHA1_HASH_SIZE 20
 
@@ -9,9 +10,6 @@
 #define SHA1_X "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 #define SHA1_XD "xx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 #define SHA1_XD_SEP 2
-
-/** SHA1 hash of ".tup" */
-#define TUPDIR_HASH "9692fbc94cb1bc4ed7650fc86f47d0f73436bcf6"
 
 /** Size of the tupid_t type, which is the sha1 hash written out in a hex
  * string.
@@ -21,6 +19,7 @@
 #define TUPID_SIZE SHA1_HASH_SIZE * 2
 
 typedef char tupid_t[TUPID_SIZE];
+typedef sqlite3_int64 new_tupid_t;
 
 #define TUP_CREATE 0x001
 #define TUP_DELETE 0x002

@@ -19,19 +19,16 @@ int delete_if_exists(const char *path);
  */
 int write_all(int fd, const void *buf, int size, const char *filename);
 
-/** Creates a link. This link goes in the object directory of 'a' and links to
- * the .name file of 'b'
- */
-int create_link(const tupid_t a, const tupid_t b);
+/** Creates a link, a -> b.  */
+int create_link(const new_tupid_t a, const new_tupid_t b);
 
-int create_command_link(const tupid_t a, const tupid_t b);
 int delete_link(const tupid_t a, const tupid_t b);
 
 int create_tup_file(const char *tup, const char *path);
 int create_tup_file_tupid(const char *tup, const tupid_t tupid);
-int create_name_file(const char *path);
-int create_command_file(const char *cmd);
-int create_dir_file(const char *path);
+new_tupid_t create_name_file(const char *path);
+new_tupid_t create_command_file(const char *cmd);
+new_tupid_t create_dir_file(const char *path);
 int recreate_cmd_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
@@ -43,8 +40,17 @@ int num_dependencies(const tupid_t tupid);
  * Note: *not* thread safe.
  */
 int delete_name_file(const tupid_t tupid);
+
 int canonicalize(const char *path, char *out, int len);
 int canonicalize2(const char *path, const char *file, char *out, int len);
-void canonicalize_string(char *str, int len);
+
+/** Canonicalizes a path name. Changes instances of "//" and "/./" to "/",
+ * changes "foo/../bar" to "bar", and removes trailing slashes.
+ *
+ * The sz parameter is the size of the string buffer (including
+ * nul-terminator).  The return value is the size of the shortened string (<=
+ * sz), also including the nul-terminator.
+ */
+int canonicalize_string(char *str, int sz);
 
 #endif

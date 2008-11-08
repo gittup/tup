@@ -7,23 +7,23 @@
 
 static void dump_node(FILE *f, struct node *n);
 
-struct node *find_node(const struct graph *g, const tupid_t tupid)
+struct node *find_node(const struct graph *g, const new_tupid_t tupid)
 {
 	struct node *n;
 
 	/* TODO: Use hash */
 	list_for_each_entry(n, &g->node_list, list) {
-		if(memcmp(n->tupid, tupid, sizeof(n->tupid)) == 0)
+		if(n->tupid == tupid)
 			return n;
 	}
 	list_for_each_entry(n, &g->plist, list) {
-		if(memcmp(n->tupid, tupid, sizeof(n->tupid)) == 0)
+		if(n->tupid == tupid)
 			return n;
 	}
 	return NULL;
 }
 
-struct node *create_node(const tupid_t tupid)
+struct node *create_node(const new_tupid_t tupid, const char *name)
 {
 	struct node *n;
 
@@ -34,8 +34,13 @@ struct node *create_node(const tupid_t tupid)
 	}
 	n->edges = NULL;
 	n->type = 0;
-	memcpy(n->tupid, tupid, sizeof(n->tupid));
+	n->tupid = tupid;
 	n->incoming_count = 0;
+	n->name = strdup(name);
+	if(!n->name) {
+		perror("strdup");
+		return NULL;
+	}
 	return n;
 }
 
@@ -43,7 +48,7 @@ void remove_node(struct node *n)
 {
 	list_del(&n->list);
 	if(n->edges) {
-		DEBUGP("Warning: Node %.*s still has edges.\n", 8, n->tupid);
+		DEBUGP("Warning: Node %lli still has edges.\n", n->tupid);
 	}
 	/* TODO: block pool */
 	free(n);
@@ -80,12 +85,12 @@ struct edge *remove_edge(struct edge *e)
 	return tmp;
 }
 
-int create_graph(struct graph *g, const tupid_t root)
+int create_graph(struct graph *g)
 {
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
 
-	g->root = create_node(root);
+	g->root = create_node(0, "root");
 	if(!g->root)
 		return -1;
 	list_add(&g->root->list, &g->node_list);
@@ -126,20 +131,17 @@ static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
 	int color = 0;
-	if(n->type & TUP_CREATE)
+	if(n->flags & TUP_CREATE)
 		color |= 0x00bb00;
-	if(n->type & TUP_DELETE)
+	if(n->flags & TUP_DELETE)
 		color |= 0xff0000;
-	if(n->type & TUP_MODIFY)
+	if(n->flags & TUP_MODIFY)
 		color |= 0x0000ff;
-	fprintf(f, "tup%.*s [label=\"%.*s (%i)\",color=\"#%06x\"];\n",
-		sizeof(tupid_t), n->tupid,
-		8, n->tupid,
-		n->incoming_count, color);
+	fprintf(f, "tup%lli [label=\"%s (%i)\",color=\"#%06x\"];\n",
+		n->tupid, n->name, n->incoming_count, color);
 	/* TODO: slist_for_each? */
 	for(e=n->edges; e; e=e->next) {
-		fprintf(f, "tup%.*s -> tup%.*s [dir=back];\n",
-			sizeof(tupid_t), e->dest->tupid,
-			sizeof(tupid_t), n->tupid);
+		fprintf(f, "tup%lli -> tup%lli [dir=back];\n",
+			e->dest->tupid, n->tupid);
 	}
 }

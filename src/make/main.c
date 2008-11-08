@@ -7,21 +7,12 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-int create(const tupid_t tupid);
+int create(const char *dir);
 
-int create(const tupid_t tupid)
+int create(const char *dir)
 {
 	int pid;
 	int status;
-	struct buf name;
-	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
-
-	tupid_to_xd(tupfilename + 12, tupid);
-	if(slurp(tupfilename, &name) < 0) {
-		perror(tupfilename);
-		return -1;
-	}
-	name.s[name.len-1] = 0;
 
 	pid = fork();
 	if(pid < 0) {
@@ -31,23 +22,21 @@ int create(const tupid_t tupid)
 	if(pid == 0) {
 		clearenv();
 		setenv("PATH", "/bin:/usr/bin:/home/marf/tup", 1); /* TODO */
-		setenv("TUPWD", name.s, 1);
-		execl("/usr/bin/make", "make", "--no-print-directory", "-r", "-R", "-C", name.s, NULL);
+		setenv("TUPWD", dir, 1);
+		execl("/usr/bin/make", "make", "--no-print-directory", "-r", "-R", "-C", dir, NULL);
 		perror("execl");
 		exit(1);
 	}
 	wait(&status);
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			free(name.s);
 			return 0;
 		}
 		fprintf(stderr, "Error: Update process failed with %i in %s/\n",
-			WEXITSTATUS(status), name.s);
+			WEXITSTATUS(status), dir);
 	} else {
 		fprintf(stderr, "Error: Update process didn't return at %s/\n",
-			name.s);
+			dir);
 	}
-	free(name.s);
 	return -1;
 }

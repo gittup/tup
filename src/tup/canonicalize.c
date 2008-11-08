@@ -60,26 +60,29 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 	return 0;
 }
 
-void canonicalize_string(char *str, int len)
+int canonicalize_string(char *str, int sz)
 {
 	int x;
 
-	for(x=0; x<len; x++) {
+	if(sz == 0)
+		return 0;
+
+	for(x=0; x<sz; x++) {
 		if(x) {
 			if(str[x] == '/' && str[x-1] == '/') {
-				memmove(str+x, str+x+1, len-x);
-				len--;
+				memmove(str+x, str+x+1, sz-x);
+				sz--;
 				x--;
 			}
 		}
 	}
-	for(x=0; x<len; x++) {
+	for(x=0; x<sz; x++) {
 		if(x >= 1) {
 			if(str[x-0] == '/' &&
 			   str[x-1] == '.' &&
 			   (x == 1 || str[x-2] == '/')) {
-				memmove(str+x-1, str+x+1, len-x);
-				len -= 2;
+				memmove(str+x-1, str+x+1, sz-x);
+				sz -= 2;
 				x--;
 			}
 		}
@@ -91,22 +94,28 @@ void canonicalize_string(char *str, int len)
 			   str[x-3] == '/') {
 				for(sl = x - 4; sl >= 0; sl--) {
 					if(str[sl] == '/') {
-						memmove(str+sl, str+x, len-x+1);
-						len -= x-sl;
+						memmove(str+sl, str+x, sz-x+1);
+						sz -= x-sl;
 						x = sl;
 						goto done;
 					}
 				}
-				memmove(str, str+x+1, len-x);
-				len -= (x + 1);
+				memmove(str, str+x+1, sz-x);
+				sz -= (x + 1);
 				x = 0;
 done:
 				;
 			}
 		}
 	}
-	while(len > 0 && str[len-1] == '/') {
-		str[len-1] = 0;
-		len--;
+	while(sz > 0 && str[sz-1] == '/') {
+		str[sz-1] = 0;
+		sz--;
 	}
+	if(sz == 0) {
+		sz = 1;
+		str[0] = '.';
+		str[1] = 0;
+	}
+	return sz;
 }

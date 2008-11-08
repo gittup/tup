@@ -32,18 +32,33 @@ int tup_create_db(void)
 
 int tup_db_exec(char **errmsg, const char *sql, ...)
 {
-	int len;
-	static char buf[8192];
 	va_list ap;
 	int rc;
+	char *buf;
 
 	va_start(ap, sql);
-	len = vsnprintf(buf, sizeof(buf), sql, ap);
+	buf = sqlite3_vmprintf(sql, ap);
 	va_end(ap);
-	if(len >= (signed)sizeof(buf)) {
-		fprintf(stderr, "Error: SQL too big for the buffer.\n");
-		return -1;
-	}
+
+	printf("exec: %s\n", buf);
 	rc = sqlite3_exec(tup_db, buf, NULL, NULL, errmsg);
+	sqlite3_free(buf);
+	return rc;
+}
+
+int tup_db_select(char **errmsg, int (*callback)(void *, int, char **, char **),
+		  void *arg, const char *sql, ...)
+{
+	va_list ap;
+	int rc;
+	char *buf;
+
+	va_start(ap, sql);
+	buf = sqlite3_vmprintf(sql, ap);
+	va_end(ap);
+
+	printf("select: %s\n", buf);
+	rc = sqlite3_exec(tup_db, buf, callback, arg, errmsg);
+	sqlite3_free(buf);
 	return rc;
 }

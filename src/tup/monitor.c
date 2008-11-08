@@ -165,25 +165,34 @@ static int watch_path(const char *path, const char *file)
 		return -1;
 	}
 
-	/* Remove trailing / temporarily-ish */
-	fullpath[len-1] = 0;
+	/* The canonicalization will remove the trailing '/' temporarily */
+	len = canonicalize_string(fullpath, len);
+
 	if(stat(fullpath, &buf) != 0) {
 		perror(fullpath);
 		rc = -1;
 		goto out_free;
 	}
+
 	if(S_ISREG(buf.st_mode)) {
-		canonicalize_string(fullpath, len-1);
 		create_name_file(fullpath);
 		goto out_free;
 	}
-	if(!S_ISDIR(buf.st_mode)) {
+	if(S_ISDIR(buf.st_mode)) {
+		create_dir_file(fullpath);
+	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			fullpath);
 		rc = -1;
 		goto out_free;
 	}
-	fullpath[len-1] = '/';
+
+	/* This is totally valid since we have enough space from the asprintf
+	 * above, and the canonicalize function can only make then len smaller.
+	 */
+	fullpath[len] = '/';
+	len++;
+	fullpath[len] = 0;
 
 	DEBUGP("add watch: '%s'\n", fullpath);
 

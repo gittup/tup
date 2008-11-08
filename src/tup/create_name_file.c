@@ -1,40 +1,59 @@
+/* For atoll */
+#define _ISOC99_SOURCE
 #include "fileio.h"
 #include "db.h"
 #include <stdio.h>
+#include <stdlib.h>
 
-static int create_node(const char *name, int type, int flags);
+static int node_cb(void *id, int argc, char **argv, char **col);
+static new_tupid_t create_node(const char *name, int type, int flags);
 
-int create_name_file(const char *path)
+new_tupid_t create_name_file(const char *path)
 {
 	return create_node(path, TUP_NODE_FILE, TUP_FLAGS_MODIFY);
 }
 
-int create_command_file(const char *cmd)
+new_tupid_t create_command_file(const char *cmd)
 {
 	return create_node(cmd, TUP_NODE_CMD, TUP_FLAGS_MODIFY);
 }
 
-int create_dir_file(const char *path)
+new_tupid_t create_dir_file(const char *path)
 {
 	return create_node(path, TUP_NODE_DIR, TUP_FLAGS_CREATE);
 }
 
-static int create_node(const char *name, int type, int flags)
+static int node_cb(void *id, int argc, char **argv, char **col)
 {
+	int x;
+	new_tupid_t *iptr = id;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(col[x], "id") == 0) {
+			*iptr = atoll(argv[x]);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static new_tupid_t create_node(const char *name, int type, int flags)
+{
+	new_tupid_t id = -1;
 	int rc;
 	char *errmsg;
 
-	/* The "or ignore" is supposed to ignore the error if the entry is
-	 * already in the database (in that case, we'll just re-use the
-	 * existing one). However, it also seems to ignore other errors (like
-	 * if a 'not null' column isn't specified, or something), which can be
-	 * annoying.
-	 */
+	rc = tup_db_select(&errmsg, node_cb, &id,
+			   "select id from node where name='%q'", name);
+	if(rc == 0 && id != -1) {
+		return id;
+	}
+
 	rc = tup_db_exec(&errmsg,
-			 "insert or ignore into node(name, type, flags) values('%s', %i, %i)",
+			 "insert into node(name, type, flags) values('%q', %i, %i)",
 			 name, type, flags);
 	if(rc == 0)
-		return 0;
+		return sqlite3_last_insert_rowid(tup_db);
 
 	fprintf(stderr, "SQL node insertion error: %s\n", errmsg);
 	return -1;

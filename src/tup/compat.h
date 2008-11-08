@@ -11,6 +11,6 @@
 #define TUP_OBJECT_LOCK ".tup/object"
 
 /** Lock file used to ensure only one updater runs at a time */
-#define TUP_UPDATE_LOCK ".tup/create"
+#define TUP_UPDATE_LOCK ".tup/updater"
 
 #endif

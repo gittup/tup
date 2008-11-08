@@ -8,6 +8,9 @@
 #include "tup/compat.h"
 #include "tup/db.h"
 #include "tup/monitor.h"
+#include "tup/tupid.h"
+#include "tup/fileio.h"
+#include "tup/updater.h"
 
 #define ARRAY_SIZE(n) ((signed)(sizeof(n) / sizeof(n[0])))
 
@@ -19,6 +22,7 @@ static int init(void);
 static int graph_node_cb(void *unused, int argc, char **argv, char **col);
 static int graph_link_cb(void *unused, int argc, char **argv, char **col);
 static int graph(int argc, char **argv);
+static int mlink(int argc, char **argv);
 static void usage(void);
 
 int main(int argc, char **argv)
@@ -50,6 +54,10 @@ int main(int argc, char **argv)
 		return monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
 		return graph(argc, argv);
+	} else if(strcmp(cmd, "link") == 0) {
+		return mlink(argc, argv);
+	} else if(strcmp(cmd, "upd") == 0) {
+		return updater(argc, argv);
 	} else {
 		fprintf(stderr, "Unknown command: %s\n", argv[1]);
 		return 1;
@@ -109,6 +117,10 @@ static int init(void)
 		perror(TUP_OBJECT_LOCK);
 		return -1;
 	}
+	if(creat(TUP_UPDATE_LOCK, 0666) < 0) {
+		perror(TUP_UPDATE_LOCK);
+		return -1;
+	}
 	return 0;
 }
 
@@ -126,13 +138,13 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "id") == 0) {
-			id = atoi(argv[x]);
+			id = atoll(argv[x]);
 		} else if(strcmp(col[x], "name") == 0) {
 			name = argv[x];
 		} else if(strcmp(col[x], "type") == 0) {
-			type = atoi(argv[x]);
+			type = atoll(argv[x]);
 		} else if(strcmp(col[x], "flags") == 0) {
-			flags = atoi(argv[x]);
+			flags = atoll(argv[x]);
 		}
 	}
 
@@ -178,9 +190,9 @@ static int graph_link_cb(void *unused, int argc, char **argv, char **col)
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "from_id") == 0) {
-			from_id = atoi(argv[x]);
+			from_id = atoll(argv[x]);
 		} else if(strcmp(col[x], "to_id") == 0) {
-			to_id = atoi(argv[x]);
+			to_id = atoll(argv[x]);
 		}
 	}
 
@@ -211,6 +223,72 @@ static int graph(int argc, char **argv)
 		return -1;
 	}
 	printf("}\n");
+	return 0;
+}
+
+static int mlink(int argc, char **argv)
+{
+	static char cname[PATH_MAX];
+	int type;
+	int x;
+	new_tupid_t cmd_id;
+	new_tupid_t id;
+
+	if(argc) {}
+	if(argv) {}
+
+
+	if(argc < 4) {
+		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
+			argv[0]);
+		return 1;
+	}
+
+	cmd_id = create_command_file(argv[1]);
+	if(cmd_id < 0) {
+		return -1;
+	}
+
+	id = create_dir_file(get_sub_dir());
+	if(id < 0)
+		return -1;
+	if(create_link(id, cmd_id) < 0)
+		return -1;
+
+	for(x=2; x<argc; x++) {
+		char *name = argv[x];
+		if(name[0] == '-') {
+			if(name[1] == 'i') {
+				type = 0;
+			} else if(name[1] == 'o') {
+				type = 1;
+			} else {
+				fprintf(stderr, "Invalid argument: '%s'\n",
+					name);
+				return 1;
+			}
+		} else {
+			fprintf(stderr, "Invalid argument: '%s'\n", name);
+			return 1;
+		}
+		if(canonicalize(name+2, cname, sizeof(cname)) < 0) {
+			fprintf(stderr, "Unable to canonicalize '%s'\n", argv[2]);
+			return 1;
+		}
+
+		id = create_name_file(cname);
+		if(id < 0)
+			return 1;
+
+		if(type == 0) {
+			if(create_link(id, cmd_id) < 0)
+				return -1;
+		} else {
+			if(create_link(cmd_id, id) < 0)
+				return -1;
+		}
+	}
+
 	return 0;
 }
 
