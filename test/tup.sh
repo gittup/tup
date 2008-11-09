@@ -61,11 +61,10 @@ check_not_exist()
 tup_object_exist()
 {
 	while [ $# -gt 0 ]; do
-		sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-		if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/.name" ]; then
+		if sqlite3 $tupdir/.tup/db "select name from node where name like '$1'" | grep $1 > /dev/null; then
 			:
 		else
-			echo "Missing object $1 from .tup/object" 1>&2
+			echo "Missing node $1 from .tup/db" 1>&2
 			exit 1
 		fi
 		shift
@@ -75,8 +74,7 @@ tup_object_exist()
 tup_object_no_exist()
 {
 	while [ $# -gt 0 ]; do
-		sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-		if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/.name" ]; then
+		if tup_object_exist $1; then
 			echo "Object $1 exists in .tup/object" 1>&2
 			exit 1
 		fi
@@ -106,9 +104,10 @@ tup_dep_no_exist()
 
 tup_create_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/create/$sum" ]; then
-		echo "$1 doesn't exist in .tup/create/"
+	if sqlite3 $tupdir/.tup/db "select flags from node where name like '$1'" | grep 2 > /dev/null; then
+		:
+	else
+		echo "$1 doesn't have create flags"
 		exit 1
 	fi
 }

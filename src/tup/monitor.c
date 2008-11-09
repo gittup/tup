@@ -38,6 +38,7 @@
 #include "tupid.h"
 #include "fileio.h"
 #include "compat.h"
+#include "db.h"
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
@@ -245,25 +246,43 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 
+	/* Makefile gets special treatment, since we have to mark the
+	 * directory as needing update.
+	 */
 	if(strcmp(e->name, "Makefile") == 0) {
 		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
 			return;
-		if(cname[0] == 0)
-			create_dir_file(".");
-		else
-			create_dir_file(cname);
+		create_dir_file(cname);
 	}
+
+	/* Not a Makefile, so canonicalize the full filename into cname for
+	 * the rest of the function.
+	 */
 	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
 		return;
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
 			watch_path(dc->path, e->name);
 		} else {
+			char *slash;
 			create_name_file(cname);
+			slash = strrchr(cname, '/');
+			if(slash) {
+				*slash = 0;
+				create_dir_file(cname);
+				*slash = '/';
+			} else {
+				create_dir_file(".");
+			}
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		create_tup_file("modify", cname);
+		new_tupid_t tupid;
+		tupid = create_name_file(cname);
+		if(tupid < 0)
+			return;
+		tup_db_exec("update node set flags=%i where id=%lli",
+			    TUP_FLAGS_MODIFY, tupid);
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
 		handle_delete(cname);

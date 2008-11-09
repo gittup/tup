@@ -240,8 +240,6 @@ static int build_graph(struct graph *g)
 		}
 	}
 
-	dump_graph(g, "/home/marf/test1.dot");
-
 	return 0;
 }
 
