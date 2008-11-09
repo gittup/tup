@@ -7,6 +7,7 @@
 #include "tup/config.h"
 #include "tup/compat.h"
 #include "tup/db.h"
+#include "tup/lock.h"
 #include "tup/getexecwd.h"
 #include "tup/monitor.h"
 #include "tup/tupid.h"
@@ -25,10 +26,15 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col);
 static int graph_link_cb(void *unused, int argc, char **argv, char **col);
 static int graph(int argc, char **argv);
 static int mlink(int argc, char **argv);
+/* Testing commands */
+static int node_exists(int argc, char **argv);
+static int link_exists(int argc, char **argv);
+
 static void usage(void);
 
 int main(int argc, char **argv)
 {
+	int rc = 0;
 	const char *cmd;
 
 	if(argc < 2) {
@@ -51,28 +57,39 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if(tup_open_db() != 0) {
+	if(tup_lock_init() < 0) {
 		return 1;
+	}
+	if(tup_open_db() != 0) {
+		rc = 1;
+		goto out;
 	}
 
 	cmd = argv[1];
 	argc--;
 	argv++;
 	if(strcmp(cmd, "monitor") == 0) {
-		return monitor(argc, argv);
+		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
-		return graph(argc, argv);
+		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "link") == 0) {
-		return mlink(argc, argv);
+		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "upd") == 0) {
-		return updater(argc, argv);
+		rc = updater(argc, argv);
 	} else if(strcmp(cmd, "wrap") == 0) {
-		return wrap(argc, argv);
+		rc = wrap(argc, argv);
+	} else if(strcmp(cmd, "node_exists") == 0) {
+		rc = node_exists(argc, argv);
+	} else if(strcmp(cmd, "link_exists") == 0) {
+		rc = link_exists(argc, argv);
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
-		return 1;
+		rc = 1;
 	}
-	return 0;
+
+out:
+	tup_lock_exit();
+	return rc;
 }
 
 static int file_exists(const char *s)
@@ -92,7 +109,8 @@ static int init(void)
 	const char *init_sql[] = {
 		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
 		"create table link (from_id integer, to_id integer)",
-		"create index node_index on node(name)",
+		/* TODO: Not needed because name is unique? */
+		/*"create index node_index on node(name)",*/
 		"create index node_flags_index on node(flags)",
 		"create index link_index on link(from_id)",
 		"create index link_index2 on link(to_id)"
@@ -300,6 +318,25 @@ static int mlink(int argc, char **argv)
 	}
 
 	return 0;
+}
+
+static int node_exists(int argc, char **argv)
+{
+	int x;
+	for(x=1; x<argc; x++) {
+		if(select_node(argv[x]) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+static int link_exists(int argc, char **argv)
+{
+	if(argc != 3) {
+		fprintf(stderr, "Error: link_exists requires two filenames\n");
+		return -1;
+	}
+	return find_link(argv[1], argv[2]);
 }
 
 static void usage(void)

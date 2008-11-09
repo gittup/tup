@@ -21,6 +21,7 @@ int write_all(int fd, const void *buf, int size, const char *filename);
 
 /** Creates a link, a -> b.  */
 int create_link(const new_tupid_t a, const new_tupid_t b);
+int find_link(const char *from, const char *to);
 
 int delete_link(const tupid_t a, const tupid_t b);
 
@@ -33,6 +34,8 @@ int recreate_cmd_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
 int num_dependencies(const tupid_t tupid);
+int update_node_flags(const char *name, int flags);
+new_tupid_t select_node(const char *name);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.

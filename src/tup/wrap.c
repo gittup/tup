@@ -16,7 +16,6 @@ int wrap(int argc, char **argv)
 	int pid;
 	int arg_start = 1;
 	int status;
-	int lock_fd;
 
 	if(argc < 2) {
 		fprintf(stderr, "Usage: %s cmd [args]\n", argv[0]);
@@ -26,16 +25,6 @@ int wrap(int argc, char **argv)
 		setenv(TUP_DEBUG, "1", 1);
 		debug_enable("tup_wrapper");
 		arg_start++;
-	}
-
-	lock_fd = open(TUP_OBJECT_LOCK, O_RDONLY);
-	if(lock_fd < 0) {
-		perror(TUP_OBJECT_LOCK);
-		return 1;
-	}
-	if(flock(lock_fd, LOCK_SH) < 0) {
-		perror("flock");
-		return 1;
 	}
 
 	start_server();
@@ -63,7 +52,6 @@ int wrap(int argc, char **argv)
 		}
 		return WEXITSTATUS(status);
 	}
-	flock(lock_fd, LOCK_UN);
 	fprintf(stderr, "Program terminated abnormally (%i)\n", status);
 	return 1;
 }

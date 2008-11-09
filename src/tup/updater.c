@@ -45,7 +45,6 @@ struct name_list {
 int updater(int argc, char **argv)
 {
 	struct graph g;
-	int obj_lock;
 	int upd_lock;
 	void *handle;
 	int x;
@@ -54,16 +53,6 @@ int updater(int argc, char **argv)
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
 		}
-	}
-
-	obj_lock = open(TUP_OBJECT_LOCK, O_RDONLY);
-	if(obj_lock < 0) {
-		perror(TUP_OBJECT_LOCK);
-		return 1;
-	}
-	if(flock(obj_lock, LOCK_SH) < 0) {
-		perror("flock");
-		return 1;
 	}
 
 	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
@@ -107,8 +96,6 @@ lock_success:
 
 	flock(upd_lock, LOCK_UN);
 	close(upd_lock);
-	flock(obj_lock, LOCK_UN);
-	close(obj_lock);
 	return 0;
 }
 

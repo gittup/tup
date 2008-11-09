@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <libgen.h> /* TODO: dirname */
+#include <signal.h>
 #include "dircache.h"
 #include "flist.h"
 #include "debug.h"
@@ -39,14 +40,19 @@
 #include "fileio.h"
 #include "compat.h"
 #include "db.h"
+#include "lock.h"
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
 static int handle_delete(const char *path);
+static void sighandler(int sig);
 
 static int inot_fd;
-static int lock_fd;
 static int lock_wd;
+static struct sigaction sigact = {
+	.sa_handler = sighandler,
+	.sa_flags = 0,
+};
 
 int monitor(int argc, char **argv)
 {
@@ -62,16 +68,11 @@ int monitor(int argc, char **argv)
 		}
 	}
 
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
+
 	gettimeofday(&t1, NULL);
-	lock_fd = open(TUP_OBJECT_LOCK, O_RDONLY);
-	if(lock_fd < 0) {
-		perror(TUP_OBJECT_LOCK);
-		return -1;
-	}
-	if(flock(lock_fd, LOCK_EX) < 0) {
-		perror("flock");
-		return -1;
-	}
 
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
@@ -79,11 +80,13 @@ int monitor(int argc, char **argv)
 		return -1;
 	}
 
-	if(watch_path(".", "") < 0) {
-		rc = -1;
-		goto close_inot;
-	}
-
+	/* Make sure we're watching the lock before we try to take it
+	 * exclusively, since the only way we know to release the lock is if
+	 * some other process opens it. We don't want to get in the race
+	 * condition of us taking the exclusive lock, then some other process
+	 * opens the lock and waits on a shared lock, and then we add a watch
+	 * and both sit there staring at each other. Word.
+	 */
 	lock_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
 	if(lock_wd < 0) {
 		perror("inotify_add_watch");
@@ -91,10 +94,17 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	if(flock(lock_fd, LOCK_UN) < 0) {
-		perror("flock (un)");
+	if(flock(tup_obj_lock(), LOCK_EX) < 0) {
+		perror("flock");
 		return -1;
 	}
+	locked = 1;
+
+	if(watch_path(".", "") < 0) {
+		rc = -1;
+		goto close_inot;
+	}
+
 	gettimeofday(&t2, NULL);
 	fprintf(stderr, "Initialized in %f seconds.\n",
 		(double)(t2.tv_sec - t1.tv_sec) +
@@ -119,19 +129,22 @@ int monitor(int argc, char **argv)
 			 * handle_event()?
 			 */
 			if(e->wd == lock_wd) {
-				if(e->mask & IN_OPEN)
-					locked = 1;
+				if(e->mask & IN_OPEN) {
+					locked = 0;
+					flock(tup_obj_lock(), LOCK_UN);
+					DEBUGP("monitor off");
+				}
 				if(e->mask & IN_CLOSE) {
-					if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+					if(flock(tup_obj_lock(), LOCK_EX | LOCK_NB) < 0) {
 						if(errno != EWOULDBLOCK)
 							perror("flock");
 					} else {
-						locked = 0;
-						flock(lock_fd, LOCK_UN);
+						locked = 1;
+						DEBUGP("monitor ON");
 					}
 				}
 			} else {
-				if(!locked)
+				if(locked)
 					handle_event(e);
 			}
 
@@ -141,7 +154,6 @@ int monitor(int argc, char **argv)
 
 close_inot:
 	close(inot_fd);
-	close(lock_fd);
 	return rc;
 }
 
@@ -223,7 +235,6 @@ static void handle_event(struct inotify_event *e)
 {
 	static char cname[PATH_MAX];
 	struct dircache *dc;
-	int lock_mask = IN_MODIFY | IN_ATTRIB | IN_DELETE | IN_MOVE;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
 	/* Skip hidden files */
@@ -235,15 +246,6 @@ static void handle_event(struct inotify_event *e)
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
 			e->wd);
 		return;
-	}
-
-	if(e->mask & lock_mask) {
-		if(flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
-			if(errno == EWOULDBLOCK)
-				goto nolock;
-			perror("flock");
-			return;
-		}
 	}
 
 	/* Makefile gets special treatment, since we have to mark the
@@ -277,21 +279,12 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		new_tupid_t tupid;
-		tupid = create_name_file(cname);
-		if(tupid < 0)
-			return;
-		tup_db_exec("update node set flags=%i where id=%lli",
-			    TUP_FLAGS_MODIFY, tupid);
+		update_node_flags(cname, TUP_FLAGS_MODIFY);
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
 		handle_delete(cname);
 	}
-	if(e->mask & lock_mask) {
-		flock(lock_fd, LOCK_UN);
-	}
 
-nolock:
 	if(e->mask & IN_IGNORED) {
 		dircache_del(dc);
 	}
@@ -320,4 +313,10 @@ static int handle_delete(const char *path)
 		free(p2);
 	}
 	return 0;
+}
+
+static void sighandler(int sig)
+{
+	if(sig) {}
+	/* TODO: gracefully close, or something? */
 }

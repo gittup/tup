@@ -61,7 +61,7 @@ check_not_exist()
 tup_object_exist()
 {
 	while [ $# -gt 0 ]; do
-		if sqlite3 $tupdir/.tup/db "select name from node where name like '$1'" | grep $1 > /dev/null; then
+		if tup node_exists $1; then
 			:
 		else
 			echo "Missing node $1 from .tup/db" 1>&2
@@ -74,8 +74,8 @@ tup_object_exist()
 tup_object_no_exist()
 {
 	while [ $# -gt 0 ]; do
-		if tup_object_exist $1; then
-			echo "Object $1 exists in .tup/object" 1>&2
+		if tup node_exists $1; then
+			echo "Node $1 exists when it shouldn't" 1>&2
 			exit 1
 		fi
 		shift
