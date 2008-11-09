@@ -21,4 +21,7 @@ void print_tup_config(const struct tup_config *cfg, const char *key);
 int tup_config_set_param(struct tup_config *cfg, struct buf *lval,
 			  struct buf *rval);
 
+int config_get_int(const char *lval);
+int config_set_int(const char *lval, int x);
+
 #endif

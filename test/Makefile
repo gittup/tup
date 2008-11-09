@@ -22,11 +22,10 @@ $T:
 	if [ -d "$n" ]; then cp -Rdp $$n/* tuptesttmp-$$n/; fi; \
 	cd tuptesttmp-$$n; \
 	tup init; \
-	tup monitor &\
-	mpid=$$!;\
+	tup monitor;\
 	../$@;\
 	rc=$$?;\
-	kill $$mpid;\
+	tup stop; wait;\
 	if [ $$rc == 0 ]; then cd $$dir; rm -rf tuptesttmp-$$n; exit 0; else exit 1; fi
 
 $B: clearmarks

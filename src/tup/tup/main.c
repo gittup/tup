@@ -70,6 +70,8 @@ int main(int argc, char **argv)
 	argv++;
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
+	} else if(strcmp(cmd, "stop") == 0) {
+		rc = stop_monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "link") == 0) {
@@ -109,6 +111,7 @@ static int init(void)
 	const char *init_sql[] = {
 		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
 		"create table link (from_id integer, to_id integer)",
+		"create table config(lval varchar(256) unique, rval varchar(256))",
 		/* TODO: Not needed because name is unique? */
 		/*"create index node_index on node(name)",*/
 		"create index node_flags_index on node(flags)",
@@ -147,6 +150,10 @@ static int init(void)
 	}
 	if(creat(TUP_UPDATE_LOCK, 0666) < 0) {
 		perror(TUP_UPDATE_LOCK);
+		return -1;
+	}
+	if(creat(TUP_MONITOR_LOCK, 0666) < 0) {
+		perror(TUP_MONITOR_LOCK);
 		return -1;
 	}
 	return 0;

@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-for i in db object updater; do
+for i in db object updater monitor; do
 	if [ ! -f ".tup/$i" ]; then
 		echo ".tup/$i not created!" 1>&2
 		exit 1

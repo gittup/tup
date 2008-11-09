@@ -33,14 +33,18 @@
 #include <unistd.h>
 #include <libgen.h> /* TODO: dirname */
 #include <signal.h>
+#include <time.h>
 #include "dircache.h"
 #include "flist.h"
 #include "debug.h"
 #include "tupid.h"
 #include "fileio.h"
 #include "compat.h"
+#include "config.h"
 #include "db.h"
 #include "lock.h"
+
+#define MONITOR_PID_CFG "monitor pid"
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
@@ -48,7 +52,8 @@ static int handle_delete(const char *path);
 static void sighandler(int sig);
 
 static int inot_fd;
-static int lock_wd;
+static int obj_wd;
+static int mon_wd;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
@@ -59,6 +64,7 @@ int monitor(int argc, char **argv)
 	int x;
 	int rc = 0;
 	int locked = 0;
+	int mon_lock;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
 
@@ -71,6 +77,19 @@ int monitor(int argc, char **argv)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
+
+	config_set_int(MONITOR_PID_CFG, getpid());
+
+	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
+	if(mon_lock < 0) {
+		perror(TUP_MONITOR_LOCK);
+		return -1;
+	}
+	if(flock(mon_lock, LOCK_EX) < 0) {
+		perror("flock");
+		rc = -1;
+		goto close_monlock;
+	}
 
 	gettimeofday(&t1, NULL);
 
@@ -87,8 +106,15 @@ int monitor(int argc, char **argv)
 	 * opens the lock and waits on a shared lock, and then we add a watch
 	 * and both sit there staring at each other. Word.
 	 */
-	lock_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
-	if(lock_wd < 0) {
+	obj_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
+	if(obj_wd < 0) {
+		perror("inotify_add_watch");
+		rc = -1;
+		goto close_inot;
+	}
+
+	mon_wd = inotify_add_watch(inot_fd, TUP_MONITOR_LOCK, IN_OPEN);
+	if(mon_wd < 0) {
 		perror("inotify_add_watch");
 		rc = -1;
 		goto close_inot;
@@ -96,9 +122,13 @@ int monitor(int argc, char **argv)
 
 	if(flock(tup_obj_lock(), LOCK_EX) < 0) {
 		perror("flock");
-		return -1;
+		rc = -1;
+		goto close_inot;
 	}
 	locked = 1;
+
+	if(fork() > 0)
+		exit(0);
 
 	if(watch_path(".", "") < 0) {
 		rc = -1;
@@ -124,11 +154,8 @@ int monitor(int argc, char **argv)
 			 * at once. Also, we can't count the number of opens
 			 * and closes because inotify sometimes slurps some
 			 * duplicate events.
-			 *
-			 * TODO: Reduce duplicate flocking here and in
-			 * handle_event()?
 			 */
-			if(e->wd == lock_wd) {
+			if(e->wd == obj_wd) {
 				if(e->mask & IN_OPEN) {
 					locked = 0;
 					flock(tup_obj_lock(), LOCK_UN);
@@ -143,6 +170,8 @@ int monitor(int argc, char **argv)
 						DEBUGP("monitor ON");
 					}
 				}
+			} else if(e->wd == mon_wd) {
+				goto close_inot;
 			} else {
 				if(locked)
 					handle_event(e);
@@ -154,7 +183,27 @@ int monitor(int argc, char **argv)
 
 close_inot:
 	close(inot_fd);
+close_monlock:
+	close(mon_lock);
+	config_set_int(MONITOR_PID_CFG, -1);
 	return rc;
+}
+
+int stop_monitor(int argc, char **argv)
+{
+	int mon_lock;
+
+	if(argc) {}
+	if(argv) {}
+
+	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
+	if(mon_lock < 0) {
+		perror(TUP_MONITOR_LOCK);
+		return -1;
+	}
+	close(mon_lock);
+
+	return 0;
 }
 
 static int watch_path(const char *path, const char *file)
@@ -318,5 +367,7 @@ static int handle_delete(const char *path)
 static void sighandler(int sig)
 {
 	if(sig) {}
+	config_set_int(MONITOR_PID_CFG, -1);
 	/* TODO: gracefully close, or something? */
+	exit(0);
 }
