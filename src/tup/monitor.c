@@ -159,7 +159,7 @@ int monitor(int argc, char **argv)
 				if(e->mask & IN_OPEN) {
 					locked = 0;
 					flock(tup_obj_lock(), LOCK_UN);
-					DEBUGP("monitor off");
+					DEBUGP("monitor off\n");
 				}
 				if(e->mask & IN_CLOSE) {
 					if(flock(tup_obj_lock(), LOCK_EX | LOCK_NB) < 0) {
@@ -167,7 +167,7 @@ int monitor(int argc, char **argv)
 							perror("flock");
 					} else {
 						locked = 1;
-						DEBUGP("monitor ON");
+						DEBUGP("monitor ON\n");
 					}
 				}
 			} else if(e->wd == mon_wd) {

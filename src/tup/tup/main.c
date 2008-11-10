@@ -352,10 +352,16 @@ static int link_exists(int argc, char **argv)
 static int touch(int argc, char **argv)
 {
 	int x;
+	static char cname[PATH_MAX];
 	for(x=1; x<argc; x++) {
-		if(create_name_file(argv[x]) < 0)
+		if(canonicalize(argv[x], cname, sizeof(cname)) < 0) {
+			fprintf(stderr, "Unable to canonicalize '%s'\n",
+				argv[x]);
 			return -1;
-		if(update_node_flags(argv[x], TUP_FLAGS_MODIFY) < 0)
+		}
+		if(create_name_file(cname) < 0)
+			return -1;
+		if(update_node_flags(cname, TUP_FLAGS_MODIFY) < 0)
 			return -1;
 	}
 	return 0;
