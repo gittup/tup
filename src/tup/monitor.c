@@ -31,7 +31,6 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <unistd.h>
-#include <libgen.h> /* TODO: dirname */
 #include <signal.h>
 #include <time.h>
 #include "dircache.h"
@@ -48,7 +47,6 @@
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
-static int handle_delete(const char *path);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -293,6 +291,7 @@ static void handle_event(struct inotify_event *e)
 {
 	static char cname[PATH_MAX];
 	struct dircache *dc;
+	int cdf = 0;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
 
 	/* Skip hidden files */
@@ -324,53 +323,35 @@ static void handle_event(struct inotify_event *e)
 		if(e->mask & IN_ISDIR) {
 			watch_path(dc->path, e->name);
 		} else {
-			char *slash;
 			create_name_file(cname);
-			slash = strrchr(cname, '/');
-			if(slash) {
-				*slash = 0;
-				create_dir_file(cname);
-				*slash = '/';
-			} else {
-				create_dir_file(".");
-			}
+			cdf = 1;
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
 		update_node_flags(cname, TUP_FLAGS_MODIFY);
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
-		handle_delete(cname);
+		update_node_flags(cname, TUP_FLAGS_DELETE);
+		cdf = 1;
+	}
+
+	if(cdf) {
+		char *slash;
+		slash = strrchr(cname, '/');
+		if(slash) {
+			*slash = 0;
+			create_dir_file(cname);
+			update_node_flags(cname, TUP_FLAGS_CREATE);
+			*slash = '/';
+		} else {
+			create_dir_file(".");
+			update_node_flags(".", TUP_FLAGS_CREATE);
+		}
 	}
 
 	if(e->mask & IN_IGNORED) {
 		dircache_del(dc);
 	}
-}
-
-static int handle_delete(const char *path)
-{
-	tupid_t tupid;
-
-	tupid_from_filename(tupid, path);
-	create_tup_file_tupid("delete", tupid);
-	delete_tup_file("create", tupid);
-	delete_tup_file("modify", tupid);
-	{
-		/* TODO */
-		char *p2;
-		char *dir;
-		p2 = strdup(path);
-		if(!p2) {
-			perror("strdup");
-			return -1;
-		}
-		dir = dirname(p2);
-		if(create_dir_file(dir) < 0)
-			return -1;
-		free(p2);
-	}
-	return 0;
 }
 
 static void sighandler(int sig)

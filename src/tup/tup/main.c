@@ -31,7 +31,9 @@ static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
+static int file_mod(const char *file, int flags);
 static int touch(int argc, char **argv);
+static int delete(int argc, char **argv);
 
 static void usage(void);
 
@@ -91,6 +93,8 @@ int main(int argc, char **argv)
 		rc = flags_exists(argc, argv);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
+	} else if(strcmp(cmd, "delete") == 0) {
+		rc = delete(argc, argv);
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -377,19 +381,37 @@ static int flags_exists(int argc, char **argv)
 	return x;
 }
 
+static int file_mod(const char *file, int flags)
+{
+	static char cname[PATH_MAX];
+
+	if(canonicalize(file, cname, sizeof(cname)) < 0) {
+		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
+		return -1;
+	}
+	if(create_name_file(cname) < 0)
+		return -1;
+	if(update_node_flags(cname, flags) < 0)
+		return -1;
+
+	return 0;
+}
+
 static int touch(int argc, char **argv)
 {
 	int x;
-	static char cname[PATH_MAX];
 	for(x=1; x<argc; x++) {
-		if(canonicalize(argv[x], cname, sizeof(cname)) < 0) {
-			fprintf(stderr, "Unable to canonicalize '%s'\n",
-				argv[x]);
+		if(file_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
 			return -1;
-		}
-		if(create_name_file(cname) < 0)
-			return -1;
-		if(update_node_flags(cname, TUP_FLAGS_MODIFY) < 0)
+	}
+	return 0;
+}
+
+static int delete(int argc, char **argv)
+{
+	int x;
+	for(x=1; x<argc; x++) {
+		if(file_mod(argv[x], TUP_FLAGS_DELETE) < 0)
 			return -1;
 	}
 	return 0;

@@ -85,9 +85,9 @@ tup_object_no_exist()
 
 tup_dep_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	dep=`echo -n $2 | sha1sum | awk '{print $1}'`
-	if [ ! -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/$dep" ]; then
+	if tup link_exists "$1" "$2"; then
+		:
+	else
 		echo "Dependency from $1 -> $2 does not exist" 1>&2
 		exit 1
 	fi
@@ -95,9 +95,7 @@ tup_dep_exist()
 
 tup_dep_no_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	dep=`echo -n $2 | sha1sum | awk '{print $1}'`
-	if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/$dep" ]; then
+	if tup link_exists "$1" "$2"; then
 		echo "Dependency from $1 -> $2 exists when it shouldn't" 1>&2
 		exit 1
 	fi
