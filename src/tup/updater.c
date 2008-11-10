@@ -91,7 +91,6 @@ lock_success:
 		return 1;
 	if(build_graph(&g) < 0)
 		return 1;
-	dump_graph(&g, "/home/marf/ok.dot");
 	if(execute_graph(&g) < 0)
 		return 1;
 
@@ -204,11 +203,11 @@ static int build_graph(struct graph *g)
 
 	g->cur = g->root;
 	g->root->flags = TUP_FLAGS_MODIFY;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_MODIFY) != 0)
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i or flags=%i", TUP_FLAGS_MODIFY, TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) != 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_DELETE;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_DELETE) != 0)
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i or flags=%i", TUP_FLAGS_DELETE, TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) != 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_NONE;
@@ -309,13 +308,9 @@ static int execute_graph(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_FILE &&
-			   (n->flags == TUP_FLAGS_DELETE)) {
-				/* Only delete when exactly the delete flag is
-				 * set. If the modify flag is also set, then
-				 * another command may be updating the file
-				 * later anyway.
-				 */
-				delete_file(n);
+			   (n->flags & TUP_FLAGS_DELETE)) {
+				if(num_dependencies(n->tupid) == 0)
+					delete_file(n);
 			}
 			if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
@@ -376,12 +371,15 @@ static int update(struct node *n)
 
 static int delete_file(struct node *n)
 {
-	printf("[31mDelete[%lli]: %s[0m\n", n->tupid, n->name);
+	printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
 	if(delete_name_file(n->tupid) < 0)
 		return -1;
 	if(unlink(n->name) < 0) {
-		perror(n->name);
-		return -1;
+		/* Don't care if the file is already gone. */
+		if(errno != ENOENT) {
+			perror(n->name);
+			return -1;
+		}
 	}
 
 	return 0;

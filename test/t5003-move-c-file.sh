@@ -15,7 +15,7 @@ sym_check prog main bar1
 # Rename bar.c to realbar.c.
 mv bar.c realbar.c
 tup delete bar.c
-tup create realbar.c
+tup touch realbar.c
 update
 check_not_exist bar.o
 tup_object_no_exist bar.c bar.o

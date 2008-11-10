@@ -32,6 +32,8 @@ static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
 static int file_mod(const char *file, int flags);
+static int get_flags_cb(void *arg, int argc, char **argv, char **col);
+static int get_flags(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int delete(int argc, char **argv);
 
@@ -91,6 +93,8 @@ int main(int argc, char **argv)
 		rc = link_exists(argc, argv);
 	} else if(strcmp(cmd, "flags_exists") == 0) {
 		rc = flags_exists(argc, argv);
+	} else if(strcmp(cmd, "get_flags") == 0) {
+		rc = get_flags(argc, argv);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "delete") == 0) {
@@ -177,7 +181,7 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 	char *name;
 	int type;
 	int flags;
-	const char *color;
+	int color;
 	const char *shape;
 
 	if(unused) {}
@@ -208,20 +212,14 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 			shape="ellipse";
 	}
 
-	switch(flags) {
-		case TUP_FLAGS_MODIFY:
-			color = "#0000ff";
-			break;
-		case TUP_FLAGS_CREATE:
-			color = "#00ff00";
-			break;
-		case TUP_FLAGS_DELETE:
-			color = "#ff0000";
-			break;
-		default:
-			color = "#000000";
-	}
-	printf("\tnode_%i [label=\"%s\" shape=\"%s\" color=\"%s\"];\n", id, name, shape, color);
+	color = 0;
+	if(flags & TUP_FLAGS_MODIFY)
+		color |= 0x0000ff;
+	if(flags & TUP_FLAGS_CREATE)
+		color |= 0x00ff00;
+	if(flags & TUP_FLAGS_DELETE)
+		color |= 0xff0000;
+	printf("\tnode_%i [label=\"%s\" shape=\"%s\" color=\"#%06x\"];\n", id, name, shape, color);
 
 	return 0;
 }
@@ -375,6 +373,40 @@ static int flags_exists(int argc, char **argv)
 			 "select id from node where flags != 0") != 0)
 		return -1;
 	return x;
+}
+
+static int get_flags_cb(void *arg, int argc, char **argv, char **col)
+{
+	int *iptr = arg;
+	int x;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(col[x], "flags") == 0) {
+			*iptr = atoi(argv[x]);
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static int get_flags(int argc, char **argv)
+{
+	int flags;
+	int requested_flags;
+
+	if(argc != 3) {
+		fprintf(stderr, "Error: get_flags requires exactly two args\n");
+		return -1;
+	}
+
+	if(tup_db_select(get_flags_cb, &flags, "select flags from node where name='%q'", argv[1]) != 0)
+		return -1;
+
+	requested_flags = atoi(argv[2]);
+
+	if((flags & requested_flags) != requested_flags)
+		return -1;
+	return 0;
 }
 
 static int file_mod(const char *file, int flags)

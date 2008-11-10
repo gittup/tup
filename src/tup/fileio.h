@@ -33,7 +33,7 @@ new_tupid_t create_dir_file(const char *path);
 int recreate_cmd_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
-int num_dependencies(const tupid_t tupid);
+int num_dependencies(new_tupid_t tupid);
 int update_node_flags(const char *name, int flags);
 new_tupid_t select_node(const char *name);
 

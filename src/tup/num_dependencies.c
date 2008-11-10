@@ -1,17 +1,27 @@
 #include "fileio.h"
+#include "db.h"
 #include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
 
-int num_dependencies(const tupid_t tupid)
+static int nd_cb(void *arg, int argc, char **argv, char **col);
+
+int num_dependencies(new_tupid_t tupid)
 {
-	struct stat buf;
-	char tupfilename[] = ".tup/object/" SHA1_XD "/.name";
+	int x = 0;
 
-	tupid_to_xd(tupfilename + 12, tupid);
-	if(stat(tupfilename, &buf) < 0) {
-		perror(tupfilename);
+	if(tup_db_select(nd_cb, &x, "select from_id from link where to_id=%lli",
+			 tupid) != 0)
 		return -1;
-	}
-	return buf.st_nlink - 1;
+
+	return x;
+}
+
+static int nd_cb(void *arg, int argc, char **argv, char **col)
+{
+	int *iptr = arg;
+	if(argc) {}
+	if(argv) {}
+	if(col) {}
+
+	(*iptr)++;
+	return 0;
 }

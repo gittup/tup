@@ -103,28 +103,10 @@ tup_dep_no_exist()
 
 tup_create_exist()
 {
-	if sqlite3 $tupdir/.tup/db "select flags from node where name like '$1'" | grep 2 > /dev/null; then
+	if tup get_flags $1 2; then
 		:
 	else
 		echo "$1 doesn't have create flags"
-		exit 1
-	fi
-}
-
-tup_modify_exist()
-{
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/modify/$sum" ]; then
-		echo "$1 doesn't exist in .tup/modify/"
-		exit 1
-	fi
-}
-
-tup_delete_exist()
-{
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/delete/$sum" ]; then
-		echo "$1 doesn't exist in .tup/delete/"
 		exit 1
 	fi
 }
