@@ -32,7 +32,7 @@ static void show_progress(int n, int tot);
 
 static int (*create)(const tupid_t tupid);
 static int update(struct node *n);
-static int delete_cmd(new_tupid_t tupid);
+static int delete_file(struct node *n);
 static struct tup_config cfg;
 char make_so[] = "make.so";
 
@@ -91,6 +91,7 @@ lock_success:
 		return 1;
 	if(build_graph(&g) < 0)
 		return 1;
+	dump_graph(&g, "/home/marf/ok.dot");
 	if(execute_graph(&g) < 0)
 		return 1;
 
@@ -308,17 +309,17 @@ static int execute_graph(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_FILE &&
-			   (n->flags & TUP_FLAGS_DELETE)) {
-#if 0
-				TODO
-				if(num_dependencies(n->tupid) == 0) {
-					delete_name_file(n->tupid);
-				}
-#endif
+			   (n->flags == TUP_FLAGS_DELETE)) {
+				/* Only delete when exactly the delete flag is
+				 * set. If the modify flag is also set, then
+				 * another command may be updating the file
+				 * later anyway.
+				 */
+				delete_file(n);
 			}
 			if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
-					if(delete_cmd(n->tupid) < 0)
+					if(delete_name_file(n->tupid) < 0)
 						return -1;
 				} else {
 					if(update(n) < 0)
@@ -373,14 +374,15 @@ static int update(struct node *n)
 	return 0;
 }
 
-static int delete_cmd(new_tupid_t tupid)
+static int delete_file(struct node *n)
 {
-	if(tup_db_exec("delete from node where id=%lli", tupid) != 0)
+	printf("[31mDelete[%lli]: %s[0m\n", n->tupid, n->name);
+	if(delete_name_file(n->tupid) < 0)
 		return -1;
-
-	/* TODO: Do we want to delete all links? I assume so */
-	if(tup_db_exec("delete from link where from_id=%lli or to_id=%lli", tupid, tupid) != 0)
+	if(unlink(n->name) < 0) {
+		perror(n->name);
 		return -1;
+	}
 
 	return 0;
 }

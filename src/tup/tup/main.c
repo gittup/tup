@@ -280,10 +280,6 @@ static int mlink(int argc, char **argv)
 	new_tupid_t cmd_id;
 	new_tupid_t id;
 
-	if(argc) {}
-	if(argv) {}
-
-
 	if(argc < 4) {
 		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
 			argv[0]);

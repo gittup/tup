@@ -49,8 +49,14 @@ static new_tupid_t create_node(const char *name, int type, int flags)
 	int rc;
 
 	rc = tup_db_select(node_cb, &idf,
-			   "select id from node where name='%q'", name);
+			   "select id, flags from node where name='%q'", name);
 	if(rc == 0 && idf.tupid != -1) {
+		/* If the node already exists, just wipe its delete flag */
+		if(idf.flags & TUP_FLAGS_DELETE) {
+			idf.flags &= ~TUP_FLAGS_DELETE;
+			if(tup_db_exec("update node set flags=%i where id=%lli", idf.flags, idf.tupid) < 0)
+				return -1;
+		}
 		return idf.tupid;
 	}
 

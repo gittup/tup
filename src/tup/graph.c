@@ -94,6 +94,7 @@ int create_graph(struct graph *g)
 	g->root = create_node(0, "root");
 	if(!g->root)
 		return -1;
+	g->root->type = TUP_NODE_ROOT;
 	list_add(&g->root->list, &g->node_list);
 	g->num_nodes = 0;
 	return 0;

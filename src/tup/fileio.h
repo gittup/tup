@@ -39,10 +39,8 @@ new_tupid_t select_node(const char *name);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.
- *
- * Note: *not* thread safe.
  */
-int delete_name_file(const tupid_t tupid);
+int delete_name_file(new_tupid_t tupid);
 
 int canonicalize(const char *path, char *out, int len);
 int canonicalize2(const char *path, const char *file, char *out, int len);

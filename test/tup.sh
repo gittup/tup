@@ -76,7 +76,7 @@ tup_object_no_exist()
 {
 	while [ $# -gt 0 ]; do
 		if tup node_exists $1; then
-			echo "Node $1 exists when it shouldn't" 1>&2
+			echo "Node $1 exists in .tup/db when it shouldn't" 1>&2
 			exit 1
 		fi
 		shift
