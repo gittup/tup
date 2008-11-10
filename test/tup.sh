@@ -1,9 +1,10 @@
 tupdir=$PWD
 check_empty_tupdirs()
 {
-	if [ "$(ls -A $tupdir/.tup/create)" ]; then
-		cd $tupdir
-		echo "Files shouldn't exist: " .tup/{create,modify,delete}/* 1>&2
+	if tup flags_exists; then
+		:
+	else
+		echo "Nodes shouldn't have flags set" 1>&2
 		exit 1
 	fi
 }

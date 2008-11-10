@@ -29,6 +29,8 @@ static int mlink(int argc, char **argv);
 /* Testing commands */
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
+static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
+static int flags_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
 
 static void usage(void);
@@ -85,6 +87,8 @@ int main(int argc, char **argv)
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {
 		rc = link_exists(argc, argv);
+	} else if(strcmp(cmd, "flags_exists") == 0) {
+		rc = flags_exists(argc, argv);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
 	} else {
@@ -347,6 +351,30 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 	return find_link(argv[1], argv[2]);
+}
+
+static int flags_exists_cb(void *arg, int argc, char **argv, char **col)
+{
+	int *iptr = arg;
+	if(argc) {}
+	if(argv) {}
+	if(col) {}
+
+	*iptr = 1;
+
+	return 0;
+}
+
+static int flags_exists(int argc, char **argv)
+{
+	int x = 0;
+	if(argc) {}
+	if(argv) {}
+
+	if(tup_db_select(flags_exists_cb, &x,
+			 "select id from node where flags != 0") != 0)
+		return -1;
+	return x;
 }
 
 static int touch(int argc, char **argv)
