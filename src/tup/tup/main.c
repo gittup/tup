@@ -417,6 +417,8 @@ static int file_mod(const char *file, int flags)
 		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
 		return -1;
 	}
+	if(select_node(cname) < 0 || flags == TUP_FLAGS_DELETE)
+		update_create_dir_for_file(cname);
 	if(create_name_file(cname) < 0)
 		return -1;
 	if(update_node_flags(cname, flags) < 0)

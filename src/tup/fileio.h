@@ -25,11 +25,10 @@ int find_link(const char *from, const char *to);
 
 int delete_link(const tupid_t a, const tupid_t b);
 
-int create_tup_file(const char *tup, const char *path);
-int create_tup_file_tupid(const char *tup, const tupid_t tupid);
 new_tupid_t create_name_file(const char *path);
 new_tupid_t create_command_file(const char *cmd);
 new_tupid_t create_dir_file(const char *path);
+int update_create_dir_for_file(char *name);
 int recreate_cmd_file(const tupid_t tupid);
 int delete_tup_file(const char *tup, const tupid_t tupid);
 int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);

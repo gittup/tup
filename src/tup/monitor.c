@@ -312,6 +312,7 @@ static void handle_event(struct inotify_event *e)
 		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
 			return;
 		create_dir_file(cname);
+		update_node_flags(cname, TUP_FLAGS_CREATE);
 	}
 
 	/* Not a Makefile, so canonicalize the full filename into cname for
@@ -336,17 +337,7 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(cdf) {
-		char *slash;
-		slash = strrchr(cname, '/');
-		if(slash) {
-			*slash = 0;
-			create_dir_file(cname);
-			update_node_flags(cname, TUP_FLAGS_CREATE);
-			*slash = '/';
-		} else {
-			create_dir_file(".");
-			update_node_flags(".", TUP_FLAGS_CREATE);
-		}
+		update_create_dir_for_file(cname);
 	}
 
 	if(e->mask & IN_IGNORED) {

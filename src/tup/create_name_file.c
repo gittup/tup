@@ -97,3 +97,30 @@ new_tupid_t select_node(const char *name)
 		return idf.tupid;
 	return -1;
 }
+
+int update_create_dir_for_file(char *name)
+{
+	int rc = 0;
+	char *slash;
+
+	slash = strrchr(name, '/');
+	if(slash) {
+		*slash = 0;
+		if(create_dir_file(name) < 0) {
+			rc = -1;
+			goto out;
+		}
+		if(update_node_flags(name, TUP_FLAGS_CREATE) < 0) {
+			rc = -1;
+		}
+out:
+		*slash = '/';
+	} else {
+		if(create_dir_file(".") < 0)
+			return -1;
+		if(update_node_flags(".", TUP_FLAGS_CREATE) < 0)
+			return -1;
+	}
+
+	return rc;
+}
