@@ -192,6 +192,8 @@ close_monlock:
 int stop_monitor(int argc, char **argv)
 {
 	int mon_lock;
+	struct timespec ts = {0, 5e6};
+	int x;
 
 	if(argc) {}
 	if(argv) {}
@@ -203,7 +205,14 @@ int stop_monitor(int argc, char **argv)
 	}
 	close(mon_lock);
 
-	return 0;
+	for(x=0; x<25; x++) {
+		if(config_get_int(MONITOR_PID_CFG) == -1)
+			return 0;
+		nanosleep(&ts, NULL);
+	}
+	fprintf(stderr, "Error: monitor pid never reset.\n");
+
+	return -1;
 }
 
 static int watch_path(const char *path, const char *file)

@@ -29,6 +29,7 @@ static int mlink(int argc, char **argv);
 /* Testing commands */
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
+static int touch(int argc, char **argv);
 
 static void usage(void);
 
@@ -84,6 +85,8 @@ int main(int argc, char **argv)
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {
 		rc = link_exists(argc, argv);
+	} else if(strcmp(cmd, "touch") == 0) {
+		rc = touch(argc, argv);
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -344,6 +347,18 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 	return find_link(argv[1], argv[2]);
+}
+
+static int touch(int argc, char **argv)
+{
+	int x;
+	for(x=1; x<argc; x++) {
+		if(create_name_file(argv[x]) < 0)
+			return -1;
+		if(update_node_flags(argv[x], TUP_FLAGS_MODIFY) < 0)
+			return -1;
+	}
+	return 0;
 }
 
 static void usage(void)
