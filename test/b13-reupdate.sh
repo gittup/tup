@@ -1,11 +1,11 @@
 #! /bin/sh -e
 
 cp ../testMakefile ./Makefile
-nums=`seq 1 $1`
-for i in $nums; do echo "void foo$i(void) {}" > $i.c; tup touch $i.c; done
+for i in `seq 1 $1`; do echo "void foo$i(void) {}" > $i.c; done
+seq 1 $1 | sed 's/$/.c/' | xargs tup touch
 echo "int main(void) {}" >> 1.c
 tup upd
-for i in $nums; do tup touch $i.c; done
+seq 1 $1 | sed 's/$/.c/' | xargs tup touch
 tup upd
 if nm prog | grep main > /dev/null; then
 	:
