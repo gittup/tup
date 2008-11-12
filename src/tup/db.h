@@ -28,5 +28,7 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 tupid_t tup_db_create_node(const char *name, int type, int flags);
 tupid_t tup_db_select_node(const char *name);
 int tup_db_set_node_flags(const char *name, int flags);
+int tup_db_begin(void);
+int tup_db_commit(void);
 
 #endif

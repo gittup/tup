@@ -145,6 +145,60 @@ int tup_db_set_node_flags(const char *name, int flags)
 	return 0;
 }
 
+int tup_db_begin(void)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "begin";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
+}
+
+int tup_db_commit(void)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "commit";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
+}
+
 static int node_insert(const char *name, int type, int flags)
 {
 	int rc;

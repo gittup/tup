@@ -418,13 +418,13 @@ static int file_mod(const char *file, int flags)
 static int touch(int argc, char **argv)
 {
 	int x;
-	if(tup_db_exec("begin") != 0)
+	if(tup_db_begin() < 0)
 		return -1;
 	for(x=1; x<argc; x++) {
 		if(file_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
 			return -1;
 	}
-	if(tup_db_exec("commit") != 0)
+	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
 }
