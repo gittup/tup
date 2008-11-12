@@ -1,8 +1,8 @@
 #include "file.h"
-#include "tup/fileio.h"
 #include "tup/access_event.h"
 #include "tup/debug.h"
 #include "tup/list.h"
+#include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -64,7 +64,7 @@ int write_files(tupid_t cmdid)
 	list_for_each_entry(w, &write_list, list) {
 		struct file_entry *tmp;
 
-		if(create_link(cmdid, w->tupid) < 0)
+		if(tup_db_create_link(cmdid, w->tupid) < 0)
 			return -1;
 		list_for_each_entry_safe(r, tmp, &read_list, list) {
 			if(w->tupid == r->tupid)
@@ -73,7 +73,7 @@ int write_files(tupid_t cmdid)
 	}
 
 	list_for_each_entry(r, &read_list, list) {
-		if(create_link(r->tupid, cmdid) < 0)
+		if(tup_db_create_link(r->tupid, cmdid) < 0)
 			return -1;
 	}
 	return 0;

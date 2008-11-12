@@ -280,7 +280,7 @@ static int mlink(int argc, char **argv)
 	id = create_dir_file(get_sub_dir());
 	if(id < 0)
 		return -1;
-	if(create_link(id, cmd_id) < 0)
+	if(tup_db_create_link(id, cmd_id) < 0)
 		return -1;
 
 	for(x=2; x<argc; x++) {
@@ -309,10 +309,10 @@ static int mlink(int argc, char **argv)
 			return 1;
 
 		if(type == 0) {
-			if(create_link(id, cmd_id) < 0)
+			if(tup_db_create_link(id, cmd_id) < 0)
 				return -1;
 		} else {
-			if(create_link(cmd_id, id) < 0)
+			if(tup_db_create_link(cmd_id, id) < 0)
 				return -1;
 		}
 	}

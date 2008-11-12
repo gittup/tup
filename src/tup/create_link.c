@@ -7,23 +7,6 @@
 
 static int link_cb(void *id, int argc, char **argv, char **col);
 
-int create_link(tupid_t a, tupid_t b)
-{
-	tupid_t id = -1;
-	int rc;
-
-	rc = tup_db_select(link_cb, &id,
-			   "select from_id from link where from_id=%lli and to_id=%lli", a, b);
-	if(rc == 0 && id != -1)
-		return 0;
-
-	rc = tup_db_exec("insert into link(from_id, to_id) values(%lli, %lli)",
-			 a, b);
-	if(rc == 0)
-		return 0;
-	return -1;
-}
-
 int find_link(const char *from, const char *to)
 {
 	tupid_t id = -1;

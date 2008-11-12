@@ -19,16 +19,22 @@ enum TUP_FLAGS_TYPE {
 	TUP_FLAGS_DELETE=4,
 };
 
+/* General operations */
 int tup_open_db(void);
 int tup_create_db(void);
+int tup_db_begin(void);
+int tup_db_commit(void);
+
 int tup_db_exec(const char *sql, ...);
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
 
+/* Node operations */
 tupid_t tup_db_create_node(const char *name, int type, int flags);
 tupid_t tup_db_select_node(const char *name);
 int tup_db_set_node_flags(const char *name, int flags);
-int tup_db_begin(void);
-int tup_db_commit(void);
+
+/* Link operations */
+int tup_db_create_link(tupid_t a, tupid_t b);
 
 #endif
