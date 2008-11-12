@@ -1,3 +1,6 @@
 #! /bin/sh -e
 
-for i in `seq 1 $1`; do tup touch $i $i.o; tup link "foo" -i$i -o$i.o; done
+nums=`seq 1 $1`
+echo $nums | xargs tup touch
+echo $nums | sed 's/$/.o/' | xargs tup touch
+for i in $nums; do tup link "foo" -i$i -o$i.o; done

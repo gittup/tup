@@ -7,7 +7,7 @@
 
 static int link_cb(void *id, int argc, char **argv, char **col);
 
-int create_link(const tupid_t a, const tupid_t b)
+int create_link(tupid_t a, tupid_t b)
 {
 	tupid_t id = -1;
 	int rc;

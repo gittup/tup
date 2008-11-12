@@ -34,8 +34,8 @@ struct graph {
 	int num_nodes;
 };
 
-struct node *find_node(const struct graph *g, const tupid_t tupid);
-struct node *create_node(const tupid_t tupid, const char *name);
+struct node *find_node(const struct graph *g, tupid_t tupid);
+struct node *create_node(tupid_t tupid, const char *name);
 void remove_node(struct node *n);
 
 int create_edge(struct node *n1, struct node *n2);

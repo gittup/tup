@@ -4,7 +4,7 @@
 #include "tup/tupid.h"
 
 /** Creates a link, a -> b.  */
-int create_link(const tupid_t a, const tupid_t b);
+int create_link(tupid_t a, tupid_t b);
 int find_link(const char *from, const char *to);
 
 tupid_t create_name_file(const char *path);
