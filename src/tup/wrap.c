@@ -12,6 +12,8 @@ int wrap(int argc, char **argv)
 	int pid;
 	int arg_start = 1;
 	int status;
+	char *tup_cmd_id;
+	tupid_t cmdid;
 
 	if(argc < 2) {
 		fprintf(stderr, "Usage: %s cmd [args]\n", argv[0]);
@@ -22,6 +24,13 @@ int wrap(int argc, char **argv)
 		debug_enable("tup_wrapper");
 		arg_start++;
 	}
+
+	tup_cmd_id = getenv(TUP_CMD_ID);
+	if(tup_cmd_id == NULL) {
+		fprintf(stderr, "Error: TUP_CMD_ID is not set!\n");
+		return -1;
+	}
+	cmdid = atoll(getenv(TUP_CMD_ID));
 
 	start_server();
 	pid = fork();
@@ -39,9 +48,6 @@ int wrap(int argc, char **argv)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			tupid_t cmdid;
-
-			cmdid = atoll(getenv(TUP_CMD_ID));
 			if(write_files(cmdid) < 0)
 				return 1;
 			return 0;
