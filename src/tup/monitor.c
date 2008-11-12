@@ -214,7 +214,7 @@ static int watch_path(const char *path, const char *file)
 	int rc = 0;
 	int len;
 	uint32_t mask;
-	struct flist f;
+	struct flist f = {0, 0, 0};
 	struct stat buf;
 	char *fullpath;
 

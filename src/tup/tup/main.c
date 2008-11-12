@@ -172,10 +172,10 @@ static int init(void)
 static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 {
 	int x;
-	int id;
-	char *name;
-	int type;
-	int flags;
+	int id = 0;
+	char *name = NULL;
+	int type = 0;
+	int flags = 0;
 	int color;
 	const char *shape;
 
@@ -222,8 +222,8 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 static int graph_link_cb(void *unused, int argc, char **argv, char **col)
 {
 	int x;
-	int from_id;
-	int to_id;
+	int from_id = 0;
+	int to_id = 0;
 
 	if(unused) {}
 

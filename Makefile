@@ -36,6 +36,6 @@ libtup.a: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/*.c))
 $(objs): $(BUILD)%.o: %.c Makefile
 	$Qecho "  CC      $<";\
 	mkdir -p $(@D);\
-	gcc -MMD $(CCFLAGS) -Isrc -c $< -o $@ -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Winline -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
+	gcc -Os -MMD $(CCFLAGS) -Isrc -c $< -o $@ -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
 
 -include $(deps)

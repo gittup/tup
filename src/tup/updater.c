@@ -92,7 +92,7 @@ lock_success:
 static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 {
 	int x;
-	char *name;
+	char *name = NULL;
 	struct list_head *list = arg;
 	struct name_list *nl;
 	tupid_t id = -1;
@@ -163,11 +163,11 @@ static int process_create_nodes(void)
 static int md_flag_cb(void *arg, int argc, char **argv, char **col)
 {
 	struct graph *g = arg;
-	char *name;
-	int type;
-	int flags;
+	char *name = NULL;
+	int type = 0;
+	int flags = 0;
 	int x;
-	tupid_t id;
+	tupid_t id = 0;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "name") == 0)
