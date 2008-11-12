@@ -121,7 +121,6 @@ static int file_exists(const char *s)
 
 static int init(void)
 {
-	int rc;
 	int x;
 	const char *init_sql[] = {
 		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
@@ -133,7 +132,6 @@ static int init(void)
 		"create index link_index on link(from_id)",
 		"create index link_index2 on link(to_id)"
 	};
-	char *errmsg;
 
 	if(file_exists(TUP_DB_FILE)) {
 		printf("TODO: DB file already exists. abort\n");
@@ -152,11 +150,8 @@ static int init(void)
 	}
 
 	for(x=0; x<ARRAY_SIZE(init_sql); x++) {
-		rc = sqlite3_exec(tup_db, init_sql[x], NULL, NULL, &errmsg);
-		if(rc != 0) {
-			fprintf(stderr, "SQL error: %s\n", errmsg);
+		if(tup_db_exec(init_sql[x]) != 0)
 			return -1;
-		}
 	}
 
 	if(creat(TUP_OBJECT_LOCK, 0666) < 0) {
@@ -248,24 +243,17 @@ static int graph(int argc, char **argv)
 {
 	const char node_sql[] = "select * from node";
 	const char link_sql[] = "select * from link";
-	char *errmsg;
-	int rc;
 
 	if(argc) {}
 	if(argv) {}
 
 	printf("digraph G {\n");
-	rc = sqlite3_exec(tup_db, node_sql, graph_node_cb, NULL, &errmsg);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_select(graph_node_cb, NULL, node_sql) != 0)
 		return -1;
-	}
 
-	rc = sqlite3_exec(tup_db, link_sql, graph_link_cb, NULL, &errmsg);
-	if(rc != 0) {
-		fprintf(stderr, "SQL error: %s\n", errmsg);
+	if(tup_db_select(graph_link_cb, NULL, link_sql) != 0)
 		return -1;
-	}
+
 	printf("}\n");
 	return 0;
 }

@@ -2,10 +2,9 @@
 #define tup_db_h
 
 #include <sqlite3.h>
+#include "tupid.h"
 
 #define TUP_DB_FILE ".tup/db"
-
-extern sqlite3 *tup_db;
 
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
@@ -26,5 +25,6 @@ int tup_create_db(void);
 int tup_db_exec(const char *sql, ...);
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
+tupid_t tup_db_last_insert_id(void);
 
 #endif

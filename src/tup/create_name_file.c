@@ -62,7 +62,7 @@ static tupid_t create_node(const char *name, int type, int flags)
 	rc = tup_db_exec("insert into node(name, type, flags) values('%q', %i, %i)",
 			 name, type, flags);
 	if(rc == 0)
-		return sqlite3_last_insert_rowid(tup_db);
+		return tup_db_last_insert_id();
 	return -1;
 }
 

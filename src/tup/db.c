@@ -1,7 +1,7 @@
 #include "db.h"
 #include <stdio.h>
 
-sqlite3 *tup_db = NULL;
+static sqlite3 *tup_db = NULL;
 
 int tup_open_db(void)
 {
@@ -86,4 +86,9 @@ int tup_db_select(int (*callback)(void *, int, char **, char **),
 	}
 	sqlite3_free(buf);
 	return rc;
+}
+
+tupid_t tup_db_last_insert_id(void)
+{
+	return sqlite3_last_insert_rowid(tup_db);
 }
