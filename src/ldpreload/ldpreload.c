@@ -156,7 +156,7 @@ static int ignore_file(const char *file)
 		return 1;
 	if(strncmp(file, "/dev/", 5) == 0)
 		return 1;
-	if(strstr(file, TUP_DB_FILE) != NULL)
+	if(strstr(file, ".tup") != NULL)
 		return 1;
 	return 0;
 }

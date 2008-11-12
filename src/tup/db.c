@@ -107,9 +107,6 @@ tupid_t tup_db_create_node(const char *name, int type, int flags)
 	}
 
 	if(dbn.tupid != -1) {
-		/* TODO: If I always do set_node_flags() here, t4000 hangs?
-		 * Why should that be?
-		 */
 		if(dbn.flags & TUP_FLAGS_DELETE) {
 			dbn.flags &= ~TUP_FLAGS_DELETE;
 			if(set_node_flags(dbn.tupid, dbn.flags) < 0)
