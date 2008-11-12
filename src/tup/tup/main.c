@@ -324,7 +324,7 @@ static int node_exists(int argc, char **argv)
 {
 	int x;
 	for(x=1; x<argc; x++) {
-		if(select_node(argv[x]) < 0)
+		if(tup_db_select_node(argv[x]) < 0)
 			return -1;
 	}
 	return 0;
@@ -405,11 +405,11 @@ static int file_mod(const char *file, int flags)
 		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
 		return -1;
 	}
-	if(select_node(cname) < 0 || flags == TUP_FLAGS_DELETE)
+	if(tup_db_select_node(cname) < 0 || flags == TUP_FLAGS_DELETE)
 		update_create_dir_for_file(cname);
 	if(create_name_file(cname) < 0)
 		return -1;
-	if(update_node_flags(cname, flags) < 0)
+	if(tup_db_set_node_flags(cname, flags) < 0)
 		return -1;
 
 	return 0;

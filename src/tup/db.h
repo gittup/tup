@@ -1,7 +1,6 @@
 #ifndef tup_db_h
 #define tup_db_h
 
-#include <sqlite3.h>
 #include "tupid.h"
 
 #define TUP_DB_FILE ".tup/db"
@@ -25,6 +24,9 @@ int tup_create_db(void);
 int tup_db_exec(const char *sql, ...);
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
-tupid_t tup_db_last_insert_id(void);
+
+tupid_t tup_db_create_node(const char *name, int type, int flags);
+tupid_t tup_db_select_node(const char *name);
+int tup_db_set_node_flags(const char *name, int flags);
 
 #endif

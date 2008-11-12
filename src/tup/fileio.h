@@ -12,8 +12,6 @@ tupid_t create_command_file(const char *cmd);
 tupid_t create_dir_file(const char *path);
 int update_create_dir_for_file(char *name);
 int num_dependencies(tupid_t tupid);
-int update_node_flags(const char *name, int flags);
-tupid_t select_node(const char *name);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.

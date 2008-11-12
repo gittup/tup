@@ -307,7 +307,7 @@ static void handle_event(struct inotify_event *e)
 		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
 			return;
 		create_dir_file(cname);
-		update_node_flags(cname, TUP_FLAGS_CREATE);
+		tup_db_set_node_flags(cname, TUP_FLAGS_CREATE);
 	}
 
 	/* Not a Makefile, so canonicalize the full filename into cname for
@@ -324,10 +324,10 @@ static void handle_event(struct inotify_event *e)
 		}
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		update_node_flags(cname, TUP_FLAGS_MODIFY);
+		tup_db_set_node_flags(cname, TUP_FLAGS_MODIFY);
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
-		update_node_flags(cname, TUP_FLAGS_DELETE);
+		tup_db_set_node_flags(cname, TUP_FLAGS_DELETE);
 		cdf = 1;
 	}
 
