@@ -4,6 +4,7 @@
 #include "db.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int node_cb(void *arg, int argc, char **argv, char **col);
 static new_tupid_t create_node(const char *name, int type, int flags);

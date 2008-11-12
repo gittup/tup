@@ -63,10 +63,6 @@ int write_files(new_tupid_t cmdid)
 	struct file_entry *w;
 	struct file_entry *r;
 
-	/* TODO: Not necessary? */
-/*	if(recreate_cmd_file(cmdid) < 0)
-		return 1;*/
-
 	list_for_each_entry(w, &write_list, list) {
 		struct file_entry *tmp;
 

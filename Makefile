@@ -1,5 +1,5 @@
 BUILD := build/
-srcs := $(wildcard src/*/*.c src/tup/mozilla-sha1/*.c src/tup/tup/*.c)
+srcs := $(wildcard src/*/*.c src/tup/tup/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
@@ -28,7 +28,7 @@ $(SHLIBS): %.so:
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 
-libtup.a: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/*.c) $(wildcard src/tup/mozilla-sha1/*.c))
+libtup.a: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/*.c))
 	$Qecho "  AR      $@";\
 	rm -f $@ ;\
 	ar cru $@ $^

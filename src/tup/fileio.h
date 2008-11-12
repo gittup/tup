@@ -3,35 +3,14 @@
 
 #include "tup/tupid.h"
 
-/** Assuming the directory exists to hold the file, an empty file is created at
- * the given path if it doesn't already exist. Returns 0 on success, -1 on
- * failure.
- */
-int create_if_not_exist(const char *path);
-
-/** Removes a file if it exists */
-int delete_if_exists(const char *path);
-
-/** Basically write(), but returns -1 if the write fails or if the length
- * returned doesn't equal the 'size' argument.
- *
- * The 'filename' parameter is only used for error messages.
- */
-int write_all(int fd, const void *buf, int size, const char *filename);
-
 /** Creates a link, a -> b.  */
 int create_link(const new_tupid_t a, const new_tupid_t b);
 int find_link(const char *from, const char *to);
-
-int delete_link(const tupid_t a, const tupid_t b);
 
 new_tupid_t create_name_file(const char *path);
 new_tupid_t create_command_file(const char *cmd);
 new_tupid_t create_dir_file(const char *path);
 int update_create_dir_for_file(char *name);
-int recreate_cmd_file(const tupid_t tupid);
-int delete_tup_file(const char *tup, const tupid_t tupid);
-int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
 int num_dependencies(new_tupid_t tupid);
 int update_node_flags(const char *name, int flags);
 new_tupid_t select_node(const char *name);

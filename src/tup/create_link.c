@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int link_cb(void *id, int argc, char **argv, char **col);
 

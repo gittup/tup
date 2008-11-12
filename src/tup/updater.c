@@ -4,7 +4,6 @@
 #include "flist.h"
 #include "fileio.h"
 #include "tupid.h"
-#include "slurp.h"
 #include "debug.h"
 #include "config.h"
 #include "compat.h"
@@ -30,11 +29,13 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int (*create)(const tupid_t tupid);
+static int (*create)(const char *dir);
 static int update(struct node *n);
 static int delete_file(struct node *n);
-static struct tup_config cfg;
+
+/* TODO: get from config */
 char make_so[] = "make.so";
+int do_show_progress = 1;
 
 struct name_list {
 	struct list_head list;
@@ -72,12 +73,10 @@ int updater(int argc, char **argv)
 lock_success:
 
 	/* TODO: load config */
-	cfg.build_so = make_so;
-	cfg.show_progress = 1;
 
-	handle = dlopen(cfg.build_so, RTLD_LAZY);
+	handle = dlopen(make_so, RTLD_LAZY);
 	if(!handle) {
-		fprintf(stderr, "Error: Unable to load %s\n", cfg.build_so);
+		fprintf(stderr, "Error: Unable to load %s\n", make_so);
 		return 1;
 	}
 	create = dlsym(handle, "create");
@@ -387,7 +386,7 @@ static int delete_file(struct node *n)
 
 static void show_progress(int n, int tot)
 {
-	if(cfg.show_progress && tot) {
+	if(do_show_progress && tot) {
 		int x, a, b;
 		const int max = 40;
 		char c = '=';
