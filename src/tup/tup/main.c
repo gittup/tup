@@ -332,11 +332,23 @@ static int node_exists(int argc, char **argv)
 
 static int link_exists(int argc, char **argv)
 {
+	tupid_t a, b;
+
 	if(argc != 3) {
 		fprintf(stderr, "Error: link_exists requires two filenames\n");
 		return -1;
 	}
-	return find_link(argv[1], argv[2]);
+	a = tup_db_select_node(argv[1]);
+	if(a < 0) {
+		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[1]);
+		return -1;
+	}
+	b = tup_db_select_node(argv[2]);
+	if(b < 0) {
+		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[1]);
+		return -1;
+	}
+	return tup_db_link_exists(a, b);
 }
 
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col)

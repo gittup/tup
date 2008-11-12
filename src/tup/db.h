@@ -36,5 +36,6 @@ int tup_db_set_node_flags(const char *name, int flags);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
+int tup_db_link_exists(tupid_t a, tupid_t b);
 
 #endif
