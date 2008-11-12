@@ -39,7 +39,7 @@ int wrap(int argc, char **argv)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			new_tupid_t cmdid;
+			tupid_t cmdid;
 
 			cmdid = atoll(getenv(TUP_CMD_ID));
 			if(write_files(cmdid) < 0)

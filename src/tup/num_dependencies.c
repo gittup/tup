@@ -4,7 +4,7 @@
 
 static int nd_cb(void *arg, int argc, char **argv, char **col);
 
-int num_dependencies(new_tupid_t tupid)
+int num_dependencies(tupid_t tupid)
 {
 	int x = 0;
 

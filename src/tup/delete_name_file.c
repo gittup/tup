@@ -1,7 +1,7 @@
 #include "fileio.h"
 #include "db.h"
 
-int delete_name_file(new_tupid_t tupid)
+int delete_name_file(tupid_t tupid)
 {
 	if(tup_db_exec("delete from node where id=%lli", tupid) != 0)
 		return -1;

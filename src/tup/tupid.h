@@ -8,6 +8,6 @@
  */
 #define TUP_CMD_ID "TUP_CMD_ID"
 
-typedef sqlite3_int64 new_tupid_t;
+typedef sqlite3_int64 tupid_t;
 
 #endif

@@ -14,7 +14,7 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col);
 static int process_create_nodes(void);
 static int md_flag_cb(void *arg, int argc, char **argv, char **col);
 static int build_graph(struct graph *g);
-static int add_file(struct graph *g, new_tupid_t tupid, struct node *src,
+static int add_file(struct graph *g, tupid_t tupid, struct node *src,
 		    int type, const char *name);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
@@ -31,7 +31,7 @@ int do_show_progress = 1;
 struct name_list {
 	struct list_head list;
 	char *name;
-	new_tupid_t tupid;
+	tupid_t tupid;
 };
 
 int updater(int argc, char **argv)
@@ -95,7 +95,7 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 	char *name;
 	struct list_head *list = arg;
 	struct name_list *nl;
-	new_tupid_t id = -1;
+	tupid_t id = -1;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "id") == 0)
@@ -167,7 +167,7 @@ static int md_flag_cb(void *arg, int argc, char **argv, char **col)
 	int type;
 	int flags;
 	int x;
-	new_tupid_t id;
+	tupid_t id;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "name") == 0)
@@ -220,7 +220,7 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file(struct graph *g, new_tupid_t tupid, struct node *src,
+static int add_file(struct graph *g, tupid_t tupid, struct node *src,
 		    int type, const char *name)
 {
 	struct node *n;

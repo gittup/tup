@@ -7,9 +7,9 @@
 
 static int link_cb(void *id, int argc, char **argv, char **col);
 
-int create_link(const new_tupid_t a, const new_tupid_t b)
+int create_link(const tupid_t a, const tupid_t b)
 {
-	new_tupid_t id = -1;
+	tupid_t id = -1;
 	int rc;
 
 	rc = tup_db_select(link_cb, &id,
@@ -26,7 +26,7 @@ int create_link(const new_tupid_t a, const new_tupid_t b)
 
 int find_link(const char *from, const char *to)
 {
-	new_tupid_t id = -1;
+	tupid_t id = -1;
 	int rc;
 
 	rc = tup_db_select(link_cb, &id,
@@ -41,7 +41,7 @@ int find_link(const char *from, const char *to)
 static int link_cb(void *id, int argc, char **argv, char **col)
 {
 	int x;
-	new_tupid_t *iptr = id;
+	tupid_t *iptr = id;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "from_id") == 0) {

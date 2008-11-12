@@ -40,7 +40,7 @@ struct access_event {
 	/** The tupid corresponding to this event. Not needed for the
 	 * ACCESS_STOP_SERVER event.
 	 */
-	new_tupid_t tupid;
+	tupid_t tupid;
 };
 
 #endif

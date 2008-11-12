@@ -8,7 +8,7 @@
 
 static void dump_node(FILE *f, struct node *n);
 
-struct node *find_node(const struct graph *g, const new_tupid_t tupid)
+struct node *find_node(const struct graph *g, const tupid_t tupid)
 {
 	struct node *n;
 
@@ -24,7 +24,7 @@ struct node *find_node(const struct graph *g, const new_tupid_t tupid)
 	return NULL;
 }
 
-struct node *create_node(const new_tupid_t tupid, const char *name)
+struct node *create_node(const tupid_t tupid, const char *name)
 {
 	struct node *n;
 

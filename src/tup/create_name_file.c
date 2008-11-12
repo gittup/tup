@@ -5,24 +5,24 @@
 #include <string.h>
 
 static int node_cb(void *arg, int argc, char **argv, char **col);
-static new_tupid_t create_node(const char *name, int type, int flags);
+static tupid_t create_node(const char *name, int type, int flags);
 
 struct id_flags {
-	new_tupid_t tupid;
+	tupid_t tupid;
 	int flags;
 };
 
-new_tupid_t create_name_file(const char *path)
+tupid_t create_name_file(const char *path)
 {
 	return create_node(path, TUP_NODE_FILE, TUP_FLAGS_MODIFY);
 }
 
-new_tupid_t create_command_file(const char *cmd)
+tupid_t create_command_file(const char *cmd)
 {
 	return create_node(cmd, TUP_NODE_CMD, TUP_FLAGS_MODIFY);
 }
 
-new_tupid_t create_dir_file(const char *path)
+tupid_t create_dir_file(const char *path)
 {
 	return create_node(path, TUP_NODE_DIR, TUP_FLAGS_CREATE);
 }
@@ -42,7 +42,7 @@ static int node_cb(void *arg, int argc, char **argv, char **col)
 	return 0;
 }
 
-static new_tupid_t create_node(const char *name, int type, int flags)
+static tupid_t create_node(const char *name, int type, int flags)
 {
 	struct id_flags idf = {-1, 0};
 	int rc;
@@ -85,7 +85,7 @@ int update_node_flags(const char *name, int flags)
 	return -1;
 }
 
-new_tupid_t select_node(const char *name)
+tupid_t select_node(const char *name)
 {
 	struct id_flags idf = {-1, 0};
 	int rc;

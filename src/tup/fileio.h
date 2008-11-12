@@ -4,21 +4,21 @@
 #include "tup/tupid.h"
 
 /** Creates a link, a -> b.  */
-int create_link(const new_tupid_t a, const new_tupid_t b);
+int create_link(const tupid_t a, const tupid_t b);
 int find_link(const char *from, const char *to);
 
-new_tupid_t create_name_file(const char *path);
-new_tupid_t create_command_file(const char *cmd);
-new_tupid_t create_dir_file(const char *path);
+tupid_t create_name_file(const char *path);
+tupid_t create_command_file(const char *cmd);
+tupid_t create_dir_file(const char *path);
 int update_create_dir_for_file(char *name);
-int num_dependencies(new_tupid_t tupid);
+int num_dependencies(tupid_t tupid);
 int update_node_flags(const char *name, int flags);
-new_tupid_t select_node(const char *name);
+tupid_t select_node(const char *name);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.
  */
-int delete_name_file(new_tupid_t tupid);
+int delete_name_file(tupid_t tupid);
 
 int canonicalize(const char *path, char *out, int len);
 int canonicalize2(const char *path, const char *file, char *out, int len);

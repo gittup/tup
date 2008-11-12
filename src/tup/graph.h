@@ -16,7 +16,7 @@ struct edge {
 struct node {
 	struct list_head list;
 	struct edge *edges;
-	new_tupid_t tupid;
+	tupid_t tupid;
 	char *name;
 	int incoming_count;
 
@@ -34,8 +34,8 @@ struct graph {
 	int num_nodes;
 };
 
-struct node *find_node(const struct graph *g, const new_tupid_t tupid);
-struct node *create_node(const new_tupid_t tupid, const char *name);
+struct node *find_node(const struct graph *g, const tupid_t tupid);
+struct node *create_node(const tupid_t tupid, const char *name);
 void remove_node(struct node *n);
 
 int create_edge(struct node *n1, struct node *n2);

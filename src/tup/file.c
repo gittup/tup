@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 struct file_entry {
-	new_tupid_t tupid;
+	tupid_t tupid;
 	int pid;
 	struct list_head list;
 };
@@ -56,7 +56,7 @@ int handle_file(const struct access_event *event)
 	return rc;
 }
 
-int write_files(new_tupid_t cmdid)
+int write_files(tupid_t cmdid)
 {
 	struct file_entry *w;
 	struct file_entry *r;

@@ -275,8 +275,8 @@ static int mlink(int argc, char **argv)
 	static char cname[PATH_MAX];
 	int type;
 	int x;
-	new_tupid_t cmd_id;
-	new_tupid_t id;
+	tupid_t cmd_id;
+	tupid_t id;
 
 	if(argc < 4) {
 		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
