@@ -1,5 +1,3 @@
-/* For atoll */
-#define _ISOC99_SOURCE
 #include "fileio.h"
 #include "db.h"
 #include <stdio.h>

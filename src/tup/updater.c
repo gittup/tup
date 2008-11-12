@@ -1,22 +1,13 @@
-#define _ATFILE_SOURCE
 #include "updater.h"
 #include "graph.h"
-#include "flist.h"
 #include "fileio.h"
-#include "tupid.h"
 #include "debug.h"
-#include "config.h"
-#include "compat.h"
 #include "db.h"
-#include "list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
 #include <sys/file.h>
 
 static int create_flag_cb(void *arg, int argc, char **argv, char **col);

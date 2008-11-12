@@ -1,6 +1,4 @@
 #include "fileio.h"
-#include "flist.h"
-#include "debug.h"
 #include "db.h"
 
 int delete_name_file(new_tupid_t tupid)

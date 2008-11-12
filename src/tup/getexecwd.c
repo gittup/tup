@@ -1,12 +1,11 @@
-#define _BSD_SOURCE
 #include "getexecwd.h"
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "compat.h"
 
 static char mycwd[PATH_MAX];
 static int check_path(const char *path, const char *file);

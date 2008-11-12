@@ -1,15 +1,11 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/file.h>
+#include "wrap.h"
 #include "server.h"
 #include "file.h"
 #include "debug.h"
-#include "compat.h"
-#include "tupid.h"
-#include "wrap.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 
 int wrap(int argc, char **argv)
 {

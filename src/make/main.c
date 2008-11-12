@@ -1,6 +1,3 @@
-#include "tup/tupid.h"
-#include "tup/fileio.h"
-#include "tup/flist.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

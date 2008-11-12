@@ -2,17 +2,13 @@
 #define _GNU_SOURCE
 #include "tup/access_event.h"
 #include "tup/debug.h"
-#include "tup/tupid.h"
 #include "tup/config.h"
 #include "tup/fileio.h"
 #include "tup/db.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <dlfcn.h>

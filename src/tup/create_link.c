@@ -1,5 +1,4 @@
 #include "fileio.h"
-#include "debug.h"
 #include "db.h"
 
 #include <stdio.h>

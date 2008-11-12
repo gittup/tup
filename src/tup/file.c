@@ -5,8 +5,6 @@
 #include "tup/list.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
 
 struct file_entry {
 	new_tupid_t tupid;
