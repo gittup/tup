@@ -54,7 +54,6 @@ int main(int argc, char **argv)
 	}
 
 	if(find_tup_dir() != 0) {
-		fprintf(stderr, "Unable to find .tup directory. Run 'tup init' from the top of your working tree first.\n");
 		return 1;
 	}
 
