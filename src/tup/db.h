@@ -38,4 +38,8 @@ int tup_db_set_node_flags(const char *name, int flags);
 int tup_db_create_link(tupid_t a, tupid_t b);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 
+/* Config operations */
+int tup_db_config_set_int(const char *lval, int x);
+int tup_db_config_get_int(const char *lval);
+
 #endif

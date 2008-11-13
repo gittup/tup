@@ -71,7 +71,7 @@ int monitor(int argc, char **argv)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 
-	config_set_int(MONITOR_PID_CFG, getpid());
+	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
 
 	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
 	if(mon_lock < 0) {
@@ -178,7 +178,7 @@ close_inot:
 	close(inot_fd);
 close_monlock:
 	close(mon_lock);
-	config_set_int(MONITOR_PID_CFG, -1);
+	tup_db_config_set_int(MONITOR_PID_CFG, -1);
 	return rc;
 }
 
@@ -199,7 +199,7 @@ int stop_monitor(int argc, char **argv)
 	close(mon_lock);
 
 	for(x=0; x<25; x++) {
-		if(config_get_int(MONITOR_PID_CFG) == -1)
+		if(tup_db_config_get_int(MONITOR_PID_CFG) == -1)
 			return 0;
 		nanosleep(&ts, NULL);
 	}
@@ -343,7 +343,7 @@ static void handle_event(struct inotify_event *e)
 static void sighandler(int sig)
 {
 	if(sig) {}
-	config_set_int(MONITOR_PID_CFG, -1);
+	tup_db_config_set_int(MONITOR_PID_CFG, -1);
 	/* TODO: gracefully close, or something? */
 	exit(0);
 }

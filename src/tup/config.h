@@ -7,7 +7,4 @@ int get_tup_top_len(void);
 const char *get_sub_dir(void);
 int get_sub_dir_len(void);
 
-int config_get_int(const char *lval);
-int config_set_int(const char *lval, int x);
-
 #endif
