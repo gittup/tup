@@ -20,8 +20,8 @@ enum TUP_FLAGS_TYPE {
 };
 
 /* General operations */
-int tup_open_db(void);
-int tup_create_db(void);
+int tup_db_open(void);
+int tup_db_create(void);
 int tup_db_begin(void);
 int tup_db_commit(void);
 

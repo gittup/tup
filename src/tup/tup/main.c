@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	if(tup_lock_init() < 0) {
 		return 1;
 	}
-	if(tup_open_db() != 0) {
+	if(tup_db_open() != 0) {
 		rc = 1;
 		goto out;
 	}
@@ -147,7 +147,7 @@ static int init(void)
 		}
 	}
 
-	if(tup_create_db() != 0) {
+	if(tup_db_create() != 0) {
 		return -1;
 	}
 

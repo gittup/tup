@@ -180,7 +180,7 @@ static void ldpre_init(void)
 		exit(1);
 	}
 
-	if(tup_open_db() < 0) {
+	if(tup_db_open() < 0) {
 		exit(1);
 	}
 
