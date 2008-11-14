@@ -192,11 +192,11 @@ static int build_graph(struct graph *g)
 
 	g->cur = g->root;
 	g->root->flags = TUP_FLAGS_MODIFY;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i or flags=%i", TUP_FLAGS_MODIFY, TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) != 0)
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_MODIFY) != 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_DELETE;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i or flags=%i", TUP_FLAGS_DELETE, TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) != 0)
+	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_DELETE) != 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_NONE;
