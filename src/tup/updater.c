@@ -113,7 +113,7 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.
 	 */
-	if(tup_db_exec("update node set flags=%i where id in (select to_id from link where from_id=%lli)", TUP_FLAGS_DELETE, id) != 0)
+	if(tup_db_exec("update node set flags=%i where id in (select to_id from cmdlink where from_id=%lli)", TUP_FLAGS_DELETE, id) != 0)
 		return -1;
 
 	nl = malloc(sizeof *nl);
@@ -274,6 +274,9 @@ static int find_deps(struct graph *g, struct node *n)
 	if(tup_db_select(md_flag_cb, g,
 			 "select * from node where id in (select to_id from link where from_id=%lli)", n->tupid) != 0)
 		return -1;
+	if(tup_db_select(md_flag_cb, g,
+			 "select * from node where id in (select to_id from cmdlink where from_id=%lli)", n->tupid) != 0)
+		return -1;
 	return 0;
 }
 
@@ -351,6 +354,11 @@ static int update(struct node *n)
 		perror("setenv");
 		return -1;
 	}
+
+	if(tup_db_exec("delete from link where from_id=%lli or to_id=%lli",
+		       n->tupid, n->tupid) != 0)
+		return -1;
+
 	printf("%s\n", n->name);
 	rc = system(n->name);
 	unsetenv(TUP_CMD_ID);

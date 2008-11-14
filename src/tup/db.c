@@ -14,6 +14,7 @@ static int node_select(const char *name, struct db_node *dbn);
 static int set_node_flags(tupid_t tupid, int flags);
 
 static int link_insert(tupid_t a, tupid_t b);
+static int cmdlink_insert(tupid_t a, tupid_t b);
 
 int tup_open_db(void)
 {
@@ -235,11 +236,59 @@ int tup_db_create_link(tupid_t a, tupid_t b)
 	return 0;
 }
 
+int tup_db_create_cmdlink(tupid_t a, tupid_t b)
+{
+	if(tup_db_cmdlink_exists(a, b) == 0)
+		return 0;
+	if(cmdlink_insert(a, b) < 0)
+		return -1;
+	return 0;
+}
+
 int tup_db_link_exists(tupid_t a, tupid_t b)
 {
 	int rc;
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "select to_id from link where from_id=? and to_id=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, a) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(stmt, 2, b) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc == SQLITE_DONE) {
+		return -1;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_cmdlink_exists(tupid_t a, tupid_t b)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select to_id from cmdlink where from_id=? and to_id=?";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
@@ -456,6 +505,43 @@ static int link_insert(tupid_t a, tupid_t b)
 	int rc;
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "insert into link(from_id, to_id) values(?, ?)";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, a) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(stmt, 2, b) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int cmdlink_insert(tupid_t a, tupid_t b)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "insert into cmdlink(from_id, to_id) values(?, ?)";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {

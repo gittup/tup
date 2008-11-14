@@ -123,13 +123,16 @@ static int init(void)
 	int x;
 	const char *init_sql[] = {
 		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
+		"create table cmdlink (from_id integer, to_id integer)",
 		"create table link (from_id integer, to_id integer)",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
 		/* TODO: Not needed because name is unique? */
 		/*"create index node_index on node(name)",*/
 		"create index node_flags_index on node(flags)",
 		"create index link_index on link(from_id)",
-		"create index link_index2 on link(to_id)"
+		"create index link_index2 on link(to_id)",
+		"create index cmdlink_index on cmdlink(from_id)",
+		"create index cmdlink_index2 on cmdlink(to_id)",
 	};
 
 	if(file_exists(TUP_DB_FILE)) {
@@ -279,7 +282,7 @@ static int mlink(int argc, char **argv)
 	id = create_dir_file(get_sub_dir());
 	if(id < 0)
 		return -1;
-	if(tup_db_create_link(id, cmd_id) < 0)
+	if(tup_db_create_cmdlink(id, cmd_id) < 0)
 		return -1;
 
 	for(x=2; x<argc; x++) {
