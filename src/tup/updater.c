@@ -113,7 +113,7 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.
 	 */
-	if(tup_db_exec("update node set flags=%i where id in (select to_id from cmdlink where from_id=%lli)", TUP_FLAGS_DELETE, id) != 0)
+	if(tup_db_set_cmdchild_flags(id, TUP_FLAGS_DELETE) < 0)
 		return -1;
 
 	nl = malloc(sizeof *nl);

@@ -45,6 +45,9 @@ int tup_db_create_cmdlink(tupid_t a, tupid_t b);
 int tup_db_cmdlink_exists(tupid_t a, tupid_t b);
 int tup_db_delete_cmdlinks(tupid_t tupid);
 
+/* Combo operations */
+int tup_db_set_cmdchild_flags(tupid_t parent, int flags);
+
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
