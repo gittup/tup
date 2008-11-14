@@ -39,9 +39,11 @@ int tup_db_delete_node(tupid_t tupid);
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
 int tup_db_link_exists(tupid_t a, tupid_t b);
+int tup_db_delete_links(tupid_t tupid);
 
 int tup_db_create_cmdlink(tupid_t a, tupid_t b);
 int tup_db_cmdlink_exists(tupid_t a, tupid_t b);
+int tup_db_delete_cmdlinks(tupid_t tupid);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);

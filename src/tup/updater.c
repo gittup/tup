@@ -353,8 +353,7 @@ static int update(struct node *n)
 		return -1;
 	}
 
-	if(tup_db_exec("delete from link where from_id=%lli or to_id=%lli",
-		       n->tupid, n->tupid) != 0)
+	if(tup_db_delete_links(n->tupid) < 0)
 		return -1;
 
 	printf("%s\n", n->name);
