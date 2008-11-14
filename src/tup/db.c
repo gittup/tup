@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <sqlite3.h>
 
+#define ARRAY_SIZE(n) ((signed)(sizeof(n) / sizeof(n[0])))
+
 struct db_node {
 	tupid_t tupid;
 	int type;
@@ -35,6 +37,20 @@ int tup_db_open(void)
 int tup_db_create(void)
 {
 	int rc;
+	int x;
+	const char *sql[] = {
+		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
+		"create table cmdlink (from_id integer, to_id integer)",
+		"create table link (from_id integer, to_id integer)",
+		"create table config(lval varchar(256) unique, rval varchar(256))",
+		/* TODO: Not needed because name is unique? */
+		/*"create index node_index on node(name)",*/
+		"create index node_flags_index on node(flags)",
+		"create index link_index on link(from_id)",
+		"create index link_index2 on link(to_id)",
+		"create index cmdlink_index on cmdlink(from_id)",
+		"create index cmdlink_index2 on cmdlink(to_id)",
+	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
 	if(rc == 0) {
@@ -42,6 +58,15 @@ int tup_db_create(void)
 	} else {
 		fprintf(stderr, "Unable to create database: %s\n",
 			sqlite3_errmsg(tup_db));
+	}
+
+	for(x=0; x<ARRAY_SIZE(sql); x++) {
+		char *errmsg;
+		if(sqlite3_exec(tup_db, sql[x], NULL, NULL, &errmsg) != 0) {
+			fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				errmsg, sql[x]);
+			return -1;
+		}
 	}
 
 	return rc;
@@ -99,32 +124,6 @@ int tup_db_commit(void)
 		return -1;
 	}
 	return 0;
-}
-
-int tup_db_exec(const char *sql, ...)
-{
-	va_list ap;
-	int rc;
-	char *buf;
-	char *errmsg;
-
-	if(!tup_db) {
-		fprintf(stderr, "Error: tup_db not opened.\n");
-		return -1;
-	}
-
-	va_start(ap, sql);
-	buf = sqlite3_vmprintf(sql, ap);
-	va_end(ap);
-
-	rc = sqlite3_exec(tup_db, buf, NULL, NULL, &errmsg);
-	if(rc != 0) {
-		fprintf(stderr, "SQL exec error: %s\nQuery was: %s\n",
-			errmsg, buf);
-		sqlite3_free(errmsg);
-	}
-	sqlite3_free(buf);
-	return rc;
 }
 
 int tup_db_select(int (*callback)(void *, int, char **, char **),

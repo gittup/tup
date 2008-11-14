@@ -25,7 +25,6 @@ int tup_db_create(void);
 int tup_db_begin(void);
 int tup_db_commit(void);
 
-int tup_db_exec(const char *sql, ...);
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
 

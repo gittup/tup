@@ -15,8 +15,6 @@
 #include "tup/updater.h"
 #include "tup/wrap.h"
 
-#define ARRAY_SIZE(n) ((signed)(sizeof(n) / sizeof(n[0])))
-
 #define TUP_DIR ".tup"
 
 static int file_exists(const char *s);
@@ -120,21 +118,6 @@ static int file_exists(const char *s)
 
 static int init(void)
 {
-	int x;
-	const char *init_sql[] = {
-		"create table node (id integer primary key not null, name varchar(4096) unique, type integer not null, flags integer not null)",
-		"create table cmdlink (from_id integer, to_id integer)",
-		"create table link (from_id integer, to_id integer)",
-		"create table config(lval varchar(256) unique, rval varchar(256))",
-		/* TODO: Not needed because name is unique? */
-		/*"create index node_index on node(name)",*/
-		"create index node_flags_index on node(flags)",
-		"create index link_index on link(from_id)",
-		"create index link_index2 on link(to_id)",
-		"create index cmdlink_index on cmdlink(from_id)",
-		"create index cmdlink_index2 on cmdlink(to_id)",
-	};
-
 	if(file_exists(TUP_DB_FILE)) {
 		printf("TODO: DB file already exists. abort\n");
 		return -1;
@@ -149,11 +132,6 @@ static int init(void)
 
 	if(tup_db_create() != 0) {
 		return -1;
-	}
-
-	for(x=0; x<ARRAY_SIZE(init_sql); x++) {
-		if(tup_db_exec(init_sql[x]) != 0)
-			return -1;
 	}
 
 	if(creat(TUP_OBJECT_LOCK, 0666) < 0) {
