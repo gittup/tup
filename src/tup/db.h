@@ -34,6 +34,7 @@ tupid_t tup_db_create_node(const char *name, int type, int flags);
 tupid_t tup_db_select_node(const char *name);
 int tup_db_set_flags_by_name(const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
+int tup_db_delete_node(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
