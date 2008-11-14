@@ -300,9 +300,8 @@ static int execute_graph(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_FILE &&
-			   (n->flags & TUP_FLAGS_DELETE)) {
-				if(num_dependencies(n->tupid) == 0)
-					delete_file(n);
+			   (n->flags == TUP_FLAGS_DELETE)) {
+				delete_file(n);
 			}
 			if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {

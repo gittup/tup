@@ -107,11 +107,11 @@ void dump_graph(const struct graph *g, const char *filename)
 	char *realfile;
 	FILE *f;
 
-	fprintf(stderr, "Dumping graph '%s'\n", filename);
-	if(asprintf(&realfile, filename, count) < 0) {
+	if(asprintf(&realfile, filename, getpid(), count) < 0) {
 		perror("asprintf");
 		return;
 	}
+	fprintf(stderr, "Dumping graph '%s'\n", realfile);
 	count++;
 	f = fopen(realfile, "w");
 	if(!f) {
