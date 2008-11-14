@@ -414,6 +414,7 @@ static int get_flags(int argc, char **argv)
 static int file_mod(const char *file, int flags)
 {
 	static char cname[PATH_MAX];
+	tupid_t tupid;
 
 	if(canonicalize(file, cname, sizeof(cname)) < 0) {
 		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
@@ -421,9 +422,10 @@ static int file_mod(const char *file, int flags)
 	}
 	if(tup_db_select_node(cname) < 0 || flags == TUP_FLAGS_DELETE)
 		update_create_dir_for_file(cname);
-	if(create_name_file(cname) < 0)
+	tupid = create_name_file(cname);
+	if(tupid < 0)
 		return -1;
-	if(tup_db_set_node_flags(cname, flags) < 0)
+	if(tup_db_set_flags_by_id(tupid, flags) < 0)
 		return -1;
 
 	return 0;

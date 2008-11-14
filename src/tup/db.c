@@ -11,7 +11,6 @@ struct db_node {
 static sqlite3 *tup_db = NULL;
 static int node_insert(const char *name, int type, int flags);
 static int node_select(const char *name, struct db_node *dbn);
-static int set_node_flags(tupid_t tupid, int flags);
 
 static int link_insert(tupid_t a, tupid_t b);
 static int cmdlink_insert(tupid_t a, tupid_t b);
@@ -191,7 +190,7 @@ tupid_t tup_db_create_node(const char *name, int type, int flags)
 	if(dbn.tupid != -1) {
 		if(dbn.flags & TUP_FLAGS_DELETE) {
 			dbn.flags &= ~TUP_FLAGS_DELETE;
-			if(set_node_flags(dbn.tupid, dbn.flags) < 0)
+			if(tup_db_set_flags_by_id(dbn.tupid, dbn.flags) < 0)
 				return -1;
 		}
 		return dbn.tupid;
@@ -213,7 +212,7 @@ tupid_t tup_db_select_node(const char *name)
 	return dbn.tupid;
 }
 
-int tup_db_set_node_flags(const char *name, int flags)
+int tup_db_set_flags_by_name(const char *name, int flags)
 {
 	struct db_node dbn = {-1, 0, 0};
 
@@ -222,8 +221,45 @@ int tup_db_set_node_flags(const char *name, int flags)
 	if(dbn.tupid == -1)
 		return -1;
 
-	if(set_node_flags(dbn.tupid, flags) < 0)
+	if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
 		return -1;
+	return 0;
+}
+
+int tup_db_set_flags_by_id(tupid_t tupid, int flags)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "update node set flags=? where id=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(stmt, 1, flags) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -461,43 +497,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-static int set_node_flags(tupid_t tupid, int flags)
-{
-	int rc;
-	static sqlite3_stmt *stmt = NULL;
-	static char s[] = "update node set flags=? where id=?";
-
-	if(!stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(stmt, 1, flags) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int64(stmt, 2, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(stmt);
-	if(sqlite3_reset(stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
 }
 
 static int link_insert(tupid_t a, tupid_t b)

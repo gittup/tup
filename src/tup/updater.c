@@ -149,8 +149,7 @@ static int process_create_nodes(void)
 		nl = list_entry(namelist.next, struct name_list, list);
 		if(create(nl->name) < 0)
 			return -1;
-		if(tup_db_exec("update node set flags=%i where id=%lli",
-			       TUP_FLAGS_NONE, nl->tupid) != 0)
+		if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
 		list_del(&nl->list);
 		free(nl->name);
@@ -328,8 +327,7 @@ static int execute_graph(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-		if(tup_db_exec("update node set flags=%i where id=%lli",
-			       TUP_FLAGS_NONE, n->tupid) != 0)
+		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
 		remove_node(n);
 	}

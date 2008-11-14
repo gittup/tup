@@ -28,23 +28,26 @@ int update_create_dir_for_file(char *name)
 {
 	int rc = 0;
 	char *slash;
+	tupid_t tupid;
 
 	slash = strrchr(name, '/');
 	if(slash) {
 		*slash = 0;
-		if(create_dir_file(name) < 0) {
+		tupid = create_dir_file(name);
+		if(tupid < 0) {
 			rc = -1;
 			goto out;
 		}
-		if(tup_db_set_node_flags(name, TUP_FLAGS_CREATE) < 0) {
+		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_CREATE) < 0) {
 			rc = -1;
 		}
 out:
 		*slash = '/';
 	} else {
-		if(create_dir_file(".") < 0)
+		tupid = create_dir_file(".");
+		if(tupid < 0)
 			return -1;
-		if(tup_db_set_node_flags(".", TUP_FLAGS_CREATE) < 0)
+		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_CREATE) < 0)
 			return -1;
 	}
 
