@@ -36,8 +36,6 @@ int tup_db_create(void)
 		"create table cmdlink (from_id integer, to_id integer)",
 		"create table link (from_id integer, to_id integer)",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
-		/* TODO: Not needed because name is unique? */
-		/*"create index node_index on node(name)",*/
 		"create index node_flags_index on node(flags)",
 		"create index link_index on link(from_id)",
 		"create index link_index2 on link(to_id)",
