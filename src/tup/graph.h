@@ -4,7 +4,7 @@
 #include "tup/list.h"
 #include "tup/tupid.h"
 #include "tup/db.h"
-#include <sqlite3.h>
+#include "tup/memdb.h"
 
 struct edge {
 	struct edge *next;
@@ -34,7 +34,7 @@ struct graph {
 	struct node *root;
 	struct node *cur;
 	int num_nodes;
-	sqlite3 *db;
+	struct memdb memdb;
 };
 
 struct node *find_node(const struct graph *g, tupid_t tupid);
