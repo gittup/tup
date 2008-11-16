@@ -250,21 +250,10 @@ static int add_file(struct graph *g, tupid_t tupid, struct node *src,
 		}
 		goto edge_create;
 	}
-	n = create_node(tupid, name);
+	n = create_node(g, tupid, name, type, flags);
 	if(!n)
 		return -1;
-
-	n->type = type;
-
 	DEBUGP("create node: %lli (0x%x)\n", tupid, type);
-	list_add(&n->list, &g->plist);
-	n->state = STATE_INITIALIZED;
-	n->flags = flags;
-
-	if(n->type == TUP_NODE_CMD ||
-	   (n->type == TUP_NODE_FILE && n->flags == TUP_FLAGS_DELETE)) {
-		g->num_nodes++;
-	}
 
 edge_create:
 	if(n->state == STATE_PROCESSING) {
@@ -343,7 +332,7 @@ static int execute_graph(struct graph *g)
 		}
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
-		remove_node(n);
+		remove_node(g, n);
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
 		fprintf(stderr, "Error: Graph is not empty after execution.\n");

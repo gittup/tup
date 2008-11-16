@@ -2,29 +2,61 @@
 #include "graph.h"
 #include "debug.h"
 #include "db.h"
+#include "array_size.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+static int db_add(struct graph *g, struct node *n);
+static int db_remove(struct graph *g, struct node *n);
 static void dump_node(FILE *f, struct node *n);
 
 struct node *find_node(const struct graph *g, tupid_t tupid)
 {
+	int dbrc;
 	struct node *n;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select ptr from node_map where id=?";
+	int res;
 
-	/* TODO: Use hash */
-	list_for_each_entry(n, &g->node_list, list) {
-		if(n->tupid == tupid)
-			return n;
+	if(!stmt) {
+		if(sqlite3_prepare_v2(g->db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(g->db), s);
+			return NULL;
+		}
 	}
-	list_for_each_entry(n, &g->plist, list) {
-		if(n->tupid == tupid)
-			return n;
+
+	if(sqlite3_bind_int64(stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(g->db));
+		return NULL;
 	}
-	return NULL;
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		n = NULL;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(g->db));
+		n = NULL;
+		goto out_reset;
+	}
+
+	res = sqlite3_column_int(stmt, 0);
+	n = (struct node*)res;
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(g->db));
+		return NULL;
+	}
+
+	return n;
 }
 
-struct node *create_node(tupid_t tupid, const char *name)
+struct node *create_node(struct graph *g, tupid_t tupid, const char *name,
+			 int type, int flags)
 {
 	struct node *n;
 
@@ -34,7 +66,6 @@ struct node *create_node(tupid_t tupid, const char *name)
 		return NULL;
 	}
 	n->edges = NULL;
-	n->type = 0;
 	n->tupid = tupid;
 	n->incoming_count = 0;
 	n->name = strdup(name);
@@ -42,15 +73,28 @@ struct node *create_node(tupid_t tupid, const char *name)
 		perror("strdup");
 		return NULL;
 	}
+	n->state = STATE_INITIALIZED;
+	n->type = type;
+	n->flags = flags;
+	list_add(&n->list, &g->plist);
+
+	if(n->type == TUP_NODE_CMD ||
+	   (n->type == TUP_NODE_FILE && n->flags == TUP_FLAGS_DELETE)) {
+		g->num_nodes++;
+	}
+
+	if(db_add(g, n) < 0)
+		return NULL;
 	return n;
 }
 
-void remove_node(struct node *n)
+void remove_node(struct graph *g, struct node *n)
 {
 	list_del(&n->list);
 	if(n->edges) {
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tupid);
 	}
+	db_remove(g, n);
 	/* TODO: block pool */
 	free(n);
 }
@@ -88,14 +132,39 @@ struct edge *remove_edge(struct edge *e)
 
 int create_graph(struct graph *g)
 {
+	int x;
+	int rc;
+	const char *sql[] = {
+		"create table node_map (id integer primary key not null, ptr integer not null)",
+	};
+
+	if(sizeof(struct node *) != 4) {
+		fprintf(stderr, "Error: sizeof node pointer is not 32 bits (size = %i bytes). This needs to be fixed.\n", sizeof(struct node *));
+		return -1;
+	}
+
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
 
-	g->root = create_node(0, "root");
+	rc = sqlite3_open(":memory:", &g->db);
+	if(rc != 0) {
+		fprintf(stderr, "Unable to create in-memory database: %s\n",
+			sqlite3_errmsg(g->db));
+		return -1;
+	}
+	for(x=0; x<ARRAY_SIZE(sql); x++) {
+		char *errmsg;
+		if(sqlite3_exec(g->db, sql[x], NULL, NULL, &errmsg) != 0) {
+			fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				errmsg, sql[x]);
+			return -1;
+		}
+	}
+
+	g->root = create_node(g, 0, "root", TUP_NODE_ROOT, TUP_FLAGS_NONE);
 	if(!g->root)
 		return -1;
-	g->root->type = TUP_NODE_ROOT;
-	list_add(&g->root->list, &g->node_list);
+	list_move(&g->root->list, &g->node_list);
 	g->num_nodes = 0;
 	return 0;
 }
@@ -127,6 +196,76 @@ void dump_graph(const struct graph *g, const char *filename)
 	}
 	fprintf(f, "}\n");
 	fclose(f);
+}
+
+static int db_add(struct graph *g, struct node *n)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "insert into node_map(id, ptr) values(?, ?)";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(g->db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(g->db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, n->tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+	if(sqlite3_bind_int(stmt, 2, (int)n) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int db_remove(struct graph *g, struct node *n)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "delete from node_map where id=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(g->db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(g->db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, n->tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(g->db));
+		return -1;
+	}
+
+	return 0;
 }
 
 static void dump_node(FILE *f, struct node *n)

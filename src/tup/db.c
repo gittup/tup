@@ -1,8 +1,7 @@
 #include "db.h"
+#include "array_size.h"
 #include <stdio.h>
 #include <sqlite3.h>
-
-#define ARRAY_SIZE(n) ((signed)(sizeof(n) / sizeof(n[0])))
 
 struct db_node {
 	tupid_t tupid;
@@ -80,7 +79,7 @@ int tup_db_begin(void)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -107,7 +106,7 @@ int tup_db_commit(void)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -208,7 +207,7 @@ int tup_db_set_flags_by_id(tupid_t tupid, int flags)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -245,7 +244,7 @@ int tup_db_delete_node(tupid_t tupid)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -286,7 +285,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -325,7 +324,7 @@ int tup_db_delete_links(tupid_t tupid)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -370,7 +369,7 @@ int tup_db_cmdlink_exists(tupid_t a, tupid_t b)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -409,7 +408,7 @@ int tup_db_delete_cmdlinks(tupid_t tupid)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -445,7 +444,7 @@ int tup_db_set_cmdchild_flags(tupid_t parent, int flags)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -482,7 +481,7 @@ int tup_db_config_set_int(const char *lval, int x)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -520,7 +519,7 @@ int tup_db_config_get_int(const char *lval)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -561,7 +560,7 @@ static int node_insert(const char *name, int type, int flags)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -603,7 +602,7 @@ static int node_select(const char *name, struct db_node *dbn)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -647,7 +646,7 @@ static int link_insert(tupid_t a, tupid_t b)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
@@ -684,7 +683,7 @@ static int cmdlink_insert(tupid_t a, tupid_t b)
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s",
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
 			return -1;
 		}
