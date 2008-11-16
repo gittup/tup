@@ -223,6 +223,7 @@ static int graph(int argc, char **argv)
 {
 	const char node_sql[] = "select * from node";
 	const char link_sql[] = "select * from link";
+	const char cmdlink_sql[] = "select * from cmdlink";
 
 	if(argc) {}
 	if(argv) {}
@@ -232,6 +233,9 @@ static int graph(int argc, char **argv)
 		return -1;
 
 	if(tup_db_select(graph_link_cb, NULL, link_sql) != 0)
+		return -1;
+
+	if(tup_db_select(graph_link_cb, NULL, cmdlink_sql) != 0)
 		return -1;
 
 	printf("}\n");
