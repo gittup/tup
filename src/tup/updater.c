@@ -23,9 +23,8 @@ static int (*create)(const char *dir);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
-/* TODO: get from config */
-char make_so[] = "make.so";
-int do_show_progress = 1;
+static char *create_so;
+static int do_show_progress = 1;
 
 struct name_list {
 	struct list_head list;
@@ -35,6 +34,7 @@ struct name_list {
 
 int updater(int argc, char **argv)
 {
+	const char *s;
 	struct graph g;
 	int upd_lock;
 	void *handle;
@@ -62,11 +62,17 @@ int updater(int argc, char **argv)
 	}
 lock_success:
 
-	/* TODO: load config */
+	s = tup_db_config_get_string("create_so");
+	if(s) {
+		create_so = strdup(s);
+	} else {
+		create_so = strdup("make.so");
+	}
+	do_show_progress = tup_db_config_get_int("show_progress");
 
-	handle = dlopen(make_so, RTLD_LAZY);
+	handle = dlopen(create_so, RTLD_LAZY);
 	if(!handle) {
-		fprintf(stderr, "Error: Unable to load %s\n", make_so);
+		fprintf(stderr, "Error: Unable to load %s\n", create_so);
 		return 1;
 	}
 	create = dlsym(handle, "create");

@@ -43,6 +43,8 @@ int tup_db_create(void)
 		"create index link_index2 on link(to_id)",
 		"create index cmdlink_index on cmdlink(from_id)",
 		"create index cmdlink_index2 on cmdlink(to_id)",
+		"insert into config values('show_progress', 1)",
+		"insert into config values('create_so', 'make.so')",
 	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
@@ -709,6 +711,85 @@ out_reset:
 	}
 
 	return rc;
+}
+
+int tup_db_config_set_string(const char *lval, const char *rval)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "insert or replace into config values(?, ?)";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_text(stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(stmt, 2, rval, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+const char *tup_db_config_get_string(const char *lval)
+{
+	const char *res;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select rval from config where lval=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return NULL;
+		}
+	}
+
+	if(sqlite3_bind_text(stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return NULL;
+	}
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		res = NULL;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		res = NULL;
+		goto out_reset;
+	}
+
+	res = (const char *)sqlite3_column_text(stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return NULL;
+	}
+
+	return res;
 }
 
 static int node_insert(const char *name, int type, int flags)
