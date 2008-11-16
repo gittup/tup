@@ -1,6 +1,7 @@
 #include "dircache.h"
-#include "tup/debug.h"
-#include "tup/list.h"
+#include "debug.h"
+#include "list.h"
+#include "memdb.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 static void dump_dircache(void);
 static LIST_HEAD(dclist);
 
-void dircache_add(int wd, char *path)
+void dircache_add(struct memdb *m, int wd, char *path)
 {
 	struct dircache *dc = malloc(sizeof *dc);
 	if(!dc) {
@@ -21,12 +22,14 @@ void dircache_add(int wd, char *path)
 	dc->wd = wd;
 	dc->path = path;
 	list_add(&dc->list, &dclist);
+	memdb_add(m, wd, dc);
 	return;
 }
 
-void dircache_del(struct dircache *dc)
+void dircache_del(struct memdb *m, struct dircache *dc)
 {
 	DEBUGP("del %i\n", dc->wd);
+	memdb_remove(m, dc->wd);
 	list_del(&dc->list);
 	free(dc->path);
 	free(dc);
@@ -34,15 +37,9 @@ void dircache_del(struct dircache *dc)
 		dump_dircache();
 }
 
-struct dircache *dircache_lookup(int wd)
+struct dircache *dircache_lookup(const struct memdb *m, int wd)
 {
-	/* TODO: Make efficient: use same hash algorithm in wrapper? */
-	struct dircache *dc;
-	list_for_each_entry(dc, &dclist, list) {
-		if(dc->wd == wd)
-			return dc;
-	}
-	return NULL;
+	return memdb_find(m, wd);
 }
 
 static void dump_dircache(void)

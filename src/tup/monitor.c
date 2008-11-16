@@ -37,6 +37,7 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
+#include "memdb.h"
 
 #define MONITOR_PID_CFG "monitor pid"
 
@@ -47,6 +48,7 @@ static void sighandler(int sig);
 static int inot_fd;
 static int obj_wd;
 static int mon_wd;
+static struct memdb mdb;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
@@ -66,6 +68,9 @@ int monitor(int argc, char **argv)
 			debug_enable("monitor");
 		}
 	}
+
+	if(memdb_init(&mdb) < 0)
+		return -1;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -267,7 +272,7 @@ static int watch_path(const char *path, const char *file)
 		rc = -1;
 		goto out_free;
 	}
-	dircache_add(wd, fullpath);
+	dircache_add(&mdb, wd, fullpath);
 	flist_foreach(&f, fullpath) {
 		if(strcmp(f.filename, ".") == 0 ||
 		   strcmp(f.filename, "..") == 0)
@@ -293,7 +298,7 @@ static void handle_event(struct inotify_event *e)
 	if(e->name[0] == '.')
 		return;
 
-	dc = dircache_lookup(e->wd);
+	dc = dircache_lookup(&mdb, e->wd);
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
 			e->wd);
@@ -339,7 +344,7 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(e->mask & IN_IGNORED) {
-		dircache_del(dc);
+		dircache_del(&mdb, dc);
 	}
 }
 
