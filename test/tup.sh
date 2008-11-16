@@ -106,7 +106,7 @@ tup_create_exist()
 	if tup get_flags $1 2; then
 		:
 	else
-		echo "$1 doesn't have create flags"
+		echo "$1 doesn't have create flags" 1>&2
 		exit 1
 	fi
 }
@@ -116,10 +116,20 @@ update()
 	if tup upd; then
 		:
 	else
-		echo "Failed to update!"
+		echo "Failed to update!" 1>&2
 		exit 1
 	fi
 	check_empty_tupdirs
+}
+
+update_fail()
+{
+	if tup upd 2>/dev/null; then
+		echo "Expected update to fail, but didn't" 1>&2
+		exit 1
+	else
+		:
+	fi
 }
 
 check_same_link()
@@ -127,7 +137,7 @@ check_same_link()
 	if stat $* | grep Inode | awk 'BEGIN{x=-1} {if(x == -1) {x=$4} if(x != $4) {exit 1}}'; then
 		:
 	else
-		echo "Files '$*' are not the same inode."
+		echo "Files '$*' are not the same inode." 1>&2
 		exit 1
 	fi
 }
