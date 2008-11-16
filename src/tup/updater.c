@@ -151,7 +151,6 @@ static int process_create_nodes(void)
 static int md_flag_cb(void *arg, struct db_node *dbn)
 {
 	struct graph *g = arg;
-	/* TODO: fix add_file to take in db_node */
 	if(add_file(g, g->cur, dbn) < 0)
 		return -1;
 	return 0;
