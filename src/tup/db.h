@@ -37,6 +37,7 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 
 /* Node operations */
 tupid_t tup_db_create_node(const char *name, int type, int flags);
+tupid_t tup_db_create_dup_node(const char *name, int type, int flags);
 tupid_t tup_db_select_node(const char *name);
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 				void *arg, int flags);
@@ -52,6 +53,8 @@ int tup_db_delete_links(tupid_t tupid);
 int tup_db_create_cmdlink(tupid_t a, tupid_t b);
 int tup_db_cmdlink_exists(tupid_t a, tupid_t b);
 int tup_db_delete_cmdlinks(tupid_t tupid);
+
+int tup_db_move_cmdlink(tupid_t orig, tupid_t new);
 
 /* Combo operations */
 int tup_db_set_cmdchild_flags(tupid_t parent, int flags);

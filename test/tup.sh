@@ -128,6 +128,7 @@ update_fail()
 		echo "Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
+		echo "Update expected to fail, and did"
 		:
 	fi
 }

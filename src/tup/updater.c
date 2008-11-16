@@ -314,26 +314,35 @@ static int update(struct node *n)
 {
 	int rc;
 	char s[32];
+	tupid_t tupid;
 
-	if(snprintf(s, sizeof(s), "%lli", n->tupid) >= (signed)sizeof(s)) {
-		fprintf(stderr, "Buffer size error in update()\n");
+	tupid = tup_db_create_dup_node(n->name, n->type, TUP_FLAGS_NONE);
+	if(tupid < 0)
 		return -1;
+
+	if(snprintf(s, sizeof(s), "%lli", tupid) >= (signed)sizeof(s)) {
+		fprintf(stderr, "Buffer size error in update()\n");
+		goto err_delete_node;
 	}
 
 	if(setenv(TUP_CMD_ID, s, 1) < 0) {
 		perror("setenv");
-		return -1;
+		goto err_delete_node;
 	}
-
-	if(tup_db_delete_links(n->tupid) < 0)
-		return -1;
 
 	printf("%s\n", n->name);
 	rc = system(n->name);
 	unsetenv(TUP_CMD_ID);
 	if(rc != 0)
+		goto err_delete_node;
+	if(tup_db_move_cmdlink(n->tupid, tupid) < 0)
 		return -1;
+	delete_name_file(n->tupid);
 	return 0;
+
+err_delete_node:
+	delete_name_file(tupid);
+	return -1;
 }
 
 static int delete_file(struct node *n)
