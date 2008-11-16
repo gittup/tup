@@ -10,9 +10,10 @@
 #include <dlfcn.h>
 #include <sys/file.h>
 
-static int create_flag_cb(void *arg, int argc, char **argv, char **col);
+static int create_flag_cb(void *arg, struct db_node *dbn);
 static int process_create_nodes(void);
-static int md_flag_cb(void *arg, int argc, char **argv, char **col);
+static int old_md_flag_cb(void *arg, int argc, char **argv, char **col);
+static int md_flag_cb(void *arg, struct db_node *dbn);
 static int build_graph(struct graph *g);
 static int add_file(struct graph *g, tupid_t tupid, struct node *src,
 		    int type, const char *name);
@@ -89,32 +90,10 @@ lock_success:
 	return 0;
 }
 
-static int create_flag_cb(void *arg, int argc, char **argv, char **col)
+static int create_flag_cb(void *arg, struct db_node *dbn)
 {
-	int x;
-	char *name = NULL;
 	struct list_head *list = arg;
 	struct name_list *nl;
-	tupid_t id = -1;
-
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "id") == 0)
-			id = atoll(argv[x]);
-		else if(strcmp(col[x], "name") == 0)
-			name = argv[x];
-	}
-
-	if(id < 0) {
-		fprintf(stderr, "Error: No valid ID for create node.\n");
-		return -1;
-	}
-
-	/* Move all existing commands over to delete - then the ones that are
-	 * re-created will be moved back out in create(). All those that are
-	 * no longer generated remain in delete for cleanup.
-	 */
-	if(tup_db_set_cmdchild_flags(id, TUP_FLAGS_DELETE) < 0)
-		return -1;
 
 	nl = malloc(sizeof *nl);
 	if(!nl) {
@@ -122,14 +101,21 @@ static int create_flag_cb(void *arg, int argc, char **argv, char **col)
 		return -1;
 	}
 
-	nl->name = strdup(name);
+	nl->name = strdup(dbn->name);
 	if(!nl->name) {
 		perror("strdup");
 		return -1;
 	}
-	nl->tupid = id;
+	nl->tupid = dbn->tupid;
 
 	list_add(&nl->list, list);
+
+	/* Move all existing commands over to delete - then the ones that are
+	 * re-created will be moved back out in create(). All those that are
+	 * no longer generated remain in delete for cleanup.
+	 */
+	if(tup_db_set_cmdchild_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
+		return -1;
 
 	return 0;
 }
@@ -140,9 +126,8 @@ static int process_create_nodes(void)
 	LIST_HEAD(namelist);
 
 	/* TODO: Do in while loop in case it creates more create nodes? */
-	if(tup_db_select(create_flag_cb, &namelist,
-			 "select id, name from node where flags=%i",
-			 TUP_FLAGS_CREATE) != 0)
+	if(tup_db_select_node_by_flags(create_flag_cb, &namelist,
+				       TUP_FLAGS_CREATE) != 0)
 		return -1;
 
 	while(!list_empty(&namelist)) {
@@ -159,7 +144,16 @@ static int process_create_nodes(void)
 	return 0;
 }
 
-static int md_flag_cb(void *arg, int argc, char **argv, char **col)
+static int md_flag_cb(void *arg, struct db_node *dbn)
+{
+	struct graph *g = arg;
+	/* TODO: fix add_file to take in db_node */
+	if(add_file(g, dbn->tupid, g->cur, dbn->type, dbn->name) < 0)
+		return -1;
+	return 0;
+}
+
+static int old_md_flag_cb(void *arg, int argc, char **argv, char **col)
 {
 	struct graph *g = arg;
 	char *name = NULL;
@@ -192,11 +186,11 @@ static int build_graph(struct graph *g)
 
 	g->cur = g->root;
 	g->root->flags = TUP_FLAGS_MODIFY;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_MODIFY) != 0)
+	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_DELETE;
-	if(tup_db_select(md_flag_cb, g, "select * from node where flags=%i", TUP_FLAGS_DELETE) != 0)
+	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_DELETE) < 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_NONE;
@@ -271,10 +265,10 @@ static int find_deps(struct graph *g, struct node *n)
 {
 
 	g->cur = n;
-	if(tup_db_select(md_flag_cb, g,
+	if(tup_db_select(old_md_flag_cb, g,
 			 "select * from node where id in (select to_id from link where from_id=%lli)", n->tupid) != 0)
 		return -1;
-	if(tup_db_select(md_flag_cb, g,
+	if(tup_db_select(old_md_flag_cb, g,
 			 "select * from node where id in (select to_id from cmdlink where from_id=%lli)", n->tupid) != 0)
 		return -1;
 	return 0;

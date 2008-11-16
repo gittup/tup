@@ -3,12 +3,6 @@
 #include <stdio.h>
 #include <sqlite3.h>
 
-struct db_node {
-	tupid_t tupid;
-	int type;
-	int flags;
-};
-
 static sqlite3 *tup_db = NULL;
 static int node_insert(const char *name, int type, int flags);
 static int node_select(const char *name, struct db_node *dbn);
@@ -154,7 +148,7 @@ int tup_db_select(int (*callback)(void *, int, char **, char **),
 
 tupid_t tup_db_create_node(const char *name, int type, int flags)
 {
-	struct db_node dbn = {-1, 0, 0};
+	struct db_node dbn = {-1, NULL, 0, 0};
 
 	if(node_select(name, &dbn) < 0) {
 		return -1;
@@ -176,7 +170,7 @@ tupid_t tup_db_create_node(const char *name, int type, int flags)
 
 tupid_t tup_db_select_node(const char *name)
 {
-	struct db_node dbn = {-1, 0, 0};
+	struct db_node dbn = {-1, NULL, 0, 0};
 
 	if(node_select(name, &dbn) < 0) {
 		return -1;
@@ -185,9 +179,64 @@ tupid_t tup_db_select_node(const char *name)
 	return dbn.tupid;
 }
 
+int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
+				void *arg, int flags)
+{
+	int rc;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select id, name, type from node where flags=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(stmt, 1, flags) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		struct db_node dbn;
+
+		dbrc = sqlite3_step(stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		dbn.tupid = sqlite3_column_int64(stmt, 0);
+		dbn.name = (const char *)sqlite3_column_text(stmt, 1);
+		dbn.type = sqlite3_column_int(stmt, 2);
+		dbn.flags = flags;
+
+		if(callback(arg, &dbn) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+	}
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 int tup_db_set_flags_by_name(const char *name, int flags)
 {
-	struct db_node dbn = {-1, 0, 0};
+	struct db_node dbn = {-1, NULL, 0, 0};
 
 	if(node_select(name, &dbn) < 0)
 		return -1;
