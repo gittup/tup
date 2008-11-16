@@ -3,6 +3,7 @@
 
 #include "tup/list.h"
 #include "tup/tupid.h"
+#include "tup/db.h"
 #include <sqlite3.h>
 
 struct edge {
@@ -37,8 +38,7 @@ struct graph {
 };
 
 struct node *find_node(const struct graph *g, tupid_t tupid);
-struct node *create_node(struct graph *g, tupid_t tupid, const char *name,
-			 int type, int flags);
+struct node *create_node(struct graph *g, struct db_node *dbn);
 void remove_node(struct graph *g, struct node *n);
 
 int create_edge(struct node *n1, struct node *n2);

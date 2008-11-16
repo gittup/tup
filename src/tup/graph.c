@@ -55,8 +55,7 @@ out_reset:
 	return n;
 }
 
-struct node *create_node(struct graph *g, tupid_t tupid, const char *name,
-			 int type, int flags)
+struct node *create_node(struct graph *g, struct db_node *dbn)
 {
 	struct node *n;
 
@@ -66,16 +65,16 @@ struct node *create_node(struct graph *g, tupid_t tupid, const char *name,
 		return NULL;
 	}
 	n->edges = NULL;
-	n->tupid = tupid;
+	n->tupid = dbn->tupid;
 	n->incoming_count = 0;
-	n->name = strdup(name);
+	n->name = strdup(dbn->name);
 	if(!n->name) {
 		perror("strdup");
 		return NULL;
 	}
 	n->state = STATE_INITIALIZED;
-	n->type = type;
-	n->flags = flags;
+	n->type = dbn->type;
+	n->flags = dbn->flags;
 	list_add(&n->list, &g->plist);
 
 	if(n->type == TUP_NODE_CMD ||
@@ -134,6 +133,7 @@ int create_graph(struct graph *g)
 {
 	int x;
 	int rc;
+	struct db_node dbn_root = {0, "root", TUP_NODE_ROOT, TUP_FLAGS_NONE};
 	const char *sql[] = {
 		"create table node_map (id integer primary key not null, ptr integer not null)",
 	};
@@ -161,7 +161,7 @@ int create_graph(struct graph *g)
 		}
 	}
 
-	g->root = create_node(g, 0, "root", TUP_NODE_ROOT, TUP_FLAGS_NONE);
+	g->root = create_node(g, &dbn_root);
 	if(!g->root)
 		return -1;
 	list_move(&g->root->list, &g->node_list);

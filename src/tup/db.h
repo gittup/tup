@@ -55,6 +55,10 @@ int tup_db_delete_cmdlinks(tupid_t tupid);
 
 /* Combo operations */
 int tup_db_set_cmdchild_flags(tupid_t parent, int flags);
+int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
+			       void *arg, tupid_t tupid);
+int tup_db_select_node_by_cmdlink(int (*callback)(void *, struct db_node *),
+				  void *arg, tupid_t tupid);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);

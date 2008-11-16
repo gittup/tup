@@ -12,11 +12,9 @@
 
 static int create_flag_cb(void *arg, struct db_node *dbn);
 static int process_create_nodes(void);
-static int old_md_flag_cb(void *arg, int argc, char **argv, char **col);
 static int md_flag_cb(void *arg, struct db_node *dbn);
 static int build_graph(struct graph *g);
-static int add_file(struct graph *g, tupid_t tupid, struct node *src,
-		    int type, const char *name);
+static int add_file(struct graph *g, struct node *src, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
@@ -148,31 +146,7 @@ static int md_flag_cb(void *arg, struct db_node *dbn)
 {
 	struct graph *g = arg;
 	/* TODO: fix add_file to take in db_node */
-	if(add_file(g, dbn->tupid, g->cur, dbn->type, dbn->name) < 0)
-		return -1;
-	return 0;
-}
-
-static int old_md_flag_cb(void *arg, int argc, char **argv, char **col)
-{
-	struct graph *g = arg;
-	char *name = NULL;
-	int type = 0;
-	int flags = 0;
-	int x;
-	tupid_t id = 0;
-
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "name") == 0)
-			name = argv[x];
-		else if(strcmp(col[x], "id") == 0)
-			id = atoll(argv[x]);
-		else if(strcmp(col[x], "type") == 0)
-			type = atoll(argv[x]);
-		else if(strcmp(col[x], "flags") == 0)
-			flags = atoll(argv[x]);
-	}
-	if(add_file(g, id, g->cur, type, name) < 0)
+	if(add_file(g, g->cur, dbn) < 0)
 		return -1;
 	return 0;
 }
@@ -213,47 +187,45 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file(struct graph *g, tupid_t tupid, struct node *src,
-		    int type, const char *name)
+static int add_file(struct graph *g, struct node *src, struct db_node *dbn)
 {
 	struct node *n;
-	int flags;
 
 	/* Inherit flags of the parent, unless the parent is a file, in which
 	 * case we default to just modify (since a command is only deleted
 	 * if the directory is modified and isn't re-created in the create
 	 * phase. Yeah that totally makes sense.)
 	 */
-	flags = src->flags;
+	dbn->flags = src->flags;
 	if(src->type == TUP_NODE_FILE)
-		flags = TUP_FLAGS_MODIFY;
+		dbn->flags = TUP_FLAGS_MODIFY;
 
-	if((n = find_node(g, tupid)) != NULL) {
-		if(!(n->flags & flags)) {
+	if((n = find_node(g, dbn->tupid)) != NULL) {
+		if(!(n->flags & dbn->flags)) {
 			/* Check to see if we counted this as a node we'll
 			 * print something about later that we'll actually
 			 * skip (a file with modify flags just gets skipped)
 			 */
 			if(n->type == TUP_NODE_FILE &&
 			   n->flags == TUP_FLAGS_DELETE &&
-			   (flags&TUP_FLAGS_MODIFY)) {
+			   (dbn->flags&TUP_FLAGS_MODIFY)) {
 				g->num_nodes--;
 			}
-			DEBUGP("adding flag (0x%x) to %lli\n", flags, tupid);
-			n->flags |= flags;
+			DEBUGP("adding flag (0x%x) to %lli\n", dbn->flags, dbn->tupid);
+			n->flags |= dbn->flags;
 		}
 		goto edge_create;
 	}
-	n = create_node(g, tupid, name, type, flags);
+	n = create_node(g, dbn);
 	if(!n)
 		return -1;
-	DEBUGP("create node: %lli (0x%x)\n", tupid, type);
+	DEBUGP("create node: %lli (0x%x)\n", dbn->tupid, dbn->type);
 
 edge_create:
 	if(n->state == STATE_PROCESSING) {
 		fprintf(stderr, "Error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
-			src->tupid, tupid);
+			src->tupid, dbn->tupid);
 		return -1;
 	}
 	if(create_edge(src, n) < 0)
@@ -265,11 +237,9 @@ static int find_deps(struct graph *g, struct node *n)
 {
 
 	g->cur = n;
-	if(tup_db_select(old_md_flag_cb, g,
-			 "select * from node where id in (select to_id from link where from_id=%lli)", n->tupid) != 0)
+	if(tup_db_select_node_by_link(md_flag_cb, g, n->tupid) < 0)
 		return -1;
-	if(tup_db_select(old_md_flag_cb, g,
-			 "select * from node where id in (select to_id from cmdlink where from_id=%lli)", n->tupid) != 0)
+	if(tup_db_select_node_by_cmdlink(md_flag_cb, g, n->tupid) < 0)
 		return -1;
 	return 0;
 }
