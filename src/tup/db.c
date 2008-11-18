@@ -13,11 +13,21 @@ static int cmdlink_insert(tupid_t a, tupid_t b);
 int tup_db_open(void)
 {
 	int rc;
+	char *errmsg;
+	char sql[] = "PRAGMA synchronous=OFF";
 
 	rc = sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL);
 	if(rc != 0) {
 		fprintf(stderr, "Unable to open database: %s\n",
 			sqlite3_errmsg(tup_db));
+	}
+
+	if(tup_db_config_get_int("db_sync") == 0) {
+		if(sqlite3_exec(tup_db, sql, NULL, NULL, &errmsg) != 0) {
+			fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				errmsg, sql);
+			return -1;
+		}
 	}
 
 	/* TODO: better to figure out concurrency access issues? Maybe a full
@@ -44,6 +54,7 @@ int tup_db_create(void)
 		"create index cmdlink_index2 on cmdlink(to_id)",
 		"insert into config values('show_progress', 1)",
 		"insert into config values('create_so', 'make.so')",
+		"insert into config values('db_sync', 1)",
 	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
