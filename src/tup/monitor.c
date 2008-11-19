@@ -43,6 +43,7 @@
 
 static int watch_path(const char *path, const char *file);
 static void handle_event(struct inotify_event *e);
+static void check_deletion(struct inotify_event *e);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -144,6 +145,13 @@ int monitor(int argc, char **argv)
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
 
+			if(e->mask & IN_ISDIR && (
+						  e->mask & IN_IGNORED ||
+						  e->mask & IN_DELETE ||
+						  e->mask & IN_MOVED_FROM)) {
+				check_deletion(e);
+			}
+
 			/* If the lock file is opened, assume we are now
 			 * locked out. When the file is closed, check to see
 			 * if the lock is available again. We can't just
@@ -154,12 +162,12 @@ int monitor(int argc, char **argv)
 			 * duplicate events.
 			 */
 			if(e->wd == obj_wd) {
-				if(e->mask & IN_OPEN) {
+				if((e->mask & IN_OPEN) && locked) {
 					locked = 0;
 					flock(tup_obj_lock(), LOCK_UN);
 					DEBUGP("monitor off\n");
 				}
-				if(e->mask & IN_CLOSE) {
+				if((e->mask & IN_CLOSE) && !locked) {
 					if(flock(tup_obj_lock(), LOCK_EX | LOCK_NB) < 0) {
 						if(errno != EWOULDBLOCK)
 							perror("flock");
@@ -265,7 +273,7 @@ static int watch_path(const char *path, const char *file)
 
 	DEBUGP("add watch: '%s'\n", fullpath);
 
-	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
+	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE | IN_DELETE_SELF | IN_MOVE_SELF;
 	wd = inotify_add_watch(inot_fd, fullpath, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
@@ -292,7 +300,7 @@ static void handle_event(struct inotify_event *e)
 	static char cname[PATH_MAX];
 	struct dircache *dc;
 	int cdf = 0;
-	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->name);
+	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->len ? e->name : "");
 
 	/* Skip hidden files */
 	if(e->name[0] == '.')
@@ -342,10 +350,25 @@ static void handle_event(struct inotify_event *e)
 	if(cdf) {
 		update_create_dir_for_file(cname);
 	}
+}
 
-	if(e->mask & IN_IGNORED) {
-		dircache_del(&mdb, dc);
+static void check_deletion(struct inotify_event *e)
+{
+	static char cname[PATH_MAX];
+	struct dircache *dc;
+	DEBUGP("check deletion: wd=%i, name='%s'\n", e->wd, e->name);
+
+	dc = dircache_lookup(&mdb, e->wd);
+	if(!dc) {
+		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
+			e->wd);
+		return;
 	}
+
+	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
+		return;
+	printf("[31mDELETE: %s[0m\n", cname);
+/*	dircache_del(&mdb, e->wd);*/
 }
 
 static void sighandler(int sig)

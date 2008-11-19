@@ -51,13 +51,13 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 		return -1;
 	}
 
-	canonicalize_string(out, sz);
+	sz = canonicalize_string(out, sz);
 	if(strncmp(out, "../", 3) == 0) {
 		DEBUGP("Relative path '%s' is outside the tup hierarchy.\n",
 		       out);
 		return -1;
 	}
-	return 0;
+	return sz;
 }
 
 int canonicalize_string(char *str, int sz)

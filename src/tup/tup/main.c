@@ -396,14 +396,36 @@ static int get_flags(int argc, char **argv)
 static int file_mod(const char *file, int flags)
 {
 	static char cname[PATH_MAX];
+	static char slash_make[] = "/Makefile";
+	int len;
+	int upddir = 0;
 	tupid_t tupid;
 
-	if(canonicalize(file, cname, sizeof(cname)) < 0) {
+	len = canonicalize(file, cname, sizeof(cname));
+	if(len < 0) {
 		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
 		return -1;
 	}
-	if(tup_db_select_node(cname) < 0 || flags == TUP_FLAGS_DELETE)
+
+	/* Tried to simplify the gross if logic. Basically we want to re-update
+	 * the create nodes if:
+	 * 1) the file is new
+	 * 2) the file was deleted
+	 * 3-4) a Makefile was modified
+	 */
+	if(tup_db_select_node(cname) < 0)
+		upddir = 1;
+	if(flags == TUP_FLAGS_DELETE)
+		upddir = 1;
+	if(len >= (signed)sizeof(slash_make) &&
+	   strcmp(cname + len - sizeof(slash_make) + 1, slash_make) == 0)
+		upddir = 1;
+	if(strcmp(cname, "Makefile") == 0)
+		upddir = 1;
+
+	if(upddir)
 		update_create_dir_for_file(cname);
+
 	tupid = create_name_file(cname);
 	if(tupid < 0)
 		return -1;
