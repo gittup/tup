@@ -23,7 +23,6 @@ static int (*create)(const char *dir);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
-static char *create_so;
 static int do_show_progress = 1;
 
 struct name_list {
@@ -34,7 +33,7 @@ struct name_list {
 
 int updater(int argc, char **argv)
 {
-	const char *s;
+	char *create_so;
 	struct graph g;
 	int upd_lock;
 	void *handle;
@@ -62,12 +61,8 @@ int updater(int argc, char **argv)
 	}
 lock_success:
 
-	s = tup_db_config_get_string("create_so");
-	if(s) {
-		create_so = strdup(s);
-	} else {
-		create_so = strdup("make.so");
-	}
+	if(tup_db_config_get_string(&create_so, "create_so", "make.so") < 0)
+		return -1;
 	do_show_progress = tup_db_config_get_int("show_progress");
 
 	handle = dlopen(create_so, RTLD_LAZY);

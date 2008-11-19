@@ -67,6 +67,6 @@ int tup_db_select_node_by_cmdlink(int (*callback)(void *, struct db_node *),
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
 int tup_db_config_set_string(const char *lval, const char *rval);
-const char *tup_db_config_get_string(const char *lval);
+int tup_db_config_get_string(char **s, const char *lval, const char *def);
 
 #endif

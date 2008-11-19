@@ -1,6 +1,7 @@
 #include "db.h"
 #include "array_size.h"
 #include <stdio.h>
+#include <string.h>
 #include <sqlite3.h>
 
 static sqlite3 *tup_db = NULL;
@@ -804,9 +805,8 @@ int tup_db_config_set_string(const char *lval, const char *rval)
 	return 0;
 }
 
-const char *tup_db_config_get_string(const char *lval)
+int tup_db_config_get_string(char **res, const char *lval, const char *def)
 {
-	const char *res;
 	int dbrc;
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "select rval from config where lval=?";
@@ -815,35 +815,37 @@ const char *tup_db_config_get_string(const char *lval)
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
-			return NULL;
+			return -1;
 		}
 	}
 
 	if(sqlite3_bind_text(stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return NULL;
+		return -1;
 	}
 
 	dbrc = sqlite3_step(stmt);
 	if(dbrc == SQLITE_DONE) {
-		res = NULL;
+		*res = strdup(def);
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		res = NULL;
+		*res = NULL;
 		goto out_reset;
 	}
 
-	res = (const char *)sqlite3_column_text(stmt, 0);
+	*res = strdup((const char *)sqlite3_column_text(stmt, 0));
 
 out_reset:
 	if(sqlite3_reset(stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return NULL;
+		return -1;
 	}
 
-	return res;
+	if(*res)
+		return 0;
+	return -1;
 }
 
 static int node_insert(const char *name, int type, int flags)
