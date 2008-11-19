@@ -15,4 +15,4 @@ sym_check a/prog main
 mv a b
 update
 tup_object_exist b/foo.c b/foo.o b/prog
-tup_object_no_exist a/foo.c a/foo.o a/prog
+tup_object_no_exist a/foo.c a/foo.o a/prog a
