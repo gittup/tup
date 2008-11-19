@@ -11,7 +11,14 @@ static LIST_HEAD(dclist);
 
 void dircache_add(struct memdb *m, int wd, char *path)
 {
-	struct dircache *dc = malloc(sizeof *dc);
+	struct dircache *dc;
+
+	dc = dircache_lookup(m, wd);
+	if(dc) {
+		dircache_del(m, dc);
+	}
+
+	dc = malloc(sizeof *dc);
 	if(!dc) {
 		fprintf(stderr, "Out of memory.\n");
 		return;

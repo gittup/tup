@@ -343,6 +343,43 @@ int tup_db_delete_node(tupid_t tupid)
 	return 0;
 }
 
+int tup_db_delete_dir(const char *path)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "update node set flags=? where name glob ?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(stmt, 1, TUP_FLAGS_DELETE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(stmt, 2, path, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
 int tup_db_create_link(tupid_t a, tupid_t b)
 {
 	if(tup_db_link_exists(a, b) == 0)

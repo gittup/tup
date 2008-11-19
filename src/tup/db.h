@@ -44,6 +44,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 int tup_db_set_flags_by_name(const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);
+int tup_db_delete_dir(const char *path);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);

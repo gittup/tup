@@ -273,7 +273,7 @@ static int watch_path(const char *path, const char *file)
 
 	DEBUGP("add watch: '%s'\n", fullpath);
 
-	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE | IN_DELETE_SELF | IN_MOVE_SELF;
+	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, fullpath, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
@@ -356,6 +356,7 @@ static void check_deletion(struct inotify_event *e)
 {
 	static char cname[PATH_MAX];
 	struct dircache *dc;
+	int len;
 	DEBUGP("check deletion: wd=%i, name='%s'\n", e->wd, e->name);
 
 	dc = dircache_lookup(&mdb, e->wd);
@@ -365,10 +366,17 @@ static void check_deletion(struct inotify_event *e)
 		return;
 	}
 
-	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
+	len = canonicalize2(dc->path, e->name, cname, sizeof(cname));
+	if(len < 0)
 		return;
-	printf("[31mDELETE: %s[0m\n", cname);
-/*	dircache_del(&mdb, e->wd);*/
+	if(len >= (signed)sizeof(cname) - 3) {
+		fprintf(stderr, "Error: sizeof(cname) is too small for globbing.\n");
+		return;
+	}
+	cname[len] = '/';
+	cname[len+1] = '*';
+	cname[len+2] = 0;
+	tup_db_delete_dir(cname);
 }
 
 static void sighandler(int sig)
