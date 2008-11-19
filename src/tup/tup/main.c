@@ -19,7 +19,7 @@
 
 static int file_exists(const char *s);
 
-static int init(void);
+static int init(int argc, char **argv);
 static int graph_node_cb(void *unused, int argc, char **argv, char **col);
 static int graph_link_cb(void *unused, int argc, char **argv, char **col);
 static int graph(int argc, char **argv);
@@ -48,7 +48,9 @@ int main(int argc, char **argv)
 	}
 
 	if(strcmp(argv[1], "init") == 0) {
-		return init();
+		argc--;
+		argv++;
+		return init(argc, argv);
 	}
 
 	if(find_tup_dir() != 0) {
@@ -116,8 +118,16 @@ static int file_exists(const char *s)
 	return 0;
 }
 
-static int init(void)
+static int init(int argc, char **argv)
 {
+	int x;
+	int db_sync = 1;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(argv[x], "--no-sync") == 0)
+			db_sync = 0;
+	}
+
 	if(file_exists(TUP_DB_FILE)) {
 		printf("TODO: DB file already exists. abort\n");
 		return -1;
@@ -130,7 +140,7 @@ static int init(void)
 		}
 	}
 
-	if(tup_db_create() != 0) {
+	if(tup_db_create(db_sync) != 0) {
 		return -1;
 	}
 

@@ -10,12 +10,11 @@ static int node_select(const char *name, struct db_node *dbn);
 
 static int link_insert(tupid_t a, tupid_t b);
 static int cmdlink_insert(tupid_t a, tupid_t b);
+static int no_sync(void);
 
 int tup_db_open(void)
 {
 	int rc;
-	char *errmsg;
-	char sql[] = "PRAGMA synchronous=OFF";
 
 	rc = sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL);
 	if(rc != 0) {
@@ -24,11 +23,8 @@ int tup_db_open(void)
 	}
 
 	if(tup_db_config_get_int("db_sync") == 0) {
-		if(sqlite3_exec(tup_db, sql, NULL, NULL, &errmsg) != 0) {
-			fprintf(stderr, "SQL error: %s\nQuery was: %s",
-				errmsg, sql);
+		if(no_sync() < 0)
 			return -1;
-		}
 	}
 
 	/* TODO: better to figure out concurrency access issues? Maybe a full
@@ -38,7 +34,7 @@ int tup_db_open(void)
 	return rc;
 }
 
-int tup_db_create(void)
+int tup_db_create(int db_sync)
 {
 	int rc;
 	int x;
@@ -66,6 +62,11 @@ int tup_db_create(void)
 			sqlite3_errmsg(tup_db));
 	}
 
+	if(db_sync == 0) {
+		if(no_sync() < 0)
+			return -1;
+	}
+
 	for(x=0; x<ARRAY_SIZE(sql); x++) {
 		char *errmsg;
 		if(sqlite3_exec(tup_db, sql[x], NULL, NULL, &errmsg) != 0) {
@@ -75,7 +76,12 @@ int tup_db_create(void)
 		}
 	}
 
-	return rc;
+	if(db_sync == 0) {
+		if(tup_db_config_set_int("db_sync", 0) < 0)
+			return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_begin(void)
@@ -1005,5 +1011,18 @@ static int cmdlink_insert(tupid_t a, tupid_t b)
 		return -1;
 	}
 
+	return 0;
+}
+
+static int no_sync(void)
+{
+	char *errmsg;
+	char sql[] = "PRAGMA synchronous=OFF";
+
+	if(sqlite3_exec(tup_db, sql, NULL, NULL, &errmsg) != 0) {
+		fprintf(stderr, "SQL error: %s\nQuery was: %s",
+			errmsg, sql);
+		return -1;
+	}
 	return 0;
 }
