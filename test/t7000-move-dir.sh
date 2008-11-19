@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
+tup monitor
 mkdir a
 cp ../testMakefile Makefile
 cp ../testMakefile a/Makefile
