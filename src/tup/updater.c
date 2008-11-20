@@ -191,20 +191,7 @@ static int add_file(struct graph *g, struct node *src, struct db_node *dbn)
 {
 	struct node *n;
 
-	/* Inherit flags of the parent, unless the parent is a file, in which
-	 * case we default to just modify (since a command is only deleted
-	 * if the directory is modified and isn't re-created in the create
-	 * phase. Yeah that totally makes sense.)
-	 */
-	dbn->flags = src->flags;
-	if(src->type == TUP_NODE_FILE)
-		dbn->flags = TUP_FLAGS_MODIFY;
-
 	if((n = find_node(g, dbn->tupid)) != NULL) {
-		if(!(n->flags & dbn->flags)) {
-			DEBUGP("adding flag (0x%x) to %lli\n", dbn->flags, dbn->tupid);
-			n->flags |= dbn->flags;
-		}
 		goto edge_create;
 	}
 	n = create_node(g, dbn);
@@ -226,7 +213,6 @@ edge_create:
 
 static int find_deps(struct graph *g, struct node *n)
 {
-
 	g->cur = n;
 	if(tup_db_select_node_by_link(md_flag_cb, g, n->tupid) < 0)
 		return -1;
@@ -258,6 +244,12 @@ static int execute_graph(struct graph *g)
 			if(n->type == TUP_NODE_FILE &&
 			   (n->flags == TUP_FLAGS_DELETE)) {
 				delete_file(n);
+			} else if(n->type == TUP_NODE_DIR &&
+				  n->flags == TUP_FLAGS_DELETE) {
+				printf("[35mDelete[%lli]: %s[0m\n",
+				       n->tupid, n->name);
+				if(delete_name_file(n->tupid) < 0)
+					return -1;
 			} else if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
 					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
@@ -281,6 +273,17 @@ static int execute_graph(struct graph *g)
 				list_add(&e->dest->list, &g->plist);
 				e->dest->state = STATE_PROCESSING;
 			}
+
+			if(n->type == TUP_NODE_FILE) {
+				if(n->type == TUP_FLAGS_DELETE ||
+				   n->type == TUP_FLAGS_MODIFY)
+					e->dest->flags |= TUP_FLAGS_MODIFY;
+			} else if(n->type == TUP_NODE_CMD) {
+				e->dest->flags |= n->flags;
+			} else if(n->type == TUP_NODE_DIR) {
+				e->dest->flags |= n->flags;
+			}
+
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
