@@ -8,6 +8,7 @@ cp ../testMakefile a/Makefile
 
 echo "int main(void) {return 0;}" > a/foo.c
 update
+tup_object_exist a/foo.c a/foo.o a/prog a
 sym_check a/foo.o main
 sym_check a/prog main
 
