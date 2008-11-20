@@ -202,15 +202,6 @@ static int add_file(struct graph *g, struct node *src, struct db_node *dbn)
 
 	if((n = find_node(g, dbn->tupid)) != NULL) {
 		if(!(n->flags & dbn->flags)) {
-			/* Check to see if we counted this as a node we'll
-			 * print something about later that we'll actually
-			 * skip (a file with modify flags just gets skipped)
-			 */
-			if(n->type == TUP_NODE_FILE &&
-			   n->flags == TUP_FLAGS_DELETE &&
-			   (dbn->flags&TUP_FLAGS_MODIFY)) {
-				g->num_nodes--;
-			}
 			DEBUGP("adding flag (0x%x) to %lli\n", dbn->flags, dbn->tupid);
 			n->flags |= dbn->flags;
 		}
@@ -267,10 +258,7 @@ static int execute_graph(struct graph *g)
 			if(n->type == TUP_NODE_FILE &&
 			   (n->flags == TUP_FLAGS_DELETE)) {
 				delete_file(n);
-				num_processed++;
-				show_progress(num_processed, g->num_nodes);
-			}
-			if(n->type == TUP_NODE_CMD) {
+			} else if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
 					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
 					if(delete_name_file(n->tupid) < 0)
@@ -279,9 +267,11 @@ static int execute_graph(struct graph *g)
 					if(update(n) < 0)
 						return -1;
 				}
-				num_processed++;
-				show_progress(num_processed, g->num_nodes);
+			} else {
+				printf("skip: %s\n", n->name);
 			}
+			num_processed++;
+			show_progress(num_processed, g->num_nodes);
 		}
 		while(n->edges) {
 			struct edge *e;
