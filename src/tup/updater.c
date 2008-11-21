@@ -23,7 +23,8 @@ static int (*create)(const char *dir);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
-static int do_show_progress = 1;
+static int do_show_progress;
+static int do_keep_going;
 
 struct name_list {
 	struct list_head list;
@@ -38,12 +39,6 @@ int updater(int argc, char **argv)
 	int upd_lock;
 	void *handle;
 	int x;
-
-	for(x=1; x<argc; x++) {
-		if(strcmp(argv[x], "-d") == 0) {
-			debug_enable("tup.updater");
-		}
-	}
 
 	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
 	if(upd_lock < 0) {
@@ -64,6 +59,22 @@ lock_success:
 	if(tup_db_config_get_string(&create_so, "create_so", "make.so") < 0)
 		return -1;
 	do_show_progress = tup_db_config_get_int("show_progress");
+	do_keep_going = tup_db_config_get_int("keep_going");
+
+	for(x=1; x<argc; x++) {
+		if(strcmp(argv[x], "-d") == 0) {
+			debug_enable("tup.updater");
+		} else if(strcmp(argv[x], "--show-progress") == 0) {
+			do_show_progress = 1;
+		} else if(strcmp(argv[x], "--no-show-progress") == 0) {
+			do_show_progress = 0;
+		} else if(strcmp(argv[x], "--keep-going") == 0 ||
+			  strcmp(argv[x], "-k") == 0) {
+			do_keep_going = 1;
+		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
+			do_keep_going = 0;
+		}
+	}
 
 	handle = dlopen(create_so, RTLD_LAZY);
 	if(!handle) {
@@ -256,14 +267,15 @@ static int execute_graph(struct graph *g)
 					if(delete_name_file(n->tupid) < 0)
 						return -1;
 				} else {
-					if(update(n) < 0)
+					if(update(n) < 0) {
+						if(do_keep_going)
+							goto keep_going;
 						return -1;
+					}
 				}
 			} else {
 				printf("skip: %s\n", n->name);
 			}
-			num_processed++;
-			show_progress(num_processed, g->num_nodes);
 		}
 		while(n->edges) {
 			struct edge *e;
@@ -289,10 +301,20 @@ static int execute_graph(struct graph *g)
 		}
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
+keep_going:
+		if(n != root) {
+			num_processed++;
+			show_progress(num_processed, g->num_nodes);
+		}
 		remove_node(g, n);
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
-		fprintf(stderr, "Error: Graph is not empty after execution.\n");
+		printf("\n");
+		if(do_keep_going) {
+			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
+		} else {
+			fprintf(stderr, "Error: Graph is not empty after execution.\n");
+		}
 		return -1;
 	}
 	return 0;

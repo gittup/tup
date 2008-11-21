@@ -113,7 +113,7 @@ tup_create_exist()
 
 update()
 {
-	if tup upd; then
+	if tup upd "$@"; then
 		:
 	else
 		echo "Failed to update!" 1>&2
@@ -124,7 +124,7 @@ update()
 
 update_fail()
 {
-	if tup upd 2>/dev/null; then
+	if tup upd "$@" 2>/dev/null; then
 		echo "Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
