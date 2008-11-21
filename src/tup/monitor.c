@@ -27,6 +27,7 @@
 #include <sys/inotify.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <sys/select.h>
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
@@ -42,6 +43,13 @@
 #define MONITOR_PID_CFG "monitor pid"
 
 static int watch_path(const char *path, const char *file);
+static int events_queued(void);
+static void queue_event(struct inotify_event *e);
+static void flush_queue(void);
+static int skip_event(struct inotify_event *e);
+static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
+static int same_event(struct inotify_event *e1, struct inotify_event *e2);
+static int ephemeral_event(struct inotify_event *e);
 static void handle_event(struct inotify_event *e);
 static void check_deletion(struct inotify_event *e);
 static void sighandler(int sig);
@@ -54,6 +62,10 @@ static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
 };
+static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
+static int queue_start = 0;
+static int queue_end = 0;
+static struct inotify_event *queue_last_e = NULL;
 
 int monitor(int argc, char **argv)
 {
@@ -163,6 +175,7 @@ int monitor(int argc, char **argv)
 			 */
 			if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
+					flush_queue();
 					locked = 0;
 					flock(tup_obj_lock(), LOCK_UN);
 					DEBUGP("monitor off\n");
@@ -180,10 +193,24 @@ int monitor(int argc, char **argv)
 				goto close_inot;
 			} else {
 				if(locked)
-					handle_event(e);
+					queue_event(e);
 			}
 
 			offset += sizeof(*e) + e->len;
+		}
+
+		if(events_queued()) {
+			struct timeval tv = {0, 100000};
+			int ret;
+			fd_set rfds;
+
+			FD_ZERO(&rfds);
+			FD_SET(inot_fd, &rfds);
+			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
+			if(ret == 0) {
+				/* Timeout, flush queue */
+				flush_queue();
+			}
 		}
 	}
 
@@ -295,16 +322,151 @@ out_free:
 	return rc;
 }
 
+static int events_queued(void)
+{
+	return queue_start != queue_end;
+}
+
+static void queue_event(struct inotify_event *e)
+{
+	int new_start;
+	int new_end;
+
+	if(skip_event(e))
+		return;
+	if(eventcmp(queue_last_e, e) == 0)
+		return;
+	if(ephemeral_event(e) == 0)
+		return;
+	DEBUGP("Queue[%i]: '%s' %08x\n",
+	       sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
+
+	new_start = queue_end;
+	new_end = new_start + sizeof(*e) + e->len;
+	if(new_end >= (signed)sizeof(queue_buf)) {
+		fprintf(stderr, "Error: Event dropped\n");
+		return;
+	}
+
+	queue_last_e = (struct inotify_event*)&queue_buf[new_start];
+
+	memcpy(&queue_buf[new_start], e, sizeof(*e));
+	memcpy(&queue_buf[new_start + sizeof(*e)], e->name, e->len);
+
+	queue_end += sizeof(*e) + e->len;
+}
+
+static void flush_queue(void)
+{
+	while(queue_start < queue_end) {
+		struct inotify_event *e;
+
+		e = (struct inotify_event*)&queue_buf[queue_start];
+		DEBUGP("Handle[%i]: '%s' %08x\n",
+		       sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
+		if(e->mask != 0)
+			handle_event(e);
+		queue_start += sizeof(*e) + e->len;
+	}
+
+	queue_start = 0;
+	queue_end = 0;
+	queue_last_e = NULL;
+}
+
+static int skip_event(struct inotify_event *e)
+{
+	/* Skip hidden files */
+	if(e->len && e->name[0] == '.')
+		return 1;
+	return 0;
+}
+
+static int eventcmp(struct inotify_event *e1, struct inotify_event *e2)
+{
+	/* Checks if events are identical in every way. See also same_event() */
+	if(!e1 || !e2)
+		return -1;
+	if(memcmp(e1, e2, sizeof(struct inotify_event)) != 0)
+		return -1;
+	if(e1->len && strcmp(e1->name, e2->name) != 0)
+		return -1;
+	return 0;
+}
+
+static int same_event(struct inotify_event *e1, struct inotify_event *e2)
+{
+	/* Checks if events are on the same file, but may have a different mask
+	 * and/or cookie. See also eventcmp()
+	 */
+	if(!e1 || !e2)
+		return -1;
+	if(e1->wd != e2->wd || e1->len != e2->len)
+		return -1;
+	if(e1->len && strcmp(e1->name, e2->name) != 0)
+		return -1;
+	return 0;
+}
+
+static int ephemeral_event(struct inotify_event *e)
+{
+	int x;
+	struct inotify_event *qe;
+	int create_and_delete = 0;
+	int rc = -1;
+	int newflags = IN_CREATE | IN_MOVED_TO;
+	int delflags = IN_DELETE | IN_MOVED_FROM;
+
+	if(!(e->mask & (newflags | delflags))) {
+		return -1;
+	}
+
+	for(x=queue_start; x<queue_end;) {
+		qe = (struct inotify_event*)&queue_buf[x];
+
+		if(same_event(qe, e) == 0) {
+			if(qe->mask & newflags && e->mask & delflags) {
+				/* Previously the file was created, now it's
+				 * destroyed, so we delete all record of it.
+				 */
+				rc = 0;
+				qe->mask = 0;
+				create_and_delete = 1;
+			} else if(qe->mask & delflags && e->mask & newflags) {
+				/* The file was previously deleted and now it's
+				 * recreated. Remove almost all record of it,
+				 * except we set the latest event to be
+				 * 'modified', since we effectively just
+				 * updated the file.
+				 *
+				 * Note we don't set rc here since we want
+				 * to still write e to the queue.
+				 */
+				qe->mask = 0;
+				e->mask = IN_MODIFY;
+				create_and_delete = 1;
+			} else if(create_and_delete) {
+				/* Delete any events about a file in between
+				 * when it was created and subsequently
+				 * deleted, or deleted and subsequently
+				 * re-created.
+				 */
+				qe->mask = 0;
+			}
+		}
+
+		x += sizeof(*qe) + qe->len;
+	}
+
+	return rc;
+}
+
 static void handle_event(struct inotify_event *e)
 {
 	static char cname[PATH_MAX];
 	struct dircache *dc;
 	int cdf = 0;
 	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->len ? e->name : "");
-
-	/* Skip hidden files */
-	if(e->name[0] == '.')
-		return;
 
 	dc = dircache_lookup(&mdb, e->wd);
 	if(!dc) {
