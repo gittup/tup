@@ -279,6 +279,8 @@ static int watch_path(const char *path, const char *file)
 	}
 
 	if(S_ISREG(buf.st_mode)) {
+		if(tup_db_select_node(fullpath) < 0)
+			update_create_dir_for_file(fullpath);
 		create_name_file(fullpath);
 		goto out_free;
 	}
