@@ -29,7 +29,9 @@ struct buf {
 static int fslurp(int fd, struct buf *b);
 static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid);
 static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt);
-static char *cmd_printf(const char *cmd, const char *dir, const char *filename);
+static int do_rule(struct rule *r, const char *filename, const char *dir,
+		   tupid_t dt);
+static char *tup_printf(const char *cmd, const char *dir, const char *filename);
 
 int parser_create(const char *dir, tupid_t tupid)
 {
@@ -177,34 +179,67 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 {
 	struct rule *r;
 	struct flist f = {0, 0, 0};
-	int flags = FNM_PATHNAME | FNM_PERIOD;
-	char *cmd;
-	tupid_t cmd_id;
 
 	flist_foreach(&f, dir) {
 		list_for_each_entry(r, rules, list) {
-			if(fnmatch(r->input_pattern, f.filename, flags) == 0) {
-				if(r->foreach) {
-					cmd = cmd_printf(r->command, dir,
-							 f.filename);
-					if(!cmd)
-						return -1;
-					cmd_id = create_command_file(cmd);
-					if(cmd_id < 0)
-						return -1;
-					if(tup_db_create_cmdlink(dt, cmd_id) < 0)
-						return -1;
-					printf("Match[%lli]: %s, %s\n", dt, r->input_pattern,
-					       f.filename);
-					printf("Command: %s\n", cmd);
-				}
-			}
+			if(f.filename[0] == '.')
+				continue;
+			if(do_rule(r, f.filename, dir, dt) < 0)
+				return -1;
 		}
 	}
 	return 0;
 }
 
-static char *cmd_printf(const char *cmd, const char *dir, const char *filename)
+static int do_rule(struct rule *r, const char *filename, const char *dir,
+		   tupid_t dt)
+{
+	int flags = FNM_PATHNAME | FNM_PERIOD;
+	char *cmd;
+	char *output;
+	tupid_t cmd_id;
+	tupid_t in_id;
+	tupid_t out_id;
+	static char cname[PATH_MAX];
+
+	if(canonicalize2(dir, filename, cname, sizeof(cname)) < 0)
+		return -1;
+	in_id = create_name_file(cname);
+	if(in_id < 0)
+		return -1;
+	if(fnmatch(r->input_pattern, filename, flags) == 0) {
+		if(r->foreach) {
+			cmd = tup_printf(r->command, dir, filename);
+			if(!cmd)
+				return -1;
+			cmd_id = create_command_file(cmd);
+			if(cmd_id < 0)
+				return -1;
+			if(tup_db_create_cmdlink(dt, cmd_id) < 0)
+				return -1;
+			printf("Match[%lli]: %s, %s\n", dt, r->input_pattern,
+			       filename);
+			printf("Command: %s\n", cmd);
+			free(cmd);
+
+			output = tup_printf(r->output_pattern, dir, filename);
+			out_id = create_name_file(output);
+			if(out_id < 0)
+				return -1;
+
+			if(tup_db_create_link(in_id, cmd_id) < 0)
+				return -1;
+			if(tup_db_create_link(cmd_id, out_id) < 0)
+				return -1;
+
+			printf("Output: %s\n", output);
+			free(output);
+		}
+	}
+	return 0;
+}
+
+static char *tup_printf(const char *cmd, const char *dir, const char *filename)
 {
 	char *s;
 	int x;
@@ -225,9 +260,9 @@ static char *cmd_printf(const char *cmd, const char *dir, const char *filename)
 	p = cmd;
 	while((p = strchr(p, '$')) !=  NULL) {
 		p++;
-		if(*p == 'f') {
+		if(*p == 'p') {
 			clen += dlen + 1 + flen;
-		} else if(*p == 'F') {
+		} else if(*p == 'P') {
 			clen += dlen + 1 + extlessflen;
 		}
 	}
@@ -246,7 +281,7 @@ static char *cmd_printf(const char *cmd, const char *dir, const char *filename)
 
 		next++;
 		p = next + 1;
-		if(*next == 'f') {
+		if(*next == 'p') {
 			if(dir[0] != '.') {
 				memcpy(&s[x], dir, dlen);
 				x += dlen;
@@ -255,7 +290,7 @@ static char *cmd_printf(const char *cmd, const char *dir, const char *filename)
 			}
 			memcpy(&s[x], filename, flen);
 			x += flen;
-		} else if(*next == 'F') {
+		} else if(*next == 'P') {
 			if(dir[0] != '.') {
 				memcpy(&s[x], dir, dlen);
 				x += dlen;
