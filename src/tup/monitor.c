@@ -477,10 +477,10 @@ static void handle_event(struct inotify_event *e)
 		return;
 	}
 
-	/* Makefile gets special treatment, since we have to mark the
+	/* Tupfile gets special treatment, since we have to mark the
 	 * directory as needing update.
 	 */
-	if(strcmp(e->name, "Makefile") == 0) {
+	if(strcmp(e->name, "Tupfile") == 0) {
 		tupid_t tupid;
 		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
 			return;
@@ -490,7 +490,7 @@ static void handle_event(struct inotify_event *e)
 		tup_db_set_flags_by_id(tupid, TUP_FLAGS_CREATE);
 	}
 
-	/* Not a Makefile, so canonicalize the full filename into cname for
+	/* Not a Tupfile, so canonicalize the full filename into cname for
 	 * the rest of the function.
 	 */
 	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)

@@ -406,7 +406,7 @@ static int get_flags(int argc, char **argv)
 static int file_mod(const char *file, int flags)
 {
 	static char cname[PATH_MAX];
-	static char slash_make[] = "/Makefile";
+	static char slash_make[] = "/Tupfile";
 	int len;
 	int upddir = 0;
 	tupid_t tupid;
@@ -421,7 +421,7 @@ static int file_mod(const char *file, int flags)
 	 * the create nodes if:
 	 * 1) the file is new
 	 * 2) the file was deleted
-	 * 3-4) a Makefile was modified
+	 * 3-4) a Tupfile was modified
 	 */
 	if(tup_db_select_node(cname) < 0)
 		upddir = 1;
@@ -430,7 +430,7 @@ static int file_mod(const char *file, int flags)
 	if(len >= (signed)sizeof(slash_make) &&
 	   strcmp(cname + len - sizeof(slash_make) + 1, slash_make) == 0)
 		upddir = 1;
-	if(strcmp(cname, "Makefile") == 0)
+	if(strcmp(cname, "Tupfile") == 0)
 		upddir = 1;
 
 	if(upddir)

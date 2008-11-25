@@ -3,6 +3,7 @@
 #include "fileio.h"
 #include "debug.h"
 #include "db.h"
+#include "parser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,7 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int (*create)(const char *dir);
+static int (*create)(const char *dir, tupid_t tupid);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
@@ -76,16 +77,21 @@ lock_success:
 		}
 	}
 
-	handle = dlopen(create_so, RTLD_LAZY);
-	if(!handle) {
-		fprintf(stderr, "Error: Unable to load %s\n", create_so);
-		return 1;
-	}
-	create = dlsym(handle, "create");
-	if(!create) {
-		fprintf(stderr, "Error: Couldn't find 'create' symbol in "
-			"builder.\n");
-		return 1;
+	if(strcmp(create_so, "tup") == 0) {
+		create = parser_create;
+	} else {
+		handle = dlopen(create_so, RTLD_LAZY);
+		if(!handle) {
+			fprintf(stderr, "Error: Unable to load %s\n",
+				create_so);
+			return 1;
+		}
+		create = dlsym(handle, "create");
+		if(!create) {
+			fprintf(stderr, "Error: Couldn't find 'create' symbol "
+				"in shared library.\n");
+			return 1;
+		}
 	}
 
 	if(process_create_nodes() < 0)
@@ -142,7 +148,7 @@ static int process_create_nodes(void)
 
 	while(!list_empty(&namelist)) {
 		nl = list_entry(namelist.next, struct name_list, list);
-		if(create(nl->name) < 0)
+		if(create(nl->name, nl->tupid) < 0)
 			return -1;
 		if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
