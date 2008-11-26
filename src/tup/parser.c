@@ -13,12 +13,29 @@
 #include <fnmatch.h>
 #include <sys/stat.h>
 
+struct name_list {
+	struct list_head entries;
+	int num_entries;
+	int totlen;
+	int extlesstotlen;
+	tupid_t dt;
+};
+
+struct name_list_entry {
+	struct list_head list;
+	char *path;
+	int len;
+	int extlesslen;
+	tupid_t tupid;
+};
+
 struct rule {
 	struct list_head list;
 	int foreach;
 	char *input_pattern;
 	char *output_pattern;
 	char *command;
+	struct name_list namelist;
 };
 
 struct buf {
@@ -29,9 +46,10 @@ struct buf {
 static int fslurp(int fd, struct buf *b);
 static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid);
 static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt);
-static int do_rule(struct rule *r, const char *filename, const char *dir,
-		   tupid_t dt);
-static char *tup_printf(const char *cmd, const char *dir, const char *filename);
+static int file_match(struct rule *r, const char *filename, const char *dir,
+		      tupid_t dt);
+static int do_rule(struct rule *r, struct name_list *nl);
+static char *tup_printf(const char *cmd, struct name_list *nl);
 
 int parser_create(const char *dir, tupid_t tupid)
 {
@@ -157,6 +175,10 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 		}
 		r->output_pattern = output;
 		r->command = cmd;
+		INIT_LIST_HEAD(&r->namelist.entries);
+		r->namelist.num_entries = 0;
+		r->namelist.totlen = 0;
+		r->namelist.extlesstotlen = 0;
 
 		list_add(&r->list, &rules);
 	}
@@ -184,86 +206,156 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 		list_for_each_entry(r, rules, list) {
 			if(f.filename[0] == '.')
 				continue;
-			if(do_rule(r, f.filename, dir, dt) < 0)
+			if(file_match(r, f.filename, dir, dt) < 0)
 				return -1;
+		}
+	}
+
+	list_for_each_entry(r, rules, list) {
+		if(!r->foreach) {
+			struct name_list_entry *nle;
+
+			if(do_rule(r, &r->namelist) < 0)
+				return -1;
+
+			while(!list_empty(&r->namelist.entries)) {
+				nle = list_entry(r->namelist.entries.next,
+						struct name_list_entry, list);
+				list_del(&nle->list);
+				free(nle->path);
+				free(nle);
+			}
 		}
 	}
 	return 0;
 }
 
-static int do_rule(struct rule *r, const char *filename, const char *dir,
-		   tupid_t dt)
+static int file_match(struct rule *r, const char *filename, const char *dir,
+		      tupid_t dt)
 {
 	int flags = FNM_PATHNAME | FNM_PERIOD;
-	char *cmd;
-	char *output;
-	tupid_t cmd_id;
-	tupid_t in_id;
-	tupid_t out_id;
 	static char cname[PATH_MAX];
+	int clen;
+	int extlesslen;
+	tupid_t in_id;
 
-	if(canonicalize2(dir, filename, cname, sizeof(cname)) < 0)
+	clen = canonicalize2(dir, filename, cname, sizeof(cname));
+	if(clen < 0)
 		return -1;
+	extlesslen = clen - 1;
+	while(extlesslen > 0 && cname[extlesslen] != '.')
+		extlesslen--;
+
 	in_id = create_name_file(cname);
 	if(in_id < 0)
 		return -1;
 	if(fnmatch(r->input_pattern, filename, flags) == 0) {
 		if(r->foreach) {
-			cmd = tup_printf(r->command, dir, filename);
-			if(!cmd)
-				return -1;
-			cmd_id = create_command_file(cmd);
-			if(cmd_id < 0)
-				return -1;
-			if(tup_db_create_cmdlink(dt, cmd_id) < 0)
-				return -1;
-			printf("Match[%lli]: %s, %s\n", dt, r->input_pattern,
-			       filename);
-			printf("Command: %s\n", cmd);
-			free(cmd);
+			struct name_list nl;
+			struct name_list_entry nle;
 
-			output = tup_printf(r->output_pattern, dir, filename);
-			out_id = create_name_file(output);
-			if(out_id < 0)
-				return -1;
+			nle.path = cname;
+			nle.len = clen;
+			nle.extlesslen = extlesslen;
+			nle.tupid = in_id;
+			INIT_LIST_HEAD(&nl.entries);
+			list_add(&nle.list, &nl.entries);
+			nl.num_entries = 1;
+			nl.totlen = clen;
+			nl.extlesstotlen = extlesslen;
+			nl.dt = dt;
 
-			if(tup_db_create_link(in_id, cmd_id) < 0)
+			if(do_rule(r, &nl) < 0)
 				return -1;
-			if(tup_db_create_link(cmd_id, out_id) < 0)
-				return -1;
+		} else {
+			struct name_list_entry *nle;
 
-			printf("Output: %s\n", output);
-			free(output);
+			nle = malloc(sizeof *nle);
+			if(!nle) {
+				perror("malloc");
+				return -1;
+			}
+
+			nle->path = strdup(cname);
+			if(!nle->path) {
+				perror("strdup");
+				return -1;
+			}
+
+			nle->len = clen;
+			nle->extlesslen = extlesslen;
+			nle->tupid = in_id;
+
+			list_add(&nle->list, &r->namelist.entries);
+			r->namelist.num_entries++;
+			r->namelist.totlen += clen;
+			r->namelist.extlesstotlen += extlesslen;
+			r->namelist.dt = dt;
 		}
 	}
 	return 0;
 }
 
-static char *tup_printf(const char *cmd, const char *dir, const char *filename)
+static int do_rule(struct rule *r, struct name_list *nl)
 {
+	struct name_list_entry *nle;
+	char *cmd;
+	char *output;
+	tupid_t cmd_id;
+	tupid_t out_id;
+
+	cmd = tup_printf(r->command, nl);
+	if(!cmd)
+		return -1;
+	cmd_id = create_command_file(cmd);
+	free(cmd);
+	if(cmd_id < 0)
+		return -1;
+	if(tup_db_create_cmdlink(nl->dt, cmd_id) < 0)
+		return -1;
+
+	list_for_each_entry(nle, &nl->entries, list) {
+		printf("Match[%lli]: %s, %s\n", nl->dt, r->input_pattern,
+		       nle->path);
+		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
+			return -1;
+	}
+
+	output = tup_printf(r->output_pattern, nl);
+	out_id = create_name_file(output);
+	free(output);
+	if(out_id < 0)
+		return -1;
+
+	if(tup_db_create_link(cmd_id, out_id) < 0)
+		return -1;
+	return 0;
+}
+
+static char *tup_printf(const char *cmd, struct name_list *nl)
+{
+	struct name_list_entry *nle;
 	char *s;
 	int x;
 	const char *p;
 	const char *next;
+	const char *spc;
 	int clen = strlen(cmd);
-	int dlen = strlen(dir);
-	int flen = strlen(filename);
-	int extlessflen;
-
-	extlessflen = flen - 1;
-	while(extlessflen > 0 && filename[extlessflen] != '.') {
-		extlessflen--;
-	}
-
-	printf("File: '%s', len = %i, extlessflen: %i\n", filename, flen, extlessflen);
 
 	p = cmd;
 	while((p = strchr(p, '$')) !=  NULL) {
+		int paste_chars;
+
+		clen -= 2;
 		p++;
+		spc = p + 1;
+		while(*spc && *spc != ' ')
+			spc++;
+		paste_chars = (nl->num_entries - 1) * (spc - p);
 		if(*p == 'p') {
-			clen += dlen + 1 + flen;
+			clen += nl->totlen + paste_chars;
 		} else if(*p == 'P') {
-			clen += dlen + 1 + extlessflen;
+			clen += nl->extlesstotlen + paste_chars;
 		}
 	}
 
@@ -281,26 +373,32 @@ static char *tup_printf(const char *cmd, const char *dir, const char *filename)
 
 		next++;
 		p = next + 1;
+		spc = p + 1;
+		while(*spc && *spc != ' ')
+			spc++;
+		if(*spc == ' ')
+			spc++;
 		if(*next == 'p') {
-			if(dir[0] != '.') {
-				memcpy(&s[x], dir, dlen);
-				x += dlen;
-				s[x] = '/';
-				x++;
+			list_for_each_entry(nle, &nl->entries, list) {
+				memcpy(&s[x], nle->path, nle->len);
+				x += nle->len;
+				memcpy(&s[x], p, spc - p);
+				x += spc - p;
 			}
-			memcpy(&s[x], filename, flen);
-			x += flen;
 		} else if(*next == 'P') {
-			if(dir[0] != '.') {
-				memcpy(&s[x], dir, dlen);
-				x += dlen;
-				s[x] = '/';
-				x++;
+			list_for_each_entry(nle, &nl->entries, list) {
+				memcpy(&s[x], nle->path, nle->extlesslen);
+				x += nle->extlesslen;
+				memcpy(&s[x], p, spc - p);
+				x += spc - p;
 			}
-			memcpy(&s[x], filename, extlessflen);
-			x += extlessflen;
 		}
+		p = spc;
 	}
 	strcpy(&s[x], p);
+	if((signed)strlen(s) != clen) {
+		fprintf(stderr, "Error: Calculated string length didn't match actual.\n");
+		return NULL;
+	}
 	return s;
 }
