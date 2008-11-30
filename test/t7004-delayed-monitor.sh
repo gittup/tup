@@ -4,7 +4,7 @@
 
 # First create a foo.c program, then stop the monitor
 tup monitor
-cp ../testMakefile Makefile
+cp ../testTupfile Tupfile
 echo "int main(void) {return 0;}" > foo.c
 update
 tup stop

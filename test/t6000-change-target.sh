@@ -1,17 +1,17 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
-tup touch foo.c Makefile
+tup touch foo.c Tupfile
 update
 sym_check foo.o foo
 sym_check prog foo
 
-cat Makefile | sed 's/prog := prog/prog := newprog/' > tmpMakefile
-mv tmpMakefile Makefile
-tup touch Makefile
+cat Tupfile | sed 's/prog/newprog/g' > tmpTupfile
+mv tmpTupfile Tupfile
+tup touch Tupfile
 update
 
 sym_check newprog foo

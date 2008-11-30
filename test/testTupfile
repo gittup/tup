@@ -1,0 +1,2 @@
+foreach *.c >> tup wrap gcc -c $p -o $P.o >> $P.o
+*.c >> tup wrap gcc $P.o -o prog >> prog

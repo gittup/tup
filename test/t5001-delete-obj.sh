@@ -4,7 +4,7 @@ echo "[33mSkip t5001 - not needed?"
 exit 0
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile Tupfile
 
 echo "int main(void) {return 0;}" > foo.c
 echo "void bar1(void) {}" > bar.c

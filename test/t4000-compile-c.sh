@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile Tupfile
 
 echo "int main(void) {}" > foo.c
 tup touch foo.c

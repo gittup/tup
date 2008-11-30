@@ -406,7 +406,7 @@ static int get_flags(int argc, char **argv)
 static int file_mod(const char *file, int flags)
 {
 	static char cname[PATH_MAX];
-	static char slash_make[] = "/Tupfile";
+	static char slash_tup[] = "/Tupfile";
 	int len;
 	int upddir = 0;
 	tupid_t tupid;
@@ -427,8 +427,8 @@ static int file_mod(const char *file, int flags)
 		upddir = 1;
 	if(flags == TUP_FLAGS_DELETE)
 		upddir = 1;
-	if(len >= (signed)sizeof(slash_make) &&
-	   strcmp(cname + len - sizeof(slash_make) + 1, slash_make) == 0)
+	if(len >= (signed)sizeof(slash_tup) &&
+	   strcmp(cname + len - sizeof(slash_tup) + 1, slash_tup) == 0)
 		upddir = 1;
 	if(strcmp(cname, "Tupfile") == 0)
 		upddir = 1;

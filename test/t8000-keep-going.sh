@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile Tupfile
 
 # Admittedly, I don't really know how the order these files are created
 # determines the order in which they are processed in the updater. I just
@@ -12,9 +12,9 @@ cp ../testMakefile Makefile
 # made dependent on each other, since we're supposed to test the keep_going
 # logic, which requires independent commands.
 
+echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
 echo "void foo2(void) {}" > foo2.c
-echo "void bar(void) {}" > bar.c
 tup touch foo.c foo2.c bar.c
 update_fail
 

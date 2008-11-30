@@ -212,7 +212,7 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 	}
 
 	list_for_each_entry(r, rules, list) {
-		if(!r->foreach) {
+		if(!r->foreach && r->namelist.num_entries > 0) {
 			struct name_list_entry *nle;
 
 			if(do_rule(r, &r->namelist) < 0)
