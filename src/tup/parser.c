@@ -126,6 +126,13 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 
 	while(p < e) {
 		line = p;
+		if(line[0] == '#') {
+			p = strchr(p, '\n');
+			p++;
+			if(!p)
+				goto syntax_error;
+			continue;
+		}
 
 		input = p;
 		while(*input == ' ')
