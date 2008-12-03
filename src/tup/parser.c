@@ -18,6 +18,8 @@ struct name_list {
 	int num_entries;
 	int totlen;
 	int extlesstotlen;
+	const char *dir;
+	int dirlen;
 	tupid_t dt;
 };
 
@@ -49,6 +51,7 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt);
 static int file_match(struct rule *r, const char *filename, const char *dir,
 		      tupid_t dt);
 static int do_rule(struct rule *r, struct name_list *nl);
+static void setup_nl_dir(struct name_list *nl, const char *dir);
 static char *tup_printf(const char *cmd, struct name_list *nl);
 
 int parser_create(const char *dir, tupid_t tupid)
@@ -125,6 +128,8 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 	e = b->s + b->len;
 
 	while(p < e) {
+		while((*p == ' ' || *p == '\t' || *p == '\n') && p < e)
+			p++;
 		line = p;
 		if(line[0] == '#') {
 			p = strchr(p, '\n');
@@ -186,6 +191,7 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 		r->namelist.num_entries = 0;
 		r->namelist.totlen = 0;
 		r->namelist.extlesstotlen = 0;
+		setup_nl_dir(&r->namelist, dir);
 
 		list_add(&r->list, &rules);
 	}
@@ -271,6 +277,7 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 			nl.totlen = clen;
 			nl.extlesstotlen = extlesslen;
 			nl.dt = dt;
+			setup_nl_dir(&nl, dir);
 
 			if(do_rule(r, &nl) < 0)
 				return -1;
@@ -339,6 +346,17 @@ static int do_rule(struct rule *r, struct name_list *nl)
 	return 0;
 }
 
+static void setup_nl_dir(struct name_list *nl, const char *dir)
+{
+	if(dir[0] == '.') {
+		nl->dir = "";
+		nl->dirlen = 0;
+	} else {
+		nl->dir = dir;
+		nl->dirlen = strlen(dir) + 1; /* Room for trailing '/' */
+	}
+}
+
 static char *tup_printf(const char *cmd, struct name_list *nl)
 {
 	struct name_list_entry *nle;
@@ -363,6 +381,8 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			clen += nl->totlen + paste_chars;
 		} else if(*p == 'P') {
 			clen += nl->extlesstotlen + paste_chars;
+		} else if(*p == 'd') {
+			clen += nl->dirlen;
 		}
 	}
 
@@ -399,12 +419,20 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
 			}
+		} else if(*next == 'd') {
+			if(nl->dirlen) {
+				memcpy(&s[x], nl->dir, nl->dirlen);
+				x += nl->dirlen;
+				s[x-1] = '/';
+			}
+			memcpy(&s[x], p, spc - p);
+			x += spc - p;
 		}
 		p = spc;
 	}
 	strcpy(&s[x], p);
 	if((signed)strlen(s) != clen) {
-		fprintf(stderr, "Error: Calculated string length didn't match actual.\n");
+		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%i).\n", clen, strlen(s));
 		return NULL;
 	}
 	return s;
