@@ -141,10 +141,12 @@ int monitor(int argc, char **argv)
 	if(fork() > 0)
 		exit(0);
 
+	tup_db_begin();
 	if(watch_path(".", "") < 0) {
 		rc = -1;
 		goto close_inot;
 	}
+	tup_db_commit();
 
 	gettimeofday(&t2, NULL);
 	fprintf(stderr, "Initialized in %f seconds.\n",
@@ -360,6 +362,7 @@ static void queue_event(struct inotify_event *e)
 
 static void flush_queue(void)
 {
+	tup_db_begin();
 	while(queue_start < queue_end) {
 		struct inotify_event *e;
 
@@ -370,6 +373,7 @@ static void flush_queue(void)
 			handle_event(e);
 		queue_start += sizeof(*e) + e->len;
 	}
+	tup_db_commit();
 
 	queue_start = 0;
 	queue_end = 0;
