@@ -139,6 +139,33 @@ int tup_db_commit(void)
 	return 0;
 }
 
+int tup_db_rollback(void)
+{
+	int rc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "rollback";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(stmt);
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
+}
+
 int tup_db_select(int (*callback)(void *, int, char **, char **),
 		  void *arg, const char *sql, ...)
 {

@@ -15,7 +15,7 @@ static int create_flag_cb(void *arg, struct db_node *dbn);
 static int process_create_nodes(void);
 static int md_flag_cb(void *arg, struct db_node *dbn);
 static int build_graph(struct graph *g);
-static int add_file(struct graph *g, struct node *src, struct db_node *dbn);
+static int add_file(struct graph *g, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
@@ -141,29 +141,35 @@ static int process_create_nodes(void)
 	struct name_list *nl;
 	LIST_HEAD(namelist);
 
+	tup_db_begin();
 	/* TODO: Do in while loop in case it creates more create nodes? */
 	if(tup_db_select_node_by_flags(create_flag_cb, &namelist,
 				       TUP_FLAGS_CREATE) != 0)
-		return -1;
+		goto err_rollback;
 
 	while(!list_empty(&namelist)) {
 		nl = list_entry(namelist.next, struct name_list, list);
 		if(create(nl->name, nl->tupid) < 0)
-			return -1;
+			goto err_rollback;
 		if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE) < 0)
-			return -1;
+			goto err_rollback;
 		list_del(&nl->list);
 		free(nl->name);
 		free(nl);
 	}
+	tup_db_commit();
 
 	return 0;
+
+err_rollback:
+	tup_db_rollback();
+	return -1;
 }
 
 static int md_flag_cb(void *arg, struct db_node *dbn)
 {
 	struct graph *g = arg;
-	if(add_file(g, g->cur, dbn) < 0)
+	if(add_file(g, dbn) < 0)
 		return -1;
 	return 0;
 }
@@ -204,7 +210,7 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file(struct graph *g, struct node *src, struct db_node *dbn)
+static int add_file(struct graph *g, struct db_node *dbn)
 {
 	struct node *n;
 
@@ -220,10 +226,10 @@ edge_create:
 	if(n->state == STATE_PROCESSING) {
 		fprintf(stderr, "Error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
-			src->tupid, dbn->tupid);
+			g->cur->tupid, dbn->tupid);
 		return -1;
 	}
-	if(create_edge(src, n) < 0)
+	if(create_edge(g->cur, n) < 0)
 		return -1;
 	return 0;
 }

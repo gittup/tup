@@ -31,6 +31,7 @@ int tup_db_open(void);
 int tup_db_create(int db_sync);
 int tup_db_begin(void);
 int tup_db_commit(void);
+int tup_db_rollback(void);
 
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
