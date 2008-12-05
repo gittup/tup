@@ -475,4 +475,9 @@ static void usage(void)
 	printf("Where command is:\n");
 	printf("  init		Initialize the tup database in .tup/\n");
 	printf("  monitor 	Start the file monitor\n");
+	printf("  stop		Stop the file monitor\n");
+	printf("  g		Print a graphviz .dot graph of the .tup repository to stdout\n");
+	printf("  link cmd -iinfile... -ooutfile...\n\t\tCreate a command node containing 'cmd', with -i as input nodes\n\t\tand -o as output nodes\n");
+	printf("  wrap cmd	Run the specified command using the wrapper.\n");
+	printf("  upd		Run the updater. (Actually build stuff).\n");
 }
