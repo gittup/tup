@@ -15,6 +15,7 @@ struct file_entry {
 
 static struct file_entry *new_entry(const struct access_event *event,
 				    tupid_t tupid);
+static void del_entry(struct file_entry *fent);
 static int handle_rename_to(int pid, tupid_t tupid);
 static int __handle_rename_to(struct file_entry *from, tupid_t tupid);
 
@@ -74,17 +75,17 @@ int write_files(tupid_t cmdid)
 			return -1;
 		list_for_each_entry_safe(r, tmp, &read_list, list) {
 			if(w->tupid == r->tupid)
-				list_del(&r->list);
+				del_entry(r);
 		}
 
-		list_del(&w->list);
+		del_entry(w);
 	}
 
 	while(!list_empty(&read_list)) {
 		r = list_entry(read_list.next, struct file_entry, list);
 		if(tup_db_create_link(r->tupid, cmdid) < 0)
 			return -1;
-		list_del(&r->list);
+		del_entry(r);
 	}
 	return 0;
 }
@@ -105,6 +106,12 @@ static struct file_entry *new_entry(const struct access_event *event,
 	return fent;
 }
 
+static void del_entry(struct file_entry *fent)
+{
+	list_del(&fent->list);
+	free(fent);
+}
+
 static int handle_rename_to(int pid, tupid_t tupid)
 {
 	struct file_entry *from;
@@ -123,8 +130,6 @@ static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 {
 	struct file_entry *fent;
 
-	list_del(&from->list);
-
 	list_for_each_entry(fent, &write_list, list) {
 		if(fent->tupid == from->tupid) {
 			fent->tupid = tupid;
@@ -135,5 +140,6 @@ static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 			fent->tupid = tupid;
 		}
 	}
+	del_entry(from);
 	return 0;
 }

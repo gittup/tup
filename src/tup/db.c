@@ -34,6 +34,22 @@ int tup_db_open(void)
 	return rc;
 }
 
+int tup_db_close(void)
+{
+	sqlite3_stmt *stmt;
+
+	while((stmt = sqlite3_next_stmt(tup_db, 0)) !=0) {
+		sqlite3_finalize(stmt);
+	}
+
+	if(sqlite3_close(tup_db) != 0) {
+		fprintf(stderr, "Unable to close database: %s\n",
+			sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
+}
+
 int tup_db_create(int db_sync)
 {
 	int rc;

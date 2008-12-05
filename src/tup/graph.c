@@ -50,6 +50,7 @@ void remove_node(struct graph *g, struct node *n)
 	}
 	memdb_remove(&g->memdb, n->tupid);
 	/* TODO: block pool */
+	free(n->name);
 	free(n);
 }
 

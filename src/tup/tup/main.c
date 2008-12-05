@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <mcheck.h>
 #include "tup/config.h"
 #include "tup/compat.h"
 #include "tup/db.h"
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
 	int rc = 0;
 	const char *cmd;
 
+	mtrace();
 	if(argc < 2) {
 		usage();
 		return 1;
@@ -100,6 +102,7 @@ int main(int argc, char **argv)
 		rc = 1;
 	}
 
+	tup_db_close();
 out:
 	tup_lock_exit();
 	return rc;

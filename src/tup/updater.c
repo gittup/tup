@@ -96,6 +96,7 @@ lock_success:
 			return 1;
 		}
 	}
+	free(create_so);
 
 	if(process_create_nodes() < 0)
 		return 1;
