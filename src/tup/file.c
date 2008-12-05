@@ -1,8 +1,9 @@
 #include "file.h"
-#include "tup/access_event.h"
-#include "tup/debug.h"
-#include "tup/list.h"
-#include "tup/db.h"
+#include "access_event.h"
+#include "debug.h"
+#include "list.h"
+#include "db.h"
+#include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,27 +13,31 @@ struct file_entry {
 	struct list_head list;
 };
 
-static struct file_entry *new_entry(const struct access_event *event);
-static int handle_rename_to(const struct access_event *event);
-static int __handle_rename_to(struct file_entry *from,
-			      const struct access_event *event);
+static struct file_entry *new_entry(const struct access_event *event,
+				    tupid_t tupid);
+static int handle_rename_to(int pid, tupid_t tupid);
+static int __handle_rename_to(struct file_entry *from, tupid_t tupid);
 
 static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
 static LIST_HEAD(rename_list);
 
-int handle_file(const struct access_event *event)
+int handle_file(const struct access_event *event, const char *filename)
 {
 	struct file_entry *fent;
 	int rc = 0;
+	tupid_t tupid;
 
-	DEBUGP("received tupid '%lli' in mode %i\n", event->tupid, event->at);
+	tupid = create_name_file(filename);
+	if(tupid < 0)
+		return -1;
+	DEBUGP("received tupid '%lli' in mode %i\n", tupid, event->at);
 
 	if(event->at == ACCESS_RENAME_TO) {
-		return handle_rename_to(event);
+		return handle_rename_to(event->pid, tupid);
 	}
 
-	fent = new_entry(event);
+	fent = new_entry(event, tupid);
 	if(!fent) {
 		return -1;
 	}
@@ -61,8 +66,9 @@ int write_files(tupid_t cmdid)
 	struct file_entry *w;
 	struct file_entry *r;
 
-	list_for_each_entry(w, &write_list, list) {
+	while(!list_empty(&write_list)) {
 		struct file_entry *tmp;
+		w = list_entry(write_list.next, struct file_entry, list);
 
 		if(tup_db_create_link(cmdid, w->tupid) < 0)
 			return -1;
@@ -70,16 +76,21 @@ int write_files(tupid_t cmdid)
 			if(w->tupid == r->tupid)
 				list_del(&r->list);
 		}
+
+		list_del(&w->list);
 	}
 
-	list_for_each_entry(r, &read_list, list) {
+	while(!list_empty(&read_list)) {
+		r = list_entry(read_list.next, struct file_entry, list);
 		if(tup_db_create_link(r->tupid, cmdid) < 0)
 			return -1;
+		list_del(&r->list);
 	}
 	return 0;
 }
 
-static struct file_entry *new_entry(const struct access_event *event)
+static struct file_entry *new_entry(const struct access_event *event,
+				    tupid_t tupid)
 {
 	struct file_entry *fent;
 
@@ -89,27 +100,26 @@ static struct file_entry *new_entry(const struct access_event *event)
 		return NULL;
 	}
 
-	fent->tupid = event->tupid;
+	fent->tupid = tupid;
 	fent->pid = event->pid;
 	return fent;
 }
 
-static int handle_rename_to(const struct access_event *event)
+static int handle_rename_to(int pid, tupid_t tupid)
 {
 	struct file_entry *from;
 
 	list_for_each_entry(from, &rename_list, list) {
-		if(from->pid == event->pid) {
-			return __handle_rename_to(from, event);
+		if(from->pid == pid) {
+			return __handle_rename_to(from, tupid);
 		}
 	}
 	fprintf(stderr, "Error: ACCESS_RENAME_TO event corresponding to pid %i "
-		"not found in rename_list.\n", event->pid);
+		"not found in rename_list.\n", pid);
 	return -1;
 }
 
-static int __handle_rename_to(struct file_entry *from,
-			      const struct access_event *event)
+static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 {
 	struct file_entry *fent;
 
@@ -117,12 +127,12 @@ static int __handle_rename_to(struct file_entry *from,
 
 	list_for_each_entry(fent, &write_list, list) {
 		if(fent->tupid == from->tupid) {
-			fent->tupid = event->tupid;
+			fent->tupid = tupid;
 		}
 	}
 	list_for_each_entry(fent, &read_list, list) {
 		if(fent->tupid == from->tupid) {
-			fent->tupid = event->tupid;
+			fent->tupid = tupid;
 		}
 	}
 	return 0;

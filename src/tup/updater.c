@@ -4,12 +4,15 @@
 #include "debug.h"
 #include "db.h"
 #include "parser.h"
+#include "server.h"
+#include "file.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <dlfcn.h>
 #include <sys/file.h>
+#include <sys/wait.h>
 
 static int create_flag_cb(void *arg, struct db_node *dbn);
 static int process_create_nodes(void);
@@ -248,11 +251,13 @@ static int execute_graph(struct graph *g)
 {
 	struct node *root;
 	int num_processed = 0;
+	int rc = -1;
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
 	list_move(&root->list, &g->plist);
 
+	tup_db_begin();
 	show_progress(num_processed, g->num_nodes);
 	while(!list_empty(&g->plist)) {
 		struct node *n;
@@ -272,17 +277,17 @@ static int execute_graph(struct graph *g)
 				printf("[35mDelete[%lli]: %s[0m\n",
 				       n->tupid, n->name);
 				if(delete_name_file(n->tupid) < 0)
-					return -1;
+					goto out;
 			} else if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
 					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
 					if(delete_name_file(n->tupid) < 0)
-						return -1;
+						goto out;
 				} else {
 					if(update(n) < 0) {
 						if(do_keep_going)
 							goto keep_going;
-						return -1;
+						goto out;
 					}
 				}
 			} else {
@@ -312,7 +317,7 @@ static int execute_graph(struct graph *g)
 			n->edges = remove_edge(e);
 		}
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-			return -1;
+			goto out;
 keep_going:
 		if(n != root) {
 			num_processed++;
@@ -327,38 +332,52 @@ keep_going:
 		} else {
 			fprintf(stderr, "Error: Graph is not empty after execution.\n");
 		}
-		return -1;
+		goto out;
 	}
-	return 0;
+	rc = 0;
+out:
+	tup_db_commit();
+	return rc;
 }
 
 static int update(struct node *n)
 {
-	int rc;
-	char s[32];
+	int status;
+	int pid;
 	tupid_t tupid;
 
 	tupid = tup_db_create_dup_node(n->name, n->type, TUP_FLAGS_NONE);
 	if(tupid < 0)
 		return -1;
 
-	if(snprintf(s, sizeof(s), "%lli", tupid) >= (signed)sizeof(s)) {
-		fprintf(stderr, "Buffer size error in update()\n");
-		goto err_delete_node;
-	}
-
-	if(setenv(TUP_CMD_ID, s, 1) < 0) {
-		perror("setenv");
-		goto err_delete_node;
-	}
-
 	printf("%s\n", n->name);
-	rc = system(n->name);
-	unsetenv(TUP_CMD_ID);
-	if(rc != 0)
+
+	start_server();
+	pid = fork();
+	if(pid < 0) {
+		perror("fork");
 		goto err_delete_node;
+	}
+	if(pid == 0) {
+		execl("/bin/sh", "/bin/sh", "-c", n->name, NULL);
+		perror("execl");
+		exit(1);
+	}
+	wait(&status);
+	stop_server();
+
+	if(WIFEXITED(status)) {
+		if(WEXITSTATUS(status) == 0) {
+			if(write_files(tupid) < 0)
+				goto err_delete_node;
+		} else {
+			goto err_delete_node;
+		}
+	}
+
 	if(tup_db_move_cmdlink(n->tupid, tupid) < 0)
-		return -1;
+		goto err_delete_node;
+
 	delete_name_file(n->tupid);
 	return 0;
 

@@ -11,7 +11,7 @@ d := \$(if \$(filter .,\$(TUPWD)),,\$(TUPWD)/)
 
 all:
 	@echo "Run a command to generate multiple files"
-	tup link "tup wrap sh ok.sh"
+	tup link "sh ok.sh"
 
 .PHONY: all
 HERE

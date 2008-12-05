@@ -11,5 +11,5 @@ tup touch foo.h
 tup touch bar/foo.c
 update
 sym_check bar/foo.o main
-tup_dep_exist foo.h "tup wrap gcc -c bar/foo.c -o bar/foo.o"
-tup_dep_exist "tup wrap gcc -c bar/foo.c -o bar/foo.o" bar/foo.o
+tup_dep_exist foo.h "gcc -c bar/foo.c -o bar/foo.o"
+tup_dep_exist "gcc -c bar/foo.c -o bar/foo.o" bar/foo.o

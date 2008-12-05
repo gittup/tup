@@ -37,10 +37,8 @@ struct access_event {
 	 */
 	int pid;
 
-	/** The tupid corresponding to this event. Not needed for the
-	 * ACCESS_STOP_SERVER event.
-	 */
-	tupid_t tupid;
+	/** Length of the path, which will follow the access_event struct */
+	int len;
 };
 
 #endif

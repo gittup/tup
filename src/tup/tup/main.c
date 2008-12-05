@@ -13,7 +13,6 @@
 #include "tup/tupid.h"
 #include "tup/fileio.h"
 #include "tup/updater.h"
-#include "tup/wrap.h"
 
 #define TUP_DIR ".tup"
 
@@ -84,8 +83,6 @@ int main(int argc, char **argv)
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv);
-	} else if(strcmp(cmd, "wrap") == 0) {
-		rc = wrap(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {
@@ -478,6 +475,5 @@ static void usage(void)
 	printf("  stop		Stop the file monitor\n");
 	printf("  g		Print a graphviz .dot graph of the .tup repository to stdout\n");
 	printf("  link cmd -iinfile... -ooutfile...\n\t\tCreate a command node containing 'cmd', with -i as input nodes\n\t\tand -o as output nodes\n");
-	printf("  wrap cmd	Run the specified command using the wrapper.\n");
 	printf("  upd		Run the updater. (Actually build stuff).\n");
 }

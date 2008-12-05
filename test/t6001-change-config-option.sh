@@ -19,12 +19,12 @@ d := \$(if \$(filter .,\$(TUPWD)),,\$(TUPWD)/)
 ifneq (,\$(strip \$(objs)))
 \$(prog): \$(objs)
 	@echo "Link '\$(patsubst %,\$d%,\$^)' into '\$d\$@'"; \
-	tup link "tup wrap gcc \$(patsubst %,\$d%,\$^) -o \$d\$@" \$(foreach f,\$^,-i\$f) -o\$@
+	tup link "gcc \$(patsubst %,\$d%,\$^) -o \$d\$@" \$(foreach f,\$^,-i\$f) -o\$@
 endif
 
 \$(objs): %.o: %.c
 	@echo "Compile '\$d\$<' into '\$d\$@'"; \
-	tup link "tup wrap gcc -c \$d\$< -o \$d\$@" -i\$< -o\$@
+	tup link "gcc -c \$d\$< -o \$d\$@" -i\$< -o\$@
 
 default: ; @true
 

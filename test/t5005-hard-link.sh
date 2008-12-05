@@ -9,7 +9,7 @@ ln file1 file2
 cat > Makefile << HERE
 all: new-file1 new-file2
 new-%: %
-	tup link "tup wrap cp \$< \$@" -i\$< -o\$@
+	tup link "cp \$< \$@" -i\$< -o\$@
 HERE
 
 tup touch file1 file2 Makefile

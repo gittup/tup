@@ -1,8 +1,9 @@
 #include "server.h"
 #include "file.h"
-#include "tup/access_event.h"
-#include "tup/debug.h"
-#include "tup/getexecwd.h"
+#include "access_event.h"
+#include "debug.h"
+#include "getexecwd.h"
+#include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -82,13 +83,32 @@ void stop_server(void)
 static void *message_thread(void *arg)
 {
 	struct access_event event;
+	static char filename[PATH_MAX];
+	static char cname[PATH_MAX];
 	int rc;
 	if(arg) {/* unused */}
 
 	while((rc = recv(sd, &event, sizeof(event), 0)) > 0) {
 		if(event.at == ACCESS_STOP_SERVER)
 			break;
-		if(handle_file(&event) < 0)
+		if(event.len) {
+			rc = recv(sd, filename, sizeof(filename), 0);
+			if(rc < 0) {
+				perror("recv");
+				return NULL;
+			}
+			if(rc != event.len) {
+				fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, event.len);
+				return NULL;
+			}
+
+			/* Skip the file if it's outside of our local tree */
+			if(canonicalize(filename, cname, sizeof(cname)) < 0)
+				continue;
+		} else {
+			cname[0] = 0;
+		}
+		if(handle_file(&event, cname) < 0)
 			break;
 	}
 	if(rc < 0) {

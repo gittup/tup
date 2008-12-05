@@ -3,8 +3,6 @@
 #include "tup/access_event.h"
 #include "tup/debug.h"
 #include "tup/config.h"
-#include "tup/fileio.h"
-#include "tup/db.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,23 +120,16 @@ int rename(const char *old, const char *new)
 static void handle_file(const char *file, int at, const char *funcname)
 {
 	struct access_event event;
-	static char cname[PATH_MAX];
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 	if(ignore_file(file))
 		return;
-	pthread_mutex_lock(&lock);
-	if(canonicalize(file, cname, sizeof(cname)) < 0) {
-		pthread_mutex_unlock(&lock);
-		return;
-	}
-	event.tupid = create_name_file(cname);
-	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
-	pthread_mutex_unlock(&lock);
+	DEBUGP("send file '%s' mode %i from func %s\n", file, at, funcname);
 
 	event.at = at;
 	event.pid = my_pid;
-	sendto(sd, &event, sizeof(event), 0, (void*)&addr, sizeof(addr));
+	event.len = strlen(file) + 1;
+	sendto(sd, &event, sizeof(event), MSG_MORE, (void*)&addr, sizeof(addr));
+	sendto(sd, file, event.len, 0, (void*)&addr, sizeof(addr));
 }
 
 static void handle_rename_file(const char *old, const char *new)
@@ -177,10 +168,6 @@ static void ldpre_init(void)
 		exit(1);
 	}
 	if(find_tup_dir() < 0) {
-		exit(1);
-	}
-
-	if(tup_db_open() < 0) {
 		exit(1);
 	}
 
