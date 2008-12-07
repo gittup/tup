@@ -17,5 +17,8 @@ sym_check a/a2/prog main
 # Move directory a to b
 mv a b
 update
+tup g | dot -Tpng | xv -
 tup_object_exist b/a2/foo.c b/a2/foo.o b/a2/prog
 tup_object_no_exist a/a2/foo.c a/a2/foo.o a/a2/prog a a/a2
+exit 1
+# TODO: Commands still exist here (gcc -c a/a2/foo.c) and shouldn't

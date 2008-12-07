@@ -7,6 +7,7 @@
 
 struct db_node {
 	tupid_t tupid;
+	tupid_t dt;
 	const char *name;
 	int type;
 	int flags;
@@ -38,33 +39,25 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
 
 /* Node operations */
-tupid_t tup_db_create_node(const char *name, int type, int flags);
-tupid_t tup_db_create_dup_node(const char *name, int type, int flags);
-tupid_t tup_db_select_node(const char *name);
+tupid_t tup_db_create_node(tupid_t dt, const char *name, int type, int flags);
+tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type, int flags);
+tupid_t tup_db_select_node(tupid_t dt, const char *name);
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 				void *arg, int flags);
-int tup_db_set_flags_by_name(const char *name, int flags);
+int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);
-int tup_db_delete_dir(const char *path);
+int tup_db_delete_dir(const char *dir);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_delete_links(tupid_t tupid);
 
-int tup_db_create_cmdlink(tupid_t a, tupid_t b);
-int tup_db_cmdlink_exists(tupid_t a, tupid_t b);
-int tup_db_delete_cmdlinks(tupid_t tupid);
-
-int tup_db_move_cmdlink(tupid_t orig, tupid_t new);
-
 /* Combo operations */
-int tup_db_set_cmdchild_flags(tupid_t parent, int flags);
+int tup_db_set_dircmd_flags(tupid_t parent, int flags);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
 			       void *arg, tupid_t tupid);
-int tup_db_select_node_by_cmdlink(int (*callback)(void *, struct db_node *),
-				  void *arg, tupid_t tupid);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);

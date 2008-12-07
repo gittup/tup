@@ -86,29 +86,48 @@ static void *message_thread(void *arg)
 	static char filename[PATH_MAX];
 	static char cname[PATH_MAX];
 	int rc;
+	int lastslash;
+	tupid_t dt;
+	tupid_t tupid;
 	if(arg) {/* unused */}
 
 	while((rc = recv(sd, &event, sizeof(event), 0)) > 0) {
 		if(event.at == ACCESS_STOP_SERVER)
 			break;
-		if(event.len) {
-			rc = recv(sd, filename, sizeof(filename), 0);
-			if(rc < 0) {
-				perror("recv");
-				return NULL;
-			}
-			if(rc != event.len) {
-				fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, event.len);
-				return NULL;
-			}
-
-			/* Skip the file if it's outside of our local tree */
-			if(canonicalize(filename, cname, sizeof(cname)) < 0)
-				continue;
-		} else {
-			cname[0] = 0;
+		if(!event.len)
+			continue;
+		rc = recv(sd, filename, sizeof(filename), 0);
+		if(rc < 0) {
+			perror("recv");
+			return NULL;
 		}
-		if(handle_file(&event, cname) < 0)
+		if(rc != event.len) {
+			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, event.len);
+			return NULL;
+		}
+
+		/* TODO: Re-use tup_file_mod here? */
+		/* Skip the file if it's outside of our local tree */
+		if(canonicalize(filename, cname, sizeof(cname),
+				&lastslash) < 0)
+			continue;
+		if(lastslash == -1) {
+			dt = create_dir_file(".");
+			if(dt < 0)
+				return NULL;
+			tupid = create_name_file(dt, cname);
+			if(tupid < 0)
+				return NULL;
+		} else {
+			cname[lastslash] = 0;
+			dt = create_dir_file(cname);
+			if(dt < 0)
+				return NULL;
+			tupid = create_name_file(dt, &cname[lastslash+1]);
+			if(tupid < 0)
+				return NULL;
+		}
+		if(handle_file(&event, tupid) < 0)
 			break;
 	}
 	if(rc < 0) {

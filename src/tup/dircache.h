@@ -2,10 +2,12 @@
 #define dircache_h
 
 #include "list.h"
+#include "tupid.h"
 
 struct dircache {
 	struct list_head list;
 	int wd;
+	tupid_t dt;
 	char *path;
 };
 
@@ -15,7 +17,7 @@ struct memdb;
  * ownership of the memory pointed to by path, which must have been allocated
  * by malloc() or equivalent.
  */
-void dircache_add(struct memdb *m, int wd, char *path);
+void dircache_add(struct memdb *m, int wd, char *path, tupid_t dt);
 
 /** Returns the path given when wd was added to the dircache, or NULL if not
  * found.

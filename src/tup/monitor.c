@@ -159,9 +159,7 @@ int monitor(int argc, char **argv)
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
 
-			if(e->mask & IN_ISDIR && (
-						  e->mask & IN_IGNORED ||
-						  e->mask & IN_DELETE ||
+			if(e->mask & IN_ISDIR && (e->mask & IN_DELETE ||
 						  e->mask & IN_MOVED_FROM)) {
 				check_deletion(e);
 			}
@@ -259,6 +257,8 @@ static int watch_path(const char *path, const char *file)
 	struct flist f = {0, 0, 0};
 	struct stat buf;
 	char *fullpath;
+	int lastslash;
+	tupid_t dt;
 
 	/* Skip hidden directories */
 	if(file[0] == '.') {
@@ -272,7 +272,9 @@ static int watch_path(const char *path, const char *file)
 	}
 
 	/* The canonicalization will remove the trailing '/' temporarily */
-	len = canonicalize_string(fullpath, len);
+	len = canonicalize_string(fullpath, len, &lastslash);
+	if(len < 0)
+		goto out_free;
 
 	if(stat(fullpath, &buf) != 0) {
 		perror(fullpath);
@@ -281,13 +283,23 @@ static int watch_path(const char *path, const char *file)
 	}
 
 	if(S_ISREG(buf.st_mode)) {
-		if(tup_db_select_node(fullpath) < 0)
-			update_create_dir_for_file(fullpath);
-		create_name_file(fullpath);
+		/* TODO: Re-use tup_file_mod() somehow? */
+		fullpath[lastslash] = 0;
+		dt = create_dir_file(fullpath);
+		if(dt < 0) {
+			rc = -1;
+			goto out_free;
+		}
+		if(tup_db_select_node(dt, file) < 0)
+			if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0) {
+				rc = -1;
+				goto out_free;
+			}
+		create_name_file(dt, file);
 		goto out_free;
 	}
 	if(S_ISDIR(buf.st_mode)) {
-		create_dir_file(fullpath);
+		dt = create_dir_file(fullpath);
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			fullpath);
@@ -311,7 +323,7 @@ static int watch_path(const char *path, const char *file)
 		rc = -1;
 		goto out_free;
 	}
-	dircache_add(&mdb, wd, fullpath);
+	dircache_add(&mdb, wd, fullpath, dt);
 	flist_foreach(&f, fullpath) {
 		if(strcmp(f.filename, ".") == 0 ||
 		   strcmp(f.filename, "..") == 0)
@@ -469,10 +481,9 @@ static int ephemeral_event(struct inotify_event *e)
 
 static void handle_event(struct inotify_event *e)
 {
-	static char cname[PATH_MAX];
 	struct dircache *dc;
-	int cdf = 0;
-	DEBUGP("event: wd=%i, name='%s'\n", e->wd, e->len ? e->name : "");
+	int flags = 0;
+	printf("event: wd=%i, name='%s' mask=%08x\n", e->wd, e->len ? e->name : "", e->mask);
 
 	dc = dircache_lookup(&mdb, e->wd);
 	if(!dc) {
@@ -481,42 +492,35 @@ static void handle_event(struct inotify_event *e)
 		return;
 	}
 
-	/* Tupfile gets special treatment, since we have to mark the
-	 * directory as needing update.
-	 */
-	if(strcmp(e->name, "Tupfile") == 0) {
-		tupid_t tupid;
-		if(canonicalize(dc->path, cname, sizeof(cname)) < 0)
-			return;
-		tupid = create_dir_file(cname);
-		if(tupid < 0)
-			return;
-		tup_db_set_flags_by_id(tupid, TUP_FLAGS_CREATE);
+	if(e->mask & IN_IGNORED) {
+		dircache_del(&mdb, dc);
+		return;
 	}
 
-	/* Not a Tupfile, so canonicalize the full filename into cname for
-	 * the rest of the function.
-	 */
-	if(canonicalize2(dc->path, e->name, cname, sizeof(cname)) < 0)
-		return;
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
 			watch_path(dc->path, e->name);
-		} else {
-			create_name_file(cname);
-			cdf = 1;
+			return;
 		}
+		flags = TUP_FLAGS_MODIFY;
 	}
 	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
-		tup_db_set_flags_by_name(cname, TUP_FLAGS_MODIFY);
+		flags = TUP_FLAGS_MODIFY;
 	}
 	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
-		tup_db_set_flags_by_name(cname, TUP_FLAGS_DELETE);
-		cdf = 1;
+		flags = TUP_FLAGS_DELETE;
 	}
 
-	if(cdf) {
-		update_create_dir_for_file(cname);
+	if(e->mask & IN_ISDIR) {
+		static char cname[PATH_MAX];
+		int len;
+
+		len = canonicalize2(dc->path, e->name, cname, sizeof(cname), NULL);
+		if(len < 0)
+			return;
+		tup_file_mod(0, cname, flags);
+	} else {
+		tup_file_mod(dc->dt, e->name, flags);
 	}
 }
 
@@ -534,16 +538,10 @@ static void check_deletion(struct inotify_event *e)
 		return;
 	}
 
-	len = canonicalize2(dc->path, e->name, cname, sizeof(cname));
+	len = canonicalize2(dc->path, e->name, cname, sizeof(cname), NULL);
 	if(len < 0)
 		return;
-	if(len >= (signed)sizeof(cname) - 3) {
-		fprintf(stderr, "Error: sizeof(cname) is too small for globbing.\n");
-		return;
-	}
-	cname[len] = '/';
-	cname[len+1] = '*';
-	cname[len+2] = 0;
+
 	tup_db_delete_dir(cname);
 }
 

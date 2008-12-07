@@ -29,7 +29,6 @@ static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
-static int file_mod(const char *file, int flags);
 static int get_flags_cb(void *arg, int argc, char **argv, char **col);
 static int get_flags(int argc, char **argv);
 static int touch(int argc, char **argv);
@@ -162,7 +161,8 @@ static int init(int argc, char **argv)
 static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 {
 	int x;
-	int id = 0;
+	tupid_t id = 0;
+	tupid_t dt = 0;
 	char *name = NULL;
 	int type = 0;
 	int flags = 0;
@@ -174,6 +174,8 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 	for(x=0; x<argc; x++) {
 		if(strcmp(col[x], "id") == 0) {
 			id = atoll(argv[x]);
+		} else if(strcmp(col[x], "dir") == 0) {
+			dt = atoll(argv[x]);
 		} else if(strcmp(col[x], "name") == 0) {
 			name = argv[x];
 		} else if(strcmp(col[x], "type") == 0) {
@@ -204,7 +206,9 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 		color |= 0x00ff00;
 	if(flags & TUP_FLAGS_DELETE)
 		color |= 0xff0000;
-	printf("\tnode_%i [label=\"%s\" shape=\"%s\" color=\"#%06x\"];\n", id, name, shape, color);
+	printf("\tnode_%lli [label=\"%s\" shape=\"%s\" color=\"#%06x\"];\n", id, name, shape, color);
+	if(dt)
+		printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", id, dt);
 
 	return 0;
 }
@@ -233,7 +237,6 @@ static int graph(int argc, char **argv)
 {
 	const char node_sql[] = "select * from node";
 	const char link_sql[] = "select * from link";
-	const char cmdlink_sql[] = "select * from cmdlink";
 
 	if(argc) {}
 	if(argv) {}
@@ -245,19 +248,16 @@ static int graph(int argc, char **argv)
 	if(tup_db_select(graph_link_cb, NULL, link_sql) != 0)
 		return -1;
 
-	if(tup_db_select(graph_link_cb, NULL, cmdlink_sql) != 0)
-		return -1;
-
 	printf("}\n");
 	return 0;
 }
 
 static int mlink(int argc, char **argv)
 {
-	static char cname[PATH_MAX];
 	int type;
 	int x;
 	tupid_t cmd_id;
+	tupid_t dt;
 	tupid_t id;
 
 	if(argc < 4) {
@@ -266,16 +266,14 @@ static int mlink(int argc, char **argv)
 		return 1;
 	}
 
-	cmd_id = create_command_file(argv[1]);
+	dt = create_dir_file(get_sub_dir());
+	if(dt < 0)
+		return -1;
+
+	cmd_id = create_command_file(dt, argv[1]);
 	if(cmd_id < 0) {
 		return -1;
 	}
-
-	id = create_dir_file(get_sub_dir());
-	if(id < 0)
-		return -1;
-	if(tup_db_create_cmdlink(id, cmd_id) < 0)
-		return -1;
 
 	for(x=2; x<argc; x++) {
 		char *name = argv[x];
@@ -293,12 +291,8 @@ static int mlink(int argc, char **argv)
 			fprintf(stderr, "Invalid argument: '%s'\n", name);
 			return 1;
 		}
-		if(canonicalize(name+2, cname, sizeof(cname)) < 0) {
-			fprintf(stderr, "Unable to canonicalize '%s'\n", argv[2]);
-			return 1;
-		}
 
-		id = create_name_file(cname);
+		id = create_name_file(dt, name);
 		if(id < 0)
 			return 1;
 
@@ -317,8 +311,19 @@ static int mlink(int argc, char **argv)
 static int node_exists(int argc, char **argv)
 {
 	int x;
+	tupid_t dt;
+
+	if(argc < 3) {
+		fprintf(stderr, "Usage: node_exists dir [n1] [n2...]\n");
+		return -1;
+	}
+	dt = tup_db_select_node(0, argv[1]);
+	if(dt < 0)
+		return -1;
+	argv++;
+	argc--;
 	for(x=1; x<argc; x++) {
-		if(tup_db_select_node(argv[x]) < 0)
+		if(tup_db_select_node(dt, argv[x]) < 0)
 			return -1;
 	}
 	return 0;
@@ -326,20 +331,34 @@ static int node_exists(int argc, char **argv)
 
 static int link_exists(int argc, char **argv)
 {
+	tupid_t dta, dtb;
 	tupid_t a, b;
 
-	if(argc != 3) {
-		fprintf(stderr, "Error: link_exists requires two filenames\n");
+	if(argc != 5) {
+		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
 		return -1;
 	}
-	a = tup_db_select_node(argv[1]);
+	dta = tup_db_select_node(0, argv[1]);
+	if(dta < 0) {
+		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[1]);
+		return -1;
+	}
+
+	a = tup_db_select_node(dta, argv[2]);
 	if(a < 0) {
-		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[1]);
+		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[2]);
 		return -1;
 	}
-	b = tup_db_select_node(argv[2]);
+
+	dtb = tup_db_select_node(0, argv[3]);
+	if(dtb < 0) {
+		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[3]);
+		return -1;
+	}
+
+	b = tup_db_select_node(dtb, argv[4]);
 	if(b < 0) {
-		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[1]);
+		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[4]);
 		return -1;
 	}
 	return tup_db_link_exists(a, b);
@@ -403,55 +422,13 @@ static int get_flags(int argc, char **argv)
 	return 0;
 }
 
-static int file_mod(const char *file, int flags)
-{
-	static char cname[PATH_MAX];
-	static char slash_tup[] = "/Tupfile";
-	int len;
-	int upddir = 0;
-	tupid_t tupid;
-
-	len = canonicalize(file, cname, sizeof(cname));
-	if(len < 0) {
-		fprintf(stderr, "Unable to canonicalize '%s'\n", file);
-		return -1;
-	}
-
-	/* Tried to simplify the gross if logic. Basically we want to re-update
-	 * the create nodes if:
-	 * 1) the file is new
-	 * 2) the file was deleted
-	 * 3-4) a Tupfile was modified
-	 */
-	if(tup_db_select_node(cname) < 0)
-		upddir = 1;
-	if(flags == TUP_FLAGS_DELETE)
-		upddir = 1;
-	if(len >= (signed)sizeof(slash_tup) &&
-	   strcmp(cname + len - sizeof(slash_tup) + 1, slash_tup) == 0)
-		upddir = 1;
-	if(strcmp(cname, "Tupfile") == 0)
-		upddir = 1;
-
-	if(upddir)
-		update_create_dir_for_file(cname);
-
-	tupid = create_name_file(cname);
-	if(tupid < 0)
-		return -1;
-	if(tup_db_set_flags_by_id(tupid, flags) < 0)
-		return -1;
-
-	return 0;
-}
-
 static int touch(int argc, char **argv)
 {
 	int x;
 	if(tup_db_begin() < 0)
 		return -1;
 	for(x=1; x<argc; x++) {
-		if(file_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
+		if(tup_pathname_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
 			return -1;
 	}
 	if(tup_db_commit() < 0)
@@ -463,7 +440,7 @@ static int delete(int argc, char **argv)
 {
 	int x;
 	for(x=1; x<argc; x++) {
-		if(file_mod(argv[x], TUP_FLAGS_DELETE) < 0)
+		if(tup_pathname_mod(argv[x], TUP_FLAGS_DELETE) < 0)
 			return -1;
 	}
 	return 0;

@@ -19,6 +19,7 @@ struct node {
 	struct list_head list;
 	struct edge *edges;
 	tupid_t tupid;
+	tupid_t dt;
 	char *name;
 	int incoming_count;
 

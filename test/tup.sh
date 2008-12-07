@@ -61,8 +61,14 @@ check_not_exist()
 
 tup_object_exist()
 {
+	dir=$1
+	shift
+	if [ $# -le 0 ]; then
+		echo "tup_object_exist needs a dir and files" 1>&2
+		exit 1
+	fi
 	while [ $# -gt 0 ]; do
-		if tup node_exists $1; then
+		if tup node_exists $dir $1; then
 			:
 		else
 			echo "Missing node $1 from .tup/db" 1>&2
@@ -74,8 +80,14 @@ tup_object_exist()
 
 tup_object_no_exist()
 {
+	dir=$1
+	shift
+	if [ $# -le 0 ]; then
+		echo "tup_object_no_exist needs a dir and files" 1>&2
+		exit 1
+	fi
 	while [ $# -gt 0 ]; do
-		if tup node_exists $1; then
+		if tup node_exists $dir $1; then
 			echo "Node $1 exists in .tup/db when it shouldn't" 1>&2
 			exit 1
 		fi
@@ -85,18 +97,18 @@ tup_object_no_exist()
 
 tup_dep_exist()
 {
-	if tup link_exists "$1" "$2"; then
+	if tup link_exists "$1" "$2" "$3" "$4"; then
 		:
 	else
-		echo "Dependency from $1 -> $2 does not exist" 1>&2
+		echo "Dependency from $2 [$1] -> $4 [$3] does not exist" 1>&2
 		exit 1
 	fi
 }
 
 tup_dep_no_exist()
 {
-	if tup link_exists "$1" "$2"; then
-		echo "Dependency from $1 -> $2 exists when it shouldn't" 1>&2
+	if tup link_exists "$1" "$2" "$3" "$4"; then
+		echo "Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
 		exit 1
 	fi
 }

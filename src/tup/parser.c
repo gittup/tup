@@ -52,7 +52,7 @@ static int parse_rule(char *p, struct list_head *rules, const char *dir);
 static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt);
 static int file_match(struct rule *r, const char *filename, const char *dir,
 		      tupid_t dt);
-static int do_rule(struct rule *r, struct name_list *nl);
+static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
 static void setup_nl_dir(struct name_list *nl, const char *dir);
 static char *tup_printf(const char *cmd, struct name_list *nl);
 
@@ -262,9 +262,13 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 {
 	struct rule *r;
 	struct flist f = {0, 0, 0};
+	struct stat buf;
 
 	flist_foreach(&f, dir) {
 		if(f.filename[0] == '.')
+			continue;
+		if(fstatat(dirfd(f._d), f.filename, &buf, 0) == 0 &&
+		   S_ISDIR(buf.st_mode))
 			continue;
 		list_for_each_entry(r, rules, list) {
 			if(file_match(r, f.filename, dir, dt) < 0)
@@ -276,7 +280,7 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 		if(!r->foreach && r->namelist.num_entries > 0) {
 			struct name_list_entry *nle;
 
-			if(do_rule(r, &r->namelist) < 0)
+			if(do_rule(r, &r->namelist, dt) < 0)
 				return -1;
 
 			while(!list_empty(&r->namelist.entries)) {
@@ -295,40 +299,42 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 		      tupid_t dt)
 {
 	int flags = FNM_PATHNAME | FNM_PERIOD;
-	static char cname[PATH_MAX];
-	int clen;
 	int extlesslen;
+	int len;
 	tupid_t in_id;
 
-	clen = canonicalize2(dir, filename, cname, sizeof(cname));
-	if(clen < 0)
-		return -1;
-	extlesslen = clen - 1;
-	while(extlesslen > 0 && cname[extlesslen] != '.')
-		extlesslen--;
-
-	in_id = create_name_file(cname);
+	in_id = create_name_file(dt, filename);
 	if(in_id < 0)
 		return -1;
+	len = strlen(filename);
+	extlesslen = len - 1;
+	while(extlesslen > 0 && filename[extlesslen] != '.')
+		extlesslen--;
+
 	if(fnmatch(r->input_pattern, filename, flags) == 0) {
 		if(r->foreach) {
 			struct name_list nl;
 			struct name_list_entry nle;
 
-			nle.path = cname;
-			nle.len = clen;
+			nle.path = strdup(filename);
+			if(!nle.path) {
+				perror("strdup");
+				return -1;
+			}
+			nle.len = len;
 			nle.extlesslen = extlesslen;
 			nle.tupid = in_id;
 			INIT_LIST_HEAD(&nl.entries);
 			list_add(&nle.list, &nl.entries);
 			nl.num_entries = 1;
-			nl.totlen = clen;
+			nl.totlen = len;
 			nl.extlesstotlen = extlesslen;
 			nl.dt = dt;
 			setup_nl_dir(&nl, dir);
 
-			if(do_rule(r, &nl) < 0)
+			if(do_rule(r, &nl, dt) < 0)
 				return -1;
+			free(nle.path);
 		} else {
 			struct name_list_entry *nle;
 
@@ -338,19 +344,19 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 				return -1;
 			}
 
-			nle->path = strdup(cname);
+			nle->path = strdup(filename);
 			if(!nle->path) {
 				perror("strdup");
 				return -1;
 			}
 
-			nle->len = clen;
+			nle->len = len;
 			nle->extlesslen = extlesslen;
 			nle->tupid = in_id;
 
 			list_add(&nle->list, &r->namelist.entries);
 			r->namelist.num_entries++;
-			r->namelist.totlen += clen;
+			r->namelist.totlen += len;
 			r->namelist.extlesstotlen += extlesslen;
 			r->namelist.dt = dt;
 		}
@@ -358,22 +364,23 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 	return 0;
 }
 
-static int do_rule(struct rule *r, struct name_list *nl)
+static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 {
+	static char cname[PATH_MAX];
+	int lastslash;
 	struct name_list_entry *nle;
 	char *cmd;
 	char *output;
 	tupid_t cmd_id;
 	tupid_t out_id;
+	tupid_t out_dt;
 
 	cmd = tup_printf(r->command, nl);
 	if(!cmd)
 		return -1;
-	cmd_id = create_command_file(cmd);
+	cmd_id = create_command_file(dt, cmd);
 	free(cmd);
 	if(cmd_id < 0)
-		return -1;
-	if(tup_db_create_cmdlink(nl->dt, cmd_id) < 0)
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
@@ -384,10 +391,25 @@ static int do_rule(struct rule *r, struct name_list *nl)
 	}
 
 	output = tup_printf(r->output_pattern, nl);
-	out_id = create_name_file(output);
-	free(output);
-	if(out_id < 0)
+	if(canonicalize(output, cname, sizeof(cname), &lastslash) < 0)
 		return -1;
+	if(lastslash == -1) {
+		out_dt = create_dir_file(".");
+		if(out_dt < 0)
+			return -1;
+		out_id = create_name_file(out_dt, cname);
+		if(out_id < 0)
+			return -1;
+	} else {
+		cname[lastslash] = 0;
+		out_dt = create_dir_file(cname);
+		if(out_dt < 0)
+			return -1;
+		out_id = create_name_file(out_dt, &cname[lastslash+1]);
+		if(out_id < 0)
+			return -1;
+	}
+	free(output);
 
 	if(tup_db_create_link(cmd_id, out_id) < 0)
 		return -1;
@@ -414,6 +436,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 	const char *next;
 	const char *spc;
 	int clen = strlen(cmd);
+	int dirtotlen = nl->dirlen * nl->num_entries;
 
 	p = cmd;
 	while((p = strchr(p, '$')) !=  NULL) {
@@ -426,9 +449,9 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			spc++;
 		paste_chars = (nl->num_entries - 1) * (spc - p);
 		if(*p == 'p') {
-			clen += nl->totlen + paste_chars;
+			clen += nl->totlen + paste_chars + dirtotlen;
 		} else if(*p == 'P') {
-			clen += nl->extlesstotlen + paste_chars;
+			clen += nl->extlesstotlen + paste_chars + dirtotlen;
 		} else if(*p == 'd') {
 			clen += nl->dirlen;
 		}
@@ -455,6 +478,11 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			spc++;
 		if(*next == 'p') {
 			list_for_each_entry(nle, &nl->entries, list) {
+				if(nl->dirlen) {
+					memcpy(&s[x], nl->dir, nl->dirlen);
+					x += nl->dirlen;
+					s[x-1] = '/';
+				}
 				memcpy(&s[x], nle->path, nle->len);
 				x += nle->len;
 				memcpy(&s[x], p, spc - p);
@@ -462,6 +490,11 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			}
 		} else if(*next == 'P') {
 			list_for_each_entry(nle, &nl->entries, list) {
+				if(nl->dirlen) {
+					memcpy(&s[x], nl->dir, nl->dirlen);
+					x += nl->dirlen;
+					s[x-1] = '/';
+				}
 				memcpy(&s[x], nle->path, nle->extlesslen);
 				x += nle->extlesslen;
 				memcpy(&s[x], p, spc - p);

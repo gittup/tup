@@ -9,7 +9,7 @@
 static void dump_dircache(void);
 static LIST_HEAD(dclist);
 
-void dircache_add(struct memdb *m, int wd, char *path)
+void dircache_add(struct memdb *m, int wd, char *path, tupid_t dt)
 {
 	struct dircache *dc;
 
@@ -27,6 +27,7 @@ void dircache_add(struct memdb *m, int wd, char *path)
 	DEBUGP("add %i:'%s'\n", wd, path);
 
 	dc->wd = wd;
+	dc->dt = dt;
 	dc->path = path;
 	list_add(&dc->list, &dclist);
 	memdb_add(m, wd, dc);

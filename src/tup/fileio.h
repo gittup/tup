@@ -3,18 +3,20 @@
 
 #include "tup/tupid.h"
 
-tupid_t create_name_file(const char *path);
-tupid_t create_command_file(const char *cmd);
+tupid_t create_name_file(tupid_t dt, const char *path);
+tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(const char *path);
-int update_create_dir_for_file(char *name);
+int tup_file_mod(tupid_t dt, const char *file, int flags);
+int tup_pathname_mod(const char *path, int flags);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.
  */
 int delete_name_file(tupid_t tupid);
 
-int canonicalize(const char *path, char *out, int len);
-int canonicalize2(const char *path, const char *file, char *out, int len);
+int canonicalize(const char *path, char *out, int len, int *lastslash);
+int canonicalize2(const char *path, const char *file, char *out, int len,
+		  int *lastslash);
 
 /** Canonicalizes a path name. Changes instances of "//" and "/./" to "/",
  * changes "foo/../bar" to "bar", and removes trailing slashes.
@@ -22,7 +24,11 @@ int canonicalize2(const char *path, const char *file, char *out, int len);
  * The sz parameter is the size of the string buffer (including
  * nul-terminator).  The return value is the size of the shortened string (<=
  * sz), also including the nul-terminator.
+ *
+ * If not NULL, lastslash will be set to the index of the last '/' character
+ * in the string. If there is no '/' in the string, lastslash will be set to
+ * -1.
  */
-int canonicalize_string(char *str, int sz);
+int canonicalize_string(char *str, int sz, int *lastslash);
 
 #endif

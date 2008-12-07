@@ -23,15 +23,11 @@ static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
 static LIST_HEAD(rename_list);
 
-int handle_file(const struct access_event *event, const char *filename)
+int handle_file(const struct access_event *event, tupid_t tupid)
 {
 	struct file_entry *fent;
 	int rc = 0;
-	tupid_t tupid;
 
-	tupid = create_name_file(filename);
-	if(tupid < 0)
-		return -1;
 	DEBUGP("received tupid '%lli' in mode %i\n", tupid, event->at);
 
 	if(event->at == ACCESS_RENAME_TO) {

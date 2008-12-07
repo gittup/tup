@@ -4,15 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 
-int canonicalize(const char *path, char *out, int len)
+int canonicalize(const char *path, char *out, int len, int *lastslash)
 {
 	if(path[0] == '/')
-		return canonicalize2(path, "", out, len);
+		return canonicalize2(path, "", out, len, lastslash);
 	else
-		return canonicalize2("", path, out, len);
+		return canonicalize2("", path, out, len, lastslash);
 }
 
-int canonicalize2(const char *path, const char *file, char *out, int len)
+int canonicalize2(const char *path, const char *file, char *out, int len,
+		  int *lastslash)
 {
 	int sz;
 
@@ -51,7 +52,7 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 		return -1;
 	}
 
-	sz = canonicalize_string(out, sz);
+	sz = canonicalize_string(out, sz, lastslash);
 	if(strncmp(out, "../", 3) == 0) {
 		DEBUGP("Relative path '%s' is outside the tup hierarchy.\n",
 		       out);
@@ -60,7 +61,7 @@ int canonicalize2(const char *path, const char *file, char *out, int len)
 	return sz;
 }
 
-int canonicalize_string(char *str, int sz)
+int canonicalize_string(char *str, int sz, int *lastslash)
 {
 	int x;
 
@@ -116,6 +117,15 @@ done:
 		sz = 1;
 		str[0] = '.';
 		str[1] = 0;
+	}
+	if(lastslash) {
+		*lastslash = -1;
+		for(x=sz-1; x>=0; x--) {
+			if(str[x] == '/') {
+				*lastslash = x;
+				break;
+			}
+		}
 	}
 	return sz;
 }

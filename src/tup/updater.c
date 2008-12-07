@@ -134,7 +134,7 @@ static int create_flag_cb(void *arg, struct db_node *dbn)
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.
 	 */
-	if(tup_db_set_cmdchild_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_set_dircmd_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;
 
 	return 0;
@@ -243,8 +243,8 @@ static int find_deps(struct graph *g, struct node *n)
 	g->cur = n;
 	if(tup_db_select_node_by_link(md_flag_cb, g, n->tupid) < 0)
 		return -1;
-	if(tup_db_select_node_by_cmdlink(md_flag_cb, g, n->tupid) < 0)
-		return -1;
+/*TODO 	if(tup_db_select_node_by_cmdlink(md_flag_cb, g, n->tupid) < 0)
+		return -1;*/
 	return 0;
 }
 
@@ -347,7 +347,7 @@ static int update(struct node *n)
 	int pid;
 	tupid_t tupid;
 
-	tupid = tup_db_create_dup_node(n->name, n->type, TUP_FLAGS_NONE);
+	tupid = tup_db_create_dup_node(n->dt, n->name, n->type, TUP_FLAGS_NONE);
 	if(tupid < 0)
 		return -1;
 
@@ -375,9 +375,6 @@ static int update(struct node *n)
 			goto err_delete_node;
 		}
 	}
-
-	if(tup_db_move_cmdlink(n->tupid, tupid) < 0)
-		goto err_delete_node;
 
 	delete_name_file(n->tupid);
 	return 0;
