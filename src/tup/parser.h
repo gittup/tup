@@ -3,6 +3,6 @@
 
 #include "tupid.h"
 
-int parser_create(const char *dir, tupid_t tupid);
+int parser_create(tupid_t tupid);
 
 #endif

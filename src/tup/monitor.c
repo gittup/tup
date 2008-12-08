@@ -42,7 +42,7 @@
 
 #define MONITOR_PID_CFG "monitor pid"
 
-static int watch_path(const char *path, const char *file);
+static int watch_path(tupid_t dt, const char *path, const char *file);
 static int events_queued(void);
 static void queue_event(struct inotify_event *e);
 static void flush_queue(void);
@@ -51,7 +51,6 @@ static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
 static int same_event(struct inotify_event *e1, struct inotify_event *e2);
 static int ephemeral_event(struct inotify_event *e);
 static void handle_event(struct inotify_event *e);
-static void check_deletion(struct inotify_event *e);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -142,7 +141,7 @@ int monitor(int argc, char **argv)
 		exit(0);
 
 	tup_db_begin();
-	if(watch_path(".", "") < 0) {
+	if(watch_path(0, "", ".") < 0) {
 		rc = -1;
 		goto close_inot;
 	}
@@ -158,11 +157,6 @@ int monitor(int argc, char **argv)
 
 		while(offset < x) {
 			struct inotify_event *e = (void*)((char*)buf + offset);
-
-			if(e->mask & IN_ISDIR && (e->mask & IN_DELETE ||
-						  e->mask & IN_MOVED_FROM)) {
-				check_deletion(e);
-			}
 
 			/* If the lock file is opened, assume we are now
 			 * locked out. When the file is closed, check to see
@@ -248,93 +242,99 @@ int stop_monitor(int argc, char **argv)
 	return -1;
 }
 
-static int watch_path(const char *path, const char *file)
+static int watch_path(tupid_t dt, const char *path, const char *file)
 {
 	int wd;
-	int rc = 0;
-	int len;
 	uint32_t mask;
 	struct flist f = {0, 0, 0};
 	struct stat buf;
+	int rc = 0;
 	char *fullpath;
-	int lastslash;
-	tupid_t dt;
+	int curfd;
+	tupid_t newdt;
 
-	/* Skip hidden directories */
-	if(file[0] == '.') {
-		return 0;
-	}
+	printf("Watch[cur='%s']: %lli, '%s' '%s'\n", get_current_dir_name(), dt, path, file);
 
-	len = asprintf(&fullpath, "%s%s/", path, file);
-	if(len < 0) {
-		perror("asprintf");
+	curfd = open(".", O_RDONLY);
+	if(curfd < 0) {
+		perror(".");
 		return -1;
 	}
+	if(path[0] != 0)
+		chdir(path);
 
-	/* The canonicalization will remove the trailing '/' temporarily */
-	len = canonicalize_string(fullpath, len, &lastslash);
-	if(len < 0)
-		goto out_free;
-
-	if(stat(fullpath, &buf) != 0) {
-		perror(fullpath);
+	if(lstat(file, &buf) != 0) {
+		fprintf(stderr, "Hey wtf\n");
+		perror(file);
 		rc = -1;
-		goto out_free;
+		goto out_close;
 	}
 
 	if(S_ISREG(buf.st_mode)) {
-		/* TODO: Re-use tup_file_mod() somehow? */
-		fullpath[lastslash] = 0;
-		dt = create_dir_file(fullpath);
-		if(dt < 0) {
-			rc = -1;
-			goto out_free;
-		}
-		if(tup_db_select_node(dt, file) < 0)
+		if(tup_db_select_node(dt, file) < 0) {
 			if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0) {
 				rc = -1;
-				goto out_free;
+				goto out_close;
 			}
-		create_name_file(dt, file);
-		goto out_free;
+		}
+		if(create_name_file(dt, file) < 0) {
+			rc = -1;
+			goto out_close;
+		}
+		goto out_close;
 	}
 	if(S_ISDIR(buf.st_mode)) {
-		dt = create_dir_file(fullpath);
+		newdt = create_dir_file2(dt, file);
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
-			fullpath);
+			file);
 		rc = -1;
-		goto out_free;
+		goto out_close;
 	}
 
-	/* This is totally valid since we have enough space from the asprintf
-	 * above, and the canonicalize function can only make then len smaller.
-	 */
-	fullpath[len] = '/';
-	len++;
-	fullpath[len] = 0;
-
-	DEBUGP("add watch: '%s'\n", fullpath);
+	DEBUGP("add watch: '%s'\n", file);
 
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
-	wd = inotify_add_watch(inot_fd, fullpath, mask);
+	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
 		rc = -1;
-		goto out_free;
+		goto out_close;
 	}
-	dircache_add(&mdb, wd, fullpath, dt);
-	flist_foreach(&f, fullpath) {
-		if(strcmp(f.filename, ".") == 0 ||
-		   strcmp(f.filename, "..") == 0)
-			continue;
-		watch_path(fullpath, f.filename);
-	}
-	/* dircache assumes ownership of fullpath memory */
-	return 0;
 
-out_free:
-	free(fullpath);
+	if(path[0] == 0) {
+		fullpath = strdup(".");
+	} else if(strcmp(path, ".") == 0) {
+		fullpath = strdup(file);
+	} else {
+		if(asprintf(&fullpath, "%s/%s", path, file) < 0) {
+			perror("asprintf");
+			rc = -1;
+			goto out_close;
+		}
+	}
+	if(!fullpath) {
+		perror("Unable to allocate space for path.\n");
+		rc = -1;
+		goto out_close;
+	}
+	dircache_add(&mdb, wd, fullpath, newdt);
+	/* dircache assumes ownership of fullpath */
+
+	fchdir(curfd);
+
+	flist_foreach(&f, fullpath) {
+		if(f.filename[0] == '.')
+			continue;
+		if(watch_path(newdt, fullpath, f.filename) < 0) {
+			rc = -1;
+			goto out_close;
+		}
+	}
+out_close:
+	fchdir(curfd);
+	close(curfd);
+
 	return rc;
 }
 
@@ -493,13 +493,15 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(e->mask & IN_IGNORED) {
+		printf("[36mIN_IGNORED: %s[0m\n", dc->path);
+		tup_db_delete_dir(dc->dt);
 		dircache_del(&mdb, dc);
 		return;
 	}
 
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
-			watch_path(dc->path, e->name);
+			watch_path(dc->dt, dc->path, e->name);
 			return;
 		}
 		flags = TUP_FLAGS_MODIFY;
@@ -512,37 +514,21 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(e->mask & IN_ISDIR) {
-		static char cname[PATH_MAX];
-		int len;
-
-		len = canonicalize2(dc->path, e->name, cname, sizeof(cname), NULL);
-		if(len < 0)
-			return;
-		tup_file_mod(0, cname, flags);
+		/* TODO: Beef up tup_file_mod to handle this deletion */
+		if(flags & TUP_FLAGS_DELETE) {
+			tupid_t dt;
+			dt = tup_db_select_node(dc->dt, e->name);
+			if(dt < 0) {
+				fprintf(stderr, "Can't find node to delete\n");
+				return;
+			}
+			tup_db_delete_dir(dt);
+		} else {
+			tup_file_mod(dc->dt, e->name, flags);
+		}
 	} else {
 		tup_file_mod(dc->dt, e->name, flags);
 	}
-}
-
-static void check_deletion(struct inotify_event *e)
-{
-	static char cname[PATH_MAX];
-	struct dircache *dc;
-	int len;
-	DEBUGP("check deletion: wd=%i, name='%s'\n", e->wd, e->name);
-
-	dc = dircache_lookup(&mdb, e->wd);
-	if(!dc) {
-		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
-			e->wd);
-		return;
-	}
-
-	len = canonicalize2(dc->path, e->name, cname, sizeof(cname), NULL);
-	if(len < 0)
-		return;
-
-	tup_db_delete_dir(cname);
 }
 
 static void sighandler(int sig)

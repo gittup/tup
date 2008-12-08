@@ -23,7 +23,7 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int (*create)(const char *dir, tupid_t tupid);
+static int (*create)(tupid_t tupid);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
@@ -153,7 +153,7 @@ static int process_create_nodes(void)
 
 	while(!list_empty(&namelist)) {
 		nl = list_entry(namelist.next, struct name_list, list);
-		if(create(nl->name, nl->tupid) < 0)
+		if(create(nl->tupid) < 0)
 			goto err_rollback;
 		if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE) < 0)
 			goto err_rollback;
@@ -345,11 +345,22 @@ static int update(struct node *n)
 {
 	int status;
 	int pid;
+	int dfd;
+	int curfd;
 	tupid_t tupid;
 
 	tupid = tup_db_create_dup_node(n->dt, n->name, n->type, TUP_FLAGS_NONE);
 	if(tupid < 0)
 		return -1;
+
+	curfd = open(".", O_RDONLY);
+	if(curfd < 0)
+		goto err_delete_node;
+
+	dfd = tup_db_opendir(n->dt);
+	if(dfd < 0)
+		goto err_close_curfd;
+	fchdir(dfd);
 
 	printf("%s\n", n->name);
 
@@ -357,7 +368,7 @@ static int update(struct node *n)
 	pid = fork();
 	if(pid < 0) {
 		perror("fork");
-		goto err_delete_node;
+		goto err_close_dfd;
 	}
 	if(pid == 0) {
 		execl("/bin/sh", "/bin/sh", "-c", n->name, NULL);
@@ -370,15 +381,23 @@ static int update(struct node *n)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			if(write_files(tupid) < 0)
-				goto err_delete_node;
+				goto err_close_dfd;
 		} else {
-			goto err_delete_node;
+			goto err_close_dfd;
 		}
 	}
+	fchdir(curfd);
 
+	close(dfd);
+	close(curfd);
 	delete_name_file(n->tupid);
 	return 0;
 
+err_close_dfd:
+	fchdir(curfd);
+	close(dfd);
+err_close_curfd:
+	close(curfd);
 err_delete_node:
 	delete_name_file(tupid);
 	return -1;

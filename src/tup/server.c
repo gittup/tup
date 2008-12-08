@@ -84,14 +84,28 @@ static void *message_thread(void *arg)
 {
 	struct access_event event;
 	static char filename[PATH_MAX];
+	static char cwd[PATH_MAX];
 	static char cname[PATH_MAX];
 	int rc;
-	int lastslash;
-	tupid_t dt;
+	int dlen;
 	tupid_t tupid;
 	if(arg) {/* unused */}
 
+	if(getcwd(cwd, sizeof(cwd)) == NULL) {
+		perror("getcwd");
+		return NULL;
+	}
+	dlen = strlen(cwd);
+	if(dlen >= (signed)sizeof(cwd) - 2) {
+		fprintf(stderr, "Error: CWD[%s] is too large.\n", cwd);
+		return NULL;
+	}
+	cwd[dlen] = '/';
+	cwd[dlen+1] = 0;
+
 	while((rc = recv(sd, &event, sizeof(event), 0)) > 0) {
+		int len;
+
 		if(event.at == ACCESS_STOP_SERVER)
 			break;
 		if(!event.len)
@@ -106,27 +120,18 @@ static void *message_thread(void *arg)
 			return NULL;
 		}
 
-		/* TODO: Re-use tup_file_mod here? */
-		/* Skip the file if it's outside of our local tree */
-		if(canonicalize(filename, cname, sizeof(cname),
-				&lastslash) < 0)
-			continue;
-		if(lastslash == -1) {
-			dt = create_dir_file(".");
-			if(dt < 0)
-				return NULL;
-			tupid = create_name_file(dt, cname);
-			if(tupid < 0)
-				return NULL;
+		if(filename[0] == '/') {
+			len = canonicalize(filename, cname, sizeof(cname), NULL);
 		} else {
-			cname[lastslash] = 0;
-			dt = create_dir_file(cname);
-			if(dt < 0)
-				return NULL;
-			tupid = create_name_file(dt, &cname[lastslash+1]);
-			if(tupid < 0)
-				return NULL;
+			len = canonicalize2(cwd, filename, cname, sizeof(cname), NULL);
 		}
+		/* Skip the file if it's outside of our local tree */
+		if(len < 0)
+			continue;
+
+		tupid = create_path_file(cname);
+		if(tupid < 0)
+			return NULL;
 		if(handle_file(&event, tupid) < 0)
 			break;
 	}

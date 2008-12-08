@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #define _ATFILE_SOURCE
 #include "parser.h"
 #include "list.h"
@@ -19,8 +20,6 @@ struct name_list {
 	int num_entries;
 	int totlen;
 	int extlesstotlen;
-	const char *dir;
-	int dirlen;
 	tupid_t dt;
 };
 
@@ -47,36 +46,34 @@ struct buf {
 };
 
 static int fslurp(int fd, struct buf *b);
-static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid);
-static int parse_rule(char *p, struct list_head *rules, const char *dir);
-static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt);
-static int file_match(struct rule *r, const char *filename, const char *dir,
-		      tupid_t dt);
+static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid);
+static int parse_rule(char *p, struct list_head *rules);
+static int execute_rules(struct list_head *rules, int dfd, tupid_t dt);
+static int file_match(struct rule *r, const char *filename, tupid_t dt);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
-static void setup_nl_dir(struct name_list *nl, const char *dir);
 static char *tup_printf(const char *cmd, struct name_list *nl);
 
-int parser_create(const char *dir, tupid_t tupid)
+int parser_create(tupid_t tupid)
 {
 	int dfd;
 	int fd;
 	int rc = 0;
 	struct buf b;
 
-	dfd = open(dir, O_RDONLY);
-	if(dfd < 0) {
-		perror(dir);
+	dfd = tup_db_opendir(tupid);
+	if(dfd < 0)
 		return -1;
-	}
 	fd = openat(dfd, "Tupfile", O_RDONLY);
 	if(fd < 0)
 		goto out_close_dir;
 
 	if((rc = fslurp(fd, &b)) < 0) {
-		goto out_close_dir;
+		goto out_close_file;
 	}
-	rc = execute_tupfile(&b, dir, tupid);
+	rc = execute_tupfile(&b, dfd, tupid);
 	free(b.s);
+out_close_file:
+	close(fd);
 
 out_close_dir:
 	close(dfd);
@@ -116,7 +113,7 @@ err_out:
 	return -1;
 }
 
-static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
+static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid)
 {
 	char *p, *e;
 	char *line;
@@ -144,7 +141,7 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 		if(line[0] == '#') {
 			/* Skip comments */
 		} else if(line[0] == ':') {
-			if(parse_rule(p+1, &rules, dir) < 0)
+			if(parse_rule(p+1, &rules) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -186,7 +183,7 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 		p = nl + 1;
 	}
 
-	rc = execute_rules(&rules, dir, tupid);
+	rc = execute_rules(&rules, dfd, tupid);
 	while(!list_empty(&rules)) {
 		r = list_entry(rules.next, struct rule, list);
 		list_del(&r->list);
@@ -195,12 +192,11 @@ static int execute_tupfile(struct buf *b, const char *dir, tupid_t tupid)
 	return rc;
 
 syntax_error:
-	fprintf(stderr, "Syntax error parsing %s/Tupfile\n  Line was: %s",
-		dir, line);
+	fprintf(stderr, "Syntax error parsing Tupfile\n  Line was: %s", line);
 	return -1;
 }
 
-static int parse_rule(char *p, struct list_head *rules, const char *dir)
+static int parse_rule(char *p, struct list_head *rules)
 {
 	char *input, *cmd, *output;
 	char *ie, *ce;
@@ -251,27 +247,29 @@ static int parse_rule(char *p, struct list_head *rules, const char *dir)
 	r->namelist.num_entries = 0;
 	r->namelist.totlen = 0;
 	r->namelist.extlesstotlen = 0;
-	setup_nl_dir(&r->namelist, dir);
 
 	list_add(&r->list, rules);
 
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
+static int execute_rules(struct list_head *rules, int dfd, tupid_t dt)
 {
 	struct rule *r;
 	struct flist f = {0, 0, 0};
 	struct stat buf;
 
-	flist_foreach(&f, dir) {
+	/* fdopendir will close the file descriptor, but we still need it, so
+	 * we dup() it
+	 */
+	flist_foreachfd(&f, dup(dfd)) {
 		if(f.filename[0] == '.')
 			continue;
 		if(fstatat(dirfd(f._d), f.filename, &buf, 0) == 0 &&
 		   S_ISDIR(buf.st_mode))
 			continue;
 		list_for_each_entry(r, rules, list) {
-			if(file_match(r, f.filename, dir, dt) < 0)
+			if(file_match(r, f.filename, dt) < 0)
 				return -1;
 		}
 	}
@@ -295,8 +293,7 @@ static int execute_rules(struct list_head *rules, const char *dir, tupid_t dt)
 	return 0;
 }
 
-static int file_match(struct rule *r, const char *filename, const char *dir,
-		      tupid_t dt)
+static int file_match(struct rule *r, const char *filename, tupid_t dt)
 {
 	int flags = FNM_PATHNAME | FNM_PERIOD;
 	int extlesslen;
@@ -330,7 +327,6 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 			nl.totlen = len;
 			nl.extlesstotlen = extlesslen;
 			nl.dt = dt;
-			setup_nl_dir(&nl, dir);
 
 			if(do_rule(r, &nl, dt) < 0)
 				return -1;
@@ -366,14 +362,11 @@ static int file_match(struct rule *r, const char *filename, const char *dir,
 
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 {
-	static char cname[PATH_MAX];
-	int lastslash;
 	struct name_list_entry *nle;
 	char *cmd;
 	char *output;
 	tupid_t cmd_id;
 	tupid_t out_id;
-	tupid_t out_dt;
 
 	cmd = tup_printf(r->command, nl);
 	if(!cmd)
@@ -391,40 +384,12 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 	}
 
 	output = tup_printf(r->output_pattern, nl);
-	if(canonicalize(output, cname, sizeof(cname), &lastslash) < 0)
-		return -1;
-	if(lastslash == -1) {
-		out_dt = create_dir_file(".");
-		if(out_dt < 0)
-			return -1;
-		out_id = create_name_file(out_dt, cname);
-		if(out_id < 0)
-			return -1;
-	} else {
-		cname[lastslash] = 0;
-		out_dt = create_dir_file(cname);
-		if(out_dt < 0)
-			return -1;
-		out_id = create_name_file(out_dt, &cname[lastslash+1]);
-		if(out_id < 0)
-			return -1;
-	}
+	out_id = create_name_file(dt, output);
 	free(output);
 
 	if(tup_db_create_link(cmd_id, out_id) < 0)
 		return -1;
 	return 0;
-}
-
-static void setup_nl_dir(struct name_list *nl, const char *dir)
-{
-	if(dir[0] == '.') {
-		nl->dir = "";
-		nl->dirlen = 0;
-	} else {
-		nl->dir = dir;
-		nl->dirlen = strlen(dir) + 1; /* Room for trailing '/' */
-	}
 }
 
 static char *tup_printf(const char *cmd, struct name_list *nl)
@@ -436,7 +401,6 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 	const char *next;
 	const char *spc;
 	int clen = strlen(cmd);
-	int dirtotlen = nl->dirlen * nl->num_entries;
 
 	p = cmd;
 	while((p = strchr(p, '$')) !=  NULL) {
@@ -448,12 +412,10 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 		while(*spc && *spc != ' ')
 			spc++;
 		paste_chars = (nl->num_entries - 1) * (spc - p);
-		if(*p == 'p') {
-			clen += nl->totlen + paste_chars + dirtotlen;
-		} else if(*p == 'P') {
-			clen += nl->extlesstotlen + paste_chars + dirtotlen;
-		} else if(*p == 'd') {
-			clen += nl->dirlen;
+		if(*p == 'f') {
+			clen += nl->totlen + paste_chars;
+		} else if(*p == 'F') {
+			clen += nl->extlesstotlen + paste_chars;
 		}
 	}
 
@@ -476,38 +438,20 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			spc++;
 		if(*spc == ' ')
 			spc++;
-		if(*next == 'p') {
+		if(*next == 'f') {
 			list_for_each_entry(nle, &nl->entries, list) {
-				if(nl->dirlen) {
-					memcpy(&s[x], nl->dir, nl->dirlen);
-					x += nl->dirlen;
-					s[x-1] = '/';
-				}
 				memcpy(&s[x], nle->path, nle->len);
 				x += nle->len;
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
 			}
-		} else if(*next == 'P') {
+		} else if(*next == 'F') {
 			list_for_each_entry(nle, &nl->entries, list) {
-				if(nl->dirlen) {
-					memcpy(&s[x], nl->dir, nl->dirlen);
-					x += nl->dirlen;
-					s[x-1] = '/';
-				}
 				memcpy(&s[x], nle->path, nle->extlesslen);
 				x += nle->extlesslen;
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
 			}
-		} else if(*next == 'd') {
-			if(nl->dirlen) {
-				memcpy(&s[x], nl->dir, nl->dirlen);
-				x += nl->dirlen;
-				s[x-1] = '/';
-			}
-			memcpy(&s[x], p, spc - p);
-			x += spc - p;
 		}
 		p = spc;
 	}

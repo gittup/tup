@@ -13,7 +13,7 @@ tup stop
 echo "void bar(void) {}" > bar.c
 tup monitor
 update
-tup_object_exist bar.c bar.o
+tup_object_exist . bar.c bar.o
 sym_check prog bar
 tup stop
 

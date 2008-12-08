@@ -206,7 +206,7 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 		color |= 0x00ff00;
 	if(flags & TUP_FLAGS_DELETE)
 		color |= 0xff0000;
-	printf("\tnode_%lli [label=\"%s\" shape=\"%s\" color=\"#%06x\"];\n", id, name, shape, color);
+	printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\"];\n", id, name, id, shape, color);
 	if(dt)
 		printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", id, dt);
 
@@ -317,7 +317,7 @@ static int node_exists(int argc, char **argv)
 		fprintf(stderr, "Usage: node_exists dir [n1] [n2...]\n");
 		return -1;
 	}
-	dt = tup_db_select_node(0, argv[1]);
+	dt = find_dir_tupid(argv[1]);
 	if(dt < 0)
 		return -1;
 	argv++;
@@ -338,7 +338,7 @@ static int link_exists(int argc, char **argv)
 		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
 		return -1;
 	}
-	dta = tup_db_select_node(0, argv[1]);
+	dta = find_dir_tupid(argv[1]);
 	if(dta < 0) {
 		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[1]);
 		return -1;
@@ -350,7 +350,7 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	dtb = tup_db_select_node(0, argv[3]);
+	dtb = find_dir_tupid(argv[3]);
 	if(dtb < 0) {
 		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[3]);
 		return -1;

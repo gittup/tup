@@ -3,11 +3,15 @@
 
 #include "tup/tupid.h"
 
-tupid_t create_name_file(tupid_t dt, const char *path);
+tupid_t create_path_file(const char *path);
+#define create_name_file(a, b) __create_name_file(a, b, __FILE__, __LINE__)
+tupid_t __create_name_file(tupid_t dt, const char *file, const char *f, int l);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(const char *path);
+tupid_t create_dir_file2(tupid_t dt, const char *path);
 int tup_file_mod(tupid_t dt, const char *file, int flags);
 int tup_pathname_mod(const char *path, int flags);
+tupid_t find_dir_tupid(const char *dir);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.

@@ -29,7 +29,10 @@ int canonicalize2(const char *path, const char *file, char *out, int len,
 			return -1;
 		}
 		if(file[0]) {
-			sz = snprintf(out, len, "%s/%s", path + ttl + 1, file);
+			if(path[ttl + 1])
+				sz = snprintf(out, len, "%s/%s", path + ttl + 1, file);
+			else
+				sz = snprintf(out, len, "%s", file);
 		} else {
 			sz = snprintf(out, len, "%s", path + ttl + 1);
 		}

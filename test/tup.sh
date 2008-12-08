@@ -68,10 +68,10 @@ tup_object_exist()
 		exit 1
 	fi
 	while [ $# -gt 0 ]; do
-		if tup node_exists $dir $1; then
+		if tup node_exists $dir "$1"; then
 			:
 		else
-			echo "Missing node $1 from .tup/db" 1>&2
+			echo "Missing node \"$1\" from .tup/db" 1>&2
 			exit 1
 		fi
 		shift
@@ -87,8 +87,8 @@ tup_object_no_exist()
 		exit 1
 	fi
 	while [ $# -gt 0 ]; do
-		if tup node_exists $dir $1; then
-			echo "Node $1 exists in .tup/db when it shouldn't" 1>&2
+		if tup node_exists $dir "$1"; then
+			echo "Node \"$1\" exists in .tup/db when it shouldn't" 1>&2
 			exit 1
 		fi
 		shift
