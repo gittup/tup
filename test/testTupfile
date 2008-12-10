@@ -1,2 +1,2 @@
 : foreach *.c >> gcc -c $f -o $F.o >> $F.o
-: *.c >> gcc $F.o -o prog >> prog
+: *.o >> gcc $f -o prog >> prog

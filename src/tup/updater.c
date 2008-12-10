@@ -136,6 +136,8 @@ static int create_flag_cb(void *arg, struct db_node *dbn)
 	 */
 	if(tup_db_set_dircmd_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;
+	if(tup_db_set_cmd_output_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
+		return -1;
 
 	return 0;
 }

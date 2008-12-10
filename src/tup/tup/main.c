@@ -292,7 +292,7 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		id = create_name_file(dt, name);
+		id = create_name_file(dt, name+2);
 		if(id < 0)
 			return 1;
 

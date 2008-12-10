@@ -62,6 +62,7 @@ int tup_db_delete_links(tupid_t tupid);
 
 /* Combo operations */
 int tup_db_set_dircmd_flags(tupid_t parent, int flags);
+int tup_db_set_cmd_output_flags(tupid_t parent, int flags);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
 			       void *arg, tupid_t tupid);
 
