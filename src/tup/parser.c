@@ -476,7 +476,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 
 		next++;
 		p = next + 1;
-		spc = p + 1;
+		spc = p;
 		while(*spc && *spc != ' ')
 			spc++;
 		if(*spc == ' ')

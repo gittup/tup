@@ -15,7 +15,7 @@ cp ../testTupfile Tupfile
 echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
 echo "void foo2(void) {}" > foo2.c
-tup touch foo.c foo2.c bar.c
+tup touch bar.c foo.c foo2.c
 update_fail
 
 check_exist bar.o

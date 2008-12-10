@@ -339,7 +339,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 	int rc;
 	int dbrc;
 	static sqlite3_stmt *stmt = NULL;
-	static char s[] = "select id, name, type, flags from node where dir=? and type=? and name glob ?";
+	static char s[] = "select id, name, type, flags from node where dir=? and type=? and flags!=? and name glob ?";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
@@ -357,7 +357,11 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_text(stmt, 3, glob, -1, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int(stmt, 3, TUP_FLAGS_DELETE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(stmt, 4, glob, -1, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

@@ -10,7 +10,7 @@ srcs += foo.c
 endif
 
 : foreach \$(srcs) >> gcc -c \$f -o \$F.o >> \$F.o
-: *.o >> gcc \$F.o -o prog >> prog
+: *.o >> gcc \$f -o prog >> prog
 HERE
 
 echo "int main(void) {} void bar(void) {}" > bar.c
