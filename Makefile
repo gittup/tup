@@ -39,3 +39,6 @@ $(objs): $(BUILD)%.o: %.c Makefile
 	gcc -Os -MMD $(CCFLAGS) -Isrc -c $< -o $@ -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
 
 -include $(deps)
+
+clean:
+	rm -f $(PROGS) $(SHLIBS); rm -rf build
