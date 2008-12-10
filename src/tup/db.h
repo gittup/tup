@@ -47,6 +47,8 @@ tupid_t tup_db_select_node(tupid_t dt, const char *name);
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len);
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 				void *arg, int flags);
+int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
+				void *arg, tupid_t dt, const char *glob);
 int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);

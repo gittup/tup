@@ -1,6 +1,7 @@
 #include "vardb.h"
 #include "array_size.h"
 #include <stdio.h>
+#include <string.h>
 
 static int append(struct vardb *v, const char *var, const char *value);
 static int var_exists(struct vardb *v, const char *var);
@@ -75,6 +76,103 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		rc = append(v, var, value);
 	else
 		rc = vardb_set(v, var, value);
+	return rc;
+}
+
+int vardb_len(struct vardb *v, const char *var, int varlen)
+{
+	int rc = 0;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select length(value) from vars where var=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(v->db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(v->db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_text(stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		/* Variable not found: length of "" == 0 */
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	rc = sqlite3_column_int(stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
+		return -1;
+	}
+
+	return rc;
+}
+
+int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
+{
+	int rc = 0;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select value, length(value) from vars where var=?";
+	int valen;
+	const char *value;
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(v->db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(v->db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_text(stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		/* Variable not found: length of "" == 0 */
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	valen = sqlite3_column_int(stmt, 1);
+	if(valen < 0) {
+		rc = -1;
+		goto out_reset;
+	}
+	value = (const char *)sqlite3_column_text(stmt, 0);
+	if(!value) {
+		rc = -1;
+		goto out_reset;
+	}
+	memcpy(*dest, value, valen);
+	*dest += valen;
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
+		return -1;
+	}
+
 	return rc;
 }
 

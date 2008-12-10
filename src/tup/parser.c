@@ -46,12 +46,13 @@ struct buf {
 };
 
 static int fslurp(int fd, struct buf *b);
-static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid);
+static int execute_tupfile(struct buf *b, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
-static int execute_rules(struct list_head *rules, int dfd, tupid_t dt);
-static int file_match(struct rule *r, const char *filename, tupid_t dt);
+static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v);
+static int file_match(void *rule, struct db_node *dbn);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
 static char *tup_printf(const char *cmd, struct name_list *nl);
+static char *eval(struct vardb *v, const char *string);
 
 int parser_create(tupid_t tupid)
 {
@@ -64,19 +65,18 @@ int parser_create(tupid_t tupid)
 	if(dfd < 0)
 		return -1;
 	fd = openat(dfd, "Tupfile", O_RDONLY);
+	close(dfd);
 	if(fd < 0)
-		goto out_close_dir;
+		return -1;
 
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = execute_tupfile(&b, dfd, tupid);
+	rc = execute_tupfile(&b, tupid);
 	free(b.s);
 out_close_file:
 	close(fd);
 
-out_close_dir:
-	close(dfd);
 	return rc;
 }
 
@@ -113,13 +113,14 @@ err_out:
 	return -1;
 }
 
-static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid)
+static int execute_tupfile(struct buf *b, tupid_t tupid)
 {
 	char *p, *e;
 	char *line;
 	int rc;
 	struct rule *r;
 	struct vardb vdb;
+	int if_true = 1;
 	LIST_HEAD(rules);
 
 	if(vardb_init(&vdb) < 0)
@@ -140,6 +141,42 @@ static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid)
 		*nl = 0;
 		if(line[0] == '#') {
 			/* Skip comments */
+		} else if(strcmp(line, "else") == 0) {
+			if_true = !if_true;
+		} else if(strcmp(line, "endif") == 0) {
+			/* TODO: Nested if */
+			if_true = 1;
+		} else if(!if_true) {
+			/* Skip the false part of an if block */
+		} else if(strncmp(line, "ifeq ", 5) == 0) {
+			char *paren;
+			char *comma;
+			char *lval;
+			char *rval;
+
+			paren = strchr(line+5, '(');
+			if(!paren)
+				goto syntax_error;
+			lval = paren + 1;
+			comma = strchr(lval, ',');
+			if(!comma)
+				goto syntax_error;
+			rval = comma + 1;
+			if(nl[-1] != ')')
+				goto syntax_error;
+			*comma = 0;
+			nl[-1] = 0;
+
+			lval = eval(&vdb, lval);
+			rval = eval(&vdb, rval);
+
+			if(strcmp(lval, rval) == 0) {
+				if_true = 1;
+			} else {
+				if_true = 0;
+			}
+			free(lval);
+			free(rval);
 		} else if(line[0] == ':') {
 			if(parse_rule(p+1, &rules) < 0)
 				goto syntax_error;
@@ -156,11 +193,17 @@ static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid)
 				value = eq + 2;
 				append = 1;
 			} else {
-				eq = strchr(p, '=');
-				if(!eq)
-					goto syntax_error;
-				append = 0;
-				value = eq + 1;
+				eq = strstr(p, ":=");
+				if(eq) {
+					value = eq + 2;
+					append = 0;
+				} else {
+					eq = strchr(p, '=');
+					if(!eq)
+						goto syntax_error;
+					value = eq + 1;
+					append = 0;
+				}
 			}
 
 			/* End the lval with a 0, then space-delete the end
@@ -183,16 +226,18 @@ static int execute_tupfile(struct buf *b, int dfd, tupid_t tupid)
 		p = nl + 1;
 	}
 
-	rc = execute_rules(&rules, dfd, tupid);
+	vardb_dump(&vdb);
+	rc = execute_rules(&rules, tupid, &vdb);
 	while(!list_empty(&rules)) {
 		r = list_entry(rules.next, struct rule, list);
 		list_del(&r->list);
 		free(r);
 	}
+	sqlite3_close(vdb.db);
 	return rc;
 
 syntax_error:
-	fprintf(stderr, "Syntax error parsing Tupfile\n  Line was: %s", line);
+	fprintf(stderr, "Syntax error parsing Tupfile\n  Line was: %s\n", line);
 	return -1;
 }
 
@@ -248,30 +293,34 @@ static int parse_rule(char *p, struct list_head *rules)
 	r->namelist.totlen = 0;
 	r->namelist.extlesstotlen = 0;
 
-	list_add(&r->list, rules);
+	list_add_tail(&r->list, rules);
 
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, int dfd, tupid_t dt)
+static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v)
 {
 	struct rule *r;
-	struct flist f = {0, 0, 0};
-	struct stat buf;
 
-	/* fdopendir will close the file descriptor, but we still need it, so
-	 * we dup() it
-	 */
-	flist_foreachfd(&f, dup(dfd)) {
-		if(f.filename[0] == '.')
-			continue;
-		if(fstatat(dirfd(f._d), f.filename, &buf, 0) == 0 &&
-		   S_ISDIR(buf.st_mode))
-			continue;
-		list_for_each_entry(r, rules, list) {
-			if(file_match(r, f.filename, dt) < 0)
+	list_for_each_entry(r, rules, list) {
+		char *inp;
+		char *spc;
+		char *p;
+
+		inp = eval(v, r->input_pattern);
+		if(!inp)
+			return -1;
+
+		p = inp;
+		while((spc = strchr(p, ' ')) != NULL) {
+			*spc = 0;
+			if(tup_db_select_node_dir_glob(file_match, r, dt, p)<0)
 				return -1;
+			p = spc + 1;
 		}
+		if(tup_db_select_node_dir_glob(file_match, r, dt, p) < 0)
+			return -1;
+		free(inp);
 	}
 
 	list_for_each_entry(r, rules, list) {
@@ -293,69 +342,63 @@ static int execute_rules(struct list_head *rules, int dfd, tupid_t dt)
 	return 0;
 }
 
-static int file_match(struct rule *r, const char *filename, tupid_t dt)
+static int file_match(void *rule, struct db_node *dbn)
 {
-	int flags = FNM_PATHNAME | FNM_PERIOD;
+	struct rule *r = rule;
 	int extlesslen;
 	int len;
-	tupid_t in_id;
 
-	in_id = create_name_file(dt, filename);
-	if(in_id < 0)
-		return -1;
-	len = strlen(filename);
+	len = strlen(dbn->name);
 	extlesslen = len - 1;
-	while(extlesslen > 0 && filename[extlesslen] != '.')
+	while(extlesslen > 0 && dbn->name[extlesslen] != '.')
 		extlesslen--;
 
-	if(fnmatch(r->input_pattern, filename, flags) == 0) {
-		if(r->foreach) {
-			struct name_list nl;
-			struct name_list_entry nle;
+	if(r->foreach) {
+		struct name_list nl;
+		struct name_list_entry nle;
 
-			nle.path = strdup(filename);
-			if(!nle.path) {
-				perror("strdup");
-				return -1;
-			}
-			nle.len = len;
-			nle.extlesslen = extlesslen;
-			nle.tupid = in_id;
-			INIT_LIST_HEAD(&nl.entries);
-			list_add(&nle.list, &nl.entries);
-			nl.num_entries = 1;
-			nl.totlen = len;
-			nl.extlesstotlen = extlesslen;
-			nl.dt = dt;
-
-			if(do_rule(r, &nl, dt) < 0)
-				return -1;
-			free(nle.path);
-		} else {
-			struct name_list_entry *nle;
-
-			nle = malloc(sizeof *nle);
-			if(!nle) {
-				perror("malloc");
-				return -1;
-			}
-
-			nle->path = strdup(filename);
-			if(!nle->path) {
-				perror("strdup");
-				return -1;
-			}
-
-			nle->len = len;
-			nle->extlesslen = extlesslen;
-			nle->tupid = in_id;
-
-			list_add(&nle->list, &r->namelist.entries);
-			r->namelist.num_entries++;
-			r->namelist.totlen += len;
-			r->namelist.extlesstotlen += extlesslen;
-			r->namelist.dt = dt;
+		nle.path = strdup(dbn->name);
+		if(!nle.path) {
+			perror("strdup");
+			return -1;
 		}
+		nle.len = len;
+		nle.extlesslen = extlesslen;
+		nle.tupid = dbn->tupid;
+		INIT_LIST_HEAD(&nl.entries);
+		list_add(&nle.list, &nl.entries);
+		nl.num_entries = 1;
+		nl.totlen = len;
+		nl.extlesstotlen = extlesslen;
+		nl.dt = dbn->dt;
+
+		if(do_rule(r, &nl, dbn->dt) < 0)
+			return -1;
+		free(nle.path);
+	} else {
+		struct name_list_entry *nle;
+
+		nle = malloc(sizeof *nle);
+		if(!nle) {
+			perror("malloc");
+			return -1;
+		}
+
+		nle->path = strdup(dbn->name);
+		if(!nle->path) {
+			perror("strdup");
+			return -1;
+		}
+
+		nle->len = len;
+		nle->extlesslen = extlesslen;
+		nle->tupid = dbn->tupid;
+
+		list_add(&nle->list, &r->namelist.entries);
+		r->namelist.num_entries++;
+		r->namelist.totlen += len;
+		r->namelist.extlesstotlen += extlesslen;
+		r->namelist.dt = dbn->dt;
 	}
 	return 0;
 }
@@ -461,4 +504,73 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 		return NULL;
 	}
 	return s;
+}
+
+static char *eval(struct vardb *v, const char *string)
+{
+	int len = 0;
+	const char *dollar;
+	char *ret;
+	char *p;
+	const char *s;
+
+	s = string;
+	while((dollar = strchr(s, '$')) != NULL) {
+		const char *rparen;
+		const char *var;
+		int vlen;
+
+		len += dollar - s;
+		if(dollar[1] != '(')
+			goto syntax_error;
+		rparen = strchr(dollar+1, ')');
+		if(!rparen)
+			goto syntax_error;
+
+		var = dollar + 2;
+		vlen = vardb_len(v, var, rparen-var);
+		len += vlen;
+		s = rparen + 1;
+	}
+	len += strlen(s);
+
+	ret = malloc(len+1);
+	if(!ret) {
+		perror("malloc");
+		return NULL;
+	}
+
+	p = ret;
+	s = string;
+	while((dollar = strchr(s, '$')) != NULL) {
+		const char *rparen;
+		const char *var;
+
+		memcpy(p, s, dollar-s);
+		p += dollar-s;
+
+		len += dollar - s;
+		if(dollar[1] != '(')
+			goto syntax_error;
+		rparen = strchr(dollar+1, ')');
+		if(!rparen)
+			goto syntax_error;
+
+		var = dollar + 2;
+		if(vardb_get(v, var, rparen-var, &p) < 0)
+			return NULL;
+
+		s = rparen + 1;
+	}
+	strcpy(p, s);
+
+	if((signed)strlen(ret) != len) {
+		fprintf(stderr, "Length mismatch: expected %i bytes, wrote %i\n", len, strlen(ret));
+	}
+
+	return ret;
+
+syntax_error:
+	fprintf(stderr, "Syntax error: expected $(\n");
+	return NULL;
 }
