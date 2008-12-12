@@ -148,21 +148,26 @@ static int process_create_nodes(void)
 	LIST_HEAD(namelist);
 
 	tup_db_begin();
-	/* TODO: Do in while loop in case it creates more create nodes? */
-	if(tup_db_select_node_by_flags(create_flag_cb, &namelist,
-				       TUP_FLAGS_CREATE) != 0)
-		goto err_rollback;
+	while(1) {
+		if(tup_db_select_node_by_flags(create_flag_cb, &namelist,
+					       TUP_FLAGS_CREATE) != 0)
+			goto err_rollback;
 
-	while(!list_empty(&namelist)) {
-		nl = list_entry(namelist.next, struct name_list, list);
-		if(create(nl->tupid) < 0)
-			goto err_rollback;
-		if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE) < 0)
-			goto err_rollback;
-		list_del(&nl->list);
-		free(nl->name);
-		free(nl);
+		if(list_empty(&namelist))
+			goto out_commit;
+
+		while(!list_empty(&namelist)) {
+			nl = list_entry(namelist.next, struct name_list, list);
+			if(create(nl->tupid) < 0)
+				goto err_rollback;
+			if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE)<0)
+				goto err_rollback;
+			list_del(&nl->list);
+			free(nl->name);
+			free(nl);
+		}
 	}
+out_commit:
 	tup_db_commit();
 
 	return 0;

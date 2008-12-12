@@ -59,9 +59,12 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	if(strcmp(file, "Tupfile") == 0)
 		upddir = 1;
 
-	if(upddir)
+	if(upddir) {
 		if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0)
 			return -1;
+		if(tup_db_set_dependent_dir_flags(dt, TUP_FLAGS_CREATE) < 0)
+			return -1;
+	}
 
 	tupid = create_name_file(dt, file);
 	if(tupid < 0)
@@ -162,7 +165,8 @@ static tupid_t __create_dir_tupid(const char *dir, int include_last,
 
 	while((slash = strchr(dir, '/')) != NULL) {
 		dt = tup_db_create_node_part(dt, dir, slash - dir,
-					     TUP_NODE_DIR, TUP_FLAGS_CREATE);
+					     TUP_NODE_DIR, TUP_FLAGS_CREATE,
+					     NULL);
 		if(dt < 0)
 			return -1;
 		dir = slash + 1;

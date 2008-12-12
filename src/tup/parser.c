@@ -323,6 +323,11 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v)
 				*spc = 0;
 
 			subdir = find_dir_tupid_dt(dt, p, &file);
+			if(subdir < 0)
+				return -1;
+			if(subdir != dt)
+				if(tup_db_create_link(subdir, dt) < 0)
+					return -1;
 			if(p != file) {
 				/* Note that dirlen should be file-p-1, but we
 				 * add 1 to account for the trailing '/' that
@@ -456,6 +461,7 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 	struct name_list_entry *nle;
 	char *cmd;
 	char *output;
+	int node_created = 0;
 	tupid_t cmd_id;
 	tupid_t out_id;
 
@@ -475,7 +481,13 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 	}
 
 	output = tup_printf(r->output_pattern, nl);
-	out_id = create_name_file(dt, output);
+	out_id = tup_db_create_node_part(dt, output, -1, TUP_NODE_FILE,
+					 TUP_FLAGS_MODIFY, &node_created);
+	if(out_id < 0)
+		return -1;
+	if(node_created)
+		if(tup_db_set_dependent_dir_flags(dt, TUP_FLAGS_CREATE) < 0)
+			return -1;
 	free(output);
 
 	if(tup_db_create_link(cmd_id, out_id) < 0)
