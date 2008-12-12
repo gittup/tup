@@ -38,6 +38,8 @@ struct rule {
 	char *output_pattern;
 	char *command;
 	struct name_list namelist;
+	const char *dir;
+	int dirlen;
 };
 
 struct buf {
@@ -50,6 +52,7 @@ static int execute_tupfile(struct buf *b, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
 static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v);
 static int file_match(void *rule, struct db_node *dbn);
+static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
 static char *tup_printf(const char *cmd, struct name_list *nl);
 static char *eval(struct vardb *v, const char *string);
@@ -306,20 +309,40 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v)
 		char *inp;
 		char *spc;
 		char *p;
+		const char *file;
+		tupid_t subdir;
 
 		inp = eval(v, r->input_pattern);
 		if(!inp)
 			return -1;
 
 		p = inp;
-		while((spc = strchr(p, ' ')) != NULL) {
-			*spc = 0;
-			if(tup_db_select_node_dir_glob(file_match, r, dt, p)<0)
+		do {
+			spc = strchr(p, ' ');
+			if(spc)
+				*spc = 0;
+
+			subdir = find_dir_tupid_dt(dt, p, &file);
+			if(p != file) {
+				/* Note that dirlen should be file-p-1, but we
+				 * add 1 to account for the trailing '/' that
+				 * will be added.
+				 */
+				p[file-p-1] = 0;
+				r->dir = p;
+				r->dirlen = file-p;
+			} else {
+				r->dir = "";
+				r->dirlen = 0;
+			}
+			if(tup_db_select_node_dir_glob(file_match, r,
+						       subdir, file) < 0)
 				return -1;
-			p = spc + 1;
-		}
-		if(tup_db_select_node_dir_glob(file_match, r, dt, p) < 0)
-			return -1;
+
+			if(spc)
+				p = spc + 1;
+		} while(spc != NULL);
+
 		free(inp);
 	}
 
@@ -348,7 +371,7 @@ static int file_match(void *rule, struct db_node *dbn)
 	int extlesslen;
 	int len;
 
-	len = strlen(dbn->name);
+	len = strlen(dbn->name) + r->dirlen;
 	extlesslen = len - 1;
 	while(extlesslen > 0 && dbn->name[extlesslen] != '.')
 		extlesslen--;
@@ -357,11 +380,10 @@ static int file_match(void *rule, struct db_node *dbn)
 		struct name_list nl;
 		struct name_list_entry nle;
 
-		nle.path = strdup(dbn->name);
-		if(!nle.path) {
-			perror("strdup");
+		nle.path = set_path(dbn->name, r->dir, r->dirlen);
+		if(!nle.path)
 			return -1;
-		}
+
 		nle.len = len;
 		nle.extlesslen = extlesslen;
 		nle.tupid = dbn->tupid;
@@ -384,11 +406,9 @@ static int file_match(void *rule, struct db_node *dbn)
 			return -1;
 		}
 
-		nle->path = strdup(dbn->name);
-		if(!nle->path) {
-			perror("strdup");
+		nle->path = set_path(dbn->name, r->dir, r->dirlen);
+		if(!nle->path)
 			return -1;
-		}
 
 		nle->len = len;
 		nle->extlesslen = extlesslen;
@@ -401,6 +421,34 @@ static int file_match(void *rule, struct db_node *dbn)
 		r->namelist.dt = dbn->dt;
 	}
 	return 0;
+}
+
+static char *set_path(const char *name, const char *dir, int dirlen)
+{
+	char *path;
+
+	if(dirlen) {
+		int nlen;
+
+		nlen = strlen(name);
+		/* +1 for '/', +1 for nul */
+		path = malloc(nlen + dirlen + 1);
+		if(!path) {
+			perror("malloc");
+			return NULL;
+		}
+
+		memcpy(path, dir, dirlen-1);
+		path[dirlen-1] = '/';
+		strcpy(path + dirlen, name);
+	} else {
+		path = strdup(name);
+		if(!path) {
+			perror("strdup");
+			return NULL;
+		}
+	}
+	return path;
 }
 
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)

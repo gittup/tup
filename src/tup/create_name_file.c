@@ -10,7 +10,7 @@ struct id_flags {
 	int flags;
 };
 
-static tupid_t __find_dir_tupid(const char *dir, int include_last);
+static tupid_t __find_dir_tupid(const char *dir, const char **last);
 static tupid_t __create_dir_tupid(const char *dir, int include_last,
 				  const char **last_part);
 
@@ -26,10 +26,8 @@ tupid_t create_path_file(const char *path)
 	return create_name_file(dt, file);
 }
 
-tupid_t __create_name_file(tupid_t dt, const char *file, const char *f, int l)
+tupid_t create_name_file(tupid_t dt, const char *file)
 {
-	if(0)
-	fprintf(stderr, "CNF[%s:%i]: %lli '%s'\n", f, l, dt, file);
 	return tup_db_create_node(dt, file, TUP_NODE_FILE, TUP_FLAGS_MODIFY);
 }
 
@@ -38,16 +36,7 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 	return tup_db_create_node(dt, cmd, TUP_NODE_CMD, TUP_FLAGS_MODIFY);
 }
 
-tupid_t create_dir_file(const char *path)
-{
-	tupid_t dt;
-	dt = __find_dir_tupid(path, 0);
-	if(dt < 0)
-		return -1;
-	return tup_db_create_node(dt, path, TUP_NODE_DIR, TUP_FLAGS_CREATE);
-}
-
-tupid_t create_dir_file2(tupid_t dt, const char *path)
+tupid_t create_dir_file(tupid_t dt, const char *path)
 {
 	return tup_db_create_node(dt, path, TUP_NODE_DIR, TUP_FLAGS_CREATE);
 }
@@ -107,25 +96,18 @@ int tup_pathname_mod(const char *path, int flags)
 
 tupid_t find_dir_tupid(const char *dir)
 {
-	return __find_dir_tupid(dir, 1);
+	return __find_dir_tupid(dir, NULL);
 }
 
-static tupid_t __find_dir_tupid(const char *dir, int include_last)
+tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last)
 {
 	char *slash;
-	tupid_t dt;
 
-	dt = tup_db_select_node(0, ".");
-	if(dt < 0)
-		return -1;
-	if(strcmp(dir, ".") == 0) {
-		/* If the directory is the top, and we wanted to include the
-		 * whole thing, then return that directory. If we want the
-		 * parent of ".", then that's just zero.
-		 */
-		if(include_last)
-			return dt;
-		return 0;
+	while(strncmp(dir, "../", 3) == 0) {
+		dir += 3;
+		dt = tup_db_parent(dt);
+		if(dt < 0)
+			return -1;
 	}
 
 	while((slash = strchr(dir, '/')) != NULL) {
@@ -134,12 +116,36 @@ static tupid_t __find_dir_tupid(const char *dir, int include_last)
 			return -1;
 		dir = slash + 1;
 	}
-	if(include_last) {
+	if(last) {
+		*last = dir;
+	} else {
 		dt = tup_db_select_node(dt, dir);
 		if(dt < 0)
 			return -1;
 	}
 	return dt;
+}
+
+static tupid_t __find_dir_tupid(const char *dir, const char **last)
+{
+	tupid_t dotdt;
+
+	dotdt = tup_db_select_node(0, ".");
+	if(dotdt < 0)
+		return -1;
+	if(strcmp(dir, ".") == 0) {
+		/* If the directory is the top, and we wanted to include the
+		 * whole thing, then return that directory. If we want the
+		 * parent of ".", then that's just zero.
+		 */
+		if(last) {
+			*last = NULL;
+			return 0;
+		}
+		return dotdt;
+	}
+
+	return find_dir_tupid_dt(dotdt, dir, last);
 }
 
 static tupid_t __create_dir_tupid(const char *dir, int include_last,

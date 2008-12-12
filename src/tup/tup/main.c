@@ -254,10 +254,14 @@ static int graph(int argc, char **argv)
 
 static int mlink(int argc, char **argv)
 {
+	/* This only works for files in the top-level directory. It's only
+	 * used by the benchmarking suite, and in fact may just disappear
+	 * entirely. I wouldn't use it for any other purpose.
+	 */
 	int type;
 	int x;
 	tupid_t cmd_id;
-	tupid_t dt;
+	tupid_t dotdt;
 	tupid_t id;
 
 	if(argc < 4) {
@@ -266,11 +270,11 @@ static int mlink(int argc, char **argv)
 		return 1;
 	}
 
-	dt = create_dir_file(get_sub_dir());
-	if(dt < 0)
+	dotdt = create_dir_file(0, ".");
+	if(dotdt < 0)
 		return -1;
 
-	cmd_id = create_command_file(dt, argv[1]);
+	cmd_id = create_command_file(dotdt, argv[1]);
 	if(cmd_id < 0) {
 		return -1;
 	}
@@ -292,7 +296,7 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		id = create_name_file(dt, name+2);
+		id = create_name_file(dotdt, name+2);
 		if(id < 0)
 			return 1;
 

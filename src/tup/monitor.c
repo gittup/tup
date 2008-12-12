@@ -284,7 +284,7 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 		goto out_close;
 	}
 	if(S_ISDIR(buf.st_mode)) {
-		newdt = create_dir_file2(dt, file);
+		newdt = create_dir_file(dt, file);
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			file);
