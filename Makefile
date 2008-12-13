@@ -4,7 +4,7 @@ objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
 PROGS := tup
-SHLIBS := ldpreload.so make.so
+SHLIBS := ldpreload.so
 
 all: $(PROGS) $(SHLIBS)
 
@@ -14,10 +14,8 @@ tup: LDFLAGS := -lsqlite3 -ldl
 ldpreload.so: CCFLAGS := -fpic
 ldpreload.so: LDFLAGS := -ldl -lsqlite3
 libtup.a: CCFLAGS := -fpic
-make.so: CCFLAGS := -fpic
 
 tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
-make.so: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/make/*.c)) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
 
 $(PROGS):

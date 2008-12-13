@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <dlfcn.h>
 #include <sys/file.h>
 #include <sys/wait.h>
 
@@ -23,7 +22,6 @@ static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int (*create)(tupid_t tupid);
 static int update(struct node *n);
 static int delete_file(struct node *n);
 
@@ -38,10 +36,8 @@ struct name_list {
 
 int updater(int argc, char **argv)
 {
-	char *create_so;
 	struct graph g;
 	int upd_lock;
-	void *handle;
 	int x;
 
 	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
@@ -60,8 +56,6 @@ int updater(int argc, char **argv)
 	}
 lock_success:
 
-	if(tup_db_config_get_string(&create_so, "create_so", "make.so") < 0)
-		return -1;
 	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
 
@@ -79,24 +73,6 @@ lock_success:
 			do_keep_going = 0;
 		}
 	}
-
-	if(strcmp(create_so, "tup") == 0) {
-		create = parser_create;
-	} else {
-		handle = dlopen(create_so, RTLD_LAZY);
-		if(!handle) {
-			fprintf(stderr, "Error: Unable to load %s\n",
-				create_so);
-			return 1;
-		}
-		create = dlsym(handle, "create");
-		if(!create) {
-			fprintf(stderr, "Error: Couldn't find 'create' symbol "
-				"in shared library.\n");
-			return 1;
-		}
-	}
-	free(create_so);
 
 	if(process_create_nodes() < 0)
 		return 1;
@@ -162,7 +138,7 @@ static int process_create_nodes(void)
 
 		while(!list_empty(&namelist)) {
 			nl = list_entry(namelist.next, struct name_list, list);
-			if(create(nl->tupid) < 0)
+			if(parser_create(nl->tupid) < 0)
 				goto err_rollback;
 			if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE)<0)
 				goto err_rollback;
