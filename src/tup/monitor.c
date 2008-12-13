@@ -253,8 +253,6 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	int curfd;
 	tupid_t newdt;
 
-	printf("Watch[cur='%s']: %lli, '%s' '%s'\n", get_current_dir_name(), dt, path, file);
-
 	curfd = open(".", O_RDONLY);
 	if(curfd < 0) {
 		perror(".");
@@ -484,7 +482,6 @@ static void handle_event(struct inotify_event *e)
 {
 	struct dircache *dc;
 	int flags = 0;
-	printf("event: wd=%i, name='%s' mask=%08x\n", e->wd, e->len ? e->name : "", e->mask);
 
 	dc = dircache_lookup(&mdb, e->wd);
 	if(!dc) {

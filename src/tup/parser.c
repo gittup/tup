@@ -69,8 +69,9 @@ int parser_create(tupid_t tupid)
 		return -1;
 	fd = openat(dfd, "Tupfile", O_RDONLY);
 	close(dfd);
+	/* No Tupfile means we have nothing to do */
 	if(fd < 0)
-		return -1;
+		return 0;
 
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;

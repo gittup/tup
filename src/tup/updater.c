@@ -130,6 +130,10 @@ static int create_flag_cb(void *arg, struct db_node *dbn)
 
 	list_add(&nl->list, list);
 
+	/* TODO: Is this really valid to set here in the select callback?
+	 * Maybe it should be moved into the while(!list_empty) loop in
+	 * process_create_nodes()?
+	 */
 	/* Move all existing commands over to delete - then the ones that are
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.

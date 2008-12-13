@@ -65,7 +65,7 @@ for($x=0; $x<$num_files; $x++) {
 	if($dir_names{$path_names{$x}} != 1) {
 		$dir_names{$path_names{$x}} = 1;
 		$mains{$x} = 1;
-		system("cp ../testMakefile ttup/$path_names{$x}/Makefile");
+		system("cp ../testTupfile ttup/$path_names{$x}/Tupfile");
 	}
 }
 
@@ -76,13 +76,9 @@ print MAKEFILE "objs :=\n";
 print MAKEFILE "progs :=\n";
 
 for($x=0; $x<$num_files; $x++) {
-	my ($tmp_name);
-	$tmp_name = $path_names{$x};
-	$tmp_name =~ s/\/$//;
-	$tmp_name =~ s#/#_#g;
 	print MAKEFILE "objs += $path_names{$x}$x.o\n";
-	print MAKEFILE "progs += prog_$tmp_name\n";
-	print MAKEFILE "prog_$tmp_name: $path_names{$x}$x.o\n";
+	print MAKEFILE "progs += $path_names{$x}prog\n";
+	print MAKEFILE "$path_names{$x}prog: $path_names{$x}$x.o\n";
 	open FILE, ">tmake/$path_names{$x}$x.c" or die "Can't open tmake/$path_names{$x}$x.c for write\n";
 	for($y=0; $y<$num_deps; $y++) {
 		my ($tmp);
