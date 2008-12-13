@@ -23,8 +23,8 @@ static int init(int argc, char **argv);
 static int graph_node_cb(void *unused, int argc, char **argv, char **col);
 static int graph_link_cb(void *unused, int argc, char **argv, char **col);
 static int graph(int argc, char **argv);
-static int mlink(int argc, char **argv);
 /* Testing commands */
+static int mlink(int argc, char **argv);
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
@@ -458,6 +458,5 @@ static void usage(void)
 	printf("  monitor 	Start the file monitor\n");
 	printf("  stop		Stop the file monitor\n");
 	printf("  g		Print a graphviz .dot graph of the .tup repository to stdout\n");
-	printf("  link cmd -iinfile... -ooutfile...\n\t\tCreate a command node containing 'cmd', with -i as input nodes\n\t\tand -o as output nodes\n");
 	printf("  upd		Run the updater. (Actually build stuff).\n");
 }
