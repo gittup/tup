@@ -230,8 +230,6 @@ static int find_deps(struct graph *g, struct node *n)
 	g->cur = n;
 	if(tup_db_select_node_by_link(md_flag_cb, g, n->tupid) < 0)
 		return -1;
-/*TODO 	if(tup_db_select_node_by_cmdlink(md_flag_cb, g, n->tupid) < 0)
-		return -1;*/
 	return 0;
 }
 
