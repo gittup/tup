@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #include "updater.h"
 #include "graph.h"
 #include "fileio.h"
@@ -390,18 +391,28 @@ err_delete_node:
 
 static int delete_file(struct node *n)
 {
+	int dirfd;
+	int rc = 0;
+
 	printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
 	if(delete_name_file(n->tupid) < 0)
 		return -1;
-	if(unlink(n->name) < 0) {
+	dirfd = tup_db_opendir(n->dt);
+	if(dirfd < 0)
+		return -1;
+
+	if(unlinkat(dirfd, n->name, 0) < 0) {
 		/* Don't care if the file is already gone. */
 		if(errno != ENOENT) {
 			perror(n->name);
-			return -1;
+			rc = -1;
+			goto out;
 		}
 	}
 
-	return 0;
+out:
+	close(dirfd);
+	return rc;
 }
 
 static void show_progress(int n, int tot)
