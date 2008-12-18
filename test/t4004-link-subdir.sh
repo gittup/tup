@@ -3,14 +3,14 @@
 . ../tup.sh
 
 cat > Tupfile << HERE
-: foreach *.c >> gcc -c \$f -o \$F.o >> \$F.o
-: *.o fs/built-in.o >> gcc \$f -o prog >> prog
+: foreach *.c >> gcc -c %f -o %F.o >> %F.o
+: *.o fs/built-in.o >> gcc %f -o prog >> prog
 HERE
 
 mkdir fs
 cat > fs/Tupfile << HERE
-: foreach *.c >> gcc -c \$f -o \$F.o >> \$F.o
-: *.o >> ld -r \$f -o built-in.o >> built-in.o
+: foreach *.c >> gcc -c %f -o %F.o >> %F.o
+: *.o >> ld -r %f -o built-in.o >> built-in.o
 HERE
 
 echo "int main(void) {return 0;}" > main.c

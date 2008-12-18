@@ -508,7 +508,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 	int clen = strlen(cmd);
 
 	p = cmd;
-	while((p = strchr(p, '$')) !=  NULL) {
+	while((p = strchr(p, '%')) !=  NULL) {
 		int paste_chars;
 
 		clen -= 2;
@@ -532,7 +532,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 
 	p = cmd;
 	x = 0;
-	while((next = strchr(p, '$')) !=  NULL) {
+	while((next = strchr(p, '%')) !=  NULL) {
 		memcpy(&s[x], p, next-p);
 		x += next-p;
 

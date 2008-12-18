@@ -1,2 +1,2 @@
-: foreach *.c >> gcc -I/home/marf/tup/test/make_v_tup/.run_test/ttup -c $f -o $F.o >> $F.o
-: *.o >> gcc $f -o prog >> prog
+: foreach *.c >> gcc -I/home/marf/tup/test/make_v_tup/.run_test/ttup -c %f -o %F.o >> %F.o
+: *.o >> gcc %f -o prog >> prog
