@@ -1224,6 +1224,11 @@ static int link_insert(tupid_t a, tupid_t b)
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "insert into link(from_id, to_id) values(?, ?)";
 
+	if(a == b) {
+		fprintf(stderr, "Error: Attempt made to link a node to itself (%lli)\n", a);
+		return -1;
+	}
+
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
