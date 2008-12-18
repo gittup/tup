@@ -611,7 +611,6 @@ static char *eval(struct vardb *v, const char *string)
 		memcpy(p, s, dollar-s);
 		p += dollar-s;
 
-		len += dollar - s;
 		if(dollar[1] != '(')
 			goto syntax_error;
 		rparen = strchr(dollar+1, ')');
