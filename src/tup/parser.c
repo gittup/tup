@@ -155,7 +155,6 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 		eval_line = eval(&vdb, line);
 		if(!eval_line)
 			return -1;
-		printf("LINE: '%s'\n", eval_line);
 
 		if(strcmp(eval_line, "else") == 0) {
 			if_true = !if_true;
