@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fnmatch.h>
+#include <ctype.h>
 #include <sys/stat.h>
 
 struct name_list {
@@ -135,7 +136,7 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 
 	while(p < e) {
 		char *nl;
-		while((*p == ' ' || *p == '\t' || *p == '\n') && p < e)
+		while(isspace(*p) && p < e)
 			p++;
 
 		line = p;
@@ -214,10 +215,10 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			 * of the variable name and the beginning of the value.
 			 */
 			*eq = 0;
-			while(*value == ' ' && *value != 0)
+			while(isspace(*value) && *value != 0)
 				value++;
 			eq--;
-			while(*eq == ' ' && eq > p) {
+			while(isspace(*eq) && eq > p) {
 				*eq = 0;
 				eq--;
 			}
@@ -252,27 +253,27 @@ static int parse_rule(char *p, struct list_head *rules)
 	struct rule *r;
 
 	input = p;
-	while(*input == ' ')
+	while(isspace(*input))
 		input++;
 	p = strstr(p, ">>");
 	if(!p)
 		return -1;
 	ie = p - 1;
-	while(*ie == ' ')
+	while(isspace(*ie))
 		ie--;
 	p += 2;
 	cmd = p;
-	while(*cmd == ' ')
+	while(isspace(*cmd))
 		cmd++;
 	p = strstr(p, ">>");
 	if(!p)
 		return -1;
 	ce = p - 1;
-	while(*ce == ' ')
+	while(isspace(*ce))
 		ce--;
 	p += 2;
 	output = p;
-	while(*output == ' ')
+	while(isspace(*output))
 		output++;
 	ie[1] = 0;
 	ce[1] = 0;
