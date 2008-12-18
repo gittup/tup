@@ -51,7 +51,7 @@ struct buf {
 static int fslurp(int fd, struct buf *b);
 static int execute_tupfile(struct buf *b, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
-static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v);
+static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
@@ -122,6 +122,7 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 {
 	char *p, *e;
 	char *line;
+	char *eval_line;
 	int rc;
 	struct rule *r;
 	struct vardb vdb;
@@ -144,22 +145,32 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 		if(!nl)
 			goto syntax_error;
 		*nl = 0;
+		p = nl + 1;
+
 		if(line[0] == '#') {
 			/* Skip comments */
-		} else if(strcmp(line, "else") == 0) {
+			continue;
+		}
+
+		eval_line = eval(&vdb, line);
+		if(!eval_line)
+			return -1;
+		printf("LINE: '%s'\n", eval_line);
+
+		if(strcmp(eval_line, "else") == 0) {
 			if_true = !if_true;
-		} else if(strcmp(line, "endif") == 0) {
+		} else if(strcmp(eval_line, "endif") == 0) {
 			/* TODO: Nested if */
 			if_true = 1;
 		} else if(!if_true) {
 			/* Skip the false part of an if block */
-		} else if(strncmp(line, "ifeq ", 5) == 0) {
+		} else if(strncmp(eval_line, "ifeq ", 5) == 0) {
 			char *paren;
 			char *comma;
 			char *lval;
 			char *rval;
 
-			paren = strchr(line+5, '(');
+			paren = strchr(eval_line+5, '(');
 			if(!paren)
 				goto syntax_error;
 			lval = paren + 1;
@@ -167,23 +178,19 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			if(!comma)
 				goto syntax_error;
 			rval = comma + 1;
-			if(nl[-1] != ')')
+			paren = strchr(rval, ')');
+			if(!paren)
 				goto syntax_error;
 			*comma = 0;
-			nl[-1] = 0;
-
-			lval = eval(&vdb, lval);
-			rval = eval(&vdb, rval);
+			*paren = 0;
 
 			if(strcmp(lval, rval) == 0) {
 				if_true = 1;
 			} else {
 				if_true = 0;
 			}
-			free(lval);
-			free(rval);
-		} else if(line[0] == ':') {
-			if(parse_rule(p+1, &rules) < 0)
+		} else if(eval_line[0] == ':') {
+			if(parse_rule(eval_line+1, &rules) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -193,17 +200,17 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			/* Find the += or = sign, and point value to the start
 			 * of the string after that op.
 			 */
-			eq = strstr(p, "+=");
+			eq = strstr(eval_line, "+=");
 			if(eq) {
 				value = eq + 2;
 				append = 1;
 			} else {
-				eq = strstr(p, ":=");
+				eq = strstr(eval_line, ":=");
 				if(eq) {
 					value = eq + 2;
 					append = 0;
 				} else {
-					eq = strchr(p, '=');
+					eq = strchr(eval_line, '=');
 					if(!eq)
 						goto syntax_error;
 					value = eq + 1;
@@ -218,24 +225,28 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			while(isspace(*value) && *value != 0)
 				value++;
 			eq--;
-			while(isspace(*eq) && eq > p) {
+			while(isspace(*eq) && eq > eval_line) {
 				*eq = 0;
 				eq--;
 			}
 
 			if(append)
-				vardb_append(&vdb, p, value);
+				vardb_append(&vdb, eval_line, value);
 			else
-				vardb_set(&vdb, p, value);
+				vardb_set(&vdb, eval_line, value);
 		}
-		p = nl + 1;
+
+		free(eval_line);
 	}
 
 	vardb_dump(&vdb);
-	rc = execute_rules(&rules, tupid, &vdb);
+	rc = execute_rules(&rules, tupid);
 	while(!list_empty(&rules)) {
 		r = list_entry(rules.next, struct rule, list);
 		list_del(&r->list);
+		free(r->input_pattern);
+		free(r->output_pattern);
+		free(r->command);
 		free(r);
 	}
 	sqlite3_close(vdb.db);
@@ -285,14 +296,26 @@ static int parse_rule(char *p, struct list_head *rules)
 		return -1;
 	}
 	if(strncmp(input, "foreach ", 8) == 0) {
-		r->input_pattern = input + 8;
+		r->input_pattern = strdup(input + 8);
 		r->foreach = 1;
 	} else {
-		r->input_pattern = input;
+		r->input_pattern = strdup(input);
 		r->foreach = 0;
 	}
-	r->output_pattern = output;
-	r->command = cmd;
+	if(!r->input_pattern) {
+		perror("strdup");
+		return -1;
+	}
+	r->output_pattern = strdup(output);
+	if(!r->output_pattern) {
+		perror("strdup");
+		return -1;
+	}
+	r->command = strdup(cmd);
+	if(!r->command) {
+		perror("strdup");
+		return -1;
+	}
 	INIT_LIST_HEAD(&r->namelist.entries);
 	r->namelist.num_entries = 0;
 	r->namelist.totlen = 0;
@@ -303,22 +326,17 @@ static int parse_rule(char *p, struct list_head *rules)
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v)
+static int execute_rules(struct list_head *rules, tupid_t dt)
 {
 	struct rule *r;
 
 	list_for_each_entry(r, rules, list) {
-		char *inp;
 		char *spc;
 		char *p;
 		const char *file;
 		tupid_t subdir;
 
-		inp = eval(v, r->input_pattern);
-		if(!inp)
-			return -1;
-
-		p = inp;
+		p = r->input_pattern;
 		do {
 			spc = strchr(p, ' ');
 			if(spc)
@@ -349,8 +367,6 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct vardb *v)
 			if(spc)
 				p = spc + 1;
 		} while(spc != NULL);
-
-		free(inp);
 	}
 
 	list_for_each_entry(r, rules, list) {
