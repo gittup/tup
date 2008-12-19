@@ -168,6 +168,7 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 	int flags = 0;
 	int color;
 	const char *shape;
+	const char *style;
 
 	if(unused) {}
 
@@ -199,14 +200,19 @@ static int graph_node_cb(void *unused, int argc, char **argv, char **col)
 			shape="ellipse";
 	}
 
+	style = "solid";
 	color = 0;
-	if(flags & TUP_FLAGS_MODIFY)
+	if(flags & TUP_FLAGS_MODIFY) {
 		color |= 0x0000ff;
-	if(flags & TUP_FLAGS_CREATE)
+		style = "dashed";
+	} else if(flags & TUP_FLAGS_CREATE) {
 		color |= 0x00ff00;
-	if(flags & TUP_FLAGS_DELETE)
+		style = "dashed peripheries=2";
+	} else if(flags & TUP_FLAGS_DELETE) {
 		color |= 0xff0000;
-	printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\"];\n", id, name, id, shape, color);
+		style = "dotted";
+	}
+	printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" style=%s];\n", id, name, id, shape, color, style);
 	if(dt)
 		printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", id, dt);
 
