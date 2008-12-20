@@ -366,9 +366,7 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 			if(spc)
 				p = spc + 1;
 		} while(spc != NULL);
-	}
 
-	list_for_each_entry(r, rules, list) {
 		if(!r->foreach && r->namelist.num_entries > 0) {
 			struct name_list_entry *nle;
 
