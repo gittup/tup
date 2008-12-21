@@ -49,7 +49,8 @@ struct buf {
 };
 
 static int fslurp(int fd, struct buf *b);
-static int execute_tupfile(struct buf *b, tupid_t tupid);
+static int parse_tupfile(struct buf *b, struct vardb *vdb,
+			 struct list_head *rules, int dfd);
 static int parse_rule(char *p, struct list_head *rules);
 static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
@@ -62,25 +63,50 @@ int parser_create(tupid_t tupid)
 {
 	int dfd;
 	int fd;
-	int rc = 0;
+	int rc = -1;
 	struct buf b;
+	struct vardb vdb;
+	struct rule *r;
+	LIST_HEAD(rules);
+
+	if(vardb_init(&vdb) < 0)
+		return -1;
 
 	dfd = tup_db_opendir(tupid);
 	if(dfd < 0)
-		return -1;
+		goto out_close_vdb;
+
 	fd = openat(dfd, "Tupfile", O_RDONLY);
-	close(dfd);
 	/* No Tupfile means we have nothing to do */
-	if(fd < 0)
-		return 0;
+	if(fd < 0) {
+		rc = 0;
+		goto out_close_dfd;
+	}
 
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = execute_tupfile(&b, tupid);
+	rc = parse_tupfile(&b, &vdb, &rules, dfd);
+	if(rc < 0)
+		goto out_free_bs;
+	vardb_dump(&vdb);
+	rc = execute_rules(&rules, tupid);
+out_free_bs:
 	free(b.s);
+	while(!list_empty(&rules)) {
+		r = list_entry(rules.next, struct rule, list);
+		list_del(&r->list);
+		free(r->input_pattern);
+		free(r->output_pattern);
+		free(r->command);
+		free(r);
+	}
 out_close_file:
 	close(fd);
+out_close_vdb:
+	sqlite3_close(vdb.db);
+out_close_dfd:
+	close(dfd);
 
 	return rc;
 }
@@ -118,19 +144,13 @@ err_out:
 	return -1;
 }
 
-static int execute_tupfile(struct buf *b, tupid_t tupid)
+static int parse_tupfile(struct buf *b, struct vardb *vdb,
+			 struct list_head *rules, int dfd)
 {
 	char *p, *e;
 	char *line;
 	char *eval_line;
-	int rc;
-	struct rule *r;
-	struct vardb vdb;
 	int if_true = 1;
-	LIST_HEAD(rules);
-
-	if(vardb_init(&vdb) < 0)
-		return -1;
 
 	p = b->s;
 	e = b->s + b->len;
@@ -152,11 +172,34 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			continue;
 		}
 
-		eval_line = eval(&vdb, line);
+		eval_line = eval(vdb, line);
 		if(!eval_line)
 			return -1;
 
-		if(strcmp(eval_line, "else") == 0) {
+		if(strncmp(eval_line, "include ", 8) == 0) {
+			struct buf incb;
+			int fd;
+			int rc;
+
+			fd = openat(dfd, eval_line+8, O_RDONLY);
+			if(fd < 0) {
+				fprintf(stderr, "Error including '%s': %s\n", eval_line+8, strerror(errno));
+				return -1;
+			}
+			rc = fslurp(fd, &incb);
+			close(fd);
+			if(rc < 0) {
+				fprintf(stderr, "Error slurping file.\n");
+				return -1;
+			}
+
+			rc = parse_tupfile(&incb, vdb, rules, dfd);
+			free(incb.s);
+			if(rc < 0) {
+				fprintf(stderr, "Error parsing included file '%s'\n", eval_line);
+				return -1;
+			}
+		} else if(strcmp(eval_line, "else") == 0) {
 			if_true = !if_true;
 		} else if(strcmp(eval_line, "endif") == 0) {
 			/* TODO: Nested if */
@@ -189,7 +232,7 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 				if_true = 0;
 			}
 		} else if(eval_line[0] == ':') {
-			if(parse_rule(eval_line+1, &rules) < 0)
+			if(parse_rule(eval_line+1, rules) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -230,26 +273,15 @@ static int execute_tupfile(struct buf *b, tupid_t tupid)
 			}
 
 			if(append)
-				vardb_append(&vdb, eval_line, value);
+				vardb_append(vdb, eval_line, value);
 			else
-				vardb_set(&vdb, eval_line, value);
+				vardb_set(vdb, eval_line, value);
 		}
 
 		free(eval_line);
 	}
 
-	vardb_dump(&vdb);
-	rc = execute_rules(&rules, tupid);
-	while(!list_empty(&rules)) {
-		r = list_entry(rules.next, struct rule, list);
-		list_del(&r->list);
-		free(r->input_pattern);
-		free(r->output_pattern);
-		free(r->command);
-		free(r);
-	}
-	sqlite3_close(vdb.db);
-	return rc;
+	return 0;
 
 syntax_error:
 	fprintf(stderr, "Syntax error parsing Tupfile\n  Line was: %s\n", line);
