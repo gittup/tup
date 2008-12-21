@@ -554,28 +554,38 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 		spc = p;
 		while(*spc && *spc != ' ')
 			spc++;
-		if(*spc == ' ')
-			spc++;
 		if(*next == 'f') {
+			int first = 1;
 			list_for_each_entry(nle, &nl->entries, list) {
+				if(!first) {
+					s[x] = ' ';
+					x++;
+				}
 				memcpy(&s[x], nle->path, nle->len);
 				x += nle->len;
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
+				first = 0;
 			}
 		} else if(*next == 'F') {
+			int first = 1;
 			list_for_each_entry(nle, &nl->entries, list) {
+				if(!first) {
+					s[x] = ' ';
+					x++;
+				}
 				memcpy(&s[x], nle->path, nle->extlesslen);
 				x += nle->extlesslen;
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
+				first = 0;
 			}
 		}
 		p = spc;
 	}
 	strcpy(&s[x], p);
 	if((signed)strlen(s) != clen) {
-		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%i).\n", clen, strlen(s));
+		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%i). String is: '%s'.\n", clen, strlen(s), s);
 		return NULL;
 	}
 	return s;
