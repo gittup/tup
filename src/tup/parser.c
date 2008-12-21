@@ -180,8 +180,22 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			struct buf incb;
 			int fd;
 			int rc;
+			char *last_slash;
+			char *file;
 
-			fd = openat(dfd, eval_line+8, O_RDONLY);
+			file = eval_line + 8;
+			last_slash = strrchr(file, '/');
+			if(last_slash) {
+				*last_slash = 0;
+				dfd = openat(dfd, file, O_RDONLY);
+				if(dfd < 0) {
+					perror("openat");
+					return -1;
+				}
+				file = last_slash + 1;
+			}
+
+			fd = openat(dfd, file, O_RDONLY);
 			if(fd < 0) {
 				fprintf(stderr, "Error including '%s': %s\n", eval_line+8, strerror(errno));
 				return -1;
@@ -194,6 +208,9 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			}
 
 			rc = parse_tupfile(&incb, vdb, rules, dfd);
+			if(last_slash) {
+				close(dfd);
+			}
 			free(incb.s);
 			if(rc < 0) {
 				fprintf(stderr, "Error parsing included file '%s'\n", eval_line);
