@@ -784,11 +784,11 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_set_dircmd_flags(tupid_t parent, int flags)
+int tup_db_or_dircmd_flags(tupid_t parent, int flags)
 {
 	int rc;
 	static sqlite3_stmt *stmt = NULL;
-	static char s[] = "update node set flags=? where dir=? and type=?";
+	static char s[]="update node set flags=flags|? where dir=? and type=?";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {

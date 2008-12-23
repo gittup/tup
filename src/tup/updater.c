@@ -115,7 +115,7 @@ static int create_flag_cb(void *arg, struct db_node *dbn)
 	 * re-created will be moved back out in create(). All those that are
 	 * no longer generated remain in delete for cleanup.
 	 */
-	if(tup_db_set_dircmd_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_or_dircmd_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;
 	if(tup_db_set_cmd_output_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;

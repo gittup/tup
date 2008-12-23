@@ -18,9 +18,9 @@ tup touch foo.c
 update_fail
 
 tup touch Tupfile
-if tup upd  | grep 'gcc.*foo.o' | wc -l | grep 2 > /dev/null; then
+if tup upd 2>&1 | grep 'gcc -c foo.c -o foo.o' > /dev/null; then
 	:
 else
-	echo "foo.c should have been compiled and linked again." 1>&2
+	echo "foo.c should have been compiled again." 1>&2
 	exit 1
 fi
