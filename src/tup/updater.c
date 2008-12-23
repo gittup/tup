@@ -365,9 +365,9 @@ static int update(struct node *n)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			if(write_files(tupid) < 0)
-				goto err_close_dfd;
+				goto err_cmd_failed;
 		} else {
-			goto err_close_dfd;
+			goto err_cmd_failed;
 		}
 	}
 	fchdir(curfd);
@@ -376,6 +376,13 @@ static int update(struct node *n)
 	close(curfd);
 	delete_name_file(n->tupid);
 	return 0;
+
+err_cmd_failed:
+	/* Make sure we process this command again next time (since the command
+	 * could be here because of an input file modification, which will now
+	 * be cleared).
+	 */
+	tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_MODIFY);
 
 err_close_dfd:
 	fchdir(curfd);
