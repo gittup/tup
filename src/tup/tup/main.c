@@ -106,6 +106,7 @@ int main(int argc, char **argv)
 	tup_db_close();
 out:
 	tup_lock_exit();
+	muntrace();
 
 	if(check_open_fds() < 0)
 		rc = 1;
