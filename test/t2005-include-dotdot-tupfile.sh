@@ -20,7 +20,7 @@ HERE
 
 cat > Tupfile.ccargs << HERE
 CCARGS := -c %f
-CCARGS += -o %F.o
+CCARGS += -o %o
 HERE
 
 tup touch a/foo.c a/bar.c a/Tupfile

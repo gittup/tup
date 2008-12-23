@@ -9,7 +9,7 @@ ifeq (1,\$(CONFIG_FOO))
 srcs += foo.c
 endif
 
-: foreach \$(srcs) >> gcc -c %f -o %F.o >> %F.o
+: foreach \$(srcs) >> gcc -c %f -o %o >> %F.o
 : *.o >> gcc %f -o prog >> prog
 HERE
 

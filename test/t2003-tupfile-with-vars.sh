@@ -6,7 +6,7 @@
 cat > Tupfile << HERE
 CC = gcc
 CCARGS := -c %f
-CCARGS += -o %F.o
+CCARGS += -o %o
 CC = echo \$(CC)
 : foreach *.c >> \$(CC) \$(CCARGS) >> %F.o
 : *.o >> \$(CC) -o prog %f >> prog

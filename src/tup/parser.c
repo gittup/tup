@@ -56,7 +56,7 @@ static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
-static char *tup_printf(const char *cmd, struct name_list *nl);
+static char *tup_printf(const char *cmd, struct name_list *nl, const char *o);
 static char *eval(struct vardb *v, const char *string);
 
 int parser_create(tupid_t tupid)
@@ -529,7 +529,11 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 	tupid_t cmd_id;
 	tupid_t out_id;
 
-	cmd = tup_printf(r->command, nl);
+	output = tup_printf(r->output_pattern, nl, NULL);
+	if(!output)
+		return -1;
+
+	cmd = tup_printf(r->command, nl, output);
 	if(!cmd)
 		return -1;
 	cmd_id = create_command_file(dt, cmd);
@@ -544,7 +548,6 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 			return -1;
 	}
 
-	output = tup_printf(r->output_pattern, nl);
 	out_id = tup_db_create_node_part(dt, output, -1, TUP_NODE_FILE,
 					 TUP_FLAGS_MODIFY, &node_created);
 	if(out_id < 0)
@@ -559,7 +562,7 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 	return 0;
 }
 
-static char *tup_printf(const char *cmd, struct name_list *nl)
+static char *tup_printf(const char *cmd, struct name_list *nl, const char *o)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -568,6 +571,9 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 	const char *next;
 	const char *spc;
 	int clen = strlen(cmd);
+	int olen = 0;
+
+	if(o) olen = strlen(o);
 
 	p = cmd;
 	while((p = strchr(p, '%')) !=  NULL) {
@@ -583,6 +589,12 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 			clen += nl->totlen + paste_chars;
 		} else if(*p == 'F') {
 			clen += nl->extlesstotlen + paste_chars;
+		} else if(*p == 'o') {
+			if(!o) {
+				fprintf(stderr, "Error: %%o can only be used in a command.\n");
+				return NULL;
+			}
+			clen += olen;
 		}
 	}
 
@@ -629,6 +641,9 @@ static char *tup_printf(const char *cmd, struct name_list *nl)
 				x += spc - p;
 				first = 0;
 			}
+		} else if(*next == 'o') {
+			memcpy(&s[x], o, olen);
+			x += olen;
 		}
 		p = spc;
 	}

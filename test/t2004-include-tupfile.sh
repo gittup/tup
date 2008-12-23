@@ -12,7 +12,7 @@ HERE
 cat > Tupfile.vars << HERE
 CC = gcc
 CCARGS := -c %f
-CCARGS += -o %F.o
+CCARGS += -o %o
 CC = echo \$(CC)
 HERE
 
