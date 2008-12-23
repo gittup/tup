@@ -277,8 +277,6 @@ static int execute_graph(struct graph *g)
 						goto out;
 					}
 				}
-			} else {
-				printf("skip: %s\n", n->name);
 			}
 		}
 		while(n->edges) {
@@ -306,7 +304,7 @@ static int execute_graph(struct graph *g)
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			goto out;
 keep_going:
-		if(n != root) {
+		if(n->type == TUP_NODE_CMD) {
 			num_processed++;
 			show_progress(num_processed, g->num_nodes);
 		}
