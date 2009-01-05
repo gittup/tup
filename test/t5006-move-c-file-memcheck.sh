@@ -4,16 +4,19 @@
 # a fair bit of the usual functionality in a single trace.
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cat > Tupfile << HERE
+: foreach *.c >> gcc -c %f -o %o >> %F.o
+: *.o >> ar cru %o %f >> libfoo.a
+HERE
 
 # Verify both files are compiled
-echo "int main(void) {return 0;}" > foo.c
+echo "int foo(void) {return 0;}" > foo.c
 echo "void bar1(void) {}" > bar.c
 tup touch foo.c bar.c
 update
-sym_check foo.o main
+sym_check foo.o foo
 sym_check bar.o bar1
-sym_check prog main bar1
+sym_check libfoo.a foo bar1
 
 # Rename bar.c to realbar.c.
 mv bar.c realbar.c
