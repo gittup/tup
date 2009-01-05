@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 
+#define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
 
 struct db_node {

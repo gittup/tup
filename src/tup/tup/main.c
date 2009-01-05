@@ -16,8 +16,6 @@
 #include "tup/updater.h"
 #include <errno.h>
 
-#define TUP_DIR ".tup"
-
 static int file_exists(const char *s);
 
 static int init(int argc, char **argv);

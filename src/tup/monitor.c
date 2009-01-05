@@ -54,6 +54,7 @@ static void handle_event(struct inotify_event *e);
 static void sighandler(int sig);
 
 static int inot_fd;
+static int tup_wd;
 static int obj_wd;
 static int mon_wd;
 static struct memdb mdb;
@@ -109,6 +110,13 @@ int monitor(int argc, char **argv)
 		return -1;
 	}
 
+	tup_wd = inotify_add_watch(inot_fd, TUP_DIR, IN_DELETE);
+	if(tup_wd < 0) {
+		perror("inotify_add_watch");
+		rc = -1;
+		goto close_inot;
+	}
+
 	/* Make sure we're watching the lock before we try to take it
 	 * exclusively, since the only way we know to release the lock is if
 	 * some other process opens it. We don't want to get in the race
@@ -153,10 +161,11 @@ int monitor(int argc, char **argv)
 		(double)(t2.tv_usec - t1.tv_usec)/1e6);
 
 	while((x = read(inot_fd, buf, sizeof(buf))) > 0) {
+		struct inotify_event *e;
 		int offset = 0;
 
-		while(offset < x) {
-			struct inotify_event *e = (void*)((char*)buf + offset);
+		for(offset = 0; offset < x; offset += sizeof(*e) + e->len) {
+			e = (void*)((char*)buf + offset);
 
 			/* If the lock file is opened, assume we are now
 			 * locked out. When the file is closed, check to see
@@ -167,7 +176,12 @@ int monitor(int argc, char **argv)
 			 * and closes because inotify sometimes slurps some
 			 * duplicate events.
 			 */
-			if(e->wd == obj_wd) {
+			if(e->wd == tup_wd) {
+				if(e->len && strcmp(e->name, "db-journal") == 0)
+					continue;
+				printf("tup monitor: .tup file '%s' deleted - shutting down.\n", e->len ? e->name : "");
+				goto close_inot;
+			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
 					flush_queue();
 					locked = 0;
@@ -189,8 +203,6 @@ int monitor(int argc, char **argv)
 				if(locked)
 					queue_event(e);
 			}
-
-			offset += sizeof(*e) + e->len;
 		}
 
 		if(events_queued()) {
