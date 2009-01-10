@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <mcheck.h>
+#include <errno.h>
 #include "tup/config.h"
 #include "tup/compat.h"
 #include "tup/db.h"
@@ -14,13 +15,12 @@
 #include "tup/tupid.h"
 #include "tup/fileio.h"
 #include "tup/updater.h"
-#include <errno.h>
+#include "tup/graph.h"
 
 static int file_exists(const char *s);
 
 static int init(int argc, char **argv);
-static int graph_node_cb(void *unused, int argc, char **argv, char **col);
-static int graph_link_cb(void *unused, int argc, char **argv, char **col);
+static int graph_cb(void *arg, struct db_node *dbn);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
@@ -161,102 +161,109 @@ static int init(int argc, char **argv)
 	return 0;
 }
 
-static int graph_node_cb(void *unused, int argc, char **argv, char **col)
+static int graph_cb(void *arg, struct db_node *dbn)
 {
-	int x;
-	tupid_t id = 0;
-	tupid_t dt = 0;
-	char *name = NULL;
-	int type = 0;
-	int flags = 0;
-	int color;
-	const char *shape;
-	const char *style;
+	struct graph *g = arg;
+	struct node *n;
 
-	if(unused) {}
+	if((n = find_node(g, dbn->tupid)) != NULL)
+		goto edge_create;
+	n = create_node(g, dbn);
+	if(!n)
+		return -1;
 
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "id") == 0) {
-			id = atoll(argv[x]);
-		} else if(strcmp(col[x], "dir") == 0) {
-			dt = atoll(argv[x]);
-		} else if(strcmp(col[x], "name") == 0) {
-			name = argv[x];
-		} else if(strcmp(col[x], "type") == 0) {
-			type = atoll(argv[x]);
-		} else if(strcmp(col[x], "flags") == 0) {
-			flags = atoll(argv[x]);
-		}
-	}
-
-	switch(type) {
-		case TUP_NODE_FILE:
-			shape = "oval";
-			break;
-		case TUP_NODE_CMD:
-			shape = "rectangle";
-			break;
-		case TUP_NODE_DIR:
-			shape = "diamond";
-			break;
-		default:
-			shape="ellipse";
-	}
-
-	style = "solid";
-	color = 0;
-	if(flags & TUP_FLAGS_MODIFY) {
-		color |= 0x0000ff;
-		style = "dashed";
-	} else if(flags & TUP_FLAGS_CREATE) {
-		color |= 0x00ff00;
-		style = "dashed peripheries=2";
-	} else if(flags & TUP_FLAGS_DELETE) {
-		color |= 0xff0000;
-		style = "dotted";
-	}
-	printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" style=%s];\n", id, name, id, shape, color, style);
-	if(dt)
-		printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", id, dt);
-
-	return 0;
-}
-
-static int graph_link_cb(void *unused, int argc, char **argv, char **col)
-{
-	int x;
-	int from_id = 0;
-	int to_id = 0;
-
-	if(unused) {}
-
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "from_id") == 0) {
-			from_id = atoll(argv[x]);
-		} else if(strcmp(col[x], "to_id") == 0) {
-			to_id = atoll(argv[x]);
-		}
-	}
-
-	printf("\tnode_%i -> node_%i [dir=back]\n", to_id, from_id);
+edge_create:
+	if(g->cur)
+		if(create_edge(g->cur, n) < 0)
+			return -1;
 	return 0;
 }
 
 static int graph(int argc, char **argv)
 {
-	const char node_sql[] = "select * from node";
-	const char link_sql[] = "select * from link";
+	int x;
+	struct graph g;
+	struct node *n;
+	tupid_t tupid;
 
-	if(argc) {}
-	if(argv) {}
+	if(create_graph(&g) < 0)
+		return -1;
+
+	for(x=1; x<argc; x++) {
+		struct db_node dbn;
+
+		tupid = get_dbn(argv[x], &dbn);
+		if(tupid < 0) {
+			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
+			return -1;
+		}
+
+		if(find_node(&g, dbn.tupid) == NULL) {
+			if(!create_node(&g, &dbn))
+				return -1;
+		}
+	}
+
+	while(!list_empty(&g.plist)) {
+		g.cur = list_entry(g.plist.next, struct node, list);
+		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tupid) < 0)
+			return -1;
+		list_move(&g.cur->list, &g.node_list);
+
+		if(g.cur->type == TUP_NODE_DIR) {
+			tupid = g.cur->tupid;
+			g.cur = NULL;
+			if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
+				return -1;
+		}
+	}
 
 	printf("digraph G {\n");
-	if(tup_db_select(graph_node_cb, NULL, node_sql) != 0)
-		return -1;
+	list_for_each_entry(n, &g.node_list, list) {
+		int color;
+		const char *shape;
+		const char *style;
+		struct edge *e;
 
-	if(tup_db_select(graph_link_cb, NULL, link_sql) != 0)
-		return -1;
+		if(n == g.root)
+			continue;
 
+		switch(n->type) {
+			case TUP_NODE_FILE:
+				shape = "oval";
+				break;
+			case TUP_NODE_CMD:
+				shape = "rectangle";
+				break;
+			case TUP_NODE_DIR:
+				shape = "diamond";
+				break;
+			default:
+				shape="ellipse";
+		}
+
+		style = "solid";
+		color = 0;
+		if(n->flags & TUP_FLAGS_MODIFY) {
+			color |= 0x0000ff;
+			style = "dashed";
+		} else if(n->flags & TUP_FLAGS_CREATE) {
+			color |= 0x00ff00;
+			style = "dashed peripheries=2";
+		} else if(n->flags & TUP_FLAGS_DELETE) {
+			color |= 0xff0000;
+			style = "dotted";
+		}
+		printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" style=%s];\n", n->tupid, n->name, n->tupid, shape, color, style);
+		if(n->dt)
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
+
+		e = n->edges;
+		while(e) {
+			printf("\tnode_%lli -> node_%lli [dir=back]\n", e->dest->tupid, n->tupid);
+			e = e->next;
+		}
+	}
 	printf("}\n");
 	return 0;
 }

@@ -266,6 +266,14 @@ tupid_t tup_db_select_node(tupid_t dt, const char *name)
 	return dbn.tupid;
 }
 
+tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
+{
+	if(node_select(dt, name, -1, dbn) < 0)
+		return -1;
+
+	return dbn->tupid;
+}
+
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len)
 {
 	struct db_node dbn = {-1, -1, NULL, 0, 0};
@@ -317,6 +325,62 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 		dbn.name = (const char *)sqlite3_column_text(stmt, 2);
 		dbn.type = sqlite3_column_int(stmt, 3);
 		dbn.flags = flags;
+
+		if(callback(arg, &dbn) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+	}
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_select_node_dir(int (*callback)(void *, struct db_node *), void *arg,
+			   tupid_t dt)
+{
+	int rc;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select id, name, type, flags from node where dir=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		struct db_node dbn;
+
+		dbrc = sqlite3_step(stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		dbn.tupid = sqlite3_column_int64(stmt, 0);
+		dbn.dt = dt;
+		dbn.name = (const char *)sqlite3_column_text(stmt, 1);
+		dbn.type = sqlite3_column_int(stmt, 2);
+		dbn.flags = sqlite3_column_int(stmt, 3);
 
 		if(callback(arg, &dbn) < 0) {
 			rc = -1;

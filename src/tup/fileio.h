@@ -3,12 +3,15 @@
 
 #include "tup/tupid.h"
 
+struct db_node;
+
 tupid_t create_path_file(const char *path);
 tupid_t create_name_file(tupid_t dt, const char *file);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 int tup_file_mod(tupid_t dt, const char *file, int flags);
 int tup_pathname_mod(const char *path, int flags);
+tupid_t get_dbn(const char *path, struct db_node *dbn);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last);
 

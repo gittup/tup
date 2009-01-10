@@ -116,6 +116,10 @@ done:
 		str[sz-1] = 0;
 		sz--;
 	}
+	while(sz > 1 && str[sz-1] == '.' && str[sz-2] == '/') {
+		str[sz-2] = 0;
+		sz -= 2;
+	}
 	if(sz == 0) {
 		sz = 1;
 		str[0] = '.';
