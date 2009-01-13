@@ -1,7 +1,7 @@
 #ifndef tup_fileio_h
 #define tup_fileio_h
 
-#include "tup/tupid.h"
+#include "tupid.h"
 
 struct db_node;
 

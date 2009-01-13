@@ -1,7 +1,7 @@
 #ifndef file_h
 #define file_h
 
-#include "tup/tupid.h"
+#include "tupid.h"
 
 struct access_event;
 int handle_file(const struct access_event *event, tupid_t tupid);

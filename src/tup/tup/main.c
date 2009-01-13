@@ -3,16 +3,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <mcheck.h>
 #include <errno.h>
 #include "tup/config.h"
-#include "tup/compat.h"
-#include "tup/db.h"
 #include "tup/lock.h"
 #include "tup/getexecwd.h"
 #include "tup/monitor.h"
-#include "tup/tupid.h"
 #include "tup/fileio.h"
 #include "tup/updater.h"
 #include "tup/graph.h"

@@ -1,10 +1,10 @@
 #ifndef tup_graph_h
 #define tup_graph_h
 
-#include "tup/list.h"
-#include "tup/tupid.h"
-#include "tup/db.h"
-#include "tup/memdb.h"
+#include "list.h"
+#include "tupid.h"
+#include "db.h"
+#include "memdb.h"
 
 struct edge {
 	struct edge *next;

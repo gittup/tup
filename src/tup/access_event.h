@@ -1,8 +1,6 @@
 #ifndef tup_access_event_h
 #define tup_access_event_h
 
-#include "tupid.h"
-
 /** The environment variable used to pass the name of the UNIX socket server
  * to subprocesses.
  */

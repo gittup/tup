@@ -1,9 +1,9 @@
-#define _LARGEFILE64_SOURCE
 #define _GNU_SOURCE
 #include "tup/access_event.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <sys/un.h>
 #include <sys/socket.h>
