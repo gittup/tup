@@ -371,8 +371,13 @@ static void queue_event(struct inotify_event *e)
 	new_start = queue_end;
 	new_end = new_start + sizeof(*e) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
-		fprintf(stderr, "Error: Event dropped\n");
-		return;
+		flush_queue();
+		new_start = queue_end;
+		new_end = new_start + sizeof(*e) + e->len;
+		if(new_end >= (signed)sizeof(queue_buf)) {
+			fprintf(stderr, "Error: Event dropped\n");
+			return;
+		}
 	}
 
 	queue_last_e = (struct inotify_event*)&queue_buf[new_start];
