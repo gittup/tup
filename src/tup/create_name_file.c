@@ -72,6 +72,18 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	if(tup_db_set_flags_by_id(tupid, flags) < 0)
 		return -1;
 
+	/* If a file was deleted and it was created by a command, set the
+	 * command's flags to modify. For example, if foo.o was deleted, we
+	 * set 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed.
+	 *
+	 * This is really just to mimic what people would expect from make.
+	 * Randomly deleting object files is pretty stupid.
+	 */
+	if(flags == TUP_FLAGS_DELETE) {
+		if(tup_db_set_cmd_flags_by_output(tupid, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+	}
+
 	return 0;
 }
 

@@ -1,8 +1,5 @@
 #! /bin/sh -e
 
-echo "[33mSkip t5001 - not needed?"
-exit 0
-
 . ../tup.sh
 cp ../testTupfile Tupfile
 
