@@ -10,13 +10,12 @@ all: $(PROGS) $(SHLIBS)
 
 Q=@
 
-tup: LDFLAGS := -lsqlite3 -ldl
+tup: LDFLAGS := -lsqlite3
 ldpreload.so: CCFLAGS := -fpic
 ldpreload.so: LDFLAGS := -ldl -lsqlite3
-libtup.a: CCFLAGS := -fpic
 
 tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
-ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs)) libtup.a
+ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
 
 $(PROGS):
 	$Qecho "  LD      $@";\

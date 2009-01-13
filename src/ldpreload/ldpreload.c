@@ -1,19 +1,16 @@
 #define _LARGEFILE64_SOURCE
 #define _GNU_SOURCE
 #include "tup/access_event.h"
-#include "tup/debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/un.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <dlfcn.h>
-#include <pthread.h>
 
-#define HANDLE_FILE(f, at) handle_file(f, at, __func__);
-
-static void handle_file(const char *file, int at, const char *func);
+static void handle_file(const char *file, int at);
 static void handle_rename_file(const char *old, const char *new);
 static int ignore_file(const char *file);
 static void ldpre_init(void) __attribute__((constructor));
@@ -43,7 +40,7 @@ int open(const char *pathname, int flags, ...)
 	/* O_ACCMODE is 0x3, which covers O_WRONLY and O_RDWR */
 	rc = s_open(pathname, flags, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, flags&O_ACCMODE);
+		handle_file(pathname, flags&O_ACCMODE);
 	return rc;
 }
 
@@ -60,7 +57,7 @@ int open64(const char *pathname, int flags, ...)
 	}
 	rc = s_open64(pathname, flags, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, flags&O_ACCMODE);
+		handle_file(pathname, flags&O_ACCMODE);
 	return rc;
 }
 
@@ -70,7 +67,7 @@ FILE *fopen(const char *path, const char *mode)
 
 	f = s_fopen(path, mode);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -80,7 +77,7 @@ FILE *fopen64(const char *path, const char *mode)
 
 	f = s_fopen64(path, mode);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -90,7 +87,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 
 	f = s_freopen(path, mode, stream);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -100,7 +97,7 @@ int creat(const char *pathname, mode_t mode)
 
 	rc = s_creat(pathname, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, 1);
+		handle_file(pathname, 1);
 	return rc;
 }
 
@@ -110,19 +107,17 @@ int rename(const char *old, const char *new)
 
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		DEBUGP("renamed %s to %s\n", old, new);
 		handle_rename_file(old, new);
 	}
 	return rc;
 }
 
-static void handle_file(const char *file, int at, const char *funcname)
+static void handle_file(const char *file, int at)
 {
 	struct access_event event;
 
 	if(ignore_file(file))
 		return;
-	DEBUGP("send file '%s' mode %i from func %s\n", file, at, funcname);
 
 	event.at = at;
 	event.pid = my_pid;
@@ -136,8 +131,8 @@ static void handle_rename_file(const char *old, const char *new)
 	if(ignore_file(old) || ignore_file(new))
 		return;
 
-	HANDLE_FILE(old, ACCESS_RENAME_FROM);
-	HANDLE_FILE(new, ACCESS_RENAME_TO);
+	handle_file(old, ACCESS_RENAME_FROM);
+	handle_file(new, ACCESS_RENAME_TO);
 }
 
 static int ignore_file(const char *file)
@@ -168,9 +163,6 @@ static void ldpre_init(void)
 	}
 
 	my_pid = getpid();
-	if(getenv(TUP_DEBUG) != NULL) {
-		debug_enable("tup_ldpreload.so");
-	}
 
 	path = getenv(SERVER_NAME);
 	if(!path) {
