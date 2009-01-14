@@ -21,7 +21,6 @@ struct name_list {
 	int num_entries;
 	int totlen;
 	int extlesstotlen;
-	tupid_t dt;
 };
 
 struct name_list_entry {
@@ -56,8 +55,13 @@ static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt);
-static void delete_name_list_entry(struct name_list_entry *nle);
-static char *tup_printf(const char *cmd, struct name_list *nl, const char *o);
+static void init_name_list(struct name_list *nl);
+static void add_name_list_entry(struct name_list *nl,
+				struct name_list_entry *nle);
+static void delete_name_list_entry(struct name_list *nl,
+				   struct name_list_entry *nle);
+static char *tup_printf(const char *cmd, struct name_list *nl,
+			struct name_list *onl);
 static char *eval(struct vardb *v, const char *string);
 
 int parser_create(tupid_t tupid)
@@ -318,9 +322,14 @@ static int parse_rule(char *p, struct list_head *rules)
 	p = strstr(p, ">>");
 	if(!p)
 		return -1;
-	ie = p - 1;
-	while(isspace(*ie))
-		ie--;
+	if(input < p) {
+		ie = p - 1;
+		while(isspace(*ie))
+			ie--;
+		ie[1] = 0;
+	} else {
+		input = NULL;
+	}
 	p += 2;
 	cmd = p;
 	while(isspace(*cmd))
@@ -335,7 +344,6 @@ static int parse_rule(char *p, struct list_head *rules)
 	output = p;
 	while(isspace(*output))
 		output++;
-	ie[1] = 0;
 	ce[1] = 0;
 	p++;
 
@@ -344,11 +352,16 @@ static int parse_rule(char *p, struct list_head *rules)
 		perror("malloc");
 		return -1;
 	}
-	if(strncmp(input, "foreach ", 8) == 0) {
-		r->input_pattern = strdup(input + 8);
-		r->foreach = 1;
+	if(input) {
+		if(strncmp(input, "foreach ", 8) == 0) {
+			r->input_pattern = strdup(input + 8);
+			r->foreach = 1;
+		} else {
+			r->input_pattern = strdup(input);
+			r->foreach = 0;
+		}
 	} else {
-		r->input_pattern = strdup(input);
+		r->input_pattern = strdup("");
 		r->foreach = 0;
 	}
 	if(!r->input_pattern) {
@@ -365,10 +378,7 @@ static int parse_rule(char *p, struct list_head *rules)
 		perror("strdup");
 		return -1;
 	}
-	INIT_LIST_HEAD(&r->namelist.entries);
-	r->namelist.num_entries = 0;
-	r->namelist.totlen = 0;
-	r->namelist.extlesstotlen = 0;
+	init_name_list(&r->namelist);
 
 	list_add_tail(&r->list, rules);
 
@@ -417,7 +427,16 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 				p = spc + 1;
 		} while(spc != NULL);
 
-		if(!r->foreach && r->namelist.num_entries > 0) {
+		/* Only parse non-foreach rules if the namelist has some
+		 * entries, or if there is no input listed. We don't want to
+		 * generate a command if there is an input pattern but no
+		 * entries match (for example, *.o inputs to ld %f with no
+		 * object files). However, if you have no input but just a
+		 * command (eg: you want to run a shell script), then we still
+		 * want to do the rule for that case.
+		 */
+		if(!r->foreach && (r->namelist.num_entries > 0 ||
+				   strcmp(r->input_pattern, "") == 0)) {
 			struct name_list_entry *nle;
 
 			if(do_rule(r, &r->namelist, dt) < 0)
@@ -426,7 +445,7 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 			while(!list_empty(&r->namelist.entries)) {
 				nle = list_entry(r->namelist.entries.next,
 						struct name_list_entry, list);
-				delete_name_list_entry(nle);
+				delete_name_list_entry(&r->namelist, nle);
 			}
 		}
 	}
@@ -455,12 +474,9 @@ static int file_match(void *rule, struct db_node *dbn)
 		nle.len = len;
 		nle.extlesslen = extlesslen;
 		nle.tupid = dbn->tupid;
-		INIT_LIST_HEAD(&nl.entries);
-		list_add(&nle.list, &nl.entries);
-		nl.num_entries = 1;
-		nl.totlen = len;
-		nl.extlesstotlen = extlesslen;
-		nl.dt = dbn->dt;
+
+		init_name_list(&nl);
+		add_name_list_entry(&nl, &nle);
 
 		if(do_rule(r, &nl, dbn->dt) < 0)
 			return -1;
@@ -482,11 +498,7 @@ static int file_match(void *rule, struct db_node *dbn)
 		nle->extlesslen = extlesslen;
 		nle->tupid = dbn->tupid;
 
-		list_add(&nle->list, &r->namelist.entries);
-		r->namelist.num_entries++;
-		r->namelist.totlen += len;
-		r->namelist.extlesstotlen += extlesslen;
-		r->namelist.dt = dbn->dt;
+		add_name_list_entry(&r->namelist, nle);
 	}
 	return 0;
 }
@@ -521,68 +533,116 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 
 static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 {
-	struct name_list_entry *nle, *tmp;
+	struct name_list onl;
+	struct name_list_entry *nle, *tmp, *onle;
+	char *p;
+	char *spc;
 	char *cmd;
-	char *output;
 	int node_created = 0;
 	tupid_t cmd_id;
-	tupid_t out_id;
 
-	output = tup_printf(r->output_pattern, nl, NULL);
-	if(!output)
-		return -1;
+	init_name_list(&onl);
 
-	out_id = tup_db_create_node_part(dt, output, -1, TUP_NODE_FILE,
-					 TUP_FLAGS_MODIFY, &node_created);
-	if(out_id < 0)
-		return -1;
-	if(node_created)
-		if(tup_db_set_dependent_dir_flags(dt, TUP_FLAGS_CREATE) < 0)
+	p = r->output_pattern;
+	do {
+		spc = strchr(p, ' ');
+		if(spc)
+			*spc = 0;
+
+		onle = malloc(sizeof *onle);
+		if(!onle) {
+			perror("malloc");
 			return -1;
+		}
+		onle->path = tup_printf(p, nl, NULL);
+		if(!onle->path)
+			return -1;
+		onle->len = strlen(onle->path);
+		onle->extlesslen = onle->len - 1;
+		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
+			onle->extlesslen--;
+
+		onle->tupid = tup_db_create_node_part(dt, onle->path, -1,
+						      TUP_NODE_FILE,
+						      TUP_FLAGS_MODIFY,
+						      &node_created);
+		if(onle->tupid < 0)
+			return -1;
+		if(node_created)
+			if(tup_db_set_dependent_dir_flags(dt,
+							  TUP_FLAGS_CREATE) < 0)
+				return -1;
+
+		add_name_list_entry(&onl, onle);
+
+		if(spc)
+			p = spc + 1;
+	} while(spc != NULL);
 
 	list_for_each_entry_safe(nle, tmp, &nl->entries, list) {
-		if(nle->tupid == out_id) {
-			fprintf(stderr, "Error: Attemping to use a command's output as its input in dir ID %lli. Output ID %lli is '%s'. Deleting entry from input list\n", dt, out_id, output);
-			nl->totlen -= nle->len;
-			nl->extlesstotlen -= nle->extlesslen;
-			nl->num_entries--;
-			delete_name_list_entry(nle);
+		list_for_each_entry(onle, &onl.entries, list) {
+			if(nle->tupid == onle->tupid) {
+				fprintf(stderr, "Error: Attemping to use a command's output as its input in dir ID %lli. Output ID %lli is '%s'. Deleting entry from input list\n", dt, onle->tupid, onle->path);
+				delete_name_list_entry(&r->namelist, nle);
+			}
 		}
 	}
 
-	cmd = tup_printf(r->command, nl, output);
+	cmd = tup_printf(r->command, nl, &onl);
 	if(!cmd)
 		return -1;
 	cmd_id = create_command_file(dt, cmd);
 	free(cmd);
-	free(output);
 	if(cmd_id < 0)
 		return -1;
 
-	if(tup_db_create_link(cmd_id, out_id) < 0)
-		return -1;
+	while(!list_empty(&onl.entries)) {
+		onle = list_entry(onl.entries.next, struct name_list_entry,
+				  list);
+		if(tup_db_create_link(cmd_id, onle->tupid) < 0)
+			return -1;
+		delete_name_list_entry(&onl, onle);
+	}
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		printf("Match[%lli]: %s, %s\n", nl->dt, r->input_pattern,
-		       nle->path);
-		if(nle->tupid == out_id) {
+		printf("Match: %s, %s\n", r->input_pattern, nle->path);
+		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
 			return -1;
-		} else {
-			if(tup_db_create_link(nle->tupid, cmd_id) < 0)
-				return -1;
-		}
 	}
 	return 0;
 }
 
-static void delete_name_list_entry(struct name_list_entry *nle)
+static void init_name_list(struct name_list *nl)
 {
+	INIT_LIST_HEAD(&nl->entries);
+	nl->num_entries = 0;
+	nl->totlen = 0;
+	nl->extlesstotlen = 0;
+}
+
+static void add_name_list_entry(struct name_list *nl,
+				struct name_list_entry *nle)
+{
+	list_add(&nle->list, &nl->entries);
+	nl->num_entries++;
+	nl->totlen += nle->len;
+	nl->extlesstotlen += nle->extlesslen;
+}
+
+static void delete_name_list_entry(struct name_list *nl,
+				   struct name_list_entry *nle)
+{
+	nl->num_entries--;
+	nl->totlen -= nle->len;
+	nl->extlesstotlen -= nle->extlesslen;
+
 	list_del(&nle->list);
 	free(nle->path);
 	free(nle);
 }
 
-static char *tup_printf(const char *cmd, struct name_list *nl, const char *o)
+static char *tup_printf(const char *cmd, struct name_list *nl,
+			struct name_list *onl)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -591,9 +651,6 @@ static char *tup_printf(const char *cmd, struct name_list *nl, const char *o)
 	const char *next;
 	const char *spc;
 	int clen = strlen(cmd);
-	int olen = 0;
-
-	if(o) olen = strlen(o);
 
 	p = cmd;
 	while((p = strchr(p, '%')) !=  NULL) {
@@ -610,11 +667,11 @@ static char *tup_printf(const char *cmd, struct name_list *nl, const char *o)
 		} else if(*p == 'F') {
 			clen += nl->extlesstotlen + paste_chars;
 		} else if(*p == 'o') {
-			if(!o) {
+			if(!onl) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
 				return NULL;
 			}
-			clen += olen;
+			clen += onl->totlen + (onl->num_entries-1);
 		}
 	}
 
@@ -662,8 +719,16 @@ static char *tup_printf(const char *cmd, struct name_list *nl, const char *o)
 				first = 0;
 			}
 		} else if(*next == 'o') {
-			memcpy(&s[x], o, olen);
-			x += olen;
+			int first = 1;
+			list_for_each_entry(nle, &onl->entries, list) {
+				if(!first) {
+					s[x] = ' ';
+					x++;
+				}
+				memcpy(&s[x], nle->path, nle->len);
+				x += nle->len;
+				first = 0;
+			}
 		}
 		p = spc;
 	}

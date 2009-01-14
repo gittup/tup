@@ -228,6 +228,9 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
 {
 	struct db_node dbn = {-1, -1, NULL, 0, 0};
 
+	if(node_created)
+		*node_created = 0;
+
 	if(node_select(dt, name, len, &dbn) < 0) {
 		return -1;
 	}
