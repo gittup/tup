@@ -3,8 +3,8 @@
 . ../tup.sh
 tup monitor
 mkdir a
-cp ../testTupfile Tupfile
-cp ../testTupfile a/Tupfile
+cp ../testTupfile.tup Tupfile
+cp ../testTupfile.tup a/Tupfile
 
 echo "int main(void) {return 0;}" > a/foo.c
 update

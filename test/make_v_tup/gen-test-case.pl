@@ -65,7 +65,7 @@ for($x=0; $x<$num_files; $x++) {
 	if($dir_names{$path_names{$x}} != 1) {
 		$dir_names{$path_names{$x}} = 1;
 		$mains{$x} = 1;
-		system("cp ../testTupfile ttup/$path_names{$x}/Tupfile");
+		system("cp ../testTupfile.tup ttup/$path_names{$x}/Tupfile");
 	}
 }
 

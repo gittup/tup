@@ -4,9 +4,9 @@
 tup monitor
 mkdir a
 mkdir a/a2
-cp ../testTupfile Tupfile
-cp ../testTupfile a/Tupfile
-cp ../testTupfile a/a2/Tupfile
+cp ../testTupfile.tup Tupfile
+cp ../testTupfile.tup a/Tupfile
+cp ../testTupfile.tup a/a2/Tupfile
 
 echo "int main(void) {return 0;}" > a/a2/foo.c
 update

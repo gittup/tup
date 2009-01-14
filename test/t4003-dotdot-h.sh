@@ -1,10 +1,10 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 mkdir bar
-cp ../testTupfile bar/Tupfile
+cp ../testTupfile.tup bar/Tupfile
 echo "#define FOO 3" > foo.h
 (echo "#include \"../foo.h\""; echo "int main(void) {return FOO;}") > bar/foo.c
 tup touch foo.h

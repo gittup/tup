@@ -2,7 +2,7 @@
 
 . ../tup.sh
 mkdir blah
-cp ../testTupfile blah/Tupfile
+cp ../testTupfile.tup blah/Tupfile
 
 # Verify all files are compiled
 echo "int main(void) {return 0;}" > blah/foo.c

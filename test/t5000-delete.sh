@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 # Verify all files are compiled
 echo "int main(void) {return 0;}" > foo.c

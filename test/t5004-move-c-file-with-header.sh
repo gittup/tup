@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 # Verify both files are compiled
 (echo "#include \"foo.h\""; echo "int main(void) {return 0;}") > foo.c

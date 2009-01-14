@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 # Admittedly, I don't really know how the order these files are created
 # determines the order in which they are processed in the updater. I just

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
 tup touch foo.c Tupfile

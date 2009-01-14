@@ -2,7 +2,7 @@
 
 . ../tup.sh
 tup monitor
-cp ../testTupfile Tupfile
+cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {return 0;}" > foo.c
 update
