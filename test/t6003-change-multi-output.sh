@@ -2,7 +2,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: >> sh ok.sh >> a b
+: |> sh ok.sh |> a b
 HERE
 
 cat > ok.sh << HERE
@@ -21,7 +21,7 @@ touch c
 HERE
 
 cat > Tupfile << HERE
-: >> sh ok.sh >> a c
+: |> sh ok.sh |> a c
 HERE
 
 tup touch ok.sh Tupfile

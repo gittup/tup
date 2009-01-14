@@ -9,8 +9,8 @@ ifeq (1,\$(CONFIG_FOO))
 srcs += foo.c
 endif
 
-: foreach \$(srcs) >> gcc -c %f -o %o >> %F.o
-: *.o >> gcc %f -o prog >> prog
+: foreach \$(srcs) |> gcc -c %f -o %o |> %F.o
+: *.o |> gcc %f -o prog |> prog
 HERE
 
 echo "int main(void) {} void bar(void) {}" > bar.c

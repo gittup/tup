@@ -5,8 +5,8 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c >> echo gcc -c %f -o %o >> %F.o
-: *.o >> echo gcc -o prog %f >> prog
+: foreach *.c |> echo gcc -c %f -o %o |> %F.o
+: *.o |> echo gcc -o prog %f |> prog
 HERE
 tup touch foo.c bar.c Tupfile
 tup upd

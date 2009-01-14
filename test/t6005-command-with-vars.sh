@@ -9,8 +9,8 @@ CFILES = *.c
 OFILES = *.o
 EXE = prog
 
-: foreach \$(CFILES) >> \$(CC) -c %f -o %o >> %F.o
-: \$(OFILES) >> \$(CC) %f -o \$(EXE) >> \$(EXE)
+: foreach \$(CFILES) |> \$(CC) -c %f -o %o |> %F.o
+: \$(OFILES) |> \$(CC) %f -o \$(EXE) |> \$(EXE)
 HERE
 
 echo "int main(void) {} void foo(void) {}" > foo.c

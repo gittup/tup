@@ -8,8 +8,8 @@
 mkdir a
 cat > a/Tupfile << HERE
 include ../Tupfile.vars
-: foreach *.c >> \$(CC) \$(CCARGS) >> %F.o
-: *.o >> \$(CC) -o prog %f >> prog
+: foreach *.c |> \$(CC) \$(CCARGS) |> %F.o
+: *.o |> \$(CC) -o prog %f |> prog
 HERE
 
 cat > Tupfile.vars << HERE

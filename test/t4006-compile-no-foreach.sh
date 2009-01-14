@@ -7,8 +7,8 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foo.c >> gcc -c %f -o %o>> %F.o
-: foo.o >> gcc %f -o prog >> prog
+: foo.c |> gcc -c %f -o %o|> %F.o
+: foo.o |> gcc %f -o prog |> prog
 HERE
 
 echo "int main(void) {}" > foo.c

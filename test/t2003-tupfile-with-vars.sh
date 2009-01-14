@@ -8,8 +8,8 @@ CC = gcc
 CCARGS := -c %f
 CCARGS += -o %o
 CC = echo \$(CC)
-: foreach *.c >> \$(CC) \$(CCARGS) >> %F.o
-: *.o >> \$(CC) -o prog %f >> prog
+: foreach *.c |> \$(CC) \$(CCARGS) |> %F.o
+: *.o |> \$(CC) -o prog %f |> prog
 HERE
 tup touch foo.c bar.c Tupfile
 tup upd

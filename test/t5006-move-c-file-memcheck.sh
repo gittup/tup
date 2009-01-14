@@ -5,8 +5,8 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c >> gcc -c %f -o %o >> %F.o
-: *.o >> ar cru %o %f >> libfoo.a
+: foreach *.c |> gcc -c %f -o %o |> %F.o
+: *.o |> ar cru %o %f |> libfoo.a
 HERE
 
 # Verify both files are compiled

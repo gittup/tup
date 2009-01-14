@@ -319,7 +319,7 @@ static int parse_rule(char *p, struct list_head *rules)
 	input = p;
 	while(isspace(*input))
 		input++;
-	p = strstr(p, ">>");
+	p = strstr(p, "|>");
 	if(!p)
 		return -1;
 	if(input < p) {
@@ -334,7 +334,7 @@ static int parse_rule(char *p, struct list_head *rules)
 	cmd = p;
 	while(isspace(*cmd))
 		cmd++;
-	p = strstr(p, ">>");
+	p = strstr(p, "|>");
 	if(!p)
 		return -1;
 	ce = p - 1;
