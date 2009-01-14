@@ -383,6 +383,7 @@ err_cmd_failed:
 	 * be cleared).
 	 */
 	tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_MODIFY);
+	fprintf(stderr, " *** Command %lli failed.\n", n->tupid);
 
 err_close_dfd:
 	fchdir(curfd);

@@ -236,6 +236,10 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
 	}
 
 	if(dbn.tupid != -1) {
+		if(dbn.type != type) {
+			fprintf(stderr, "Error: Attempt to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
+			return -1;
+		}
 		if(dbn.flags & TUP_FLAGS_DELETE) {
 			dbn.flags &= ~TUP_FLAGS_DELETE;
 			if(tup_db_set_flags_by_id(dbn.tupid, dbn.flags) < 0)
