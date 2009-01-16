@@ -226,7 +226,7 @@ tupid_t tup_db_create_node(tupid_t dt, const char *name, int type, int flags)
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
 				int flags, int *node_created)
 {
-	struct db_node dbn = {-1, -1, NULL, 0, 0};
+	struct db_node dbn;
 
 	if(node_created)
 		*node_created = 0;
@@ -264,7 +264,7 @@ tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type, int flags
 
 tupid_t tup_db_select_node(tupid_t dt, const char *name)
 {
-	struct db_node dbn = {-1, -1, NULL, 0, 0};
+	struct db_node dbn;
 
 	if(node_select(dt, name, -1, &dbn) < 0) {
 		return -1;
@@ -278,12 +278,15 @@ tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 	if(node_select(dt, name, -1, dbn) < 0)
 		return -1;
 
+	dbn->dt = dt;
+	dbn->name = name;
+
 	return dbn->tupid;
 }
 
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len)
 {
-	struct db_node dbn = {-1, -1, NULL, 0, 0};
+	struct db_node dbn;
 
 	if(node_select(dt, name, len, &dbn) < 0) {
 		return -1;
@@ -474,7 +477,7 @@ out_reset:
 
 int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags)
 {
-	struct db_node dbn = {-1, -1, NULL, 0, 0};
+	struct db_node dbn;
 
 	if(node_select(dt, name, -1, &dbn) < 0)
 		return -1;
@@ -1283,6 +1286,12 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int dbrc;
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "select id, type, flags from node where dir=? and name=?";
+
+	dbn->tupid = -1;
+	dbn->dt = -1;
+	dbn->name = NULL;
+	dbn->type = 0;
+	dbn->flags = 0;
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {

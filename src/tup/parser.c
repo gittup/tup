@@ -397,6 +397,10 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 
 		p = r->input_pattern;
 		do {
+			/* Blank input pattern */
+			if(!p[0])
+				break;
+
 			spc = strchr(p, ' ');
 			if(spc)
 				*spc = 0;
@@ -419,9 +423,18 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 				r->dir = "";
 				r->dirlen = 0;
 			}
-			if(tup_db_select_node_dir_glob(file_match, r,
-						       subdir, file) < 0)
-				return -1;
+			if(strchr(file, '*') == NULL) {
+				struct db_node dbn;
+				if(tup_db_select_dbn(subdir, file, &dbn) < 0) {
+					fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", file, subdir);
+					return -1;
+				}
+				if(file_match(r, &dbn) < 0)
+					return -1;
+			} else {
+				if(tup_db_select_node_dir_glob(file_match, r, subdir, file) < 0)
+					return -1;
+			}
 
 			if(spc)
 				p = spc + 1;

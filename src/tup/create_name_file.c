@@ -112,6 +112,7 @@ int tup_pathname_mod(const char *path, int flags)
 tupid_t get_dbn(const char *path, struct db_node *dbn)
 {
 	static char cname[PATH_MAX];
+	int rc;
 	int len;
 	const char *file;
 	tupid_t dt;
@@ -122,21 +123,22 @@ tupid_t get_dbn(const char *path, struct db_node *dbn)
 		return -1;
 	}
 
-	dbn->name = path;
-
 	if(strcmp(cname, ".") == 0) {
-		dbn->dt = 0;
-		return tup_db_select_dbn(0, cname, dbn);
+		rc = tup_db_select_dbn(0, cname, dbn);
+		/* Overwrite since tup_db_select_dbn points name to cname */
+		dbn->name = path;
+		return rc;
 	}
 
 	dt = __find_dir_tupid(cname, &file);
 	if(dt < 0)
 		return -1;
 
-	dbn->dt = dt;
-
 	if(file) {
-		return tup_db_select_dbn(dt, file, dbn);
+		rc = tup_db_select_dbn(dt, file, dbn);
+		/* Overwrite since tup_db_select_dbn points name to cname */
+		dbn->name = path;
+		return rc;
 	} else {
 		printf("TODO: no dbn?\n");
 		return -1;
