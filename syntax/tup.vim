@@ -14,11 +14,13 @@ syntax case match
 syntax match rule /:/
 syntax match separator /|>/
 syntax match format display "%\([Ffo]\)" contained
+syntax match variable /$(.*)/
 syntax keyword keys foreach
-syntax region command matchgroup=separator start=/|>/ end=/|>/ contains=format
+syntax region command matchgroup=separator start=/|>/ end=/|>/ contains=format,variable
 
 highlight link command String
 highlight link rule Operator
 highlight link separator Keyword
 highlight link keys Keyword
 highlight link format Special
+highlight link variable Special
