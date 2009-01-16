@@ -178,8 +178,17 @@ static int build_graph(struct graph *g)
 	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 
+	/* Delete gets those things marked only delete, and those marked
+	 * modify/delete. We can get stuff marked modify/delete if an update
+	 * fails with some commands remaining (so they are still marked modify),
+	 * and then we change the Tupfile so those commands are no longer
+	 * generated.
+	 */
 	g->root->flags = TUP_FLAGS_DELETE;
 	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(md_flag_cb, g,
+				       TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) < 0)
 		return -1;
 
 	g->root->flags = TUP_FLAGS_NONE;
