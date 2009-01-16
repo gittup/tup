@@ -18,11 +18,13 @@ static struct file_entry *new_entry(const struct access_event *event,
 static void del_entry(struct file_entry *fent);
 static int handle_rename_to(int pid, tupid_t tupid);
 static int __handle_rename_to(struct file_entry *from, tupid_t tupid);
-static int handle_unlink(tupid_t tupid);
+static void check_unlink_list(tupid_t tupid);
+static void handle_unlink(void);
 
 static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
 static LIST_HEAD(rename_list);
+static LIST_HEAD(unlink_list);
 
 int handle_file(const struct access_event *event, tupid_t tupid)
 {
@@ -32,10 +34,8 @@ int handle_file(const struct access_event *event, tupid_t tupid)
 	DEBUGP("received tupid '%lli' in mode %i\n", tupid, event->at);
 
 	if(event->at == ACCESS_RENAME_TO) {
+		check_unlink_list(tupid);
 		return handle_rename_to(event->pid, tupid);
-	}
-	if(event->at == ACCESS_UNLINK) {
-		return handle_unlink(tupid);
 	}
 
 	fent = new_entry(event, tupid);
@@ -48,10 +48,14 @@ int handle_file(const struct access_event *event, tupid_t tupid)
 			list_add(&fent->list, &read_list);
 			break;
 		case ACCESS_WRITE:
+			check_unlink_list(tupid);
 			list_add(&fent->list, &write_list);
 			break;
 		case ACCESS_RENAME_FROM:
 			list_add(&fent->list, &rename_list);
+			break;
+		case ACCESS_UNLINK:
+			list_add(&fent->list, &unlink_list);
 			break;
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", event->at);
@@ -66,6 +70,8 @@ int write_files(tupid_t cmdid)
 {
 	struct file_entry *w;
 	struct file_entry *r;
+
+	handle_unlink();
 
 	while(!list_empty(&write_list)) {
 		struct file_entry *tmp;
@@ -146,19 +152,36 @@ static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 	return 0;
 }
 
-static int handle_unlink(tupid_t tupid)
+static void check_unlink_list(tupid_t tupid)
 {
 	struct file_entry *fent, *tmp;
 
-	list_for_each_entry_safe(fent, tmp, &write_list, list) {
+	list_for_each_entry_safe(fent, tmp, &unlink_list, list) {
 		if(fent->tupid == tupid) {
 			del_entry(fent);
 		}
 	}
-	list_for_each_entry_safe(fent, tmp, &read_list, list) {
-		if(fent->tupid == tupid) {
-			del_entry(fent);
+}
+
+static void handle_unlink(void)
+{
+	struct file_entry *u, *fent, *tmp;
+
+	while(!list_empty(&unlink_list)) {
+		u = list_entry(unlink_list.next, struct file_entry, list);
+
+		list_for_each_entry_safe(fent, tmp, &write_list, list) {
+			if(fent->tupid == u->tupid) {
+				del_entry(fent);
+			}
 		}
+		list_for_each_entry_safe(fent, tmp, &read_list, list) {
+			if(fent->tupid == u->tupid) {
+				del_entry(fent);
+			}
+		}
+
+		delete_name_file(u->tupid);
+		del_entry(u);
 	}
-	return delete_name_file(tupid);
 }
