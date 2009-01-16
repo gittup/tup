@@ -25,6 +25,8 @@ static FILE *(*s_fopen64)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
 static int (*s_creat)(const char *, mode_t);
 static int (*s_rename)(const char*, const char*);
+static int (*s_unlink)(const char*);
+static int (*s_unlinkat)(int, const char*, int);
 
 int open(const char *pathname, int flags, ...)
 {
@@ -112,6 +114,33 @@ int rename(const char *old, const char *new)
 	return rc;
 }
 
+int unlink(const char *pathname)
+{
+	int rc;
+
+	rc = s_unlink(pathname);
+	if(rc == 0) {
+		handle_file(pathname, ACCESS_UNLINK);
+	}
+	return rc;
+}
+
+int unlinkat(int dirfd, const char *pathname, int flags)
+{
+	int rc;
+
+	rc = s_unlinkat(dirfd, pathname, flags);
+	if(rc == 0) {
+		if(dirfd == AT_FDCWD) {
+			handle_file(pathname, ACCESS_UNLINK);
+		} else {
+			fprintf(stderr, "tup.ldpreload: Error - unlinkat() not supported unless dirfd == AT_FDCWD\n");
+			return -1;
+		}
+	}
+	return rc;
+}
+
 static void handle_file(const char *file, int at)
 {
 	struct access_event event;
@@ -156,8 +185,10 @@ static void ldpre_init(void)
 	s_freopen = dlsym(RTLD_NEXT, "freopen");
 	s_creat = dlsym(RTLD_NEXT, "creat");
 	s_rename = dlsym(RTLD_NEXT, "rename");
+	s_unlink = dlsym(RTLD_NEXT, "unlink");
+	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
 	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
-	   !s_creat || !s_rename) {
+	   !s_creat || !s_rename || !s_unlink || !s_unlinkat) {
 		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
 		exit(1);
 	}

@@ -18,6 +18,7 @@ static struct file_entry *new_entry(const struct access_event *event,
 static void del_entry(struct file_entry *fent);
 static int handle_rename_to(int pid, tupid_t tupid);
 static int __handle_rename_to(struct file_entry *from, tupid_t tupid);
+static int handle_unlink(tupid_t tupid);
 
 static LIST_HEAD(read_list);
 static LIST_HEAD(write_list);
@@ -32,6 +33,9 @@ int handle_file(const struct access_event *event, tupid_t tupid)
 
 	if(event->at == ACCESS_RENAME_TO) {
 		return handle_rename_to(event->pid, tupid);
+	}
+	if(event->at == ACCESS_UNLINK) {
+		return handle_unlink(tupid);
 	}
 
 	fent = new_entry(event, tupid);
@@ -140,4 +144,21 @@ static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 	}
 	del_entry(from);
 	return 0;
+}
+
+static int handle_unlink(tupid_t tupid)
+{
+	struct file_entry *fent, *tmp;
+
+	list_for_each_entry_safe(fent, tmp, &write_list, list) {
+		if(fent->tupid == tupid) {
+			del_entry(fent);
+		}
+	}
+	list_for_each_entry_safe(fent, tmp, &read_list, list) {
+		if(fent->tupid == tupid) {
+			del_entry(fent);
+		}
+	}
+	return delete_name_file(tupid);
 }
