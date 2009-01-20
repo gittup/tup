@@ -1,4 +1,5 @@
 #include "vardb.h"
+#include "db.h"
 #include "array_size.h"
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,7 @@ int vardb_init(struct vardb *v)
 			return -1;
 		}
 	}
+
 	return 0;
 }
 
@@ -101,7 +103,9 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 
 	dbrc = sqlite3_step(stmt);
 	if(dbrc == SQLITE_DONE) {
-		/* Variable not found: length of "" == 0 */
+		fprintf(stderr, "Error: Variable '%.*s' not found.\n",
+			varlen, var);
+		rc = -1;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -145,7 +149,9 @@ int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
 
 	dbrc = sqlite3_step(stmt);
 	if(dbrc == SQLITE_DONE) {
-		/* Variable not found: length of "" == 0 */
+		fprintf(stderr, "Error: Variable '%.*s' not found.\n",
+			varlen, var);
+		rc = -1;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {

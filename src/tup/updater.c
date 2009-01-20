@@ -139,8 +139,12 @@ static int process_create_nodes(void)
 
 		while(!list_empty(&namelist)) {
 			nl = list_entry(namelist.next, struct name_list, list);
-			if(parser_create(nl->tupid) < 0)
-				goto err_rollback;
+			/* Not sure if this is the best place to ignore Rodney,
+			 * but it seems to work.
+			 */
+			if(nl->tupid != VAR_DT)
+				if(parser_create(nl->tupid) < 0)
+					goto err_rollback;
 			if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE)<0)
 				goto err_rollback;
 			list_del(&nl->list);

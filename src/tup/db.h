@@ -5,6 +5,7 @@
 
 #define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
+#define VAR_DT 2
 
 struct db_node {
 	tupid_t tupid;
@@ -18,6 +19,7 @@ enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
 	TUP_NODE_CMD,
 	TUP_NODE_DIR,
+	TUP_NODE_VAR,
 	TUP_NODE_ROOT,
 };
 
@@ -77,6 +79,11 @@ int tup_db_set_dependent_dir_flags(tupid_t dt, int flags);
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
 int tup_db_config_set_string(const char *lval, const char *rval);
-int tup_db_config_get_string(char **s, const char *lval, const char *def);
+int tup_db_config_get_string(char **res, const char *lval, const char *def);
+
+/* Var operations */
+int tup_db_set_var(tupid_t tupid, const char *value);
+int tup_db_get_var(const char *var, int varlen, char **dest);
+int tup_db_get_varlen(const char *var, int varlen);
 
 #endif

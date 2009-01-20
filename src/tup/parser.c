@@ -49,7 +49,7 @@ struct buf {
 
 static int fslurp(int fd, struct buf *b);
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, int dfd);
+			 struct list_head *rules, int dfd, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
 static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
@@ -62,7 +62,7 @@ static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
-static char *eval(struct vardb *v, const char *string);
+static char *eval(struct vardb *v, const char *string, tupid_t tupid);
 
 int parser_create(tupid_t tupid)
 {
@@ -91,7 +91,7 @@ int parser_create(tupid_t tupid)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, &rules, dfd);
+	rc = parse_tupfile(&b, &vdb, &rules, dfd, tupid);
 	if(rc < 0)
 		goto out_free_bs;
 	vardb_dump(&vdb);
@@ -150,7 +150,7 @@ err_out:
 }
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, int dfd)
+			 struct list_head *rules, int dfd, tupid_t tupid)
 {
 	char *p, *e;
 	char *line;
@@ -177,7 +177,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			continue;
 		}
 
-		eval_line = eval(vdb, line);
+		eval_line = eval(vdb, line, tupid);
 		if(!eval_line)
 			return -1;
 
@@ -212,7 +212,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				return -1;
 			}
 
-			rc = parse_tupfile(&incb, vdb, rules, dfd);
+			rc = parse_tupfile(&incb, vdb, rules, dfd, tupid);
 			if(last_slash) {
 				close(dfd);
 			}
@@ -753,33 +753,50 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 	return s;
 }
 
-static char *eval(struct vardb *v, const char *string)
+static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 {
 	int len = 0;
-	const char *dollar;
 	char *ret;
 	char *p;
 	const char *s;
+	const char *var;
+	int vlen;
 
 	s = string;
-	while((dollar = strchr(s, '$')) != NULL) {
-		const char *rparen;
-		const char *var;
-		int vlen;
+	while(*s) {
+		if(*s == '$') {
+			const char *rparen;
 
-		len += dollar - s;
-		if(dollar[1] != '(')
-			goto syntax_error;
-		rparen = strchr(dollar+1, ')');
-		if(!rparen)
-			goto syntax_error;
+			if(s[1] != '(')
+				goto syntax_error;
+			rparen = strchr(s+1, ')');
+			if(!rparen)
+				goto syntax_error;
 
-		var = dollar + 2;
-		vlen = vardb_len(v, var, rparen-var);
-		len += vlen;
-		s = rparen + 1;
+			var = s + 2;
+			vlen = vardb_len(v, var, rparen-var);
+			if(vlen < 0)
+				return NULL;
+			len += vlen;
+			s = rparen + 1;
+		} else if(*s == '@') {
+			const char *rat;
+
+			rat = strchr(s+1, '@');
+			if(!rat)
+				goto syntax_error;
+
+			var = s + 1;
+			vlen = tup_db_get_varlen(var, rat-s-1);
+			if(vlen < 0)
+				return NULL;
+			len += vlen;
+			s = rat + 1;
+		} else {
+			s++;
+			len++;
+		}
 	}
-	len += strlen(s);
 
 	ret = malloc(len+1);
 	if(!ret) {
@@ -789,24 +806,42 @@ static char *eval(struct vardb *v, const char *string)
 
 	p = ret;
 	s = string;
-	while((dollar = strchr(s, '$')) != NULL) {
-		const char *rparen;
-		const char *var;
+	while(*s) {
+		if(*s == '$') {
+			const char *rparen;
 
-		memcpy(p, s, dollar-s);
-		p += dollar-s;
+			if(s[1] != '(')
+				goto syntax_error;
+			rparen = strchr(s+1, ')');
+			if(!rparen)
+				goto syntax_error;
 
-		if(dollar[1] != '(')
-			goto syntax_error;
-		rparen = strchr(dollar+1, ')');
-		if(!rparen)
-			goto syntax_error;
+			var = s + 2;
+			if(vardb_get(v, var, rparen-var, &p) < 0)
+				return NULL;
 
-		var = dollar + 2;
-		if(vardb_get(v, var, rparen-var, &p) < 0)
-			return NULL;
+			s = rparen + 1;
+		} else if(*s == '@') {
+			const char *rat;
+			tupid_t vt;
 
-		s = rparen + 1;
+			rat = strchr(s+1, '@');
+			if(!rat)
+				goto syntax_error;
+
+			var = s + 1;
+			vt = tup_db_get_var(var, rat-s-1, &p);
+			if(vt < 0)
+				return NULL;
+			if(tup_db_create_link(vt, tupid) < 0)
+				return NULL;
+
+			s = rat + 1;
+		} else {
+			*p = *s;
+			p++;
+			s++;
+		}
 	}
 	strcpy(p, s);
 

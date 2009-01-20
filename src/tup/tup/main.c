@@ -28,6 +28,7 @@ static int get_flags_cb(void *arg, int argc, char **argv, char **col);
 static int get_flags(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int delete(int argc, char **argv);
+static int varset(int argc, char **argv);
 
 static int check_open_fds(void);
 static void usage(void);
@@ -92,6 +93,8 @@ int main(int argc, char **argv)
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "delete") == 0) {
 		rc = delete(argc, argv);
+	} else if(strcmp(cmd, "varset") == 0) {
+		rc = varset(argc, argv);
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -101,8 +104,12 @@ int main(int argc, char **argv)
 out:
 	tup_lock_exit();
 
-	if(check_open_fds() < 0)
-		rc = 1;
+	if(check_open_fds() < 0) {
+		if(rc == 0) {
+			fprintf(stderr, "Returning failure due to open FDs.\n");
+			rc = 1;
+		}
+	}
 	return rc;
 }
 
@@ -233,6 +240,9 @@ static int graph(int argc, char **argv)
 				break;
 			case TUP_NODE_DIR:
 				shape = "diamond";
+				break;
+			case TUP_NODE_VAR:
+				shape = "octagon";
 				break;
 			default:
 				shape="ellipse";
@@ -459,6 +469,17 @@ static int delete(int argc, char **argv)
 		if(tup_pathname_mod(argv[x], TUP_FLAGS_DELETE) < 0)
 			return -1;
 	}
+	return 0;
+}
+
+static int varset(int argc, char **argv)
+{
+	if(argc != 3) {
+		fprintf(stderr, "Error: varset requires exactly two args\n");
+		return -1;
+	}
+	if(create_var_file(argv[1], argv[2]) < 0)
+		return -1;
 	return 0;
 }
 
