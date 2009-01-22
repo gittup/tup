@@ -7,12 +7,13 @@ cat > Tupfile << HERE
 / foo.txt |> out.txt
 HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
+echo "This is an email@address.com" >> foo.txt
 tup touch foo.txt Tupfile
 tup varset CONFIG_FOO sup
 tup upd
 tup_object_exist . foo.txt out.txt
-echo "hey sup yo" | diff out.txt -
+(echo "hey sup yo"; echo "This is an email@address.com") | diff out.txt -
 
 tup varset CONFIG_FOO blah
 tup upd
-echo "hey blah yo" | diff out.txt -
+(echo "hey blah yo"; echo "This is an email@address.com") | diff out.txt -

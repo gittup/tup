@@ -507,6 +507,7 @@ static int var_replace(struct node *n)
 				perror("write");
 				goto err_close_ofd;
 			}
+			p = rat;
 		}
 		
 	} while(p < e);
