@@ -20,6 +20,7 @@ enum TUP_NODE_TYPE {
 	TUP_NODE_CMD,
 	TUP_NODE_DIR,
 	TUP_NODE_VAR,
+	TUP_NODE_VAR_SED,
 	TUP_NODE_ROOT,
 };
 
@@ -85,5 +86,6 @@ int tup_db_config_get_string(char **res, const char *lval, const char *def);
 int tup_db_set_var(tupid_t tupid, const char *value);
 int tup_db_get_var(const char *var, int varlen, char **dest);
 int tup_db_get_varlen(const char *var, int varlen);
+int tup_db_write_var(const char *var, int varlen, int fd);
 
 #endif

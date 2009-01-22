@@ -8,6 +8,7 @@ struct db_node;
 tupid_t create_path_file(const char *path);
 tupid_t create_name_file(tupid_t dt, const char *file);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
+tupid_t create_varsed_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 tupid_t create_var_file(const char *var, const char *value);
 int tup_file_mod(tupid_t dt, const char *file, int flags);

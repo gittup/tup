@@ -4,6 +4,7 @@
 #include "list.h"
 #include "flist.h"
 #include "fileio.h"
+#include "fslurp.h"
 #include "db.h"
 #include "vardb.h"
 #include <stdio.h>
@@ -12,7 +13,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fnmatch.h>
 #include <ctype.h>
 #include <sys/stat.h>
 
@@ -40,17 +40,13 @@ struct rule {
 	struct name_list namelist;
 	const char *dir;
 	int dirlen;
+	int rtype;
 };
 
-struct buf {
-	char *s;
-	int len;
-};
-
-static int fslurp(int fd, struct buf *b);
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, int dfd, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
+static int parse_varsed(char *p, struct list_head *rules);
 static int execute_rules(struct list_head *rules, tupid_t dt);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
@@ -114,39 +110,6 @@ out_close_dfd:
 	close(dfd);
 
 	return rc;
-}
-
-static int fslurp(int fd, struct buf *b)
-{
-	struct stat st;
-	char *tmp;
-	int rc;
-
-	if(fstat(fd, &st) < 0) {
-		return -1;
-	}
-
-	tmp = malloc(st.st_size);
-	if(!tmp) {
-		return -1;
-	}
-
-	rc = read(fd, tmp, st.st_size);
-	if(rc < 0) {
-		goto err_out;
-	}
-	if(rc != st.st_size) {
-		errno = EIO;
-		goto err_out;
-	}
-
-	b->s = tmp;
-	b->len = st.st_size;
-	return 0;
-
-err_out:
-	free(tmp);
-	return -1;
 }
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
@@ -256,6 +219,9 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		} else if(eval_line[0] == ':') {
 			if(parse_rule(eval_line+1, rules) < 0)
 				goto syntax_error;
+		} else if(eval_line[0] == '/') {
+			if(parse_varsed(eval_line+1, rules) < 0)
+				goto syntax_error;
 		} else {
 			char *eq;
 			char *value;
@@ -345,7 +311,6 @@ static int parse_rule(char *p, struct list_head *rules)
 	while(isspace(*output))
 		output++;
 	ce[1] = 0;
-	p++;
 
 	r = malloc(sizeof *r);
 	if(!r) {
@@ -380,8 +345,60 @@ static int parse_rule(char *p, struct list_head *rules)
 	}
 	init_name_list(&r->namelist);
 
+	r->rtype = TUP_NODE_CMD;
+
 	list_add_tail(&r->list, rules);
 
+	return 0;
+}
+
+static int parse_varsed(char *p, struct list_head *rules)
+{
+	char *input, *output;
+	char *ie;
+	struct rule *r;
+
+	input = p;
+	while(isspace(*input))
+		input++;
+	p = strstr(p, "|>");
+	if(!p)
+		return -1;
+	if(input < p) {
+		ie = p - 1;
+		while(isspace(*ie))
+			ie--;
+		ie[1] = 0;
+	} else {
+		input = NULL;
+	}
+	p += 2;
+	output = p;
+	while(isspace(*output))
+		output++;
+
+	r = malloc(sizeof *r);
+	if(!r) {
+		perror("malloc");
+		return -1;
+	}
+	r->foreach = 1;
+	r->input_pattern = strdup(input);
+	if(!r->input_pattern) {
+		perror("strdup");
+		return -1;
+	}
+	r->output_pattern = strdup(output);
+	if(!r->output_pattern) {
+		perror("strdup");
+		return -1;
+	}
+
+	r->command = NULL;
+
+	init_name_list(&r->namelist);
+	r->rtype = TUP_NODE_VAR_SED;
+	list_add_tail(&r->list, rules);
 	return 0;
 }
 
@@ -601,11 +618,30 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 		}
 	}
 
-	cmd = tup_printf(r->command, nl, &onl);
-	if(!cmd)
+	if(r->rtype == TUP_NODE_CMD) {
+		cmd = tup_printf(r->command, nl, &onl);
+		if(!cmd)
+			return -1;
+		cmd_id = create_command_file(dt, cmd);
+		free(cmd);
+	} else if(r->rtype == TUP_NODE_VAR_SED) {
+		if(nl->num_entries != 1) {
+			fprintf(stderr, "Error: Expected exactly 1 input entry.\n");
+			return -1;
+		}
+		if(onl.num_entries != 1) {
+			fprintf(stderr, "Error: Expected exactly 1 output entry.\n");
+			return -1;
+		}
+		cmd = tup_printf("%f > %o", nl, &onl);
+		if(!cmd)
+			return -1;
+		cmd_id = create_varsed_file(dt, cmd);
+		free(cmd);
+	} else {
+		fprintf(stderr, "Invalid rtype: %i\n", r->rtype);
 		return -1;
-	cmd_id = create_command_file(dt, cmd);
-	free(cmd);
+	}
 	if(cmd_id < 0)
 		return -1;
 
@@ -760,6 +796,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	char *p;
 	const char *s;
 	const char *var;
+	const char *expected = "oops";
 	int vlen;
 
 	s = string;
@@ -767,11 +804,15 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 		if(*s == '$') {
 			const char *rparen;
 
-			if(s[1] != '(')
+			if(s[1] != '(') {
+				expected = "$(";
 				goto syntax_error;
+			}
 			rparen = strchr(s+1, ')');
-			if(!rparen)
+			if(!rparen) {
+				expected = "ending variable paren ')'";
 				goto syntax_error;
+			}
 
 			var = s + 2;
 			vlen = vardb_len(v, var, rparen-var);
@@ -783,8 +824,10 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 			const char *rat;
 
 			rat = strchr(s+1, '@');
-			if(!rat)
+			if(!rat) {
+				expected = "ending @-symbol";
 				goto syntax_error;
+			}
 
 			var = s + 1;
 			vlen = tup_db_get_varlen(var, rat-s-1);
@@ -810,11 +853,15 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 		if(*s == '$') {
 			const char *rparen;
 
-			if(s[1] != '(')
+			if(s[1] != '(') {
+				expected = "$(";
 				goto syntax_error;
+			}
 			rparen = strchr(s+1, ')');
-			if(!rparen)
+			if(!rparen) {
+				expected = "ending variable paren ')'";
 				goto syntax_error;
+			}
 
 			var = s + 2;
 			if(vardb_get(v, var, rparen-var, &p) < 0)
@@ -826,8 +873,10 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 			tupid_t vt;
 
 			rat = strchr(s+1, '@');
-			if(!rat)
+			if(!rat) {
+				expected = "ending @-symbol";
 				goto syntax_error;
+			}
 
 			var = s + 1;
 			vt = tup_db_get_var(var, rat-s-1, &p);
@@ -852,6 +901,6 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	return ret;
 
 syntax_error:
-	fprintf(stderr, "Syntax error: expected $(\n");
+	fprintf(stderr, "Syntax error: expected %s\n", expected);
 	return NULL;
 }

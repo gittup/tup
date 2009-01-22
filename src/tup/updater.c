@@ -7,10 +7,12 @@
 #include "parser.h"
 #include "server.h"
 #include "file.h"
+#include "fslurp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/file.h>
 #include <sys/wait.h>
 
@@ -24,6 +26,7 @@ static int execute_graph(struct graph *g);
 static void show_progress(int n, int tot);
 
 static int update(struct node *n);
+static int var_replace(struct node *n);
 static int delete_file(struct node *n);
 
 static int do_show_progress;
@@ -290,6 +293,18 @@ static int execute_graph(struct graph *g)
 						goto out;
 					}
 				}
+			} else if(n->type == TUP_NODE_VAR_SED) {
+				if(n->flags & TUP_FLAGS_DELETE) {
+					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
+					if(delete_name_file(n->tupid) < 0)
+						goto out;
+				} else {
+					if(var_replace(n) < 0) {
+						if(do_keep_going)
+							goto keep_going;
+						goto out;
+					}
+				}
 			}
 		}
 		while(n->edges) {
@@ -406,6 +421,110 @@ err_close_curfd:
 err_delete_node:
 	delete_name_file(tupid);
 	return -1;
+}
+
+static int var_replace(struct node *n)
+{
+	int dfd;
+	int curfd;
+	int ifd;
+	int ofd;
+	struct buf b;
+	char *rbracket;
+	char *p, *e;
+	int rc = -1;
+
+	curfd = open(".", O_RDONLY);
+	if(curfd < 0)
+		return -1;
+
+	dfd = tup_db_opendir(n->dt);
+	if(dfd < 0)
+		goto err_close_curfd;
+	fchdir(dfd);
+
+	printf("%s\n", n->name);
+	rbracket = strchr(n->name, '>');
+	if(rbracket == NULL) {
+		fprintf(stderr, "Unable to find '>' in var/sed command '%s'\n",
+			n->name);
+		goto err_close_dfd;
+	}
+	/* Use -1 since the string is '%s > %s' and we need to set the space
+	 * before the '>' to 0.
+	 */
+	if(rbracket == n->name) {
+		fprintf(stderr, "Error: the '>' symbol can't be at the start of the var/sed command.\n");
+		return -1;
+	}
+	rbracket[-1] = 0;
+
+	ifd = open(n->name, O_RDONLY);
+	if(ifd < 0) {
+		perror(n->name);
+		goto err_close_dfd;
+	}
+	if(fslurp(ifd, &b) < 0) {
+		goto err_close_ifd;
+	}
+	ofd = open(rbracket+2, O_WRONLY|O_CREAT, 0666);
+	if(ofd < 0) {
+		perror(rbracket+2);
+		goto err_free_buf;
+	}
+
+	p = b.s;
+	e = b.s + b.len;
+	do {
+		char *at;
+		char *rat;
+		at = p;
+		while(at < e && *at != '@') {
+			at++;
+		}
+		if(write(ofd, p, at-p) != at-p) {
+			perror("write");
+			goto err_close_ofd;
+		}
+		if(at >= e)
+			break;
+
+		p = at;
+		rat = p+1;
+		while(rat < e && (isalnum(*rat) || *rat == '_')) {
+			rat++;
+		}
+		if(rat < e && *rat == '@') {
+			tupid_t varid;
+			varid = tup_db_write_var(p+1, rat-(p+1), ofd);
+			if(varid < 0)
+				return -1;
+			if(tup_db_create_link(varid, n->tupid) < 0)
+				return -1;
+			p = rat + 1;
+		} else {
+			if(write(ofd, p, rat-p) != rat-p) {
+				perror("write");
+				goto err_close_ofd;
+			}
+		}
+		
+	} while(p < e);
+
+	rc = 0;
+
+err_close_ofd:
+	close(ofd);
+err_free_buf:
+	free(b.s);
+err_close_ifd:
+	close(ifd);
+err_close_dfd:
+	fchdir(curfd);
+	close(dfd);
+err_close_curfd:
+	close(curfd);
+	return rc;
 }
 
 static int delete_file(struct node *n)

@@ -1280,7 +1280,7 @@ int tup_db_get_var(const char *var, int varlen, char **dest)
 	tupid_t tupid = -1;
 	const char *value;
 	static sqlite3_stmt *stmt = NULL;
-	static char s[] = "select var.id, value, length(value) from var, node where node.name=? and node.dir=? and node.id=var.id";
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
@@ -1290,11 +1290,11 @@ int tup_db_get_var(const char *var, int varlen, char **dest)
 		}
 	}
 
-	if(sqlite3_bind_text(stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int(stmt, 1, VAR_DT) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(stmt, 2, VAR_DT) != 0) {
+	if(sqlite3_bind_text(stmt, 2, var, varlen, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -1337,7 +1337,7 @@ int tup_db_get_varlen(const char *var, int varlen)
 	int rc = -1;
 	int dbrc;
 	static sqlite3_stmt *stmt = NULL;
-	static char s[] = "select length(value) from var, node where node.name=? and node.dir=? and node.id=var.id";
+	static char s[] = "select length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
@@ -1347,12 +1347,11 @@ int tup_db_get_varlen(const char *var, int varlen)
 		}
 	}
 
-	printf("Varlen: '%.*s'\n", varlen, var);
-	if(sqlite3_bind_text(stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int(stmt, 1, VAR_DT) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(stmt, 2, VAR_DT) != 0) {
+	if(sqlite3_bind_text(stmt, 2, var, varlen, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -1377,6 +1376,64 @@ out_reset:
 	}
 
 	return rc;
+}
+
+int tup_db_write_var(const char *var, int varlen, int fd)
+{
+	int dbrc;
+	int len;
+	const char *value;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	tupid_t tupid = -1;
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(stmt, 1, VAR_DT) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(stmt, 2, var, varlen, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		fprintf(stderr,"Error: Variable '%.*s' not found in .tup/db.\n",
+			varlen, var);
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		goto out_reset;
+	}
+
+	len = sqlite3_column_int(stmt, 2);
+	if(len < 0) {
+		goto out_reset;
+	}
+	value = (const char *)sqlite3_column_text(stmt, 1);
+	if(!value) {
+		goto out_reset;
+	}
+
+	if(write(fd, value, len) == len)
+		tupid = sqlite3_column_int64(stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return tupid;
 }
 
 static int node_insert(tupid_t dt, const char *name, int len, int type,
