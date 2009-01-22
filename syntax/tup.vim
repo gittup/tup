@@ -11,12 +11,14 @@ endif
 
 syntax case match
 
-syntax match rule /:/
+syntax match rule ,^[:\/],
 syntax match separator /|>/
 syntax match format display "%\([Ffo]\)" contained
-syntax match variable /$(.*)/
+syntax match variable /$([^)]*)/
+syntax match variable /@[a-zA-Z0-9_]*@/
 syntax keyword keys foreach
-syntax region command matchgroup=separator start=/|>/ end=/|>/ contains=format,variable
+syntax region varsed matchgroup=rule start=/\// end=/$/ contains=separator,format,variable
+syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable
 
 highlight link command String
 highlight link rule Operator
