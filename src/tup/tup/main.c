@@ -235,6 +235,7 @@ static int graph(int argc, char **argv)
 			case TUP_NODE_FILE:
 				shape = "oval";
 				break;
+			case TUP_NODE_VAR_SED:
 			case TUP_NODE_CMD:
 				shape = "rectangle";
 				break;
