@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <sqlite3.h>
 
+#define DB_VERSION 1
+
 static sqlite3 *tup_db = NULL;
 static int node_insert(tupid_t dt, const char *name, int len,
 		       int type, int flags);
@@ -28,6 +30,7 @@ struct id_entry {
 int tup_db_open(void)
 {
 	int rc;
+	int version;
 
 	rc = sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL);
 	if(rc != 0) {
@@ -38,6 +41,15 @@ int tup_db_open(void)
 	if(tup_db_config_get_int("db_sync") == 0) {
 		if(no_sync() < 0)
 			return -1;
+	}
+	version = tup_db_config_get_int("db_version");
+	if(version < 0) {
+		fprintf(stderr, "Error getting .tup/db version.\n");
+		return -1;
+	}
+	if(version != DB_VERSION) {
+		fprintf(stderr, "Error: Database version %i not compatible with %i\n", version, DB_VERSION);
+		return -1;
 	}
 
 	/* TODO: better to figure out concurrency access issues? Maybe a full
@@ -79,6 +91,7 @@ int tup_db_create(int db_sync)
 		"insert into config values('show_progress', 1)",
 		"insert into config values('keep_going', 0)",
 		"insert into config values('db_sync', 1)",
+		"insert into config values('db_version', 0)",
 		"insert into node values(1, 0, 2, 2, '.')",
 		"insert into node values(2, 1, 2, 2, '@')",
 	};
@@ -109,6 +122,8 @@ int tup_db_create(int db_sync)
 		if(tup_db_config_set_int("db_sync", 0) < 0)
 			return -1;
 	}
+	if(tup_db_config_set_int("db_version", DB_VERSION) < 0)
+		return -1;
 
 	return 0;
 }
