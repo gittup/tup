@@ -33,6 +33,8 @@ static int varset(int argc, char **argv);
 static int check_open_fds(void);
 static void usage(void);
 
+static int start_fd;
+
 int main(int argc, char **argv)
 {
 	int rc = 0;
@@ -42,6 +44,19 @@ int main(int argc, char **argv)
 	if(argc < 2) {
 		usage();
 		return 1;
+	}
+	for (start_fd = 4; start_fd < (int) FD_SETSIZE; start_fd++) {
+		int flags;
+		errno = 0;
+		flags = fcntl(start_fd, F_GETFD, 0);
+		if (flags == -1 && errno) {
+			if (errno != EBADF) {
+				perror("fcntl");
+				return -1;
+			}
+			else
+				break;
+		}
 	}
 
 	if(strcmp(argv[1], "init") == 0) {
@@ -493,17 +508,18 @@ static int check_open_fds(void)
 	/* This is basically from http://www.linuxquestions.org/questions/programming-9/how-to-find-out-the-number-of-open-file-descriptors-391536/, but I
 	 * skip stdin/stdout/stderr/mtrace.
 	 */
-	for (fd = 4; fd < (int) FD_SETSIZE; fd++) {
+	for (fd = start_fd; fd < (int) FD_SETSIZE; fd++) {
 		errno = 0;
 		flags = fcntl(fd, F_GETFD, 0);
 		if (flags == -1 && errno) {
 			if (errno != EBADF) {
+				perror("fcntl");
 				return -1;
 			}
 			else
 				continue;
 		}
-		printf("FD %i still open\n", fd);
+		fprintf(stderr, "FD %i still open\n", fd);
 		rc = -1;
 	}
 	return rc;
