@@ -92,8 +92,8 @@ int tup_db_create(int db_sync)
 		"insert into config values('keep_going', 0)",
 		"insert into config values('db_sync', 1)",
 		"insert into config values('db_version', 0)",
-		"insert into node values(1, 0, 2, 2, '.')",
-		"insert into node values(2, 1, 2, 2, '@')",
+		"insert into node values(1, 0, 2, 0, '.')",
+		"insert into node values(2, 1, 2, 0, '@')",
 	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
