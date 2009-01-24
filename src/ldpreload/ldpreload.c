@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 static void handle_file(const char *file, int at);
 static void handle_rename_file(const char *old, const char *new);
@@ -143,16 +144,27 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 
 static void handle_file(const char *file, int at)
 {
-	struct access_event event;
+	struct access_event *event;
+	static char msgbuf[sizeof(*event) + PATH_MAX];
+	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	if(ignore_file(file))
 		return;
 
-	event.at = at;
-	event.pid = my_pid;
-	event.len = strlen(file) + 1;
-	sendto(sd, &event, sizeof(event), MSG_MORE, (void*)&addr, sizeof(addr));
-	sendto(sd, file, event.len, 0, (void*)&addr, sizeof(addr));
+	pthread_mutex_lock(&mutex);
+	event = (struct access_event*)msgbuf;
+	event->at = at;
+	event->pid = my_pid;
+	event->len = strlen(file) + 1;
+	if(event->len >= PATH_MAX) {
+		fprintf(stderr, "tup.ldpreload error: Path too long (%i bytes)\n", event->len);
+		goto out_unlock;
+	}
+	memcpy(msgbuf + sizeof(*event), file, event->len);
+	sendto(sd, msgbuf, sizeof(*event) + event->len, 0,
+	       (void*)&addr, sizeof(addr));
+out_unlock:
+	pthread_mutex_unlock(&mutex);
 }
 
 static void handle_rename_file(const char *old, const char *new)

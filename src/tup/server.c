@@ -82,8 +82,9 @@ void stop_server(void)
 
 static void *message_thread(void *arg)
 {
-	struct access_event event;
-	static char filename[PATH_MAX];
+	struct access_event *event;
+	char *filename;
+	static char msgbuf[sizeof(*event) + PATH_MAX];
 	static char cwd[PATH_MAX];
 	static char cname[PATH_MAX];
 	int rc;
@@ -103,20 +104,20 @@ static void *message_thread(void *arg)
 	cwd[dlen] = '/';
 	cwd[dlen+1] = 0;
 
-	while((rc = recv(sd, &event, sizeof(event), 0)) > 0) {
+	event = (struct access_event*)msgbuf;
+	filename = &msgbuf[sizeof(*event)];
+	while((rc = recv(sd, msgbuf, sizeof(msgbuf), 0)) > 0) {
 		int len;
+		int expected;
 
-		if(event.at == ACCESS_STOP_SERVER)
+		if(event->at == ACCESS_STOP_SERVER)
 			break;
-		if(!event.len)
+		if(!event->len)
 			continue;
-		rc = recv(sd, filename, sizeof(filename), 0);
-		if(rc < 0) {
-			perror("recv");
-			return NULL;
-		}
-		if(rc != event.len) {
-			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, event.len);
+
+		expected = sizeof(*event) + event->len;
+		if(rc != expected) {
+			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, expected);
 			return NULL;
 		}
 
@@ -132,7 +133,7 @@ static void *message_thread(void *arg)
 		tupid = create_path_file(cname);
 		if(tupid < 0)
 			return NULL;
-		if(handle_file(&event, tupid) < 0)
+		if(handle_file(event, tupid) < 0)
 			break;
 	}
 	if(rc < 0) {
