@@ -296,7 +296,7 @@ static int execute_graph(struct graph *g)
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			goto out;
 keep_going:
-		if(n->type == TUP_NODE_CMD) {
+		if(n->type == TUP_NODE_CMD || n->type == TUP_NODE_VAR_SED) {
 			num_processed++;
 			show_progress(num_processed, g->num_nodes);
 		}

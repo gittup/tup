@@ -36,7 +36,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->flags = dbn->flags;
 	list_add(&n->list, &g->plist);
 
-	if(n->type == TUP_NODE_CMD)
+	if(n->type == TUP_NODE_CMD || n->type == TUP_NODE_VAR_SED)
 		g->num_nodes++;
 
 	if(memdb_add(&g->memdb, n->tupid, n) < 0)
