@@ -99,13 +99,6 @@ static int create_flag_cb(void *arg, struct db_node *dbn)
 	dest->flags = dbn->flags;
 
 	return CREATE_CB_SUCCESS;
-
-	/* TODO: Is this really valid to set here in the select callback?
-	 * Maybe it should be moved into the while(!list_empty) loop in
-	 * process_create_nodes()?
-	 */
-
-	return 0;
 }
 
 static int process_create_nodes(void)
