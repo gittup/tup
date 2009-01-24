@@ -184,7 +184,9 @@ static int graph_cb(void *arg, struct db_node *dbn)
 	struct graph *g = arg;
 	struct node *n;
 
-	if((n = find_node(g, dbn->tupid)) != NULL)
+	if(find_node(g, dbn->tupid, &n) < 0)
+		return -1;
+	if(n != NULL)
 		goto edge_create;
 	n = create_node(g, dbn);
 	if(!n)
@@ -216,7 +218,9 @@ static int graph(int argc, char **argv)
 			return -1;
 		}
 
-		if(find_node(&g, dbn.tupid) == NULL) {
+		if(find_node(&g, dbn.tupid, &n) < 0)
+			return -1;
+		if(n == NULL) {
 			if(!create_node(&g, &dbn))
 				return -1;
 		}

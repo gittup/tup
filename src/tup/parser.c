@@ -6,6 +6,7 @@
 #include "fileio.h"
 #include "fslurp.h"
 #include "db.h"
+#include "memdb.h"
 #include "vardb.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,7 @@ struct rule {
 	int rtype;
 };
 
+static int parse(tupid_t tupid);
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, int dfd, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
@@ -60,7 +62,16 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
 static char *eval(struct vardb *v, const char *string, tupid_t tupid);
 
+static struct memdb cur_parse_db;
+
 int parser_create(tupid_t tupid)
+{
+	if(memdb_init(&cur_parse_db) < 0)
+		return -1;
+	return parse(tupid);
+}
+
+static int parse(tupid_t tupid)
 {
 	int dfd;
 	int fd;
@@ -68,9 +79,30 @@ int parser_create(tupid_t tupid)
 	struct buf b;
 	struct vardb vdb;
 	struct rule *r;
+	void *p;
 	LIST_HEAD(rules);
 
+	printf("[33mParse(%lli)[0m\n", tupid);
+	if(memdb_find(&cur_parse_db, tupid, &p) < 0)
+		return -1;
+	if(p != NULL) {
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last tupid = %lli). This is madness!\n", tupid);
+		return -1;
+	}
+	p = (void*)1; /* We just need a non-NULL value */
+	if(memdb_add(&cur_parse_db, tupid, p) < 0)
+		return -1;
+
 	if(vardb_init(&vdb) < 0)
+		return -1;
+
+	/* Move all existing commands over to delete - then the ones that are
+	 * re-created will be moved back out in create(). All those that are no
+	 * longer generated remain in delete for cleanup.
+	 */
+	if(tup_db_or_dircmd_flags(tupid, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(tup_db_set_cmd_output_flags(tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;
 
 	dfd = tup_db_opendir(tupid);
@@ -108,6 +140,15 @@ out_close_vdb:
 	sqlite3_close(vdb.db);
 out_close_dfd:
 	close(dfd);
+
+	if(memdb_remove(&cur_parse_db, tupid) < 0)
+		return -1;
+
+	if(rc == 0) {
+		printf("[34mParsed %lli[0m\n", tupid);
+		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_NONE) < 0)
+			return -1;
+	}
 
 	return rc;
 }
@@ -425,9 +466,17 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 			subdir = find_dir_tupid_dt(dt, p, &file);
 			if(subdir < 0)
 				return -1;
-			if(subdir != dt)
+			if(subdir != dt) {
+				int flags;
+				flags = tup_db_select_flags(subdir);
+				if(flags < 0)
+					return -1;
+				if(flags & TUP_FLAGS_CREATE)
+					if(parse(subdir) < 0)
+						return -1;
 				if(tup_db_create_link(subdir, dt) < 0)
 					return -1;
+			}
 			if(p != file) {
 				/* Note that dirlen should be file-p-1, but we
 				 * add 1 to account for the trailing '/' that

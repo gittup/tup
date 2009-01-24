@@ -32,12 +32,6 @@ static int delete_file(struct node *n);
 static int do_show_progress;
 static int do_keep_going;
 
-struct name_list {
-	struct list_head list;
-	char *name;
-	tupid_t tupid;
-};
-
 int updater(int argc, char **argv)
 {
 	struct graph g;
@@ -90,72 +84,48 @@ lock_success:
 	return 0;
 }
 
+/* This is used to short-circuit the tup_db_select_node_by_flags call to only
+ * give us the first node.
+ */
+#define CREATE_CB_SUCCESS -18
 static int create_flag_cb(void *arg, struct db_node *dbn)
 {
-	struct list_head *list = arg;
-	struct name_list *nl;
+	struct db_node *dest = arg;
 
-	nl = malloc(sizeof *nl);
-	if(!nl) {
-		perror("malloc");
-		return -1;
-	}
+	dest->tupid = dbn->tupid;
+	dest->dt = dbn->dt;
+	dest->name = NULL;
+	dest->type = dbn->type;
+	dest->flags = dbn->flags;
 
-	nl->name = strdup(dbn->name);
-	if(!nl->name) {
-		perror("strdup");
-		return -1;
-	}
-	nl->tupid = dbn->tupid;
-
-	list_add(&nl->list, list);
+	return CREATE_CB_SUCCESS;
 
 	/* TODO: Is this really valid to set here in the select callback?
 	 * Maybe it should be moved into the while(!list_empty) loop in
 	 * process_create_nodes()?
 	 */
-	/* Move all existing commands over to delete - then the ones that are
-	 * re-created will be moved back out in create(). All those that are
-	 * no longer generated remain in delete for cleanup.
-	 */
-	if(tup_db_or_dircmd_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
-		return -1;
-	if(tup_db_set_cmd_output_flags(dbn->tupid, TUP_FLAGS_DELETE) < 0)
-		return -1;
 
 	return 0;
 }
 
 static int process_create_nodes(void)
 {
-	struct name_list *nl;
-	LIST_HEAD(namelist);
+	struct db_node dbn;
 
 	tup_db_begin();
 	while(1) {
-		if(tup_db_select_node_by_flags(create_flag_cb, &namelist,
-					       TUP_FLAGS_CREATE) != 0)
+		int rc;
+		rc = tup_db_select_node_by_flags(create_flag_cb, &dbn,
+						 TUP_FLAGS_CREATE);
+		if(rc == 0) /* No nodes selected */
+			break;
+		if(rc != CREATE_CB_SUCCESS)
 			goto err_rollback;
 
-		if(list_empty(&namelist))
-			goto out_commit;
-
-		while(!list_empty(&namelist)) {
-			nl = list_entry(namelist.next, struct name_list, list);
-			/* Not sure if this is the best place to ignore Rodney,
-			 * but it seems to work.
-			 */
-			if(nl->tupid != VAR_DT)
-				if(parser_create(nl->tupid) < 0)
-					goto err_rollback;
-			if(tup_db_set_flags_by_id(nl->tupid, TUP_FLAGS_NONE)<0)
+		if(dbn.tupid != VAR_DT)
+			if(parser_create(dbn.tupid) < 0)
 				goto err_rollback;
-			list_del(&nl->list);
-			free(nl->name);
-			free(nl);
-		}
 	}
-out_commit:
 	tup_db_commit();
 
 	return 0;
@@ -222,9 +192,10 @@ static int add_file(struct graph *g, struct db_node *dbn)
 {
 	struct node *n;
 
-	if((n = find_node(g, dbn->tupid)) != NULL) {
+	if(find_node(g, dbn->tupid, &n) < 0)
+		return -1;
+	if(n != NULL)
 		goto edge_create;
-	}
 	n = create_node(g, dbn);
 	if(!n)
 		return -1;

@@ -11,6 +11,6 @@ struct memdb {
 int memdb_init(struct memdb *m);
 int memdb_add(struct memdb *m, tupid_t id, void *n);
 int memdb_remove(struct memdb *m, tupid_t id);
-void *memdb_find(const struct memdb *m, tupid_t id);
+int memdb_find(const struct memdb *m, tupid_t id, void *p);
 
 #endif

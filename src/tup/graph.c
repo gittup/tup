@@ -8,9 +8,9 @@
 
 static void dump_node(FILE *f, struct node *n);
 
-struct node *find_node(const struct graph *g, tupid_t tupid)
+int find_node(const struct graph *g, tupid_t tupid, struct node **n)
 {
-	return memdb_find(&g->memdb, tupid);
+	return memdb_find(&g->memdb, tupid, n);
 }
 
 struct node *create_node(struct graph *g, struct db_node *dbn)

@@ -97,46 +97,47 @@ int memdb_remove(struct memdb *m, tupid_t id)
 	return 0;
 }
 
-void *memdb_find(const struct memdb *m, tupid_t id)
+int memdb_find(const struct memdb *m, tupid_t id, void *p)
 {
 	int dbrc;
-	void *ptr;
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "select ptr from node_map where id=?";
 	int res;
+	int rc = -1;
 
 	if(!stmt) {
 		if(sqlite3_prepare_v2(m->db, s, sizeof(s), &stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(m->db), s);
-			return NULL;
+			return -1;
 		}
 	}
 
 	if(sqlite3_bind_int64(stmt, 1, id) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(m->db));
-		return NULL;
+		return -1;
 	}
 
 	dbrc = sqlite3_step(stmt);
 	if(dbrc == SQLITE_DONE) {
-		ptr = NULL;
+		*(void**)p = NULL;
+		rc = 0;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(m->db));
-		ptr = NULL;
 		goto out_reset;
 	}
 
 	res = sqlite3_column_int(stmt, 0);
-	ptr = (struct node*)res;
+	*(void**)p = (void*)res;
+	rc = 0;
 
 out_reset:
 	if(sqlite3_reset(stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(m->db));
-		return NULL;
+		return -1;
 	}
 
-	return ptr;
+	return rc;
 }

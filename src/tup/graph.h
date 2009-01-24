@@ -38,7 +38,7 @@ struct graph {
 	struct memdb memdb;
 };
 
-struct node *find_node(const struct graph *g, tupid_t tupid);
+int find_node(const struct graph *g, tupid_t tupid, struct node **n);
 struct node *create_node(struct graph *g, struct db_node *dbn);
 void remove_node(struct graph *g, struct node *n);
 
