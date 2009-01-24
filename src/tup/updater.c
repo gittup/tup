@@ -431,7 +431,7 @@ static int var_replace(struct node *n)
 	if(fslurp(ifd, &b) < 0) {
 		goto err_close_ifd;
 	}
-	ofd = open(rbracket+2, O_WRONLY|O_CREAT, 0666);
+	ofd = creat(rbracket+2, 0666);
 	if(ofd < 0) {
 		perror(rbracket+2);
 		goto err_free_buf;
