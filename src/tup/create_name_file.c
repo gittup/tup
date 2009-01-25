@@ -48,15 +48,29 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 
 tupid_t create_var_file(const char *var, const char *value)
 {
+	int rc;
 	tupid_t tupid;
 
-	tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR, TUP_FLAGS_MODIFY);
-	if(tupid < 0)
-		return -1;
-	if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_MODIFY) < 0)
-		return -1;
-	if(tup_db_set_dependent_dir_flags(tupid, TUP_FLAGS_CREATE) < 0)
-		return -1;
+	tupid = tup_db_select_node(VAR_DT, var);
+	if(tupid < 0) {
+		tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR, TUP_FLAGS_MODIFY);
+		if(tupid < 0)
+			return -1;
+	} else {
+		char *orig_value;
+		if(tup_db_get_var_id(tupid, &orig_value) < 0)
+			return -1;
+		rc = strcmp(orig_value, value);
+		free(orig_value);
+		/* Nothing to do if the value hasn't changed */
+		if(rc == 0)
+			return 0;
+
+		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+		if(tup_db_set_dependent_dir_flags(tupid, TUP_FLAGS_CREATE) < 0)
+			return -1;
+	}
 	return tup_db_set_var(tupid, value);
 }
 

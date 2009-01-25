@@ -1328,7 +1328,7 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 	return 0;
 }
 
-int tup_db_get_var(const char *var, int varlen, char **dest)
+tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 {
 	int dbrc;
 	int len;
@@ -1387,6 +1387,64 @@ out_reset:
 	return tupid;
 }
 
+int tup_db_get_var_id(tupid_t tupid, char **dest)
+{
+	int rc = -1;
+	int dbrc;
+	int len;
+	const char *value;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select value, length(value) from var where var.id=?";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(stmt);
+	if(dbrc == SQLITE_DONE) {
+		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tupid);
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		goto out_reset;
+	}
+
+	len = sqlite3_column_int(stmt, 1);
+	if(len < 0) {
+		goto out_reset;
+	}
+	value = (const char *)sqlite3_column_text(stmt, 0);
+	if(!value) {
+		goto out_reset;
+	}
+	*dest = malloc(len + 1);
+	if(!*dest) {
+		perror("malloc");
+		goto out_reset;
+	}
+	memcpy(*dest, value, len);
+	(*dest)[len] = 0;
+	rc = 0;
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 int tup_db_get_varlen(const char *var, int varlen)
 {
 	int rc = -1;
@@ -1433,7 +1491,7 @@ out_reset:
 	return rc;
 }
 
-int tup_db_write_var(const char *var, int varlen, int fd)
+tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 {
 	int dbrc;
 	int len;
