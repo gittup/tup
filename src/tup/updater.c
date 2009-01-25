@@ -238,7 +238,10 @@ static int execute_graph(struct graph *g)
 		if(n != root) {
 			if(n->type == TUP_NODE_FILE &&
 			   (n->flags == TUP_FLAGS_DELETE)) {
-				delete_file(n);
+				printf("[35mDelete[%lli]: %s[0m\n",
+				       n->tupid, n->name);
+				if(delete_file(n) < 0)
+					goto out;
 			} else if(n->type == TUP_NODE_DIR &&
 				  n->flags == TUP_FLAGS_DELETE) {
 				printf("[35mDelete[%lli]: %s[0m\n",
@@ -247,7 +250,8 @@ static int execute_graph(struct graph *g)
 					goto out;
 			} else if(n->type == TUP_NODE_CMD) {
 				if(n->flags & TUP_FLAGS_DELETE) {
-					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
+					printf("[35mDelete[%lli]: %s[0m\n",
+					       n->tupid, n->name);
 					if(delete_name_file(n->tupid) < 0)
 						goto out;
 				} else {
@@ -498,12 +502,19 @@ static int delete_file(struct node *n)
 	int dirfd;
 	int rc = 0;
 
-	printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
 	if(delete_name_file(n->tupid) < 0)
 		return -1;
 	dirfd = tup_db_opendir(n->dt);
-	if(dirfd < 0)
-		return -1;
+	if(dirfd < 0) {
+		if(dirfd == -ENOENT) {
+			/* If the directory doesn't exist, the file can't
+			 * either
+			 */
+			return 0;
+		} else {
+			return -1;
+		}
+	}
 
 	if(unlinkat(dirfd, n->name, 0) < 0) {
 		/* Don't care if the file is already gone. */

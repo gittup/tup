@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sqlite3.h>
 
 #define DB_VERSION 1
@@ -618,7 +619,7 @@ int tup_db_delete_node(tupid_t tupid)
 
 int tup_db_delete_dir(tupid_t dt)
 {
-	printf("[31m Delete dir: %lli[0m\n", dt);
+	printf("[35m Delete dir: %lli[0m\n", dt);
 	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_DELETE) < 0)
 		return -1;
 	return delete_dir(dt);
@@ -635,6 +636,10 @@ int tup_db_opendir(tupid_t dt)
 	int fd;
 
 	if(dt == 0) {
+		fprintf(stderr, "Error: Trying to tup_db_opendir(0)\n");
+		return -1;
+	}
+	if(dt == 1) {
 		return open(".", O_RDONLY);
 	}
 	if(!stmt) {
@@ -652,7 +657,7 @@ int tup_db_opendir(tupid_t dt)
 
 	dbrc = sqlite3_step(stmt);
 	if(dbrc == SQLITE_DONE) {
-		rc = -1;
+		rc = -ENOENT;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -673,6 +678,12 @@ int tup_db_opendir(tupid_t dt)
 		return -1;
 
 	rc = openat(fd, path, O_RDONLY);
+	if(rc < 0) {
+		if(errno == ENOENT)
+			rc = -ENOENT;
+		else
+			perror(path);
+	}
 	close(fd);
 	free(path);
 
@@ -734,7 +745,7 @@ static int delete_dir(tupid_t dt)
 	static sqlite3_stmt *stmt = NULL;
 	static char s[] = "update node set flags=? where dir=?";
 
-	printf("[31m delete dir: %lli[0m\n", dt);
+	printf("[35m delete dir: %lli[0m\n", dt);
 	if(!stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
