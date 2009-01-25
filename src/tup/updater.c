@@ -272,16 +272,6 @@ static int execute_graph(struct graph *g)
 				e->dest->state = STATE_PROCESSING;
 			}
 
-			if(n->type == TUP_NODE_FILE) {
-				if(n->type == TUP_FLAGS_DELETE ||
-				   n->type == TUP_FLAGS_MODIFY)
-					e->dest->flags |= TUP_FLAGS_MODIFY;
-			} else if(n->type == TUP_NODE_CMD) {
-				e->dest->flags |= n->flags;
-			} else if(n->type == TUP_NODE_DIR) {
-				e->dest->flags |= n->flags;
-			}
-
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
