@@ -63,7 +63,7 @@ tupid_t create_var_file(const char *var, const char *value)
 int tup_file_mod(tupid_t dt, const char *file, int flags)
 {
 	int upddir = 0;
-	tupid_t tupid;
+	struct db_node dbn;
 
 	/* Tried to simplify the gross if logic. Basically we want to re-update
 	 * the create nodes if:
@@ -71,7 +71,7 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	 * 2) the file was deleted
 	 * 3) a Tupfile was modified
 	 */
-	if(tup_db_select_node(dt, file) < 0)
+	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		upddir = 1;
 	if(flags == TUP_FLAGS_DELETE)
 		upddir = 1;
@@ -85,22 +85,38 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 			return -1;
 	}
 
-	tupid = create_name_file(dt, file);
-	if(tupid < 0)
-		return -1;
-	if(tup_db_set_flags_by_id(tupid, flags) < 0)
-		return -1;
-
-	/* If a file was deleted and it was created by a command, set the
-	 * command's flags to modify. For example, if foo.o was deleted, we
-	 * set 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed.
-	 *
-	 * This is really just to mimic what people would expect from make.
-	 * Randomly deleting object files is pretty stupid.
-	 */
-	if(flags == TUP_FLAGS_DELETE) {
-		if(tup_db_set_cmd_flags_by_output(tupid, TUP_FLAGS_MODIFY) < 0)
+	if(dbn.tupid < 0) {
+		if(flags == TUP_FLAGS_DELETE) {
+			fprintf(stderr, "Error: Trying to delete file '%s', which isn't in .tup/db\n", file);
 			return -1;
+		}
+		dbn.tupid = create_name_file(dt, file);
+		if(dbn.tupid < 0)
+			return -1;
+	} else {
+		/* Directories that are deleted get special treatment, since we
+		 * recurse and delete all sub-nodes.
+		 */
+		if(flags == TUP_FLAGS_DELETE && dbn.type == TUP_NODE_DIR) {
+			if(tup_db_delete_dir(dbn.tupid) < 0)
+				return -1;
+		} else {
+			/* If a file was deleted and it was created by a
+			 * command, set the command's flags to modify. For
+			 * example, if foo.o was deleted, we set 'gcc -c foo.c
+			 * -o foo.o' to modify, so it will be re-executed.
+			 *
+			 * This is really just to mimic what people would
+			 * expect from make.  Randomly deleting object files is
+			 * pretty stupid.
+			 */
+			if(flags == TUP_FLAGS_DELETE) {
+				if(tup_db_set_cmd_flags_by_output(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
+					return -1;
+			}
+			if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
+				return -1;
+		}
 	}
 
 	return 0;

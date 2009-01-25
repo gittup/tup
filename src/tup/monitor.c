@@ -528,22 +528,7 @@ static void handle_event(struct inotify_event *e)
 		flags = TUP_FLAGS_DELETE;
 	}
 
-	if(e->mask & IN_ISDIR) {
-		/* TODO: Beef up tup_file_mod to handle this deletion */
-		if(flags & TUP_FLAGS_DELETE) {
-			tupid_t dt;
-			dt = tup_db_select_node(dc->dt, e->name);
-			if(dt < 0) {
-				fprintf(stderr, "Can't find node to delete\n");
-				return;
-			}
-			tup_db_delete_dir(dt);
-		} else {
-			tup_file_mod(dc->dt, e->name, flags);
-		}
-	} else {
-		tup_file_mod(dc->dt, e->name, flags);
-	}
+	tup_file_mod(dc->dt, e->name, flags);
 }
 
 static void sighandler(int sig)
