@@ -12,13 +12,13 @@ endif
 syntax case match
 
 syntax match comment ,^#.*$,
-syntax match rule ,^[:\/],
+syntax match rule ,^[:,],
 syntax match separator /|>/
 syntax match format display "%\([Ffo]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /@[a-zA-Z0-9_]*@/
 syntax keyword keys foreach
-syntax region varsed matchgroup=rule start=/\// end=/$/ contains=separator,format,variable
+syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable
 
 highlight link comment Comment
