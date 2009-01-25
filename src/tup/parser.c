@@ -180,7 +180,14 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			continue;
 		}
 
-		eval_line = eval(vdb, line, tupid);
+		if(if_true) {
+			eval_line = eval(vdb, line, tupid);
+		} else {
+			eval_line = strdup(line);
+			if(!eval_line) {
+				perror("strdup");
+			}
+		}
 		if(!eval_line)
 			return -1;
 
