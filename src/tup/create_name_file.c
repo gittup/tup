@@ -36,11 +36,6 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 	return tup_db_create_node(dt, cmd, TUP_NODE_CMD, TUP_FLAGS_MODIFY);
 }
 
-tupid_t create_varsed_file(tupid_t dt, const char *cmd)
-{
-	return tup_db_create_node(dt, cmd, TUP_NODE_VAR_SED, TUP_FLAGS_MODIFY);
-}
-
 tupid_t create_dir_file(tupid_t dt, const char *path)
 {
 	return tup_db_create_node(dt, path, TUP_NODE_DIR, TUP_FLAGS_CREATE);

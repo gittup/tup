@@ -257,18 +257,6 @@ static int execute_graph(struct graph *g)
 						goto out;
 					}
 				}
-			} else if(n->type == TUP_NODE_VAR_SED) {
-				if(n->flags & TUP_FLAGS_DELETE) {
-					printf("[35mDelete[%lli]: %s[0m\n", n->tupid, n->name);
-					if(delete_name_file(n->tupid) < 0)
-						goto out;
-				} else {
-					if(var_replace(n) < 0) {
-						if(do_keep_going)
-							goto keep_going;
-						goto out;
-					}
-				}
 			}
 		}
 		while(n->edges) {
@@ -296,7 +284,7 @@ static int execute_graph(struct graph *g)
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			goto out;
 keep_going:
-		if(n->type == TUP_NODE_CMD || n->type == TUP_NODE_VAR_SED) {
+		if(n->type == TUP_NODE_CMD) {
 			num_processed++;
 			show_progress(num_processed, g->num_nodes);
 		}
@@ -324,6 +312,10 @@ static int update(struct node *n)
 	int dfd;
 	int curfd;
 	tupid_t tupid;
+
+	/* Commands that begin with a ',' are special var/sed commands */
+	if(n->name[0] == ',')
+		return var_replace(n);
 
 	tupid = tup_db_create_dup_node(n->dt, n->name, n->type, TUP_FLAGS_NONE);
 	if(tupid < 0)
@@ -394,9 +386,18 @@ static int var_replace(struct node *n)
 	int ifd;
 	int ofd;
 	struct buf b;
+	char *input;
 	char *rbracket;
 	char *p, *e;
 	int rc = -1;
+
+	if(n->name[0] != ',') {
+		fprintf(stderr, "Error: var_replace command must begin with ','\n");
+		return -1;
+	}
+	input = n->name + 1;
+	while(isspace(*input))
+		input++;
 
 	curfd = open(".", O_RDONLY);
 	if(curfd < 0)
@@ -407,25 +408,25 @@ static int var_replace(struct node *n)
 		goto err_close_curfd;
 	fchdir(dfd);
 
-	printf("%s\n", n->name);
-	rbracket = strchr(n->name, '>');
+	printf("%s\n", input);
+	rbracket = strchr(input, '>');
 	if(rbracket == NULL) {
 		fprintf(stderr, "Unable to find '>' in var/sed command '%s'\n",
-			n->name);
+			input);
 		goto err_close_dfd;
 	}
 	/* Use -1 since the string is '%s > %s' and we need to set the space
 	 * before the '>' to 0.
 	 */
-	if(rbracket == n->name) {
+	if(rbracket == input) {
 		fprintf(stderr, "Error: the '>' symbol can't be at the start of the var/sed command.\n");
 		return -1;
 	}
 	rbracket[-1] = 0;
 
-	ifd = open(n->name, O_RDONLY);
+	ifd = open(input, O_RDONLY);
 	if(ifd < 0) {
-		perror(n->name);
+		perror(input);
 		goto err_close_dfd;
 	}
 	if(fslurp(ifd, &b) < 0) {

@@ -12,8 +12,13 @@ tup touch foo.txt Tupfile
 tup varset CONFIG_FOO sup
 update
 tup_object_exist . foo.txt out.txt
+tup_object_exist . ", foo.txt > out.txt"
 (echo "hey sup yo"; echo "This is an email@address.com") | diff out.txt -
 
-tup varset CONFIG_FOO blah
+cat > Tupfile << HERE
+HERE
+tup touch Tupfile
 update
-(echo "hey blah yo"; echo "This is an email@address.com") | diff out.txt -
+
+tup_object_no_exist . out.txt
+tup_object_no_exist . ", foo.txt > out.txt"

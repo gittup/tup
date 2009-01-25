@@ -41,7 +41,6 @@ struct rule {
 	struct name_list namelist;
 	const char *dir;
 	int dirlen;
-	int rtype;
 };
 
 static int parse(tupid_t tupid);
@@ -260,7 +259,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		} else if(eval_line[0] == ':') {
 			if(parse_rule(eval_line+1, rules) < 0)
 				goto syntax_error;
-		} else if(eval_line[0] == '/') {
+		} else if(eval_line[0] == ',') {
 			if(parse_varsed(eval_line+1, rules) < 0)
 				goto syntax_error;
 		} else {
@@ -386,8 +385,6 @@ static int parse_rule(char *p, struct list_head *rules)
 	}
 	init_name_list(&r->namelist);
 
-	r->rtype = TUP_NODE_CMD;
-
 	list_add_tail(&r->list, rules);
 
 	return 0;
@@ -435,10 +432,13 @@ static int parse_varsed(char *p, struct list_head *rules)
 		return -1;
 	}
 
-	r->command = NULL;
+	r->command = strdup(", %f > %o");
+	if(!r->command) {
+		perror("strdup");
+		return -1;
+	}
 
 	init_name_list(&r->namelist);
-	r->rtype = TUP_NODE_VAR_SED;
 	list_add_tail(&r->list, rules);
 	return 0;
 }
@@ -667,30 +667,11 @@ static int do_rule(struct rule *r, struct name_list *nl, tupid_t dt)
 		}
 	}
 
-	if(r->rtype == TUP_NODE_CMD) {
-		cmd = tup_printf(r->command, nl, &onl);
-		if(!cmd)
-			return -1;
-		cmd_id = create_command_file(dt, cmd);
-		free(cmd);
-	} else if(r->rtype == TUP_NODE_VAR_SED) {
-		if(nl->num_entries != 1) {
-			fprintf(stderr, "Error: Expected exactly 1 input entry.\n");
-			return -1;
-		}
-		if(onl.num_entries != 1) {
-			fprintf(stderr, "Error: Expected exactly 1 output entry.\n");
-			return -1;
-		}
-		cmd = tup_printf("%f > %o", nl, &onl);
-		if(!cmd)
-			return -1;
-		cmd_id = create_varsed_file(dt, cmd);
-		free(cmd);
-	} else {
-		fprintf(stderr, "Invalid rtype: %i\n", r->rtype);
+	cmd = tup_printf(r->command, nl, &onl);
+	if(!cmd)
 		return -1;
-	}
+	cmd_id = create_command_file(dt, cmd);
+	free(cmd);
 	if(cmd_id < 0)
 		return -1;
 
