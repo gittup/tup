@@ -12,6 +12,7 @@
 #include "tup/fileio.h"
 #include "tup/updater.h"
 #include "tup/graph.h"
+#include "tup/init.h"
 
 static int file_exists(const char *s);
 
@@ -65,23 +66,14 @@ int main(int argc, char **argv)
 		return init(argc, argv);
 	}
 
-	if(find_tup_dir() != 0) {
-		return 1;
-	}
-
 	if(init_getexecwd(argv[0]) < 0) {
 		fprintf(stderr, "Error: Unable to determine tup's "
 			"execution directory for shared libs.\n");
 		return 1;
 	}
 
-	if(tup_lock_init() < 0) {
+	if(tup_init() < 0)
 		return 1;
-	}
-	if(tup_db_open() != 0) {
-		rc = 1;
-		goto out;
-	}
 
 	cmd = argv[1];
 	argc--;
@@ -115,9 +107,7 @@ int main(int argc, char **argv)
 		rc = 1;
 	}
 
-	tup_db_close();
-out:
-	tup_lock_exit();
+	tup_cleanup();
 
 	if(check_open_fds() < 0) {
 		if(rc == 0) {
