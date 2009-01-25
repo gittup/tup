@@ -1549,6 +1549,58 @@ out_reset:
 	return tupid;
 }
 
+int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg)
+{
+	int rc = -1;
+	int dbrc;
+	static sqlite3_stmt *stmt = NULL;
+	static char s[] = "select name, value from var, node where node.dir=? and node.id=var.id";
+
+	if(!stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), &stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(stmt, 1, VAR_DT) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		const char *var;
+		const char *value;
+
+		dbrc = sqlite3_step(stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		var = (const char *)sqlite3_column_text(stmt, 0);
+		value = (const char *)sqlite3_column_text(stmt, 1);
+
+		if((rc = callback(arg, var, value)) < 0) {
+			goto out_reset;
+		}
+	}
+
+out_reset:
+	if(sqlite3_reset(stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 static int node_insert(tupid_t dt, const char *name, int len, int type,
 		       int flags)
 {
