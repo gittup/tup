@@ -99,7 +99,7 @@ static int parse(tupid_t tupid)
 	 * re-created will be moved back out in create(). All those that are no
 	 * longer generated remain in delete for cleanup.
 	 */
-	if(tup_db_or_dircmd_flags(tupid, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_or_dircmd_flags(tupid, TUP_FLAGS_DELETE, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_set_cmd_output_flags(tupid, TUP_FLAGS_DELETE) < 0)
 		return -1;

@@ -242,7 +242,8 @@ static int execute_graph(struct graph *g)
 				       n->tupid, n->name);
 				if(delete_file(n) < 0)
 					goto out;
-			} else if(n->type == TUP_NODE_DIR &&
+			} else if((n->type == TUP_NODE_DIR ||
+				   n->type == TUP_NODE_VAR) &&
 				  n->flags == TUP_FLAGS_DELETE) {
 				printf("[35mDelete[%lli]: %s[0m\n",
 				       n->tupid, n->name);

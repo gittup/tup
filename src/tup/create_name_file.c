@@ -44,9 +44,10 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 tupid_t create_var_file(const char *var, const char *value)
 {
 	int rc;
+	struct db_node dbn;
 	tupid_t tupid;
 
-	tupid = tup_db_select_node(VAR_DT, var);
+	tupid = tup_db_select_dbn(VAR_DT, var, &dbn);
 	if(tupid < 0) {
 		tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR, TUP_FLAGS_MODIFY);
 		if(tupid < 0)
@@ -57,12 +58,19 @@ tupid_t create_var_file(const char *var, const char *value)
 			return -1;
 		rc = strcmp(orig_value, value);
 		free(orig_value);
-		/* Nothing to do if the value hasn't changed */
-		if(rc == 0)
+		/* If the value hasn't changed, just clear the flags */
+		if(rc == 0) {
+			if(dbn.flags & TUP_FLAGS_DELETE) {
+				dbn.flags &= ~TUP_FLAGS_DELETE;
+				if(tup_db_set_flags_by_id(dbn.tupid, dbn.flags) < 0)
+					return -1;
+			}
 			return 0;
+		}
 
-		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_MODIFY) < 0)
-			return -1;
+		if(! (dbn.flags & TUP_FLAGS_MODIFY))
+			if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_MODIFY) < 0)
+				return -1;
 		if(tup_db_set_dependent_dir_flags(tupid, TUP_FLAGS_CREATE) < 0)
 			return -1;
 	}

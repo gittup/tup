@@ -927,7 +927,7 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_or_dircmd_flags(tupid_t parent, int flags)
+int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type)
 {
 	int rc;
 	static sqlite3_stmt *stmt = NULL;
@@ -949,7 +949,7 @@ int tup_db_or_dircmd_flags(tupid_t parent, int flags)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(stmt, 3, TUP_NODE_CMD) != 0) {
+	if(sqlite3_bind_int(stmt, 3, type) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

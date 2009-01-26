@@ -69,7 +69,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_delete_links(tupid_t tupid);
 
 /* Combo operations */
-int tup_db_or_dircmd_flags(tupid_t parent, int flags);
+int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type);
 int tup_db_set_cmd_output_flags(tupid_t parent, int flags);
 int tup_db_set_cmd_flags_by_output(tupid_t output, int flags);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
