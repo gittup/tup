@@ -36,6 +36,7 @@ struct graph {
 	struct node *cur;
 	int num_nodes;
 	struct memdb memdb;
+	int count_flags;
 };
 
 int find_node(struct graph *g, tupid_t tupid, struct node **n);
@@ -45,7 +46,7 @@ void remove_node(struct graph *g, struct node *n);
 int create_edge(struct node *n1, struct node *n2);
 struct edge *remove_edge(struct edge *e);
 
-int create_graph(struct graph *g);
+int create_graph(struct graph *g, int count_flags);
 int destroy_graph(struct graph *g);
 void dump_graph(const struct graph *g, const char *filename);
 

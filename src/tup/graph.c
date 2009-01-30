@@ -36,7 +36,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->flags = dbn->flags;
 	list_add(&n->list, &g->plist);
 
-	if(n->type == TUP_NODE_CMD)
+	if(n->type == g->count_flags)
 		g->num_nodes++;
 
 	if(memdb_add(&g->memdb, n->tupid, n) < 0)
@@ -87,7 +87,7 @@ struct edge *remove_edge(struct edge *e)
 	return tmp;
 }
 
-int create_graph(struct graph *g)
+int create_graph(struct graph *g, int count_flags)
 {
 	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT, TUP_FLAGS_NONE};
 
@@ -107,6 +107,7 @@ int create_graph(struct graph *g)
 		return -1;
 	list_move(&g->root->list, &g->node_list);
 	g->num_nodes = 0;
+	g->count_flags = count_flags;
 	return 0;
 }
 

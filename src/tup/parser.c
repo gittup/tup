@@ -120,7 +120,6 @@ TODO: How to find circular deps?
 	rc = parse_tupfile(&b, &vdb, &rules, dfd, tupid);
 	if(rc < 0)
 		goto out_free_bs;
-	vardb_dump(&vdb);
 	rc = execute_rules(&rules, tupid, mdb);
 out_free_bs:
 	free(b.s);
@@ -687,7 +686,6 @@ static int do_rule(struct rule *r, struct name_list *nl)
 	}
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		printf("Match: %s, %s\n", r->input_pattern, nle->path);
 		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
 			return -1;
 	}

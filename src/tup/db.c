@@ -964,7 +964,6 @@ int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type)
 	sqlite3_stmt **stmt = &stmts[DB_OR_DIRCMD_FLAGS];
 	static char s[]="update node set flags=flags|? where dir=? and type=?";
 
-	printf("update node set flags=flags|%i where dir=%lli and type=%i\n", flags, parent, type);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",

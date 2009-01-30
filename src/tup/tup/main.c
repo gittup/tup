@@ -196,7 +196,7 @@ static int graph(int argc, char **argv)
 	struct node *n;
 	tupid_t tupid;
 
-	if(create_graph(&g) < 0)
+	if(create_graph(&g, 0) < 0)
 		return -1;
 
 	for(x=1; x<argc; x++) {
@@ -280,6 +280,7 @@ static int graph(int argc, char **argv)
 		}
 	}
 	printf("}\n");
+	destroy_graph(&g);
 	return 0;
 }
 

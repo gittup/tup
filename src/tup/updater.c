@@ -85,7 +85,7 @@ static int process_create_nodes(void)
 {
 	struct graph g;
 
-	if(create_graph(&g) < 0)
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
 	if(build_graph(&g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -100,7 +100,7 @@ static int process_update_nodes(void)
 {
 	struct graph g;
 
-	if(create_graph(&g) < 0)
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(build_graph(&g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -179,6 +179,9 @@ static int execute_create(struct graph *g)
 	int num_processed = 0;
 	int rc = -1;
 
+	if(g->num_nodes)
+		printf("Parsing Tupfiles\n");
+
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
 	list_move(&root->list, &g->plist);
@@ -196,13 +199,10 @@ static int execute_create(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_DIR) {
-				printf("State: %i\n", n->state);
 				if(parse(n->tupid, &g->memdb) < 0)
 					return -1;
 			} else if(n->type == TUP_NODE_VAR) {
-				printf("Var: '%s'\n", n->name);
 			} else if(n->type==TUP_NODE_FILE || n->type==TUP_NODE_CMD) {
-				printf("Skip: '%s'\n", n->name);
 			} else {
 				fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
 				return -1;
@@ -249,6 +249,9 @@ static int execute_update(struct graph *g)
 	struct node *root;
 	int num_processed = 0;
 	int rc = -1;
+
+	if(g->num_nodes)
+		printf("Executing Commands\n");
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
