@@ -2,7 +2,8 @@
 #define tup_parser_h
 
 #include "tupid.h"
+struct memdb;
 
-int parser_create(tupid_t tupid);
+int parse(tupid_t tupid, struct memdb *mdb);
 
 #endif

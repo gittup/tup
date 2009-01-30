@@ -47,12 +47,11 @@ struct rule {
 	tupid_t dt;
 };
 
-static int parse(tupid_t tupid);
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, int dfd, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
 static int parse_varsed(char *p, struct list_head *rules);
-static int execute_rules(struct list_head *rules, tupid_t dt);
+static int execute_rules(struct list_head *rules, tupid_t dt, struct memdb *mbd);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl);
@@ -66,16 +65,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
 static char *eval(struct vardb *v, const char *string, tupid_t tupid);
 
-static struct memdb cur_parse_db;
-
-int parser_create(tupid_t tupid)
-{
-	if(memdb_init(&cur_parse_db) < 0)
-		return -1;
-	return parse(tupid);
-}
-
-static int parse(tupid_t tupid)
+int parse(tupid_t tupid, struct memdb *mdb)
 {
 	int dfd;
 	int fd;
@@ -83,20 +73,24 @@ static int parse(tupid_t tupid)
 	struct buf b;
 	struct vardb vdb;
 	struct rule *r;
-	void *p;
+	struct node *n;
 	LIST_HEAD(rules);
 
 	printf("[33mParse(%lli)[0m\n", tupid);
-	if(memdb_find(&cur_parse_db, tupid, &p) < 0)
+	if(memdb_find(mdb, tupid, &n) < 0)
 		return -1;
-	if(p != NULL) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last tupid = %lli). This is madness!\n", tupid);
+	if(n == NULL) {
+		fprintf(stderr, "Error: Parse node %lli not found in graph!\n",
+			tupid);
 		return -1;
 	}
-	p = (void*)1; /* We just need a non-NULL value */
-	if(memdb_add(&cur_parse_db, tupid, p) < 0)
+/*
+TODO: How to find circular deps?
+	if(n->state == 
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last tupid = %lli).\nThis is madness!\n", tupid);
 		return -1;
-
+	}
+*/
 	if(vardb_init(&vdb) < 0)
 		return -1;
 
@@ -127,7 +121,7 @@ static int parse(tupid_t tupid)
 	if(rc < 0)
 		goto out_free_bs;
 	vardb_dump(&vdb);
-	rc = execute_rules(&rules, tupid);
+	rc = execute_rules(&rules, tupid, mdb);
 out_free_bs:
 	free(b.s);
 	while(!list_empty(&rules)) {
@@ -141,12 +135,10 @@ out_free_bs:
 out_close_file:
 	close(fd);
 out_close_vdb:
-	sqlite3_close(vdb.db);
+	if(vardb_close(&vdb) < 0)
+		rc = -1;
 out_close_dfd:
 	close(dfd);
-
-	if(memdb_remove(&cur_parse_db, tupid) < 0)
-		return -1;
 
 	if(rc == 0) {
 		printf("[34mParsed %lli[0m\n", tupid);
@@ -455,7 +447,7 @@ static int parse_varsed(char *p, struct list_head *rules)
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, tupid_t dt)
+static int execute_rules(struct list_head *rules, tupid_t dt, struct memdb *mdb)
 {
 	struct rule *r;
 
@@ -485,7 +477,7 @@ static int execute_rules(struct list_head *rules, tupid_t dt)
 				if(flags < 0)
 					return -1;
 				if(flags & TUP_FLAGS_CREATE)
-					if(parse(subdir) < 0)
+					if(parse(subdir, mdb) < 0)
 						return -1;
 				if(tup_db_create_link(subdir, dt) < 0)
 					return -1;
@@ -662,10 +654,6 @@ static int do_rule(struct rule *r, struct name_list *nl)
 						      &node_created);
 		if(onle->tupid < 0)
 			return -1;
-		if(node_created)
-			if(tup_db_set_dependent_dir_flags(r->dt,
-							  TUP_FLAGS_CREATE) < 0)
-				return -1;
 
 		add_name_list_entry(&onl, onle);
 

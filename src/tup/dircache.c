@@ -45,7 +45,7 @@ void dircache_del(struct memdb *m, struct dircache *dc)
 		dump_dircache();
 }
 
-struct dircache *dircache_lookup(const struct memdb *m, int wd)
+struct dircache *dircache_lookup(struct memdb *m, int wd)
 {
 	struct dircache *dc;
 	if(memdb_find(m, wd, &dc) < 0)

@@ -22,7 +22,7 @@ void dircache_add(struct memdb *m, int wd, char *path, tupid_t dt);
 /** Returns the path given when wd was added to the dircache, or NULL if not
  * found.
  */
-struct dircache *dircache_lookup(const struct memdb *m, int wd);
+struct dircache *dircache_lookup(struct memdb *m, int wd);
 
 /** Deletes the wd from the dircache. */
 void dircache_del(struct memdb *m, struct dircache *dc);

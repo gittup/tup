@@ -8,7 +8,7 @@
 
 static void dump_node(FILE *f, struct node *n);
 
-int find_node(const struct graph *g, tupid_t tupid, struct node **n)
+int find_node(struct graph *g, tupid_t tupid, struct node **n)
 {
 	return memdb_find(&g->memdb, tupid, n);
 }
@@ -107,6 +107,13 @@ int create_graph(struct graph *g)
 		return -1;
 	list_move(&g->root->list, &g->node_list);
 	g->num_nodes = 0;
+	return 0;
+}
+
+int destroy_graph(struct graph *g)
+{
+	if(memdb_close(&g->memdb) < 0)
+		return -1;
 	return 0;
 }
 

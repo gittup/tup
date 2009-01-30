@@ -74,7 +74,6 @@ int tup_db_set_cmd_output_flags(tupid_t parent, int flags);
 int tup_db_set_cmd_flags_by_output(tupid_t output, int flags);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
 			       void *arg, tupid_t tupid);
-int tup_db_set_dependent_dir_flags(tupid_t dt, int flags);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);

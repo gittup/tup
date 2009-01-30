@@ -16,13 +16,13 @@
 #include <sys/file.h>
 #include <sys/wait.h>
 
-static int create_flag_cb(void *arg, struct db_node *dbn);
 static int process_create_nodes(void);
-static int md_flag_cb(void *arg, struct db_node *dbn);
-static int build_graph(struct graph *g);
-static int add_file(struct graph *g, struct db_node *dbn);
+static int process_update_nodes(void);
+static int build_graph(struct graph *g, int flags);
+static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
-static int execute_graph(struct graph *g);
+static int execute_create(struct graph *g);
+static int execute_update(struct graph *g);
 static void show_progress(int n, int tot);
 
 static int update(struct node *n);
@@ -34,14 +34,13 @@ static int do_keep_going;
 
 int updater(int argc, char **argv)
 {
-	struct graph g;
 	int upd_lock;
 	int x;
 
 	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
 	if(upd_lock < 0) {
 		perror(TUP_UPDATE_LOCK);
-		return 1;
+		return -1;
 	}
 	if(flock(upd_lock, LOCK_EX|LOCK_NB) < 0) {
 		if(errno == EWOULDBLOCK) {
@@ -50,7 +49,7 @@ int updater(int argc, char **argv)
 				goto lock_success;
 		}
 		perror("flock");
-		return 1;
+		return -1;
 	}
 lock_success:
 
@@ -73,95 +72,54 @@ lock_success:
 	}
 
 	if(process_create_nodes() < 0)
-		return 1;
-	if(build_graph(&g) < 0)
-		return 1;
-	if(execute_graph(&g) < 0)
-		return 1;
+		return -1;
+	if(process_update_nodes() < 0)
+		return -1;
 
 	flock(upd_lock, LOCK_UN);
 	close(upd_lock);
 	return 0;
 }
 
-/* This is used to short-circuit the tup_db_select_node_by_flags call to only
- * give us the first node.
- */
-#define CREATE_CB_SUCCESS -18
-static int create_flag_cb(void *arg, struct db_node *dbn)
-{
-	struct db_node *dest = arg;
-
-	dest->tupid = dbn->tupid;
-	dest->dt = dbn->dt;
-	dest->name = NULL;
-	dest->type = dbn->type;
-	dest->flags = dbn->flags;
-
-	return CREATE_CB_SUCCESS;
-}
-
 static int process_create_nodes(void)
 {
-	struct db_node dbn;
+	struct graph g;
 
-	tup_db_begin();
-	while(1) {
-		int rc;
-		rc = tup_db_select_node_by_flags(create_flag_cb, &dbn,
-						 TUP_FLAGS_CREATE);
-		if(rc == 0) /* No nodes selected */
-			break;
-		if(rc != CREATE_CB_SUCCESS)
-			goto err_rollback;
-
-		if(dbn.tupid != VAR_DT)
-			if(parser_create(dbn.tupid) < 0)
-				goto err_rollback;
-	}
-	tup_db_commit();
-
-	return 0;
-
-err_rollback:
-	tup_db_rollback();
-	return -1;
-}
-
-static int md_flag_cb(void *arg, struct db_node *dbn)
-{
-	struct graph *g = arg;
-	if(add_file(g, dbn) < 0)
+	if(create_graph(&g) < 0)
+		return -1;
+	if(build_graph(&g, TUP_FLAGS_CREATE) < 0)
+		return -1;
+	if(execute_create(&g) < 0)
+		return -1;
+	if(destroy_graph(&g) < 0)
 		return -1;
 	return 0;
 }
 
-static int build_graph(struct graph *g)
+static int process_update_nodes(void)
+{
+	struct graph g;
+
+	if(create_graph(&g) < 0)
+		return -1;
+	if(build_graph(&g, TUP_FLAGS_MODIFY) < 0)
+		return -1;
+	if(build_graph(&g, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(execute_update(&g) < 0)
+		return -1;
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return 0;
+}
+
+static int build_graph(struct graph *g, int flags)
 {
 	struct node *cur;
 
-	if(create_graph(g) < 0)
-		return -1;
-
 	g->cur = g->root;
-	g->root->flags = TUP_FLAGS_MODIFY;
-	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_MODIFY) < 0)
+	if(tup_db_select_node_by_flags(add_file_cb, g, flags) < 0)
 		return -1;
-
-	/* Delete gets those things marked only delete, and those marked
-	 * modify/delete. We can get stuff marked modify/delete if an update
-	 * fails with some commands remaining (so they are still marked modify),
-	 * and then we change the Tupfile so those commands are no longer
-	 * generated.
-	 */
-	g->root->flags = TUP_FLAGS_DELETE;
-	if(tup_db_select_node_by_flags(md_flag_cb, g, TUP_FLAGS_DELETE) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(md_flag_cb, g,
-				       TUP_FLAGS_MODIFY|TUP_FLAGS_DELETE) < 0)
-		return -1;
-
-	g->root->flags = TUP_FLAGS_NONE;
 
 	while(!list_empty(&g->plist)) {
 		cur = list_entry(g->plist.next, struct node, list);
@@ -181,8 +139,9 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file(struct graph *g, struct db_node *dbn)
+static int add_file_cb(void *arg, struct db_node *dbn)
 {
+	struct graph *g = arg;
 	struct node *n;
 
 	if(find_node(g, dbn->tupid, &n) < 0)
@@ -209,12 +168,83 @@ edge_create:
 static int find_deps(struct graph *g, struct node *n)
 {
 	g->cur = n;
-	if(tup_db_select_node_by_link(md_flag_cb, g, n->tupid) < 0)
+	if(tup_db_select_node_by_link(add_file_cb, g, n->tupid) < 0)
 		return -1;
 	return 0;
 }
 
-static int execute_graph(struct graph *g)
+static int execute_create(struct graph *g)
+{
+	struct node *root;
+	int num_processed = 0;
+	int rc = -1;
+
+	root = list_entry(g->node_list.next, struct node, list);
+	DEBUGP("root node: %lli\n", root->tupid);
+	list_move(&root->list, &g->plist);
+
+	tup_db_begin();
+	show_progress(num_processed, g->num_nodes);
+	while(!list_empty(&g->plist)) {
+		struct node *n;
+		n = list_entry(g->plist.next, struct node, list);
+		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
+		if(n->incoming_count) {
+			list_move(&n->list, &g->node_list);
+			n->state = STATE_FINISHED;
+			continue;
+		}
+		if(n != root) {
+			if(n->type == TUP_NODE_DIR) {
+				printf("State: %i\n", n->state);
+				if(parse(n->tupid, &g->memdb) < 0)
+					return -1;
+			} else if(n->type == TUP_NODE_VAR) {
+				printf("Var: '%s'\n", n->name);
+			} else if(n->type==TUP_NODE_FILE || n->type==TUP_NODE_CMD) {
+				printf("Skip: '%s'\n", n->name);
+			} else {
+				fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
+				return -1;
+			}
+		}
+		while(n->edges) {
+			struct edge *e;
+			e = n->edges;
+			if(e->dest->state != STATE_PROCESSING) {
+				list_del(&e->dest->list);
+				list_add(&e->dest->list, &g->plist);
+				e->dest->state = STATE_PROCESSING;
+			}
+
+			/* TODO: slist_del? */
+			n->edges = remove_edge(e);
+		}
+		/* TODO: Clear just the create flag? */
+/*		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
+			goto out;*/
+		if(n->type == TUP_NODE_DIR) {
+			num_processed++;
+			show_progress(num_processed, g->num_nodes);
+		}
+		remove_node(g, n);
+	}
+	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
+		printf("\n");
+		if(do_keep_going) {
+			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
+		} else {
+			fprintf(stderr, "Error: Graph is not empty after execution.\n");
+		}
+		goto out;
+	}
+	rc = 0;
+out:
+	tup_db_commit();
+	return rc;
+}
+
+static int execute_update(struct graph *g)
 {
 	struct node *root;
 	int num_processed = 0;

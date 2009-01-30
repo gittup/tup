@@ -38,7 +38,7 @@ struct graph {
 	struct memdb memdb;
 };
 
-int find_node(const struct graph *g, tupid_t tupid, struct node **n);
+int find_node(struct graph *g, tupid_t tupid, struct node **n);
 struct node *create_node(struct graph *g, struct db_node *dbn);
 void remove_node(struct graph *g, struct node *n);
 
@@ -46,6 +46,7 @@ int create_edge(struct node *n1, struct node *n2);
 struct edge *remove_edge(struct edge *e);
 
 int create_graph(struct graph *g);
+int destroy_graph(struct graph *g);
 void dump_graph(const struct graph *g, const char *filename);
 
 #endif
