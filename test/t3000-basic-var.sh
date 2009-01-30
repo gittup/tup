@@ -24,7 +24,7 @@ tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
 
 tup varset CONFIG_BAR y
-if tup upd | wc -l | grep 0 > /dev/null; then
+if sqlite .tup/db 'select * from node where flags != 0' | wc -l | grep 0 > /dev/null; then
 	:
 else
 	echo "Update shouldn't do anything when setting a var to the same value." 1>&2
