@@ -25,6 +25,7 @@ static FILE *(*s_fopen)(const char *, const char *);
 static FILE *(*s_fopen64)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
 static int (*s_creat)(const char *, mode_t);
+static int (*s_symlink)(const char *, const char *);
 static int (*s_rename)(const char*, const char*);
 static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
@@ -100,7 +101,16 @@ int creat(const char *pathname, mode_t mode)
 
 	rc = s_creat(pathname, mode);
 	if(rc >= 0)
-		handle_file(pathname, 1);
+		handle_file(pathname, ACCESS_WRITE);
+	return rc;
+}
+
+int symlink(const char *oldpath, const char *newpath)
+{
+	int rc;
+	rc = s_symlink(oldpath, newpath);
+	if(rc == 0)
+		handle_file(newpath, ACCESS_WRITE);
 	return rc;
 }
 
@@ -196,6 +206,7 @@ static void ldpre_init(void)
 	s_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 	s_freopen = dlsym(RTLD_NEXT, "freopen");
 	s_creat = dlsym(RTLD_NEXT, "creat");
+	s_symlink = dlsym(RTLD_NEXT, "symlink");
 	s_rename = dlsym(RTLD_NEXT, "rename");
 	s_unlink = dlsym(RTLD_NEXT, "unlink");
 	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
