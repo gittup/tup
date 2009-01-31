@@ -18,7 +18,7 @@ syntax match format display "%\([FfoBb]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /@[a-zA-Z0-9_]*@/
 syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_root\>\)"
-syntax keyword keys foreach nochdir
+syntax keyword keys foreach
 syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable
 

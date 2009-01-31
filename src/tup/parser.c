@@ -42,7 +42,6 @@ struct name_list_entry {
 struct rule {
 	struct list_head list;
 	int foreach;
-	int nochdir;
 	char *input_pattern;
 	char *output_pattern;
 	char *command;
@@ -75,6 +74,8 @@ int parse(struct node *n, struct graph *g)
 	int dfd;
 	int fd;
 	int rc = -1;
+	tupid_t parent;
+	int num_dotdots;
 	struct buf b;
 	struct vardb vdb;
 	struct rule *r;
@@ -90,6 +91,31 @@ TODO: How to find circular deps?
 */
 	if(vardb_init(&vdb) < 0)
 		return -1;
+	parent = n->tupid;
+	num_dotdots = 0;
+	while(parent != DOT_DT) {
+		parent = tup_db_parent(parent);
+		num_dotdots++;
+	}
+	if(num_dotdots) {
+		char *path = malloc(num_dotdots * 3 + 1);
+		char *p;
+		if(!path) {
+			perror("malloc");
+			return -1;
+		}
+		p = path;
+		for(; num_dotdots; num_dotdots--) {
+			strcpy(p, "../");
+			p += 3;
+		}
+		if(vardb_set(&vdb, "TUP_TOP", path) < 0)
+			return -1;
+		free(path);
+	} else {
+		if(vardb_set(&vdb, "TUP_TOP", "") < 0)
+			return -1;
+	}
 
 	/* Move all existing commands over to delete - then the ones that are
 	 * re-created will be moved back out in when parsing the Tupfile. All
@@ -386,13 +412,8 @@ static int parse_rule(char *p, struct list_head *rules)
 	}
 	if(input) {
 		r->foreach = 0;
-		r->nochdir = 0;
 		if(strncmp(input, "foreach ", 8) == 0) {
 			r->foreach = 1;
-			input += 8;
-		}
-		if(strncmp(input, "nochdir ", 8) == 0) {
-			r->nochdir = 1;
 			input += 8;
 		}
 		r->input_pattern = strdup(input);
@@ -495,10 +516,7 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 			if(spc)
 				*spc = 0;
 
-			if(r->nochdir)
-				subdir = find_dir_tupid_dt(DOT_DT, p, &file);
-			else
-				subdir = find_dir_tupid_dt(dt, p, &file);
+			subdir = find_dir_tupid_dt(dt, p, &file);
 			if(subdir < 0) {
 				fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
 				return -1;
