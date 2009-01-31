@@ -231,11 +231,6 @@ next_dir:
 
 static tupid_t __find_dir_tupid(const char *dir, const char **last)
 {
-	tupid_t dotdt;
-
-	dotdt = tup_db_select_node(0, ".");
-	if(dotdt < 0)
-		return -1;
 	if(strcmp(dir, ".") == 0) {
 		/* If the directory is the top, and we wanted to include the
 		 * whole thing, then return that directory. If we want the
@@ -245,10 +240,10 @@ static tupid_t __find_dir_tupid(const char *dir, const char **last)
 			*last = NULL;
 			return 0;
 		}
-		return dotdt;
+		return DOT_DT;
 	}
 
-	return find_dir_tupid_dt(dotdt, dir, last);
+	return find_dir_tupid_dt(DOT_DT, dir, last);
 }
 
 static tupid_t __create_dir_tupid(const char *dir, int include_last,

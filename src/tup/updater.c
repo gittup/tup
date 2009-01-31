@@ -340,28 +340,42 @@ static int update(struct node *n)
 {
 	int status;
 	int pid;
-	int dfd;
-	int curfd;
+	int dfd = -1;
+	int curfd = -1;
+	int do_chdir = 1;
+	int print_name = 1;
+	const char *name = n->name;
 	tupid_t tupid;
 
 	/* Commands that begin with a ',' are special var/sed commands */
-	if(n->name[0] == ',')
+	if(name[0] == ',')
 		return var_replace(n);
 
 	tupid = tup_db_create_dup_node(n->dt, n->name, n->type, TUP_FLAGS_NONE);
 	if(tupid < 0)
 		return -1;
 
-	curfd = open(".", O_RDONLY);
-	if(curfd < 0)
-		goto err_delete_node;
+	if(name[0] == '^') {
+		do_chdir = 0;
+		name++;
+	}
+	if(name[0] == '@') {
+		print_name = 0;
+		name++;
+	}
 
-	dfd = tup_db_opendir(n->dt);
-	if(dfd < 0)
-		goto err_close_curfd;
-	fchdir(dfd);
+	if(do_chdir) {
+		curfd = open(".", O_RDONLY);
+		if(curfd < 0)
+			goto err_delete_node;
 
-	printf("%s\n", n->name);
+		dfd = tup_db_opendir(n->dt);
+		if(dfd < 0)
+			goto err_close_curfd;
+		fchdir(dfd);
+	}
+	if(print_name)
+		printf("%s\n", name);
 
 	start_server();
 	pid = fork();
@@ -385,10 +399,12 @@ static int update(struct node *n)
 			goto err_cmd_failed;
 		}
 	}
-	fchdir(curfd);
+	if(do_chdir) {
+		fchdir(curfd);
 
-	close(dfd);
-	close(curfd);
+		close(dfd);
+		close(curfd);
+	}
 	delete_name_file(n->tupid);
 	return 0;
 

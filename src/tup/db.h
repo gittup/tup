@@ -5,6 +5,7 @@
 
 #define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
+#define DOT_DT 1
 #define VAR_DT 2
 
 struct db_node {

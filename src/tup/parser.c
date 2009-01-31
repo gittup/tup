@@ -9,6 +9,7 @@
 #include "memdb.h"
 #include "vardb.h"
 #include "graph.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,7 @@ struct name_list_entry {
 struct rule {
 	struct list_head list;
 	int foreach;
+	int nochdir;
 	char *input_pattern;
 	char *output_pattern;
 	char *command;
@@ -190,26 +192,45 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		if(!eval_line)
 			return -1;
 
-		if(strncmp(eval_line, "include ", 8) == 0) {
+		if(strncmp(eval_line, "include ", 8) == 0 ||
+		   strncmp(eval_line, "include_root ", 13) == 0) {
 			struct buf incb;
+			int incdirfd;
 			int fd;
 			int rc;
+			int include_root = (eval_line[7] == '_');
 			char *last_slash;
 			char *file;
 
-			file = eval_line + 8;
+			if(include_root)
+				file = eval_line + 13;
+			else
+				file = eval_line + 8;
 			last_slash = strrchr(file, '/');
 			if(last_slash) {
 				*last_slash = 0;
-				dfd = openat(dfd, file, O_RDONLY);
-				if(dfd < 0) {
-					perror("openat");
+				if(include_root)
+					incdirfd = open(file, O_RDONLY);
+				else
+					incdirfd = openat(dfd, file, O_RDONLY);
+				if(incdirfd < 0) {
+					perror(file);
 					return -1;
 				}
 				file = last_slash + 1;
+			} else {
+				if(include_root) {
+					incdirfd = open(".", O_RDONLY);
+					if(incdirfd < 0) {
+						perror(".");
+						return -1;
+					}
+				} else {
+					incdirfd = dfd;
+				}
 			}
 
-			fd = openat(dfd, file, O_RDONLY);
+			fd = openat(incdirfd, file, O_RDONLY);
 			if(fd < 0) {
 				fprintf(stderr, "Error including '%s': %s\n", eval_line+8, strerror(errno));
 				return -1;
@@ -221,9 +242,9 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				return -1;
 			}
 
-			rc = parse_tupfile(&incb, vdb, rules, dfd, tupid);
-			if(last_slash) {
-				close(dfd);
+			rc = parse_tupfile(&incb, vdb, rules, incdirfd, tupid);
+			if(incdirfd != dfd) {
+				close(incdirfd);
 			}
 			free(incb.s);
 			if(rc < 0) {
@@ -364,13 +385,17 @@ static int parse_rule(char *p, struct list_head *rules)
 		return -1;
 	}
 	if(input) {
+		r->foreach = 0;
+		r->nochdir = 0;
 		if(strncmp(input, "foreach ", 8) == 0) {
-			r->input_pattern = strdup(input + 8);
 			r->foreach = 1;
-		} else {
-			r->input_pattern = strdup(input);
-			r->foreach = 0;
+			input += 8;
 		}
+		if(strncmp(input, "nochdir ", 8) == 0) {
+			r->nochdir = 1;
+			input += 8;
+		}
+		r->input_pattern = strdup(input);
 	} else {
 		r->input_pattern = strdup("");
 		r->foreach = 0;
@@ -470,9 +495,14 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 			if(spc)
 				*spc = 0;
 
-			subdir = find_dir_tupid_dt(dt, p, &file);
-			if(subdir < 0)
+			if(r->nochdir)
+				subdir = find_dir_tupid_dt(DOT_DT, p, &file);
+			else
+				subdir = find_dir_tupid_dt(dt, p, &file);
+			if(subdir < 0) {
+				fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
 				return -1;
+			}
 			if(subdir != dt) {
 				struct node *n;
 				if(memdb_find(&g->memdb, subdir, &n) < 0)
