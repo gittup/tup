@@ -199,13 +199,13 @@ static int execute_create(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_DIR) {
-				if(parse(n->tupid, &g->memdb) < 0)
-					return -1;
+				if(parse(n, g) < 0)
+					goto out_err;
 			} else if(n->type == TUP_NODE_VAR) {
 			} else if(n->type==TUP_NODE_FILE || n->type==TUP_NODE_CMD) {
 			} else {
 				fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
-				return -1;
+				goto out_err;
 			}
 		}
 		while(n->edges) {
@@ -242,6 +242,9 @@ static int execute_create(struct graph *g)
 out:
 	tup_db_commit();
 	return rc;
+out_err:
+	tup_db_rollback();
+	return -1;
 }
 
 static int execute_update(struct graph *g)

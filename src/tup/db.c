@@ -17,7 +17,6 @@ enum {
 	DB_BEGIN,
 	DB_COMMIT,
 	DB_ROLLBACK,
-	DB_SELECT_FLAGS,
 	DB_SELECT_NODE_BY_FLAGS,
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
@@ -33,6 +32,7 @@ enum {
 	DB_SET_CMD_OUTPUT_FLAGS,
 	DB_SET_CMD_FLAGS_BY_OUTPUT,
 	DB_SELECT_NODE_BY_LINK,
+	DB_DELETE_DEPENDENT_DIR_LINKS,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
 	DB_CONFIG_SET_STRING,
@@ -332,47 +332,6 @@ tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 	dbn->name = name;
 
 	return dbn->tupid;
-}
-
-int tup_db_select_flags(tupid_t tupid)
-{
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_SELECT_FLAGS];
-	static char s[] = "select flags from node where id=?";
-	int flags = -1;
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr, "Node not found: %lli\n", tupid);
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		goto out_reset;
-	}
-
-	flags = sqlite3_column_int(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return flags;
 }
 
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len)
@@ -1131,6 +1090,46 @@ out_reset:
 	}
 
 	return rc;
+}
+
+int tup_db_delete_dependent_dir_links(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_DELETE_DEPENDENT_DIR_LINKS];
+	static char s[] = "delete from link where to_id=? and from_id in (select from_id from link, node where to_id=? and from_id=id and type=?)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_config_set_int(const char *lval, int x)

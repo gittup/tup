@@ -8,6 +8,7 @@
 #include "db.h"
 #include "memdb.h"
 #include "vardb.h"
+#include "graph.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +52,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, int dfd, tupid_t tupid);
 static int parse_rule(char *p, struct list_head *rules);
 static int parse_varsed(char *p, struct list_head *rules);
-static int execute_rules(struct list_head *rules, tupid_t dt, struct memdb *mbd);
+static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g);
 static int file_match(void *rule, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl);
@@ -65,7 +66,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
 static char *eval(struct vardb *v, const char *string, tupid_t tupid);
 
-int parse(tupid_t tupid, struct memdb *mdb)
+int parse(struct node *n, struct graph *g)
 {
 	int dfd;
 	int fd;
@@ -73,20 +74,12 @@ int parse(tupid_t tupid, struct memdb *mdb)
 	struct buf b;
 	struct vardb vdb;
 	struct rule *r;
-	struct node *n;
 	LIST_HEAD(rules);
 
-	printf("[33mParse(%lli)[0m\n", tupid);
-	if(memdb_find(mdb, tupid, &n) < 0)
-		return -1;
-	if(n == NULL) {
-		fprintf(stderr, "Error: Parse node %lli not found in graph!\n",
-			tupid);
-		return -1;
-	}
+	printf("[33mParse(%lli) %s[0m\n", n->tupid, n->name);
 /*
 TODO: How to find circular deps?
-	if(n->state == 
+	if(n->state == ) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last tupid = %lli).\nThis is madness!\n", tupid);
 		return -1;
 	}
@@ -95,15 +88,21 @@ TODO: How to find circular deps?
 		return -1;
 
 	/* Move all existing commands over to delete - then the ones that are
-	 * re-created will be moved back out in create(). All those that are no
-	 * longer generated remain in delete for cleanup.
+	 * re-created will be moved back out in when parsing the Tupfile. All
+	 * those that are no longer generated remain in delete for cleanup.
+	 *
+	 * Also delete links to our directory from directories that we depend
+	 * on. These will be re-generated when the file is parsed, or when
+	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_or_dircmd_flags(tupid, TUP_FLAGS_DELETE, TUP_NODE_CMD) < 0)
+	if(tup_db_or_dircmd_flags(n->tupid, TUP_FLAGS_DELETE, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_set_cmd_output_flags(tupid, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_set_cmd_output_flags(n->tupid, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;
 
-	dfd = tup_db_opendir(tupid);
+	dfd = tup_db_opendir(n->tupid);
 	if(dfd < 0)
 		goto out_close_vdb;
 
@@ -117,10 +116,10 @@ TODO: How to find circular deps?
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, &rules, dfd, tupid);
+	rc = parse_tupfile(&b, &vdb, &rules, dfd, n->tupid);
 	if(rc < 0)
 		goto out_free_bs;
-	rc = execute_rules(&rules, tupid, mdb);
+	rc = execute_rules(&rules, n->tupid, g);
 out_free_bs:
 	free(b.s);
 	while(!list_empty(&rules)) {
@@ -140,9 +139,9 @@ out_close_dfd:
 	close(dfd);
 
 	if(rc == 0) {
-		printf("[34mParsed %lli[0m\n", tupid);
-		if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_NONE) < 0)
+		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
+		printf("[34mParsed(%lli) %s[0m\n", n->tupid, n->name);
 	}
 
 	return rc;
@@ -446,7 +445,7 @@ static int parse_varsed(char *p, struct list_head *rules)
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, tupid_t dt, struct memdb *mdb)
+static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 {
 	struct rule *r;
 
@@ -471,13 +470,14 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct memdb *mdb)
 			if(subdir < 0)
 				return -1;
 			if(subdir != dt) {
-				int flags;
-				flags = tup_db_select_flags(subdir);
-				if(flags < 0)
+				struct node *n;
+				if(memdb_find(&g->memdb, subdir, &n) < 0)
 					return -1;
-				if(flags & TUP_FLAGS_CREATE)
-					if(parse(subdir, mdb) < 0)
+				if(n != NULL) {
+					if(parse(n, g) < 0)
 						return -1;
+				}
+				printf("Create link: %lli, %lli\n", subdir, dt);
 				if(tup_db_create_link(subdir, dt) < 0)
 					return -1;
 			}

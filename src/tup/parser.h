@@ -2,8 +2,9 @@
 #define tup_parser_h
 
 #include "tupid.h"
-struct memdb;
+struct node;
+struct graph;
 
-int parse(tupid_t tupid, struct memdb *mdb);
+int parse(struct node *n, struct graph *g);
 
 #endif
