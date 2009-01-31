@@ -477,7 +477,6 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 					if(parse(n, g) < 0)
 						return -1;
 				}
-				printf("Create link: %lli, %lli\n", subdir, dt);
 				if(tup_db_create_link(subdir, dt) < 0)
 					return -1;
 			}
