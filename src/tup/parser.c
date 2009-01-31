@@ -45,8 +45,8 @@ struct rule {
 	char *output_pattern;
 	char *command;
 	struct name_list namelist;
-	const char *dir;
-	int dirlen;
+	const char *dir; /* Only valid for use in file_match() */
+	int dirlen; /* Same as above */
 	tupid_t dt;
 };
 
@@ -650,6 +650,10 @@ static int do_rule(struct rule *r, struct name_list *nl)
 		onle->path = tup_printf(p, nl, NULL);
 		if(!onle->path)
 			return -1;
+		if(strchr(onle->path, '/')) {
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule: '%s [33m|>[0m [35m%s[0m [33m|>[0m %s'\n", onle->path, r->dt, r->input_pattern, r->command, r->output_pattern);
+			return -1;
+		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')

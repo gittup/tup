@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-# Basic foreach rule
+# Test the basename flags (%B and %b)
 
 . ../tup.sh
 cat > Tupfile << HERE
