@@ -211,9 +211,12 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last)
 	}
 
 	while((slash = strchr(dir, '/')) != NULL) {
+		if(slash-dir == 1 && dir[0] == '.')
+			goto next_dir;
 		dt = tup_db_select_node_part(dt, dir, slash - dir);
 		if(dt < 0)
 			return -1;
+next_dir:
 		dir = slash + 1;
 	}
 	if(last) {
