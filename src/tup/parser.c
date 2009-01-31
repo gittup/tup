@@ -24,6 +24,7 @@ struct name_list {
 	int totlen;
 	int extlesstotlen;
 	int basetotlen;
+	int extlessbasetotlen;
 };
 
 struct name_list_entry {
@@ -33,6 +34,7 @@ struct name_list_entry {
 	int len;
 	int extlesslen;
 	int baselen;
+	int extlessbaselen;
 	tupid_t tupid;
 };
 
@@ -103,8 +105,10 @@ TODO: How to find circular deps?
 		return -1;
 
 	dfd = tup_db_opendir(n->tupid);
-	if(dfd < 0)
+	if(dfd < 0) {
+		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tupid);
 		goto out_close_vdb;
+	}
 
 	fd = openat(dfd, "Tupfile", O_RDONLY);
 	/* No Tupfile means we have nothing to do */
@@ -539,11 +543,16 @@ static int file_match(void *rule, struct db_node *dbn)
 	struct rule *r = rule;
 	int extlesslen;
 	int len;
+	int namelen;
 
-	len = strlen(dbn->name) + r->dirlen;
-	extlesslen = len - 1;
+	namelen = strlen(dbn->name);
+	len = namelen + r->dirlen;
+	extlesslen = namelen - 1;
 	while(extlesslen > 0 && dbn->name[extlesslen] != '.')
 		extlesslen--;
+	if(extlesslen == 0)
+		extlesslen = namelen;
+	extlesslen += r->dirlen;
 
 	if(r->foreach) {
 		struct name_list nl;
@@ -698,6 +707,7 @@ static void init_name_list(struct name_list *nl)
 	nl->totlen = 0;
 	nl->extlesstotlen = 0;
 	nl->basetotlen = 0;
+	nl->extlessbasetotlen = 0;
 }
 
 static void set_nle_base(struct name_list_entry *nle)
@@ -708,10 +718,15 @@ static void set_nle_base(struct name_list_entry *nle)
 		nle->base--;
 		if(nle->base[0] == '/') {
 			nle->base++;
-			return;
+			goto out;
 		}
 		nle->baselen++;
 	}
+out:
+	/* The extension-less baselen is the length of the base, minus the
+	 * length of the extension we calculated before.
+	 */
+	nle->extlessbaselen = nle->baselen - (nle->len - nle->extlesslen);
 }
 
 static void add_name_list_entry(struct name_list *nl,
@@ -722,6 +737,7 @@ static void add_name_list_entry(struct name_list *nl,
 	nl->totlen += nle->len;
 	nl->extlesstotlen += nle->extlesslen;
 	nl->basetotlen += nle->baselen;
+	nl->extlessbasetotlen += nle->extlessbaselen;
 }
 
 static void delete_name_list_entry(struct name_list *nl,
@@ -731,6 +747,7 @@ static void delete_name_list_entry(struct name_list *nl,
 	nl->totlen -= nle->len;
 	nl->extlesstotlen -= nle->extlesslen;
 	nl->basetotlen -= nle->baselen;
+	nl->extlessbasetotlen -= nle->extlessbaselen;
 
 	list_del(&nle->list);
 	free(nle->path);
@@ -764,6 +781,8 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 			clen += nl->extlesstotlen + paste_chars;
 		} else if(*p == 'b') {
 			clen += nl->basetotlen + paste_chars;
+		} else if(*p == 'B') {
+			clen += nl->extlessbasetotlen + paste_chars;
 		} else if(*p == 'o') {
 			if(!onl) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
@@ -825,6 +844,19 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->base, nle->baselen);
 				x += nle->baselen;
+				memcpy(&s[x], p, spc - p);
+				x += spc - p;
+				first = 0;
+			}
+		} else if(*next == 'B') {
+			int first = 1;
+			list_for_each_entry(nle, &nl->entries, list) {
+				if(!first) {
+					s[x] = ' ';
+					x++;
+				}
+				memcpy(&s[x], nle->base, nle->extlessbaselen);
+				x += nle->extlessbaselen;
 				memcpy(&s[x], p, spc - p);
 				x += spc - p;
 				first = 0;
