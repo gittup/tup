@@ -14,7 +14,7 @@ syntax case match
 syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match separator /|>/
-syntax match format display "%\([Ffo]\)" contained
+syntax match format display "%\([Ffob]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /@[a-zA-Z0-9_]*@/
 syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\)"
