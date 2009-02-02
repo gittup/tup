@@ -46,19 +46,25 @@ struct rule {
 	char *output_pattern;
 	char *command;
 	struct name_list namelist;
-	const char *dir; /* Only valid for use in file_match() */
-	int dirlen; /* Same as above */
 	tupid_t dt;
+};
+
+struct build_name_list_args {
+	struct name_list *nl;
+	const char *dir;
+	int dirlen;
 };
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, int dfd, tupid_t tupid);
-static int parse_rule(char *p, struct list_head *rules);
-static int parse_varsed(char *p, struct list_head *rules);
-static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g);
-static int file_match(void *rule, struct db_node *dbn);
+static int parse_rule(char *p, struct list_head *rules, tupid_t dt);
+static int parse_varsed(char *p, struct list_head *rules, tupid_t dt);
+static int execute_rules(struct list_head *rules, struct graph *g);
+static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
+			 struct graph *g);
+static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
-static int do_rule(struct rule *r, struct name_list *nl);
+static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -151,7 +157,7 @@ TODO: How to find circular deps?
 	rc = parse_tupfile(&b, &vdb, &rules, dfd, n->tupid);
 	if(rc < 0)
 		goto out_free_bs;
-	rc = execute_rules(&rules, n->tupid, g);
+	rc = execute_rules(&rules, g);
 out_free_bs:
 	free(b.s);
 	while(!list_empty(&rules)) {
@@ -310,10 +316,10 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				if_true = 0;
 			}
 		} else if(eval_line[0] == ':') {
-			if(parse_rule(eval_line+1, rules) < 0)
+			if(parse_rule(eval_line+1, rules, tupid) < 0)
 				goto syntax_error;
 		} else if(eval_line[0] == ',') {
-			if(parse_varsed(eval_line+1, rules) < 0)
+			if(parse_varsed(eval_line+1, rules, tupid) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -369,7 +375,7 @@ syntax_error:
 	return -1;
 }
 
-static int parse_rule(char *p, struct list_head *rules)
+static int parse_rule(char *p, struct list_head *rules, tupid_t dt)
 {
 	char *input, *cmd, *output;
 	char *ie, *ce;
@@ -435,14 +441,13 @@ static int parse_rule(char *p, struct list_head *rules)
 		perror("strdup");
 		return -1;
 	}
+	r->dt = dt;
 	init_name_list(&r->namelist);
-
 	list_add_tail(&r->list, rules);
-
 	return 0;
 }
 
-static int parse_varsed(char *p, struct list_head *rules)
+static int parse_varsed(char *p, struct list_head *rules, tupid_t dt)
 {
 	char *input, *output;
 	char *ie;
@@ -489,77 +494,70 @@ static int parse_varsed(char *p, struct list_head *rules)
 		perror("strdup");
 		return -1;
 	}
-
+	r->dt = dt;
 	init_name_list(&r->namelist);
 	list_add_tail(&r->list, rules);
 	return 0;
 }
 
-static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
+static int execute_rules(struct list_head *rules, struct graph *g)
 {
 	struct rule *r;
+	char *oosep;
+	struct name_list order_only_nl;
+	struct name_list_entry *nle;
+
+	init_name_list(&order_only_nl);
 
 	list_for_each_entry(r, rules, list) {
-		char *spc;
-		char *p;
-		const char *file;
-		tupid_t subdir;
-
-		r->dt = dt;
-		p = r->input_pattern;
-		do {
-			/* Blank input pattern */
-			if(!p[0])
-				break;
-
-			spc = strchr(p, ' ');
-			if(spc)
-				*spc = 0;
-
-			subdir = find_dir_tupid_dt(dt, p, &file);
-			if(subdir < 0) {
-				fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
+		oosep = strchr(r->input_pattern, '|');
+		if(oosep) {
+			char *p = oosep;
+			*p = 0;
+			while(p >= r->input_pattern && isspace(*p)) {
+				*p = 0;
+				p--;
+			}
+			oosep++;
+			while(*oosep && isspace(*oosep)) {
+				*oosep = 0;
+				oosep++;
+			}
+			if(get_name_list(oosep, r->dt, &order_only_nl, g) < 0)
 				return -1;
-			}
-			if(subdir != dt) {
-				struct node *n;
-				if(memdb_find(&g->memdb, subdir, &n) < 0)
-					return -1;
-				if(n != NULL) {
-					if(parse(n, g) < 0)
-						return -1;
-				}
-				if(tup_db_create_link(subdir, dt) < 0)
-					return -1;
-			}
-			if(p != file) {
-				/* Note that dirlen should be file-p-1, but we
-				 * add 1 to account for the trailing '/' that
-				 * will be added.
-				 */
-				p[file-p-1] = 0;
-				r->dir = p;
-				r->dirlen = file-p;
-			} else {
-				r->dir = "";
-				r->dirlen = 0;
-			}
-			if(strchr(file, '*') == NULL) {
-				struct db_node dbn;
-				if(tup_db_select_dbn(subdir, file, &dbn) < 0) {
-					fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", file, subdir);
-					return -1;
-				}
-				if(file_match(r, &dbn) < 0)
-					return -1;
-			} else {
-				if(tup_db_select_node_dir_glob(file_match, r, subdir, file) < 0)
-					return -1;
-			}
+		}
+		if(get_name_list(r->input_pattern, r->dt, &r->namelist, g) < 0)
+			return -1;
 
-			if(spc)
-				p = spc + 1;
-		} while(spc != NULL);
+		if(r->foreach) {
+			struct name_list tmp_nl;
+			struct name_list_entry tmp_nle;
+
+			/* For a foreach loop, iterate over each entry in the
+			 * rule's namelist and do a shallow copy over into a
+			 * single-entry temporary namelist. Note that we cheat
+			 * by not actually allocating a separate nle, which is
+			 * why we don't have to do a delete_name_list_entry
+			 * for the temporary list and can just reinitialize the
+			 * pointers using init_name_list.
+			 *
+			 * The reason I use .prev instead of .next is because
+			 * it matches the order I used to do it in, which some
+			 * test cases (specifically, t8000) depend on. Other
+			 * than that it is completely irrelevant.
+			 */
+			while(!list_empty(&r->namelist.entries)) {
+				nle = list_entry(r->namelist.entries.prev,
+						struct name_list_entry, list);
+				init_name_list(&tmp_nl);
+				memcpy(&tmp_nle, nle, sizeof(*nle));
+				add_name_list_entry(&tmp_nl, &tmp_nle);
+				if(do_rule(r, &tmp_nl, &order_only_nl) < 0)
+					return -1;
+
+				delete_name_list_entry(&r->namelist, nle);
+			}
+		}
 
 		/* Only parse non-foreach rules if the namelist has some
 		 * entries, or if there is no input listed. We don't want to
@@ -571,9 +569,8 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 		 */
 		if(!r->foreach && (r->namelist.num_entries > 0 ||
 				   strcmp(r->input_pattern, "") == 0)) {
-			struct name_list_entry *nle;
 
-			if(do_rule(r, &r->namelist) < 0)
+			if(do_rule(r, &r->namelist, &order_only_nl) < 0)
 				return -1;
 
 			while(!list_empty(&r->namelist.entries)) {
@@ -582,65 +579,115 @@ static int execute_rules(struct list_head *rules, tupid_t dt, struct graph *g)
 				delete_name_list_entry(&r->namelist, nle);
 			}
 		}
+
+		while(!list_empty(&order_only_nl.entries)) {
+			nle = list_entry(order_only_nl.entries.next,
+					 struct name_list_entry, list);
+			delete_name_list_entry(&order_only_nl, nle);
+		}
 	}
 	return 0;
 }
 
-static int file_match(void *rule, struct db_node *dbn)
+static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
+			 struct graph *g)
 {
-	struct rule *r = rule;
+	char *spc;
+	char *p = data;
+	const char *file;
+	struct build_name_list_args args;
+	tupid_t subdir;
+
+	do {
+		/* Blank input pattern */
+		if(!p[0])
+			break;
+
+		spc = strchr(p, ' ');
+		if(spc)
+			*spc = 0;
+
+		subdir = find_dir_tupid_dt(dt, p, &file);
+		if(subdir < 0) {
+			fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
+			return -1;
+		}
+		if(subdir != dt) {
+			struct node *n;
+			if(memdb_find(&g->memdb, subdir, &n) < 0)
+				return -1;
+			if(n != NULL) {
+				if(parse(n, g) < 0)
+					return -1;
+			}
+			if(tup_db_create_link(subdir, dt) < 0)
+				return -1;
+		}
+		if(p != file) {
+			/* Note that dirlen should be file-p-1, but we
+			 * add 1 to account for the trailing '/' that
+			 * will be added.
+			 */
+			p[file-p-1] = 0;
+			args.dir = p;
+			args.dirlen = file-p;
+		} else {
+			args.dir = "";
+			args.dirlen = 0;
+		}
+		args.nl = nl;
+		if(strchr(file, '*') == NULL) {
+			struct db_node dbn;
+			if(tup_db_select_dbn(subdir, file, &dbn) < 0) {
+				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", file, subdir);
+				return -1;
+			}
+			if(build_name_list_cb(&args, &dbn) < 0)
+				return -1;
+		} else {
+			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, subdir, file) < 0)
+				return -1;
+		}
+
+		if(spc)
+			p = spc + 1;
+	} while(spc != NULL);
+	return 0;
+}
+
+static int build_name_list_cb(void *arg, struct db_node *dbn)
+{
+	struct build_name_list_args *args = arg;
 	int extlesslen;
 	int len;
 	int namelen;
+	struct name_list_entry *nle;
 
 	namelen = strlen(dbn->name);
-	len = namelen + r->dirlen;
+	len = namelen + args->dirlen;
 	extlesslen = namelen - 1;
 	while(extlesslen > 0 && dbn->name[extlesslen] != '.')
 		extlesslen--;
 	if(extlesslen == 0)
 		extlesslen = namelen;
-	extlesslen += r->dirlen;
+	extlesslen += args->dirlen;
 
-	if(r->foreach) {
-		struct name_list nl;
-		struct name_list_entry nle;
-
-		nle.path = set_path(dbn->name, r->dir, r->dirlen);
-		if(!nle.path)
-			return -1;
-
-		nle.len = len;
-		nle.extlesslen = extlesslen;
-		nle.tupid = dbn->tupid;
-		set_nle_base(&nle);
-
-		init_name_list(&nl);
-		add_name_list_entry(&nl, &nle);
-
-		if(do_rule(r, &nl) < 0)
-			return -1;
-		free(nle.path);
-	} else {
-		struct name_list_entry *nle;
-
-		nle = malloc(sizeof *nle);
-		if(!nle) {
-			perror("malloc");
-			return -1;
-		}
-
-		nle->path = set_path(dbn->name, r->dir, r->dirlen);
-		if(!nle->path)
-			return -1;
-
-		nle->len = len;
-		nle->extlesslen = extlesslen;
-		nle->tupid = dbn->tupid;
-		set_nle_base(nle);
-
-		add_name_list_entry(&r->namelist, nle);
+	nle = malloc(sizeof *nle);
+	if(!nle) {
+		perror("malloc");
+		return -1;
 	}
+
+	nle->path = set_path(dbn->name, args->dir, args->dirlen);
+	if(!nle->path)
+		return -1;
+
+	nle->len = len;
+	nle->extlesslen = extlesslen;
+	nle->tupid = dbn->tupid;
+	set_nle_base(nle);
+
+	add_name_list_entry(args->nl, nle);
 	return 0;
 }
 
@@ -672,7 +719,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int do_rule(struct rule *r, struct name_list *nl)
+static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *tmp, *onle;
@@ -746,6 +793,10 @@ static int do_rule(struct rule *r, struct name_list *nl)
 	}
 
 	list_for_each_entry(nle, &nl->entries, list) {
+		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
+			return -1;
+	}
+	list_for_each_entry(nle, &oonl->entries, list) {
 		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
 			return -1;
 	}
