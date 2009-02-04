@@ -435,6 +435,13 @@ static int parse_rule(char *p, struct list_head *rules, tupid_t dt)
 			r->foreach = 1;
 			input += 8;
 		}
+		if(strcmp(input, "foreach") == 0) {
+			/* This case is possible if you do 'foreach $(blah)'
+			 * and the 'blah' variable is empty.
+			 */
+			r->foreach = 1;
+			input += 7;
+		}
 		r->input_pattern = strdup(input);
 	} else {
 		r->input_pattern = strdup("");
@@ -629,8 +636,11 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt)
 		if(!p[0])
 			break;
 		spc = strchr(p, ' ');
-		if(spc)
+		if(spc) {
 			*spc = 0;
+			if(spc == p)
+				goto skip_empty_space;
+		}
 		pl = malloc(sizeof *pl);
 		if(!pl) {
 			perror("malloc");
@@ -652,6 +662,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt)
 		}
 		list_add_tail(&pl->list, plist);
 
+skip_empty_space:
 		if(spc)
 			p = spc + 1;
 	} while(spc != NULL);
@@ -714,74 +725,6 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 	}
 	return 0;
 }
-
-#if 0
-static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
-			 struct graph *g)
-{
-	char *spc;
-	char *p = data;
-	const char *file;
-	struct build_name_list_args args;
-	tupid_t subdir;
-
-	do {
-		/* Blank input pattern */
-		if(!p[0])
-			break;
-
-		spc = strchr(p, ' ');
-		if(spc)
-			*spc = 0;
-
-		subdir = find_dir_tupid_dt(dt, p, &file);
-		if(subdir < 0) {
-			fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
-			return -1;
-		}
-		if(subdir != dt) {
-			struct node *n;
-			if(memdb_find(&g->memdb, subdir, &n) < 0)
-				return -1;
-			if(n != NULL) {
-				if(parse(n, g) < 0)
-					return -1;
-			}
-			if(tup_db_create_link(subdir, dt) < 0)
-				return -1;
-		}
-		if(p != file) {
-			/* Note that dirlen should be file-p-1, but we
-			 * add 1 to account for the trailing '/' that
-			 * will be added.
-			 */
-			p[file-p-1] = 0;
-			args.dir = p;
-			args.dirlen = file-p;
-		} else {
-			args.dir = "";
-			args.dirlen = 0;
-		}
-		args.nl = nl;
-		if(strchr(file, '*') == NULL) {
-			struct db_node dbn;
-			if(tup_db_select_dbn(subdir, file, &dbn) < 0) {
-				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", file, subdir);
-				return -1;
-			}
-			if(build_name_list_cb(&args, &dbn) < 0)
-				return -1;
-		} else {
-			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, subdir, file) < 0)
-				return -1;
-		}
-
-		if(spc)
-			p = spc + 1;
-	} while(spc != NULL);
-	return 0;
-}
-#endif
 
 static int build_name_list_cb(void *arg, struct db_node *dbn)
 {
