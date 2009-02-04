@@ -6,7 +6,7 @@
 . ../tup.sh
 
 cat > Tupfile << HERE
-: foreach input/*.o |> cat %f > foo |> foo
+: foreach input/*.o |> cat %f > %o |> %b
 HERE
 
 mkdir input

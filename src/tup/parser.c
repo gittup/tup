@@ -914,8 +914,10 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
 				  list);
-		if(tup_db_create_link(cmd_id, onle->tupid) < 0)
+		if(tup_db_create_unique_link(cmd_id, onle->tupid) < 0) {
+			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
+		}
 		delete_name_list_entry(&onl, onle);
 	}
 

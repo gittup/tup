@@ -65,7 +65,9 @@ tupid_t tup_db_parent(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
+int tup_db_create_unique_link(tupid_t a, tupid_t b);
 int tup_db_link_exists(tupid_t a, tupid_t b);
+int tup_db_is_root_node(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);
 
 /* Combo operations */

@@ -27,6 +27,7 @@ enum {
 	DB_DELETE_DIR,
 	_DB_GET_RECURSE_DIRS,
 	DB_LINK_EXISTS,
+	DB_IS_ROOT_NODE,
 	DB_DELETE_LINKS,
 	DB_OR_DIRCMD_FLAGS,
 	DB_SET_CMD_OUTPUT_FLAGS,
@@ -838,6 +839,23 @@ int tup_db_create_link(tupid_t a, tupid_t b)
 	return 0;
 }
 
+int tup_db_create_unique_link(tupid_t a, tupid_t b)
+{
+	int rc;
+	if(tup_db_link_exists(a, b) == 0)
+		return 0;
+	rc = tup_db_is_root_node(b);
+	if(rc < 0)
+		return -1;
+	if(rc == 0) {
+		fprintf(stderr, "Error: Unable to create a unique link from %lli to %lli because the destination has other incoming links.\n", a, b);
+		return -1;
+	}
+	if(link_insert(a, b) < 0)
+		return -1;
+	return 0;
+}
+
 int tup_db_link_exists(tupid_t a, tupid_t b)
 {
 	int rc;
@@ -868,6 +886,45 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 	}
 	if(rc == SQLITE_DONE) {
 		return -1;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_is_root_node(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_IS_ROOT_NODE];
+	static char s[] = "select from_id from link, node where to_id=? and from_id=id and not flags&?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_FLAGS_DELETE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc == SQLITE_DONE) {
+		return 1;
 	}
 	if(rc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
