@@ -271,8 +271,7 @@ static tupid_t __create_dir_tupid(const char *dir, int include_last,
 
 	while((slash = strchr(dir, '/')) != NULL) {
 		dt = tup_db_create_node_part(dt, dir, slash - dir,
-					     TUP_NODE_DIR, TUP_FLAGS_CREATE,
-					     NULL);
+					     TUP_NODE_DIR, TUP_FLAGS_CREATE);
 		if(dt < 0)
 			return -1;
 		dir = slash + 1;

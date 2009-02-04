@@ -271,16 +271,13 @@ int tup_db_select(int (*callback)(void *, int, char **, char **),
 
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type, int flags)
 {
-	return tup_db_create_node_part(dt, name, -1, type, flags, NULL);
+	return tup_db_create_node_part(dt, name, -1, type, flags);
 }
 
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
-				int flags, int *node_created)
+				int flags)
 {
 	struct db_node dbn;
-
-	if(node_created)
-		*node_created = 0;
 
 	if(node_select(dt, name, len, &dbn) < 0) {
 		return -1;
@@ -301,8 +298,6 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
 
 	if(node_insert(dt, name, len, type, flags) < 0)
 		return -1;
-	if(node_created)
-		*node_created = 1;
 	return sqlite3_last_insert_rowid(tup_db);
 }
 

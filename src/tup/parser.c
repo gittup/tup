@@ -855,7 +855,6 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	char *p;
 	char *spc;
 	char *cmd;
-	int node_created = 0;
 	tupid_t cmd_id;
 
 	init_name_list(&onl);
@@ -885,8 +884,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 
 		onle->tupid = tup_db_create_node_part(r->dt, onle->path, -1,
 						      TUP_NODE_FILE,
-						      TUP_FLAGS_MODIFY,
-						      &node_created);
+						      TUP_FLAGS_MODIFY);
 		if(onle->tupid < 0)
 			return -1;
 

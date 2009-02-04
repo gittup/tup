@@ -45,7 +45,7 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 /* Node operations */
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type, int flags);
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
-				int flags, int *node_created);
+				int flags);
 tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type, int flags);
 tupid_t tup_db_select_node(tupid_t dt, const char *name);
 tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
