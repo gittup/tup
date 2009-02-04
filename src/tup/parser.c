@@ -37,6 +37,14 @@ struct name_list_entry {
 	int baselen;
 	int extlessbaselen;
 	tupid_t tupid;
+	tupid_t dt;
+};
+
+struct path_list {
+	struct list_head list;
+	char *path;
+	const char *file;
+	tupid_t dt;
 };
 
 struct rule {
@@ -56,12 +64,15 @@ struct build_name_list_args {
 };
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, int dfd, tupid_t tupid);
+			 struct list_head *rules, tupid_t tupid, tupid_t curdir);
 static int parse_rule(char *p, struct list_head *rules, tupid_t dt);
 static int parse_varsed(char *p, struct list_head *rules, tupid_t dt);
 static int execute_rules(struct list_head *rules, struct graph *g);
-static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
-			 struct graph *g);
+static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g);
+static int get_path_list(char *p, struct list_head *head, tupid_t dt);
+static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
+				    struct graph *g);
+static int get_name_list(struct list_head *plist, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl);
@@ -138,7 +149,7 @@ TODO: How to find circular deps?
 	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;
 
-	dfd = tup_db_opendir(n->tupid);
+	dfd = tup_db_open_tupid(n->tupid);
 	if(dfd < 0) {
 		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tupid);
 		goto out_close_vdb;
@@ -154,7 +165,7 @@ TODO: How to find circular deps?
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, &rules, dfd, n->tupid);
+	rc = parse_tupfile(&b, &vdb, &rules, n->tupid, n->tupid);
 	if(rc < 0)
 		goto out_free_bs;
 	rc = execute_rules(&rules, g);
@@ -186,7 +197,7 @@ out_close_dfd:
 }
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, int dfd, tupid_t tupid)
+			 struct list_head *rules, tupid_t tupid, tupid_t curdir)
 {
 	char *p, *e;
 	char *line;
@@ -197,16 +208,16 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 	e = b->s + b->len;
 
 	while(p < e) {
-		char *nl;
+		char *newline;
 		while(isspace(*p) && p < e)
 			p++;
 
 		line = p;
-		nl = strchr(p, '\n');
-		if(!nl)
+		newline = strchr(p, '\n');
+		if(!newline)
 			goto syntax_error;
-		*nl = 0;
-		p = nl + 1;
+		*newline = 0;
+		p = newline + 1;
 
 		if(line[0] == '#') {
 			/* Skip comments */
@@ -227,61 +238,63 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		if(strncmp(eval_line, "include ", 8) == 0 ||
 		   strncmp(eval_line, "include_root ", 13) == 0) {
 			struct buf incb;
-			int incdirfd;
 			int fd;
 			int rc;
 			int include_root = (eval_line[7] == '_');
-			char *last_slash;
 			char *file;
+			struct name_list nl;
+			struct name_list_entry *nle, *tmpnle;
+			struct path_list *pl, *tmppl;
+			tupid_t incdir;
+			LIST_HEAD(plist);
 
-			if(include_root)
+			init_name_list(&nl);
+
+			if(include_root) {
 				file = eval_line + 13;
-			else
+				incdir = DOT_DT;
+			} else {
 				file = eval_line + 8;
-			last_slash = strrchr(file, '/');
-			if(last_slash) {
-				*last_slash = 0;
-				if(include_root)
-					incdirfd = open(file, O_RDONLY);
-				else
-					incdirfd = openat(dfd, file, O_RDONLY);
-				if(incdirfd < 0) {
-					perror(file);
+				incdir = curdir;
+			}
+			if(get_path_list(file, &plist, incdir) < 0)
+				return -1;
+			if(get_name_list(&plist, &nl) < 0)
+				return -1;
+			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
+				fd = tup_db_open_tupid(nle->tupid);
+				if(fd < 0) {
+					fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
 					return -1;
 				}
-				file = last_slash + 1;
-			} else {
-				if(include_root) {
-					incdirfd = open(".", O_RDONLY);
-					if(incdirfd < 0) {
-						perror(".");
-						return -1;
-					}
-				} else {
-					incdirfd = dfd;
+				rc = fslurp(fd, &incb);
+				close(fd);
+				if(rc < 0) {
+					fprintf(stderr, "Error slurping file.\n");
+					return -1;
 				}
-			}
 
-			fd = openat(incdirfd, file, O_RDONLY);
-			if(fd < 0) {
-				fprintf(stderr, "Error including '%s': %s\n", eval_line+8, strerror(errno));
-				return -1;
-			}
-			rc = fslurp(fd, &incb);
-			close(fd);
-			if(rc < 0) {
-				fprintf(stderr, "Error slurping file.\n");
-				return -1;
-			}
+				/* When parsing the included Tupfile, any files
+				 * it includes will be relative to it
+				 * (nle->dt), not to the parent dir (tupid).
+				 * However, we want all links to be made to the
+				 * parent tupid.
+				 */
+				rc = parse_tupfile(&incb, vdb, rules, tupid,
+						   nle->dt);
+				free(incb.s);
+				if(rc < 0) {
+					fprintf(stderr, "Error parsing included file '%s'\n", eval_line);
+					return -1;
+				}
 
-			rc = parse_tupfile(&incb, vdb, rules, incdirfd, tupid);
-			if(incdirfd != dfd) {
-				close(incdirfd);
+				if(tup_db_create_link(nle->tupid, tupid) < 0)
+					return -1;
+				delete_name_list_entry(&nl, nle);
 			}
-			free(incb.s);
-			if(rc < 0) {
-				fprintf(stderr, "Error parsing included file '%s'\n", eval_line);
-				return -1;
+			list_for_each_entry_safe(pl, tmppl, &plist, list) {
+				list_del(&pl->list);
+				free(pl);
 			}
 		} else if(strcmp(eval_line, "else") == 0) {
 			if_true = !if_true;
@@ -523,10 +536,10 @@ static int execute_rules(struct list_head *rules, struct graph *g)
 				*oosep = 0;
 				oosep++;
 			}
-			if(get_name_list(oosep, r->dt, &order_only_nl, g) < 0)
+			if(parse_input_patterns(oosep, r->dt, &order_only_nl, g) < 0)
 				return -1;
 		}
-		if(get_name_list(r->input_pattern, r->dt, &r->namelist, g) < 0)
+		if(parse_input_patterns(r->input_pattern, r->dt, &r->namelist, g) < 0)
 			return -1;
 
 		if(r->foreach) {
@@ -589,6 +602,119 @@ static int execute_rules(struct list_head *rules, struct graph *g)
 	return 0;
 }
 
+static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g)
+{
+	LIST_HEAD(plist);
+	struct path_list *pl, *tmp;
+
+	if(get_path_list(p, &plist, dt) < 0)
+		return -1;
+	if(parse_dependent_tupfiles(&plist, dt, g) < 0)
+		return -1;
+	if(get_name_list(&plist, nl) < 0)
+		return -1;
+	list_for_each_entry_safe(pl, tmp, &plist, list) {
+		list_del(&pl->list);
+		free(pl);
+	}
+	return 0;
+}
+
+static int get_path_list(char *p, struct list_head *plist, tupid_t dt)
+{
+	struct path_list *pl;
+	char *spc;
+
+	do {
+		if(!p[0])
+			break;
+		spc = strchr(p, ' ');
+		if(spc)
+			*spc = 0;
+		pl = malloc(sizeof *pl);
+		if(!pl) {
+			perror("malloc");
+			return -1;
+		}
+		pl->path = p;
+		pl->dt = find_dir_tupid_dt(dt, p, &pl->file);
+		if(pl->dt < 0) {
+			fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
+			return -1;
+		}
+		if(pl->path == pl->file) {
+			pl->path = NULL;
+		} else {
+			/* File points to somewhere later in the path, so set
+			 * the last '/' to 0.
+			 */
+			pl->path[pl->file-pl->path-1] = 0;
+		}
+		list_add_tail(&pl->list, plist);
+
+		if(spc)
+			p = spc + 1;
+	} while(spc != NULL);
+
+	return 0;
+}
+
+static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
+				    struct graph *g)
+{
+	struct path_list *pl;
+
+	list_for_each_entry(pl, plist, list) {
+		if(pl->dt != dt) {
+			struct node *n;
+			if(memdb_find(&g->memdb, pl->dt, &n) < 0)
+				return -1;
+			if(n != NULL) {
+				if(parse(n, g) < 0)
+					return -1;
+			}
+			if(tup_db_create_link(pl->dt, dt) < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+static int get_name_list(struct list_head *plist, struct name_list *nl)
+{
+	struct path_list *pl;
+	struct build_name_list_args args;
+
+	list_for_each_entry(pl, plist, list) {
+		if(pl->path != NULL) {
+			/* Note that dirlen should be file-p-1, but we
+			 * add 1 to account for the trailing '/' that
+			 * will be added.
+			 */
+			args.dir = pl->path;
+			args.dirlen = pl->file-pl->path;
+		} else {
+			args.dir = "";
+			args.dirlen = 0;
+		}
+		args.nl = nl;
+		if(strchr(pl->file, '*') == NULL) {
+			struct db_node dbn;
+			if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
+				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
+				return -1;
+			}
+			if(build_name_list_cb(&args, &dbn) < 0)
+				return -1;
+		} else {
+			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->file) < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+#if 0
 static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
 			 struct graph *g)
 {
@@ -654,6 +780,7 @@ static int get_name_list(char *data, tupid_t dt, struct name_list *nl,
 	} while(spc != NULL);
 	return 0;
 }
+#endif
 
 static int build_name_list_cb(void *arg, struct db_node *dbn)
 {
@@ -685,6 +812,7 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	nle->len = len;
 	nle->extlesslen = extlesslen;
 	nle->tupid = dbn->tupid;
+	nle->dt = dbn->dt;
 	set_nle_base(nle);
 
 	add_name_list_entry(args->nl, nle);

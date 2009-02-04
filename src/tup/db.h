@@ -60,7 +60,7 @@ int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
-int tup_db_opendir(tupid_t dt);
+int tup_db_open_tupid(tupid_t dt);
 tupid_t tup_db_parent(tupid_t tupid);
 
 /* Link operations */
@@ -72,6 +72,7 @@ int tup_db_delete_links(tupid_t tupid);
 int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type);
 int tup_db_set_cmd_output_flags(tupid_t parent, int flags);
 int tup_db_set_cmd_flags_by_output(tupid_t output, int flags);
+int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
 			       void *arg, tupid_t tupid);
 int tup_db_delete_dependent_dir_links(tupid_t tupid);

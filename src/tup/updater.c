@@ -363,7 +363,7 @@ static int update(struct node *n)
 	if(curfd < 0)
 			goto err_delete_node;
 
-	dfd = tup_db_opendir(n->dt);
+	dfd = tup_db_open_tupid(n->dt);
 	if(dfd < 0)
 		goto err_close_curfd;
 	fchdir(dfd);
@@ -442,7 +442,7 @@ static int var_replace(struct node *n)
 	if(curfd < 0)
 		return -1;
 
-	dfd = tup_db_opendir(n->dt);
+	dfd = tup_db_open_tupid(n->dt);
 	if(dfd < 0)
 		goto err_close_curfd;
 	fchdir(dfd);
@@ -539,7 +539,7 @@ static int delete_file(struct node *n)
 
 	if(delete_name_file(n->tupid) < 0)
 		return -1;
-	dirfd = tup_db_opendir(n->dt);
+	dirfd = tup_db_open_tupid(n->dt);
 	if(dirfd < 0) {
 		if(dirfd == -ENOENT) {
 			/* If the directory doesn't exist, the file can't

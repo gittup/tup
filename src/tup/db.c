@@ -22,7 +22,7 @@ enum {
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_SET_FLAGS_BY_ID,
 	DB_DELETE_NODE,
-	DB_OPENDIR,
+	DB_OPEN_TUPID,
 	DB_PARENT,
 	DB_DELETE_DIR,
 	_DB_GET_RECURSE_DIRS,
@@ -31,6 +31,7 @@ enum {
 	DB_OR_DIRCMD_FLAGS,
 	DB_SET_CMD_OUTPUT_FLAGS,
 	DB_SET_CMD_FLAGS_BY_OUTPUT,
+	DB_SET_DEPENDENT_DIR_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_DELETE_DEPENDENT_DIR_LINKS,
 	DB_CONFIG_SET_INT,
@@ -615,18 +616,18 @@ int tup_db_delete_dir(tupid_t dt)
 	return delete_dir(dt);
 }
 
-int tup_db_opendir(tupid_t dt)
+int tup_db_open_tupid(tupid_t dt)
 {
 	int rc;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_OPENDIR];
+	sqlite3_stmt **stmt = &stmts[DB_OPEN_TUPID];
 	static char s[] = "select dir, name from node where id=?";
 	tupid_t parent;
 	char *path;
 	int fd;
 
 	if(dt == 0) {
-		fprintf(stderr, "Error: Trying to tup_db_opendir(0)\n");
+		fprintf(stderr, "Error: Trying to tup_db_open_tupid(0)\n");
 		return -1;
 	}
 	if(dt == 1) {
@@ -663,7 +664,7 @@ int tup_db_opendir(tupid_t dt)
 		return -1;
 	}
 
-	fd = tup_db_opendir(parent);
+	fd = tup_db_open_tupid(parent);
 	if(fd < 0)
 		return -1;
 
@@ -1036,6 +1037,47 @@ int tup_db_set_cmd_flags_by_output(tupid_t output, int flags)
 	return 0;
 }
 
+int tup_db_set_dependent_dir_flags(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_DEPENDENT_DIR_FLAGS];
+	static char s[] = "update node set flags=? where id in (select to_id from link where from_id=?) and type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_FLAGS_CREATE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
 			       void *arg, tupid_t tupid)
 {
@@ -1096,7 +1138,7 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_DEPENDENT_DIR_LINKS];
-	static char s[] = "delete from link where to_id=? and from_id in (select from_id from link, node where to_id=? and from_id=id and type=?)";
+	static char s[] = "delete from link where to_id=? and from_id in (select from_id from link, node where to_id=? and from_id=id)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1111,10 +1153,6 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

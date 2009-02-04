@@ -23,8 +23,8 @@ CCARGS := -c %f
 CCARGS += -o %o
 HERE
 
-tup touch a/foo.c a/bar.c a/Tupfile
-tup upd
+tup touch a/foo.c a/bar.c a/Tupfile Tupfile.vars Tupfile.ccargs
+update
 tup_object_exist a foo.c bar.c
 tup_object_exist a "echo gcc -c foo.c -o foo.o"
 tup_object_exist a "echo gcc -c bar.c -o bar.o"

@@ -131,6 +131,10 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 				return -1;
 		}
 	}
+	if(dbn.type == TUP_NODE_FILE) {
+		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+			return -1;
+	}
 
 	return 0;
 }
