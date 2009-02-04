@@ -31,3 +31,8 @@ At the end of the day, it is your call. You might be happy re-making the world e
  gentoo is all that
 
   - http://freshmeat.net/articles/view/889/
+#
+Renaming is the killer app of distributed version control
+ - http://www.markshuttleworth.com/archives/123
+
+And by extension, why not your build system?
