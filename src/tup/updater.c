@@ -199,8 +199,12 @@ static int execute_create(struct graph *g)
 		}
 		if(n != root) {
 			if(n->type == TUP_NODE_DIR) {
-				if(parse(n, g) < 0)
-					goto out_err;
+				if(n->already_used) {
+					printf("Already parsed[%lli]: '%s'\n", n->tupid, n->name);
+				} else {
+					if(parse(n, g) < 0)
+						goto out_err;
+				}
 			} else if(n->type == TUP_NODE_VAR) {
 			} else if(n->type==TUP_NODE_FILE || n->type==TUP_NODE_CMD) {
 			} else {

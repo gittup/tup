@@ -34,6 +34,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->state = STATE_INITIALIZED;
 	n->type = dbn->type;
 	n->flags = dbn->flags;
+	n->already_used = 0;
 	list_add(&n->list, &g->plist);
 
 	if(n->type == g->count_flags)

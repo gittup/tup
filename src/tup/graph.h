@@ -26,7 +26,7 @@ struct node {
 	char state;
 	char type; /* One of TUP_NODE_* */
 	char flags; /* One of TUP_FLAGS_* */
-	char unused2;
+	char already_used;
 };
 
 struct graph {

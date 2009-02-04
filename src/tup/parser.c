@@ -669,7 +669,8 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 			struct node *n;
 			if(memdb_find(&g->memdb, pl->dt, &n) < 0)
 				return -1;
-			if(n != NULL) {
+			if(n != NULL && !n->already_used) {
+				n->already_used = 1;
 				if(parse(n, g) < 0)
 					return -1;
 			}
