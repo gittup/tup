@@ -387,11 +387,12 @@ static int update(struct node *n)
 		exit(1);
 	}
 	wait(&status);
-	stop_server();
+	if(stop_server() < 0)
+		goto err_cmd_failed;
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			if(write_files(tupid) < 0)
+			if(write_files(tupid, name) < 0)
 				goto err_cmd_failed;
 		} else {
 			goto err_cmd_failed;

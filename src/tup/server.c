@@ -65,19 +65,23 @@ int start_server(void)
 	return 0;
 }
 
-void stop_server(void)
+int stop_server(void)
 {
+	void *retval = NULL;
 	if(sd != -1) {
 		enum access_type at = ACCESS_STOP_SERVER;
 		DEBUGP("stopping server '%s'\n", addr.sun_path);
 		/* TODO: ok to reuse sd here? */
 		sendto(sd, &at, sizeof(at), 0, (void*)&addr, sizeof(addr));
-		pthread_join(tid, NULL);
+		pthread_join(tid, &retval);
 		close(sd);
 		unlink(addr.sun_path);
 		unsetenv(SERVER_NAME);
 		sd = -1;
 	}
+	if(retval == NULL)
+		return 0;
+	return -1;
 }
 
 static void *message_thread(void *arg)
@@ -89,17 +93,16 @@ static void *message_thread(void *arg)
 	static char cname[PATH_MAX];
 	int rc;
 	int dlen;
-	tupid_t tupid;
 	if(arg) {/* unused */}
 
 	if(getcwd(cwd, sizeof(cwd)) == NULL) {
 		perror("getcwd");
-		return NULL;
+		return (void*)-1;
 	}
 	dlen = strlen(cwd);
 	if(dlen >= (signed)sizeof(cwd) - 2) {
 		fprintf(stderr, "Error: CWD[%s] is too large.\n", cwd);
-		return NULL;
+		return (void*)-1;
 	}
 	cwd[dlen] = '/';
 	cwd[dlen+1] = 0;
@@ -118,7 +121,7 @@ static void *message_thread(void *arg)
 		expected = sizeof(*event) + event->len;
 		if(rc != expected) {
 			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, expected);
-			return NULL;
+			return (void*)-1;
 		}
 
 		if(filename[0] == '/') {
@@ -130,14 +133,13 @@ static void *message_thread(void *arg)
 		if(len < 0)
 			continue;
 
-		tupid = create_path_file(cname);
-		if(tupid < 0)
-			return NULL;
-		if(handle_file(event, tupid) < 0)
-			break;
+		if(handle_file(event, cname) < 0) {
+			return (void*)-1;
+		}
 	}
 	if(rc < 0) {
 		perror("recv");
+		return (void*)-1;
 	}
 	return NULL;
 }
