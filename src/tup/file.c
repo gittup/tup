@@ -124,8 +124,6 @@ static int handle_rename_to(int pid, tupid_t tupid)
 
 	list_for_each_entry(from, &rename_list, list) {
 		if(from->pid == pid) {
-			if(delete_name_file(from->tupid) < 0)
-				return -1;
 			return __handle_rename_to(from, tupid);
 		}
 	}
@@ -148,7 +146,7 @@ static int __handle_rename_to(struct file_entry *from, tupid_t tupid)
 			fent->tupid = tupid;
 		}
 	}
-	del_entry(from);
+	list_move(&from->list, &unlink_list);
 	return 0;
 }
 
