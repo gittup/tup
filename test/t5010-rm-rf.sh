@@ -1,7 +1,6 @@
 #! /bin/sh -e
 
 . ../tup.sh
-tup monitor
 mkdir a
 mkdir a/a2
 cp ../testTupfile.tup a/a2/Tupfile
