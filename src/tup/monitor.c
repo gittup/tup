@@ -39,6 +39,7 @@
 #include "db.h"
 #include "lock.h"
 #include "memdb.h"
+#include "updater.h"
 
 #define MONITOR_PID_CFG "monitor pid"
 
@@ -406,6 +407,10 @@ static void flush_queue(void)
 	queue_start = 0;
 	queue_end = 0;
 	queue_last_e = NULL;
+	if(tup_db_config_get_int("autoupdate") == 1) {
+		if(updater(1, NULL) < 0)
+			return;
+	}
 }
 
 static int skip_event(struct inotify_event *e)

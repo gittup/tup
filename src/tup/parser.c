@@ -429,23 +429,16 @@ static int parse_rule(char *p, struct list_head *rules, tupid_t dt)
 		perror("malloc");
 		return -1;
 	}
+	r->foreach = 0;
 	if(input) {
-		r->foreach = 0;
-		if(strncmp(input, "foreach ", 8) == 0) {
-			r->foreach = 1;
-			input += 8;
-		}
-		if(strcmp(input, "foreach") == 0) {
-			/* This case is possible if you do 'foreach $(blah)'
-			 * and the 'blah' variable is empty.
-			 */
+		if(strncmp(input, "foreach", 7) == 0) {
 			r->foreach = 1;
 			input += 7;
+			while(*input == ' ') input++;
 		}
 		r->input_pattern = strdup(input);
 	} else {
 		r->input_pattern = strdup("");
-		r->foreach = 0;
 	}
 	if(!r->input_pattern) {
 		perror("strdup");

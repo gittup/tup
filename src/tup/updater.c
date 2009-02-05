@@ -16,9 +16,11 @@
 #include <sys/file.h>
 #include <sys/wait.h>
 
+static int get_update_lock(void);
+static void release_update_lock(int lock);
 static int process_create_nodes(void);
 static int process_update_nodes(void);
-static int build_graph(struct graph *g, int flags);
+static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_create(struct graph *g);
@@ -37,21 +39,9 @@ int updater(int argc, char **argv)
 	int upd_lock;
 	int x;
 
-	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
-	if(upd_lock < 0) {
-		perror(TUP_UPDATE_LOCK);
+	upd_lock = get_update_lock();
+	if(upd_lock < 0)
 		return -1;
-	}
-	if(flock(upd_lock, LOCK_EX|LOCK_NB) < 0) {
-		if(errno == EWOULDBLOCK) {
-			printf("Waiting for lock...\n");
-			if(flock(upd_lock, LOCK_EX) == 0)
-				goto lock_success;
-		}
-		perror("flock");
-		return -1;
-	}
-lock_success:
 
 	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
@@ -76,9 +66,36 @@ lock_success:
 	if(process_update_nodes() < 0)
 		return -1;
 
-	flock(upd_lock, LOCK_UN);
-	close(upd_lock);
+	release_update_lock(upd_lock);
 	return 0;
+}
+
+static int get_update_lock(void)
+{
+	int upd_lock;
+
+	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
+	if(upd_lock < 0) {
+		perror(TUP_UPDATE_LOCK);
+		return -1;
+	}
+	if(flock(upd_lock, LOCK_EX|LOCK_NB) < 0) {
+		if(errno == EWOULDBLOCK) {
+			printf("Waiting for lock...\n");
+			if(flock(upd_lock, LOCK_EX) == 0)
+				return upd_lock;
+		}
+		perror("flock");
+		close(upd_lock);
+		return -1;
+	}
+	return upd_lock;
+}
+
+static void release_update_lock(int lock)
+{
+	flock(lock, LOCK_UN);
+	close(lock);
 }
 
 static int process_create_nodes(void)
@@ -87,7 +104,9 @@ static int process_create_nodes(void)
 
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
-	if(build_graph(&g, TUP_FLAGS_CREATE) < 0)
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
 		return -1;
 	if(execute_create(&g) < 0)
 		return -1;
@@ -102,9 +121,11 @@ static int process_update_nodes(void)
 
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
-	if(build_graph(&g, TUP_FLAGS_MODIFY) < 0)
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
-	if(build_graph(&g, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
 		return -1;
 	if(execute_update(&g) < 0)
 		return -1;
@@ -113,13 +134,9 @@ static int process_update_nodes(void)
 	return 0;
 }
 
-static int build_graph(struct graph *g, int flags)
+static int build_graph(struct graph *g)
 {
 	struct node *cur;
-
-	g->cur = g->root;
-	if(tup_db_select_node_by_flags(add_file_cb, g, flags) < 0)
-		return -1;
 
 	while(!list_empty(&g->plist)) {
 		cur = list_entry(g->plist.next, struct node, list);

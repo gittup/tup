@@ -103,7 +103,7 @@ int create_graph(struct graph *g, int count_flags)
 	if(memdb_init(&g->memdb) < 0)
 		return -1;
 
-	g->root = create_node(g, &dbn_root);
+	g->cur = g->root = create_node(g, &dbn_root);
 	if(!g->root)
 		return -1;
 	list_move(&g->root->list, &g->node_list);

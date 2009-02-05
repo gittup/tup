@@ -30,6 +30,8 @@ static int get_flags(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int delete(int argc, char **argv);
 static int varset(int argc, char **argv);
+static int config_cb(void *arg, int argc, char **argv, char **col);
+static int config(int argc, char **argv);
 
 static int check_open_fds(void);
 static void usage(void);
@@ -102,6 +104,13 @@ int main(int argc, char **argv)
 		rc = delete(argc, argv);
 	} else if(strcmp(cmd, "varset") == 0) {
 		rc = varset(argc, argv);
+	} else if(strcmp(cmd, "config") == 0) {
+		rc = config(argc, argv);
+	} else if(strcmp(cmd, "flush") == 0) {
+		/* The flush automatically happens because tup_init() takes the
+		 * object lock.
+		 */
+		printf("tup monitor flushed (assuming it's active)\n");
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -490,6 +499,38 @@ static int varset(int argc, char **argv)
 	}
 	if(create_var_file(argv[1], argv[2]) < 0)
 		return -1;
+	return 0;
+}
+
+static int config_cb(void *arg, int argc, char **argv, char **col)
+{
+	int x;
+	char *lval = NULL;
+	char *rval = NULL;
+	if(arg) {/* unused */}
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(col[x], "lval") == 0)
+			lval = argv[x];
+		if(strcmp(col[x], "rval") == 0)
+			rval = argv[x];
+	}
+	printf("%s: '%s'\n", lval, rval);
+	return 0;
+}
+
+static int config(int argc, char **argv)
+{
+	if(argc == 1) {
+		if(tup_db_select(config_cb, NULL, "select * from config") != 0)
+			return -1;
+	} else if(argc == 3) {
+		if(tup_db_config_set_string(argv[1], argv[2]) < 0)
+			return -1;
+	} else {
+		fprintf(stderr, "Error: config requires either 0 or 2 arguments.\n");
+		return -1;
+	}
 	return 0;
 }
 
