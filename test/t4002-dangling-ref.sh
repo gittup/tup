@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile.tup Tupfile
 
 (echo "#include \"foo.h\""; echo "int main(void) {}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
@@ -28,11 +28,11 @@ update
 check_same_link bar.o oldbar.o
 rm oldbar.o
 sym_check foo.o main x
-tup_dep_no_exist foo.h "tup wrap gcc -c bar.c -o bar.o"
+tup_dep_no_exist . foo.h . "gcc -c bar.c -o bar.o"
 
 # Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
 # some reason.
 tup touch foo.h
 update
-tup_dep_exist foo.h "tup wrap gcc -c foo.c -o foo.o"
-tup_dep_exist "tup wrap gcc -c foo.c -o foo.o" foo.o
+tup_dep_exist . foo.h . "gcc -c foo.c -o foo.o"
+tup_dep_exist . "gcc -c foo.c -o foo.o" . foo.o

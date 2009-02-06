@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile.tup Tupfile
 
 (echo "#include \"foo.h\""; echo "int main(void) {return 0;}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c

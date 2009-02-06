@@ -1,9 +1,10 @@
 tupdir=$PWD
 check_empty_tupdirs()
 {
-	if [ "$(ls -A $tupdir/.tup/create)" ]; then
-		cd $tupdir
-		echo "Files shouldn't exist: " .tup/{create,modify,delete}/* 1>&2
+	if tup flags_exists; then
+		:
+	else
+		echo "*** Nodes shouldn't have flags set" 1>&2
 		exit 1
 	fi
 }
@@ -13,7 +14,7 @@ sym_check()
 	f=$1
 	shift
 	if [ ! -f $f ]; then
-		echo "Object file does not exist: $f" 1>&2
+		echo "*** Object file does not exist: $f" 1>&2
 		exit 1
 	fi
 	while [ $# -gt 0 ]; do
@@ -21,14 +22,14 @@ sym_check()
 		if echo $sym | grep '^~' > /dev/null; then
 			sym=`echo $sym | sed 's/^~//'`
 			if nm $f | grep $sym > /dev/null; then
-				echo "'$sym' shouldn't exist in '$f'" 1>&2
+				echo "*** '$sym' shouldn't exist in '$f'" 1>&2
 				exit 1
 			fi
 		else
 			if nm $f | grep $sym > /dev/null; then
 				:
 			else
-				echo "No symbol '$sym' in object '$f'" 1>&2
+				echo "*** No symbol '$sym' in object '$f'" 1>&2
 				exit 1
 			fi
 		fi
@@ -40,7 +41,7 @@ check_exist()
 {
 	while [ $# -gt 0 ]; do
 		if [ ! -f $1 ]; then
-			echo "File '$1' does not exist when it should" 1>&2
+			echo "*** File '$1' does not exist when it should" 1>&2
 			exit 1
 		fi
 		shift
@@ -51,7 +52,7 @@ check_not_exist()
 {
 	while [ $# -gt 0 ]; do
 		if [ -f $1 ]; then
-			echo "File '$1' exists when it shouldn't" 1>&2
+			echo "*** File '$1' exists when it shouldn't" 1>&2
 			exit 1
 		fi
 		shift
@@ -60,12 +61,17 @@ check_not_exist()
 
 tup_object_exist()
 {
+	dir=$1
+	shift
+	if [ $# -le 0 ]; then
+		echo "*** tup_object_exist needs a dir and files" 1>&2
+		exit 1
+	fi
 	while [ $# -gt 0 ]; do
-		sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-		if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/.name" ]; then
+		if tup node_exists $dir "$1"; then
 			:
 		else
-			echo "Missing object $1 from .tup/object" 1>&2
+			echo "*** Missing node \"$1\" from .tup/db" 1>&2
 			exit 1
 		fi
 		shift
@@ -74,10 +80,15 @@ tup_object_exist()
 
 tup_object_no_exist()
 {
+	dir=$1
+	shift
+	if [ $# -le 0 ]; then
+		echo "*** tup_object_no_exist needs a dir and files" 1>&2
+		exit 1
+	fi
 	while [ $# -gt 0 ]; do
-		sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-		if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/.name" ]; then
-			echo "Object $1 exists in .tup/object" 1>&2
+		if tup node_exists $dir "$1"; then
+			echo "*** Node \"$1\" exists in .tup/db when it shouldn't" 1>&2
 			exit 1
 		fi
 		shift
@@ -86,60 +97,52 @@ tup_object_no_exist()
 
 tup_dep_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	dep=`echo -n $2 | sha1sum | awk '{print $1}'`
-	if [ ! -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/$dep" ]; then
-		echo "Dependency from $1 -> $2 does not exist" 1>&2
+	if tup link_exists "$1" "$2" "$3" "$4"; then
+		:
+	else
+		echo "*** Dependency from $2 [$1] -> $4 [$3] does not exist" 1>&2
 		exit 1
 	fi
 }
 
 tup_dep_no_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	dep=`echo -n $2 | sha1sum | awk '{print $1}'`
-	if [ -f "$tupdir/.tup/object/${sum:0:2}/${sum:2}/$dep" ]; then
-		echo "Dependency from $1 -> $2 exists when it shouldn't" 1>&2
+	if tup link_exists "$1" "$2" "$3" "$4"; then
+		echo "*** Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
 		exit 1
 	fi
 }
 
 tup_create_exist()
 {
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/create/$sum" ]; then
-		echo "$1 doesn't exist in .tup/create/"
-		exit 1
-	fi
-}
-
-tup_modify_exist()
-{
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/modify/$sum" ]; then
-		echo "$1 doesn't exist in .tup/modify/"
-		exit 1
-	fi
-}
-
-tup_delete_exist()
-{
-	sum=`echo -n $1 | sha1sum | awk '{print $1}'`
-	if [ ! -f ".tup/delete/$sum" ]; then
-		echo "$1 doesn't exist in .tup/delete/"
+	if tup get_flags $1 2; then
+		:
+	else
+		echo "*** $1 doesn't have create flags" 1>&2
 		exit 1
 	fi
 }
 
 update()
 {
-	if tup upd; then
+	if tup upd "$@"; then
 		:
 	else
-		echo "Failed to update!"
+		echo "*** Failed to update!" 1>&2
 		exit 1
 	fi
 	check_empty_tupdirs
+}
+
+update_fail()
+{
+	if tup upd "$@" 2>/dev/null; then
+		echo "*** Expected update to fail, but didn't" 1>&2
+		exit 1
+	else
+		echo "Update expected to fail, and did"
+		:
+	fi
 }
 
 check_same_link()
@@ -147,7 +150,7 @@ check_same_link()
 	if stat $* | grep Inode | awk 'BEGIN{x=-1} {if(x == -1) {x=$4} if(x != $4) {exit 1}}'; then
 		:
 	else
-		echo "Files '$*' are not the same inode."
+		echo "*** Files '$*' are not the same inode." 1>&2
 		exit 1
 	fi
 }

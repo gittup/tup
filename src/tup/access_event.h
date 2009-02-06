@@ -1,8 +1,6 @@
 #ifndef tup_access_event_h
 #define tup_access_event_h
 
-#include "tupid.h"
-
 /** The environment variable used to pass the name of the UNIX socket server
  * to subprocesses.
  */
@@ -13,6 +11,7 @@ enum access_type {
 	ACCESS_WRITE,
 	ACCESS_RENAME_FROM,
 	ACCESS_RENAME_TO,
+	ACCESS_UNLINK,
 	ACCESS_STOP_SERVER,
 };
 
@@ -37,10 +36,8 @@ struct access_event {
 	 */
 	int pid;
 
-	/** The tupid corresponding to this event. Not needed for the
-	 * ACCESS_STOP_SERVER event.
-	 */
-	tupid_t tupid;
+	/** Length of the path, which will follow the access_event struct */
+	int len;
 };
 
 #endif

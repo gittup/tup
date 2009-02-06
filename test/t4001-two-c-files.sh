@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile.tup Tupfile
 
 # Verify both files are compiled
 echo "int main(void) {}" > foo.c
@@ -25,7 +25,7 @@ sym_check foo.o main foo2
 # Verify both are compiled if both are touched, but only linked once
 rm foo.o
 tup touch foo.c bar.c
-if tup upd | grep 'gcc bar.o foo.o -o prog' | wc -l | grep 1 > /dev/null; then
+if tup upd | grep 'gcc .* -o prog' | wc -l | grep 1 > /dev/null; then
 	:
 else
 	echo "Program should have only been linked once." 1>&2

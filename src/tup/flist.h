@@ -29,7 +29,6 @@
   */
 struct flist {
 	const char *filename; /**< The file name, does not include directory */
-	int dirfd;            /**< The directory file descriptor */
 	struct dirent *_ent;  /**< Internal - struct dirent * */
 	DIR *_d;              /**< Internal - DIR * */
 };
@@ -49,7 +48,14 @@ struct flist {
   * @endcode
   */
 #define flist_foreach(f, p) \
-	for((f)->_d=opendir(p),(f)->dirfd=(f)->_d?dirfd((f)->_d):-1;\
+	for((f)->_d=opendir(p);\
+		((f)->_d!=0 &&\
+		 ((f)->_ent=readdir((f)->_d))!=0 &&\
+		 ((f)->filename=(f)->_ent->d_name)!=0) ||\
+		((f)->_d!=0 && closedir((f)->_d));)
+
+#define flist_foreachfd(f, fd) \
+	for((f)->_d=fdopendir(fd);\
 		((f)->_d!=0 &&\
 		 ((f)->_ent=readdir((f)->_d))!=0 &&\
 		 ((f)->filename=(f)->_ent->d_name)!=0) ||\

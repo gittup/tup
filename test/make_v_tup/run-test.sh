@@ -34,9 +34,10 @@ cd ../ttup
 find . -type f | while read i; do cat $i > /dev/null; done
 tup init > /dev/null
 echo "tup: initial"
-tup startmon
+tup monitor
 sleep 1
-time -p tup update > /dev/null
+find . -name Makefile -exec touch {} \;
+time -p tup upd > /dev/null
 sync
 cfile=`find . -name 0.c`;
 hfile=`find . -name 0.h`;
@@ -58,7 +59,7 @@ for i in `seq 1 $niter`; do
 	time -p tup upd > /dev/null
 done
 
-tup stopmon
+tup stop
 
 cd ..
 #diff -r tmake ttup | grep -v Makefile | grep -v build | grep -v '\.d$' | grep -v '\.tup'

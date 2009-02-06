@@ -1,50 +1,42 @@
 #ifndef tup_fileio_h
 #define tup_fileio_h
 
-#include "tup/tupid.h"
+#include "tupid.h"
 
-/** Assuming the directory exists to hold the file, an empty file is created at
- * the given path if it doesn't already exist. Returns 0 on success, -1 on
- * failure.
- */
-int create_if_not_exist(const char *path);
+struct db_node;
 
-/** Removes a file if it exists */
-int delete_if_exists(const char *path);
-
-/** Basically write(), but returns -1 if the write fails or if the length
- * returned doesn't equal the 'size' argument.
- *
- * The 'filename' parameter is only used for error messages.
- */
-int write_all(int fd, const void *buf, int size, const char *filename);
-
-/** Creates a link. This link goes in the object directory of 'a' and links to
- * the .name file of 'b'
- */
-int create_link(const tupid_t a, const tupid_t b);
-
-int create_command_link(const tupid_t a, const tupid_t b);
-int delete_link(const tupid_t a, const tupid_t b);
-
-int create_tup_file(const char *tup, const char *path);
-int create_tup_file_tupid(const char *tup, const tupid_t tupid);
-int create_name_file(const char *path);
-int create_command_file(const char *cmd);
-int create_dir_file(const char *path);
-int recreate_cmd_file(const tupid_t tupid);
-int delete_tup_file(const char *tup, const tupid_t tupid);
-int move_tup_file_if_exists(const char *tupsrc, const char *tupdst, const tupid_t tupid);
-int num_dependencies(const tupid_t tupid);
+tupid_t create_path_file(const char *path);
+tupid_t create_name_file(tupid_t dt, const char *file);
+tupid_t create_command_file(tupid_t dt, const char *cmd);
+tupid_t create_varsed_file(tupid_t dt, const char *cmd);
+tupid_t create_dir_file(tupid_t dt, const char *path);
+tupid_t create_var_file(const char *var, const char *value);
+int tup_file_mod(tupid_t dt, const char *file, int flags);
+int tup_pathname_mod(const char *path, int flags);
+tupid_t get_dbn(const char *path, struct db_node *dbn);
+tupid_t find_dir_tupid(const char *dir);
+tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last);
 
 /** Delete all memory of the file from .tup/object (except dangling refs). Also
  * removes the actual file, if it exists.
- *
- * Note: *not* thread safe.
  */
-int delete_name_file(const tupid_t tupid);
-int canonicalize(const char *path, char *out, int len);
-int canonicalize2(const char *path, const char *file, char *out, int len);
-void canonicalize_string(char *str, int len);
+int delete_name_file(tupid_t tupid);
+
+int canonicalize(const char *path, char *out, int len, int *lastslash);
+int canonicalize2(const char *path, const char *file, char *out, int len,
+		  int *lastslash);
+
+/** Canonicalizes a path name. Changes instances of "//" and "/./" to "/",
+ * changes "foo/../bar" to "bar", and removes trailing slashes.
+ *
+ * The sz parameter is the size of the string buffer (including
+ * nul-terminator).  The return value is the size of the shortened string (<=
+ * sz), also including the nul-terminator.
+ *
+ * If not NULL, lastslash will be set to the index of the last '/' character
+ * in the string. If there is no '/' in the string, lastslash will be set to
+ * -1.
+ */
+int canonicalize_string(char *str, int sz, int *lastslash);
 
 #endif

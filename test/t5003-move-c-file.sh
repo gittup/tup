@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile.tup Tupfile
 
 # Verify both files are compiled
 echo "int main(void) {return 0;}" > foo.c
@@ -15,7 +15,7 @@ sym_check prog main bar1
 # Rename bar.c to realbar.c.
 mv bar.c realbar.c
 tup delete bar.c
-tup create realbar.c
+tup touch realbar.c
 update
 check_not_exist bar.o
 tup_object_no_exist bar.c bar.o

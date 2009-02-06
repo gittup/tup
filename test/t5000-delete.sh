@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-cp ../testMakefile Makefile
+cp ../testTupfile.tup Tupfile
 
 # Verify all files are compiled
 echo "int main(void) {return 0;}" > foo.c
@@ -22,11 +22,11 @@ update
 check_not_exist baz.o
 sym_check prog main bar1 ~baz1
 
-tup_object_exist foo.c foo.o bar.c bar.o prog
-tup_object_no_exist baz.c baz.o
+tup_object_exist . foo.c foo.o bar.c bar.o prog
+tup_object_no_exist . baz.c baz.o
 
 rm foo.c bar.c
 tup delete foo.c bar.c
 update
 check_not_exist foo.o bar.o prog
-tup_object_no_exist foo.c foo.o bar.c bar.o prog
+tup_object_no_exist . foo.c foo.o bar.c bar.o prog

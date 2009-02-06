@@ -3,21 +3,12 @@ when restarting monitor - compare file timestamps to the last time the monitor
 
 can we update a server file (like httpd.c) and restart apache? (eg: like incrontab program)
 
-only add created monitor files to the create list if 'name' doesn't already exist?
-
 any way to wrap make so that all sub-procs are wrapped?
 
  slab: use a free hunk (unlinked memory array), and a free list (object freed is put in the free list)
 	alloc can get one from free list if available, if not then free hunk, and if not there then allocate another slab
 
-wrapper fails if monitor is not running - always create object directory? what about if wrapper and monitor try to create at the same time?
- - actually, with create logic in place, wrapper fails if output fails do not match expected outputs given during the create phase. Still, same applies - always create objects in wrapper?
-
  modify 'tup graph' to be able to take in start node ids, to trim output
-
- compare open/mmap to open/read/malloc?
-
-put configuration options in .tup/config or something. would be nice to do 'tup cfg' to see what the config is, or 'tup cfg keepgoing=1' to always run tup in 'keep going' mode. when changing cfg, print new config with keepgoing in green, or something, if it changed
 
 options/features:
  - progress bar
@@ -27,8 +18,6 @@ options/features:
 
 portability:
  mac osx may have trouble with unlink() inside a flist_foreach()?
-
-when making a better 'tup' wrapper, be sure to call find_tup_dir, getexecwd(), and the confg init thing, except in the 'tup init' case.
 
 support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
 
@@ -42,24 +31,15 @@ tup:
  if monitor is not used (eg: modify touch to do a 'tup touch foo.c' as well) -
   when rebuilding foo.c, should stat foo.h and compare against .tup/objects/foo.h/.name to see if timestamp is different? maybe have a timestamp option (part of the tup configuration) to perform this check, and if out of date add foo.h to modify list as well. That way if foo.h is modified but 'tup touch foo.h' wasn't executed, the build won't be inconsistent.
 
-test:
- make sure when a directory is deleted (eg: rm -rf bar), then the 'bar' directory object is deleted after update
-
 remove echos from Makefile, use config file - rerun timing tests
 
-sometimes delete/ isn't empty after successful update?
 using vi to edit a file with the monitor running causes the Makefile update to run (create/delete temp files shouldn't cause dir to go in create/ ?)
 
 using ar with the monitor running - the temp file created ends up putting the directory in create/, and the temp file in modify/ - at worst, the temp file should be in delete/, and the dir should not be in delete/
  - also, the temp file stays in .tup/object, when it should be removed (because wrapper handles rename()? )
-
-- sometimes directory link to command has different inode?
- - maybe just remove hard links entirely
 
 what if I change a create_dep line by changing a -i or -o flag, but keeping the command string the same?
 
 - add ability to group high-level programs into your own category?
   - eg: create a cs773 category, and all software I use for that class is
   - linked there. Then I can delete cs773 after the semester to uninstall it all
-
-move directory with subdirectories

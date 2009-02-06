@@ -1,25 +1,17 @@
-#define _LARGEFILE64_SOURCE
 #define _GNU_SOURCE
 #include "tup/access_event.h"
-#include "tup/debug.h"
-#include "tup/tupid.h"
-#include "tup/config.h"
-#include "tup/fileio.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdarg.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/un.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <pthread.h>
 
-#define HANDLE_FILE(f, at) handle_file(f, at, __func__);
-
-static void handle_file(const char *file, int at, const char *func);
+static void handle_file(const char *file, int at);
 static void handle_rename_file(const char *old, const char *new);
 static int ignore_file(const char *file);
 static void ldpre_init(void) __attribute__((constructor));
@@ -33,7 +25,10 @@ static FILE *(*s_fopen)(const char *, const char *);
 static FILE *(*s_fopen64)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
 static int (*s_creat)(const char *, mode_t);
+static int (*s_symlink)(const char *, const char *);
 static int (*s_rename)(const char*, const char*);
+static int (*s_unlink)(const char*);
+static int (*s_unlinkat)(int, const char*, int);
 
 int open(const char *pathname, int flags, ...)
 {
@@ -49,7 +44,7 @@ int open(const char *pathname, int flags, ...)
 	/* O_ACCMODE is 0x3, which covers O_WRONLY and O_RDWR */
 	rc = s_open(pathname, flags, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, flags&O_ACCMODE);
+		handle_file(pathname, flags&O_ACCMODE);
 	return rc;
 }
 
@@ -66,7 +61,7 @@ int open64(const char *pathname, int flags, ...)
 	}
 	rc = s_open64(pathname, flags, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, flags&O_ACCMODE);
+		handle_file(pathname, flags&O_ACCMODE);
 	return rc;
 }
 
@@ -76,7 +71,7 @@ FILE *fopen(const char *path, const char *mode)
 
 	f = s_fopen(path, mode);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -86,7 +81,7 @@ FILE *fopen64(const char *path, const char *mode)
 
 	f = s_fopen64(path, mode);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -96,7 +91,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 
 	f = s_freopen(path, mode, stream);
 	if(f)
-		HANDLE_FILE(path, !(mode[0] == 'r'));
+		handle_file(path, !(mode[0] == 'r'));
 	return f;
 }
 
@@ -106,7 +101,16 @@ int creat(const char *pathname, mode_t mode)
 
 	rc = s_creat(pathname, mode);
 	if(rc >= 0)
-		HANDLE_FILE(pathname, 1);
+		handle_file(pathname, ACCESS_WRITE);
+	return rc;
+}
+
+int symlink(const char *oldpath, const char *newpath)
+{
+	int rc;
+	rc = s_symlink(oldpath, newpath);
+	if(rc == 0)
+		handle_file(newpath, ACCESS_WRITE);
 	return rc;
 }
 
@@ -116,30 +120,61 @@ int rename(const char *old, const char *new)
 
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		DEBUGP("renamed %s to %s\n", old, new);
 		handle_rename_file(old, new);
 	}
 	return rc;
 }
 
-static void handle_file(const char *file, int at, const char *funcname)
+int unlink(const char *pathname)
 {
-	struct access_event event;
-	static char cname[PATH_MAX];
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	int rc;
+
+	rc = s_unlink(pathname);
+	if(rc == 0) {
+		handle_file(pathname, ACCESS_UNLINK);
+	}
+	return rc;
+}
+
+int unlinkat(int dirfd, const char *pathname, int flags)
+{
+	int rc;
+
+	rc = s_unlinkat(dirfd, pathname, flags);
+	if(rc == 0) {
+		if(dirfd == AT_FDCWD) {
+			handle_file(pathname, ACCESS_UNLINK);
+		} else {
+			fprintf(stderr, "tup.ldpreload: Error - unlinkat() not supported unless dirfd == AT_FDCWD\n");
+			return -1;
+		}
+	}
+	return rc;
+}
+
+static void handle_file(const char *file, int at)
+{
+	struct access_event *event;
+	static char msgbuf[sizeof(*event) + PATH_MAX];
+	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 	if(ignore_file(file))
 		return;
-	pthread_mutex_lock(&lock);
-	if(canonicalize(file, cname, sizeof(cname)) < 0)
-		return;
-	tupid_from_filename(event.tupid, cname);
-	DEBUGP("send file '%s' mode %i from func %s\n", cname, at, funcname);
-	pthread_mutex_unlock(&lock);
 
-	event.at = at;
-	event.pid = my_pid;
-	sendto(sd, &event, sizeof(event), 0, (void*)&addr, sizeof(addr));
+	pthread_mutex_lock(&mutex);
+	event = (struct access_event*)msgbuf;
+	event->at = at;
+	event->pid = my_pid;
+	event->len = strlen(file) + 1;
+	if(event->len >= PATH_MAX) {
+		fprintf(stderr, "tup.ldpreload error: Path too long (%i bytes)\n", event->len);
+		goto out_unlock;
+	}
+	memcpy(msgbuf + sizeof(*event), file, event->len);
+	sendto(sd, msgbuf, sizeof(*event) + event->len, 0,
+	       (void*)&addr, sizeof(addr));
+out_unlock:
+	pthread_mutex_unlock(&mutex);
 }
 
 static void handle_rename_file(const char *old, const char *new)
@@ -147,15 +182,18 @@ static void handle_rename_file(const char *old, const char *new)
 	if(ignore_file(old) || ignore_file(new))
 		return;
 
-	HANDLE_FILE(old, ACCESS_RENAME_FROM);
-	HANDLE_FILE(new, ACCESS_RENAME_TO);
+	handle_file(old, ACCESS_RENAME_FROM);
+	handle_file(new, ACCESS_RENAME_TO);
 }
 
 static int ignore_file(const char *file)
 {
-	if(strncmp(file, "/tmp/", 5) == 0) {
+	if(strncmp(file, "/tmp/", 5) == 0)
 		return 1;
-	}
+	if(strncmp(file, "/dev/", 5) == 0)
+		return 1;
+	if(strstr(file, ".tup") != NULL)
+		return 1;
 	return 0;
 }
 
@@ -168,20 +206,17 @@ static void ldpre_init(void)
 	s_fopen64 = dlsym(RTLD_NEXT, "fopen64");
 	s_freopen = dlsym(RTLD_NEXT, "freopen");
 	s_creat = dlsym(RTLD_NEXT, "creat");
+	s_symlink = dlsym(RTLD_NEXT, "symlink");
 	s_rename = dlsym(RTLD_NEXT, "rename");
+	s_unlink = dlsym(RTLD_NEXT, "unlink");
+	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
 	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
-	   !s_creat || !s_rename) {
+	   !s_creat || !s_rename || !s_unlink || !s_unlinkat) {
 		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
-		exit(1);
-	}
-	if(find_tup_dir() < 0) {
 		exit(1);
 	}
 
 	my_pid = getpid();
-	if(getenv(TUP_DEBUG) != NULL) {
-		debug_enable("tup_ldpreload.so");
-	}
 
 	path = getenv(SERVER_NAME);
 	if(!path) {
