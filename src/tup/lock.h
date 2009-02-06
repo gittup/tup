@@ -1,8 +1,10 @@
 #ifndef tup_lock_h
 #define tup_lock_h
 
-/** Lock file used to synchronize the monitor with the wrapper scripts */
+/** Tri-lock */
+#define TUP_SHARED_LOCK ".tup/shared"
 #define TUP_OBJECT_LOCK ".tup/object"
+#define TUP_TRI_LOCK ".tup/tri"
 
 /** Initializes the shared tup object lock. This allows multiple readers to
  * access tup. If you want exclusive access, you'll need to up the lock
@@ -16,7 +18,9 @@ int tup_lock_init(void);
  */
 void tup_lock_exit(void);
 
-/** Gets the file descriptor used for the tup object lock. */
+/* Tri-lock functions */
+int tup_sh_lock(void);
 int tup_obj_lock(void);
+int tup_tri_lock(void);
 
 #endif

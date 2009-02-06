@@ -9,7 +9,7 @@ HERE
 
 echo "This is the index" > index.txt
 echo "Another page" > page.txt
-update
+tup flush
 
 check_exist index.html page.html
 cat << HERE | diff index.html -

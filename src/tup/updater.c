@@ -16,8 +16,6 @@
 #include <sys/file.h>
 #include <sys/wait.h>
 
-static int get_update_lock(void);
-static void release_update_lock(int lock);
 static int process_create_nodes(void);
 static int process_update_nodes(void);
 static int build_graph(struct graph *g);
@@ -36,12 +34,7 @@ static int do_keep_going;
 
 int updater(int argc, char **argv)
 {
-	int upd_lock;
 	int x;
-
-	upd_lock = get_update_lock();
-	if(upd_lock < 0)
-		return -1;
 
 	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
@@ -65,37 +58,7 @@ int updater(int argc, char **argv)
 		return -1;
 	if(process_update_nodes() < 0)
 		return -1;
-
-	release_update_lock(upd_lock);
 	return 0;
-}
-
-static int get_update_lock(void)
-{
-	int upd_lock;
-
-	upd_lock = open(TUP_UPDATE_LOCK, O_RDONLY);
-	if(upd_lock < 0) {
-		perror(TUP_UPDATE_LOCK);
-		return -1;
-	}
-	if(flock(upd_lock, LOCK_EX|LOCK_NB) < 0) {
-		if(errno == EWOULDBLOCK) {
-			printf("Waiting for lock...\n");
-			if(flock(upd_lock, LOCK_EX) == 0)
-				return upd_lock;
-		}
-		perror("flock");
-		close(upd_lock);
-		return -1;
-	}
-	return upd_lock;
-}
-
-static void release_update_lock(int lock)
-{
-	flock(lock, LOCK_UN);
-	close(lock);
 }
 
 static int process_create_nodes(void)
@@ -392,7 +355,10 @@ static int update(struct node *n)
 	if(print_name)
 		printf("%s\n", name);
 
-	start_server();
+	if(start_server() < 0) {
+		fprintf(stderr, "Error starting update server.\n");
+		goto err_close_dfd;
+	}
 	pid = fork();
 	if(pid < 0) {
 		perror("fork");

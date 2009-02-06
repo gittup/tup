@@ -100,7 +100,7 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 
 	if(dbn.tupid < 0) {
 		if(flags == TUP_FLAGS_DELETE) {
-			fprintf(stderr, "Error: Trying to delete file '%s', which isn't in .tup/db\n", file);
+			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 			return -1;
 		}
 		dbn.tupid = create_name_file(dt, file);

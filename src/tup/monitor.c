@@ -118,12 +118,10 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	/* Make sure we're watching the lock before we try to take it
-	 * exclusively, since the only way we know to release the lock is if
-	 * some other process opens it. We don't want to get in the race
-	 * condition of us taking the exclusive lock, then some other process
-	 * opens the lock and waits on a shared lock, and then we add a watch
-	 * and both sit there staring at each other. Word.
+	/* Make sure we're watching the lock before we release the shared lock
+	 * (which will cause any other processes to try to open the object
+	 * lock). The only way we know to release the lock is if some other
+	 * process opens the object lock.
 	 */
 	obj_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
 	if(obj_wd < 0) {
@@ -139,7 +137,7 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	if(flock(tup_obj_lock(), LOCK_EX) < 0) {
+	if(flock(tup_sh_lock(), LOCK_UN) < 0) {
 		perror("flock");
 		rc = -1;
 		goto close_inot;
@@ -168,14 +166,22 @@ int monitor(int argc, char **argv)
 		for(offset = 0; offset < x; offset += sizeof(*e) + e->len) {
 			e = (void*)((char*)buf + offset);
 
-			/* If the lock file is opened, assume we are now
-			 * locked out. When the file is closed, check to see
-			 * if the lock is available again. We can't just
-			 * assume the lock is available when the file is closed
-			 * because multiple processes can have the lock shared
-			 * at once. Also, we can't count the number of opens
-			 * and closes because inotify sometimes slurps some
-			 * duplicate events.
+			DEBUGP("%c[%i: %i]: '%s' %08x [%i, %i]\n", locked? 'E' : 'e', e->wd,
+			       sizeof(*e) + e->len, e->len ? e->name : "", e->mask, tup_wd, obj_wd);
+			/* If the object lock file is opened, assume we are now
+			 * locked out. We take the tri lock before releasing
+			 * the object lock, so we can make sure we are the
+			 * first to get the object lock again when it is
+			 * available (anyone else will be stuck waiting on the
+			 * shared lock...suckers!) When the lock file is then
+			 * closed, we take the object lock, then release the
+			 * tri lock. Whoever had the object lock is waiting on
+			 * the tri lock before they release the shared lock.
+			 * So, we at least get a quick run in with locked
+			 * access (and can process any events between the
+			 * locks) before someone else gets the shared lock and
+			 * opens the object lock, causing us to go offline
+			 * again.
 			 */
 			if(e->wd == tup_wd) {
 				if(e->len && strcmp(e->name, "db-journal") == 0)
@@ -186,17 +192,27 @@ int monitor(int argc, char **argv)
 				if((e->mask & IN_OPEN) && locked) {
 					flush_queue();
 					locked = 0;
-					flock(tup_obj_lock(), LOCK_UN);
+					if(flock(tup_tri_lock(), LOCK_EX) < 0) {
+						perror("flock");
+						goto close_inot;
+					}
+					if(flock(tup_obj_lock(), LOCK_UN) < 0) {
+						perror("flock");
+						goto close_inot;
+					}
 					DEBUGP("monitor off\n");
 				}
 				if((e->mask & IN_CLOSE) && !locked) {
-					if(flock(tup_obj_lock(), LOCK_EX | LOCK_NB) < 0) {
-						if(errno != EWOULDBLOCK)
-							perror("flock");
-					} else {
-						locked = 1;
-						DEBUGP("monitor ON\n");
+					if(flock(tup_obj_lock(), LOCK_EX) < 0) {
+						perror("flock");
+						goto close_inot;
 					}
+					if(flock(tup_tri_lock(), LOCK_UN) < 0) {
+						perror("flock");
+						goto close_inot;
+					}
+					locked = 1;
+					DEBUGP("monitor ON\n");
 				}
 			} else if(e->wd == mon_wd) {
 				goto close_inot;
@@ -225,15 +241,12 @@ close_inot:
 	close(inot_fd);
 close_monlock:
 	close(mon_lock);
-	tup_db_config_set_int(MONITOR_PID_CFG, -1);
 	return rc;
 }
 
 int stop_monitor(int argc, char **argv)
 {
 	int mon_lock;
-	struct timespec ts = {0, 5e6};
-	int x;
 
 	if(argc) {}
 	if(argv) {}
@@ -245,14 +258,7 @@ int stop_monitor(int argc, char **argv)
 	}
 	close(mon_lock);
 
-	for(x=0; x<25; x++) {
-		if(tup_db_config_get_int(MONITOR_PID_CFG) == -1)
-			return 0;
-		nanosleep(&ts, NULL);
-	}
-	fprintf(stderr, "Error: monitor pid never reset.\n");
-
-	return -1;
+	return 0;
 }
 
 static int watch_path(tupid_t dt, const char *path, const char *file)
@@ -391,6 +397,8 @@ static void queue_event(struct inotify_event *e)
 
 static void flush_queue(void)
 {
+	int events_handled = 0;
+
 	tup_db_begin();
 	while(queue_start < queue_end) {
 		struct inotify_event *e;
@@ -401,15 +409,35 @@ static void flush_queue(void)
 		if(e->mask != 0)
 			handle_event(e);
 		queue_start += sizeof(*e) + e->len;
+		events_handled = 1;
 	}
 	tup_db_commit();
 
 	queue_start = 0;
 	queue_end = 0;
 	queue_last_e = NULL;
-	if(tup_db_config_get_int("autoupdate") == 1) {
-		if(updater(1, NULL) < 0)
+	if(events_handled && tup_db_config_get_int("autoupdate") == 1) {
+		/* This runs in a separate process (as opposed to just calling
+		 * updater() directly) so it can properly get the lock from us
+		 * (the monitor) and flush the queue correctly. Otherwise files
+		 * touched by the updater will be caught by us, which is
+		 * annoying.
+		 */
+		int pid = fork();
+		if(pid < 0) {
+			perror("fork");
 			return;
+		}
+		if(pid == 0) {
+			if(tup_lock_init() < 0)
+				exit(1);
+			updater(1, NULL);
+			tup_db_config_set_int(AUTOUPDATE_PID, -1);
+			tup_lock_exit();
+			exit(0);
+		} else {
+			tup_db_config_set_int(AUTOUPDATE_PID, pid);
+		}
 	}
 }
 

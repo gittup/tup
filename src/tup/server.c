@@ -41,6 +41,7 @@ int start_server(void)
 	snprintf(addr.sun_path, sizeof(addr.sun_path)-1, "/tmp/tup-%i",
 		 getpid());
 	addr.sun_path[sizeof(addr.sun_path)-1] = 0;
+	unlink(addr.sun_path);
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);

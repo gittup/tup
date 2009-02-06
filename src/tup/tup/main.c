@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 #include <mcheck.h>
 #include <errno.h>
 #include "tup/config.h"
@@ -32,6 +33,7 @@ static int delete(int argc, char **argv);
 static int varset(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
+static int flush(void);
 
 static int check_open_fds(void);
 static void usage(void);
@@ -107,10 +109,7 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "config") == 0) {
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
-		/* The flush automatically happens because tup_init() takes the
-		 * object lock.
-		 */
-		printf("tup monitor flushed (assuming it's active)\n");
+		rc = flush();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -167,8 +166,12 @@ static int init(int argc, char **argv)
 		perror(TUP_OBJECT_LOCK);
 		return -1;
 	}
-	if(creat(TUP_UPDATE_LOCK, 0666) < 0) {
-		perror(TUP_UPDATE_LOCK);
+	if(creat(TUP_SHARED_LOCK, 0666) < 0) {
+		perror(TUP_SHARED_LOCK);
+		return -1;
+	}
+	if(creat(TUP_TRI_LOCK, 0666) < 0) {
+		perror(TUP_TRI_LOCK);
 		return -1;
 	}
 	if(creat(TUP_MONITOR_LOCK, 0666) < 0) {
@@ -531,6 +534,24 @@ static int config(int argc, char **argv)
 		fprintf(stderr, "Error: config requires either 0 or 2 arguments.\n");
 		return -1;
 	}
+	return 0;
+}
+
+static int flush(void)
+{
+	struct timespec ts = {0, 10000000};
+	printf("Flush\n");
+	while(tup_db_config_get_int(AUTOUPDATE_PID) > 0) {
+		printf(" -- flush (try again)\n");
+		/* If we got the lock but autoupdate pid was set, it must've
+		 * just started but not gotten the lock yet.  So we need to
+		 * release our lock and wait a bit.
+		 */
+		tup_cleanup();
+		nanosleep(&ts, NULL);
+		tup_init();
+	}
+	printf("Flushed.\n");
 	return 0;
 }
 
