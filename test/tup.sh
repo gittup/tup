@@ -113,16 +113,6 @@ tup_dep_no_exist()
 	fi
 }
 
-tup_create_exist()
-{
-	if tup get_flags $1 2; then
-		:
-	else
-		echo "*** $1 doesn't have create flags" 1>&2
-		exit 1
-	fi
-}
-
 update()
 {
 	if tup upd "$@"; then

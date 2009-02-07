@@ -727,6 +727,9 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	int namelen;
 	struct name_list_entry *nle;
 
+	if(tup_db_in_delete_list(dbn->tupid))
+		return 0;
+
 	namelen = strlen(dbn->name);
 	len = namelen + args->dirlen;
 	extlesslen = namelen - 1;
@@ -819,8 +822,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 			onle->extlesslen--;
 
 		onle->tupid = tup_db_create_node_part(r->dt, onle->path, -1,
-						      TUP_NODE_FILE,
-						      TUP_FLAGS_MODIFY);
+						      TUP_NODE_FILE);
 		if(onle->tupid < 0)
 			return -1;
 

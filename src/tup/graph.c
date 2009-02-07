@@ -33,7 +33,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	}
 	n->state = STATE_INITIALIZED;
 	n->type = dbn->type;
-	n->flags = dbn->flags;
+	n->flags = tup_db_get_node_flags(dbn->tupid);
 	n->already_used = 0;
 	list_add(&n->list, &g->plist);
 
@@ -90,7 +90,7 @@ struct edge *remove_edge(struct edge *e)
 
 int create_graph(struct graph *g, int count_flags)
 {
-	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT, TUP_FLAGS_NONE};
+	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT};
 
 	if(sizeof(struct node *) != 4) {
 		fprintf(stderr, "Error: sizeof node pointer is not 32 bits (size = %i bytes). This needs to be fixed.\n", sizeof(struct node *));

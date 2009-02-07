@@ -28,17 +28,17 @@ tupid_t create_path_file(const char *path)
 
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
-	return tup_db_create_node(dt, file, TUP_NODE_FILE, TUP_FLAGS_MODIFY);
+	return tup_db_create_node(dt, file, TUP_NODE_FILE);
 }
 
 tupid_t create_command_file(tupid_t dt, const char *cmd)
 {
-	return tup_db_create_node(dt, cmd, TUP_NODE_CMD, TUP_FLAGS_MODIFY);
+	return tup_db_create_node(dt, cmd, TUP_NODE_CMD);
 }
 
 tupid_t create_dir_file(tupid_t dt, const char *path)
 {
-	return tup_db_create_node(dt, path, TUP_NODE_DIR, TUP_FLAGS_CREATE);
+	return tup_db_create_node(dt, path, TUP_NODE_DIR);
 }
 
 tupid_t create_var_file(const char *var, const char *value)
@@ -49,7 +49,7 @@ tupid_t create_var_file(const char *var, const char *value)
 
 	tupid = tup_db_select_dbn(VAR_DT, var, &dbn);
 	if(tupid < 0) {
-		tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR, TUP_FLAGS_CREATE|TUP_FLAGS_MODIFY);
+		tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR);
 		if(tupid < 0)
 			return -1;
 	} else {
@@ -60,17 +60,15 @@ tupid_t create_var_file(const char *var, const char *value)
 		free(orig_value);
 		/* If the value hasn't changed, just clear the flags */
 		if(rc == 0) {
-			if(dbn.flags & TUP_FLAGS_DELETE) {
-				dbn.flags &= ~TUP_FLAGS_DELETE;
-				if(tup_db_set_flags_by_id(dbn.tupid, dbn.flags) < 0)
-					return -1;
-			}
+			if(tup_db_unflag_delete(dbn.tupid) < 0)
+				return -1;
 			return 0;
 		}
 
-		if((dbn.flags & (TUP_FLAGS_CREATE|TUP_FLAGS_MODIFY)) != (TUP_FLAGS_CREATE|TUP_FLAGS_MODIFY))
-			if(tup_db_set_flags_by_id(tupid, TUP_FLAGS_CREATE|TUP_FLAGS_MODIFY) < 0)
-				return -1;
+		if(tup_db_add_create_list(dbn.tupid) < 0)
+			return -1;
+		if(tup_db_add_modify_list(dbn.tupid) < 0)
+			return -1;
 	}
 	return tup_db_set_var(tupid, value);
 }
@@ -94,7 +92,7 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 		upddir = 1;
 
 	if(upddir) {
-		if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0)
+		if(tup_db_add_create_list(dt) < 0)
 			return -1;
 	}
 
@@ -156,7 +154,8 @@ int tup_pathname_mod(const char *path, int flags)
 	if(dt < 0)
 		return -1;
 
-	tup_file_mod(dt, file, flags);
+	if(tup_file_mod(dt, file, flags) < 0)
+		return -1;
 
 	return 0;
 }
@@ -256,7 +255,7 @@ static tupid_t __create_dir_tupid(const char *dir, int include_last,
 	char *slash;
 	tupid_t dt;
 
-	dt = tup_db_create_node(0, ".", TUP_NODE_DIR, TUP_FLAGS_CREATE);
+	dt = tup_db_create_node(0, ".", TUP_NODE_DIR);
 	if(dt < 0)
 		return -1;
 	if(strcmp(dir, ".") == 0) {
@@ -270,14 +269,13 @@ static tupid_t __create_dir_tupid(const char *dir, int include_last,
 	}
 
 	while((slash = strchr(dir, '/')) != NULL) {
-		dt = tup_db_create_node_part(dt, dir, slash - dir,
-					     TUP_NODE_DIR, TUP_FLAGS_CREATE);
+		dt = tup_db_create_node_part(dt, dir, slash - dir, TUP_NODE_DIR);
 		if(dt < 0)
 			return -1;
 		dir = slash + 1;
 	}
 	if(include_last) {
-		dt = tup_db_create_node(dt,dir, TUP_NODE_DIR, TUP_FLAGS_CREATE);
+		dt = tup_db_create_node(dt,dir, TUP_NODE_DIR);
 		if(dt < 0)
 			return -1;
 	} else {

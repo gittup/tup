@@ -26,8 +26,6 @@ static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
-static int get_flags_cb(void *arg, int argc, char **argv, char **col);
-static int get_flags(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int delete(int argc, char **argv);
 static int varset(int argc, char **argv);
@@ -98,8 +96,6 @@ int main(int argc, char **argv)
 		rc = link_exists(argc, argv);
 	} else if(strcmp(cmd, "flags_exists") == 0) {
 		rc = flags_exists(argc, argv);
-	} else if(strcmp(cmd, "get_flags") == 0) {
-		rc = get_flags(argc, argv);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "delete") == 0) {
@@ -431,43 +427,15 @@ static int flags_exists(int argc, char **argv)
 	if(argv) {}
 
 	if(tup_db_select(flags_exists_cb, &x,
-			 "select id from node where flags != 0") != 0)
+			 "select * from create_list") != 0)
+		return -1;
+	if(tup_db_select(flags_exists_cb, &x,
+			 "select * from modify_list") != 0)
+		return -1;
+	if(tup_db_select(flags_exists_cb, &x,
+			 "select * from delete_list") != 0)
 		return -1;
 	return x;
-}
-
-static int get_flags_cb(void *arg, int argc, char **argv, char **col)
-{
-	int *iptr = arg;
-	int x;
-
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "flags") == 0) {
-			*iptr = atoi(argv[x]);
-			return 0;
-		}
-	}
-	return -1;
-}
-
-static int get_flags(int argc, char **argv)
-{
-	int flags;
-	int requested_flags;
-
-	if(argc != 3) {
-		fprintf(stderr, "Error: get_flags requires exactly two args\n");
-		return -1;
-	}
-
-	if(tup_db_select(get_flags_cb, &flags, "select flags from node where name='%q'", argv[1]) != 0)
-		return -1;
-
-	requested_flags = atoi(argv[2]);
-
-	if((flags & requested_flags) != requested_flags)
-		return -1;
-	return 0;
 }
 
 static int touch(int argc, char **argv)

@@ -13,7 +13,6 @@ struct db_node {
 	tupid_t dt;
 	const char *name;
 	int type;
-	int flags;
 };
 
 enum TUP_NODE_TYPE {
@@ -43,10 +42,9 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
 
 /* Node operations */
-tupid_t tup_db_create_node(tupid_t dt, const char *name, int type, int flags);
-tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type,
-				int flags);
-tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type, int flags);
+tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
+tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
+tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_select_node(tupid_t dt, const char *name);
 tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len);
@@ -62,6 +60,18 @@ int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
 tupid_t tup_db_parent(tupid_t tupid);
+
+/* Flag operations */
+int tup_db_get_node_flags(tupid_t tupid);
+int tup_db_add_create_list(tupid_t tupid);
+int tup_db_add_modify_list(tupid_t tupid);
+int tup_db_add_delete_list(tupid_t tupid);
+int tup_db_in_create_list(tupid_t tupid);
+int tup_db_in_modify_list(tupid_t tupid);
+int tup_db_in_delete_list(tupid_t tupid);
+int tup_db_unflag_create(tupid_t tupid);
+int tup_db_unflag_modify(tupid_t tupid);
+int tup_db_unflag_delete(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);

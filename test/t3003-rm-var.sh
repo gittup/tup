@@ -11,7 +11,7 @@ tup_object_exist @ CONFIG_BAR
 
 # Hack-ish - this is effectively what gets done in tup's kconfig. It moves all
 # variables to delete.
-sqlite3 .tup/db 'update node set flags=flags|4 where dir=2 and type=3'
+sqlite3 .tup/db 'insert or replace into delete_list select id from node where dir=2 and type=3'
 
 tup varset CONFIG_BAR y
 update

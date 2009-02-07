@@ -204,9 +204,10 @@ static int execute_create(struct graph *g)
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-		/* TODO: Clear just the create flag? */
-/*		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-			goto out;*/
+		if(n != root) {
+			if(tup_db_unflag_create(n->tupid) < 0)
+				goto out;
+		}
 		if(n->type == TUP_NODE_DIR) {
 			num_processed++;
 			show_progress(num_processed, g->num_nodes);
@@ -292,12 +293,19 @@ static int execute_update(struct graph *g)
 				list_add(&e->dest->list, &g->plist);
 				e->dest->state = STATE_PROCESSING;
 			}
+			/* Mark the next nodes as modify in case we hit an
+			 * error - we'll need to pick up there.
+			 */
+			if(tup_db_add_modify_list(e->dest->tupid) < 0)
+				goto out;
 
 			/* TODO: slist_del? */
 			n->edges = remove_edge(e);
 		}
-		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-			goto out;
+		if(n != root) {
+			if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
+				goto out;
+		}
 keep_going:
 		if(n->type == TUP_NODE_CMD && ! (n->flags & TUP_FLAGS_DELETE)) {
 			num_processed++;
@@ -334,7 +342,7 @@ static int update(struct node *n)
 	if(name[0] == ',')
 		return var_replace(n);
 
-	tupid = tup_db_create_dup_node(n->dt, n->name, n->type, TUP_FLAGS_NONE);
+	tupid = tup_db_create_dup_node(n->dt, n->name, n->type);
 	if(tupid < 0)
 		return -1;
 
@@ -353,7 +361,7 @@ static int update(struct node *n)
 	fchdir(dfd);
 
 	if(print_name)
-		printf("%s\n", name);
+		printf("[%lli:%lli] %s\n", n->tupid, tupid, name);
 
 	if(start_server() < 0) {
 		fprintf(stderr, "Error starting update server.\n");
@@ -389,13 +397,7 @@ static int update(struct node *n)
 	return 0;
 
 err_cmd_failed:
-	/* Make sure we process this command again next time (since the command
-	 * could be here because of an input file modification, which will now
-	 * be cleared).
-	 */
-	tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_MODIFY);
 	fprintf(stderr, " *** Command %lli failed.\n", n->tupid);
-
 err_close_dfd:
 	fchdir(curfd);
 	close(dfd);

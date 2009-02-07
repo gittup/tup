@@ -35,12 +35,12 @@ while(@ARGV) {
 	}
 }
 
-mkdir "tmake";
+#mkdir "tmake";
 mkdir "ttup";
 for($x=0; $x<$num_files; $x++) {
 	$path_names{$x} = &generate_path($x);
 	if($path_names{$x} ne "") {
-		system("mkdir -p tmake/$path_names{$x}");
+#		system("mkdir -p tmake/$path_names{$x}");
 		system("mkdir -p ttup/$path_names{$x}");
 	}
 	if($dir_names{$path_names{$x}} != 1) {
@@ -50,17 +50,17 @@ for($x=0; $x<$num_files; $x++) {
 	}
 }
 
-open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
-
-print MAKEFILE "all:\n";
-print MAKEFILE "objs :=\n";
-print MAKEFILE "progs :=\n";
+#open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
+#
+#print MAKEFILE "all:\n";
+#print MAKEFILE "objs :=\n";
+#print MAKEFILE "progs :=\n";
 
 for($x=0; $x<$num_files; $x++) {
-	print MAKEFILE "objs += $path_names{$x}$x.o\n";
-	print MAKEFILE "progs += $path_names{$x}prog\n";
-	print MAKEFILE "$path_names{$x}prog: $path_names{$x}$x.o\n";
-	open FILE, ">tmake/$path_names{$x}$x.c" or die "Can't open tmake/$path_names{$x}$x.c for write\n";
+#	print MAKEFILE "objs += $path_names{$x}$x.o\n";
+#	print MAKEFILE "progs += $path_names{$x}prog\n";
+#	print MAKEFILE "$path_names{$x}prog: $path_names{$x}$x.o\n";
+	open FILE, ">ttup/$path_names{$x}$x.c" or die "Can't open ttup/$path_names{$x}$x.c for write\n";
 	for($y=0; $y<$num_deps; $y++) {
 		my ($tmp);
 		$tmp = ($x + $y) % $num_files;
@@ -71,11 +71,11 @@ for($x=0; $x<$num_files; $x++) {
 		print FILE "int main(void) {return 0;}\n";
 	}
 	close FILE;
-	system("cp tmake/$path_names{$x}$x.c ttup/$path_names{$x}$x.c");
-	open FILE, ">tmake/$path_names{$x}$x.h" or die "Can't open tmake/$path_names{$x}$x.h for write\n";
+#	system("cp tmake/$path_names{$x}$x.c ttup/$path_names{$x}$x.c");
+	open FILE, ">ttup/$path_names{$x}$x.h" or die "Can't open ttup/$path_names{$x}$x.h for write\n";
 	print FILE "void func_$x(void);\n";
 	close FILE;
-	system("cp tmake/$path_names{$x}$x.h ttup/$path_names{$x}$x.h");
+#	system("cp tmake/$path_names{$x}$x.h ttup/$path_names{$x}$x.h");
 }
 
 print MAKEFILE "progs := \$(sort \$(progs))\n";
