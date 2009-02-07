@@ -14,6 +14,7 @@
 #include "tup/updater.h"
 #include "tup/graph.h"
 #include "tup/init.h"
+#include "tup/compat.h"
 
 static int file_exists(const char *s);
 
@@ -217,8 +218,15 @@ static int graph(int argc, char **argv)
 	}
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
+		int len;
+		static char cname[PATH_MAX];
 
-		tupid = get_dbn(argv[x], &dbn);
+		len = canonicalize(argv[x], cname, sizeof(cname), NULL);
+		if(len < 0) {
+			fprintf(stderr, "Unable to canonicalize '%s'\n", argv[x]);
+			return -1;
+		}
+		tupid = get_dbn(cname, &dbn);
 		if(tupid < 0) {
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
 			return -1;

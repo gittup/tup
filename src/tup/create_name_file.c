@@ -162,33 +162,21 @@ int tup_pathname_mod(const char *path, int flags)
 
 tupid_t get_dbn(const char *path, struct db_node *dbn)
 {
-	static char cname[PATH_MAX];
 	int rc;
-	int len;
 	const char *file;
 	tupid_t dt;
 
-	len = canonicalize(path, cname, sizeof(cname), NULL);
-	if(len < 0) {
-		fprintf(stderr, "Unable to canonicalize '%s'\n", path);
-		return -1;
-	}
-
-	if(strcmp(cname, ".") == 0) {
-		rc = tup_db_select_dbn(0, cname, dbn);
-		/* Overwrite since tup_db_select_dbn points name to cname */
-		dbn->name = path;
+	if(strcmp(path, ".") == 0) {
+		rc = tup_db_select_dbn(0, path, dbn);
 		return rc;
 	}
 
-	dt = __find_dir_tupid(cname, &file);
+	dt = __find_dir_tupid(path, &file);
 	if(dt < 0)
 		return -1;
 
 	if(file) {
 		rc = tup_db_select_dbn(dt, file, dbn);
-		/* Overwrite since tup_db_select_dbn points name to cname */
-		dbn->name = path;
 		return rc;
 	} else {
 		printf("TODO: no dbn?\n");
