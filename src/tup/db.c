@@ -69,7 +69,6 @@ static int node_select(tupid_t dt, const char *name, int len,
 
 static int link_insert(tupid_t a, tupid_t b);
 static int no_sync(void);
-static int delete_dir(tupid_t dt);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
 struct id_entry {
@@ -618,10 +617,49 @@ int tup_db_delete_node(tupid_t tupid)
 
 int tup_db_delete_dir(tupid_t dt)
 {
-	printf("[35m Delete dir: %lli[0m\n", dt);
+	LIST_HEAD(subdir_list);
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_DELETE_DIR];
+	static char s[] = "insert or replace into delete_list select id from node where dir=?";
+
+	printf("[35m delete dir: %lli[0m\n", dt);
 	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_DELETE) < 0)
 		return -1;
-	return delete_dir(dt);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(get_recurse_dirs(dt, &subdir_list) < 0)
+		return -1;
+	while(!list_empty(&subdir_list)) {
+		struct id_entry *ide = list_entry(subdir_list.next,
+						  struct id_entry, list);
+		tup_db_delete_dir(ide->id);
+		list_del(&ide->list);
+		free(ide);
+	}
+
+	return 0;
 }
 
 int tup_db_open_tupid(tupid_t dt)
@@ -1081,51 +1119,6 @@ int tup_db_unflag_delete(tupid_t tupid)
 	if(rc != SQLITE_DONE) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
-	}
-
-	return 0;
-}
-
-static int delete_dir(tupid_t dt)
-{
-	LIST_HEAD(subdir_list);
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DELETE_DIR];
-	static char s[] = "insert or replace into delete_list select id from node where dir=?";
-
-	printf("[35m delete dir: %lli[0m\n", dt);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(get_recurse_dirs(dt, &subdir_list) < 0)
-		return -1;
-	while(!list_empty(&subdir_list)) {
-		struct id_entry *ide = list_entry(subdir_list.next,
-						  struct id_entry, list);
-		delete_dir(ide->id);
-		list_del(&ide->list);
-		free(ide);
 	}
 
 	return 0;
