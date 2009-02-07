@@ -207,6 +207,14 @@ static int graph(int argc, char **argv)
 	if(create_graph(&g, 0) < 0)
 		return -1;
 
+	if(argc == 1) {
+		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_CREATE) < 0)
+			return -1;
+		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_DELETE) < 0)
+			return -1;
+	}
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
 
