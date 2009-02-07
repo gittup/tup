@@ -6,7 +6,7 @@
 
 sub gen_data
 {
-	@arr = (1, 10, 100, 1000, 10000);
+	@arr = (1, 10, 100, 1000, 10000, 100000);
 	open OUTPUT, ">plot-$_[0].dat" or die "Can't open $_[0].data for write!";
 	foreach $val (@arr) {
 		open FILE, "out-$val.txt" or die "Can't open out-$val.txt!";

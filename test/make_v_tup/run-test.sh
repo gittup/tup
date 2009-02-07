@@ -36,7 +36,6 @@ tup init > /dev/null
 echo "tup: initial"
 tup monitor
 sleep 1
-find . -name Makefile -exec touch {} \;
 time -p tup upd > /dev/null
 sync
 cfile=`find . -name 0.c`;

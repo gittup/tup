@@ -2,8 +2,10 @@
 
 use strict;
 
-my ($num_files, $num_deps, $hier_depth_min, $hier_depth_max, %path_names, $x, $y, %dir_names, %mains);
+my ($num_files, $num_deps, %path_names, $x, $y, %dir_names, %mains, @paths, @pathcounts);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
+
+$paths[0] = "";
 
 if($#ARGV < 0) {
 	&usage();
@@ -11,8 +13,6 @@ if($#ARGV < 0) {
 
 $num_files = 100;
 $num_deps = 7;
-$hier_depth_min = 0;
-$hier_depth_max = 7;
 
 while(@ARGV) {
 	if($ARGV[0] eq "-n") {
@@ -29,35 +29,16 @@ while(@ARGV) {
 		}
 		$num_deps = $ARGV[0];
 		shift;
-	} elsif($ARGV[0] eq "-hmin") {
-		shift;
-		if($#ARGV < 0) {
-			&usage();
-		}
-		$hier_depth_min = $ARGV[0];
-		shift;
-	} elsif($ARGV[0] eq "-hmax") {
-		shift;
-		if($#ARGV < 0) {
-			&usage();
-		}
-		$hier_depth_max = $ARGV[0];
-		shift;
 	} else {
 		print STDERR "Unknown argument: $ARGV[0]\n";
 		shift;
 	}
 }
 
-if($hier_depth_min > $hier_depth_max) {
-	$hier_depth_max = $hier_depth_min;
-	print STDERR "Warning: hier_depth_max set to $hier_depth_max\n";
-}
-
 mkdir "tmake";
 mkdir "ttup";
 for($x=0; $x<$num_files; $x++) {
-	$path_names{$x} = &generate_path($hier_depth_min, $hier_depth_max);
+	$path_names{$x} = &generate_path($x);
 	if($path_names{$x} ne "") {
 		system("mkdir -p tmake/$path_names{$x}");
 		system("mkdir -p ttup/$path_names{$x}");
@@ -110,17 +91,46 @@ close MAKEFILE;
 
 sub usage
 {
-	print "Usage: $0 [-n num files] [-d num deps] [-hmin min hierarchy depth] [-hmax max hierarchy depth]\n";
+	print "Usage: $0 [-n num files] [-d num deps]\n";
 	die;
 }
 
 sub generate_path
 {
-	my ($hier, $x, $path);
+	my ($x, $num, $dir, $depth, $path);
+	my ($num_files_per_dir);
+	my ($num_subdirs_per_dir);
 
-	$hier = int(rand($_[1] - $_[0] + 1)) + $_[0];
-	for($x=0; $x<$hier; $x++) {
-		$path .= $sample_paths[int(rand($#sample_paths + 1))]."/";
+	$num_files_per_dir = 10;
+	$num_subdirs_per_dir = 5;
+
+	$num = $_[0];
+	$dir = $num / $num_files_per_dir;
+	$path = "";
+	if($num < $num_files_per_dir) {
+		# leave path empty
+	} else {
+		$depth = int(log($num / $num_files_per_dir) / log($num_subdirs_per_dir + 1)) + 1;
+		for($x=$depth; $x>0; $x--) {
+			$path .= $sample_paths[$pathcounts[$x]]."/";
+		}
+	}
+	$pathcounts[0]++;
+	if($pathcounts[0] >= $num_files_per_dir) {
+		$pathcounts[1]++;
+		$pathcounts[0] = 0;
+	}
+	for($x=1; $x<$depth+1; $x++) {
+		if($pathcounts[$x] >= $num_subdirs_per_dir) {
+			$pathcounts[$x] = 0;
+			$pathcounts[$x+1]++;
+		}
+	}
+	if($path =~ /^\//) {
+		for($x=1; $x<$depth+1; $x++) {
+			print "PC[$x]: $pathcounts[$x]\n";
+		}
+		die "[$num]: Path is: $path\n";
 	}
 	return $path;
 }
