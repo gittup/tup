@@ -574,4 +574,5 @@ static void usage(void)
 	printf("  stop		Stop the file monitor\n");
 	printf("  g		Print a graphviz .dot graph of the .tup repository to stdout\n");
 	printf("  upd		Run the updater. (Actually build stuff).\n");
+	printf("  config        Display or set configuration options.\n");
 }
