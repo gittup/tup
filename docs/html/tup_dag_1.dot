@@ -1,0 +1,10 @@
+digraph G {
+	foo_o [label="foo.o"];
+	bar_o [label="bar.o"];
+	foo_h [label="foo.h"];
+	cmd1 [label="gcc -c foo.c -o foo.o" shape="rectangle"];
+	cmd2 [label="gcc -c bar.c -o bar.o" shape="rectangle"];
+	foo_o -> {cmd1} [dir="back"];
+	bar_o -> {cmd2} [dir="back"];
+	{cmd1 cmd2} -> foo_h [dir="back"];
+}

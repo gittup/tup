@@ -1,0 +1,10 @@
+<p>Getting started with tup is easy. Just follow these 7 steps:</p>
+<ol>
+  <li><a href="building_tup.html">Build tup</a>.</li>
+  <li>Make sure your source files are backed up, like in source control, or something. Tup is able to delete old files automatically, so if you hose something up because you're a n00b I don't want you to think I'm responsible. Because I'm not. N00b.</li>
+  <li>Go to the top of your source tree and type 'tup init'. This will create a .tup/ directory and stick some files in there. The 'db' file is the database, which holds the entire DAG. The rest of the empty files are just used for locking.</li>
+  <li>Start the file monitor by typing 'tup monitor'. You can do this in any subdirectory of your source tree - it will find the top (where .tup is) and run from there. This will start a background process to watch the source tree for file changes. You can stop it by doing 'tup stop', or just killing the process. If you reboot your computer or something, you'll want to do this again to start a new file monitor.</li>
+  <li>Write a Tupfile to build things. It's probably easiest to start with a single rule and expand from there. After all, tup runs in some kind of time warp so you don't save anything by doing everything up front and trying to get it right the first time.</li>
+  <li>Perform a build by running 'tup upd'. You can also run this from anywhere in the source tree. This will always update the whole tree. You can't fake out tup by trying to build a part of your program if you run upd in a subdirectory or something. Don't even try. You can't win.</li>
+  <li>Now you just edit your source files, Tupfiles, or whatevs and run 'tup upd' when you're done. Unless you have the autoupdate <a href="config.html">config</a> option set, in which case you don't need to type 'tup upd'.</li>
+</ol>

@@ -1,0 +1,26 @@
+<p>Tup has both kinds of rules: country, and western! Err, ':' and ','. The ':' rules specify input files, a command to run, and output files. The ',' rules just specify an input and output file, and are automatically sed'd for @-variable substitution. Usually you just use ':' rules, unless you are replacing some silly autoconf thing.</p>
+
+<h1>::::::::::::::::::::::::::::::::</h1>
+<p>A rule looks like this:</p>
+<pre>
+: [options] [input list] [ | order-only list] |&gt; [command] |&gt; [output list]
+</pre>
+<table border=1>
+  <tr><td><b>Field</b></td><td>What it is</td></tr>
+  <tr><td>options</td><td>Any options to the rule. Currently there is only one option, which is 'foreach'. Basically, if you want to run one command for each input file, you type 'foreach' here. If you want to run one command using all the input files at once, you don't.</td></tr>
+  <tr><td>input list</td><td>Files that you want to input. These are the files that get replaced into %f/%b style variables. You can read files from other directories (like foo/bar.c, or ../ok.c). You can also wildcard filenames (like foo/*.c). I think if you try to wildcard directory names it will explode (ex: */*.c == explode).</td></tr>
+  <tr><td>order-only list</td><td>This is a list of files that you want to have as dependencies to the command, but you don't want to list in %f. An example of this might be an auto-generated header. After you list your C files, you would put a bar '|' and then list the auto-generated headers. This way you will not generate a rule to try to compile the header, but it will still link to the command in the DAG.</td></tr>
+  <tr><td>command</td><td>This is what you would type in at the command-line to do stuff. Except any variables are replaced before the command is stored in the database. And it's not a command-line. It's a Tupfile.</td></tr>
+  <tr><td>output list</td><td>This is the list of files that are created from the command. A rule can only create files in its own directory at the moment, and probably for the foreseeable future. You'll get yelled at if you try to do otherwise. This is because it would be silly to have a Tupfile in directory A which inputs files from directory B and outputs files in directory C. If I try to have another Tupfile use input from directory C, how would I know I have to parse the Tupfile in directory A first? Surely you see the dilemma. Long story short, if you input files from other directories, or even if you don't, you probably want to use some variant of the %b or %B flag here, unless you just specify the output explicitly.</td></tr>
+</table>
+
+<h1>,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,</h1>
+<p>A sed rule can be used to replace files with static configuration-type variables. Depending on your use of compile-time configuration options, you may or may not find them useful. If you are setting some @-variables and want to put their values in a file, you would use them. The rule structure looks like:</p>
+<pre>
+, [input list] |&gt; [output list]
+</pre>
+<p>Actually I don't know that it works probably with multiple files, but I think you could do something like:</p>
+<pre>
+, *.h.in |&gt; %F
+</pre>
+<p>At least, it should work. I simply cannot be bothered to try it, though.</p>

@@ -1,0 +1,7 @@
+digraph G {
+	foo_o [label="foo.o"];
+	bar_o [label="bar.o"];
+	foo_h [label="foo.h"];
+	foo_o -> {foo_h} [dir="back"];
+	bar_o -> {foo_h} [dir="back"];
+}

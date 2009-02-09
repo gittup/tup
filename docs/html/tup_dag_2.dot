@@ -1,0 +1,9 @@
+digraph G {
+	parse_c [label="parse.c"];
+	parse_h [label="parse.h"];
+	parse_y [label="parse.y"];
+	cmd [label="bison [some arguments maybe, I dunno] parse.y" shape="rectangle"];
+	parse_c -> {cmd} [dir="back"];
+	parse_h -> {cmd} [dir="back"];
+	cmd -> parse_y [dir="back"];
+}

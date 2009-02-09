@@ -1,0 +1,10 @@
+digraph G {
+	hello_world -> {foo_o bar_o};
+	foo_o [label="foo.o"];
+	bar_o [label="bar.o"];
+	foo_c [label="foo.c"];
+	bar_c [label="bar.c"];
+	foo_h [label="foo.h"];
+	foo_o -> {foo_c foo_h};
+	bar_o -> {bar_c foo_h};
+}

@@ -1,0 +1,15 @@
+<p>Let's say you want to compile a bunch of C files in a directory. Since you would want to issue a separate compiler command for each C file, you would use the foreach directive:</p>
+<pre>
+: foreach *.c |&gt; gcc -c %f -o %o |&gt; %B.o
+</pre>
+
+<p>Assuming your monitor is running, you could then run 'tup upd' and the object files would be built. If you touch a C file and run 'tup upd', just that C file should be built again. You could also comment out the rule by putting a pound sign '#' in front of the rule, then save the Tupfile and update again. Since the rule is commented out, the object files will be deleted. Un-comment the rule and update, and the files will be re-created.</p>
+
+<p>You can link the object files with another rule. Now the Tupfile should look like this:</p>
+<pre>
+: foreach *.c |&gt; gcc -c %f -o %o |&gt; %B.o
+: *.o |&gt; gcc %f -o %o |&gt; hello_world
+</pre>
+<p>Note that we don't use the foreach keyword for the second rule, because we want all the object files to be listed where the %f is. The %o is replaced with 'hello_world' since that is what we set the output file to. One thing that may be confusing is the *.o doesn't actually do a shell glob on the filesystem. This is because when the file is parsed, the object files don't actually exist yet. Instead, the *.o does a wildcard in the tup database. The first rule will actually create an object file in the tup database (not the filesystem) when the rule is parsed. So, the rules have to go in this order, otherwise *.o won't match anything.</p>
+
+<p>That's pretty much it for now. Just put a Tupfile in a directory where you want files to be created, and write some rules. I'm sure you'll run into lots of problems, so just let me know.</p>

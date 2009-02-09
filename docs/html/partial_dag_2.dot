@@ -1,0 +1,7 @@
+digraph G {
+	parse_c [label="parse.c"];
+	parse_h [label="parse.h"];
+	parse_y [label="parse.y"];
+	parse_c -> {parse_y} [dir="back"];
+	parse_h -> {parse_y} [dir="back"];
+}
