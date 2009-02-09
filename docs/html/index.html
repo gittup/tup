@@ -16,7 +16,7 @@ git clone http://gittup.org/tup.git
 <h2>What is tup?</h2>
 <p>Tup is a build system / dependency manager program - it inputs a list of file changes and a DAG (directed acyclic graph), then processes the DAG to execute the appropriate commands required to update dependent files. The DAG is stored in an <a href="http://www.sqlite.org/">SQLite</a> database. The list of file changes can be generated manually, or by running the included file monitor daemon. By providing the file change log up front and storing the dependencies in an efficient database structure, updates can be performed with very little overhead. The monitor daemon uses inotify, so it is currently linux only. The rest of tup could probably be pretty easily ported to other UNIX-y systems, I think.</p>
 
-<h2>Why tup</h2>
+<h2>Why tup?</h2>
 <p>You can use tup anywhere you would use another build system (like make, or any of its derivatives). The reason you would want to use tup is if you like to update things very quickly. For example, if you typically execute a build in a subdirectory because it takes too long to figure out what to do when you execute the build from the top, you might want to look into tup. Unfortunately, tup is so fast that your <a href="http://xkcd.com/303/">chair mounted jousting</a> might suffer. I apologize in advance if someone besmirches your honor and you are unable to properly defend yourself as a result.</p>
 
 <h2>Why is it so awesome</h2>
