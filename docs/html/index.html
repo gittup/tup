@@ -13,7 +13,7 @@ git clone http://gittup.org/tup.git
 <a href="make_vs_tup.html">Make vs. tup</a>
 <p>Contact me using marfey if you have any questions, suggestions, or bug reports. This is on gmail.com. At some point there may be a mailing list.</p>
 
-<h2>What is tup</h2>
+<h2>What is tup?</h2>
 <p>Tup is a build system / dependency manager program - it inputs a list of file changes and a DAG (directed acyclic graph), then processes the DAG to execute the appropriate commands required to update dependent files. The DAG is stored in an <a href="http://www.sqlite.org/">SQLite</a> database. The list of file changes can be generated manually, or by running the included file monitor daemon. By providing the file change log up front and storing the dependencies in an efficient database structure, updates can be performed with very little overhead. The monitor daemon uses inotify, so it is currently linux only. The rest of tup could probably be pretty easily ported to other UNIX-y systems, I think.</p>
 
 <h2>Why tup</h2>
