@@ -6,7 +6,7 @@
 : [options] [input list] [ | order-only list] |&gt; [command] |&gt; [output list]
 </pre>
 <table border=1>
-  <tr><td><b>Field</b></td><td>What it is</td></tr>
+  <tr><td><b>Field</b></td><td><b>What it is</b></td></tr>
   <tr><td>options</td><td>Any options to the rule. Currently there is only one option, which is 'foreach'. Basically, if you want to run one command for each input file, you type 'foreach' here. If you want to run one command using all the input files at once, you don't.</td></tr>
   <tr><td>input list</td><td>Files that you want to input. These are the files that get replaced into %f/%b style variables. You can read files from other directories (like foo/bar.c, or ../ok.c). You can also wildcard filenames (like foo/*.c). I think if you try to wildcard directory names it will explode (ex: */*.c == explode).</td></tr>
   <tr><td>order-only list</td><td>This is a list of files that you want to have as dependencies to the command, but you don't want to list in %f. An example of this might be an auto-generated header. After you list your C files, you would put a bar '|' and then list the auto-generated headers. This way you will not generate a rule to try to compile the header, but it will still link to the command in the DAG.</td></tr>
