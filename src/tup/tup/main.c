@@ -283,15 +283,17 @@ static int graph(int argc, char **argv)
 
 		style = "solid";
 		color = 0;
+		if(n->flags & TUP_FLAGS_DELETE) {
+			color |= 0xff0000;
+			style = "dotted";
+		}
 		if(n->flags & TUP_FLAGS_MODIFY) {
 			color |= 0x0000ff;
 			style = "dashed";
-		} else if(n->flags & TUP_FLAGS_CREATE) {
+		}
+		if(n->flags & TUP_FLAGS_CREATE) {
 			color |= 0x00ff00;
 			style = "dashed peripheries=2";
-		} else if(n->flags & TUP_FLAGS_DELETE) {
-			color |= 0xff0000;
-			style = "dotted";
 		}
 		printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" style=%s];\n", n->tupid, n->name, n->tupid, shape, color, style);
 		if(n->dt)

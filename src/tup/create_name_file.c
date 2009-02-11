@@ -77,6 +77,9 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 {
 	int upddir = 0;
 	struct db_node dbn;
+	/* Note: if flags < 0 (TUP_FLAGS_DONTSET), it's a special case to not
+	 * update the flags. Be careful if doing any bit-masking of flags here.
+	 */
 
 	/* Tried to simplify the gross if logic. Basically we want to re-update
 	 * the create nodes if:
@@ -125,10 +128,31 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 				if(tup_db_set_cmd_flags_by_output(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
 					return -1;
 			}
-			if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
-				return -1;
+			if(flags != TUP_FLAGS_DONTSET) {
+				if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
+					return -1;
+			} else {
+				/* This is a special case for the monitor,
+				 * where a file was deleted and then
+				 * re-discovered via watch_path(). We don't
+				 * want to set the flags directly, but if it
+				 * was previously deleted it should now be
+				 * created 'new' and marked modify.
+				 */
+				if(tup_db_in_delete_list(dbn.tupid) &&
+				   dbn.type == TUP_NODE_FILE) {
+					if(tup_db_add_modify_list(dbn.tupid) < 0)
+						return -1;
+					if(tup_db_unflag_delete(dbn.tupid) < 0)
+						return -1;
+				}
+			}
 		}
 	}
+
+	/* It's possible this is a file that was included by a Tupfile. Try to
+	 * set any dependent directory flags.
+	 */
 	if(dbn.type == TUP_NODE_FILE) {
 		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 			return -1;

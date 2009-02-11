@@ -288,14 +288,11 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	}
 
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
-		/* TODO: Use tup_file_mod()? */
-		if(tup_db_select_node(dt, file) < 0) {
-			if(tup_db_add_create_list(dt) < 0) {
-				rc = -1;
-				goto out_close;
-			}
-		}
-		if(create_name_file(dt, file) < 0) {
+		/* Don't override any existing flags. Of course if a new node
+		 * is created as a result of this, the default flags will be
+		 * set.
+		 */
+		if(tup_file_mod(dt, file, TUP_FLAGS_DONTSET) < 0) {
 			rc = -1;
 			goto out_close;
 		}
