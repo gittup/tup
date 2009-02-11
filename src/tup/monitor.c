@@ -267,7 +267,7 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	uint32_t mask;
 	struct flist f = {0, 0, 0};
 	struct stat buf;
-	int rc = 0;
+	int rc = -1;
 	char *fullpath;
 	int curfd;
 	tupid_t newdt;
@@ -283,19 +283,25 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	if(lstat(file, &buf) != 0) {
 		fprintf(stderr, "Hey wtf\n");
 		perror(file);
-		rc = -1;
 		goto out_close;
 	}
 
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
-		/* Don't override any existing flags. Of course if a new node
-		 * is created as a result of this, the default flags will be
-		 * set.
+		tupid_t tupid;
+
+		/* If the file doesn't exist in the db, create it. If it
+		 * already exists but is marked delete, we want to un-delete it
+		 * and mark the directory as requiring update. So, it ends up
+		 * being the same in both cases.
 		 */
-		if(tup_file_mod(dt, file, TUP_FLAGS_DONTSET) < 0) {
-			rc = -1;
-			goto out_close;
+		tupid = tup_db_select_node(dt, file);
+		if(tupid < 0 || tup_db_in_delete_list(tupid) == 1) {
+			if(create_name_file(dt, file) < 0)
+				goto out_close;
+			if(tup_db_add_create_list(dt) < 0)
+				goto out_close;
 		}
+		rc = 0;
 		goto out_close;
 	}
 	if(S_ISDIR(buf.st_mode)) {
@@ -303,7 +309,6 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			file);
-		rc = -1;
 		goto out_close;
 	}
 
@@ -313,7 +318,6 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
 		perror("inotify_add_watch");
-		rc = -1;
 		goto out_close;
 	}
 
@@ -324,13 +328,11 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	} else {
 		if(asprintf(&fullpath, "%s/%s", path, file) < 0) {
 			perror("asprintf");
-			rc = -1;
 			goto out_close;
 		}
 	}
 	if(!fullpath) {
 		perror("Unable to allocate space for path.\n");
-		rc = -1;
 		goto out_close;
 	}
 	dircache_add(&mdb, wd, fullpath, newdt);
@@ -341,11 +343,10 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	flist_foreach(&f, fullpath) {
 		if(f.filename[0] == '.')
 			continue;
-		if(watch_path(newdt, fullpath, f.filename) < 0) {
-			rc = -1;
+		if(watch_path(newdt, fullpath, f.filename) < 0)
 			goto out_close;
-		}
 	}
+	rc = 0;
 out_close:
 	fchdir(curfd);
 	close(curfd);
