@@ -100,10 +100,6 @@ static void *message_thread(void *arg)
 	int dlen;
 	struct server *s = arg;
 
-	if(getcwd(s->cwd, sizeof(s->cwd)) == NULL) {
-		perror("getcwd");
-		return (void*)-1;
-	}
 	dlen = strlen(s->cwd);
 	if(dlen >= (signed)sizeof(s->cwd) - 2) {
 		fprintf(stderr, "Error: CWD[%s] is too large.\n", s->cwd);
@@ -132,7 +128,7 @@ static void *message_thread(void *arg)
 		if(filename[0] == '/') {
 			len = canonicalize(filename, s->cname, sizeof(s->cname), NULL);
 		} else {
-			len = canonicalize2(s->cwd, filename, s->cname, sizeof(s->cname), NULL);
+			len = canonicalize2(s->cwd, filename, s->cname, sizeof(s->cname), NULL, "");
 		}
 		/* Skip the file if it's outside of our local tree */
 		if(len < 0)

@@ -59,6 +59,7 @@ int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
+int tup_db_get_path(tupid_t tupid, char *path, int len);
 tupid_t tup_db_parent(tupid_t tupid);
 
 /* Flag operations */

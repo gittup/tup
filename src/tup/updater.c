@@ -35,7 +35,7 @@ static int delete_file(struct node *n);
 static int do_show_progress;
 static int do_keep_going;
 
-/*static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;*/
+static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct worker_thread {
@@ -367,19 +367,25 @@ static void *update_work(void *arg)
 		   (n->flags == TUP_FLAGS_DELETE)) {
 			printf("[35mDelete[%lli]: %s[0m\n",
 			       n->tupid, n->name);
+			pthread_mutex_lock(&db_mutex);
 			rc = delete_file(n);
+			pthread_mutex_unlock(&db_mutex);
 		} else if((n->type == TUP_NODE_DIR ||
 			   n->type == TUP_NODE_VAR) &&
 			  n->flags == TUP_FLAGS_DELETE) {
 			printf("[35mDelete[%lli]: %s[0m\n",
 			       n->tupid, n->name);
+			pthread_mutex_lock(&db_mutex);
 			rc = delete_name_file(n->tupid);
+			pthread_mutex_unlock(&db_mutex);
 
 		} else if(n->type == TUP_NODE_CMD) {
 			if(n->flags & TUP_FLAGS_DELETE) {
 				printf("[35mDelete[%lli]: %s[0m\n",
 				       n->tupid, n->name);
+				pthread_mutex_lock(&db_mutex);
 				rc = delete_name_file(n->tupid);
+				pthread_mutex_unlock(&db_mutex);
 			} else {
 				rc = update(n, s);
 			}
@@ -387,6 +393,7 @@ static void *update_work(void *arg)
 
 		if(rc == 0) {
 			e = n->edges;
+			pthread_mutex_lock(&db_mutex);
 			while(e) {
 				/* Mark the next nodes as modify in case we hit
 				 * an error - we'll need to pick up there.
@@ -397,6 +404,7 @@ static void *update_work(void *arg)
 			}
 			if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 				rc = -1;
+			pthread_mutex_unlock(&db_mutex);
 		}
 
 		pthread_mutex_lock(&status_mutex);
@@ -412,32 +420,40 @@ static int update(struct node *n, struct server *s)
 	int status;
 	int pid;
 	int dfd = -1;
-	int curfd = -1;
 	int print_name = 1;
 	const char *name = n->name;
+	int rc;
 	tupid_t tupid;
 
 	/* Commands that begin with a ',' are special var/sed commands */
-	if(name[0] == ',')
-		return var_replace(n);
-
-	tupid = tup_db_create_dup_node(n->dt, n->name, n->type);
-	if(tupid < 0)
-		return -1;
+	if(name[0] == ',') {
+		pthread_mutex_lock(&db_mutex);
+		rc = var_replace(n);
+		pthread_mutex_unlock(&db_mutex);
+		return rc;
+	}
 
 	if(name[0] == '@') {
 		print_name = 0;
 		name++;
 	}
 
-	curfd = open(".", O_RDONLY);
-	if(curfd < 0)
-			goto err_delete_node;
+	pthread_mutex_lock(&db_mutex);
+	tupid = tup_db_create_dup_node(n->dt, n->name, n->type);
+	if(tupid < 0) {
+		pthread_mutex_unlock(&db_mutex);
+		return -1;
+	}
 
 	dfd = tup_db_open_tupid(n->dt);
-	if(dfd < 0)
-		goto err_close_curfd;
-	fchdir(dfd);
+	if(dfd < 0) {
+		pthread_mutex_unlock(&db_mutex);
+		goto err_delete_node;
+	}
+
+	if(tup_db_get_path(n->dt, s->cwd, sizeof(s->cwd)) < 0)
+		return -1;
+	pthread_mutex_unlock(&db_mutex);
 
 	if(print_name)
 		printf("[%lli:%lli] %s\n", n->tupid, tupid, name);
@@ -452,6 +468,7 @@ static int update(struct node *n, struct server *s)
 		goto err_close_dfd;
 	}
 	if(pid == 0) {
+		fchdir(dfd);
 		execl("/bin/sh", "/bin/sh", "-c", name, NULL);
 		perror("execl");
 		exit(1);
@@ -462,28 +479,30 @@ static int update(struct node *n, struct server *s)
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			if(write_files(tupid, name, &s->finfo) < 0)
+			pthread_mutex_lock(&db_mutex);
+			rc = write_files(tupid, name, &s->finfo);
+			pthread_mutex_unlock(&db_mutex);
+			if(rc < 0)
 				goto err_cmd_failed;
 		} else {
 			goto err_cmd_failed;
 		}
 	}
-	fchdir(curfd);
 
 	close(dfd);
-	close(curfd);
+	pthread_mutex_lock(&db_mutex);
 	delete_name_file(n->tupid);
+	pthread_mutex_unlock(&db_mutex);
 	return 0;
 
 err_cmd_failed:
 	fprintf(stderr, " *** Command %lli failed.\n", n->tupid);
 err_close_dfd:
-	fchdir(curfd);
 	close(dfd);
-err_close_curfd:
-	close(curfd);
 err_delete_node:
+	pthread_mutex_lock(&db_mutex);
 	delete_name_file(tupid);
+	pthread_mutex_unlock(&db_mutex);
 	return -1;
 }
 

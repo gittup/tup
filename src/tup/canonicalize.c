@@ -7,13 +7,13 @@
 int canonicalize(const char *path, char *out, int len, int *lastslash)
 {
 	if(path[0] == '/')
-		return canonicalize2(path, "", out, len, lastslash);
+		return canonicalize2(path, "", out, len, lastslash, get_sub_dir());
 	else
-		return canonicalize2("", path, out, len, lastslash);
+		return canonicalize2("", path, out, len, lastslash, get_sub_dir());
 }
 
 int canonicalize2(const char *path, const char *file, char *out, int len,
-		  int *lastslash)
+		  int *lastslash, const char *subdir)
 {
 	int sz;
 
@@ -40,9 +40,8 @@ int canonicalize2(const char *path, const char *file, char *out, int len,
 		/* If it's a relative path, prepend the subdirectory that the
 		 * user invoked the command in relative to where .tup/ exists.
 		 */
-		const char *dir = get_sub_dir();
-		if(dir[0]) {
-			sz = snprintf(out, len, "%s/%s/%s", dir, path, file);
+		if(subdir[0]) {
+			sz = snprintf(out, len, "%s/%s/%s", subdir, path, file);
 		} else {
 			if(path[0])
 				sz = snprintf(out, len, "%s/%s", path, file);
