@@ -1,29 +1,22 @@
 #include "server.h"
 #include "file.h"
-#include "access_event.h"
 #include "debug.h"
 #include "getexecwd.h"
 #include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 
 static void *message_thread(void *arg);
 static void sighandler(int sig);
 
-static int sd = -1;
-static struct sockaddr_un addr;
-static pthread_t tid;
 static char ldpreload_path[PATH_MAX];
-static struct sigaction sigact = {
-	.sa_handler = sighandler,
-	.sa_flags = 0,
-};
+static struct sigaction sigact;
+static LIST_HEAD(server_list);
+static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
-int start_server(void)
+int server_init(void)
 {
 	if(snprintf(ldpreload_path, sizeof(ldpreload_path), "%s/ldpreload.so",
 		    getexecwd()) >= (signed)sizeof(ldpreload_path)) {
@@ -32,54 +25,68 @@ int start_server(void)
 		return -1;
 	}
 
-	sd = socket(PF_UNIX, SOCK_DGRAM, 0);
-	if(sd < 0) {
-		perror("socket");
-		return -1;
-	}
-	addr.sun_family = AF_UNIX;
-	snprintf(addr.sun_path, sizeof(addr.sun_path)-1, "/tmp/tup-%i",
-		 getpid());
-	addr.sun_path[sizeof(addr.sun_path)-1] = 0;
-	unlink(addr.sun_path);
-
+	sigact.sa_handler = sighandler;
+	sigact.sa_flags = 0;
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
+	return 0;
+}
 
-	if(bind(sd, (void*)&addr, sizeof(addr)) < 0) {
+int start_server(struct server *s)
+{
+	s->sd = socket(PF_UNIX, SOCK_DGRAM, 0);
+	if(s->sd < 0) {
+		perror("socket");
+		return -1;
+	}
+	s->addr.sun_family = AF_UNIX;
+	snprintf(s->addr.sun_path, sizeof(s->addr.sun_path)-1, "/tmp/tup-%i.%i",
+		 getpid(), s->sd);
+	s->addr.sun_path[sizeof(s->addr.sun_path)-1] = 0;
+	unlink(s->addr.sun_path);
+
+	pthread_mutex_lock(&list_lock);
+	list_add(&s->list, &server_list);
+	pthread_mutex_unlock(&list_lock);
+
+	if(bind(s->sd, (void*)&s->addr, sizeof(s->addr)) < 0) {
 		perror("bind");
-		close(sd);
+		close(s->sd);
 		return -1;
 	}
 
-	if(pthread_create(&tid, NULL, message_thread, NULL) < 0) {
+	init_file_info(&s->finfo);
+
+	if(pthread_create(&s->tid, NULL, message_thread, s) < 0) {
 		perror("pthread_create");
-		close(sd);
-		unlink(addr.sun_path);
+		close(s->sd);
+		unlink(s->addr.sun_path);
 	}
 
-	setenv(SERVER_NAME, addr.sun_path, 1);
+	setenv(SERVER_NAME, s->addr.sun_path, 1);
 	setenv("LD_PRELOAD", ldpreload_path, 1);
-	DEBUGP("started server '%s'\n", addr.sun_path);
+	DEBUGP("started server '%s'\n", s->addr.sun_path);
 
 	return 0;
 }
 
-int stop_server(void)
+int stop_server(struct server *s)
 {
 	void *retval = NULL;
-	if(sd != -1) {
-		enum access_type at = ACCESS_STOP_SERVER;
-		DEBUGP("stopping server '%s'\n", addr.sun_path);
-		/* TODO: ok to reuse sd here? */
-		sendto(sd, &at, sizeof(at), 0, (void*)&addr, sizeof(addr));
-		pthread_join(tid, &retval);
-		close(sd);
-		unlink(addr.sun_path);
-		unsetenv(SERVER_NAME);
-		sd = -1;
-	}
+	enum access_type at = ACCESS_STOP_SERVER;
+	DEBUGP("stopping server '%s'\n", s->addr.sun_path);
+	/* TODO: ok to reuse sd here? */
+	sendto(s->sd, &at, sizeof(at), 0, (void*)&s->addr, sizeof(s->addr));
+	pthread_join(s->tid, &retval);
+	close(s->sd);
+	unlink(s->addr.sun_path);
+	unsetenv(SERVER_NAME);
+
+	pthread_mutex_lock(&list_lock);
+	list_del(&s->list);
+	pthread_mutex_unlock(&list_lock);
+
 	if(retval == NULL)
 		return 0;
 	return -1;
@@ -89,28 +96,25 @@ static void *message_thread(void *arg)
 {
 	struct access_event *event;
 	char *filename;
-	static char msgbuf[sizeof(*event) + PATH_MAX];
-	static char cwd[PATH_MAX];
-	static char cname[PATH_MAX];
 	int rc;
 	int dlen;
-	if(arg) {/* unused */}
+	struct server *s = arg;
 
-	if(getcwd(cwd, sizeof(cwd)) == NULL) {
+	if(getcwd(s->cwd, sizeof(s->cwd)) == NULL) {
 		perror("getcwd");
 		return (void*)-1;
 	}
-	dlen = strlen(cwd);
-	if(dlen >= (signed)sizeof(cwd) - 2) {
-		fprintf(stderr, "Error: CWD[%s] is too large.\n", cwd);
+	dlen = strlen(s->cwd);
+	if(dlen >= (signed)sizeof(s->cwd) - 2) {
+		fprintf(stderr, "Error: CWD[%s] is too large.\n", s->cwd);
 		return (void*)-1;
 	}
-	cwd[dlen] = '/';
-	cwd[dlen+1] = 0;
+	s->cwd[dlen] = '/';
+	s->cwd[dlen+1] = 0;
 
-	event = (struct access_event*)msgbuf;
-	filename = &msgbuf[sizeof(*event)];
-	while((rc = recv(sd, msgbuf, sizeof(msgbuf), 0)) > 0) {
+	event = (struct access_event*)s->msgbuf;
+	filename = &s->msgbuf[sizeof(*event)];
+	while((rc = recv(s->sd, s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
 		int len;
 		int expected;
 
@@ -126,15 +130,15 @@ static void *message_thread(void *arg)
 		}
 
 		if(filename[0] == '/') {
-			len = canonicalize(filename, cname, sizeof(cname), NULL);
+			len = canonicalize(filename, s->cname, sizeof(s->cname), NULL);
 		} else {
-			len = canonicalize2(cwd, filename, cname, sizeof(cname), NULL);
+			len = canonicalize2(s->cwd, filename, s->cname, sizeof(s->cname), NULL);
 		}
 		/* Skip the file if it's outside of our local tree */
 		if(len < 0)
 			continue;
 
-		if(handle_file(event, cname) < 0) {
+		if(handle_file(event, s->cname, &s->finfo) < 0) {
 			return (void*)-1;
 		}
 	}
@@ -147,8 +151,13 @@ static void *message_thread(void *arg)
 
 static void sighandler(int sig)
 {
+	struct server *s;
 	/* Ensure the socket file is cleaned up if a signal is caught. */
-	close(sd);
-	unlink(addr.sun_path);
+	pthread_mutex_lock(&list_lock);
+	list_for_each_entry(s, &server_list, list) {
+		close(s->sd);
+		unlink(s->addr.sun_path);
+	}
+	pthread_mutex_unlock(&list_lock);
 	exit(sig);
 }

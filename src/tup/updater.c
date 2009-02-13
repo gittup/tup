@@ -25,7 +25,7 @@ static int execute_create(struct graph *g);
 static int execute_update(struct graph *g);
 static void show_progress(int n, int tot);
 
-static int update(struct node *n);
+static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static int delete_file(struct node *n);
 
@@ -54,6 +54,8 @@ int updater(int argc, char **argv)
 		}
 	}
 
+	if(server_init() < 0)
+		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
 	if(process_update_nodes() < 0)
@@ -235,12 +237,18 @@ out_err:
 static int execute_update(struct graph *g)
 {
 	struct node *root;
+	struct server *s;
 	int num_processed = 0;
 	int rc = -1;
 
 	if(g->num_nodes)
 		printf("Executing Commands\n");
 
+	s = malloc(sizeof *s);
+	if(!s) {
+		perror("malloc");
+		return -1;
+	}
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
 	list_move(&root->list, &g->plist);
@@ -277,7 +285,7 @@ static int execute_update(struct graph *g)
 					if(delete_name_file(n->tupid) < 0)
 						goto out;
 				} else {
-					if(update(n) < 0) {
+					if(update(n, s) < 0) {
 						if(do_keep_going)
 							goto keep_going;
 						goto out;
@@ -324,11 +332,12 @@ keep_going:
 	}
 	rc = 0;
 out:
+	free(s);
 	tup_db_commit();
 	return rc;
 }
 
-static int update(struct node *n)
+static int update(struct node *n, struct server *s)
 {
 	int status;
 	int pid;
@@ -363,7 +372,7 @@ static int update(struct node *n)
 	if(print_name)
 		printf("[%lli:%lli] %s\n", n->tupid, tupid, name);
 
-	if(start_server() < 0) {
+	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		goto err_close_dfd;
 	}
@@ -378,12 +387,12 @@ static int update(struct node *n)
 		exit(1);
 	}
 	wait(&status);
-	if(stop_server() < 0)
+	if(stop_server(s) < 0)
 		goto err_cmd_failed;
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			if(write_files(tupid, name) < 0)
+			if(write_files(tupid, name, &s->finfo) < 0)
 				goto err_cmd_failed;
 		} else {
 			goto err_cmd_failed;
