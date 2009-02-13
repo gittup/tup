@@ -13,6 +13,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <sys/file.h>
 #include <sys/wait.h>
 
@@ -21,16 +22,31 @@ static int process_update_nodes(void);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
-static int execute_create(struct graph *g);
-static int execute_update(struct graph *g);
+static int execute_graph(struct graph *g, int keep_going,
+			 void *(*work_func)(void *));
 static void show_progress(int n, int tot);
 
+static void *create_work(void *arg);
+static void *update_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static int delete_file(struct node *n);
 
 static int do_show_progress;
 static int do_keep_going;
+
+/*static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;*/
+static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct worker_thread {
+	struct list_head list;
+	pthread_t pid;
+	int node_pipe[2];
+	int status_fd;
+	struct node *n;
+	struct graph *g; /* This should only be used in create_work() */
+};
+
 
 int updater(int argc, char **argv)
 {
@@ -66,6 +82,7 @@ int updater(int argc, char **argv)
 static int process_create_nodes(void)
 {
 	struct graph g;
+	int rc;
 
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
@@ -73,8 +90,14 @@ static int process_create_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(execute_create(&g) < 0)
+	tup_db_begin();
+	rc = execute_graph(&g, 0, create_work);
+	if(rc == 0) {
+		tup_db_commit();
+	} else {
+		tup_db_rollback();
 		return -1;
+	}
 	if(destroy_graph(&g) < 0)
 		return -1;
 	return 0;
@@ -83,6 +106,7 @@ static int process_create_nodes(void)
 static int process_update_nodes(void)
 {
 	struct graph g;
+	int rc;
 
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
@@ -92,7 +116,10 @@ static int process_update_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(execute_update(&g) < 0)
+	tup_db_begin();
+	rc = execute_graph(&g, do_keep_going, update_work);
+	tup_db_commit();
+	if(rc < 0)
 		return -1;
 	if(destroy_graph(&g) < 0)
 		return -1;
@@ -155,23 +182,62 @@ static int find_deps(struct graph *g, struct node *n)
 	return 0;
 }
 
-static int execute_create(struct graph *g)
+static void pop_node(struct graph *g, struct node *n)
+{
+	while(n->edges) {
+		struct edge *e;
+		e = n->edges;
+		if(e->dest->state != STATE_PROCESSING) {
+			list_del(&e->dest->list);
+			list_add(&e->dest->list, &g->plist);
+			e->dest->state = STATE_PROCESSING;
+		}
+
+		n->edges = remove_edge(e);
+	}
+}
+
+static int execute_graph(struct graph *g, int keep_going,
+			 void *(*work_func)(void *))
 {
 	struct node *root;
+	struct worker_thread *wt;
 	int num_processed = 0;
+	int status_pipe[2];
 	int rc = -1;
 
 	if(g->num_nodes)
 		printf("Parsing Tupfiles\n");
 
+	wt = malloc(sizeof *wt);
+	if(!wt) {
+		perror("malloc");
+		return -1;
+	}
+	if(pipe(status_pipe) < 0) {
+		perror("pipe");
+		return -1;
+	}
+	wt->g = g;
+	wt->status_fd = status_pipe[1];
+	if(pipe(wt->node_pipe) < 0) {
+		perror("pipe");
+		return -1;
+	}
+	if(pthread_create(&wt->pid, NULL, work_func, wt) < 0) {
+		perror("pthread_create");
+		return -1;
+	}
+
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
-	list_move(&root->list, &g->plist);
+	pop_node(g, root);
+	remove_node(g, root);
 
-	tup_db_begin();
 	show_progress(num_processed, g->num_nodes);
 	while(!list_empty(&g->plist)) {
 		struct node *n;
+		char c = 1;
 		n = list_entry(g->plist.next, struct node, list);
 		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
 		if(n->incoming_count) {
@@ -179,38 +245,37 @@ static int execute_create(struct graph *g)
 			n->state = STATE_FINISHED;
 			continue;
 		}
-		if(n != root) {
-			if(n->type == TUP_NODE_DIR) {
-				if(n->already_used) {
-					printf("Already parsed[%lli]: '%s'\n", n->tupid, n->name);
-				} else {
-					if(parse(n, g) < 0)
-						goto out_err;
-				}
-			} else if(n->type == TUP_NODE_VAR) {
-			} else if(n->type==TUP_NODE_FILE || n->type==TUP_NODE_CMD) {
-			} else {
-				fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
-				goto out_err;
-			}
+		wt->n = n;
+		if(write(wt->node_pipe[1], &c, 1) != 1) {
+			perror("write");
+			return -1;
 		}
-		while(n->edges) {
-			struct edge *e;
-			e = n->edges;
-			if(e->dest->state != STATE_PROCESSING) {
-				list_del(&e->dest->list);
-				list_add(&e->dest->list, &g->plist);
-				e->dest->state = STATE_PROCESSING;
-			}
 
-			/* TODO: slist_del? */
-			n->edges = remove_edge(e);
-		}
-		if(n != root) {
-			if(tup_db_unflag_create(n->tupid) < 0)
+		{
+			int ret;
+			int status;
+			fd_set rfds;
+
+			FD_ZERO(&rfds);
+			FD_SET(status_pipe[0], &rfds);
+			ret = select(status_pipe[0]+1, &rfds, NULL, NULL, NULL);
+			if(ret <= 0) {
+				perror("select");
+				return -1;
+			}
+			pthread_mutex_lock(&status_mutex);
+			read(status_pipe[0], &status, sizeof(status));
+			pthread_mutex_unlock(&status_mutex);
+			if(status < 0) {
+				if(keep_going)
+					goto keep_going;
 				goto out;
+			}
 		}
-		if(n->type == TUP_NODE_DIR) {
+		pop_node(g, n);
+
+keep_going:
+		if(n->type == g->count_flags && ! (n->flags&TUP_FLAGS_DELETE)) {
 			num_processed++;
 			show_progress(num_processed, g->num_nodes);
 		}
@@ -227,114 +292,119 @@ static int execute_create(struct graph *g)
 	}
 	rc = 0;
 out:
-	tup_db_commit();
+	{
+		char c = 0;
+		write(wt->node_pipe[1], &c, 1);
+		pthread_join(wt->pid, NULL);
+		close(wt->node_pipe[0]);
+		close(wt->node_pipe[1]);
+		free(wt);
+	}
+	close(status_pipe[0]);
+	close(status_pipe[1]);
 	return rc;
-out_err:
-	tup_db_rollback();
-	return -1;
 }
 
-static int execute_update(struct graph *g)
+static void *create_work(void *arg)
 {
-	struct node *root;
-	struct server *s;
-	int num_processed = 0;
-	int rc = -1;
+	struct worker_thread *wt = arg;
+	struct graph *g = wt->g;
+	char c;
+	while(read(wt->node_pipe[0], &c, 1) == 1) {
+		struct node *n;
+		int rc = 0;
 
-	if(g->num_nodes)
-		printf("Executing Commands\n");
+		if(c == 0)
+			break;
+		n = wt->n;
+
+		if(n->type == TUP_NODE_DIR) {
+			if(n->already_used) {
+				printf("Already parsed[%lli]: '%s'\n", n->tupid, n->name);
+				rc = 0;
+			} else {
+				rc = parse(n, g);
+			}
+		} else if(n->type == TUP_NODE_VAR ||
+			  n->type==TUP_NODE_FILE ||
+			  n->type==TUP_NODE_CMD) {
+			rc = 0;
+		} else {
+			fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
+			rc = -1;
+		}
+		if(tup_db_unflag_create(n->tupid) < 0)
+			rc = -1;
+
+		pthread_mutex_lock(&status_mutex);
+		write(wt->status_fd, &rc, sizeof(rc));
+		pthread_mutex_unlock(&status_mutex);
+	}
+	return NULL;
+}
+
+static void *update_work(void *arg)
+{
+	struct worker_thread *wt = arg;
+	struct server *s;
+	char c;
 
 	s = malloc(sizeof *s);
 	if(!s) {
 		perror("malloc");
-		return -1;
+		return NULL;
 	}
-	root = list_entry(g->node_list.next, struct node, list);
-	DEBUGP("root node: %lli\n", root->tupid);
-	list_move(&root->list, &g->plist);
-
-	tup_db_begin();
-	show_progress(num_processed, g->num_nodes);
-	while(!list_empty(&g->plist)) {
+	while(read(wt->node_pipe[0], &c, 1) == 1) {
 		struct node *n;
-		n = list_entry(g->plist.next, struct node, list);
-		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
-		if(n->incoming_count) {
-			list_move(&n->list, &g->node_list);
-			n->state = STATE_FINISHED;
-			continue;
-		}
-		if(n != root) {
-			if(n->type == TUP_NODE_FILE &&
-			   (n->flags == TUP_FLAGS_DELETE)) {
-				printf("[35mDelete[%lli]: %s[0m\n",
-				       n->tupid, n->name);
-				if(delete_file(n) < 0)
-					goto out;
-			} else if((n->type == TUP_NODE_DIR ||
-				   n->type == TUP_NODE_VAR) &&
-				  n->flags == TUP_FLAGS_DELETE) {
-				printf("[35mDelete[%lli]: %s[0m\n",
-				       n->tupid, n->name);
-				if(delete_name_file(n->tupid) < 0)
-					goto out;
-			} else if(n->type == TUP_NODE_CMD) {
-				if(n->flags & TUP_FLAGS_DELETE) {
-					printf("[35mDelete[%lli]: %s[0m\n",
-					       n->tupid, n->name);
-					if(delete_name_file(n->tupid) < 0)
-						goto out;
-				} else {
-					if(update(n, s) < 0) {
-						if(do_keep_going)
-							goto keep_going;
-						goto out;
-					}
-				}
-			}
-		}
-		while(n->edges) {
-			struct edge *e;
-			e = n->edges;
-			if(e->dest->state != STATE_PROCESSING) {
-				list_del(&e->dest->list);
-				list_add(&e->dest->list, &g->plist);
-				e->dest->state = STATE_PROCESSING;
-			}
-			/* Mark the next nodes as modify in case we hit an
-			 * error - we'll need to pick up there.
-			 */
-			if(tup_db_add_modify_list(e->dest->tupid) < 0)
-				goto out;
+		struct edge *e;
+		int rc = 0;
 
-			/* TODO: slist_del? */
-			n->edges = remove_edge(e);
+		if(c == 0)
+			break;
+		n = wt->n;
+
+		if(n->type == TUP_NODE_FILE &&
+		   (n->flags == TUP_FLAGS_DELETE)) {
+			printf("[35mDelete[%lli]: %s[0m\n",
+			       n->tupid, n->name);
+			rc = delete_file(n);
+		} else if((n->type == TUP_NODE_DIR ||
+			   n->type == TUP_NODE_VAR) &&
+			  n->flags == TUP_FLAGS_DELETE) {
+			printf("[35mDelete[%lli]: %s[0m\n",
+			       n->tupid, n->name);
+			rc = delete_name_file(n->tupid);
+
+		} else if(n->type == TUP_NODE_CMD) {
+			if(n->flags & TUP_FLAGS_DELETE) {
+				printf("[35mDelete[%lli]: %s[0m\n",
+				       n->tupid, n->name);
+				rc = delete_name_file(n->tupid);
+			} else {
+				rc = update(n, s);
+			}
 		}
-		if(n != root) {
+
+		if(rc == 0) {
+			e = n->edges;
+			while(e) {
+				/* Mark the next nodes as modify in case we hit
+				 * an error - we'll need to pick up there.
+				 */
+				if(tup_db_add_modify_list(e->dest->tupid) < 0)
+					rc = -1;
+				e = e->next;
+			}
 			if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-				goto out;
+				rc = -1;
 		}
-keep_going:
-		if(n->type == TUP_NODE_CMD && ! (n->flags & TUP_FLAGS_DELETE)) {
-			num_processed++;
-			show_progress(num_processed, g->num_nodes);
-		}
-		remove_node(g, n);
+
+		pthread_mutex_lock(&status_mutex);
+		write(wt->status_fd, &rc, sizeof(rc));
+		pthread_mutex_unlock(&status_mutex);
 	}
-	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
-		printf("\n");
-		if(do_keep_going) {
-			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
-		} else {
-			fprintf(stderr, "Error: Graph is not empty after execution.\n");
-		}
-		goto out;
-	}
-	rc = 0;
-out:
 	free(s);
-	tup_db_commit();
-	return rc;
+	return NULL;
 }
 
 static int update(struct node *n, struct server *s)
