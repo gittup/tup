@@ -1054,6 +1054,8 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 				x += nle->len;
 				first = 0;
 			}
+			memcpy(&s[x], p, spc - p);
+			x += spc - p;
 		}
 		p = spc;
 	}
