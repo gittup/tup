@@ -216,6 +216,19 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		newline = strchr(p, '\n');
 		if(!newline)
 			goto syntax_error;
+		if(line == newline) {
+			/* Skip empty lines */
+			p++;
+			continue;
+		}
+		while(newline[-1] == '\\') {
+			newline[-1] = ' ';
+			newline[0] = ' ';
+			newline = strchr(p, '\n');
+			if(!newline)
+				goto syntax_error;
+		}
+
 		*newline = 0;
 		p = newline + 1;
 
@@ -623,17 +636,17 @@ static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struc
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt)
 {
 	struct path_list *pl;
-	char *spc;
+	int spc_index;
+	int last_entry = 0;
 
 	do {
-		if(!p[0])
-			break;
-		spc = strchr(p, ' ');
-		if(spc) {
-			*spc = 0;
-			if(spc == p)
-				goto skip_empty_space;
-		}
+		spc_index = strcspn(p, " \t");
+		if(p[spc_index] == 0)
+			last_entry = 1;
+		p[spc_index] = 0;
+		if(spc_index == 0)
+			goto skip_empty_space;
+
 		pl = malloc(sizeof *pl);
 		if(!pl) {
 			perror("malloc");
@@ -656,9 +669,8 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt)
 		list_add_tail(&pl->list, plist);
 
 skip_empty_space:
-		if(spc)
-			p = spc + 1;
-	} while(spc != NULL);
+		p += spc_index + 1;
+	} while(!last_entry);
 
 	return 0;
 }
