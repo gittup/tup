@@ -55,6 +55,7 @@ enum {
 	DB_GET_VAR_ID,
 	DB_GET_VARLEN,
 	DB_WRITE_VAR,
+	DB_FLAG_DELETED_VAR_DEPENDENT_DIRS,
 	DB_VAR_FOREACH,
 	_DB_NODE_INSERT,
 	_DB_NODE_SELECT,
@@ -1841,7 +1842,7 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	tupid_t tupid = -1;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[DB_GET_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id and node.id not in (select node.id from delete_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1956,7 +1957,7 @@ int tup_db_get_varlen(const char *var, int varlen)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_VARLEN];
-	static char s[] = "select length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	static char s[] = "select length(value) from var, node where node.dir=? and node.name=? and node.id=var.id and node.id not in (select node.id from delete_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2003,7 +2004,7 @@ tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 	int len;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[DB_WRITE_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id and node.id not in (select node.id from delete_list)";
 	tupid_t tupid = -1;
 
 	if(!*stmt) {
@@ -2014,7 +2015,7 @@ tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 		}
 	}
 
-	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, VAR_DT) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2053,6 +2054,48 @@ out_reset:
 	}
 
 	return tupid;
+}
+
+int tup_db_flag_deleted_var_dependent_dirs(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETED_VAR_DEPENDENT_DIRS];
+	static char s[] = "insert or replace into create_list select id from node where id in (select to_id from link where from_id in (select delete_list.id from delete_list inner join node on delete_list.id=node.id where node.type=?)) and type=?";
+	/* This should move directories into the create list that are dependent
+	 * on variables that are deleted. There's probably an easier way to do
+	 * it, since it takes much longer to say it in SQL that it does in
+	 * English.
+	 */
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_VAR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg)

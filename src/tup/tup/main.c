@@ -105,6 +105,10 @@ int main(int argc, char **argv)
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
 		rc = flush();
+	} else if(strcmp(cmd, "kconfig_pre_delete") == 0) {
+		rc = tup_db_or_dircmd_flags(VAR_DT, TUP_FLAGS_DELETE, TUP_NODE_VAR);
+	} else if(strcmp(cmd, "kconfig_post_delete") == 0) {
+		rc = tup_db_flag_deleted_var_dependent_dirs();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
