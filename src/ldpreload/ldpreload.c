@@ -1,22 +1,22 @@
 #define _GNU_SOURCE
 #include "tup/access_event.h"
+#include "tup/compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <fcntl.h>
-#include <sys/un.h>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <sys/socket.h>
 
 static void handle_file(const char *file, int at);
 static void handle_rename_file(const char *old, const char *new);
 static int ignore_file(const char *file);
 static void ldpre_init(void) __attribute__((constructor));
 static int sd;
-static struct sockaddr_un addr;
 static int my_pid;
 
 static int (*s_open)(const char *, int, ...);
@@ -171,8 +171,7 @@ static void handle_file(const char *file, int at)
 		goto out_unlock;
 	}
 	memcpy(msgbuf + sizeof(*event), file, event->len);
-	sendto(sd, msgbuf, sizeof(*event) + event->len, 0,
-	       (void*)&addr, sizeof(addr));
+	send(sd, msgbuf, sizeof(*event) + event->len, 0);
 out_unlock:
 	pthread_mutex_unlock(&mutex);
 }
@@ -224,13 +223,9 @@ static void ldpre_init(void)
 			"path from the environment.\n", SERVER_NAME);
 		exit(1);
 	}
-	strncpy(addr.sun_path, path, sizeof(addr.sun_path));
-	addr.sun_path[sizeof(addr.sun_path) - 1] = 0;
-	addr.sun_family = AF_UNIX;
-
-	sd = socket(PF_UNIX, SOCK_DGRAM, 0);
-	if(sd < 0) {
-		perror("tup.ldpreload: socket");
+	sd = strtol(path, NULL, 0);
+	if(sd <= 0) {
+		fprintf(stderr, "tup.ldpreload: Unable to get valid socket descriptor.\n");
 		exit(1);
 	}
 }

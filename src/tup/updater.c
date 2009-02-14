@@ -22,7 +22,7 @@ static int process_update_nodes(void);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
-static int execute_graph(struct graph *g, int keep_going,
+static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 static void show_progress(int n, int tot);
 
@@ -34,6 +34,7 @@ static int delete_file(struct node *n);
 
 static int do_show_progress;
 static int do_keep_going;
+static int num_jobs;
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -43,6 +44,7 @@ struct worker_thread {
 	pthread_t pid;
 	int node_pipe[2];
 	int status_fd;
+	int rc;
 	struct node *n;
 	struct graph *g; /* This should only be used in create_work() */
 };
@@ -54,6 +56,7 @@ int updater(int argc, char **argv)
 
 	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
+	num_jobs = tup_db_config_get_int("num_jobs");
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -67,7 +70,14 @@ int updater(int argc, char **argv)
 			do_keep_going = 1;
 		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
 			do_keep_going = 0;
+		} else if(strncmp(argv[x], "-j", 2) == 0) {
+			num_jobs = strtol(argv[x]+2, NULL, 0);
 		}
+	}
+
+	if(num_jobs < 1) {
+		fprintf(stderr, "Warning: Setting the number of jobs to 1\n");
+		num_jobs = 1;
 	}
 
 	if(server_init() < 0)
@@ -90,8 +100,10 @@ static int process_create_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+	if(g.num_nodes)
+		printf("Parsing Tupfiles\n");
 	tup_db_begin();
-	rc = execute_graph(&g, 0, create_work);
+	rc = execute_graph(&g, 0, 1, create_work);
 	if(rc == 0) {
 		tup_db_commit();
 	} else {
@@ -116,8 +128,10 @@ static int process_update_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+	if(g.num_nodes)
+		printf("Executing Commands\n");
 	tup_db_begin();
-	rc = execute_graph(&g, do_keep_going, update_work);
+	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
 	tup_db_commit();
 	if(rc < 0)
 		return -1;
@@ -197,63 +211,79 @@ static void pop_node(struct graph *g, struct node *n)
 	}
 }
 
-static int execute_graph(struct graph *g, int keep_going,
+static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *))
 {
 	struct node *root;
-	struct worker_thread *wt;
+	struct worker_thread *workers;
 	int num_processed = 0;
 	int status_pipe[2];
 	int rc = -1;
+	int x;
+	LIST_HEAD(worker_list);
+	LIST_HEAD(active_list);
 
-	if(g->num_nodes)
-		printf("Parsing Tupfiles\n");
-
-	wt = malloc(sizeof *wt);
-	if(!wt) {
-		perror("malloc");
-		return -1;
-	}
 	if(pipe(status_pipe) < 0) {
 		perror("pipe");
 		return -1;
 	}
-	wt->g = g;
-	wt->status_fd = status_pipe[1];
-	if(pipe(wt->node_pipe) < 0) {
-		perror("pipe");
+
+	workers = malloc(sizeof(*workers) * jobs);
+	if(!workers) {
+		perror("malloc");
 		return -1;
 	}
-	if(pthread_create(&wt->pid, NULL, work_func, wt) < 0) {
-		perror("pthread_create");
-		return -1;
+	for(x=0; x<jobs; x++) {
+		workers[x].g = g;
+		workers[x].status_fd = status_pipe[1];
+		if(pipe(workers[x].node_pipe) < 0) {
+			perror("pipe");
+			return -1;
+		}
+		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
+			perror("pthread_create");
+			return -1;
+		}
+		list_add(&workers[x].list, &worker_list);
 	}
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tupid);
+	list_del(&root->list);
 	pop_node(g, root);
 	remove_node(g, root);
 
 	show_progress(num_processed, g->num_nodes);
 	while(!list_empty(&g->plist)) {
 		struct node *n;
+		struct worker_thread *wt;
 		char c = 1;
 		n = list_entry(g->plist.next, struct node, list);
 		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
 		if(n->incoming_count) {
 			list_move(&n->list, &g->node_list);
 			n->state = STATE_FINISHED;
-			continue;
+			goto check_empties;
 		}
+
+		list_del(&n->list);
+		wt = list_entry(worker_list.next, struct worker_thread, list);
+		list_move(&wt->list, &active_list);
 		wt->n = n;
 		if(write(wt->node_pipe[1], &c, 1) != 1) {
 			perror("write");
 			return -1;
 		}
 
-		{
+check_empties:
+		/* Keep looking for dudes to return as long as:
+		 *  1) There are no more free workers
+		 *  2) There is no work to do (plist is empty) and some people
+		 *     are active.
+		 */
+		while(list_empty(&worker_list) ||
+		      (list_empty(&g->plist) && !list_empty(&active_list))) {
 			int ret;
-			int status;
 			fd_set rfds;
 
 			FD_ZERO(&rfds);
@@ -264,22 +294,27 @@ static int execute_graph(struct graph *g, int keep_going,
 				return -1;
 			}
 			pthread_mutex_lock(&status_mutex);
-			read(status_pipe[0], &status, sizeof(status));
+			if(read(status_pipe[0], &wt, sizeof(wt)) != sizeof(wt)) {
+				perror("read");
+				return -1;
+			}
 			pthread_mutex_unlock(&status_mutex);
-			if(status < 0) {
+			list_move(&wt->list, &worker_list);
+			if(wt->rc < 0) {
 				if(keep_going)
 					goto keep_going;
 				goto out;
 			}
-		}
-		pop_node(g, n);
+			pop_node(g, wt->n);
 
 keep_going:
-		if(n->type == g->count_flags && ! (n->flags&TUP_FLAGS_DELETE)) {
-			num_processed++;
-			show_progress(num_processed, g->num_nodes);
+			if(wt->n->type == g->count_flags &&
+			   ! (wt->n->flags&TUP_FLAGS_DELETE)) {
+				num_processed++;
+				show_progress(num_processed, g->num_nodes);
+			}
+			remove_node(g, wt->n);
 		}
-		remove_node(g, n);
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
 		printf("\n");
@@ -292,14 +327,14 @@ keep_going:
 	}
 	rc = 0;
 out:
-	{
+	for(x=0; x<jobs; x++) {
 		char c = 0;
-		write(wt->node_pipe[1], &c, 1);
-		pthread_join(wt->pid, NULL);
-		close(wt->node_pipe[0]);
-		close(wt->node_pipe[1]);
-		free(wt);
+		write(workers[x].node_pipe[1], &c, 1);
+		pthread_join(workers[x].pid, NULL);
+		close(workers[x].node_pipe[0]);
+		close(workers[x].node_pipe[1]);
 	}
+	free(workers); /* Viva la revolucion! */
 	close(status_pipe[0]);
 	close(status_pipe[1]);
 	return rc;
@@ -310,6 +345,7 @@ static void *create_work(void *arg)
 	struct worker_thread *wt = arg;
 	struct graph *g = wt->g;
 	char c;
+
 	while(read(wt->node_pipe[0], &c, 1) == 1) {
 		struct node *n;
 		int rc = 0;
@@ -336,8 +372,13 @@ static void *create_work(void *arg)
 		if(tup_db_unflag_create(n->tupid) < 0)
 			rc = -1;
 
+		wt->rc = rc;
 		pthread_mutex_lock(&status_mutex);
-		write(wt->status_fd, &rc, sizeof(rc));
+		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+			perror("write");
+			pthread_mutex_unlock(&status_mutex);
+			return NULL;
+		}
 		pthread_mutex_unlock(&status_mutex);
 	}
 	return NULL;
@@ -407,8 +448,13 @@ static void *update_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		}
 
+		wt->rc = rc;
 		pthread_mutex_lock(&status_mutex);
-		write(wt->status_fd, &rc, sizeof(rc));
+		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+			perror("write");
+			pthread_mutex_unlock(&status_mutex);
+			return NULL;
+		}
 		pthread_mutex_unlock(&status_mutex);
 	}
 	free(s);
@@ -469,13 +515,18 @@ static int update(struct node *n, struct server *s)
 	}
 	if(pid == 0) {
 		fchdir(dfd);
+		server_setenv(s);
 		execl("/bin/sh", "/bin/sh", "-c", name, NULL);
 		perror("execl");
 		exit(1);
 	}
-	wait(&status);
-	if(stop_server(s) < 0)
+	if(waitpid(pid, &status, 0) < 0) {
+		perror("waitpid");
 		goto err_cmd_failed;
+	}
+	if(stop_server(s) < 0) {
+		goto err_cmd_failed;
+	}
 
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {

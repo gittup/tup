@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <mcheck.h>
 #include <errno.h>
 #include "tup/config.h"
 #include "tup/lock.h"
@@ -44,7 +43,6 @@ int main(int argc, char **argv)
 	int rc = 0;
 	const char *cmd;
 
-	mtrace();
 	if(argc < 2) {
 		usage();
 		return 1;

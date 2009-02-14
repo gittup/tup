@@ -3,15 +3,12 @@
 
 #include "access_event.h"
 #include "compat.h"
-#include "list.h"
 #include "file.h"
 #include <signal.h>
 #include <sys/un.h>
 
 struct server {
-	struct list_head list;
-	int sd;
-	struct sockaddr_un addr;
+	int sd[2];
 	pthread_t tid;
 	struct file_info finfo;
 	char msgbuf[sizeof(struct access_event) + PATH_MAX];
@@ -20,6 +17,7 @@ struct server {
 };
 
 int server_init(void);
+void server_setenv(struct server *s);
 int start_server(struct server *s);
 int stop_server(struct server *s);
 

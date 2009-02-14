@@ -12,6 +12,7 @@ cp ../testTupfile.tup Tupfile
 # made dependent on each other, since we're supposed to test the keep_going
 # logic, which requires independent commands.
 
+tup config num_jobs 1
 echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
 echo "void foo2(void) {}" > foo2.c

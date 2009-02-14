@@ -5,6 +5,7 @@
 # Then we fix the compilation error by changing the C file (not the header) and
 # update - the second file won't ever be rebuilt. Obviously, that is incorrect.
 . ../tup.sh
+tup config num_jobs 1
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE

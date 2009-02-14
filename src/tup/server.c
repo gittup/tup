@@ -9,12 +9,8 @@
 #include <sys/socket.h>
 
 static void *message_thread(void *arg);
-static void sighandler(int sig);
 
 static char ldpreload_path[PATH_MAX];
-static struct sigaction sigact;
-static LIST_HEAD(server_list);
-static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int server_init(void)
 {
@@ -24,35 +20,22 @@ int server_init(void)
 			"long.\n");
 		return -1;
 	}
-
-	sigact.sa_handler = sighandler;
-	sigact.sa_flags = 0;
-	sigemptyset(&sigact.sa_mask);
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGTERM, &sigact, NULL);
 	return 0;
+}
+
+void server_setenv(struct server *s)
+{
+	char fd_name[32];
+	snprintf(fd_name, sizeof(fd_name), "%i", s->sd[1]);
+	fd_name[31] = 0;
+	setenv(SERVER_NAME, fd_name, 1);
+	setenv("LD_PRELOAD", ldpreload_path, 1);
 }
 
 int start_server(struct server *s)
 {
-	s->sd = socket(PF_UNIX, SOCK_DGRAM, 0);
-	if(s->sd < 0) {
-		perror("socket");
-		return -1;
-	}
-	s->addr.sun_family = AF_UNIX;
-	snprintf(s->addr.sun_path, sizeof(s->addr.sun_path)-1, "/tmp/tup-%i.%i",
-		 getpid(), s->sd);
-	s->addr.sun_path[sizeof(s->addr.sun_path)-1] = 0;
-	unlink(s->addr.sun_path);
-
-	pthread_mutex_lock(&list_lock);
-	list_add(&s->list, &server_list);
-	pthread_mutex_unlock(&list_lock);
-
-	if(bind(s->sd, (void*)&s->addr, sizeof(s->addr)) < 0) {
-		perror("bind");
-		close(s->sd);
+	if(socketpair(AF_UNIX, SOCK_DGRAM, 0, s->sd) < 0) {
+		perror("pipe");
 		return -1;
 	}
 
@@ -60,13 +43,10 @@ int start_server(struct server *s)
 
 	if(pthread_create(&s->tid, NULL, message_thread, s) < 0) {
 		perror("pthread_create");
-		close(s->sd);
-		unlink(s->addr.sun_path);
+		close(s->sd[0]);
+		close(s->sd[1]);
+		return -1;
 	}
-
-	setenv(SERVER_NAME, s->addr.sun_path, 1);
-	setenv("LD_PRELOAD", ldpreload_path, 1);
-	DEBUGP("started server '%s'\n", s->addr.sun_path);
 
 	return 0;
 }
@@ -75,17 +55,16 @@ int stop_server(struct server *s)
 {
 	void *retval = NULL;
 	enum access_type at = ACCESS_STOP_SERVER;
-	DEBUGP("stopping server '%s'\n", s->addr.sun_path);
-	/* TODO: ok to reuse sd here? */
-	sendto(s->sd, &at, sizeof(at), 0, (void*)&s->addr, sizeof(s->addr));
-	pthread_join(s->tid, &retval);
-	close(s->sd);
-	unlink(s->addr.sun_path);
-	unsetenv(SERVER_NAME);
+	int rc;
 
-	pthread_mutex_lock(&list_lock);
-	list_del(&s->list);
-	pthread_mutex_unlock(&list_lock);
+	rc = send(s->sd[1], &at, sizeof(at), 0);
+	if(rc != sizeof(at)) {
+		perror("write");
+		return -1;
+	}
+	pthread_join(s->tid, &retval);
+	close(s->sd[0]);
+	close(s->sd[1]);
 
 	if(retval == NULL)
 		return 0;
@@ -110,7 +89,7 @@ static void *message_thread(void *arg)
 
 	event = (struct access_event*)s->msgbuf;
 	filename = &s->msgbuf[sizeof(*event)];
-	while((rc = recv(s->sd, s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
+	while((rc = recv(s->sd[0], s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
 		int len;
 		int expected;
 
@@ -143,17 +122,4 @@ static void *message_thread(void *arg)
 		return (void*)-1;
 	}
 	return NULL;
-}
-
-static void sighandler(int sig)
-{
-	struct server *s;
-	/* Ensure the socket file is cleaned up if a signal is caught. */
-	pthread_mutex_lock(&list_lock);
-	list_for_each_entry(s, &server_list, list) {
-		close(s->sd);
-		unlink(s->addr.sun_path);
-	}
-	pthread_mutex_unlock(&list_lock);
-	exit(sig);
 }

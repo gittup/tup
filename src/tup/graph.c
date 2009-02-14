@@ -47,7 +47,6 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 
 void remove_node(struct graph *g, struct node *n)
 {
-	list_del(&n->list);
 	if(n->edges) {
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tupid);
 	}

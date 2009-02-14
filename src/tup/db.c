@@ -138,6 +138,7 @@ int tup_db_create(int db_sync)
 		"insert into config values('db_sync', 1)",
 		"insert into config values('db_version', 0)",
 		"insert into config values('autoupdate', 0)",
+		"insert into config values('num_jobs', 1)",
 		"insert into node values(1, 0, 2, '.')",
 		"insert into node values(2, 1, 2, '@')",
 	};
@@ -713,7 +714,7 @@ int tup_db_open_tupid(tupid_t tupid)
 
 	fd = tup_db_open_tupid(parent);
 	if(fd < 0)
-		return -1;
+		return fd;
 
 	rc = openat(fd, path, O_RDONLY);
 	if(rc < 0) {
