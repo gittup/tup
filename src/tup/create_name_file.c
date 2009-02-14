@@ -69,6 +69,8 @@ tupid_t create_var_file(const char *var, const char *value)
 			return -1;
 		if(tup_db_add_modify_list(dbn.tupid) < 0)
 			return -1;
+		if(tup_db_unflag_delete(dbn.tupid) < 0)
+			return -1;
 	}
 	return tup_db_set_var(tupid, value);
 }
