@@ -37,7 +37,8 @@ enum {
 	DB_UNFLAG_DELETE,
 	DB_DELETE_DIR,
 	_DB_GET_RECURSE_DIRS,
-	DB_GET_LINKS,
+	DB_GET_DEST_LINKS,
+	DB_GET_SRC_LINKS,
 	DB_LINK_EXISTS,
 	DB_IS_ROOT_NODE,
 	DB_DELETE_LINKS,
@@ -1283,11 +1284,11 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 	return 0;
 }
 
-int tup_db_get_links(tupid_t from_id, struct list_head *head)
+int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
 {
 	int rc;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_GET_LINKS];
+	sqlite3_stmt **stmt = &stmts[DB_GET_DEST_LINKS];
 	static char s[] = "select to_id from link where from_id=? and to_id not in (select id from delete_list where id=to_id)";
 
 	if(!*stmt) {
@@ -1299,6 +1300,59 @@ int tup_db_get_links(tupid_t from_id, struct list_head *head)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, from_id) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		struct tupid_list *tl;
+
+		tl = malloc(sizeof *tl);
+		if(!tl) {
+			perror("malloc");
+			rc = -1;
+			goto out_reset;
+		}
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		tl->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&tl->list, head);
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_get_src_links(tupid_t to_id, struct list_head *head)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_GET_SRC_LINKS];
+	static char s[] = "select from_id from link where to_id=? and from_id not in (select id from delete_list where id=from_id)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, to_id) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

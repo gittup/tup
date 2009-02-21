@@ -83,10 +83,13 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 	struct tupid_list *tl;
 	int output_bork = 0;
 	LIST_HEAD(old_output_list);
+	LIST_HEAD(old_input_list);
 
 	handle_unlink(info);
 
-	if(tup_db_get_links(old_cmdid, &old_output_list) < 0)
+	if(tup_db_get_dest_links(old_cmdid, &old_output_list) < 0)
+		return -1;
+	if(tup_db_get_src_links(old_cmdid, &old_input_list) < 0)
 		return -1;
 
 	while(!list_empty(&info->write_list)) {
@@ -127,11 +130,29 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
+		int rc;
 		r = list_entry(info->read_list.next, struct file_entry, list);
 		if(get_dbn(r->filename, &dbn) < 0) {
 			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
 			return -1;
 		}
+		/* Root nodes are always cool */
+		rc = tup_db_is_root_node(dbn.tupid);
+		if(rc < 0)
+			return -1;
+		if(rc == 1)
+			goto link_cool;
+		/* Non-root nodes that are specified as input links in the
+		 * Tupfile are also cool.
+		 */
+		list_for_each_entry(tl, &old_input_list, list) {
+			if(tl->tupid == dbn.tupid)
+				goto link_cool;
+		}
+		/* Non-coolness is not allowed. */
+		fprintf(stderr, "tup error: File '%s' was read from, is generated from another command, and was not specified as an input link for command '%s'. You should add this file as an input, since it is possible this could randomly break in the future.\n", r->filename, debug_name);
+		return -1;
+link_cool:
 		if(tup_db_create_link(dbn.tupid, cmdid) < 0)
 			return -1;
 		del_entry(r);

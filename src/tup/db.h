@@ -83,7 +83,8 @@ int tup_db_unflag_delete(tupid_t tupid);
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
 int tup_db_create_unique_link(tupid_t a, tupid_t b);
-int tup_db_get_links(tupid_t from_id, struct list_head *head);
+int tup_db_get_dest_links(tupid_t from_id, struct list_head *head);
+int tup_db_get_src_links(tupid_t to_id, struct list_head *head);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);
