@@ -407,7 +407,7 @@ static void *update_work(void *arg)
 		n = wt->n;
 
 		if(n->type == TUP_NODE_FILE &&
-		   (n->flags == TUP_FLAGS_DELETE)) {
+		   (n->flags & TUP_FLAGS_DELETE)) {
 			printf("[35mDelete[%lli]: %s[0m\n",
 			       n->tupid, n->name);
 			pthread_mutex_lock(&db_mutex);
@@ -415,7 +415,7 @@ static void *update_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		} else if((n->type == TUP_NODE_DIR ||
 			   n->type == TUP_NODE_VAR) &&
-			  n->flags == TUP_FLAGS_DELETE) {
+			  n->flags & TUP_FLAGS_DELETE) {
 			printf("[35mDelete[%lli]: %s[0m\n",
 			       n->tupid, n->name);
 			pthread_mutex_lock(&db_mutex);
