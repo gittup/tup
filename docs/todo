@@ -17,8 +17,6 @@ import/export vars to file
 
 yell at you if you input a file that was a commands output and you didn't specify the link in the Tupfile
 
-r->input_pattern not valid in do_rule()? it gets overwritten while generating the input nl. Maybe put in a line number where the rule was found.
-
 error cases:
 what if:
  /lib/libfoo.a

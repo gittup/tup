@@ -54,6 +54,7 @@ struct rule {
 	char *output_pattern;
 	char *command;
 	struct name_list namelist;
+	int line_number;
 	tupid_t dt;
 };
 
@@ -65,8 +66,8 @@ struct build_name_list_args {
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			 struct list_head *rules, tupid_t tupid, tupid_t curdir);
-static int parse_rule(char *p, struct list_head *rules, tupid_t dt);
-static int parse_varsed(char *p, struct list_head *rules, tupid_t dt);
+static int parse_rule(char *p, struct list_head *rules, tupid_t dt, int lno);
+static int parse_varsed(char *p, struct list_head *rules, tupid_t dt, int lno);
 static int execute_rules(struct list_head *rules, struct graph *g);
 static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g);
 static int get_path_list(char *p, struct list_head *head, tupid_t dt);
@@ -203,6 +204,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 	char *line;
 	char *eval_line;
 	int if_true = 1;
+	int lno = 0;
 
 	p = b->s;
 	e = b->s + b->len;
@@ -216,6 +218,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		newline = strchr(p, '\n');
 		if(!newline)
 			goto syntax_error;
+		lno++;
 		if(line == newline) {
 			/* Skip empty lines */
 			p++;
@@ -342,10 +345,10 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				if_true = 0;
 			}
 		} else if(eval_line[0] == ':') {
-			if(parse_rule(eval_line+1, rules, tupid) < 0)
+			if(parse_rule(eval_line+1, rules, tupid, lno) < 0)
 				goto syntax_error;
 		} else if(eval_line[0] == ',') {
-			if(parse_varsed(eval_line+1, rules, tupid) < 0)
+			if(parse_varsed(eval_line+1, rules, tupid, lno) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -401,7 +404,7 @@ syntax_error:
 	return -1;
 }
 
-static int parse_rule(char *p, struct list_head *rules, tupid_t dt)
+static int parse_rule(char *p, struct list_head *rules, tupid_t dt, int lno)
 {
 	char *input, *cmd, *output;
 	char *ie, *ce;
@@ -468,12 +471,13 @@ static int parse_rule(char *p, struct list_head *rules, tupid_t dt)
 		return -1;
 	}
 	r->dt = dt;
+	r->line_number = lno;
 	init_name_list(&r->namelist);
 	list_add_tail(&r->list, rules);
 	return 0;
 }
 
-static int parse_varsed(char *p, struct list_head *rules, tupid_t dt)
+static int parse_varsed(char *p, struct list_head *rules, tupid_t dt, int lno)
 {
 	char *input, *output;
 	char *ie;
@@ -521,6 +525,7 @@ static int parse_varsed(char *p, struct list_head *rules, tupid_t dt)
 		return -1;
 	}
 	r->dt = dt;
+	r->line_number = lno;
 	init_name_list(&r->namelist);
 	list_add_tail(&r->list, rules);
 	return 0;
@@ -814,7 +819,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 		return -1;
 	list_for_each_entry(pl, &oplist, list) {
 		if(pl->path) {
-			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule: '%s [33m|>[0m [35m%s[0m [33m|>[0m %s'\n", pl->path, r->dt, r->input_pattern, r->command, r->output_pattern);
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, r->dt, r->line_number, r->command);
 			return -1;
 		}
 		onle = malloc(sizeof *onle);
