@@ -6,7 +6,7 @@
 cat > Tupfile << HERE
 include foo/Install.tup
 include bar/Install.tup
-: foreach \$(input) |> echo cp %f %o |> %B.o
+: foreach \$(input) |> cp %f %o |> %B.o
 HERE
 
 mkdir foo
@@ -20,5 +20,5 @@ input += bar/tab
 HERE
 
 tup touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
-update
+tup parse
 tup_object_exist . sball.o tab.o

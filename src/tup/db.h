@@ -2,6 +2,7 @@
 #define tup_db_h
 
 #include "tupid.h"
+#include "list.h"
 
 #define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
@@ -13,6 +14,11 @@ struct db_node {
 	tupid_t dt;
 	const char *name;
 	int type;
+};
+
+struct tupid_list {
+	struct list_head list;
+	tupid_t tupid;
 };
 
 enum TUP_NODE_TYPE {
@@ -46,7 +52,7 @@ tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
 tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_select_node(tupid_t dt, const char *name);
-tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
+int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len);
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
 				void *arg, int flags);
@@ -77,6 +83,7 @@ int tup_db_unflag_delete(tupid_t tupid);
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
 int tup_db_create_unique_link(tupid_t a, tupid_t b);
+int tup_db_get_links(tupid_t from_id, struct list_head *head);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);

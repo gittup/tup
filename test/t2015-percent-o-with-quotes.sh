@@ -4,9 +4,9 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foo.c |> echo "gcc -c %f -o %o" |> %B.o
+: foo.c |> sh -c "gcc -c %f -o %o" |> %B.o
 HERE
 tup touch foo.c Tupfile
-update
+tup parse
 tup_object_exist . foo.c
-tup_object_exist . "echo \"gcc -c foo.c -o foo.o\""
+tup_object_exist . "sh -c \"gcc -c foo.c -o foo.o\""

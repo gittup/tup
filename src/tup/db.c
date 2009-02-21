@@ -37,6 +37,7 @@ enum {
 	DB_UNFLAG_DELETE,
 	DB_DELETE_DIR,
 	_DB_GET_RECURSE_DIRS,
+	DB_GET_LINKS,
 	DB_LINK_EXISTS,
 	DB_IS_ROOT_NODE,
 	DB_DELETE_LINKS,
@@ -336,7 +337,7 @@ tupid_t tup_db_select_node(tupid_t dt, const char *name)
 	return dbn.tupid;
 }
 
-tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
+int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 {
 	if(node_select(dt, name, -1, dbn) < 0)
 		return -1;
@@ -344,7 +345,7 @@ tupid_t tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 	dbn->dt = dt;
 	dbn->name = name;
 
-	return dbn->tupid;
+	return 0;
 }
 
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len)
@@ -1280,6 +1281,59 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 	if(link_insert(a, b) < 0)
 		return -1;
 	return 0;
+}
+
+int tup_db_get_links(tupid_t from_id, struct list_head *head)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_GET_LINKS];
+	static char s[] = "select to_id from link where from_id=? and to_id not in (select id from delete_list where id=to_id)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, from_id) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		struct tupid_list *tl;
+
+		tl = malloc(sizeof *tl);
+		if(!tl) {
+			perror("malloc");
+			rc = -1;
+			goto out_reset;
+		}
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		tl->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&tl->list, head);
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
 }
 
 int tup_db_link_exists(tupid_t a, tupid_t b)

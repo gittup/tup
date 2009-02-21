@@ -87,8 +87,10 @@ int main(int argc, char **argv)
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "link") == 0) {
 		rc = mlink(argc, argv);
+	} else if(strcmp(cmd, "parse") == 0) {
+		rc = updater(argc, argv, 1);
 	} else if(strcmp(cmd, "upd") == 0) {
-		rc = updater(argc, argv);
+		rc = updater(argc, argv, 0);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {

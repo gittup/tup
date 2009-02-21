@@ -14,7 +14,6 @@ HERE
 
 cat > Tupfile.vars << HERE
 CC = gcc
-CC = echo \$(CC)
 include Tupfile.ccargs
 HERE
 
@@ -24,8 +23,8 @@ CCARGS += -o %o
 HERE
 
 tup touch a/foo.c a/bar.c a/Tupfile Tupfile.vars Tupfile.ccargs
-update
+tup parse
 tup_object_exist a foo.c bar.c
-tup_object_exist a "echo gcc -c foo.c -o foo.o"
-tup_object_exist a "echo gcc -c bar.c -o bar.o"
-tup_object_exist a "echo gcc -o prog foo.o bar.o"
+tup_object_exist a "gcc -c foo.c -o foo.o"
+tup_object_exist a "gcc -c bar.c -o bar.o"
+tup_object_exist a "gcc -o prog foo.o bar.o"

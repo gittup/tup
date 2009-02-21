@@ -45,16 +45,16 @@ tupid_t create_var_file(const char *var, const char *value)
 {
 	int rc;
 	struct db_node dbn;
-	tupid_t tupid;
 
-	tupid = tup_db_select_dbn(VAR_DT, var, &dbn);
-	if(tupid < 0) {
-		tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR);
-		if(tupid < 0)
+	if(tup_db_select_dbn(VAR_DT, var, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0) {
+		dbn.tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR);
+		if(dbn.tupid < 0)
 			return -1;
 	} else {
 		char *orig_value;
-		if(tup_db_get_var_id(tupid, &orig_value) < 0)
+		if(tup_db_get_var_id(dbn.tupid, &orig_value) < 0)
 			return -1;
 		rc = strcmp(orig_value, value);
 		free(orig_value);
@@ -72,7 +72,7 @@ tupid_t create_var_file(const char *var, const char *value)
 		if(tup_db_unflag_delete(dbn.tupid) < 0)
 			return -1;
 	}
-	return tup_db_set_var(tupid, value);
+	return tup_db_set_var(dbn.tupid, value);
 }
 
 int tup_file_mod(tupid_t dt, const char *file, int flags)
@@ -87,6 +87,8 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	 * 3) a Tupfile was modified
 	 */
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0)
 		upddir = 1;
 	if(flags == TUP_FLAGS_DELETE)
 		upddir = 1;
@@ -168,13 +170,13 @@ int tup_pathname_mod(const char *path, int flags)
 
 tupid_t get_dbn(const char *path, struct db_node *dbn)
 {
-	int rc;
 	const char *file;
 	tupid_t dt;
 
 	if(strcmp(path, ".") == 0) {
-		rc = tup_db_select_dbn(0, path, dbn);
-		return rc;
+		if(tup_db_select_dbn(0, path, dbn) < 0)
+			return -1;
+		return dbn->tupid;
 	}
 
 	dt = __find_dir_tupid(path, &file);
@@ -182,8 +184,9 @@ tupid_t get_dbn(const char *path, struct db_node *dbn)
 		return -1;
 
 	if(file) {
-		rc = tup_db_select_dbn(dt, file, dbn);
-		return rc;
+		if(tup_db_select_dbn(dt, file, dbn) < 0)
+			return -1;
+		return dbn->tupid;
 	} else {
 		printf("TODO: no dbn?\n");
 		return -1;

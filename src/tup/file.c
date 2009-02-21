@@ -74,13 +74,20 @@ int handle_file(const struct access_event *event, const char *filename,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info)
+int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
+		struct file_info *info)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 	struct db_node dbn;
+	struct tupid_list *tl;
+	int output_bork = 0;
+	LIST_HEAD(old_output_list);
 
 	handle_unlink(info);
+
+	if(tup_db_get_links(old_cmdid, &old_output_list) < 0)
+		return -1;
 
 	while(!list_empty(&info->write_list)) {
 		struct file_entry *tmp;
@@ -97,9 +104,27 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info)
 			if(strcmp(w->filename, r->filename) == 0)
 				del_entry(r);
 		}
+		list_for_each_entry(tl, &old_output_list, list) {
+			if(tl->tupid == dbn.tupid) {
+				/* Ok to do list_del without _safe because we
+				 * break out of the loop (links are unique, so
+				 * there is only going to be one matching tupid
+				 * in the old_output_list).
+				 */
+				list_del(&tl->list);
+				free(tl);
+				break;
+			}
+		}
 
 		del_entry(w);
 	}
+	list_for_each_entry(tl, &old_output_list, list) {
+		fprintf(stderr, "Error: Tupid %lli was supposed to be written to by command %lli, but it wasn't.\n", tl->tupid, old_cmdid);
+		output_bork = 1;
+	}
+	if(output_bork)
+		return -1;
 
 	while(!list_empty(&info->read_list)) {
 		r = list_entry(info->read_list.next, struct file_entry, list);

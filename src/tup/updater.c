@@ -50,7 +50,7 @@ struct worker_thread {
 };
 
 
-int updater(int argc, char **argv)
+int updater(int argc, char **argv, int parse_only)
 {
 	int x;
 
@@ -84,6 +84,8 @@ int updater(int argc, char **argv)
 		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
+	if(parse_only)
+		return 0;
 	if(process_update_nodes() < 0)
 		return -1;
 	return 0;
@@ -531,7 +533,7 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = write_files(tupid, name, &s->finfo);
+			rc = write_files(tupid, n->tupid, name, &s->finfo);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;

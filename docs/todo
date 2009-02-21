@@ -3,9 +3,43 @@ when restarting monitor - compare file timestamps to the last time the monitor
 
 can we update a server file (like httpd.c) and restart apache? (eg: like incrontab program)
 
-portability:
- mac osx may have trouble with unlink() inside a flist_foreach()?
-
 support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
 
   when rebuilding foo.c, should stat foo.h and compare against .tup/objects/foo.h/.name to see if timestamp is different? maybe have a timestamp option (part of the tup configuration) to perform this check, and if out of date add foo.h to modify list as well. That way if foo.h is modified but 'tup touch foo.h' wasn't executed, the build won't be inconsistent.
+
+--version flag - print git commit?
+
+Change or fix 'silent' command flag '@', since it gets confused as the start of an @-variable mark.
+
+multi-arch - when building a name-list, automatically include files in a separate build/$(ARCH) directory or some such?
+
+import/export vars to file
+
+yell at you if you input a file that was a commands output and you didn't specify the link in the Tupfile
+
+r->input_pattern not valid in do_rule()? it gets overwritten while generating the input nl. Maybe put in a line number where the rule was found.
+
+error cases:
+what if:
+ /lib/libfoo.a
+ gcc bar.c -lfoo -L/usr/lib -L/lib
+ now create /usr/lib/libfoo.a
+ should the link command execute again? after all, if it *did* execute again, it would pull a different lib.
+
+cross compiling
+
+out of tree build
+
+change progress bar: Only print bar on lowest line, then backspace and print command on its own line?
+
+wrapper work if the program does a chdir?
+
+3 phases - create, update, delete? eg: during update, move things in to a separate graph, then process that graph in reverse in order to delete things in the opposite order. Doesn't really matter for files, but if commands involved ifconfig or route or whatever, it may make sense to undo commands in reverse order.
+
+html:
+  proof: big-o notation
+  proof: why deps go up
+  proof: why commands are in the DAG
+  how dependencies are described/discovered
+  tup vs. The All-Seeing Eye Of Mordor
+

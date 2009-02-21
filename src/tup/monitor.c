@@ -429,7 +429,7 @@ static void flush_queue(void)
 		if(pid == 0) {
 			if(tup_lock_init() < 0)
 				exit(1);
-			updater(1, NULL);
+			updater(1, NULL, 0);
 			tup_db_config_set_int(AUTOUPDATE_PID, -1);
 			tup_lock_exit();
 			exit(0);

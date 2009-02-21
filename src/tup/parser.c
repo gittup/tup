@@ -803,31 +803,28 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *tmp, *onle;
-	char *p;
-	char *spc;
 	char *cmd;
+	struct path_list *pl;
 	tupid_t cmd_id;
+	LIST_HEAD(oplist);
 
 	init_name_list(&onl);
 
-	p = r->output_pattern;
-	do {
-		spc = strchr(p, ' ');
-		if(spc)
-			*spc = 0;
-
+	if(get_path_list(r->output_pattern, &oplist, r->dt) < 0)
+		return -1;
+	list_for_each_entry(pl, &oplist, list) {
+		if(pl->path) {
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule: '%s [33m|>[0m [35m%s[0m [33m|>[0m %s'\n", pl->path, r->dt, r->input_pattern, r->command, r->output_pattern);
+			return -1;
+		}
 		onle = malloc(sizeof *onle);
 		if(!onle) {
 			perror("malloc");
 			return -1;
 		}
-		onle->path = tup_printf(p, nl, NULL);
+		onle->path = tup_printf(pl->file, nl, NULL);
 		if(!onle->path)
 			return -1;
-		if(strchr(onle->path, '/')) {
-			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule: '%s [33m|>[0m [35m%s[0m [33m|>[0m %s'\n", onle->path, r->dt, r->input_pattern, r->command, r->output_pattern);
-			return -1;
-		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
@@ -840,9 +837,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 
 		add_name_list_entry(&onl, onle);
 
-		if(spc)
-			p = spc + 1;
-	} while(spc != NULL);
+	}
 
 	list_for_each_entry_safe(nle, tmp, &nl->entries, list) {
 		list_for_each_entry(onle, &onl.entries, list) {
@@ -968,6 +963,10 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 		} else if(*p == 'o') {
 			if(!onl) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
+				return NULL;
+			}
+			if(onl->num_entries == 0) {
+				fprintf(stderr, "Error: %%o used in rule pattern and no output files were specified.\n");
 				return NULL;
 			}
 			clen += onl->totlen + (onl->num_entries-1);

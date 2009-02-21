@@ -4,7 +4,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foo.c |> echo gcc -c foo.c -o foo.o |> foo.o
+: foo.c |> echo gcc -c foo.c -o foo.o |>
 HERE
 tup touch foo.c Tupfile
 tup upd
