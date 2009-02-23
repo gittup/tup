@@ -8,6 +8,7 @@
 #include "server.h"
 #include "file.h"
 #include "fslurp.h"
+#include "array_size.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,25 @@ static int num_jobs;
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static const char *signal_err[] = {
+	NULL, /* 0 */
+	"Hangup detected on controlling terminal or death of controlling process",
+	"Interrupt from keyboard",
+	"Quit from keyboard",
+	"Illegal Instruction",
+	NULL, /* 5 */
+	"Abort signal from abort(3)",
+	NULL,
+	"Floating point exception",
+	"Kill signal",
+	NULL, /* 10 */
+	"Segmentation fault",
+	NULL,
+	"Broken pipe: write to pipe with no readers",
+	"Timer signal from alarm(2)",
+	"Termination signal", /* 15 */
+};
 
 struct worker_thread {
 	struct list_head list;
@@ -540,6 +560,17 @@ static int update(struct node *n, struct server *s)
 		} else {
 			goto err_cmd_failed;
 		}
+	} else if(WIFSIGNALED(status)) {
+		int sig = WTERMSIG(status);
+		const char *errmsg = "Unknown signal";
+
+		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
+			errmsg = signal_err[sig];
+		fprintf(stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
+		goto err_cmd_failed;
+	} else {
+		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", status);
+		goto err_cmd_failed;
 	}
 
 	close(dfd);
