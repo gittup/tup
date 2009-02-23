@@ -29,6 +29,8 @@ static int (*s_symlink)(const char *, const char *);
 static int (*s_rename)(const char*, const char*);
 static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
+static int (*s_execve)(const char *filename, char *const argv[],
+		       char *const envp[]);
 
 int open(const char *pathname, int flags, ...)
 {
@@ -152,6 +154,15 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 	return rc;
 }
 
+int execve(const char *filename, char *const argv[], char *const envp[])
+{
+	int rc;
+
+	handle_file(filename, ACCESS_READ);
+	rc = s_execve(filename, argv, envp);
+	return rc;
+}
+
 static void handle_file(const char *file, int at)
 {
 	struct access_event *event;
@@ -209,8 +220,9 @@ static void ldpre_init(void)
 	s_rename = dlsym(RTLD_NEXT, "rename");
 	s_unlink = dlsym(RTLD_NEXT, "unlink");
 	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
+	s_execve = dlsym(RTLD_NEXT, "execve");
 	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
-	   !s_creat || !s_rename || !s_unlink || !s_unlinkat) {
+	   !s_creat || !s_rename || !s_unlink || !s_unlinkat || !s_execve) {
 		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
 		exit(1);
 	}
