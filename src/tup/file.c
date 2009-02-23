@@ -150,7 +150,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 				goto link_cool;
 		}
 		/* Non-coolness is not allowed. */
-		fprintf(stderr, "tup error: File '%s' was read from, is generated from another command, and was not specified as an input link for command '%s'. You should add this file as an input, since it is possible this could randomly break in the future.\n", r->filename, debug_name);
+		fprintf(stderr, "tup error: Missing input dependency - file '%s' was read from, and was not specified as an input link for the command '%s'. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n", r->filename, debug_name);
 		return -1;
 link_cool:
 		if(tup_db_create_link(dbn.tupid, cmdid) < 0)
