@@ -14,6 +14,7 @@
 #include "tup/graph.h"
 #include "tup/init.h"
 #include "tup/compat.h"
+#include "tup/version.h"
 
 static int file_exists(const char *s);
 
@@ -65,6 +66,11 @@ int main(int argc, char **argv)
 		argc--;
 		argv++;
 		return init(argc, argv);
+	} else if(strcmp(argv[1], "version") == 0 ||
+		  strcmp(argv[1], "--version") == 0 ||
+		  strcmp(argv[1], "-v") == 0) {
+		printf("tup %s\n", tup_version());
+		return 0;
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {
@@ -573,7 +579,7 @@ static int check_open_fds(void)
 
 static void usage(void)
 {
-	printf("Usage: tup command [args]\n");
+	printf("tup %s usage: tup command [args]\n", tup_version());
 	printf("Where command is:\n");
 	printf("  init		Initialize the tup database in .tup/\n");
 	printf("  monitor 	Start the file monitor\n");
