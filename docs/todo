@@ -30,8 +30,5 @@ wrapper work if the program does a chdir?
 
 html:
   proof: big-o notation
-  proof: why deps go up
-  proof: why commands are in the DAG
   how dependencies are described/discovered
   tup vs. The All-Seeing Eye Of Mordor
-
