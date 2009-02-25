@@ -14,8 +14,12 @@ ldpreload.so: LDFLAGS := -ldl -lsqlite3
 tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
 
+# The git status command seems to get rid of files that may have been touched
+# but aren't modified. Not really sure why that is, or if there's a better way
+# to do it.
 tup:
-	$Qif test -z "$$(git diff-index --name-only HEAD)"; then mod=""; else mod="-mod"; fi ;\
+	$Qgit status > /dev/null 2>&1;\
+	if test -z "$$(git diff-index --name-only HEAD)"; then mod=""; else mod="-mod"; fi ;\
 	version=`git describe`; \
 	echo "  VERSION $${version}$${mod}"; \
 	echo "const char *tup_version(void) {return \"$${version}$${mod}\";}" | gcc -x c -c - -o $(BUILD)tup_version.o; \
