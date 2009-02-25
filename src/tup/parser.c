@@ -810,8 +810,11 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	struct name_list_entry *nle, *tmp, *onle;
 	char *cmd;
 	struct path_list *pl;
+	struct tupid_list *tl;
+	int bork = 0;
 	tupid_t cmd_id;
 	LIST_HEAD(oplist);
+	LIST_HEAD(old_input_list);
 
 	init_name_list(&onl);
 
@@ -861,6 +864,9 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	if(cmd_id < 0)
 		return -1;
 
+	if(tup_db_get_src_links(cmd_id, &old_input_list) < 0)
+		return -1;
+
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
 				  list);
@@ -874,11 +880,43 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	list_for_each_entry(nle, &nl->entries, list) {
 		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
 			return -1;
+		list_for_each_entry(tl, &old_input_list, list) {
+			if(tl->tupid == nle->tupid) {
+				/* Ok to delete here - we're braking for
+				 * turtles
+				 */
+				list_del(&tl->list);
+				free(tl);
+				break;
+			}
+		}
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
 		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
 			return -1;
+		list_for_each_entry(tl, &old_input_list, list) {
+			if(tl->tupid == nle->tupid) {
+				/* Ok to delete here - we're braking for
+				 * turtles
+				 */
+				list_del(&tl->list);
+				free(tl);
+				break;
+			}
+		}
 	}
+	list_for_each_entry(tl, &old_input_list, list) {
+		int rc;
+		rc = tup_db_is_root_node(tl->tupid);
+		if(rc < 0)
+			return -1;
+		if(rc == 0) {
+			fprintf(stderr, "Error: You seem to have removed a required input file (%lli). Please add it back. If it truly isn't needed anymore, you can probably remove it after a successful update.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", tl->tupid, r->dt, r->line_number, r->command);
+			bork = 1;
+		}
+	}
+	if(bork)
+		return -1;
 	return 0;
 }
 
