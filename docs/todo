@@ -1,5 +1,3 @@
-foo.c includes autogen.h, and autogen.h is correctly specified in the rule, and then later removed from the rule (but foo.c still includes it), should tup yell at you?
-
 when restarting monitor - compare file timestamps to the last time the monitor
  shutdown? that way no file changes are missed
 
