@@ -11,12 +11,12 @@ include_root tab/Install.tup
 HERE
 mkdir bar
 cat > bar/Install.tup << HERE
-lib += \$(TUP_TOP)bar/foo.so
+lib += \$(TUP_TOP)/bar/foo.so
 HERE
 
 mkdir tab
 cat > tab/Install.tup << HERE
-lib += \$(TUP_TOP)tab/blah.so
+lib += \$(TUP_TOP)/tab/blah.so
 HERE
 
 touch bar/foo.so

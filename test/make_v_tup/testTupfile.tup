@@ -1,2 +1,2 @@
-: foreach *.c |> gcc -I/home/marf/tup/test/make_v_tup/.run_test/ttup -c %f -o %o |> %F.o
+: foreach *.c |> gcc -I$(TUP_TOP) -c %f -o %o |> %F.o
 : *.o |> gcc %f -o %o |> prog

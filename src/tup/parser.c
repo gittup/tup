@@ -116,7 +116,8 @@ TODO: How to find circular deps?
 		num_dotdots++;
 	}
 	if(num_dotdots) {
-		char *path = malloc(num_dotdots * 3 + 1);
+		/* No +1 because we leave off the trailing '/' */
+		char *path = malloc(num_dotdots * 3);
 		char *p;
 		if(!path) {
 			perror("malloc");
@@ -124,14 +125,18 @@ TODO: How to find circular deps?
 		}
 		p = path;
 		for(; num_dotdots; num_dotdots--) {
-			strcpy(p, "../");
-			p += 3;
+			strcpy(p, "..");
+			p += 2;
+			if(num_dotdots > 1) {
+				strcpy(p, "/");
+				p++;
+			}
 		}
 		if(vardb_set(&vdb, "TUP_TOP", path) < 0)
 			return -1;
 		free(path);
 	} else {
-		if(vardb_set(&vdb, "TUP_TOP", "") < 0)
+		if(vardb_set(&vdb, "TUP_TOP", ".") < 0)
 			return -1;
 	}
 
