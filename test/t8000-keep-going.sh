@@ -19,8 +19,8 @@ echo "void foo2(void) {}" > foo2.c
 tup touch bar.c foo.c foo2.c
 update_fail
 
-check_exist bar.o
-check_not_exist foo2.o foo.o prog
+check_exist foo2.o
+check_not_exist bar.o foo.o prog
 
 update_fail -k
 check_exist bar.o foo2.o

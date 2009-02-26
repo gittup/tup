@@ -952,7 +952,7 @@ out:
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle)
 {
-	list_add(&nle->list, &nl->entries);
+	list_add_tail(&nle->list, &nl->entries);
 	nl->num_entries++;
 	nl->totlen += nle->len;
 	nl->extlesstotlen += nle->extlesslen;

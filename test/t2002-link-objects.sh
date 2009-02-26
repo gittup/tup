@@ -13,4 +13,4 @@ tup parse
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o"
 tup_object_exist . "gcc -c bar.c -o bar.o"
-tup_object_exist . "gcc -o prog foo.o bar.o"
+tup_object_exist . "gcc -o prog bar.o foo.o"

@@ -16,13 +16,13 @@ touch foo.h
 tup touch foo.c bar.c foo.h
 update
 check_exist foo.o bar.o
-rm -f foo.o
-echo 'bork' >> bar.c
+rm -f bar.o
+echo 'bork' >> foo.c
 tup touch foo.h
 update_fail
-check_not_exist foo.o
+check_not_exist bar.o
 
-echo '#include "foo.h"' > bar.c
-tup touch bar.c
+echo '#include "foo.h"' > foo.c
+tup touch foo.c
 update
 check_exist foo.o bar.o

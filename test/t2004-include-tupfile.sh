@@ -23,7 +23,7 @@ update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o"
 tup_object_exist . "gcc -c bar.c -o bar.o"
-tup_object_exist . "gcc -o prog foo.o bar.o"
+tup_object_exist . "gcc -o prog bar.o foo.o"
 
 # Now change the compiler to 'cc' and verify that we re-parse the parent
 # Tupfile to generate new commands and get rid of the old ones.
@@ -37,7 +37,7 @@ tup touch Tupfile.vars
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o"
 tup_object_no_exist . "gcc -c bar.c -o bar.o"
-tup_object_no_exist . "gcc -o prog foo.o bar.o"
+tup_object_no_exist . "gcc -o prog bar.o foo.o"
 tup_object_exist . "cc -c foo.c -o foo.o"
 tup_object_exist . "cc -c bar.c -o bar.o"
-tup_object_exist . "cc -o prog foo.o bar.o"
+tup_object_exist . "cc -o prog bar.o foo.o"

@@ -25,7 +25,7 @@ update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "gcc -c foo.c -o foo.o"
 tup_object_exist tmp "gcc -c bar.c -o bar.o"
-tup_object_exist tmp "gcc -o prog foo.o bar.o"
+tup_object_exist tmp "gcc -o prog bar.o foo.o"
 tup_dep_exist tmp Tupfile.vars . tmp
 
 cat > tmp/Tupfile << HERE
