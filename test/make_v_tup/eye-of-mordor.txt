@@ -1,0 +1,52 @@
+# These were generated manually.
+C
+1:
+real    0m0.049s
+user    0m0.034s
+sys     0m0.015s
+10:
+real    0m0.051s
+user    0m0.028s
+sys     0m0.024s
+100:
+real    0m0.051s
+user    0m0.036s
+sys     0m0.016s
+1000:
+real    0m0.052s
+user    0m0.030s
+sys     0m0.023s
+10000:
+real    0m0.051s
+user    0m0.035s
+sys     0m0.016s
+100000:
+real    0m0.052s
+user    0m0.034s
+sys     0m0.018s
+
+H
+1:
+real    0m0.049s
+user    0m0.036s
+sys     0m0.014s
+10:
+real    0m0.160s
+user    0m0.111s
+sys     0m0.049s
+100:
+real    0m0.191s
+user    0m0.126s
+sys     0m0.066s
+1000:
+real    0m0.192s
+user    0m0.124s
+sys     0m0.068s
+10000:
+real    0m0.194s
+user    0m0.130s
+sys     0m0.065s
+100000:
+real    0m0.193s
+user    0m0.121s
+sys     0m0.072s
