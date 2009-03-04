@@ -19,6 +19,7 @@
 #include <sys/wait.h>
 
 static int process_create_nodes(void);
+static int process_delete_nodes(void);
 static int process_update_nodes(void);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn);
@@ -28,6 +29,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 static void show_progress(int n, int tot);
 
 static void *create_work(void *arg);
+static void *delete_work(void *arg);
 static void *update_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
@@ -106,6 +108,8 @@ int updater(int argc, char **argv, int parse_only)
 		return -1;
 	if(parse_only)
 		return 0;
+	if(process_delete_nodes() < 0)
+		return -1;
 	if(process_update_nodes() < 0)
 		return -1;
 	return 0;
@@ -122,10 +126,37 @@ static int process_create_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(g.num_nodes)
+	if(g.num_nodes) {
 		printf("Parsing Tupfiles\n");
+		tup_db_begin();
+		rc = execute_graph(&g, 0, 1, create_work);
+		if(rc == 0) {
+			tup_db_commit();
+		} else {
+			tup_db_rollback();
+			return -1;
+		}
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return 0;
+}
+
+static int process_delete_nodes(void)
+{
+	struct graph g;
+	int rc;
+
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
+		return -1;
+	if(g.num_nodes)
+		printf("Deleting %i files\n", g.num_nodes);
 	tup_db_begin();
-	rc = execute_graph(&g, 0, 1, create_work);
+	rc = execute_graph(&g, 0, 1, delete_work);
 	if(rc == 0) {
 		tup_db_commit();
 	} else {
@@ -145,8 +176,6 @@ static int process_update_nodes(void)
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -330,8 +359,7 @@ check_empties:
 			pop_node(g, wt->n);
 
 keep_going:
-			if(wt->n->type == g->count_flags &&
-			   ! (wt->n->flags&TUP_FLAGS_DELETE)) {
+			if(wt->n->type == g->count_flags) {
 				num_processed++;
 				show_progress(num_processed, g->num_nodes);
 			}
@@ -384,8 +412,8 @@ static void *create_work(void *arg)
 				rc = parse(n, g);
 			}
 		} else if(n->type == TUP_NODE_VAR ||
-			  n->type==TUP_NODE_FILE ||
-			  n->type==TUP_NODE_CMD) {
+			  n->type == TUP_NODE_FILE ||
+			  n->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
 			fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
@@ -393,6 +421,65 @@ static void *create_work(void *arg)
 		}
 		if(tup_db_unflag_create(n->tupid) < 0)
 			rc = -1;
+
+		wt->rc = rc;
+		pthread_mutex_lock(&status_mutex);
+		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+			perror("write");
+			pthread_mutex_unlock(&status_mutex);
+			return NULL;
+		}
+		pthread_mutex_unlock(&status_mutex);
+	}
+	return NULL;
+}
+
+static void *delete_work(void *arg)
+{
+	struct worker_thread *wt = arg;
+	char c;
+
+	while(read(wt->node_pipe[0], &c, 1) == 1) {
+		struct node *n;
+		struct edge *e;
+		int rc = 0;
+
+		if(c == 0)
+			break;
+		n = wt->n;
+
+		if(n->flags & TUP_FLAGS_DELETE) {
+			if(n->type == TUP_NODE_FILE) {
+				printf("[35mDelete[%lli]: %s[0m\n",
+				       n->tupid, n->name);
+				pthread_mutex_lock(&db_mutex);
+				rc = delete_file(n);
+				pthread_mutex_unlock(&db_mutex);
+			} else {
+				printf("[35mDelete[%lli]: %s[0m\n",
+				       n->tupid, n->name);
+				pthread_mutex_lock(&db_mutex);
+				rc = delete_name_file(n->tupid);
+				pthread_mutex_unlock(&db_mutex);
+			}
+
+			if(rc == 0) {
+				e = n->edges;
+				pthread_mutex_lock(&db_mutex);
+				while(e) {
+					/* Mark the next nodes as modify in
+					 * case we hit an error - we'll need to
+					 * pick up there.
+					 */
+					if(tup_db_add_modify_list(e->dest->tupid) < 0)
+						rc = -1;
+					e = e->next;
+				}
+				if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
+					rc = -1;
+				pthread_mutex_unlock(&db_mutex);
+			}
+		}
 
 		wt->rc = rc;
 		pthread_mutex_lock(&status_mutex);
@@ -426,32 +513,8 @@ static void *update_work(void *arg)
 			break;
 		n = wt->n;
 
-		if(n->type == TUP_NODE_FILE &&
-		   (n->flags & TUP_FLAGS_DELETE)) {
-			printf("[35mDelete[%lli]: %s[0m\n",
-			       n->tupid, n->name);
-			pthread_mutex_lock(&db_mutex);
-			rc = delete_file(n);
-			pthread_mutex_unlock(&db_mutex);
-		} else if((n->type == TUP_NODE_DIR ||
-			   n->type == TUP_NODE_VAR) &&
-			  n->flags & TUP_FLAGS_DELETE) {
-			printf("[35mDelete[%lli]: %s[0m\n",
-			       n->tupid, n->name);
-			pthread_mutex_lock(&db_mutex);
-			rc = delete_name_file(n->tupid);
-			pthread_mutex_unlock(&db_mutex);
-
-		} else if(n->type == TUP_NODE_CMD) {
-			if(n->flags & TUP_FLAGS_DELETE) {
-				printf("[35mDelete[%lli]: %s[0m\n",
-				       n->tupid, n->name);
-				pthread_mutex_lock(&db_mutex);
-				rc = delete_name_file(n->tupid);
-				pthread_mutex_unlock(&db_mutex);
-			} else {
-				rc = update(n, s);
-			}
+		if(n->type == TUP_NODE_CMD) {
+			rc = update(n, s);
 		}
 
 		if(rc == 0) {
