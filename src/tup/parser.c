@@ -1126,7 +1126,15 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 
 	s = string;
 	while(*s) {
-		if(*s == '$') {
+		if(*s == '\\') {
+			len++;
+			s++;
+			if(! *s) {
+				fprintf(stderr, "Error: Backslash at the end of a string is not escaping anything. String was: '%s'\n", string);
+				return NULL;
+			}
+			s++;
+		} else if(*s == '$') {
 			const char *rparen;
 
 			if(s[1] != '(') {
@@ -1175,7 +1183,16 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	p = ret;
 	s = string;
 	while(*s) {
-		if(*s == '$') {
+		if(*s == '\\') {
+			s++;
+			if(! *s) {
+				fprintf(stderr, "Error: Backslash at the end of a string is not escaping anything. String was: '%s'\n", string);
+				return NULL;
+			}
+			*p = *s;
+			p++;
+			s++;
+		} else if(*s == '$') {
 			const char *rparen;
 
 			if(s[1] != '(') {
