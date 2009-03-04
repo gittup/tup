@@ -36,3 +36,7 @@ Renaming is the killer app of distributed version control
  - http://www.markshuttleworth.com/archives/123
 
 And by extension, why not your build system?
+#
+Fast iteration is more than just about time and speed. It's also about
+how you feel about the code and what you dare do with it.
+ - http://gamesfromwithin.com/?p=42
