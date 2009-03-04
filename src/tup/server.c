@@ -92,6 +92,7 @@ static void *message_thread(void *arg)
 	while((rc = recv(s->sd[0], s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
 		int len;
 		int expected;
+		int i;
 
 		if(event->at == ACCESS_STOP_SERVER)
 			break;
@@ -113,9 +114,24 @@ static void *message_thread(void *arg)
 		if(len < 0)
 			continue;
 
+		/* We skip any hidden files (including those in hidden
+		 * directories).
+		 */
+		if(s->cname[0] == '.')
+			goto skip_hidden;
+		for(i = len; i >= 0; i--) {
+			if(s->cname[i] == '/') {
+				if(s->cname[i + 1] == '.')
+					goto skip_hidden;
+			}
+		}
+
 		if(handle_file(event, s->cname, &s->finfo) < 0) {
 			return (void*)-1;
 		}
+skip_hidden:
+		/* Oh noes! An electric eel! */
+		;
 	}
 	if(rc < 0) {
 		perror("recv");
