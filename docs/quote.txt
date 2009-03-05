@@ -40,3 +40,57 @@ And by extension, why not your build system?
 Fast iteration is more than just about time and speed. It's also about
 how you feel about the code and what you dare do with it.
  - http://gamesfromwithin.com/?p=42
+#
+
+What annoys me: Ant is broken (Score:5, Insightful)
+by The Pim (140414) on Friday June 14 2002, @01:25PM (#3702950)
+
+I've gotten used to holding my tongue, but since you started it, I'll put my
+rant under yours. :-)
+
+I've used Ant, and concluded that it's only strength is that it comes with a
+bunch of modules ready-to-use. (Never mind that most of those modules would be
+five lines in a more modular, flexible system like make.) Further, in several
+respects, it has several serious regressions compared to other build systems.
+In light of this, it seems to me that the main reason Ant is popular is that
+it attempts to cover for the deficiencies of common Java compilers. What a
+mess!
+
+The first regression is that Ant (by default) doesn't do reliable rebuilds.
+The most basic function of a build system is to produce correct output, and
+Ant doesn't do it! Its default algorithm for rebuilding is to compile only
+those source files that are newer than their corresponding class files. So,
+for example, if you change an interface, Ant won't recompile all the classes
+that implement the interface. You won't know that they are broken until you
+(or someone else) tries a full rebuild.
+
+Ant has a "depend" task that attempts to fix this, by tracking source
+dependencies. Unfortunately, because most Java compilers don't do their part,
+Ant has to do this in an utterly kludgy way--by parsing class files! Not only
+is this slow and has some weird side-effects, it's still not completely
+reliable: Only the compiler really knows what files depend on what others.
+(For example, if it in-lines a constant, this may not be evident in the class
+file.) However, as far as I know, gcc is the only Java compiler that can
+output correct dependencies (jikes claims to do it, but is broken). Even if
+your compiler does output dependencies, you can't easily use them with Ant,
+because it stores its dependencies in a non-standard format.
+
+Another regression is that in Ant, individual source and class files are not
+first-class objects to the build system. You can't easily depend on, or ask to
+rebuild, a single class file. It's all or nothing. This too is largely due to
+compiler deficiencies: There is no way to tell most compilers to compile only
+the given sources; they insist upon compiling everything they think is
+out-of-date (again, gcc is an exception). This misfeature takes control out of
+the build system's hands, with the result that "recompile everything that's
+out-of-date" is the only feasible approach. Another effect is that parallel
+and distributed builds cannot be done reliably.
+
+Not to mention,
+
+    The organic growth and dynamic flexibility shows how close Java can be to
+    Lisp.
+
+I don't even know where to start on that one. All Ant shows is that if you
+give people a half-working workaround for broken tools, they'll flock to it.
+
+ - http://slashdot.org/comments.pl?sid=34220&cid=3702950
