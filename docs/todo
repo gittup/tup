@@ -34,5 +34,3 @@ html:
   how dependencies are described/discovered
   tup bugs: build in state Q, change A->B, build in state R, change B->A, build must go back to state Q (not some other state S)
   man pages: tup command line, tup_api
-  explicitly named order-only prerequisites don't get a warning when they don't exist? eg: A.java | B.class |> blah... B.java |> ... |> B.class doesn't work, but swapping the order does. In the first case it would be nice to get a warning saying B.class doesn't exist as an object, rather than waiting to run the command to get a missing input dependency error.
-

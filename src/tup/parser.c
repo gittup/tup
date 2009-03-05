@@ -729,6 +729,9 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 		if(strchr(pl->file, '*') == NULL) {
 			struct db_node dbn;
 			if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
+				return -1;
+			}
+			if(dbn.tupid < 0) {
 				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
 				return -1;
 			}
