@@ -141,8 +141,9 @@ TODO: How to find circular deps?
 	}
 
 	/* Move all existing commands over to delete - then the ones that are
-	 * re-created will be moved back out in when parsing the Tupfile. All
-	 * those that are no longer generated remain in delete for cleanup.
+	 * re-created will be moved back out to modify or none when parsing the
+	 * Tupfile. All those that are no longer generated remain in delete for
+	 * cleanup.
 	 *
 	 * Also delete links to our directory from directories that we depend
 	 * on. These will be re-generated when the file is parsed, or when

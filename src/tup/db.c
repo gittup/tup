@@ -46,6 +46,7 @@ enum {
 	DB_SET_CMD_OUTPUT_FLAGS,
 	DB_SET_CMD_FLAGS_BY_OUTPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
+	DB_MODIFY_DELETED_DEPS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_DELETE_DEPENDENT_DIR_LINKS,
 	DB_CONFIG_SET_INT,
@@ -1640,6 +1641,34 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_modify_deleted_deps(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DELETED_DEPS];
+	static char s[] = "insert or replace into modify_list select to_id from link where from_id in (select id from delete_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
 	}
 
 	rc = sqlite3_step(*stmt);
