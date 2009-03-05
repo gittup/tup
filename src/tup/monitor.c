@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <time.h>
+#include <sys/resource.h>
 #include "dircache.h"
 #include "flist.h"
 #include "debug.h"
@@ -90,8 +91,6 @@ int monitor(int argc, char **argv)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 
-	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
-
 	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
 	if(mon_lock < 0) {
 		perror(TUP_MONITOR_LOCK);
@@ -146,6 +145,8 @@ int monitor(int argc, char **argv)
 
 	if(fork() > 0)
 		exit(0);
+
+	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
 
 	tup_db_begin();
 	if(watch_path(0, "", ".") < 0) {
@@ -247,16 +248,30 @@ close_monlock:
 int stop_monitor(int argc, char **argv)
 {
 	int mon_lock;
+	int pid;
 
 	if(argc) {}
 	if(argv) {}
 
+	pid = tup_db_config_get_int(MONITOR_PID_CFG);
+	if(pid < 0) {
+		printf("No monitor process to kill (pid < 0)\n");
+		return 0;
+	}
+	/* Just using getpriority() to see if the monitor process is alive. */
+	errno = 0;
+	if(getpriority(PRIO_PROCESS, pid) == -1 && errno == ESRCH) {
+		printf("Monitor pid %i doesn't exist anymore.\n", pid);
+	} else {
+		printf("Shutting down monitor.\n");
+	}
 	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
 	if(mon_lock < 0) {
 		perror(TUP_MONITOR_LOCK);
 		return -1;
 	}
 	close(mon_lock);
+	tup_db_config_set_int(MONITOR_PID_CFG, -1);
 
 	return 0;
 }

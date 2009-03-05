@@ -26,10 +26,6 @@ change progress bar: Only print bar on lowest line, then backspace and print com
 
 wrapper work if the program does a chdir?
 
-3 phases - create, update, delete? eg: during update, move things in to a separate graph, then process that graph in reverse in order to delete things in the opposite order. Doesn't really matter for files, but if commands involved ifconfig or route or whatever, it may make sense to undo commands in reverse order.
-
-tup stop should display something
-
 html:
   proof: big-o notation
   proof: no clean target
