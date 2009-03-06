@@ -24,8 +24,6 @@ out of tree build
 
 change progress bar: Only print bar on lowest line, then backspace and print command on its own line?
 
-wrapper work if the program does a chdir?
-
 html:
   proof: big-o notation
   proof: no clean target
