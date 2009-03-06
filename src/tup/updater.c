@@ -26,7 +26,7 @@ static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
-static void show_progress(int n, int tot);
+static void show_progress(int sum, int tot, struct node *n);
 
 static void *create_work(void *arg);
 static void *delete_work(void *arg);
@@ -305,7 +305,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
-	show_progress(num_processed, g->num_nodes);
 	while(!list_empty(&g->plist)) {
 		struct node *n;
 		struct worker_thread *wt;
@@ -318,6 +317,10 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			goto check_empties;
 		}
 
+		if(n->type == g->count_flags) {
+			show_progress(num_processed, g->num_nodes, n);
+			num_processed++;
+		}
 		list_del(&n->list);
 		wt = list_entry(worker_list.next, struct worker_thread, list);
 		list_move(&wt->list, &active_list);
@@ -360,10 +363,6 @@ check_empties:
 			pop_node(g, wt->n);
 
 keep_going:
-			if(wt->n->type == g->count_flags) {
-				num_processed++;
-				show_progress(num_processed, g->num_nodes);
-			}
 			remove_node(g, wt->n);
 		}
 	}
@@ -376,6 +375,7 @@ keep_going:
 		}
 		goto out;
 	}
+	show_progress(num_processed, g->num_nodes, NULL);
 	rc = 0;
 out:
 	for(x=0; x<jobs; x++) {
@@ -451,8 +451,6 @@ static void *delete_work(void *arg)
 		if(n->flags & TUP_FLAGS_DELETE) {
 			pthread_mutex_lock(&db_mutex);
 			if(n->type == TUP_NODE_FILE) {
-				printf("[35mDelete[%lli]: %s[0m\n",
-				       n->tupid, n->name);
 				rc = delete_file(n);
 			} else {
 				rc = delete_name_file(n->tupid);
@@ -535,7 +533,6 @@ static int update(struct node *n, struct server *s)
 	int status;
 	int pid;
 	int dfd = -1;
-	int print_name = 1;
 	const char *name = n->name;
 	int rc;
 	tupid_t tupid;
@@ -546,11 +543,6 @@ static int update(struct node *n, struct server *s)
 		rc = var_replace(n);
 		pthread_mutex_unlock(&db_mutex);
 		return rc;
-	}
-
-	if(name[0] == '@') {
-		print_name = 0;
-		name++;
 	}
 
 	pthread_mutex_lock(&db_mutex);
@@ -569,9 +561,6 @@ static int update(struct node *n, struct server *s)
 	if(tup_db_get_path(n->dt, s->cwd, sizeof(s->cwd)) < 0)
 		return -1;
 	pthread_mutex_unlock(&db_mutex);
-
-	if(print_name)
-		printf("[%lli:%lli] %s\n", n->tupid, tupid, name);
 
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
@@ -784,29 +773,43 @@ out:
 	return rc;
 }
 
-static void show_progress(int n, int tot)
+static void show_progress(int sum, int tot, struct node *n)
 {
 	if(do_show_progress && tot) {
-		int x, a, b;
-		const int max = 40;
-		char c = '=';
+		int a, b;
+		const int max = 11;
+		const char *equals = "===========";
+		const char *hashes = "###########";
+		const char *spaces = "           ";
+		const char *color = "";
+		const char *endcolor = "";
+		const char *ident;
 		if(tot > max) {
-			a = n * max / tot;
+			a = sum * max / tot;
 			b = max;
-			c = '#';
+			ident = hashes;
 		} else {
-			a = n;
+			a = sum;
 			b = tot;
+			ident = equals;
 		}
-		printf("[");
-		for(x=0; x<a; x++) {
-			printf("%c", c);
+		if(n) {
+			if(n->flags & TUP_FLAGS_DELETE) {
+				color = "[35m";
+				endcolor = "[0m";
+			}
+			if(n->type == TUP_NODE_DIR) {
+				color = "[33m";
+				endcolor = "[0m";
+			}
+			printf("[%.*s%.*s] %i/%i (%3i%%) %lli: %s%s%s\n",
+			       a, ident, b-a, spaces,
+			       sum, tot, sum*100/tot,
+			       n->tupid, color, n->name, endcolor);
+		} else {
+			printf("[%.*s%.*s] [32m%i/%i (%3i%%)[0m\n",
+			       a, ident, b-a, spaces,
+			       sum, tot, sum*100/tot);
 		}
-		for(x=a; x<b; x++) {
-			printf(" ");
-		}
-		printf("] %i/%i (%3i%%) ", n, tot, n*100/tot);
-		if(n == tot)
-			printf("\n");
 	}
 }

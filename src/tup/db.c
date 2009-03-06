@@ -628,7 +628,6 @@ int tup_db_delete_dir(tupid_t dt)
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_DIR];
 	static char s[] = "insert or replace into delete_list select id from node where dir=?";
 
-	printf("[35m delete dir: %lli[0m\n", dt);
 	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_DELETE) < 0)
 		return -1;
 	if(!*stmt) {

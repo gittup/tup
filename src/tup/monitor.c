@@ -554,7 +554,6 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(e->mask & IN_IGNORED) {
-		printf("[36mIN_IGNORED: %s[0m\n", dc->path);
 		tup_db_delete_dir(dc->dt);
 		dircache_del(&mdb, dc);
 		return;

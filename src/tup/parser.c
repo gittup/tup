@@ -99,7 +99,6 @@ int parse(struct node *n, struct graph *g)
 	struct rule *r;
 	LIST_HEAD(rules);
 
-	printf("[33mParse(%lli) %s[0m\n", n->tupid, n->name);
 /*
 TODO: How to find circular deps?
 	if(n->state == ) {
@@ -197,7 +196,6 @@ out_close_dfd:
 	if(rc == 0) {
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
 			return -1;
-		printf("[34mParsed(%lli) %s[0m\n", n->tupid, n->name);
 	}
 
 	return rc;
