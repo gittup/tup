@@ -726,11 +726,19 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 		args.nl = nl;
 		if(strchr(pl->file, '*') == NULL) {
 			struct db_node dbn;
+			int rc;
 			if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
 				return -1;
 			}
 			if(dbn.tupid < 0) {
 				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
+				return -1;
+			}
+			rc = tup_db_in_delete_list(dbn.tupid);
+			if(rc < 0)
+				return -1;
+			if(rc == 1) {
+				fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (either it was deleted manually, or the command that created it has been removed).\n", pl->file, pl->dt);
 				return -1;
 			}
 			if(build_name_list_cb(&args, &dbn) < 0)
