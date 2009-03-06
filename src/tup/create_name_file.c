@@ -14,18 +14,6 @@ static tupid_t __find_dir_tupid(const char *dir, const char **last);
 static tupid_t __create_dir_tupid(const char *dir, int include_last,
 				  const char **last_part);
 
-tupid_t create_path_file(const char *path)
-{
-	const char *file = NULL;
-	tupid_t dt;
-
-	dt = __create_dir_tupid(path, 0, &file);
-	if(dt < 0)
-		return -1;
-
-	return create_name_file(dt, file);
-}
-
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	return tup_db_create_node(dt, file, TUP_NODE_FILE);

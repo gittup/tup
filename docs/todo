@@ -5,8 +5,6 @@ can we update a server file (like httpd.c) and restart apache? (eg: like incront
 
 support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
 
-Change or fix 'silent' command flag '@', since it gets confused as the start of an @-variable mark.
-
 multi-arch - when building a name-list, automatically include files in a separate build/$(ARCH) directory or some such?
 
 import/export vars to file

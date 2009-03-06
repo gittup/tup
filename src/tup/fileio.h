@@ -5,7 +5,6 @@
 
 struct db_node;
 
-tupid_t create_path_file(const char *path);
 tupid_t create_name_file(tupid_t dt, const char *file);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_varsed_file(tupid_t dt, const char *cmd);
