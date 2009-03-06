@@ -545,6 +545,25 @@ static int update(struct node *n, struct server *s)
 		return rc;
 	}
 
+	if(name[0] == '^') {
+		name++;
+		while(*name && *name != ' ') {
+			/* This space reserved for flags for something. I dunno
+			 * what yet.
+			 */
+			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
+			name++;
+			return -1;
+		}
+		while(*name && *name != '^') name++;
+		if(!*name) {
+			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tupid, n->name);
+			return -1;
+		}
+		name++;
+		while(isspace(*name)) name++;
+	}
+
 	pthread_mutex_lock(&db_mutex);
 	tupid = tup_db_create_dup_node(n->dt, n->name, n->type);
 	if(tupid < 0) {
@@ -784,6 +803,9 @@ static void show_progress(int sum, int tot, struct node *n)
 		const char *color = "";
 		const char *endcolor = "";
 		const char *ident;
+		char *name;
+		int name_sz = 0;
+
 		if(tot > max) {
 			a = sum * max / tot;
 			b = max;
@@ -794,6 +816,16 @@ static void show_progress(int sum, int tot, struct node *n)
 			ident = equals;
 		}
 		if(n) {
+			name = n->name;
+			name_sz = strlen(n->name);
+			if(name[0] == '^') {
+				name++;
+				while(*name && *name != ' ') name++;
+				name++;
+				name_sz = 0;
+				while(name[name_sz] && name[name_sz] != '^')
+					name_sz++;
+			}
 			if(n->flags & TUP_FLAGS_DELETE) {
 				color = "[35m";
 				endcolor = "[0m";
@@ -802,10 +834,10 @@ static void show_progress(int sum, int tot, struct node *n)
 				color = "[33m";
 				endcolor = "[0m";
 			}
-			printf("[%.*s%.*s] %i/%i (%3i%%) %lli: %s%s%s\n",
+			printf("[%.*s%.*s] %i/%i (%3i%%) %lli: %s%.*s%s\n",
 			       a, ident, b-a, spaces,
 			       sum, tot, sum*100/tot,
-			       n->tupid, color, n->name, endcolor);
+			       n->tupid, color, name_sz, name, endcolor);
 		} else {
 			printf("[%.*s%.*s] [32m%i/%i (%3i%%)[0m\n",
 			       a, ident, b-a, spaces,
