@@ -17,6 +17,7 @@
 #include <pthread.h>
 #include <sys/file.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
 
 static int process_create_nodes(void);
 static int process_delete_nodes(void);
@@ -47,7 +48,6 @@ static struct sigaction sigact = {
 };
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -69,15 +69,15 @@ static const char *signal_err[] = {
 };
 
 struct worker_thread {
-	struct list_head list;
 	pthread_t pid;
-	int node_pipe[2];
-	int status_fd;
-	int rc;
-	struct node *n;
+	int sock;        /* 1 sock and no shoes? What a life... */
 	struct graph *g; /* This should only be used in create_work() */
 };
 
+struct work_rc {
+	struct node *n;
+	int rc;
+};
 
 int updater(int argc, char **argv, int parse_only)
 {
@@ -294,14 +294,13 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	struct node *root;
 	struct worker_thread *workers;
 	int num_processed = 0;
-	int status_pipe[2];
+	int socks[2];
 	int rc = -1;
 	int x;
-	LIST_HEAD(worker_list);
-	LIST_HEAD(active_list);
+	int active = 0;
 
-	if(pipe(status_pipe) < 0) {
-		perror("pipe");
+	if(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, socks) < 0) {
+		perror("socketpair");
 		return -2;
 	}
 
@@ -312,16 +311,11 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	}
 	for(x=0; x<jobs; x++) {
 		workers[x].g = g;
-		workers[x].status_fd = status_pipe[1];
-		if(pipe(workers[x].node_pipe) < 0) {
-			perror("pipe");
-			return -2;
-		}
+		workers[x].sock = socks[1];
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
 			perror("pthread_create");
 			return -2;
 		}
-		list_add(&workers[x].list, &worker_list);
 	}
 
 	root = list_entry(g->node_list.next, struct node, list);
@@ -332,8 +326,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 
 	while(!list_empty(&g->plist) && !sig_quit) {
 		struct node *n;
-		struct worker_thread *wt;
-		char c = 1;
 		n = list_entry(g->plist.next, struct node, list);
 		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
 		if(n->incoming_count) {
@@ -347,11 +339,9 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			num_processed++;
 		}
 		list_del(&n->list);
-		wt = list_entry(worker_list.next, struct worker_thread, list);
-		list_move(&wt->list, &active_list);
-		wt->n = n;
-		if(write(wt->node_pipe[1], &c, 1) != 1) {
-			perror("write");
+		active++;
+		if(send(socks[0], &n, sizeof(n), 0) != sizeof(n)) {
+			perror("send");
 			return -2;
 		}
 
@@ -361,38 +351,32 @@ check_empties:
 		 *  2) There is no work to do (plist is empty or sigquit is
 		 *     set) and some people are active.
 		 */
-		while(list_empty(&worker_list) ||
-		      ((list_empty(&g->plist) || sig_quit) &&
-		       !list_empty(&active_list))) {
+		while(active == jobs ||
+		      ((list_empty(&g->plist) || sig_quit) && active)) {
 			int ret;
-			fd_set rfds;
+			struct work_rc wrc;
 
-			FD_ZERO(&rfds);
-			FD_SET(status_pipe[0], &rfds);
+			/* recv() might get EINTR if we ctrl-c or kill tup */
 			do {
-				ret = select(status_pipe[0]+1, &rfds, NULL, NULL, NULL);
-				if(ret <= 0 && errno != EINTR) {
-					perror("select");
+				ret = recv(socks[0], &wrc, sizeof(wrc), 0);
+				if(ret == sizeof(wrc))
+					break;
+				if(ret < 0 && errno != EINTR) {
+					perror("recv");
 					return -2;
 				}
-			} while(ret <= 0 && errno == EINTR);
+			} while(1);
 
-			pthread_mutex_lock(&status_mutex);
-			if(read(status_pipe[0], &wt, sizeof(wt)) != sizeof(wt)) {
-				perror("read");
-				return -2;
-			}
-			pthread_mutex_unlock(&status_mutex);
-			list_move(&wt->list, &worker_list);
-			if(wt->rc < 0) {
+			active--;
+			if(wrc.rc < 0) {
 				if(keep_going)
 					goto keep_going;
 				goto out;
 			}
-			pop_node(g, wt->n);
+			pop_node(g, wrc.n);
 
 keep_going:
-			remove_node(g, wt->n);
+			remove_node(g, wrc.n);
 		}
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
@@ -412,15 +396,15 @@ keep_going:
 	rc = 0;
 out:
 	for(x=0; x<jobs; x++) {
-		char c = 0;
-		write(workers[x].node_pipe[1], &c, 1);
+		struct node *n = NULL;
+		send(socks[0], &n, sizeof(n), 0);
+	}
+	for(x=0; x<jobs; x++) {
 		pthread_join(workers[x].pid, NULL);
-		close(workers[x].node_pipe[0]);
-		close(workers[x].node_pipe[1]);
 	}
 	free(workers); /* Viva la revolucion! */
-	close(status_pipe[0]);
-	close(status_pipe[1]);
+	close(socks[0]);
+	close(socks[1]);
 	return rc;
 }
 
@@ -428,15 +412,14 @@ static void *create_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct graph *g = wt->g;
-	char c;
+	struct node *n;
 
-	while(read(wt->node_pipe[0], &c, 1) == 1) {
-		struct node *n;
+	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
+		struct work_rc wrc;
 		int rc = 0;
 
-		if(c == 0)
+		if(n == NULL)
 			break;
-		n = wt->n;
 
 		if(n->type == TUP_NODE_DIR) {
 			if(n->already_used) {
@@ -456,14 +439,12 @@ static void *create_work(void *arg)
 		if(tup_db_unflag_create(n->tupid) < 0)
 			rc = -1;
 
-		wt->rc = rc;
-		pthread_mutex_lock(&status_mutex);
-		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+		wrc.rc = rc;
+		wrc.n = n;
+		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
 			perror("write");
-			pthread_mutex_unlock(&status_mutex);
 			return NULL;
 		}
-		pthread_mutex_unlock(&status_mutex);
 	}
 	return NULL;
 }
@@ -471,15 +452,14 @@ static void *create_work(void *arg)
 static void *delete_work(void *arg)
 {
 	struct worker_thread *wt = arg;
-	char c;
+	struct node *n;
 
-	while(read(wt->node_pipe[0], &c, 1) == 1) {
-		struct node *n;
+	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
 		int rc = 0;
+		struct work_rc wrc;
 
-		if(c == 0)
+		if(n == NULL)
 			break;
-		n = wt->n;
 
 		if(n->flags & TUP_FLAGS_DELETE) {
 			pthread_mutex_lock(&db_mutex);
@@ -496,14 +476,12 @@ static void *delete_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		}
 
-		wt->rc = rc;
-		pthread_mutex_lock(&status_mutex);
-		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+		wrc.rc = rc;
+		wrc.n = n;
+		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
 			perror("write");
-			pthread_mutex_unlock(&status_mutex);
 			return NULL;
 		}
-		pthread_mutex_unlock(&status_mutex);
 	}
 	return NULL;
 }
@@ -512,21 +490,20 @@ static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct server *s;
-	char c;
+	struct node *n;
 
 	s = malloc(sizeof *s);
 	if(!s) {
 		perror("malloc");
 		return NULL;
 	}
-	while(read(wt->node_pipe[0], &c, 1) == 1) {
-		struct node *n;
+	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
 		struct edge *e;
 		int rc = 0;
+		struct work_rc wrc;
 
-		if(c == 0)
+		if(n == NULL)
 			break;
-		n = wt->n;
 
 		if(n->type == TUP_NODE_CMD) {
 			rc = update(n, s);
@@ -548,14 +525,12 @@ static void *update_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		}
 
-		wt->rc = rc;
-		pthread_mutex_lock(&status_mutex);
-		if(write(wt->status_fd, &wt, sizeof(wt)) != sizeof(wt)) {
+		wrc.rc = rc;
+		wrc.n = n;
+		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
 			perror("write");
-			pthread_mutex_unlock(&status_mutex);
 			return NULL;
 		}
-		pthread_mutex_unlock(&status_mutex);
 	}
 	free(s);
 	return NULL;
