@@ -554,7 +554,7 @@ static void handle_event(struct inotify_event *e)
 	}
 
 	if(e->mask & IN_IGNORED) {
-		tup_db_delete_dir(dc->dt);
+		delete_dir_file(dc->dt);
 		dircache_del(&mdb, dc);
 		return;
 	}

@@ -5,6 +5,12 @@ check_empty_tupdirs()
 		:
 	else
 		echo "*** Nodes shouldn't have flags set" 1>&2
+		echo "*** create_list:" 1>&2
+		sqlite3 .tup/db 'select * from create_list'
+		echo "*** modify_list:" 1>&2
+		sqlite3 .tup/db 'select * from modify_list'
+		echo "*** delete_list:" 1>&2
+		sqlite3 .tup/db 'select * from delete_list'
 		exit 1
 	fi
 }

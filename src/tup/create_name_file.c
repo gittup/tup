@@ -65,7 +65,6 @@ tupid_t create_var_file(const char *var, const char *value)
 
 int tup_file_mod(tupid_t dt, const char *file, int flags)
 {
-	int upddir = 0;
 	struct db_node dbn;
 
 	/* Tried to simplify the gross if logic. Basically we want to re-update
@@ -76,25 +75,44 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	 */
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
-	if(dbn.tupid < 0)
-		upddir = 1;
-	if(flags == TUP_FLAGS_DELETE)
-		upddir = 1;
-	if(strcmp(file, "Tupfile") == 0)
-		upddir = 1;
 
-	if(flags == TUP_FLAGS_DELETE) {
+	if(flags == TUP_FLAGS_MODIFY) {
+		/* Need to re-parse the Tupfile if file is new to the database,
+		 * or if the file itself is the Tupfile.
+		 */
+		if(dbn.tupid < 0 || strcmp(file, "Tupfile") == 0) {
+			if(tup_db_add_create_list(dt) < 0)
+				return -1;
+		}
+
+		if(dbn.tupid < 0) {
+			dbn.tupid = create_name_file(dt, file);
+			if(dbn.tupid < 0)
+				return -1;
+		} else {
+			if(dbn.type != TUP_NODE_FILE) {
+				fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
+				return -1;
+			}
+			if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
+				return -1;
+
+			/* It's possible this is a file that was included by a
+			 * Tupfile.  Try to set any dependent directory flags.
+			 */
+			if(dbn.type == TUP_NODE_FILE) {
+				if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+					return -1;
+			}
+		}
+	} else if(flags == TUP_FLAGS_DELETE) {
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 			return -1;
 		}
-		/* Directories that are deleted get special treatment, since we
-		 * recurse and delete all sub-nodes.
-		 */
 		if(dbn.type == TUP_NODE_DIR) {
-			if(tup_db_unflag_create(dbn.tupid) < 0)
-				return -1;
-			if(tup_db_delete_dir(dbn.tupid) < 0)
+			/* Directories are pretty simple. */
+			if(delete_dir_file(dbn.tupid) < 0)
 				return -1;
 			return 0;
 		}
@@ -106,41 +124,35 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 		 * This is really just to mimic what people would expect from
 		 * make.  Randomly deleting object files is pretty stupid.
 		 */
-		if(tup_db_set_cmd_flags_by_output(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
+		if(tup_db_modify_cmds_by_output(dbn.tupid) < 0)
 			return -1;
-		if(tup_db_set_modify_by_input(dbn.tupid) < 0)
+
+		/* We also have to run any command that used this file as an
+		 * input, so we can yell at the user if they haven't already
+		 * fixed that command.
+		 */
+		if(tup_db_modify_cmds_by_input(dbn.tupid) < 0)
 			return -1;
+
+		/* Re-parse the current Tupfile (the updater automatically
+		 * parses any dependent directories).
+		 */
 		if(tup_db_add_create_list(dbn.dt) < 0)
+			return -1;
+
+		/* It's possible this is a file that was included by a Tupfile.
+		 * Try to set any dependent directory flags.
+		 */
+		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 			return -1;
 		if(tup_db_unflag_modify(dbn.tupid) < 0)
 			return -1;
 		if(delete_name_file(dbn.tupid) < 0)
 			return -1;
-		return 0;
-	}
-
-	if(upddir) {
-		if(tup_db_add_create_list(dt) < 0)
-			return -1;
-	}
-
-	if(dbn.tupid < 0) {
-		dbn.tupid = create_name_file(dt, file);
-		if(dbn.tupid < 0)
-			return -1;
 	} else {
-		if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
-			return -1;
+		fprintf(stderr, "tup error: Unknown flags argument to tup_file_mod(): %i\n", flags);
+		return -1;
 	}
-
-	/* It's possible this is a file that was included by a Tupfile. Try to
-	 * set any dependent directory flags.
-	 */
-	if(dbn.type == TUP_NODE_FILE) {
-		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
-			return -1;
-	}
-
 	return 0;
 }
 

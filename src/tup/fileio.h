@@ -16,10 +16,8 @@ tupid_t get_dbn(const char *path, struct db_node *dbn);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last);
 
-/** Delete all memory of the file from .tup/object (except dangling refs). Also
- * removes the actual file, if it exists.
- */
 int delete_name_file(tupid_t tupid);
+int delete_dir_file(tupid_t tupid);
 
 int canonicalize(const char *path, char *out, int len, int *lastslash);
 int canonicalize2(const char *path, const char *file, char *out, int len,

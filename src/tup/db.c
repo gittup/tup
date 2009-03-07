@@ -44,8 +44,8 @@ enum {
 	DB_DELETE_LINKS,
 	DB_OR_DIRCMD_FLAGS,
 	DB_SET_CMD_OUTPUT_FLAGS,
-	DB_SET_CMD_FLAGS_BY_OUTPUT,
-	DB_SET_MODIFY_BY_INPUT,
+	DB_MODIFY_CMDS_BY_OUTPUT,
+	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
 	DB_MODIFY_DELETED_DEPS,
 	DB_SELECT_NODE_BY_LINK,
@@ -1583,16 +1583,12 @@ int tup_db_set_cmd_output_flags(tupid_t parent, int flags)
 	return 0;
 }
 
-int tup_db_set_cmd_flags_by_output(tupid_t output, int flags)
+int tup_db_modify_cmds_by_output(tupid_t output)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_SET_CMD_FLAGS_BY_OUTPUT];
+	sqlite3_stmt **stmt = &stmts[DB_MODIFY_CMDS_BY_OUTPUT];
 	static char s[] = "insert or replace into modify_list select from_id from link where to_id=?";
 
-	if(flags != TUP_FLAGS_MODIFY) {
-		fprintf(stderr, "Error: tup_db_set_cmd_flags_by_output() only works with TUP_FLAGS_MODIFY now\n");
-		return -1;
-	}
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -1620,11 +1616,11 @@ int tup_db_set_cmd_flags_by_output(tupid_t output, int flags)
 	return 0;
 }
 
-int tup_db_set_modify_by_input(tupid_t input)
+int tup_db_modify_cmds_by_input(tupid_t input)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_SET_MODIFY_BY_INPUT];
-	static char s[] = "insert or replace into modify_list select to_id from link where from_id=?";
+	sqlite3_stmt **stmt = &stmts[DB_MODIFY_CMDS_BY_INPUT];
+	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id=? and to_id=id and type=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1635,6 +1631,10 @@ int tup_db_set_modify_by_input(tupid_t input)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, input) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
