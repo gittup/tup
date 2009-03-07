@@ -22,13 +22,9 @@ out of tree build
 
 change progress bar: Only print bar on lowest line, then backspace and print command on its own line?
 
-file deleted by monitor - remove node instantly, mark dependent nodes as modify?
-
 if we do out of tree build, can we have the monitor kill the updater if a file modification is detected? or restart it?
 
-ctrl-c the updater should save what was done so far
-
-like t2020, but dir becomes a file?
+replace status_mutex and the status_pipe with a datagram based pipe?
 
 html:
   proof: big-o notation

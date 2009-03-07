@@ -26,7 +26,6 @@ static int add_file_cb(void *arg, struct db_node *dbn);
 static int find_deps(struct graph *g, struct node *n);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
-static void show_progress(int sum, int tot, struct node *n);
 
 static void *create_work(void *arg);
 static void *delete_work(void *arg);
@@ -34,10 +33,18 @@ static void *update_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static int delete_file(struct node *n);
+static void sighandler(int sig);
+static void show_progress(int sum, int tot, struct node *n);
 
 static int do_show_progress;
 static int do_keep_going;
 static int num_jobs;
+
+static int sig_quit = 0;
+static struct sigaction sigact = {
+	.sa_handler = sighandler,
+	.sa_flags = SA_RESETHAND | SA_RESTART,
+};
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -132,8 +139,11 @@ static int process_create_nodes(void)
 		rc = execute_graph(&g, 0, 1, create_work);
 		if(rc == 0) {
 			tup_db_commit();
-		} else {
+		} else if(rc == -1) {
 			tup_db_rollback();
+			return -1;
+		} else {
+			fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 			return -1;
 		}
 	}
@@ -160,8 +170,11 @@ static int process_delete_nodes(void)
 	rc = execute_graph(&g, 0, 1, delete_work);
 	if(rc == 0) {
 		tup_db_commit();
-	} else {
+	} else if(rc == -1) {
 		tup_db_rollback();
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
 	if(destroy_graph(&g) < 0)
@@ -182,8 +195,15 @@ static int process_update_nodes(void)
 		return -1;
 	if(g.num_nodes)
 		printf("Executing Commands\n");
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 	tup_db_begin();
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
+	if(rc == -2) {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
+	}
 	tup_db_commit();
 	if(rc < 0)
 		return -1;
@@ -263,6 +283,11 @@ static void pop_node(struct graph *g, struct node *n)
 	}
 }
 
+/* Returns:
+ *   0: everything built ok
+ *  -1: a command failed
+ *  -2: a system call failed (some work threads may still be active)
+ */
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *))
 {
@@ -277,24 +302,24 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 
 	if(pipe(status_pipe) < 0) {
 		perror("pipe");
-		return -1;
+		return -2;
 	}
 
 	workers = malloc(sizeof(*workers) * jobs);
 	if(!workers) {
 		perror("malloc");
-		return -1;
+		return -2;
 	}
 	for(x=0; x<jobs; x++) {
 		workers[x].g = g;
 		workers[x].status_fd = status_pipe[1];
 		if(pipe(workers[x].node_pipe) < 0) {
 			perror("pipe");
-			return -1;
+			return -2;
 		}
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
 			perror("pthread_create");
-			return -1;
+			return -2;
 		}
 		list_add(&workers[x].list, &worker_list);
 	}
@@ -305,7 +330,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
-	while(!list_empty(&g->plist)) {
+	while(!list_empty(&g->plist) && !sig_quit) {
 		struct node *n;
 		struct worker_thread *wt;
 		char c = 1;
@@ -327,31 +352,35 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		wt->n = n;
 		if(write(wt->node_pipe[1], &c, 1) != 1) {
 			perror("write");
-			return -1;
+			return -2;
 		}
 
 check_empties:
 		/* Keep looking for dudes to return as long as:
 		 *  1) There are no more free workers
-		 *  2) There is no work to do (plist is empty) and some people
-		 *     are active.
+		 *  2) There is no work to do (plist is empty or sigquit is
+		 *     set) and some people are active.
 		 */
 		while(list_empty(&worker_list) ||
-		      (list_empty(&g->plist) && !list_empty(&active_list))) {
+		      ((list_empty(&g->plist) || sig_quit) &&
+		       !list_empty(&active_list))) {
 			int ret;
 			fd_set rfds;
 
 			FD_ZERO(&rfds);
 			FD_SET(status_pipe[0], &rfds);
-			ret = select(status_pipe[0]+1, &rfds, NULL, NULL, NULL);
-			if(ret <= 0) {
-				perror("select");
-				return -1;
-			}
+			do {
+				ret = select(status_pipe[0]+1, &rfds, NULL, NULL, NULL);
+				if(ret <= 0 && errno != EINTR) {
+					perror("select");
+					return -2;
+				}
+			} while(ret <= 0 && errno == EINTR);
+
 			pthread_mutex_lock(&status_mutex);
 			if(read(status_pipe[0], &wt, sizeof(wt)) != sizeof(wt)) {
 				perror("read");
-				return -1;
+				return -2;
 			}
 			pthread_mutex_unlock(&status_mutex);
 			list_move(&wt->list, &worker_list);
@@ -371,7 +400,11 @@ keep_going:
 		if(do_keep_going) {
 			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
 		} else {
-			fprintf(stderr, "Error: Graph is not empty after execution.\n");
+			if(sig_quit) {
+				fprintf(stderr, "Remaining nodes skipped due to caught signal.\n");
+			} else {
+				fprintf(stderr, "Error: Graph is not empty after execution.\n");
+			}
 		}
 		goto out;
 	}
@@ -591,6 +624,13 @@ static int update(struct node *n, struct server *s)
 		goto err_close_dfd;
 	}
 	if(pid == 0) {
+		struct sigaction sa = {
+			.sa_handler = SIG_IGN,
+			.sa_flags = SA_RESETHAND | SA_RESTART,
+		};
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
 		fchdir(dfd);
 		server_setenv(s);
 		execl("/bin/sh", "/bin/sh", "-c", name, NULL);
@@ -790,6 +830,13 @@ static int delete_file(struct node *n)
 out:
 	close(dirfd);
 	return rc;
+}
+
+static void sighandler(int sig)
+{
+	if(sig) {}
+	fprintf(stderr, " *** Signal caught - waiting for jobs to finish.\n");
+	sig_quit = 1;
 }
 
 static void show_progress(int sum, int tot, struct node *n)
