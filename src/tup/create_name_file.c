@@ -83,43 +83,54 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 	if(strcmp(file, "Tupfile") == 0)
 		upddir = 1;
 
+	if(flags == TUP_FLAGS_DELETE) {
+		if(dbn.tupid < 0) {
+			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
+			return -1;
+		}
+		/* Directories that are deleted get special treatment, since we
+		 * recurse and delete all sub-nodes.
+		 */
+		if(dbn.type == TUP_NODE_DIR) {
+			if(tup_db_unflag_create(dbn.tupid) < 0)
+				return -1;
+			if(tup_db_delete_dir(dbn.tupid) < 0)
+				return -1;
+			return 0;
+		}
+		/* If a file was deleted and it was created by a command, set
+		 * the command's flags to modify. For example, if foo.o was
+		 * deleted, we set 'gcc -c foo.c -o foo.o' to modify, so it
+		 * will be re-executed.
+		 *
+		 * This is really just to mimic what people would expect from
+		 * make.  Randomly deleting object files is pretty stupid.
+		 */
+		if(tup_db_set_cmd_flags_by_output(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+		if(tup_db_set_modify_by_input(dbn.tupid) < 0)
+			return -1;
+		if(tup_db_add_create_list(dbn.dt) < 0)
+			return -1;
+		if(tup_db_unflag_modify(dbn.tupid) < 0)
+			return -1;
+		if(delete_name_file(dbn.tupid) < 0)
+			return -1;
+		return 0;
+	}
+
 	if(upddir) {
 		if(tup_db_add_create_list(dt) < 0)
 			return -1;
 	}
 
 	if(dbn.tupid < 0) {
-		if(flags == TUP_FLAGS_DELETE) {
-			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
-			return -1;
-		}
 		dbn.tupid = create_name_file(dt, file);
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
-		/* Directories that are deleted get special treatment, since we
-		 * recurse and delete all sub-nodes.
-		 */
-		if(flags == TUP_FLAGS_DELETE && dbn.type == TUP_NODE_DIR) {
-			if(tup_db_delete_dir(dbn.tupid) < 0)
-				return -1;
-		} else {
-			/* If a file was deleted and it was created by a
-			 * command, set the command's flags to modify. For
-			 * example, if foo.o was deleted, we set 'gcc -c foo.c
-			 * -o foo.o' to modify, so it will be re-executed.
-			 *
-			 * This is really just to mimic what people would
-			 * expect from make.  Randomly deleting object files is
-			 * pretty stupid.
-			 */
-			if(flags == TUP_FLAGS_DELETE) {
-				if(tup_db_set_cmd_flags_by_output(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
-					return -1;
-			}
-			if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
-				return -1;
-		}
+		if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
+			return -1;
 	}
 
 	/* It's possible this is a file that was included by a Tupfile. Try to
