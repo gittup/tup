@@ -1,6 +1,3 @@
-when restarting monitor - compare file timestamps to the last time the monitor
- shutdown? that way no file changes are missed
-
 can we update a server file (like httpd.c) and restart apache? (eg: like incrontab program)
 
 support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
@@ -23,8 +20,6 @@ out of tree build
 change progress bar: Only print bar on lowest line, then backspace and print command on its own line?
 
 if we do out of tree build, can we have the monitor kill the updater if a file modification is detected? or restart it?
-
-replace status_mutex and the status_pipe with a datagram based pipe?
 
 html:
   proof: big-o notation
