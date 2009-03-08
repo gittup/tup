@@ -61,6 +61,11 @@ enum {
 	DB_WRITE_VAR,
 	DB_FLAG_DELETED_VAR_DEPENDENT_DIRS,
 	DB_VAR_FOREACH,
+	DB_ATTACH_TMPDB,
+	DB_DETACH_TMPDB,
+	DB_FILES_TO_TMPDB,
+	DB_UNFLAG_TMPDB,
+	DB_GET_ALL_IN_TMPDB,
 	_DB_NODE_INSERT,
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT,
@@ -76,11 +81,6 @@ static int node_select(tupid_t dt, const char *name, int len,
 static int link_insert(tupid_t a, tupid_t b);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
-
-struct id_entry {
-	struct list_head list;
-	tupid_t id;
-};
 
 int tup_db_open(void)
 {
@@ -660,7 +660,7 @@ int tup_db_delete_dir(tupid_t dt)
 	while(!list_empty(&subdir_list)) {
 		struct id_entry *ide = list_entry(subdir_list.next,
 						  struct id_entry, list);
-		tup_db_delete_dir(ide->id);
+		tup_db_delete_dir(ide->tupid);
 		list_del(&ide->list);
 		free(ide);
 	}
@@ -1246,7 +1246,7 @@ static int get_recurse_dirs(tupid_t dt, struct list_head *list)
 			perror("malloc");
 			return -1;
 		}
-		ide->id = sqlite3_column_int64(*stmt, 0);
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
 		list_add(&ide->list, list);
 	}
 
@@ -1306,10 +1306,10 @@ int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
 	}
 
 	while(1) {
-		struct tupid_list *tl;
+		struct id_entry *ide;
 
-		tl = malloc(sizeof *tl);
-		if(!tl) {
+		ide = malloc(sizeof *ide);
+		if(!ide) {
 			perror("malloc");
 			rc = -1;
 			goto out_reset;
@@ -1325,8 +1325,8 @@ int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
 			goto out_reset;
 		}
 
-		tl->tupid = sqlite3_column_int64(*stmt, 0);
-		list_add(&tl->list, head);
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&ide->list, head);
 	}
 
 out_reset:
@@ -1359,10 +1359,10 @@ int tup_db_get_src_links(tupid_t to_id, struct list_head *head)
 	}
 
 	while(1) {
-		struct tupid_list *tl;
+		struct id_entry *ide;
 
-		tl = malloc(sizeof *tl);
-		if(!tl) {
+		ide = malloc(sizeof *ide);
+		if(!ide) {
 			perror("malloc");
 			rc = -1;
 			goto out_reset;
@@ -1378,8 +1378,8 @@ int tup_db_get_src_links(tupid_t to_id, struct list_head *head)
 			goto out_reset;
 		}
 
-		tl->tupid = sqlite3_column_int64(*stmt, 0);
-		list_add(&tl->list, head);
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&ide->list, head);
 	}
 
 out_reset:
@@ -2317,6 +2317,184 @@ out_reset:
 		return -1;
 	}
 
+	return rc;
+}
+
+int tup_db_attach_tmpdb(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_ATTACH_TMPDB];
+	static char s[] = "attach ':memory:' as tmpdb";
+	char *errmsg;
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(sqlite3_exec(tup_db, "create table tmpdb.tmp_list (id integer primary key not null)", NULL, NULL, &errmsg) != 0) {
+		fprintf(stderr, "SQL error creating tmp_list table: %s\n",
+			errmsg);
+		return -1;
+	}
+	return 0;
+}
+
+int tup_db_detach_tmpdb(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_DETACH_TMPDB];
+	static char s[] = "detach tmpdb";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
+}
+
+int tup_db_files_to_tmpdb(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TMPDB];
+	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_FILE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_unflag_tmpdb(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_TMPDB];
+	static char s[] = "delete from tmpdb.tmp_list where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_get_all_in_tmpdb(struct list_head *list)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_GET_ALL_IN_TMPDB];
+	static char s[] = "select node.id, dir, type from tmpdb.tmp_list, node where tmp_list.id = node.id";
+	struct del_entry *de;
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	while(1) {
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		de = malloc(sizeof *de);
+		if(de == NULL) {
+			perror("malloc");
+			return -1;
+		}
+		de->tupid = sqlite3_column_int64(*stmt, 0);
+		de->dt = sqlite3_column_int64(*stmt, 1);
+		de->type = sqlite3_column_int(*stmt, 2);
+		list_add(&de->list, list);
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
 	return rc;
 }
 

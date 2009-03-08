@@ -1,6 +1,4 @@
 #! /bin/sh -e
-echo "[33mSkip t7004 - not sure of desired behavior[0m"
-exit 0
 
 . ../tup.sh
 
@@ -20,11 +18,12 @@ sym_check prog bar
 tup stop
 
 # Now we make another change outside of the monitor's control (modify a file)
-echo "void bar2(void) {}" >> bar.c
-tup monitor
-update
-sym_check prog bar bar2
-tup stop
+echo "[33mSkip t7004 part 2 - not sure of desired behavior[0m"
+#echo "void bar2(void) {}" >> bar.c
+#tup monitor
+#update
+#sym_check prog bar bar2
+#tup stop
 
 # Finally, delete a file outside of the monitor's control
 rm bar.c

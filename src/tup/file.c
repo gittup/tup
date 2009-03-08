@@ -80,7 +80,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 	struct file_entry *w;
 	struct file_entry *r;
 	struct db_node dbn;
-	struct tupid_list *tl;
+	struct id_entry *ide;
 	int output_bork = 0;
 	LIST_HEAD(old_output_list);
 	LIST_HEAD(old_input_list);
@@ -107,23 +107,23 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 			if(strcmp(w->filename, r->filename) == 0)
 				del_entry(r);
 		}
-		list_for_each_entry(tl, &old_output_list, list) {
-			if(tl->tupid == dbn.tupid) {
+		list_for_each_entry(ide, &old_output_list, list) {
+			if(ide->tupid == dbn.tupid) {
 				/* Ok to do list_del without _safe because we
 				 * break out of the loop (links are unique, so
 				 * there is only going to be one matching tupid
 				 * in the old_output_list).
 				 */
-				list_del(&tl->list);
-				free(tl);
+				list_del(&ide->list);
+				free(ide);
 				break;
 			}
 		}
 
 		del_entry(w);
 	}
-	list_for_each_entry(tl, &old_output_list, list) {
-		fprintf(stderr, "Error: Tupid %lli was supposed to be written to by command %lli, but it wasn't.\n", tl->tupid, old_cmdid);
+	list_for_each_entry(ide, &old_output_list, list) {
+		fprintf(stderr, "Error: Tupid %lli was supposed to be written to by command %lli, but it wasn't.\n", ide->tupid, old_cmdid);
 		output_bork = 1;
 	}
 	if(output_bork)
@@ -145,8 +145,8 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 		/* Non-root nodes that are specified as input links in the
 		 * Tupfile are also cool.
 		 */
-		list_for_each_entry(tl, &old_input_list, list) {
-			if(tl->tupid == dbn.tupid)
+		list_for_each_entry(ide, &old_input_list, list) {
+			if(ide->tupid == dbn.tupid)
 				goto link_cool;
 		}
 		/* Non-coolness is not allowed. */

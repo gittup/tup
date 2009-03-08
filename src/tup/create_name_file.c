@@ -105,54 +105,58 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 					return -1;
 			}
 		}
+		return 0;
 	} else if(flags == TUP_FLAGS_DELETE) {
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 			return -1;
 		}
-		if(dbn.type == TUP_NODE_DIR) {
-			/* Directories are pretty simple. */
-			if(delete_dir_file(dbn.tupid) < 0)
-				return -1;
-			return 0;
-		}
-		/* If a file was deleted and it was created by a command, set
-		 * the command's flags to modify. For example, if foo.o was
-		 * deleted, we set 'gcc -c foo.c -o foo.o' to modify, so it
-		 * will be re-executed.
-		 *
-		 * This is really just to mimic what people would expect from
-		 * make.  Randomly deleting object files is pretty stupid.
-		 */
-		if(tup_db_modify_cmds_by_output(dbn.tupid) < 0)
-			return -1;
-
-		/* We also have to run any command that used this file as an
-		 * input, so we can yell at the user if they haven't already
-		 * fixed that command.
-		 */
-		if(tup_db_modify_cmds_by_input(dbn.tupid) < 0)
-			return -1;
-
-		/* Re-parse the current Tupfile (the updater automatically
-		 * parses any dependent directories).
-		 */
-		if(tup_db_add_create_list(dbn.dt) < 0)
-			return -1;
-
-		/* It's possible this is a file that was included by a Tupfile.
-		 * Try to set any dependent directory flags.
-		 */
-		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
-			return -1;
-		if(tup_db_unflag_modify(dbn.tupid) < 0)
-			return -1;
-		if(delete_name_file(dbn.tupid) < 0)
-			return -1;
+		return tup_file_del(dbn.tupid, dbn.dt, dbn.type);
 	} else {
 		fprintf(stderr, "tup error: Unknown flags argument to tup_file_mod(): %i\n", flags);
 		return -1;
 	}
+}
+
+int tup_file_del(tupid_t tupid, tupid_t dt, int type)
+{
+	if(type == TUP_NODE_DIR) {
+		/* Directories are pretty simple. */
+		if(delete_dir_file(tupid) < 0)
+			return -1;
+		return 0;
+	}
+	/* If a file was deleted and it was created by a command, set the
+	 * command's flags to modify. For example, if foo.o was deleted, we set
+	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed.
+	 *
+	 * This is really just to mimic what people would expect from make.
+	 * Randomly deleting object files is pretty stupid.
+	 */
+	if(tup_db_modify_cmds_by_output(tupid) < 0)
+		return -1;
+
+	/* We also have to run any command that used this file as an input, so
+	 * we can yell at the user if they haven't already fixed that command.
+	 */
+	if(tup_db_modify_cmds_by_input(tupid) < 0)
+		return -1;
+
+	/* Re-parse the current Tupfile (the updater automatically parses any
+	 * dependent directories).
+	 */
+	if(tup_db_add_create_list(dt) < 0)
+		return -1;
+
+	/* It's possible this is a file that was included by a Tupfile.  Try to
+	 * set any dependent directory flags.
+	 */
+	if(tup_db_set_dependent_dir_flags(tupid) < 0)
+		return -1;
+	if(tup_db_unflag_modify(tupid) < 0)
+		return -1;
+	if(delete_name_file(tupid) < 0)
+		return -1;
 	return 0;
 }
 

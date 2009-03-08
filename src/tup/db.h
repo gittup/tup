@@ -16,9 +16,21 @@ struct db_node {
 	int type;
 };
 
-struct tupid_list {
+struct id_entry {
 	struct list_head list;
 	tupid_t tupid;
+};
+
+/* This is kinda like a combination of db_node and id_entry, except we don't
+ * have 'name'. This is just used to get a list of nodes to delete back to the
+ * monitor so it can handle all the deletions that happened while we were out
+ * fishing (or whatever it is programs do when they're not working).
+ */
+struct del_entry {
+	struct list_head list;
+	tupid_t tupid;
+	tupid_t dt;
+	int type;
 };
 
 enum TUP_NODE_TYPE {
@@ -114,5 +126,12 @@ int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
 int tup_db_flag_deleted_var_dependent_dirs(void);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);
+
+/* tmpdb operations */
+int tup_db_attach_tmpdb(void);
+int tup_db_detach_tmpdb(void);
+int tup_db_files_to_tmpdb(void);
+int tup_db_unflag_tmpdb(tupid_t tupid);
+int tup_db_get_all_in_tmpdb(struct list_head *list);
 
 #endif

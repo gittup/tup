@@ -44,7 +44,8 @@
 
 #define MONITOR_PID_CFG "monitor pid"
 
-static int watch_path(tupid_t dt, const char *path, const char *file);
+static int watch_path(tupid_t dt, const char *path, const char *file,
+		      int tmpdb);
 static int events_queued(void);
 static void queue_event(struct inotify_event *e);
 static void flush_queue(void);
@@ -77,6 +78,8 @@ int monitor(int argc, char **argv)
 	int mon_lock;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
+	struct del_entry *de;
+	LIST_HEAD(del_list);
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -148,12 +151,38 @@ int monitor(int argc, char **argv)
 
 	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
 
-	tup_db_begin();
-	if(watch_path(0, "", ".") < 0) {
+	/* Use tmpdb to store all file objects in a list. We then start to
+	 * watch the filesystem, and remove all existing objects from the tmpdb
+	 * list. Anything leftover in the tmpdb must have been deleted while
+	 * the monitor wasn't looking.
+	 */
+	if(tup_db_attach_tmpdb() < 0)
+		return -1;
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_files_to_tmpdb() < 0)
+		return -1;
+	if(tup_db_unflag_tmpdb(DOT_DT) < 0)
+		return -1;
+	if(tup_db_unflag_tmpdb(VAR_DT) < 0)
+		return -1;
+	if(watch_path(0, "", ".", 1) < 0) {
 		rc = -1;
 		goto close_inot;
 	}
-	tup_db_commit();
+	if(tup_db_get_all_in_tmpdb(&del_list) < 0)
+		return -1;
+	while(!list_empty(&del_list)) {
+		de = list_entry(del_list.next, struct del_entry, list);
+		if(tup_file_del(de->tupid, de->dt, de->type) < 0)
+			return -1;
+		list_del(&de->list);
+		free(de);
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	if(tup_db_detach_tmpdb() < 0)
+		return -1;
 
 	gettimeofday(&t2, NULL);
 	fprintf(stderr, "Initialized in %f seconds.\n",
@@ -185,7 +214,7 @@ int monitor(int argc, char **argv)
 			 * again.
 			 */
 			if(e->wd == tup_wd) {
-				if(e->len && strcmp(e->name, "db-journal") == 0)
+				if(e->len && strncmp(e->name, "db-", 3) == 0)
 					continue;
 				printf("tup monitor: .tup file '%s' deleted - shutting down.\n", e->len ? e->name : "");
 				goto close_inot;
@@ -276,7 +305,7 @@ int stop_monitor(int argc, char **argv)
 	return 0;
 }
 
-static int watch_path(tupid_t dt, const char *path, const char *file)
+static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 {
 	int wd;
 	uint32_t mask;
@@ -315,12 +344,21 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 				goto out_close;
 			if(tup_db_add_create_list(dt) < 0)
 				goto out_close;
+		} else {
+			if(tmpdb) {
+				if(tup_db_unflag_tmpdb(tupid) < 0)
+					goto out_close;
+			}
 		}
 		rc = 0;
 		goto out_close;
 	}
 	if(S_ISDIR(buf.st_mode)) {
 		newdt = create_dir_file(dt, file);
+		if(tmpdb) {
+			if(tup_db_unflag_tmpdb(newdt) < 0)
+				goto out_close;
+		}
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			file);
@@ -358,7 +396,7 @@ static int watch_path(tupid_t dt, const char *path, const char *file)
 	flist_foreach(&f, fullpath) {
 		if(f.filename[0] == '.')
 			continue;
-		if(watch_path(newdt, fullpath, f.filename) < 0)
+		if(watch_path(newdt, fullpath, f.filename, tmpdb) < 0)
 			goto out_close;
 	}
 	rc = 0;
@@ -561,7 +599,7 @@ static void handle_event(struct inotify_event *e)
 
 	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
 		if(e->mask & IN_ISDIR) {
-			watch_path(dc->dt, dc->path, e->name);
+			watch_path(dc->dt, dc->path, e->name, 0);
 			return;
 		}
 		flags = TUP_FLAGS_MODIFY;
