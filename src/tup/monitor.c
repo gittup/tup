@@ -42,6 +42,7 @@
 #include "memdb.h"
 #include "updater.h"
 
+#define MONITOR_TIME_CFG "monitor time"
 #define MONITOR_PID_CFG "monitor pid"
 
 static int watch_path(tupid_t dt, const char *path, const char *file,
@@ -69,6 +70,7 @@ static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
 static int queue_start = 0;
 static int queue_end = 0;
 static struct inotify_event *queue_last_e = NULL;
+static sqlite3_int64 mon_time = 0;
 
 int monitor(int argc, char **argv)
 {
@@ -150,6 +152,7 @@ int monitor(int argc, char **argv)
 		exit(0);
 
 	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
+	mon_time = tup_db_config_get_int64(MONITOR_TIME_CFG);
 
 	/* Use tmpdb to store all file objects in a list. We then start to
 	 * watch the filesystem, and remove all existing objects from the tmpdb
@@ -179,6 +182,8 @@ int monitor(int argc, char **argv)
 		list_del(&de->list);
 		free(de);
 	}
+	mon_time = time(NULL);
+	tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 	if(tup_db_commit() < 0)
 		return -1;
 	if(tup_db_detach_tmpdb() < 0)
@@ -243,6 +248,13 @@ int monitor(int argc, char **argv)
 					}
 					locked = 1;
 					DEBUGP("monitor ON\n");
+
+					/* Make sure we update our time, since
+					 * if the updater ran then some files
+					 * will have newer timestamps.
+					 */
+					mon_time = time(NULL);
+					tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 				}
 			} else if(e->wd == mon_wd) {
 				goto close_inot;
@@ -333,13 +345,8 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
 
-		/* If the file doesn't exist in the db, create it. If it
-		 * already exists but is marked delete, we want to un-delete it
-		 * and mark the directory as requiring update. So, it ends up
-		 * being the same in both cases.
-		 */
 		tupid = tup_db_select_node(dt, file);
-		if(tupid < 0 || tup_db_in_delete_list(tupid) == 1) {
+		if(tupid < 0) {
 			if(create_name_file(dt, file) < 0)
 				goto out_close;
 			if(tup_db_add_create_list(dt) < 0)
@@ -347,6 +354,10 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 		} else {
 			if(tmpdb) {
 				if(tup_db_unflag_tmpdb(tupid) < 0)
+					goto out_close;
+			}
+			if(mon_time != -1 && buf.st_mtime > mon_time) {
+				if(tup_db_add_modify_list(tupid) < 0)
 					goto out_close;
 			}
 		}
@@ -461,6 +472,10 @@ static void flush_queue(void)
 			handle_event(e);
 		queue_start += sizeof(*e) + e->len;
 		events_handled = 1;
+	}
+	if(events_handled) {
+		mon_time = time(NULL);
+		tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 	}
 	tup_db_commit();
 

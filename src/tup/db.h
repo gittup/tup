@@ -115,6 +115,8 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid);
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
+int tup_db_config_set_int64(const char *lval, sqlite3_int64 x);
+sqlite3_int64 tup_db_config_get_int64(const char *lval);
 int tup_db_config_set_string(const char *lval, const char *rval);
 int tup_db_config_get_string(char **res, const char *lval, const char *def);
 
