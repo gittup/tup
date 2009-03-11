@@ -113,10 +113,6 @@ int tup_db_open(void)
 		return -1;
 	}
 
-	/* TODO: better to figure out concurrency access issues? Maybe a full
-	 * on flock on the db would work?
-	 */
-	sqlite3_busy_timeout(tup_db, 500);
 	return rc;
 }
 

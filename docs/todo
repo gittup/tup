@@ -21,6 +21,8 @@ change progress bar: Only print bar on lowest line, then backspace and print com
 
 if we do out of tree build, can we have the monitor kill the updater if a file modification is detected? or restart it?
 
+tup delete bar/foo.o shouldn't create directory bar (since it may not exist)
+
 html:
   proof: big-o notation
   proof: no clean target
