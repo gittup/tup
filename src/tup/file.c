@@ -83,13 +83,13 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 	struct id_entry *ide;
 	int output_bork = 0;
 	LIST_HEAD(old_output_list);
-	LIST_HEAD(old_input_list);
+	LIST_HEAD(sticky_inputs);
 
 	handle_unlink(info);
 
 	if(tup_db_get_dest_links(old_cmdid, &old_output_list) < 0)
 		return -1;
-	if(tup_db_get_src_links(old_cmdid, &old_input_list) < 0)
+	if(tup_db_get_src_links(old_cmdid, &sticky_inputs, TUP_LINK_STICKY) < 0)
 		return -1;
 
 	while(!list_empty(&info->write_list)) {
@@ -145,7 +145,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 		/* Non-root nodes that are specified as input links in the
 		 * Tupfile are also cool.
 		 */
-		list_for_each_entry(ide, &old_input_list, list) {
+		list_for_each_entry(ide, &sticky_inputs, list) {
 			if(ide->tupid == dbn.tupid)
 				goto link_cool;
 		}

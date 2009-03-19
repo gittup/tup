@@ -7,16 +7,21 @@
 # command then things could break during a parallel build or if things get
 # re-ordered later. So, that should be detected and return a failure.
 . ../tup.sh
-tup config num_jobs 1
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
-: foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE
 
 echo "#define FOO 3" > foo.h.in
+tup touch foo.h.in Tupfile
+update
+
 cat > foo.c << HERE
 #include "foo.h"
 int main(void) {return FOO;}
 HERE
-tup touch foo.c foo.h.in Tupfile
+cat > Tupfile << HERE
+: foo.h.in |> cp %f %o |> %B
+: foreach *.c |> gcc -c %f -o %o |> %F.o
+HERE
+tup touch foo.c Tupfile
 update_fail

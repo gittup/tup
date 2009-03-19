@@ -35,10 +35,8 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->type = dbn->type;
 	n->flags = tup_db_get_node_flags(dbn->tupid);
 	n->already_used = 0;
-	list_add(&n->list, &g->plist);
-
-	if(n->type == g->count_flags)
-		g->num_nodes++;
+	n->expanded = 0;
+	list_add_tail(&n->list, &g->node_list);
 
 	if(memdb_add(&g->memdb, n->tupid, n) < 0)
 		return NULL;
@@ -56,7 +54,7 @@ void remove_node(struct graph *g, struct node *n)
 	free(n);
 }
 
-int create_edge(struct node *n1, struct node *n2)
+int create_edge(struct node *n1, struct node *n2, int style)
 {
 	struct edge *e;
 
@@ -68,6 +66,7 @@ int create_edge(struct node *n1, struct node *n2)
 	}
 
 	e->dest = n2;
+	e->style = style;
 
 	/* TODO: slist add? */
 	e->next = n1->edges;
@@ -105,7 +104,6 @@ int create_graph(struct graph *g, int count_flags)
 	g->cur = g->root = create_node(g, &dbn_root);
 	if(!g->root)
 		return -1;
-	list_move(&g->root->list, &g->node_list);
 	g->num_nodes = 0;
 	g->count_flags = count_flags;
 	return 0;

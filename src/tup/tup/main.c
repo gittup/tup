@@ -19,7 +19,7 @@
 static int file_exists(const char *s);
 
 static int init(int argc, char **argv);
-static int graph_cb(void *arg, struct db_node *dbn);
+static int graph_cb(void *arg, struct db_node *dbn, int style);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
@@ -188,7 +188,7 @@ static int init(int argc, char **argv)
 	return 0;
 }
 
-static int graph_cb(void *arg, struct db_node *dbn)
+static int graph_cb(void *arg, struct db_node *dbn, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
@@ -202,8 +202,12 @@ static int graph_cb(void *arg, struct db_node *dbn)
 		return -1;
 
 edge_create:
+	if(style == TUP_LINK_NORMAL && n->expanded == 0) {
+		n->expanded = 1;
+		list_move(&n->list, &g->plist);
+	}
 	if(g->cur)
-		if(create_edge(g->cur, n) < 0)
+		if(create_edge(g->cur, n, style) < 0)
 			return -1;
 	return 0;
 }
@@ -245,8 +249,11 @@ static int graph(int argc, char **argv)
 		if(find_node(&g, dbn.tupid, &n) < 0)
 			return -1;
 		if(n == NULL) {
-			if(!create_node(&g, &dbn))
+			n = create_node(&g, &dbn);
+			if(!n)
 				return -1;
+			n->expanded = 1;
+			list_move(&n->list, &g.plist);
 		}
 	}
 
@@ -267,6 +274,7 @@ static int graph(int argc, char **argv)
 	printf("digraph G {\n");
 	list_for_each_entry(n, &g.node_list, list) {
 		int color;
+		int fontcolor;
 		const char *shape;
 		const char *style;
 		struct edge *e;
@@ -293,6 +301,7 @@ static int graph(int argc, char **argv)
 
 		style = "solid";
 		color = 0;
+		fontcolor = 0;
 		if(n->flags & TUP_FLAGS_DELETE) {
 			color |= 0xff0000;
 			style = "dotted";
@@ -305,13 +314,22 @@ static int graph(int argc, char **argv)
 			color |= 0x00ff00;
 			style = "dashed peripheries=2";
 		}
-		printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" style=%s];\n", n->tupid, n->name, n->tupid, shape, color, style);
+		if(n->expanded == 0) {
+			if(color == 0) {
+				color = 0x888888;
+				fontcolor = 0x888888;
+			} else {
+				fprintf(stderr, "tup error: How is color non-zero, but the node isn't expanded? Node is %lli\n", n->tupid);
+				return -1;
+			}
+		}
+		printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, n->name, n->tupid, shape, color, fontcolor, style);
 		if(n->dt)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
 
 		e = n->edges;
 		while(e) {
-			printf("\tnode_%lli -> node_%lli [dir=back]\n", e->dest->tupid, n->tupid);
+			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tupid, n->tupid, e->style ? "dotted" : "solid");
 			e = e->next;
 		}
 	}

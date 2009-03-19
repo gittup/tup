@@ -48,6 +48,11 @@ enum TUP_FLAGS_TYPE {
 	TUP_FLAGS_DELETE=4,
 };
 
+enum TUP_LINK_TYPE {
+	TUP_LINK_NORMAL,
+	TUP_LINK_STICKY,
+};
+
 /* General operations */
 int tup_db_open(void);
 int tup_db_close(void);
@@ -66,10 +71,11 @@ tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_select_node(tupid_t dt, const char *name);
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len);
-int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *),
+int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
+						int style),
 				void *arg, int flags);
-int tup_db_select_node_dir(int (*callback)(void *, struct db_node *), void *arg,
-			   tupid_t dt);
+int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
+			   void *arg, tupid_t dt);
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 				void *arg, tupid_t dt, const char *glob);
 int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
@@ -94,12 +100,16 @@ int tup_db_unflag_delete(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b);
+int tup_db_create_sticky_link(tupid_t a, tupid_t b);
 int tup_db_create_unique_link(tupid_t a, tupid_t b);
 int tup_db_get_dest_links(tupid_t from_id, struct list_head *head);
-int tup_db_get_src_links(tupid_t to_id, struct list_head *head);
+int tup_db_get_src_links(tupid_t to_id, struct list_head *head, int style);
 int tup_db_link_exists(tupid_t a, tupid_t b);
+int tup_db_link_style_exists(tupid_t a, tupid_t b, int style);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);
+int tup_db_delete_src_links(tupid_t tupid, int style);
+int tup_db_move_sticky_links(tupid_t orig, tupid_t dest);
 
 /* Combo operations */
 int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type);
@@ -108,7 +118,8 @@ int tup_db_modify_cmds_by_output(tupid_t output);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_modify_deleted_deps(void);
-int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *),
+int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
+					       int style),
 			       void *arg, tupid_t tupid);
 int tup_db_delete_dependent_dir_links(tupid_t tupid);
 

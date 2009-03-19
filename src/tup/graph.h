@@ -9,6 +9,7 @@
 struct edge {
 	struct edge *next;
 	struct node *dest;
+	int style;
 };
 
 #define STATE_INITIALIZED 0
@@ -22,6 +23,7 @@ struct node {
 	tupid_t dt;
 	char *name;
 	int incoming_count;
+	int expanded;
 
 	char state;
 	char type; /* One of TUP_NODE_* */
@@ -43,7 +45,7 @@ int find_node(struct graph *g, tupid_t tupid, struct node **n);
 struct node *create_node(struct graph *g, struct db_node *dbn);
 void remove_node(struct graph *g, struct node *n);
 
-int create_edge(struct node *n1, struct node *n2);
+int create_edge(struct node *n1, struct node *n2, int style);
 struct edge *remove_edge(struct edge *e);
 
 int create_graph(struct graph *g, int count_flags);

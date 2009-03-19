@@ -879,12 +879,18 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	if(cmd_id < 0)
 		return -1;
 
-	if(tup_db_get_src_links(cmd_id, &old_input_list) < 0)
+	if(tup_db_get_src_links(cmd_id, &old_input_list, TUP_LINK_NORMAL) < 0)
+		return -1;
+	if(tup_db_delete_src_links(cmd_id, TUP_LINK_STICKY) < 0)
 		return -1;
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
 				  list);
+		/* Note: If this link becomes sticky, be careful that var/sed
+		 * commands still work (since they don't go through the normal
+		 * server process to create links).
+		 */
 		if(tup_db_create_unique_link(cmd_id, onle->tupid) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
@@ -893,7 +899,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 	}
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
+		if(tup_db_create_sticky_link(nle->tupid, cmd_id) < 0)
 			return -1;
 		list_for_each_entry(ide, &old_input_list, list) {
 			if(ide->tupid == nle->tupid) {
@@ -907,7 +913,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 		}
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
-		if(tup_db_create_link(nle->tupid, cmd_id) < 0)
+		if(tup_db_create_sticky_link(nle->tupid, cmd_id) < 0)
 			return -1;
 		list_for_each_entry(ide, &old_input_list, list) {
 			if(ide->tupid == nle->tupid) {

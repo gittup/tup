@@ -23,8 +23,7 @@ static int process_create_nodes(void);
 static int process_delete_nodes(void);
 static int process_update_nodes(void);
 static int build_graph(struct graph *g);
-static int add_file_cb(void *arg, struct db_node *dbn);
-static int find_deps(struct graph *g, struct node *n);
+static int add_file_cb(void *arg, struct db_node *dbn, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 
@@ -220,7 +219,8 @@ static int build_graph(struct graph *g)
 		cur = list_entry(g->plist.next, struct node, list);
 		if(cur->state == STATE_INITIALIZED) {
 			DEBUGP("find deps for node: %lli\n", cur->tupid);
-			if(find_deps(g, cur) < 0)
+			g->cur = cur;
+			if(tup_db_select_node_by_link(add_file_cb, g, cur->tupid) < 0)
 				return -1;
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
@@ -234,7 +234,7 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file_cb(void *arg, struct db_node *dbn)
+static int add_file_cb(void *arg, struct db_node *dbn, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
@@ -255,15 +255,13 @@ edge_create:
 			g->cur->tupid, dbn->tupid);
 		return -1;
 	}
-	if(create_edge(g->cur, n) < 0)
-		return -1;
-	return 0;
-}
-
-static int find_deps(struct graph *g, struct node *n)
-{
-	g->cur = n;
-	if(tup_db_select_node_by_link(add_file_cb, g, n->tupid) < 0)
+	if(style == TUP_LINK_NORMAL && n->expanded == 0) {
+		if(n->type == g->count_flags)
+			g->num_nodes++;
+		n->expanded = 1;
+		list_move(&n->list, &g->plist);
+	}
+	if(create_edge(g->cur, n, style) < 0)
 		return -1;
 	return 0;
 }
@@ -332,6 +330,13 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			list_move(&n->list, &g->node_list);
 			n->state = STATE_FINISHED;
 			goto check_empties;
+		}
+
+		if(!n->expanded) {
+			list_del(&n->list);
+			pop_node(g, n);
+			remove_node(g, n);
+			continue;
 		}
 
 		if(n->type == g->count_flags) {
@@ -516,8 +521,10 @@ static void *update_work(void *arg)
 				/* Mark the next nodes as modify in case we hit
 				 * an error - we'll need to pick up there.
 				 */
-				if(tup_db_add_modify_list(e->dest->tupid) < 0)
-					rc = -1;
+				if(e->style == TUP_LINK_NORMAL) {
+					if(tup_db_add_modify_list(e->dest->tupid) < 0)
+						rc = -1;
+				}
 				e = e->next;
 			}
 			if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
@@ -645,9 +652,10 @@ static int update(struct node *n, struct server *s)
 
 	close(dfd);
 	pthread_mutex_lock(&db_mutex);
+	rc = tup_db_move_sticky_links(n->tupid, tupid);
 	delete_name_file(n->tupid);
 	pthread_mutex_unlock(&db_mutex);
-	return 0;
+	return rc;
 
 err_cmd_failed:
 	fprintf(stderr, " *** Command %lli failed.\n", n->tupid);
@@ -671,6 +679,7 @@ static int var_replace(struct node *n)
 	char *rbracket;
 	char *p, *e;
 	int rc = -1;
+	tupid_t input_id;
 
 	if(n->name[0] != ',') {
 		fprintf(stderr, "Error: var_replace command must begin with ','\n");
@@ -704,6 +713,16 @@ static int var_replace(struct node *n)
 		return -1;
 	}
 	rbracket[-1] = 0;
+
+	/* Make sure the input file also becomes a normal link, so if the
+	 * input file changes in the future we'll continue to process the
+	 * required parts of the DAG. See t3009.
+	 */
+	input_id = tup_db_select_node(n->dt, input);
+	if(input_id < 0)
+		return -1;
+	if(tup_db_create_link(input_id, n->tupid) < 0)
+		return -1;
 
 	ifd = open(input, O_RDONLY);
 	if(ifd < 0) {
