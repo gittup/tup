@@ -23,12 +23,15 @@ struct node {
 	tupid_t dt;
 	char *name;
 	int incoming_count;
-	int expanded;
 
 	char state;
 	char type; /* One of TUP_NODE_* */
 	char flags; /* One of TUP_FLAGS_* */
 	char already_used;
+	char expanded;
+	char parsing;
+	char unused1;
+	char unused2;
 };
 
 struct graph {

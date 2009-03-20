@@ -99,13 +99,12 @@ int parse(struct node *n, struct graph *g)
 	struct rule *r;
 	LIST_HEAD(rules);
 
-/*
-TODO: How to find circular deps?
-	if(n->state == ) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last tupid = %lli).\nThis is madness!\n", tupid);
+	if(n->parsing) {
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tupid, n->name);
 		return -1;
 	}
-*/
+	n->parsing = 1;
+
 	if(vardb_init(&vdb) < 0)
 		return -1;
 	parent = n->tupid;

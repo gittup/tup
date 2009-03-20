@@ -272,8 +272,10 @@ static void pop_node(struct graph *g, struct node *n)
 		struct edge *e;
 		e = n->edges;
 		if(e->dest->state != STATE_PROCESSING) {
-			list_del(&e->dest->list);
-			list_add(&e->dest->list, &g->plist);
+			/* Put the node back on the plist, and mark it as such
+			 * by changing the state to STATE_PROCESSING.
+			 */
+			list_move(&e->dest->list, &g->plist);
 			e->dest->state = STATE_PROCESSING;
 		}
 
@@ -327,6 +329,9 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		n = list_entry(g->plist.next, struct node, list);
 		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
 		if(n->incoming_count) {
+			/* Here STATE_FINISHED means we're on the node_list,
+			 * therefore not ready for processing.
+			 */
 			list_move(&n->list, &g->node_list);
 			n->state = STATE_FINISHED;
 			goto check_empties;

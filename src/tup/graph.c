@@ -36,6 +36,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->flags = tup_db_get_node_flags(dbn->tupid);
 	n->already_used = 0;
 	n->expanded = 0;
+	n->parsing = 0;
 	list_add_tail(&n->list, &g->node_list);
 
 	if(memdb_add(&g->memdb, n->tupid, n) < 0)
