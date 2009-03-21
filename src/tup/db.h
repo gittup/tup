@@ -38,6 +38,7 @@ enum TUP_NODE_TYPE {
 	TUP_NODE_CMD,
 	TUP_NODE_DIR,
 	TUP_NODE_VAR,
+	TUP_NODE_DERIVED,
 	TUP_NODE_ROOT,
 };
 
@@ -82,9 +83,12 @@ int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
+int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
 int tup_db_get_path(tupid_t tupid, char *path, int len);
 tupid_t tup_db_parent(tupid_t tupid);
+int tup_db_is_root_node(tupid_t tupid);
+int tup_db_change_node_name(tupid_t tupid, const char *name);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
@@ -106,7 +110,7 @@ int tup_db_get_dest_links(tupid_t from_id, struct list_head *head);
 int tup_db_get_src_links(tupid_t to_id, struct list_head *head, int style);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_link_style_exists(tupid_t a, tupid_t b, int style);
-int tup_db_is_root_node(tupid_t tupid);
+int tup_db_has_incoming_links(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_delete_src_links(tupid_t tupid, int style);
 int tup_db_move_sticky_links(tupid_t orig, tupid_t dest);

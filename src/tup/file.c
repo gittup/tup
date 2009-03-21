@@ -130,18 +130,15 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
-		int rc;
 		r = list_entry(info->read_list.next, struct file_entry, list);
 		if(get_dbn(r->filename, &dbn) < 0) {
 			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
 			return -1;
 		}
 		/* Root nodes are always cool */
-		rc = tup_db_is_root_node(dbn.tupid);
-		if(rc < 0)
-			return -1;
-		if(rc == 1)
+		if(dbn.type == TUP_NODE_FILE)
 			goto link_cool;
+
 		/* Non-root nodes that are specified as input links in the
 		 * Tupfile are also cool.
 		 */

@@ -15,13 +15,3 @@ int delete_name_file(tupid_t tupid)
 		return -1;
 	return 0;
 }
-
-int delete_dir_file(tupid_t tupid)
-{
-	/* Deleted directories have to recurse to delete sub-nodes. */
-	if(tup_db_delete_dir(tupid) < 0)
-		return -1;
-	if(delete_name_file(tupid) < 0)
-		return -1;
-	return 0;
-}

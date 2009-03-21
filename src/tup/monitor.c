@@ -45,6 +45,17 @@
 #define MONITOR_TIME_CFG "monitor time"
 #define MONITOR_PID_CFG "monitor pid"
 
+struct moved_from_event;
+struct monitor_event {
+	struct moved_from_event *from_event; /* valid if mask & IN_MOVED_TO */
+	struct inotify_event e;
+};
+
+struct moved_from_event {
+	struct list_head list;
+	struct monitor_event m;
+};
+
 static int watch_path(tupid_t dt, const char *path, const char *file,
 		      int tmpdb);
 static int events_queued(void);
@@ -54,7 +65,9 @@ static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
 static int same_event(struct inotify_event *e1, struct inotify_event *e2);
 static int ephemeral_event(struct inotify_event *e);
-static void handle_event(struct inotify_event *e);
+static int add_from_event(struct inotify_event *e);
+static struct moved_from_event *check_from_events(struct inotify_event *e);
+static void handle_event(struct monitor_event *m);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -69,8 +82,9 @@ static struct sigaction sigact = {
 static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
 static int queue_start = 0;
 static int queue_end = 0;
-static struct inotify_event *queue_last_e = NULL;
+static struct monitor_event *queue_last_e = NULL;
 static sqlite3_int64 mon_time = 0;
+static LIST_HEAD(moved_from_list);
 
 int monitor(int argc, char **argv)
 {
@@ -427,34 +441,51 @@ static void queue_event(struct inotify_event *e)
 {
 	int new_start;
 	int new_end;
+	struct moved_from_event *mfe = NULL;
+	struct monitor_event *m;
 
 	if(skip_event(e))
 		return;
-	if(eventcmp(queue_last_e, e) == 0)
+	if(queue_last_e && eventcmp(&queue_last_e->e, e) == 0)
 		return;
 	if(ephemeral_event(e) == 0)
 		return;
+	if(e->mask & IN_MOVED_FROM) {
+		add_from_event(e);
+		return;
+	}
+
+	if(e->mask & IN_MOVED_TO) {
+		mfe = check_from_events(e);
+		/* It's possible mfe is still NULL here. For example, the
+		 * IN_MOVED_FROM event may have been destroyed because it was
+		 * ephemeral. In this case, we just leave IN_MOVED_TO as if it
+		 * is just a single file-creation event.
+		 */
+	}
 	DEBUGP("Queue[%i]: '%s' %08x\n",
 	       sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
 
 	new_start = queue_end;
-	new_end = new_start + sizeof(*e) + e->len;
+	new_end = new_start + sizeof(*m) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
 		flush_queue();
 		new_start = queue_end;
-		new_end = new_start + sizeof(*e) + e->len;
+		new_end = new_start + sizeof(*m) + e->len;
 		if(new_end >= (signed)sizeof(queue_buf)) {
 			fprintf(stderr, "Error: Event dropped\n");
 			return;
 		}
 	}
 
-	queue_last_e = (struct inotify_event*)&queue_buf[new_start];
+	queue_last_e = (struct monitor_event*)&queue_buf[new_start];
+	m = queue_last_e;
 
-	memcpy(&queue_buf[new_start], e, sizeof(*e));
-	memcpy(&queue_buf[new_start + sizeof(*e)], e->name, e->len);
+	memcpy(&m->e, e, sizeof(*e));
+	memcpy(m->e.name, e->name, e->len);
+	m->from_event = mfe;
 
-	queue_end += sizeof(*e) + e->len;
+	queue_end += sizeof(*m) + e->len;
 }
 
 static void flush_queue(void)
@@ -463,14 +494,16 @@ static void flush_queue(void)
 
 	tup_db_begin();
 	while(queue_start < queue_end) {
+		struct monitor_event *m;
 		struct inotify_event *e;
 
-		e = (struct inotify_event*)&queue_buf[queue_start];
+		m = (struct monitor_event*)&queue_buf[queue_start];
+		e = &m->e;
 		DEBUGP("Handle[%i]: '%s' %08x\n",
-		       sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
+		       sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
 		if(e->mask != 0)
-			handle_event(e);
-		queue_start += sizeof(*e) + e->len;
+			handle_event(m);
+		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
 	}
 	if(events_handled) {
@@ -544,6 +577,7 @@ static int same_event(struct inotify_event *e1, struct inotify_event *e2)
 static int ephemeral_event(struct inotify_event *e)
 {
 	int x;
+	struct monitor_event *m;
 	struct inotify_event *qe;
 	int create_and_delete = 0;
 	int rc = -1;
@@ -555,7 +589,8 @@ static int ephemeral_event(struct inotify_event *e)
 	}
 
 	for(x=queue_start; x<queue_end;) {
-		qe = (struct inotify_event*)&queue_buf[x];
+		m = (struct monitor_event*)&queue_buf[x];
+		qe = &m->e;
 
 		if(same_event(qe, e) == 0) {
 			if(qe->mask & newflags && e->mask & delflags) {
@@ -588,45 +623,106 @@ static int ephemeral_event(struct inotify_event *e)
 			}
 		}
 
-		x += sizeof(*qe) + qe->len;
+		x += sizeof(*m) + qe->len;
 	}
 
 	return rc;
 }
 
-static void handle_event(struct inotify_event *e)
+static int add_from_event(struct inotify_event *e)
+{
+	struct moved_from_event *mfe;
+
+	mfe = malloc(sizeof *mfe + e->len);
+	if(!mfe) {
+		perror("malloc");
+		return -1;
+	}
+
+	memcpy(&mfe->m.e, e, sizeof(*e));
+	memcpy(mfe->m.e.name, e->name, e->len);
+
+	mfe->m.from_event = NULL;
+	list_add(&mfe->list, &moved_from_list);
+
+	return 0;
+}
+
+static struct moved_from_event *check_from_events(struct inotify_event *e)
+{
+	struct moved_from_event *mfe;
+	list_for_each_entry(mfe, &moved_from_list, list) {
+		if(mfe->m.e.cookie == e->cookie) {
+			return mfe;
+		}
+	}
+	return NULL;
+}
+
+static void handle_event(struct monitor_event *m)
 {
 	struct dircache *dc;
 	int flags = 0;
 
-	dc = dircache_lookup(&mdb, e->wd);
+	dc = dircache_lookup(&mdb, m->e.wd);
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
-			e->wd);
+			m->e.wd);
 		return;
 	}
 
-	if(e->mask & IN_IGNORED) {
-		delete_dir_file(dc->dt);
+	if(m->e.mask & IN_IGNORED) {
 		dircache_del(&mdb, dc);
 		return;
 	}
 
-	if(e->mask & IN_CREATE || e->mask & IN_MOVED_TO) {
-		if(e->mask & IN_ISDIR) {
-			watch_path(dc->dt, dc->path, e->name, 0);
+	if(m->e.mask & IN_MOVED_TO && m->from_event) {
+		struct moved_from_event *mfe = m->from_event;
+		struct dircache *from_dc;
+
+		from_dc = dircache_lookup(&mdb, mfe->m.e.wd);
+		if(!from_dc) {
+			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m.e.wd);
+			return;
+		}
+		if(m->e.mask & IN_ISDIR) {
+			tupid_t tupid;
+
+			tupid = tup_db_select_node(from_dc->dt, mfe->m.e.name);
+			if(tupid < 0)
+				return;
+			if(tup_db_change_node_name(tupid, m->e.name) < 0)
+				return;
+			if(tup_db_modify_dir(tupid) < 0)
+				return;
+			watch_path(dc->dt, dc->path, m->e.name, 0);
+		} else {
+			tup_file_mod(dc->dt, m->e.name, TUP_FLAGS_MODIFY);
+			tup_file_mod(from_dc->dt, mfe->m.e.name, TUP_FLAGS_DELETE);
+		}
+		list_del(&mfe->list);
+		free(mfe);
+		return;
+	}
+
+	/* Handle IN_MOVED_TO events without corresponding from events as if
+	 * they are IN_CREATE.
+	 */
+	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
+		if(m->e.mask & IN_ISDIR) {
+			watch_path(dc->dt, dc->path, m->e.name, 0);
 			return;
 		}
 		flags = TUP_FLAGS_MODIFY;
 	}
-	if(e->mask & IN_MODIFY || e->mask & IN_ATTRIB) {
+	if(m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB) {
 		flags = TUP_FLAGS_MODIFY;
 	}
-	if(e->mask & IN_DELETE || e->mask & IN_MOVED_FROM) {
+	if(m->e.mask & IN_DELETE) {
 		flags = TUP_FLAGS_DELETE;
 	}
 
-	tup_file_mod(dc->dt, e->name, flags);
+	tup_file_mod(dc->dt, m->e.name, flags);
 }
 
 static void sighandler(int sig)

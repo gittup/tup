@@ -94,3 +94,13 @@ I don't even know where to start on that one. All Ant shows is that if you
 give people a half-working workaround for broken tools, they'll flock to it.
 
  - http://slashdot.org/comments.pl?sid=34220&cid=3702950
+#
+There's another factor besides effort that dictates how often you build: as
+project complexity increases, build times lengthen, even as you throw more
+hardware at them. At some point, you have to struggle just to do a nightly
+build.
+
+Mike Gunderloy
+Friday, November 16, 2001
+
+ - http://discuss.fogcreek.com/joelonsoftware/default.asp?cmd=show&ixPost=862

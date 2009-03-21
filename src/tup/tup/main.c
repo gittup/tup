@@ -284,6 +284,7 @@ static int graph(int argc, char **argv)
 
 		switch(n->type) {
 			case TUP_NODE_FILE:
+			case TUP_NODE_DERIVED:
 				shape = "oval";
 				break;
 			case TUP_NODE_CMD:

@@ -110,7 +110,13 @@ int parse(struct node *n, struct graph *g)
 	parent = n->tupid;
 	num_dotdots = 0;
 	while(parent != DOT_DT) {
-		parent = tup_db_parent(parent);
+		tupid_t new;
+		new = tup_db_parent(parent);
+		if(new < 0) {
+			fprintf(stderr, "Error finding parent node of node ID %lli. Database might be hosed.\n", parent);
+			return -1;
+		}
+		parent = new;
 		num_dotdots++;
 	}
 	if(num_dotdots) {
@@ -821,11 +827,12 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 {
 	struct name_list onl;
-	struct name_list_entry *nle, *tmp, *onle;
+	struct name_list_entry *nle, *onle;
 	char *cmd;
 	struct path_list *pl;
 	struct id_entry *ide;
 	int bork = 0;
+	int rc;
 	tupid_t cmd_id;
 	LIST_HEAD(oplist);
 	LIST_HEAD(old_input_list);
@@ -853,21 +860,11 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 			onle->extlesslen--;
 
 		onle->tupid = tup_db_create_node_part(r->dt, onle->path, -1,
-						      TUP_NODE_FILE);
+						      TUP_NODE_DERIVED);
 		if(onle->tupid < 0)
 			return -1;
 
 		add_name_list_entry(&onl, onle);
-
-	}
-
-	list_for_each_entry_safe(nle, tmp, &nl->entries, list) {
-		list_for_each_entry(onle, &onl.entries, list) {
-			if(nle->tupid == onle->tupid) {
-				fprintf(stderr, "Error: Attempting to use a command's output as its input in dir ID %lli. Output ID %lli is '%s'. Deleting entry from input list\n", r->dt, onle->tupid, onle->path);
-				delete_name_list_entry(&r->namelist, nle);
-			}
-		}
 	}
 
 	cmd = tup_printf(r->command, nl, &onl);
@@ -926,7 +923,6 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 		}
 	}
 	list_for_each_entry(ide, &old_input_list, list) {
-		int rc;
 		rc = tup_db_is_root_node(ide->tupid);
 		if(rc < 0)
 			return -1;

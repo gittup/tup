@@ -156,7 +156,7 @@ static int process_delete_nodes(void)
 	struct graph g;
 	int rc;
 
-	if(create_graph(&g, TUP_NODE_FILE) < 0)
+	if(create_graph(&g, TUP_NODE_DERIVED) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
 		return -1;
@@ -440,6 +440,7 @@ static void *create_work(void *arg)
 			}
 		} else if(n->type == TUP_NODE_VAR ||
 			  n->type == TUP_NODE_FILE ||
+			  n->type == TUP_NODE_DERIVED ||
 			  n->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
@@ -473,7 +474,7 @@ static void *delete_work(void *arg)
 
 		if(n->flags & TUP_FLAGS_DELETE) {
 			pthread_mutex_lock(&db_mutex);
-			if(n->type == TUP_NODE_FILE) {
+			if(n->type == TUP_NODE_DERIVED) {
 				rc = delete_file(n);
 			} else {
 				rc = delete_name_file(n->tupid);

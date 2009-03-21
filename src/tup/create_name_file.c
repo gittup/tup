@@ -67,12 +67,6 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 {
 	struct db_node dbn;
 
-	/* Tried to simplify the gross if logic. Basically we want to re-update
-	 * the create nodes if:
-	 * 1) the file is new
-	 * 2) the file was deleted
-	 * 3) a Tupfile was modified
-	 */
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 
@@ -100,10 +94,8 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 			/* It's possible this is a file that was included by a
 			 * Tupfile.  Try to set any dependent directory flags.
 			 */
-			if(dbn.type == TUP_NODE_FILE) {
-				if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
-					return -1;
-			}
+			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+				return -1;
 		}
 		return 0;
 	} else if(flags == TUP_FLAGS_DELETE) {
@@ -121,8 +113,12 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 int tup_file_del(tupid_t tupid, tupid_t dt, int type)
 {
 	if(type == TUP_NODE_DIR) {
-		/* Directories are pretty simple. */
-		if(delete_dir_file(tupid) < 0)
+		/* Directories are pretty simple, but we need to recurse and
+		 * kill anything underneath the diretory as well.
+		 */
+		if(tup_db_delete_dir(tupid) < 0)
+			return -1;
+		if(delete_name_file(tupid) < 0)
 			return -1;
 		return 0;
 	}
@@ -133,8 +129,9 @@ int tup_file_del(tupid_t tupid, tupid_t dt, int type)
 	 * This is really just to mimic what people would expect from make.
 	 * Randomly deleting object files is pretty stupid.
 	 */
-	if(tup_db_modify_cmds_by_output(tupid) < 0)
-		return -1;
+	if(type == TUP_NODE_DERIVED)
+		if(tup_db_modify_cmds_by_output(tupid) < 0)
+			return -1;
 
 	/* We also have to run any command that used this file as an input, so
 	 * we can yell at the user if they haven't already fixed that command.

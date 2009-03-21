@@ -23,9 +23,13 @@ enum {
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
+	DB_DELETE_DIR,
+	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
 	DB_GET_PATH,
 	DB_PARENT,
+	DB_IS_ROOT_NODE,
+	DB_CHANGE_NODE_NAME,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_DELETE_LIST,
@@ -35,13 +39,12 @@ enum {
 	DB_UNFLAG_CREATE,
 	DB_UNFLAG_MODIFY,
 	DB_UNFLAG_DELETE,
-	DB_DELETE_DIR,
 	_DB_GET_RECURSE_DIRS,
 	DB_GET_DEST_LINKS,
 	DB_GET_SRC_LINKS,
 	DB_LINK_EXISTS,
 	DB_LINK_STYLE_EXISTS,
-	DB_IS_ROOT_NODE,
+	DB_HAS_INCOMING_LINKS,
 	DB_DELETE_LINKS,
 	DB_DELETE_SRC_LINKS,
 	DB_OR_DIRCMD_FLAGS,
@@ -184,6 +187,7 @@ static int version_check(void)
 	char *errmsg;
 	char sql_1a[] = "alter table link add column style integer default 0";
 	char sql_1b[] = "insert or replace into create_list select id from node where type=2 and not id=2";
+	char sql_1c[] = "update node set type=4 where id in (select to_id from link) and type=0";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -203,9 +207,14 @@ static int version_check(void)
 					errmsg, sql_1b);
 				return -1;
 			}
+			if(sqlite3_exec(tup_db, sql_1c, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_1c);
+				return -1;
+			}
 			if(tup_db_config_set_int("db_version", 2) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. All Tupfiles will be re-parsed on the next update in order to generate these new links.\n");
+			fprintf(stderr, "WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_DERIVED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
 
 			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
 		case DB_VERSION:
@@ -342,7 +351,15 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 
 	if(dbn.tupid != -1) {
 		if(dbn.type != type) {
-			fprintf(stderr, "Error: Attempt to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
+			/* Try to provide a more sane error message in this
+			 * case, since a user might come across it just by
+			 * screwing up the Tupfile.
+			 */
+			if(dbn.type==TUP_NODE_FILE && type==TUP_NODE_DERIVED) {
+				fprintf(stderr, "Error: Attempting to insert '%s' as a derived node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\nThis error message is brought to you by the Defenders of the Truth to prevent   you from doing stupid things like delete your source code.\n", name);
+				return -1;
+			}
+			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
 			return -1;
 		}
 		if(tup_db_unflag_delete(dbn.tupid) < 0)
@@ -540,7 +557,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR_GLOB];
-	static char s[] = "select id, name, type from node where dir=? and type=? and name glob ?";
+	static char s[] = "select id, name, type from node where dir=? and (type=? or type=?) and name glob ?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -558,7 +575,11 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_text(*stmt, 3, glob, -1, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DERIVED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(*stmt, 4, glob, -1, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -686,7 +707,56 @@ int tup_db_delete_dir(tupid_t dt)
 		}
 	}
 
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(get_recurse_dirs(dt, &subdir_list) < 0)
+		return -1;
+	while(!list_empty(&subdir_list)) {
+		struct id_entry *ide = list_entry(subdir_list.next,
+						  struct id_entry, list);
+		tup_db_delete_dir(ide->tupid);
+		list_del(&ide->list);
+		free(ide);
+	}
+
+	return 0;
+}
+
+int tup_db_modify_dir(tupid_t dt)
+{
+	LIST_HEAD(subdir_list);
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
+	static char s[] = "insert or replace into modify_list select id from node where dir=? and type!=?";
+
+	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0)
+		return -1;
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
 	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -707,7 +777,7 @@ int tup_db_delete_dir(tupid_t dt)
 	while(!list_empty(&subdir_list)) {
 		struct id_entry *ide = list_entry(subdir_list.next,
 						  struct id_entry, list);
-		tup_db_delete_dir(ide->tupid);
+		tup_db_modify_dir(ide->tupid);
 		list_del(&ide->list);
 		free(ide);
 	}
@@ -899,6 +969,90 @@ out_reset:
 	}
 
 	return parent;
+}
+
+int tup_db_is_root_node(tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	int type;
+	sqlite3_stmt **stmt = &stmts[DB_IS_ROOT_NODE];
+	static char s[] = "select type from node where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: tup_db_is_root_node() called on node (%lli) that doesn't exist?\n", tupid);
+		rc = -1;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	type = sqlite3_column_int(*stmt, 0);
+	if(type == TUP_NODE_FILE)
+		rc = 1;
+	else
+		rc = 0;
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_change_node_name(tupid_t tupid, const char *name)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
+	static char s[] = "update node set name=? where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_text(*stmt, 1, name, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_get_node_flags(tupid_t tupid)
@@ -1329,7 +1483,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 	int rc;
 	if(tup_db_link_exists(a, b) == 0)
 		return 0;
-	rc = tup_db_is_root_node(b);
+	rc = tup_db_has_incoming_links(b);
 	if(rc < 0)
 		return -1;
 	if(rc == 0) {
@@ -1490,7 +1644,6 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 	return 0;
 }
 
-
 int tup_db_link_style_exists(tupid_t a, tupid_t b, int style)
 {
 	int rc;
@@ -1533,11 +1686,12 @@ int tup_db_link_style_exists(tupid_t a, tupid_t b, int style)
 
 	return 0;
 }
-int tup_db_is_root_node(tupid_t tupid)
+
+int tup_db_has_incoming_links(tupid_t tupid)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_IS_ROOT_NODE];
-	static char s[] = "select from_id from link, node where to_id=? and from_id=id and not from_id in (select id from delete_list where id=from_id)";
+	sqlite3_stmt **stmt = &stmts[DB_HAS_INCOMING_LINKS];
+	static char s[] = "select from_id from link where to_id=? and not from_id in (select id from delete_list where id=from_id)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2615,7 +2769,7 @@ int tup_db_files_to_tmpdb(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TMPDB];
-	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=?";
+	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=? or type=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2630,6 +2784,10 @@ int tup_db_files_to_tmpdb(void)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DERIVED) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2774,6 +2932,7 @@ static tupid_t node_insert(tupid_t dt, const char *name, int len, int type)
 				return -1;
 			break;
 		case TUP_NODE_FILE:
+		case TUP_NODE_DERIVED:
 		case TUP_NODE_CMD:
 			if(tup_db_add_modify_list(tupid) < 0)
 				return -1;
