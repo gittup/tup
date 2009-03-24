@@ -38,6 +38,7 @@ struct name_list_entry {
 	int extlessbaselen;
 	tupid_t tupid;
 	tupid_t dt;
+	int type;
 };
 
 struct path_list {
@@ -287,6 +288,15 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			if(get_name_list(&plist, &nl) < 0)
 				return -1;
 			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
+				if(nle->type != TUP_NODE_FILE) {
+					if(nle->type == TUP_NODE_DERIVED) {
+						fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
+						return -1;
+					} else {
+						fprintf(stderr, "tup error: Attempt to include node (ID %lli, name='%s') of type %i?\n", nle->tupid, nle->path, nle->type);
+						return -1;
+					}
+				}
 				fd = tup_db_open_tupid(nle->tupid);
 				if(fd < 0) {
 					fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
@@ -790,6 +800,7 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	nle->extlesslen = extlesslen;
 	nle->tupid = dbn->tupid;
 	nle->dt = dbn->dt;
+	nle->type = dbn->type;
 	set_nle_base(nle);
 
 	add_name_list_entry(args->nl, nle);
