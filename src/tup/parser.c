@@ -289,7 +289,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				return -1;
 			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
 				if(nle->type != TUP_NODE_FILE) {
-					if(nle->type == TUP_NODE_DERIVED) {
+					if(nle->type == TUP_NODE_GENERATED) {
 						fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
 						return -1;
 					} else {
@@ -871,7 +871,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 			onle->extlesslen--;
 
 		onle->tupid = tup_db_create_node_part(r->dt, onle->path, -1,
-						      TUP_NODE_DERIVED);
+						      TUP_NODE_GENERATED);
 		if(onle->tupid < 0)
 			return -1;
 

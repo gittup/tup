@@ -214,7 +214,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 2) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_DERIVED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
+			fprintf(stderr, "WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
 
 			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
 		case DB_VERSION:
@@ -355,8 +355,8 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 			 * case, since a user might come across it just by
 			 * screwing up the Tupfile.
 			 */
-			if(dbn.type==TUP_NODE_FILE && type==TUP_NODE_DERIVED) {
-				fprintf(stderr, "Error: Attempting to insert '%s' as a derived node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\nThis error message is brought to you by the Defenders of the Truth to prevent   you from doing stupid things like delete your source code.\n", name);
+			if(dbn.type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
+				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\nThis error message is brought to you by the Defenders of the Truth to prevent   you from doing stupid things like delete your source code.\n", name);
 				return -1;
 			}
 			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
@@ -575,7 +575,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DERIVED) != 0) {
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2787,7 +2787,7 @@ int tup_db_files_to_tmpdb(void)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DERIVED) != 0) {
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2932,7 +2932,7 @@ static tupid_t node_insert(tupid_t dt, const char *name, int len, int type)
 				return -1;
 			break;
 		case TUP_NODE_FILE:
-		case TUP_NODE_DERIVED:
+		case TUP_NODE_GENERATED:
 		case TUP_NODE_CMD:
 			if(tup_db_add_modify_list(tupid) < 0)
 				return -1;

@@ -129,7 +129,7 @@ int tup_file_del(tupid_t tupid, tupid_t dt, int type)
 	 * This is really just to mimic what people would expect from make.
 	 * Randomly deleting object files is pretty stupid.
 	 */
-	if(type == TUP_NODE_DERIVED)
+	if(type == TUP_NODE_GENERATED)
 		if(tup_db_modify_cmds_by_output(tupid) < 0)
 			return -1;
 
