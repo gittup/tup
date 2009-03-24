@@ -27,10 +27,6 @@ have an "include_rules" directive that will include a Rules.tup file in all pare
 
 tup build tup
 
-fix graph for weird node names (ex: double-quote)
-
-change ldpreload.so where it does strstr(".tup")? This prevents you from ever doing something like including a Rules.tup file in a tarball, for example. I believe that's just there to ignore my .tup files. Maybe it should check the prefix, not strstr.
-
 html:
   proof: big-o notation
   proof: no clean target

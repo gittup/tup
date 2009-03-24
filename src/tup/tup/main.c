@@ -277,6 +277,7 @@ static int graph(int argc, char **argv)
 		int fontcolor;
 		const char *shape;
 		const char *style;
+		char *s;
 		struct edge *e;
 
 		if(n == g.root)
@@ -324,7 +325,17 @@ static int graph(int argc, char **argv)
 				return -1;
 			}
 		}
-		printf("\tnode_%lli [label=\"%s\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, n->name, n->tupid, shape, color, fontcolor, style);
+		printf("\tnode_%lli [label=\"", n->tupid);
+		for(s = n->name; *s; s++) {
+			if(*s == '"') {
+				printf("\\\"");
+			} else if(*s == '\\') {
+				printf("\\\\");
+			} else {
+				printf("%c", *s);
+			}
+		}
+		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
 		if(n->dt)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
 

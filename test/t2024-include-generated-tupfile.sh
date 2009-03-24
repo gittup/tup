@@ -17,7 +17,6 @@ HERE
 touch Tupfile
 
 tup touch Tupfile foo/Tupfile
-tup parse
 update
 
 cat > Tupfile << HERE
