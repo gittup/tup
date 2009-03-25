@@ -5,6 +5,12 @@
 # tup_dep_exist doesn't work using '. .' (since I need to use 0 as the parent
 # for '.' and I don't feel like fixing it...and I realized all these ''s and
 # .'s look like faces.)
+#
+# Actually I fixed it so you can use the string "0" to represent the parent of
+# the '.' directory (I figure since the tup_dep_exist thing is only used by
+# test-cases, so I just won't generate a file called "0" and it will be fine -
+# it doesn't impact users with 0 files), but I'm leaving this test the way it
+# is because the faces are silly.
 
 . ../tup.sh
 mkdir tmp

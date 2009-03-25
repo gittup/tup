@@ -56,7 +56,6 @@ struct rule {
 	char *command;
 	struct name_list namelist;
 	int line_number;
-	tupid_t dt;
 };
 
 struct build_name_list_args {
@@ -65,11 +64,14 @@ struct build_name_list_args {
 	int dirlen;
 };
 
-static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, tupid_t tupid, tupid_t curdir);
-static int parse_rule(char *p, struct list_head *rules, tupid_t dt, int lno);
-static int parse_varsed(char *p, struct list_head *rules, tupid_t dt, int lno);
-static int execute_rules(struct list_head *rules, struct graph *g);
+static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
+			 tupid_t curdir, struct graph *g);
+static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
+		      struct vardb *vdb);
+static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
+			struct vardb *vdb);
+static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
+			tupid_t tupid);
 static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g);
 static int get_path_list(char *p, struct list_head *head, tupid_t dt);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
@@ -77,7 +79,8 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 static int get_name_list(struct list_head *plist, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
-static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl);
+static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
+		   struct vardb *vdb, tupid_t tupid);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -97,8 +100,6 @@ int parse(struct node *n, struct graph *g)
 	int num_dotdots;
 	struct buf b;
 	struct vardb vdb;
-	struct rule *r;
-	LIST_HEAD(rules);
 
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tupid, n->name);
@@ -177,20 +178,8 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, &rules, n->tupid, n->tupid);
-	if(rc < 0)
-		goto out_free_bs;
-	rc = execute_rules(&rules, g);
-out_free_bs:
+	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, g);
 	free(b.s);
-	while(!list_empty(&rules)) {
-		r = list_entry(rules.next, struct rule, list);
-		list_del(&r->list);
-		free(r->input_pattern);
-		free(r->output_pattern);
-		free(r->command);
-		free(r);
-	}
 out_close_file:
 	close(fd);
 out_close_vdb:
@@ -207,14 +196,14 @@ out_close_dfd:
 	return rc;
 }
 
-static int parse_tupfile(struct buf *b, struct vardb *vdb,
-			 struct list_head *rules, tupid_t tupid, tupid_t curdir)
+static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
+			 tupid_t curdir, struct graph *g)
 {
 	char *p, *e;
 	char *line;
-	char *eval_line;
 	int if_true = 1;
 	int lno = 0;
+	int linelen;
 
 	p = b->s;
 	e = b->s + b->len;
@@ -245,28 +234,19 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 		*newline = 0;
 		p = newline + 1;
 
+		linelen = newline - line;
+
 		if(line[0] == '#') {
 			/* Skip comments */
 			continue;
 		}
 
-		if(if_true) {
-			eval_line = eval(vdb, line, tupid);
-		} else {
-			eval_line = strdup(line);
-			if(!eval_line) {
-				perror("strdup");
-			}
-		}
-		if(!eval_line)
-			return -1;
-
-		if(strncmp(eval_line, "include ", 8) == 0 ||
-		   strncmp(eval_line, "include_root ", 13) == 0) {
+		if(strncmp(line, "include ", 8) == 0 ||
+		   strncmp(line, "include_root ", 13) == 0) {
 			struct buf incb;
 			int fd;
 			int rc;
-			int include_root = (eval_line[7] == '_');
+			int include_root = (line[7] == '_');
 			char *file;
 			struct name_list nl;
 			struct name_list_entry *nle, *tmpnle;
@@ -277,16 +257,25 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			init_name_list(&nl);
 
 			if(include_root) {
-				file = eval_line + 13;
+				file = line + 13;
 				incdir = DOT_DT;
 			} else {
-				file = eval_line + 8;
+				file = line + 8;
 				incdir = curdir;
 			}
+			file = eval(vdb, file, tupid);
+			if(!file)
+				return -1;
 			if(get_path_list(file, &plist, incdir) < 0)
 				return -1;
 			if(get_name_list(&plist, &nl) < 0)
 				return -1;
+			list_for_each_entry_safe(pl, tmppl, &plist, list) {
+				list_del(&pl->list);
+				free(pl);
+			}
+			/* Can only be freed after plist */
+			free(file);
 			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
 				if(nle->type != TUP_NODE_FILE) {
 					if(nle->type == TUP_NODE_GENERATED) {
@@ -315,11 +304,11 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 				 * However, we want all links to be made to the
 				 * parent tupid.
 				 */
-				rc = parse_tupfile(&incb, vdb, rules, tupid,
-						   nle->dt);
+				rc = parse_tupfile(&incb, vdb, tupid, nle->dt,
+						   g);
 				free(incb.s);
 				if(rc < 0) {
-					fprintf(stderr, "Error parsing included file '%s'\n", eval_line);
+					fprintf(stderr, "Error parsing included file '%s'\n", line);
 					return -1;
 				}
 
@@ -327,24 +316,20 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 					return -1;
 				delete_name_list_entry(&nl, nle);
 			}
-			list_for_each_entry_safe(pl, tmppl, &plist, list) {
-				list_del(&pl->list);
-				free(pl);
-			}
-		} else if(strcmp(eval_line, "else") == 0) {
+		} else if(strcmp(line, "else") == 0) {
 			if_true = !if_true;
-		} else if(strcmp(eval_line, "endif") == 0) {
+		} else if(strcmp(line, "endif") == 0) {
 			/* TODO: Nested if */
 			if_true = 1;
 		} else if(!if_true) {
 			/* Skip the false part of an if block */
-		} else if(strncmp(eval_line, "ifeq ", 5) == 0) {
+		} else if(strncmp(line, "ifeq ", 5) == 0) {
 			char *paren;
 			char *comma;
 			char *lval;
 			char *rval;
 
-			paren = strchr(eval_line+5, '(');
+			paren = strchr(line+5, '(');
 			if(!paren)
 				goto syntax_error;
 			lval = paren + 1;
@@ -352,42 +337,57 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			if(!comma)
 				goto syntax_error;
 			rval = comma + 1;
-			paren = strchr(rval, ')');
-			if(!paren)
-				goto syntax_error;
+
+			paren = line + linelen;
+			while(paren > line) {
+				if(*paren == ')')
+					goto found_paren;
+				paren--;
+			}
+			goto syntax_error;
+found_paren:
 			*comma = 0;
 			*paren = 0;
 
+			lval = eval(vdb, lval, tupid);
+			if(!lval)
+				return -1;
+			rval = eval(vdb, rval, tupid);
+			if(!rval)
+				return -1;
 			if(strcmp(lval, rval) == 0) {
 				if_true = 1;
 			} else {
 				if_true = 0;
 			}
-		} else if(eval_line[0] == ':') {
-			if(parse_rule(eval_line+1, rules, tupid, lno) < 0)
+			free(lval);
+			free(rval);
+		} else if(line[0] == ':') {
+			if(parse_rule(line+1, tupid, lno, g, vdb) < 0)
 				goto syntax_error;
-		} else if(eval_line[0] == ',') {
-			if(parse_varsed(eval_line+1, rules, tupid, lno) < 0)
+		} else if(line[0] == ',') {
+			if(parse_varsed(line+1, tupid, lno, g, vdb) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
+			char *var;
 			char *value;
 			int append;
 
 			/* Find the += or = sign, and point value to the start
 			 * of the string after that op.
 			 */
-			eq = strstr(eval_line, "+=");
+			eq = strstr(line, "+=");
 			if(eq) {
 				value = eq + 2;
 				append = 1;
 			} else {
-				eq = strstr(eval_line, ":=");
+				eq = strstr(line, ":=");
 				if(eq) {
 					value = eq + 2;
 					append = 0;
 				} else {
-					eq = strchr(eval_line, '=');
+					eq = strchr(line, '=');
 					if(!eq)
 						goto syntax_error;
 					value = eq + 1;
@@ -402,18 +402,25 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb,
 			while(isspace(*value) && *value != 0)
 				value++;
 			eq--;
-			while(isspace(*eq) && eq > eval_line) {
+			while(isspace(*eq) && eq > line) {
 				*eq = 0;
 				eq--;
 			}
 
-			if(append)
-				vardb_append(vdb, eval_line, value);
-			else
-				vardb_set(vdb, eval_line, value);
-		}
+			var = eval(vdb, line, tupid);
+			if(!var)
+				return -1;
+			value = eval(vdb, value, tupid);
+			if(!value)
+				return -1;
 
-		free(eval_line);
+			if(append)
+				vardb_append(vdb, var, value);
+			else
+				vardb_set(vdb, var, value);
+			free(var);
+			free(value);
+		}
 	}
 
 	return 0;
@@ -423,11 +430,14 @@ syntax_error:
 	return -1;
 }
 
-static int parse_rule(char *p, struct list_head *rules, tupid_t dt, int lno)
+static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
+		      struct vardb *vdb)
 {
 	char *input, *cmd, *output;
 	char *ie, *ce;
-	struct rule *r;
+	struct rule r;
+	char empty[] = "";
+	int rc;
 
 	input = p;
 	while(isspace(*input))
@@ -459,48 +469,34 @@ static int parse_rule(char *p, struct list_head *rules, tupid_t dt, int lno)
 		output++;
 	ce[1] = 0;
 
-	r = malloc(sizeof *r);
-	if(!r) {
-		perror("malloc");
-		return -1;
-	}
-	r->foreach = 0;
+	r.foreach = 0;
 	if(input) {
 		if(strncmp(input, "foreach", 7) == 0) {
-			r->foreach = 1;
+			r.foreach = 1;
 			input += 7;
 			while(*input == ' ') input++;
 		}
-		r->input_pattern = strdup(input);
+		r.input_pattern = input;
 	} else {
-		r->input_pattern = strdup("");
+		r.input_pattern = empty;
 	}
-	if(!r->input_pattern) {
-		perror("strdup");
-		return -1;
-	}
-	r->output_pattern = strdup(output);
-	if(!r->output_pattern) {
-		perror("strdup");
-		return -1;
-	}
-	r->command = strdup(cmd);
-	if(!r->command) {
-		perror("strdup");
-		return -1;
-	}
-	r->dt = dt;
-	r->line_number = lno;
-	init_name_list(&r->namelist);
-	list_add_tail(&r->list, rules);
-	return 0;
+	r.output_pattern = output;
+	r.command = cmd;
+	r.line_number = lno;
+	init_name_list(&r.namelist);
+
+	rc = execute_rule(&r, g, vdb, tupid);
+	return rc;
 }
 
-static int parse_varsed(char *p, struct list_head *rules, tupid_t dt, int lno)
+static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
+			struct vardb *vdb)
 {
 	char *input, *output;
 	char *ie;
-	struct rule *r;
+	int rc;
+	struct rule r;
+	char command[] = ", %f > %o";
 
 	input = p;
 	while(isspace(*input))
@@ -521,121 +517,111 @@ static int parse_varsed(char *p, struct list_head *rules, tupid_t dt, int lno)
 	while(isspace(*output))
 		output++;
 
-	r = malloc(sizeof *r);
-	if(!r) {
-		perror("malloc");
-		return -1;
-	}
-	r->foreach = 1;
-	r->input_pattern = strdup(input);
-	if(!r->input_pattern) {
-		perror("strdup");
-		return -1;
-	}
-	r->output_pattern = strdup(output);
-	if(!r->output_pattern) {
-		perror("strdup");
-		return -1;
-	}
+	r.foreach = 1;
+	r.input_pattern = input;
+	r.output_pattern = output;
+	r.command = command;
+	r.line_number = lno;
+	init_name_list(&r.namelist);
 
-	r->command = strdup(", %f > %o");
-	if(!r->command) {
-		perror("strdup");
-		return -1;
-	}
-	r->dt = dt;
-	r->line_number = lno;
-	init_name_list(&r->namelist);
-	list_add_tail(&r->list, rules);
-	return 0;
+	rc = execute_rule(&r, g, vdb, tupid);
+	return rc;
 }
 
-static int execute_rules(struct list_head *rules, struct graph *g)
+static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
+			tupid_t tupid)
 {
-	struct rule *r;
 	char *oosep;
 	struct name_list order_only_nl;
 	struct name_list_entry *nle;
+	char *input_pattern;
 
 	init_name_list(&order_only_nl);
 
-	list_for_each_entry(r, rules, list) {
-		oosep = strchr(r->input_pattern, '|');
-		if(oosep) {
-			char *p = oosep;
+	input_pattern = eval(vdb, r->input_pattern, tupid);
+	if(!input_pattern)
+		return -1;
+	oosep = strchr(input_pattern, '|');
+	if(oosep) {
+		char *p = oosep;
+		*p = 0;
+		while(p >= input_pattern && isspace(*p)) {
 			*p = 0;
-			while(p >= r->input_pattern && isspace(*p)) {
-				*p = 0;
-				p--;
-			}
+			p--;
+		}
+		oosep++;
+		while(*oosep && isspace(*oosep)) {
+			*oosep = 0;
 			oosep++;
-			while(*oosep && isspace(*oosep)) {
-				*oosep = 0;
-				oosep++;
-			}
-			if(parse_input_patterns(oosep, r->dt, &order_only_nl, g) < 0)
-				return -1;
 		}
-		if(parse_input_patterns(r->input_pattern, r->dt, &r->namelist, g) < 0)
+		if(parse_input_patterns(oosep, tupid, &order_only_nl, g) < 0)
 			return -1;
+	}
+	if(parse_input_patterns(input_pattern, tupid, &r->namelist, g) < 0)
+		return -1;
 
-		if(r->foreach) {
-			struct name_list tmp_nl;
-			struct name_list_entry tmp_nle;
+	if(r->foreach) {
+		struct name_list tmp_nl;
+		struct name_list_entry tmp_nle;
 
-			/* For a foreach loop, iterate over each entry in the
-			 * rule's namelist and do a shallow copy over into a
-			 * single-entry temporary namelist. Note that we cheat
-			 * by not actually allocating a separate nle, which is
-			 * why we don't have to do a delete_name_list_entry
-			 * for the temporary list and can just reinitialize the
-			 * pointers using init_name_list.
-			 *
-			 * The reason I use .prev instead of .next is because
-			 * it matches the order I used to do it in, which some
-			 * test cases (specifically, t8000) depend on. Other
-			 * than that it is completely irrelevant.
-			 */
-			while(!list_empty(&r->namelist.entries)) {
-				nle = list_entry(r->namelist.entries.prev,
-						struct name_list_entry, list);
-				init_name_list(&tmp_nl);
-				memcpy(&tmp_nle, nle, sizeof(*nle));
-				add_name_list_entry(&tmp_nl, &tmp_nle);
-				if(do_rule(r, &tmp_nl, &order_only_nl) < 0)
-					return -1;
-
-				delete_name_list_entry(&r->namelist, nle);
-			}
-		}
-
-		/* Only parse non-foreach rules if the namelist has some
-		 * entries, or if there is no input listed. We don't want to
-		 * generate a command if there is an input pattern but no
-		 * entries match (for example, *.o inputs to ld %f with no
-		 * object files). However, if you have no input but just a
-		 * command (eg: you want to run a shell script), then we still
-		 * want to do the rule for that case.
+		/* For a foreach loop, iterate over each entry in the rule's
+		 * namelist and do a shallow copy over into a single-entry
+		 * temporary namelist. Note that we cheat by not actually
+		 * allocating a separate nle, which is why we don't have to do
+		 * a delete_name_list_entry for the temporary list and can just
+		 * reinitialize the pointers using init_name_list.
+		 *
+		 * The reason I use .prev instead of .next is because it
+		 * matches the order I used to do it in, which some test cases
+		 * (specifically, t8000) depend on. Other than that it is
+		 * completely irrelevant.
 		 */
-		if(!r->foreach && (r->namelist.num_entries > 0 ||
-				   strcmp(r->input_pattern, "") == 0)) {
-
-			if(do_rule(r, &r->namelist, &order_only_nl) < 0)
+		while(!list_empty(&r->namelist.entries)) {
+			nle = list_entry(r->namelist.entries.prev,
+					 struct name_list_entry, list);
+			init_name_list(&tmp_nl);
+			memcpy(&tmp_nle, nle, sizeof(*nle));
+			add_name_list_entry(&tmp_nl, &tmp_nle);
+			if(do_rule(r, &tmp_nl, &order_only_nl, vdb, tupid) < 0)
 				return -1;
 
-			while(!list_empty(&r->namelist.entries)) {
-				nle = list_entry(r->namelist.entries.next,
-						struct name_list_entry, list);
-				delete_name_list_entry(&r->namelist, nle);
-			}
-		}
-
-		while(!list_empty(&order_only_nl.entries)) {
-			nle = list_entry(order_only_nl.entries.next,
-					 struct name_list_entry, list);
-			delete_name_list_entry(&order_only_nl, nle);
+			delete_name_list_entry(&r->namelist, nle);
 		}
 	}
+
+	/* Only parse non-foreach rules if the namelist has some entries, or if
+	 * there is no input listed. We don't want to generate a command if
+	 * there is an input pattern but no entries match (for example, *.o
+	 * inputs to ld %f with no object files). However, if you have no input
+	 * but just a command (eg: you want to run a shell script), then we
+	 * still want to do the rule for that case.
+	 *
+	 * Also note that we check that the original user string is empty
+	 * (r->input_pattern), not the eval'd string (input_pattern). This way
+	 * if the user specifies the input as $(foo) and it evaluates to empty,
+	 * we won't try to execute do_rule(). But an empty user string implies
+	 * that no input is required.
+	 */
+	if(!r->foreach && (r->namelist.num_entries > 0 ||
+			   strcmp(r->input_pattern, "") == 0)) {
+
+		if(do_rule(r, &r->namelist, &order_only_nl, vdb, tupid) < 0)
+			return -1;
+
+		while(!list_empty(&r->namelist.entries)) {
+			nle = list_entry(r->namelist.entries.next,
+					 struct name_list_entry, list);
+			delete_name_list_entry(&r->namelist, nle);
+		}
+	}
+
+	while(!list_empty(&order_only_nl.entries)) {
+		nle = list_entry(order_only_nl.entries.next,
+				 struct name_list_entry, list);
+		delete_name_list_entry(&order_only_nl, nle);
+	}
+
+	free(input_pattern);
 	return 0;
 }
 
@@ -835,10 +821,13 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
+static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
+		   struct vardb *vdb, tupid_t tupid)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
+	char *output_pattern;
+	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
 	struct id_entry *ide;
@@ -850,11 +839,14 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 
 	init_name_list(&onl);
 
-	if(get_path_list(r->output_pattern, &oplist, r->dt) < 0)
+	output_pattern = eval(vdb, r->output_pattern, tupid);
+	if(!output_pattern)
+		return -1;
+	if(get_path_list(output_pattern, &oplist, tupid) < 0)
 		return -1;
 	list_for_each_entry(pl, &oplist, list) {
 		if(pl->path) {
-			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, r->dt, r->line_number, r->command);
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tupid, r->line_number, r->command);
 			return -1;
 		}
 		onle = malloc(sizeof *onle);
@@ -870,18 +862,25 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
 
-		onle->tupid = tup_db_create_node_part(r->dt, onle->path, -1,
+		onle->tupid = tup_db_create_node_part(tupid, onle->path, -1,
 						      TUP_NODE_GENERATED);
 		if(onle->tupid < 0)
 			return -1;
 
 		add_name_list_entry(&onl, onle);
 	}
+	/* Has to be freed after use of oplist */
+	free(output_pattern);
 
-	cmd = tup_printf(r->command, nl, &onl);
+	tcmd = tup_printf(r->command, nl, &onl);
+	if(!tcmd)
+		return -1;
+	cmd = eval(vdb, tcmd, tupid);
 	if(!cmd)
 		return -1;
-	cmd_id = create_command_file(r->dt, cmd);
+	free(tcmd);
+
+	cmd_id = create_command_file(tupid, cmd);
 	free(cmd);
 	if(cmd_id < 0)
 		return -1;
@@ -938,7 +937,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl)
 		if(rc < 0)
 			return -1;
 		if(rc == 0) {
-			fprintf(stderr, "Error: You seem to have removed a required input file (%lli). Please add it back. If it truly isn't needed anymore, you can probably remove it after a successful update.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", ide->tupid, r->dt, r->line_number, r->command);
+			fprintf(stderr, "Error: You seem to have removed a required input file (%lli). Please add it back. If it truly isn't needed anymore, you can probably remove it after a successful update.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", ide->tupid, tupid, r->line_number, r->command);
 			bork = 1;
 		}
 	}

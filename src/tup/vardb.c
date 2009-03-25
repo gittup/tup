@@ -111,9 +111,7 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr, "Error: Variable '%.*s' not found.\n",
-			varlen, var);
-		rc = -1;
+		/* Variable not found: length of "" == 0 */
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -157,9 +155,7 @@ int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr, "Error: Variable '%.*s' not found.\n",
-			varlen, var);
-		rc = -1;
+		/* Variable not found: length of "" == 0 */
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {

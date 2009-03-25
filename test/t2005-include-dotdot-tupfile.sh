@@ -8,7 +8,7 @@
 mkdir a
 cat > a/Tupfile << HERE
 include ../Tupfile.vars
-: foreach *.c |> \$(CC) \$(CCARGS) |> %F.o
+: foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %F.o
 : *.o |> \$(CC) -o prog %f |> prog
 HERE
 
@@ -18,13 +18,13 @@ include Tupfile.ccargs
 HERE
 
 cat > Tupfile.ccargs << HERE
-CCARGS := -c %f
-CCARGS += -o %o
+CCARGS := -DFOO=1
+CCARGS += -DBAR=1
 HERE
 
 tup touch a/foo.c a/bar.c a/Tupfile Tupfile.vars Tupfile.ccargs
 tup parse
 tup_object_exist a foo.c bar.c
-tup_object_exist a "gcc -c foo.c -o foo.o"
-tup_object_exist a "gcc -c bar.c -o bar.o"
+tup_object_exist a "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
+tup_object_exist a "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
 tup_object_exist a "gcc -o prog bar.o foo.o"
