@@ -1005,10 +1005,10 @@ int tup_db_is_root_node(tupid_t tupid)
 	}
 
 	type = sqlite3_column_int(*stmt, 0);
-	if(type == TUP_NODE_FILE)
-		rc = 1;
-	else
+	if(type == TUP_NODE_GENERATED)
 		rc = 0;
+	else
+		rc = 1;
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
