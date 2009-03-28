@@ -3,6 +3,7 @@
 #include "debug.h"
 #include "getexecwd.h"
 #include "fileio.h"
+#include "db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -103,6 +104,23 @@ static void *message_thread(void *arg)
 		if(rc != expected) {
 			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, expected);
 			return (void*)-1;
+		}
+
+		if(event->at == ACCESS_VAR) {
+			tupid_t tupid;
+
+			pthread_mutex_lock(s->db_mutex);
+			tupid = tup_db_send_var(filename, s->sd[0]);
+			pthread_mutex_unlock(s->db_mutex);
+
+			if(tupid < 0) {
+				len = -1;
+				send(s->sd[0], &len, sizeof(len), 0);
+				return (void*)-1;
+			}
+			if(handle_tupid(tupid, &s->finfo) < 0)
+				return (void*)-1;
+			continue;
 		}
 
 		if(filename[0] == '/') {

@@ -508,6 +508,8 @@ static void *update_work(void *arg)
 		perror("malloc");
 		return NULL;
 	}
+	s->db_mutex = &db_mutex;
+
 	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
 		struct edge *e;
 		int rc = 0;

@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
 #include <sqlite3.h>
 
 #define DB_VERSION 2
@@ -65,6 +66,7 @@ enum {
 	DB_GET_VAR,
 	DB_GET_VAR_ID,
 	DB_GET_VARLEN,
+	DB_SEND_VAR,
 	DB_WRITE_VAR,
 	DB_FLAG_DELETED_VAR_DEPENDENT_DIRS,
 	DB_VAR_FOREACH,
@@ -2550,6 +2552,65 @@ out_reset:
 	}
 
 	return rc;
+}
+
+tupid_t tup_db_send_var(const char *var, int sd)
+{
+	int dbrc;
+	int len;
+	tupid_t tupid = -1;
+	const char *value;
+	sqlite3_stmt **stmt = &stmts[DB_SEND_VAR];
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id and node.id not in (select node.id from delete_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_text(*stmt, 2, var, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		fprintf(stderr,"Error: Variable '%s' not found in .tup/db.\n",
+			var);
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		goto out_reset;
+	}
+
+	len = sqlite3_column_int(*stmt, 2);
+	if(len < 0) {
+		goto out_reset;
+	}
+	value = (const char *)sqlite3_column_text(*stmt, 1);
+	if(!value) {
+		goto out_reset;
+	}
+	send(sd, &len, sizeof(len), 0);
+	send(sd, value, len, 0);
+
+	tupid = sqlite3_column_int64(*stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return tupid;
 }
 
 tupid_t tup_db_write_var(const char *var, int varlen, int fd)

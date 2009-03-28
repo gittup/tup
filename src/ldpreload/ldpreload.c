@@ -168,6 +168,7 @@ static void handle_file(const char *file, int at)
 	struct access_event *event;
 	static char msgbuf[sizeof(*event) + PATH_MAX];
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	int rc;
 
 	if(ignore_file(file))
 		return;
@@ -182,7 +183,10 @@ static void handle_file(const char *file, int at)
 		goto out_unlock;
 	}
 	memcpy(msgbuf + sizeof(*event), file, event->len);
-	send(sd, msgbuf, sizeof(*event) + event->len, 0);
+	rc = send(sd, msgbuf, sizeof(*event) + event->len, 0);
+	if(rc < 0) {
+		perror("tup.ldpreload send");
+	}
 out_unlock:
 	pthread_mutex_unlock(&mutex);
 }

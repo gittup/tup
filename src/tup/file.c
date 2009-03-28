@@ -30,6 +30,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->write_list);
 	INIT_LIST_HEAD(&info->rename_list);
 	INIT_LIST_HEAD(&info->unlink_list);
+	INIT_LIST_HEAD(&info->tupid_list);
 	return 0;
 }
 
@@ -72,6 +73,20 @@ int handle_file(const struct access_event *event, const char *filename,
 	}
 
 	return rc;
+}
+
+int handle_tupid(tupid_t tupid, struct file_info *info)
+{
+	struct id_entry *ide;
+
+	ide = malloc(sizeof *ide);
+	if(!ide) {
+		perror("malloc");
+		return -1;
+	}
+	ide->tupid = tupid;
+	list_add(&ide->list, &info->tupid_list);
+	return 0;
 }
 
 int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
@@ -153,6 +168,14 @@ link_cool:
 		if(tup_db_create_link(dbn.tupid, cmdid) < 0)
 			return -1;
 		del_entry(r);
+	}
+
+	while(!list_empty(&info->tupid_list)) {
+		ide = list_entry(info->tupid_list.next, struct id_entry, list);
+		if(tup_db_create_link(ide->tupid, cmdid) < 0)
+			return -1;
+		list_del(&ide->list);
+		free(ide);
 	}
 	return 0;
 }

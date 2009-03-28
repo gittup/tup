@@ -10,6 +10,7 @@
 struct server {
 	int sd[2];
 	pthread_t tid;
+	pthread_mutex_t *db_mutex;
 	struct file_info finfo;
 	char msgbuf[sizeof(struct access_event) + PATH_MAX];
 	char cwd[PATH_MAX];
