@@ -29,8 +29,6 @@ tup build tup
 
 recursive grep kills monitor
 
-remove open file descriptor check
-
 html:
   proof: big-o notation
   proof: no clean target

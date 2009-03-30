@@ -1520,12 +1520,6 @@ int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
 	while(1) {
 		struct id_entry *ide;
 
-		ide = malloc(sizeof *ide);
-		if(!ide) {
-			perror("malloc");
-			rc = -1;
-			goto out_reset;
-		}
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			rc = 0;
@@ -1537,6 +1531,12 @@ int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
 			goto out_reset;
 		}
 
+		ide = malloc(sizeof *ide);
+		if(!ide) {
+			perror("malloc");
+			rc = -1;
+			goto out_reset;
+		}
 		ide->tupid = sqlite3_column_int64(*stmt, 0);
 		list_add(&ide->list, head);
 	}
@@ -1577,12 +1577,6 @@ int tup_db_get_src_links(tupid_t to_id, struct list_head *head, int style)
 	while(1) {
 		struct id_entry *ide;
 
-		ide = malloc(sizeof *ide);
-		if(!ide) {
-			perror("malloc");
-			rc = -1;
-			goto out_reset;
-		}
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			rc = 0;
@@ -1594,6 +1588,12 @@ int tup_db_get_src_links(tupid_t to_id, struct list_head *head, int style)
 			goto out_reset;
 		}
 
+		ide = malloc(sizeof *ide);
+		if(!ide) {
+			perror("malloc");
+			rc = -1;
+			goto out_reset;
+		}
 		ide->tupid = sqlite3_column_int64(*stmt, 0);
 		list_add(&ide->list, head);
 	}

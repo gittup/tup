@@ -132,19 +132,18 @@ static int process_create_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(g.num_nodes) {
+	if(g.num_nodes)
 		printf("Parsing Tupfiles\n");
-		tup_db_begin();
-		rc = execute_graph(&g, 0, 1, create_work);
-		if(rc == 0) {
-			tup_db_commit();
-		} else if(rc == -1) {
-			tup_db_rollback();
-			return -1;
-		} else {
-			fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
-			return -1;
-		}
+	tup_db_begin();
+	rc = execute_graph(&g, 0, 1, create_work);
+	if(rc == 0) {
+		tup_db_commit();
+	} else if(rc == -1) {
+		tup_db_rollback();
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
 	}
 	if(destroy_graph(&g) < 0)
 		return -1;

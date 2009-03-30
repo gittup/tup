@@ -844,7 +844,8 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 		return -1;
 	if(get_path_list(output_pattern, &oplist, tupid) < 0)
 		return -1;
-	list_for_each_entry(pl, &oplist, list) {
+	while(!list_empty(&oplist)) {
+		pl = list_entry(oplist.next, struct path_list, list);
 		if(pl->path) {
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tupid, r->line_number, r->command);
 			return -1;
@@ -868,6 +869,9 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 			return -1;
 
 		add_name_list_entry(&onl, onle);
+
+		list_del(&pl->list);
+		free(pl);
 	}
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
@@ -932,7 +936,8 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 			}
 		}
 	}
-	list_for_each_entry(ide, &old_input_list, list) {
+	while(!list_empty(&old_input_list)) {
+		ide = list_entry(old_input_list.next, struct id_entry, list);
 		rc = tup_db_is_root_node(ide->tupid);
 		if(rc < 0)
 			return -1;
@@ -940,6 +945,9 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 			fprintf(stderr, "Error: You seem to have removed a required input file (%lli). Please add it back. If it truly isn't needed anymore, you can probably remove it after a successful update.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", ide->tupid, tupid, r->line_number, r->command);
 			bork = 1;
 		}
+
+		list_del(&ide->list);
+		free(ide);
 	}
 	if(bork)
 		return -1;

@@ -34,7 +34,6 @@ static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
 static int flush(void);
 
-static int check_open_fds(void);
 static void usage(void);
 
 static int start_fd;
@@ -123,13 +122,6 @@ int main(int argc, char **argv)
 	}
 
 	tup_cleanup();
-
-	if(check_open_fds() < 0) {
-		if(rc == 0) {
-			fprintf(stderr, "Returning failure due to open FDs.\n");
-			rc = 1;
-		}
-	}
 	return rc;
 }
 
@@ -585,32 +577,6 @@ static int flush(void)
 	}
 	printf("Flushed.\n");
 	return 0;
-}
-
-static int check_open_fds(void)
-{
-	int fd;
-	int flags;
-	int rc = 0;
-
-	/* This is basically from http://www.linuxquestions.org/questions/programming-9/how-to-find-out-the-number-of-open-file-descriptors-391536/, but I
-	 * skip stdin/stdout/stderr/mtrace.
-	 */
-	for (fd = start_fd; fd < (int) FD_SETSIZE; fd++) {
-		errno = 0;
-		flags = fcntl(fd, F_GETFD, 0);
-		if (flags == -1 && errno) {
-			if (errno != EBADF) {
-				perror("fcntl");
-				return -1;
-			}
-			else
-				continue;
-		}
-		fprintf(stderr, "FD %i still open\n", fd);
-		rc = -1;
-	}
-	return rc;
 }
 
 static void usage(void)

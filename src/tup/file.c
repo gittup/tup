@@ -177,6 +177,12 @@ link_cool:
 		list_del(&ide->list);
 		free(ide);
 	}
+
+	while(!list_empty(&sticky_inputs)) {
+		ide = list_entry(sticky_inputs.next, struct id_entry, list);
+		list_del(&ide->list);
+		free(ide);
+	}
 	return 0;
 }
 
