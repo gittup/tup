@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
+#include <unistd.h>
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/getexecwd.h"
@@ -227,7 +228,8 @@ static int graph(int argc, char **argv)
 		int len;
 		static char cname[PATH_MAX];
 
-		len = canonicalize(argv[x], cname, sizeof(cname), NULL);
+		len = canonicalize(argv[x], cname, sizeof(cname), NULL,
+				   get_sub_dir());
 		if(len < 0) {
 			fprintf(stderr, "Unable to canonicalize '%s'\n", argv[x]);
 			return -1;
@@ -497,9 +499,18 @@ static int flags_exists(int argc, char **argv)
 static int touch(int argc, char **argv)
 {
 	int x;
+	int fd;
 	if(tup_db_begin() < 0)
 		return -1;
+	fd = open(".", O_RDONLY);
+	if(fd < 0) {
+		perror(".");
+		return -1;
+	}
 	for(x=1; x<argc; x++) {
+		chdir(get_sub_dir());
+		close(open(argv[x], O_WRONLY | O_CREAT, 0666));
+		fchdir(fd);
 		if(tup_pathname_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
 			return -1;
 	}

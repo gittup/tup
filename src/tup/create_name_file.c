@@ -1,6 +1,7 @@
 #include "fileio.h"
 #include "db.h"
 #include "compat.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,7 +165,7 @@ int tup_pathname_mod(const char *path, int flags)
 	const char *file = NULL;
 	tupid_t dt;
 
-	len = canonicalize(path, cname, sizeof(cname), NULL);
+	len = canonicalize(path, cname, sizeof(cname), NULL, get_sub_dir());
 	if(len < 0) {
 		fprintf(stderr, "Unable to canonicalize '%s'\n", path);
 		return -1;
@@ -200,7 +201,7 @@ tupid_t get_dbn(const char *path, struct db_node *dbn)
 			return -1;
 		return dbn->tupid;
 	} else {
-		printf("TODO: no dbn?\n");
+		fprintf(stderr, "tup TODO: no dbn?\n");
 		return -1;
 		return dt;
 	}

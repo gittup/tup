@@ -4,16 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
-int canonicalize(const char *path, char *out, int len, int *lastslash)
-{
-	if(path[0] == '/')
-		return canonicalize2(path, "", out, len, lastslash, get_sub_dir());
-	else
-		return canonicalize2("", path, out, len, lastslash, get_sub_dir());
-}
-
-int canonicalize2(const char *path, const char *file, char *out, int len,
-		  int *lastslash, const char *subdir)
+int canonicalize(const char *path, char *out, int len, int *lastslash,
+		 const char *subdir)
 {
 	int sz;
 
@@ -28,29 +20,19 @@ int canonicalize2(const char *path, const char *file, char *out, int len,
 			       "in the .tup hierarchy.\n", path);
 			return -1;
 		}
-		if(file[0]) {
-			if(path[ttl + 1])
-				sz = snprintf(out, len, "%s/%s", path + ttl + 1, file);
-			else
-				sz = snprintf(out, len, "%s", file);
-		} else {
-			sz = snprintf(out, len, "%s", path + ttl + 1);
-		}
+		sz = snprintf(out, len, "%s", path + ttl + 1);
 	} else {
 		/* If it's a relative path, prepend the subdirectory that the
 		 * user invoked the command in relative to where .tup/ exists.
 		 */
-		if(subdir[0]) {
-			sz = snprintf(out, len, "%s/%s/%s", subdir, path, file);
+		if(subdir && subdir[0]) {
+			sz = snprintf(out, len, "%s/%s", subdir, path);
 		} else {
-			if(path[0])
-				sz = snprintf(out, len, "%s/%s", path, file);
-			else
-				sz = snprintf(out, len, "%s", file);
+			sz = snprintf(out, len, "%s", path);
 		}
 	}
 	if(sz >= len) {
-		fprintf(stderr, "No room for file '%s', '%s'\n", path, file);
+		fprintf(stderr, "No room for file '%s'\n", path);
 		return -1;
 	}
 

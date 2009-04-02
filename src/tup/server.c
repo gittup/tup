@@ -122,11 +122,8 @@ static void *message_thread(void *arg)
 			continue;
 		}
 
-		if(filename[0] == '/') {
-			len = canonicalize(filename, s->cname, sizeof(s->cname), NULL);
-		} else {
-			len = canonicalize2(s->cwd, filename, s->cname, sizeof(s->cname), NULL, "");
-		}
+		len = canonicalize(filename, s->cname, sizeof(s->cname), NULL,
+				   s->cwd);
 		/* Skip the file if it's outside of our local tree */
 		if(len < 0)
 			continue;

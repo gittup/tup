@@ -19,9 +19,8 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last);
 
 int delete_name_file(tupid_t tupid);
 
-int canonicalize(const char *path, char *out, int len, int *lastslash);
-int canonicalize2(const char *path, const char *file, char *out, int len,
-		  int *lastslash, const char *subdir);
+int canonicalize(const char *path, char *out, int len, int *lastslash,
+		 const char *subdir);
 
 /** Canonicalizes a path name. Changes instances of "//" and "/./" to "/",
  * changes "foo/../bar" to "bar", and removes trailing slashes.

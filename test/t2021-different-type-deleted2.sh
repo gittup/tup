@@ -9,8 +9,8 @@ mkdir foo
 touch foo/a
 tup touch foo/a
 rm foo/a
-rmdir foo
 tup delete foo/a
+rmdir foo
 tup delete foo
 
 touch foo
