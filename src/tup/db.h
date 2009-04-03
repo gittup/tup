@@ -50,8 +50,8 @@ enum TUP_FLAGS_TYPE {
 };
 
 enum TUP_LINK_TYPE {
-	TUP_LINK_NORMAL,
-	TUP_LINK_STICKY,
+	TUP_LINK_NORMAL=1,
+	TUP_LINK_STICKY=2,
 };
 
 /* General operations */
@@ -103,17 +103,17 @@ int tup_db_unflag_modify(tupid_t tupid);
 int tup_db_unflag_delete(tupid_t tupid);
 
 /* Link operations */
-int tup_db_create_link(tupid_t a, tupid_t b);
-int tup_db_create_sticky_link(tupid_t a, tupid_t b);
+int tup_db_create_link(tupid_t a, tupid_t b, int style);
 int tup_db_create_unique_link(tupid_t a, tupid_t b);
 int tup_db_get_dest_links(tupid_t from_id, struct list_head *head);
-int tup_db_get_src_links(tupid_t to_id, struct list_head *head, int style);
+int tup_db_delete_empty_links(tupid_t tupid);
+int tup_db_yell_links(tupid_t tupid, const char *errmsg);
 int tup_db_link_exists(tupid_t a, tupid_t b);
-int tup_db_link_style_exists(tupid_t a, tupid_t b, int style);
+int tup_db_link_style(tupid_t a, tupid_t b);
 int tup_db_has_incoming_links(tupid_t tupid);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_delete_src_links(tupid_t tupid, int style);
-int tup_db_move_sticky_links(tupid_t orig, tupid_t dest);
+int tup_db_unsticky_links(tupid_t tupid);
+int tup_db_copy_sticky_links(tupid_t orig, tupid_t dest);
 
 /* Combo operations */
 int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type);

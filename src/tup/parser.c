@@ -312,7 +312,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 					return -1;
 				}
 
-				if(tup_db_create_link(nle->tupid, tupid) < 0)
+				if(tup_db_create_link(nle->tupid, tupid, TUP_LINK_NORMAL) < 0)
 					return -1;
 				delete_name_list_entry(&nl, nle);
 			}
@@ -700,7 +700,7 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 				if(parse(n, g) < 0)
 					return -1;
 			}
-			if(tup_db_create_link(pl->dt, dt) < 0)
+			if(tup_db_create_link(pl->dt, dt, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}
@@ -830,12 +830,9 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
-	struct id_entry *ide;
-	int bork = 0;
 	int rc;
 	tupid_t cmd_id;
 	LIST_HEAD(oplist);
-	LIST_HEAD(old_input_list);
 
 	init_name_list(&onl);
 
@@ -889,9 +886,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	if(cmd_id < 0)
 		return -1;
 
-	if(tup_db_get_src_links(cmd_id, &old_input_list, TUP_LINK_NORMAL) < 0)
-		return -1;
-	if(tup_db_delete_src_links(cmd_id, TUP_LINK_STICKY) < 0)
+	if(tup_db_unsticky_links(cmd_id) < 0)
 		return -1;
 
 	while(!list_empty(&onl.entries)) {
@@ -909,49 +904,21 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	}
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tup_db_create_sticky_link(nle->tupid, cmd_id) < 0)
+		if(tup_db_create_link(nle->tupid, cmd_id, TUP_LINK_STICKY) < 0)
 			return -1;
-		list_for_each_entry(ide, &old_input_list, list) {
-			if(ide->tupid == nle->tupid) {
-				/* Ok to delete here - we're braking for
-				 * turtles
-				 */
-				list_del(&ide->list);
-				free(ide);
-				break;
-			}
-		}
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
-		if(tup_db_create_sticky_link(nle->tupid, cmd_id) < 0)
+		if(tup_db_create_link(nle->tupid, cmd_id, TUP_LINK_STICKY) < 0)
 			return -1;
-		list_for_each_entry(ide, &old_input_list, list) {
-			if(ide->tupid == nle->tupid) {
-				/* Ok to delete here - we're braking for
-				 * turtles
-				 */
-				list_del(&ide->list);
-				free(ide);
-				break;
-			}
-		}
 	}
-	while(!list_empty(&old_input_list)) {
-		ide = list_entry(old_input_list.next, struct id_entry, list);
-		rc = tup_db_is_root_node(ide->tupid);
-		if(rc < 0)
-			return -1;
-		if(rc == 0) {
-			fprintf(stderr, "Error: You seem to have removed a required input file (%lli). Please add it back. If it truly isn't needed anymore, you can probably remove it after a successful update.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", ide->tupid, tupid, r->line_number, r->command);
-			bork = 1;
-		}
-
-		list_del(&ide->list);
-		free(ide);
-	}
-	if(bork)
+	if(tup_db_delete_empty_links(cmd_id) < 0)
 		return -1;
-	return 0;
+	rc = tup_db_yell_links(cmd_id, "You seem to have removed a required input file - please add it back. If  it truly isn't needed anymore, you can probably remove it after a successful    update.");
+	if(rc < 0)
+		return -1;
+	if(rc == 0)
+		return 0;
+	return -1;
 }
 
 static void init_name_list(struct name_list *nl)
@@ -1253,7 +1220,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 			vt = tup_db_get_var(var, rat-s-1, &p);
 			if(vt < 0)
 				return NULL;
-			if(tup_db_create_link(vt, tupid) < 0)
+			if(tup_db_create_link(vt, tupid, TUP_LINK_NORMAL) < 0)
 				return NULL;
 
 			s = rat + 1;

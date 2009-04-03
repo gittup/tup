@@ -98,13 +98,10 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 	struct id_entry *ide;
 	int output_bork = 0;
 	LIST_HEAD(old_output_list);
-	LIST_HEAD(sticky_inputs);
 
 	handle_unlink(info);
 
 	if(tup_db_get_dest_links(old_cmdid, &old_output_list) < 0)
-		return -1;
-	if(tup_db_get_src_links(old_cmdid, &sticky_inputs, TUP_LINK_STICKY) < 0)
 		return -1;
 
 	while(!list_empty(&info->write_list)) {
@@ -116,7 +113,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 			return -1;
 		}
 
-		if(tup_db_create_link(cmdid, dbn.tupid) < 0)
+		if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
 		list_for_each_entry_safe(r, tmp, &info->read_list, list) {
 			if(strcmp(w->filename, r->filename) == 0)
@@ -150,36 +147,15 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, const char *debug_name,
 			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
 			return -1;
 		}
-		/* Root nodes are always cool */
-		if(dbn.type == TUP_NODE_FILE)
-			goto link_cool;
-
-		/* Non-root nodes that are specified as input links in the
-		 * Tupfile are also cool.
-		 */
-		list_for_each_entry(ide, &sticky_inputs, list) {
-			if(ide->tupid == dbn.tupid)
-				goto link_cool;
-		}
-		/* Non-coolness is not allowed. */
-		fprintf(stderr, "tup error: Missing input dependency - file '%s' was read from, and was not specified as an input link for the command '%s'. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n", r->filename, debug_name);
-		return -1;
-link_cool:
-		if(tup_db_create_link(dbn.tupid, cmdid) < 0)
+		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
 		del_entry(r);
 	}
 
 	while(!list_empty(&info->tupid_list)) {
 		ide = list_entry(info->tupid_list.next, struct id_entry, list);
-		if(tup_db_create_link(ide->tupid, cmdid) < 0)
+		if(tup_db_create_link(ide->tupid, cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
-		list_del(&ide->list);
-		free(ide);
-	}
-
-	while(!list_empty(&sticky_inputs)) {
-		ide = list_entry(sticky_inputs.next, struct id_entry, list);
 		list_del(&ide->list);
 		free(ide);
 	}

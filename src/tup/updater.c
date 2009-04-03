@@ -254,7 +254,7 @@ edge_create:
 			g->cur->tupid, dbn->tupid);
 		return -1;
 	}
-	if(style == TUP_LINK_NORMAL && n->expanded == 0) {
+	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
 		if(n->type == g->count_flags)
 			g->num_nodes++;
 		n->expanded = 1;
@@ -528,7 +528,7 @@ static void *update_work(void *arg)
 				/* Mark the next nodes as modify in case we hit
 				 * an error - we'll need to pick up there.
 				 */
-				if(e->style == TUP_LINK_NORMAL) {
+				if(e->style & TUP_LINK_NORMAL) {
 					if(tup_db_add_modify_list(e->dest->tupid) < 0)
 						rc = -1;
 				}
@@ -637,7 +637,21 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = write_files(tupid, n->tupid, name, &s->finfo);
+			rc = tup_db_copy_sticky_links(n->tupid, tupid);
+			if(rc == 0)
+				rc = write_files(tupid, n->tupid, name, &s->finfo);
+			if(rc == 0) {
+				rc = tup_db_yell_links(tupid, "Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created   from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could   randomly break in the future.");
+				if(rc == 0) {
+					/* Success! Delete the old node */
+					delete_name_file(n->tupid);
+				}
+				/* Yelled nodes are actually a failure */
+				if(rc == 1) {
+					fprintf(stderr, " -- Command: '%s'\n", name);
+					rc = -1;
+				}
+			}
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
@@ -658,10 +672,6 @@ static int update(struct node *n, struct server *s)
 	}
 
 	close(dfd);
-	pthread_mutex_lock(&db_mutex);
-	rc = tup_db_move_sticky_links(n->tupid, tupid);
-	delete_name_file(n->tupid);
-	pthread_mutex_unlock(&db_mutex);
 	return rc;
 
 err_cmd_failed:
@@ -728,7 +738,7 @@ static int var_replace(struct node *n)
 	input_id = tup_db_select_node(n->dt, input);
 	if(input_id < 0)
 		return -1;
-	if(tup_db_create_link(input_id, n->tupid) < 0)
+	if(tup_db_create_link(input_id, n->tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 
 	ifd = open(input, O_RDONLY);
@@ -771,7 +781,7 @@ static int var_replace(struct node *n)
 			varid = tup_db_write_var(p+1, rat-(p+1), ofd);
 			if(varid < 0)
 				return -1;
-			if(tup_db_create_link(varid, n->tupid) < 0)
+			if(tup_db_create_link(varid, n->tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			p = rat + 1;
 		} else {

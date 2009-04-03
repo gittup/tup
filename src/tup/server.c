@@ -116,9 +116,10 @@ static void *message_thread(void *arg)
 			if(tupid < 0) {
 				len = -1;
 				send(s->sd[0], &len, sizeof(len), 0);
+			} else {
+				if(handle_tupid(tupid, &s->finfo) < 0)
+					return (void*)-1;
 			}
-			if(handle_tupid(tupid, &s->finfo) < 0)
-				return (void*)-1;
 			continue;
 		}
 

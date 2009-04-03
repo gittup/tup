@@ -195,7 +195,7 @@ static int graph_cb(void *arg, struct db_node *dbn, int style)
 		return -1;
 
 edge_create:
-	if(style == TUP_LINK_NORMAL && n->expanded == 0) {
+	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
 		n->expanded = 1;
 		list_move(&n->list, &g->plist);
 	}
@@ -335,7 +335,7 @@ static int graph(int argc, char **argv)
 
 		e = n->edges;
 		while(e) {
-			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tupid, n->tupid, e->style ? "dotted" : "solid");
+			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tupid, n->tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid");
 			e = e->next;
 		}
 	}
@@ -393,10 +393,10 @@ static int mlink(int argc, char **argv)
 			return 1;
 
 		if(type == 0) {
-			if(tup_db_create_link(id, cmd_id) < 0)
+			if(tup_db_create_link(id, cmd_id, TUP_LINK_NORMAL) < 0)
 				return -1;
 		} else {
-			if(tup_db_create_link(cmd_id, id) < 0)
+			if(tup_db_create_link(cmd_id, id, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}
