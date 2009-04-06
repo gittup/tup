@@ -7,11 +7,14 @@ all: tup ldpreload.so
 
 Q=@
 
-tup: LDFLAGS := -lsqlite3
-ldpreload.so: CCFLAGS := -fpic
-ldpreload.so: LDFLAGS := -ldl -lsqlite3
+WARNINGS = -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
+$(BUILD)src/tup/tup/main.o: CCFLAGS := $(WARNINGS)
+tup: LDFLAGS := -lpthread -ldl
+libtup.a: CCFLAGS := $(WARNINGS)
+ldpreload.so: CCFLAGS := $(WARNINGS) -fpic
+ldpreload.so: LDFLAGS := -ldl
 
-tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
+tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c) src/sqlite3/sqlite3.c) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
 
 # The git status command seems to get rid of files that may have been touched
@@ -38,7 +41,7 @@ libtup.a: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/*.c))
 $(objs): $(BUILD)%.o: %.c Makefile
 	$Qecho "  CC      $<";\
 	mkdir -p $(@D);\
-	gcc -Os -MMD $(CCFLAGS) -Isrc -c $< -o $@ -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
+	gcc -Os -MMD $(CCFLAGS) -Isrc -Isrc/sqlite3 -c $< -o $@
 
 -include $(deps)
 
