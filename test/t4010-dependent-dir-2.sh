@@ -6,12 +6,12 @@
 # this all magically work though.
 . ../tup.sh
 
-mkdir bar
+tmkdir bar
 cat > bar/Tupfile << HERE
 : ../fs/*.o |> ld -r %f -o built-in.o |> built-in.o
 HERE
 
-mkdir fs
+tmkdir fs
 cat > fs/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE

@@ -11,10 +11,9 @@ struct server {
 	int sd[2];
 	pthread_t tid;
 	pthread_mutex_t *db_mutex;
+	tupid_t dt;
 	struct file_info finfo;
-	char msgbuf[sizeof(struct access_event) + PATH_MAX];
-	char cwd[PATH_MAX];
-	char cname[PATH_MAX];
+	char msgbuf[sizeof(struct access_event) + PATH_MAX*2];
 };
 
 int server_init(void);

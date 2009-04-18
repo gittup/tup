@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-mkdir a
+tmkdir a
 cp ../testTupfile.tup a/Tupfile
 
 echo "int main(void) {return 0;}" > a/foo.c
@@ -15,7 +15,7 @@ sym_check a/prog main
 # Move directory a to b
 mv a b
 tup delete a
-tup touch b/foo.c b/Tupfile
+tup touch b b/foo.c b/Tupfile
 update
 tup_object_exist . b
 tup_object_exist b foo.c foo.o prog

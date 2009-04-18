@@ -8,8 +8,8 @@ cat > Tupfile << HERE
 : foreach subdir/*.txt |> cp %f %o |> %b
 : foreach subdir/*.c |> gcc -c %f -o %o |> %B.o
 HERE
-mkdir subdir
-mkdir superlongtest
+tmkdir subdir
+tmkdir superlongtest
 tup touch subdir/foo.c subdir/readme.txt Tupfile superlongtest/ok
 tup parse
 tup_object_exist . foo.o readme.txt

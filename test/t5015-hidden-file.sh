@@ -13,7 +13,8 @@ cat > Tupfile << HERE
 HERE
 
 echo 'foo' > .hidden
-mkdir -p yo/.hidden_dir
+tmkdir yo
+tmkdir yo/.hidden_dir
 echo 'bar' > yo/.hidden_dir/foo
 tup touch Tupfile .hidden yo/.hidden_dir/foo
 update

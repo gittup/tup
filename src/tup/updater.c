@@ -599,8 +599,6 @@ static int update(struct node *n, struct server *s)
 		goto err_delete_node;
 	}
 
-	if(tup_db_get_path(n->dt, s->cwd, sizeof(s->cwd)) < 0)
-		return -1;
 	pthread_mutex_unlock(&db_mutex);
 
 	if(start_server(s) < 0) {
@@ -639,7 +637,7 @@ static int update(struct node *n, struct server *s)
 			pthread_mutex_lock(&db_mutex);
 			rc = tup_db_copy_sticky_links(n->tupid, tupid);
 			if(rc == 0)
-				rc = write_files(tupid, n->tupid, name, &s->finfo);
+				rc = write_files(tupid, n->tupid, n->dt, name, &s->finfo);
 			if(rc == 0) {
 				rc = tup_db_yell_links(tupid, "Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created   from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could   randomly break in the future.");
 				if(rc == 0) {

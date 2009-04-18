@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-mkdir foo
+tmkdir foo
 cd foo
 tup touch bar.c
 cd ..

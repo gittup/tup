@@ -9,12 +9,12 @@ include bar/Install.tup
 : foreach \$(input) |> cp %f %o |> %B.o
 HERE
 
-mkdir foo
+tmkdir foo
 cat > foo/Install.tup << HERE
 input += foo/sball
 HERE
 
-mkdir bar
+tmkdir bar
 cat > bar/Install.tup << HERE
 input += bar/tab
 HERE

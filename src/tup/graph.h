@@ -21,6 +21,7 @@ struct node {
 	struct edge *edges;
 	tupid_t tupid;
 	tupid_t dt;
+	tupid_t sym;
 	char *name;
 	int incoming_count;
 

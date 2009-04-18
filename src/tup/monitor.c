@@ -94,7 +94,7 @@ int monitor(int argc, char **argv)
 	int mon_lock;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
-	struct del_entry *de;
+	struct half_entry *he;
 	LIST_HEAD(del_list);
 
 	for(x=1; x<argc; x++) {
@@ -190,11 +190,11 @@ int monitor(int argc, char **argv)
 	if(tup_db_get_all_in_tmpdb(&del_list) < 0)
 		return -1;
 	while(!list_empty(&del_list)) {
-		de = list_entry(del_list.next, struct del_entry, list);
-		if(tup_file_del(de->tupid, de->dt, de->type) < 0)
+		he = list_entry(del_list.next, struct half_entry, list);
+		if(tup_file_del(he->tupid, he->dt, he->type) < 0)
 			return -1;
-		list_del(&de->list);
-		free(de);
+		list_del(&he->list);
+		free(he);
 	}
 	mon_time = time(NULL);
 	tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
@@ -356,7 +356,7 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 		goto out_close;
 	}
 
-	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
+	if(S_ISREG(buf.st_mode)) {
 		tupid_t tupid;
 
 		tupid = tup_db_select_node(dt, file);
@@ -377,8 +377,23 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 		}
 		rc = 0;
 		goto out_close;
-	}
-	if(S_ISDIR(buf.st_mode)) {
+	} else if(S_ISLNK(buf.st_mode)) {
+		tupid_t tupid;
+
+		tupid = update_symlink_file(dt, file);
+		if(tupid < 0)
+			goto out_close;
+		if(tmpdb) {
+			if(tup_db_unflag_tmpdb(tupid) < 0)
+				goto out_close;
+			if(mon_time != -1 && buf.st_mtime > mon_time) {
+				if(tup_db_add_modify_list(tupid) < 0)
+					goto out_close;
+			}
+		}
+		rc = 0;
+		goto out_close;
+	} else if(S_ISDIR(buf.st_mode)) {
 		newdt = create_dir_file(dt, file);
 		if(tmpdb) {
 			if(tup_db_unflag_tmpdb(newdt) < 0)
@@ -709,11 +724,8 @@ static void handle_event(struct monitor_event *m)
 	 * they are IN_CREATE.
 	 */
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
-		if(m->e.mask & IN_ISDIR) {
-			watch_path(dc->dt, dc->path, m->e.name, 0);
-			return;
-		}
-		flags = TUP_FLAGS_MODIFY;
+		watch_path(dc->dt, dc->path, m->e.name, 0);
+		return;
 	}
 	if(m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB) {
 		flags = TUP_FLAGS_MODIFY;

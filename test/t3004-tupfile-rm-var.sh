@@ -4,7 +4,7 @@
 # dependency on the directory.
 
 . ../tup.sh
-mkdir tmp
+tmkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
 file-@CONFIG_BAR@ += bar.c

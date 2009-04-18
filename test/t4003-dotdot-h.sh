@@ -3,7 +3,7 @@
 . ../tup.sh
 cp ../testTupfile.tup Tupfile
 
-mkdir bar
+tmkdir bar
 cp ../testTupfile.tup bar/Tupfile
 echo "#define FOO 3" > foo.h
 (echo "#include \"../foo.h\""; echo "int main(void) {return FOO;}") > bar/foo.c

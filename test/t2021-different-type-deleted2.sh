@@ -5,7 +5,7 @@
 
 . ../tup.sh
 
-mkdir foo
+tmkdir foo
 touch foo/a
 tup touch foo/a
 rm foo/a

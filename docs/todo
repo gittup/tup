@@ -1,7 +1,5 @@
 can we update a server file (like httpd.c) and restart apache? (eg: like incrontab program)
 
-support for test automation? (eg: when a program is rebuilt, its test are executed, or something)
-
 multi-arch - when building a name-list, automatically include files in a separate build/$(ARCH) directory or some such?
 
 import/export vars to file
@@ -21,21 +19,38 @@ change progress bar: Only print bar on lowest line, then backspace and print com
 
 if we do out of tree build, can we have the monitor kill the updater if a file modification is detected? or restart it?
 
-tup delete bar/foo.o shouldn't create directory bar (since it may not exist)
-
 have an "include_rules" directive that will include a Rules.tup file in all parent directories? Could be useful for making directory-scoped variables. Also allow doing something like set LINUX_ROOT=. and have it get set to the current directory?
+
+"either it was deleted manually" in parser no longer true?
 
 tup build tup
 
 recursive grep kills monitor
 
-will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it?
+will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
+
+symlink to non-existant file
+symlinks pointing at each other
+symlinks from monitor
+
+if create_name_file() is always in a (tupid < 0) block because we did a select, maybe bypass the node_select() that happens in tup_db_create_node_part()?
+ - also if create_name_file() is always creating a new node, it should always put dt in the create list?
+
+ tup_db_select_node shouldn't return -1 on error and a successful node-doesn't-exist? - maybe get rid of in favor of select_dbn
+
+get rid of canonicalize?
+
+get rid of get_dbn()?
+
+tup_file_mod() split?
 
 html:
   proof: big-o notation
   proof: no clean target
   when Tupfiles are parsed
+  hidden files are ignored
   how files are deleted
   how dependencies are described/discovered
   tup bugs: build in state Q, change A->B, build in state R, change B->A, build must go back to state Q (not some other state S)
   man pages: tup command line, tup_api
+  error messages (eg: you get this error message if...)

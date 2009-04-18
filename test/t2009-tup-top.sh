@@ -3,18 +3,18 @@
 # Test the TUP_TOP variable and include_root keywords
 
 . ../tup.sh
-mkdir fs
+tmkdir fs
 cat > fs/Tupfile << HERE
 include_root bar/Install.tup
 include_root tab/Install.tup
 : foreach \$(lib) |> cp %f %o |> %b
 HERE
-mkdir bar
+tmkdir bar
 cat > bar/Install.tup << HERE
 lib += \$(TUP_TOP)/bar/foo.so
 HERE
 
-mkdir tab
+tmkdir tab
 cat > tab/Install.tup << HERE
 lib += \$(TUP_TOP)/tab/blah.so
 HERE

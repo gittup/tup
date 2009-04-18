@@ -2,5 +2,5 @@
 
 . ../tup.sh
 mkdir foo
-tup touch $PWD/foo/bar.c
+tup touch foo $PWD/foo/bar.c
 tup_object_exist foo bar.c

@@ -332,6 +332,8 @@ static int graph(int argc, char **argv)
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
 		if(n->dt)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
+		if(n->sym != -1)
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\"]\n", n->sym, n->tupid);
 
 		e = n->edges;
 		while(e) {
@@ -500,6 +502,8 @@ static int touch(int argc, char **argv)
 {
 	int x;
 	int fd;
+	tupid_t sub_dir_dt;
+
 	if(tup_db_begin() < 0)
 		return -1;
 	fd = open(".", O_RDONLY);
@@ -507,13 +511,56 @@ static int touch(int argc, char **argv)
 		perror(".");
 		return -1;
 	}
-	for(x=1; x<argc; x++) {
-		chdir(get_sub_dir());
-		close(open(argv[x], O_WRONLY | O_CREAT, 0666));
-		fchdir(fd);
-		if(tup_pathname_mod(argv[x], TUP_FLAGS_MODIFY) < 0)
-			return -1;
+	chdir(get_sub_dir());
+	sub_dir_dt = find_dir_tupid(get_sub_dir());
+	if(sub_dir_dt < 0) {
+		fprintf(stderr, "Error finding dt for subdir: %s\n", get_sub_dir());
+		return -1;
 	}
+
+	for(x=1; x<argc; x++) {
+		struct stat buf;
+		const char *path;
+		const char *file;
+		tupid_t dt;
+		tupid_t curdt;
+
+		close(open(argv[x], O_WRONLY | O_CREAT, 0666));
+		if(lstat(argv[x], &buf) < 0) {
+			fprintf(stderr, "stat: ");
+			perror(argv[x]);
+			return -1;
+		}
+
+		curdt = sub_dir_dt;
+		path = argv[x];
+		if(path[0] == '/') {
+			int ttl = get_tup_top_len();
+			if(strncmp(path, get_tup_top(), ttl) != 0 ||
+			   path[ttl] != '/') {
+				fprintf(stderr, "Error: The path '%s' is not in the tup hierarchy.\n", argv[x]);
+				return -1;
+			}
+			path += ttl + 1;
+			curdt = DOT_DT;
+		}
+		dt = find_dir_tupid_dt(curdt, path, &file, NULL);
+		if(dt < 0) {
+			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", path, curdt);
+			return -1;
+		}
+		if(S_ISDIR(buf.st_mode)) {
+			if(create_dir_file(dt, file) < 0)
+				return -1;
+		} else if(S_ISREG(buf.st_mode)) {
+			if(tup_file_mod(dt, file, TUP_FLAGS_MODIFY) < 0)
+				return -1;
+		} else if(S_ISLNK(buf.st_mode)) {
+			if(update_symlink_file(dt, file) < 0)
+				return -1;
+		}
+	}
+	fchdir(fd);
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;

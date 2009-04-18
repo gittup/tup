@@ -7,7 +7,7 @@
 cat > Tupfile << HERE
 : foo.c |> gcc -c foo.c -o foo.o |> bar/foo.o
 HERE
-mkdir bar
+tmkdir bar
 tup touch bar/hey
 touch foo.c
 tup touch foo.c Tupfile

@@ -76,22 +76,13 @@ static void *message_thread(void *arg)
 {
 	struct access_event *event;
 	char *filename;
+	char *file2;
 	int rc;
-	int dlen;
 	struct server *s = arg;
-
-	dlen = strlen(s->cwd);
-	if(dlen >= (signed)sizeof(s->cwd) - 2) {
-		fprintf(stderr, "Error: CWD[%s] is too large.\n", s->cwd);
-		return (void*)-1;
-	}
-	s->cwd[dlen] = '/';
-	s->cwd[dlen+1] = 0;
 
 	event = (struct access_event*)s->msgbuf;
 	filename = &s->msgbuf[sizeof(*event)];
 	while((rc = recv(s->sd[0], s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
-		int len;
 		int expected;
 		int i;
 
@@ -100,7 +91,7 @@ static void *message_thread(void *arg)
 		if(!event->len)
 			continue;
 
-		expected = sizeof(*event) + event->len;
+		expected = sizeof(*event) + event->len + event->len2;
 		if(rc != expected) {
 			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, expected);
 			return (void*)-1;
@@ -114,6 +105,7 @@ static void *message_thread(void *arg)
 			pthread_mutex_unlock(s->db_mutex);
 
 			if(tupid < 0) {
+				int len;
 				len = -1;
 				send(s->sd[0], &len, sizeof(len), 0);
 			} else {
@@ -123,25 +115,31 @@ static void *message_thread(void *arg)
 			continue;
 		}
 
+#if 0
 		len = canonicalize(filename, s->cname, sizeof(s->cname), NULL,
 				   s->cwd);
 		/* Skip the file if it's outside of our local tree */
 		if(len < 0)
 			continue;
+#endif
+
+		file2 = &s->msgbuf[sizeof(*event) + event->len];
+		/* TODO: Skip hidden file2? */
 
 		/* We skip any hidden files (including those in hidden
 		 * directories).
 		 */
-		if(s->cname[0] == '.')
+		if(filename[0] == '.' && strncmp(filename, "..", 2) != 0)
 			goto skip_hidden;
-		for(i = len; i >= 0; i--) {
-			if(s->cname[i] == '/') {
-				if(s->cname[i + 1] == '.')
+		for(i = event->len; i >= 0; i--) {
+			if(filename[i] == '/') {
+				if(filename[i + 1] == '.' && 
+				   strncmp(filename+i+1, "..", 2) != 0)
 					goto skip_hidden;
 			}
 		}
 
-		if(handle_file(event, s->cname, &s->finfo) < 0) {
+		if(handle_file(event->at, filename, file2, &s->finfo) < 0) {
 			return (void*)-1;
 		}
 skip_hidden:

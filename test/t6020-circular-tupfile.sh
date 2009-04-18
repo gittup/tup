@@ -9,7 +9,7 @@ cat > Tupfile << HERE
 : foo/*.o |> gcc %f -o %o |> prog
 HERE
 
-mkdir foo
+tmkdir foo
 cat > foo/Tupfile << HERE
 : foreach ../*.c |> gcc -c %f -o %o |> %B.o
 HERE

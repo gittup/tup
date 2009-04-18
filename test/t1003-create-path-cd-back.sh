@@ -1,9 +1,9 @@
 #! /bin/sh -e
 
 . ../tup.sh
-mkdir foo
+tmkdir foo
 cd foo
-mkdir baz
+tmkdir baz
 cd baz
 tup touch ../bar.c
 cd ../..

@@ -14,6 +14,7 @@ struct db_node {
 	tupid_t dt;
 	const char *name;
 	int type;
+	tupid_t sym;
 };
 
 struct id_entry {
@@ -22,11 +23,12 @@ struct id_entry {
 };
 
 /* This is kinda like a combination of db_node and id_entry, except we don't
- * have 'name'. This is just used to get a list of nodes to delete back to the
- * monitor so it can handle all the deletions that happened while we were out
- * fishing (or whatever it is programs do when they're not working).
+ * have 'name'. This is used in symlists, as well as to get a list of nodes to
+ * delete back to the monitor so it can handle all the deletions that happened
+ * while we were out fishing (or whatever it is programs do when they're not
+ * working).
  */
-struct del_entry {
+struct half_entry {
 	struct list_head list;
 	tupid_t tupid;
 	tupid_t dt;
@@ -70,7 +72,10 @@ tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
 tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_select_node(tupid_t dt, const char *name);
+int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn);
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
+int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
+			   struct db_node *dbn);
 tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len);
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 						int style),
@@ -89,6 +94,7 @@ int tup_db_get_path(tupid_t tupid, char *path, int len);
 tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node_name(tupid_t tupid, const char *name);
+int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);

@@ -5,7 +5,7 @@
 # directory).
 
 . ../tup.sh
-mkdir a
+tmkdir a
 cat > a/Tupfile << HERE
 include ../Tupfile.vars
 : foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %F.o

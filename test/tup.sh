@@ -1,4 +1,10 @@
 tupdir=$PWD
+tmkdir()
+{
+	mkdir $1
+	tup touch $1
+}
+
 check_empty_tupdirs()
 {
 	if tup flags_exists; then
@@ -155,4 +161,35 @@ check_same_link()
 		echo "*** Files '$*' are not the same inode." 1>&2
 		exit 1
 	fi
+}
+
+check_updates()
+{
+	if [ ! -f $2 ]; then
+		echo "check_updates($1, $2) failed because $2 doesn't already exist"
+		exit 1
+	fi
+	rm $2
+	tup touch $1
+	update
+	if [ ! -f $2 ]; then
+		echo "check_updates($1, $2) failed to re-create $2"
+		exit 1
+	fi
+}
+
+check_no_updates()
+{
+	if [ ! -f $2 ]; then
+		echo "check_no_updates($1, $2) failed because $2 doesn't already exist"
+		exit 1
+	fi
+	mv $2 $2_check_no_updates.bak
+	tup touch $1
+	update
+	if [ -f $2 ]; then
+		echo "check_no_updates($1, $2) re-created $2 when it shouldn't have"
+		exit 1
+	fi
+	mv $2_check_no_updates.bak $2
 }

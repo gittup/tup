@@ -20,7 +20,7 @@ cat > Tupfile << HERE
 : *.o |> gcc %f -o %o |> prog
 HERE
 
-mkdir include
+tmkdir include
 touch include/foo.h
 (echo "#include \"foo.h\""; echo "void foo(void) {bork}") > foo.c
 echo "int main(void) {}" > bar.c

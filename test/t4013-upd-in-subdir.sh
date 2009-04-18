@@ -5,8 +5,8 @@
 
 . ../tup.sh
 
-mkdir a
-mkdir a/b
+tmkdir a
+tmkdir a/b
 cp ../testTupfile.tup a/b/Tupfile
 
 echo "int main(void) {}" > a/b/foo.c

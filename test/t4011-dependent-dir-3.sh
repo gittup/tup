@@ -9,17 +9,17 @@
 . ../tup.sh
 
 # Need to make sure C runs first when it comes up (seems to go in order of ID)
-mkdir C
+tmkdir C
 cat > C/Tupfile << HERE
 HERE
 tup touch C/Tupfile
 
-mkdir A
+tmkdir A
 cat > A/Tupfile << HERE
 : |> echo hey > %o |> foo.txt
 HERE
 
-mkdir B
+tmkdir B
 cat > B/Tupfile << HERE
 : foreach ../A/*.txt |> cp %f %o |> %b
 HERE

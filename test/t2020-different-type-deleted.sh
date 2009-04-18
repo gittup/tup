@@ -9,6 +9,6 @@ tup touch foo
 rm foo
 tup delete foo
 
-mkdir foo
+tmkdir foo
 touch foo/bar
 tup touch foo/bar

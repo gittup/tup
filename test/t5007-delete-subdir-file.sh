@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 . ../tup.sh
-mkdir blah
+tmkdir blah
 cp ../testTupfile.tup blah/Tupfile
 
 # Verify all files are compiled

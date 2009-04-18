@@ -10,7 +10,7 @@
 # that it should error on the fact that it was a generated file.
 
 . ../tup.sh
-mkdir foo
+tmkdir foo
 cat > foo/Tupfile << HERE
 : |> echo "var=foo" > %o |> inc
 HERE

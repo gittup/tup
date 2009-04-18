@@ -13,7 +13,7 @@
 # is because the faces are silly.
 
 . ../tup.sh
-mkdir tmp
+tmkdir tmp
 cat > tmp/Tupfile << HERE
 include Tupfile.vars
 : foreach *.c |> gcc -c %f -o %o |> %F.o

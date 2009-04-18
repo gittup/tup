@@ -9,7 +9,7 @@ cat > Tupfile << HERE
 : foreach input/*.o |> cat %f > %o |> %b
 HERE
 
-mkdir input
+tmkdir input
 cat > input/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE

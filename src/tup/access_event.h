@@ -9,10 +9,10 @@
 enum access_type {
 	ACCESS_READ,
 	ACCESS_WRITE,
-	ACCESS_RENAME_FROM,
-	ACCESS_RENAME_TO,
+	ACCESS_RENAME,
 	ACCESS_UNLINK,
 	ACCESS_VAR,
+	ACCESS_SYMLINK,
 	ACCESS_STOP_SERVER,
 };
 
@@ -28,17 +28,11 @@ struct access_event {
 	 */
 	enum access_type at;
 
-	/** This field is used in ACCESS_RENAME_* events, and can be set to 0
-	 * otherwise. It is used to match a ACCESS_RENAME_FROM event to a
-	 * ACCESS_RENAME_TO event. Since a sub-process will send these events
-	 * atomically, it uses its process ID as the unique identifier. Since
-	 * these events may not be atomic wrt other sub-processes, this
-	 * identifier is required for these two events.
-	 */
-	int pid;
-
 	/** Length of the path, which will follow the access_event struct */
 	int len;
+
+	/** Length of the second path, for events that require two paths */
+	int len2;
 };
 
 #endif

@@ -7,7 +7,7 @@ cat > Tupfile << HERE
 : *.o fs/built-in.o |> gcc %f -o prog |> prog
 HERE
 
-mkdir fs
+tmkdir fs
 cat > fs/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 : *.o |> ld -r %f -o built-in.o |> built-in.o

@@ -6,12 +6,12 @@ cat > Tupfile << HERE
 : fs/*.o |> ld -r %f -o built-in.o |> built-in.o
 HERE
 
-mkdir fs
+tmkdir fs
 cat > fs/Tupfile << HERE
 : foreach input/*.o |> cp %f %o |> %b
 HERE
 
-mkdir fs/input
+tmkdir fs/input
 cat > fs/input/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE

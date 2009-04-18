@@ -5,15 +5,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 struct id_flags {
 	tupid_t tupid;
 	int flags;
 };
 
-static tupid_t __find_dir_tupid(const char *dir, const char **last);
-static tupid_t __create_dir_tupid(const char *dir, int include_last,
-				  const char **last_part);
+static tupid_t __find_dir_tupid(const char *dir, const char **last,
+				struct list_head *symlist);
 
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
@@ -28,6 +28,51 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 tupid_t create_dir_file(tupid_t dt, const char *path)
 {
 	return tup_db_create_node(dt, path, TUP_NODE_DIR);
+}
+
+tupid_t update_symlink_file(tupid_t dt, const char *file)
+{
+	int rc;
+	tupid_t tupid;
+	tupid_t link_dt;
+	tupid_t link_tupid;
+	static char linkname[PATH_MAX];
+
+	tupid = tup_db_select_node(dt, file);
+	if(tupid < 0) {
+		tupid = create_name_file(dt, file);
+		if(tupid < 0)
+			return -1;
+	}
+
+	rc = readlink(file, linkname, sizeof(linkname));
+	if(rc < 0) {
+		fprintf(stderr, "readlink: ");
+		perror(file);
+		return -1;
+	}
+	if(rc >= (signed)sizeof(linkname)) {
+		fprintf(stderr, "tup error: linkname buffer is too small for the symlink of '%s'\n", file);
+		return -1;
+	}
+	linkname[rc] = 0;
+
+	/* TODO: What if the symlink is a full path? Shouldn't
+	 * be relative to dt then.
+	 */
+	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL);
+	if(link_dt < 0)
+		return -1;
+	link_tupid = tup_db_select_node(link_dt, file);
+	if(link_tupid < 0) {
+		fprintf(stderr, "Error: Unable to find node '%s' in directory %lli in order to symlink %s\n", file, link_dt, file);
+		return -1;
+	}
+	if(tup_db_set_sym(tupid, link_tupid) < 0)
+		return -1;
+	if(tup_db_add_modify_list(tupid) < 0)
+		return -1;
+	return tupid;
 }
 
 tupid_t create_var_file(const char *var, const char *value)
@@ -64,7 +109,7 @@ tupid_t create_var_file(const char *var, const char *value)
 	return tup_db_set_var(dbn.tupid, value);
 }
 
-int tup_file_mod(tupid_t dt, const char *file, int flags)
+tupid_t tup_file_mod(tupid_t dt, const char *file, int flags)
 {
 	struct db_node dbn;
 
@@ -85,7 +130,8 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 			if(dbn.tupid < 0)
 				return -1;
 		} else {
-			if(dbn.type != TUP_NODE_FILE) {
+			if(dbn.type != TUP_NODE_FILE &&
+			   dbn.type != TUP_NODE_GENERATED) {
 				fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
 				return -1;
 			}
@@ -98,7 +144,7 @@ int tup_file_mod(tupid_t dt, const char *file, int flags)
 			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 				return -1;
 		}
-		return 0;
+		return dbn.tupid;
 	} else if(flags == TUP_FLAGS_DELETE) {
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
@@ -158,7 +204,7 @@ int tup_file_del(tupid_t tupid, tupid_t dt, int type)
 	return 0;
 }
 
-int tup_pathname_mod(const char *path, int flags)
+tupid_t tup_pathname_mod(const char *path, int flags)
 {
 	static char cname[PATH_MAX];
 	int len;
@@ -171,34 +217,87 @@ int tup_pathname_mod(const char *path, int flags)
 		return -1;
 	}
 
-	dt = __create_dir_tupid(cname, 0, &file);
-	if(dt < 0)
+	dt = __find_dir_tupid(cname, &file, NULL);
+	if(dt < 0) {
+		fprintf(stderr, "Unable to find directory for '%s'\n", cname);
 		return -1;
-
-	if(tup_file_mod(dt, file, flags) < 0)
-		return -1;
-
-	return 0;
-}
-
-tupid_t get_dbn(const char *path, struct db_node *dbn)
-{
-	const char *file;
-	tupid_t dt;
-
-	if(strcmp(path, ".") == 0) {
-		if(tup_db_select_dbn(0, path, dbn) < 0)
-			return -1;
-		return dbn->tupid;
 	}
 
-	dt = __find_dir_tupid(path, &file);
+	return tup_file_mod(dt, file, flags);
+}
+
+tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
+		   struct list_head *symlist)
+{
+	const char *file;
+
+	dt = find_dir_tupid_dt(dt, path, &file, symlist);
 	if(dt < 0)
 		return -1;
 
 	if(file) {
 		if(tup_db_select_dbn(dt, file, dbn) < 0)
 			return -1;
+		while(dbn->sym != -1) {
+			if(symlist) {
+				struct half_entry *he;
+				he = malloc(sizeof *he);
+				if(!he) {
+					perror("malloc");
+					return -1;
+				}
+				he->tupid = dbn->tupid;
+				he->dt = dbn->dt;
+				he->type = dbn->type;
+				list_add(&he->list, symlist);
+			}
+
+			if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
+				return -1;
+		}
+		return dbn->tupid;
+	} else {
+		fprintf(stderr, "tup TODO: no dbn?\n");
+		return -1;
+		return dt;
+	}
+}
+
+tupid_t get_dbn(const char *path, struct db_node *dbn)
+{
+	return get_dbn_and_sym_tupids(path, dbn, NULL);
+}
+
+tupid_t get_dbn_and_sym_tupids(const char *path, struct db_node *dbn,
+			       struct list_head *symlist)
+{
+	const char *file;
+	tupid_t dt;
+
+	dt = __find_dir_tupid(path, &file, symlist);
+	if(dt < 0)
+		return -1;
+
+	if(file) {
+		if(tup_db_select_dbn(dt, file, dbn) < 0)
+			return -1;
+		while(dbn->sym != -1) {
+			if(symlist) {
+				struct half_entry *he;
+				he = malloc(sizeof *he);
+				if(!he) {
+					perror("malloc");
+					return -1;
+				}
+				he->tupid = dbn->tupid;
+				he->dt = dbn->dt;
+				he->type = dbn->type;
+				list_add(&he->list, symlist);
+			}
+
+			if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
+				return -1;
+		}
 		return dbn->tupid;
 	} else {
 		fprintf(stderr, "tup TODO: no dbn?\n");
@@ -209,10 +308,11 @@ tupid_t get_dbn(const char *path, struct db_node *dbn)
 
 tupid_t find_dir_tupid(const char *dir)
 {
-	return __find_dir_tupid(dir, NULL);
+	return __find_dir_tupid(dir, NULL, NULL);
 }
 
-tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last)
+tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
+			  struct list_head *symlist)
 {
 	char *slash;
 
@@ -224,25 +324,65 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last)
 	}
 
 	while((slash = strchr(dir, '/')) != NULL) {
+		struct db_node dbn;
+
 		if(slash-dir == 1 && dir[0] == '.')
 			goto next_dir;
-		dt = tup_db_select_node_part(dt, dir, slash - dir);
-		if(dt < 0)
+		if(tup_db_select_dbn_part(dt, dir, slash - dir, &dbn) < 0)
 			return -1;
+
+		while(dbn.sym != -1) {
+			if(symlist) {
+				struct half_entry *he;
+				he = malloc(sizeof *he);
+				if(!he) {
+					perror("malloc");
+					return -1;
+				}
+				he->tupid = dbn.tupid;
+				he->dt = dbn.dt;
+				he->type = dbn.type;
+				list_add(&he->list, symlist);
+			}
+
+			if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
+				return -1;
+		}
+		dt = dbn.tupid;
 next_dir:
 		dir = slash + 1;
 	}
 	if(last) {
 		*last = dir;
 	} else {
-		dt = tup_db_select_node(dt, dir);
-		if(dt < 0)
+		struct db_node dbn;
+
+		if(tup_db_select_dbn(dt, dir, &dbn) < 0)
 			return -1;
+		while(dbn.sym != -1) {
+			if(symlist) {
+				struct half_entry *he;
+				he = malloc(sizeof *he);
+				if(!he) {
+					perror("malloc");
+					return -1;
+				}
+				he->tupid = dbn.tupid;
+				he->dt = dbn.dt;
+				he->type = dbn.type;
+				list_add(&he->list, symlist);
+			}
+
+			if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
+				return -1;
+		}
+		dt = dbn.tupid;
 	}
 	return dt;
 }
 
-static tupid_t __find_dir_tupid(const char *dir, const char **last)
+static tupid_t __find_dir_tupid(const char *dir, const char **last,
+				struct list_head *symlist)
 {
 	if(strcmp(dir, ".") == 0) {
 		/* If the directory is the top, and we wanted to include the
@@ -250,47 +390,11 @@ static tupid_t __find_dir_tupid(const char *dir, const char **last)
 		 * parent of ".", then that's just zero.
 		 */
 		if(last) {
-			*last = NULL;
+			*last = dir;
 			return 0;
 		}
 		return DOT_DT;
 	}
 
-	return find_dir_tupid_dt(DOT_DT, dir, last);
-}
-
-static tupid_t __create_dir_tupid(const char *dir, int include_last,
-				  const char **last_part)
-{
-	char *slash;
-	tupid_t dt;
-
-	dt = tup_db_create_node(0, ".", TUP_NODE_DIR);
-	if(dt < 0)
-		return -1;
-	if(strcmp(dir, ".") == 0) {
-		if(include_last) {
-			*last_part = NULL;
-			return dt;
-		} else {
-			*last_part = ".";
-			return 0;
-		}
-	}
-
-	while((slash = strchr(dir, '/')) != NULL) {
-		dt = tup_db_create_node_part(dt, dir, slash - dir, TUP_NODE_DIR);
-		if(dt < 0)
-			return -1;
-		dir = slash + 1;
-	}
-	if(include_last) {
-		dt = tup_db_create_node(dt,dir, TUP_NODE_DIR);
-		if(dt < 0)
-			return -1;
-	} else {
-		if(last_part)
-			*last_part = dir;
-	}
-	return dt;
+	return find_dir_tupid_dt(DOT_DT, dir, last, symlist);
 }

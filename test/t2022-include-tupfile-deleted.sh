@@ -8,7 +8,7 @@ include yo/Install.tup
 : |> echo foo |>
 HERE
 
-mkdir yo
+tmkdir yo
 cat > yo/Install.tup << HERE
 : |> echo bar |>
 HERE
