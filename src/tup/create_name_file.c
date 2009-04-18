@@ -351,6 +351,7 @@ static int get_path_elements(const char *dir, struct pel_group *pg)
 {
 	struct path_element *pel;
 	const char *p = dir;
+	int num_elements = 0;
 
 	if(dir[0] == '/')
 		pg->is_root = 1;
@@ -383,12 +384,16 @@ static int get_path_elements(const char *dir, struct pel_group *pg)
 				 * include it if it's at the beginning of the
 				 * path.
 				 */
-				if(!list_empty(&pg->path_list)) {
+				if(num_elements) {
 					pel = list_entry(pg->path_list.prev, struct path_element, list);
+					num_elements--;
 					del_pel(pel);
 					continue;
 				}
-				/* Fall through to the malloc */
+				/* Don't set num_elements, since a ".." path
+				 * can't be deleted by a subsequent ".."
+				 */
+				goto skip_num_elements;
 			} else {
 				/* Ignore hidden paths */
 				while(!list_empty(&pg->path_list)) {
@@ -399,6 +404,9 @@ static int get_path_elements(const char *dir, struct pel_group *pg)
 				return 0;
 			}
 		}
+
+		num_elements++;
+skip_num_elements:
 
 		pel = malloc(sizeof *pel);
 		if(!pel) {
