@@ -12,8 +12,20 @@ struct id_flags {
 	int flags;
 };
 
-static tupid_t __find_dir_tupid(const char *dir, const char **last,
-				struct list_head *symlist);
+struct path_element {
+	struct list_head list;
+	const char *path; /* Not nul-terminated */
+	int len;
+};
+
+struct pel_group {
+	struct list_head path_list;
+	int is_root;
+	int is_hidden;
+};
+
+static int get_path_elements(const char *dir, struct pel_group *pg);
+static void del_pel(struct path_element *pel);
 
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
@@ -57,12 +69,11 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 	}
 	linkname[rc] = 0;
 
-	/* TODO: What if the symlink is a full path? Shouldn't
-	 * be relative to dt then.
-	 */
 	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL);
-	if(link_dt < 0)
+	if(link_dt <= 0) {
+		fprintf(stderr, "Error: Unable to find directory ID for '%s' in update_symlink_file()\n", linkname);
 		return -1;
+	}
 	link_tupid = tup_db_select_node(link_dt, file);
 	if(link_tupid < 0) {
 		fprintf(stderr, "Error: Unable to find node '%s' in directory %lli in order to symlink %s\n", file, link_dt, file);
@@ -204,32 +215,12 @@ int tup_file_del(tupid_t tupid, tupid_t dt, int type)
 	return 0;
 }
 
-tupid_t tup_pathname_mod(const char *path, int flags)
-{
-	static char cname[PATH_MAX];
-	int len;
-	const char *file = NULL;
-	tupid_t dt;
-
-	len = canonicalize(path, cname, sizeof(cname), NULL, get_sub_dir());
-	if(len < 0) {
-		fprintf(stderr, "Unable to canonicalize '%s'\n", path);
-		return -1;
-	}
-
-	dt = __find_dir_tupid(cname, &file, NULL);
-	if(dt < 0) {
-		fprintf(stderr, "Unable to find directory for '%s'\n", cname);
-		return -1;
-	}
-
-	return tup_file_mod(dt, file, flags);
-}
-
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist)
 {
-	const char *file;
+	const char *file = NULL;
+
+	dbn->tupid = -1;
 
 	dt = find_dir_tupid_dt(dt, path, &file, symlist);
 	if(dt < 0)
@@ -257,144 +248,172 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		}
 		return dbn->tupid;
 	} else {
-		fprintf(stderr, "tup TODO: no dbn?\n");
-		return -1;
-		return dt;
-	}
-}
-
-tupid_t get_dbn(const char *path, struct db_node *dbn)
-{
-	return get_dbn_and_sym_tupids(path, dbn, NULL);
-}
-
-tupid_t get_dbn_and_sym_tupids(const char *path, struct db_node *dbn,
-			       struct list_head *symlist)
-{
-	const char *file;
-	tupid_t dt;
-
-	dt = __find_dir_tupid(path, &file, symlist);
-	if(dt < 0)
-		return -1;
-
-	if(file) {
-		if(tup_db_select_dbn(dt, file, dbn) < 0)
+		if(tup_db_select_dbn_by_id(dt, dbn) < 0)
 			return -1;
-		while(dbn->sym != -1) {
-			if(symlist) {
-				struct half_entry *he;
-				he = malloc(sizeof *he);
-				if(!he) {
-					perror("malloc");
-					return -1;
-				}
-				he->tupid = dbn->tupid;
-				he->dt = dbn->dt;
-				he->type = dbn->type;
-				list_add(&he->list, symlist);
-			}
-
-			if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
-				return -1;
-		}
-		return dbn->tupid;
-	} else {
-		fprintf(stderr, "tup TODO: no dbn?\n");
-		return -1;
+		dbn->name = path;
 		return dt;
 	}
 }
 
 tupid_t find_dir_tupid(const char *dir)
 {
-	return __find_dir_tupid(dir, NULL, NULL);
+	struct db_node dbn;
+
+	return get_dbn_dt(DOT_DT, dir, &dbn, NULL);
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 			  struct list_head *symlist)
 {
-	char *slash;
+	struct pel_group pg;
+	struct path_element *pel;
 
-	while(strncmp(dir, "../", 3) == 0) {
-		dir += 3;
-		dt = tup_db_parent(dt);
-		if(dt < 0)
-			return -1;
+	if(get_path_elements(dir, &pg) < 0)
+		return -1;
+	if(pg.is_hidden)
+		return 0;
+
+	if(pg.is_root) {
+		const char *top = get_tup_top();
+
+		do {
+			/* Returns are 0 here to indicate file is outside of
+			 * .tup
+			 */
+			if(list_empty(&pg.path_list))
+				return 0;
+			if(top[0] != '/')
+				return 0;
+			top++;
+			pel = list_entry(pg.path_list.next, struct path_element, list);
+			if(strncmp(top, pel->path, pel->len) != 0)
+				return 0;
+			top += pel->len;
+
+			del_pel(pel);
+		} while(*top);
 	}
 
-	while((slash = strchr(dir, '/')) != NULL) {
-		struct db_node dbn;
+	/* The list can be empty if dir is "." or something like "foo/..". In
+	 * this case just return dt (the start dir).
+	 */
+	if(list_empty(&pg.path_list))
+		return dt;
 
-		if(slash-dir == 1 && dir[0] == '.')
-			goto next_dir;
-		if(tup_db_select_dbn_part(dt, dir, slash - dir, &dbn) < 0)
-			return -1;
-
-		while(dbn.sym != -1) {
-			if(symlist) {
-				struct half_entry *he;
-				he = malloc(sizeof *he);
-				if(!he) {
-					perror("malloc");
-					return -1;
-				}
-				he->tupid = dbn.tupid;
-				he->dt = dbn.dt;
-				he->type = dbn.type;
-				list_add(&he->list, symlist);
-			}
-
-			if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
-				return -1;
-		}
-		dt = dbn.tupid;
-next_dir:
-		dir = slash + 1;
-	}
 	if(last) {
-		*last = dir;
+		pel = list_entry(pg.path_list.prev, struct path_element, list);
+		*last = pel->path;
+		del_pel(pel);
 	} else {
+		/* TODO */
+		fprintf(stderr, "[31mBork[0m\n");
+		exit(1);
+	}
+
+	while(!list_empty(&pg.path_list)) {
 		struct db_node dbn;
 
-		if(tup_db_select_dbn(dt, dir, &dbn) < 0)
-			return -1;
-		while(dbn.sym != -1) {
-			if(symlist) {
-				struct half_entry *he;
-				he = malloc(sizeof *he);
-				if(!he) {
-					perror("malloc");
-					return -1;
-				}
-				he->tupid = dbn.tupid;
-				he->dt = dbn.dt;
-				he->type = dbn.type;
-				list_add(&he->list, symlist);
-			}
-
-			if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
+		pel = list_entry(pg.path_list.next, struct path_element, list);
+		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
+			dt = tup_db_parent(dt);
+			if(dt < 0)
 				return -1;
+		} else {
+			if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
+				return -1;
+			while(dbn.sym != -1) {
+				if(symlist) {
+					struct half_entry *he;
+					he = malloc(sizeof *he);
+					if(!he) {
+						perror("malloc");
+						return -1;
+					}
+					he->tupid = dbn.tupid;
+					he->dt = dbn.dt;
+					he->type = dbn.type;
+					list_add(&he->list, symlist);
+				}
+
+				if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
+					return -1;
+			}
+			dt = dbn.tupid;
 		}
-		dt = dbn.tupid;
+
+		del_pel(pel);
 	}
+
 	return dt;
 }
 
-static tupid_t __find_dir_tupid(const char *dir, const char **last,
-				struct list_head *symlist)
+static int get_path_elements(const char *dir, struct pel_group *pg)
 {
-	if(strcmp(dir, ".") == 0) {
-		/* If the directory is the top, and we wanted to include the
-		 * whole thing, then return that directory. If we want the
-		 * parent of ".", then that's just zero.
-		 */
-		if(last) {
-			*last = dir;
-			return 0;
-		}
-		return DOT_DT;
-	}
+	struct path_element *pel;
+	const char *p = dir;
 
-	return find_dir_tupid_dt(DOT_DT, dir, last, symlist);
+	if(dir[0] == '/')
+		pg->is_root = 1;
+	else
+		pg->is_root = 0;
+	pg->is_hidden = 0;
+	INIT_LIST_HEAD(&pg->path_list);
+
+	while(1) {
+		const char *path;
+		int len;
+		while(*p && *p == '/') {
+			p++;
+		}
+		if(!*p)
+			break;
+		path = p;
+		while(*p && *p != '/') {
+			p++;
+		}
+		len = p - path;
+		if(path[0] == '.') {
+			if(len == 1) {
+				/* Skip extraneous "." paths */
+				continue;
+			}
+			if(path[1] == '.' && len == 2) {
+				/* If it's a ".." path, then delete the
+				 * previous entry, if any. Otherwise we just
+				 * include it if it's at the beginning of the
+				 * path.
+				 */
+				if(!list_empty(&pg->path_list)) {
+					pel = list_entry(pg->path_list.prev, struct path_element, list);
+					del_pel(pel);
+					continue;
+				}
+				/* Fall through to the malloc */
+			} else {
+				/* Ignore hidden paths */
+				while(!list_empty(&pg->path_list)) {
+					pel = list_entry(pg->path_list.prev, struct path_element, list);
+					del_pel(pel);
+				}
+				pg->is_hidden = 1;
+				return 0;
+			}
+		}
+
+		pel = malloc(sizeof *pel);
+		if(!pel) {
+			perror("malloc");
+			return -1;
+		}
+		pel->path = path;
+		pel->len = len;
+		list_add_tail(&pel->list, &pg->path_list);
+	}
+	return 0;
+}
+
+static void del_pel(struct path_element *pel)
+{
+	list_del(&pel->list);
+	free(pel);
 }

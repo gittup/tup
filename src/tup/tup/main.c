@@ -211,8 +211,13 @@ static int graph(int argc, char **argv)
 	struct graph g;
 	struct node *n;
 	tupid_t tupid;
+	tupid_t sub_dir_dt;
 
 	if(create_graph(&g, 0) < 0)
+		return -1;
+
+	sub_dir_dt = get_sub_dir_dt();
+	if(sub_dir_dt < 0)
 		return -1;
 
 	if(argc == 1) {
@@ -225,16 +230,8 @@ static int graph(int argc, char **argv)
 	}
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
-		int len;
-		static char cname[PATH_MAX];
 
-		len = canonicalize(argv[x], cname, sizeof(cname), NULL,
-				   get_sub_dir());
-		if(len < 0) {
-			fprintf(stderr, "Unable to canonicalize '%s'\n", argv[x]);
-			return -1;
-		}
-		tupid = get_dbn(cname, &dbn);
+		tupid = get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL);
 		if(tupid < 0) {
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
 			return -1;
@@ -512,11 +509,9 @@ static int touch(int argc, char **argv)
 		return -1;
 	}
 	chdir(get_sub_dir());
-	sub_dir_dt = find_dir_tupid(get_sub_dir());
-	if(sub_dir_dt < 0) {
-		fprintf(stderr, "Error finding dt for subdir: %s\n", get_sub_dir());
+	sub_dir_dt = get_sub_dir_dt();
+	if(sub_dir_dt < 0)
 		return -1;
-	}
 
 	for(x=1; x<argc; x++) {
 		struct stat buf;
@@ -545,7 +540,7 @@ static int touch(int argc, char **argv)
 			curdt = DOT_DT;
 		}
 		dt = find_dir_tupid_dt(curdt, path, &file, NULL);
-		if(dt < 0) {
+		if(dt <= 0) {
 			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", path, curdt);
 			return -1;
 		}
@@ -570,7 +565,17 @@ static int delete(int argc, char **argv)
 {
 	int x;
 	for(x=1; x<argc; x++) {
-		if(tup_pathname_mod(argv[x], TUP_FLAGS_DELETE) < 0)
+		struct db_node dbn;
+		tupid_t sub_dir_dt;
+
+		sub_dir_dt = get_sub_dir_dt();
+		if(sub_dir_dt < 0)
+			return -1;
+		if(get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL) < 0) {
+			fprintf(stderr, "Unable to find node '%s' relative to %lli\n", argv[x], sub_dir_dt);
+			return -1;
+		}
+		if(tup_file_del(dbn.tupid, dbn.dt, dbn.type) < 0)
 			return -1;
 	}
 	return 0;

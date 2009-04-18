@@ -114,8 +114,28 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		struct file_entry *tmp;
 		w = list_entry(info->write_list.next, struct file_entry, list);
 
-		if(tup_db_select_dbn(dt, w->filename, &dbn) < 0)
-			return -1;
+		if(strchr(w->filename, '/')) {
+			tupid_t tmpdt;
+			const char *last;
+
+			/* TODO: need symlist here? What if a command writes to
+			 * a full-path that uses a symlink?
+			 */
+			tmpdt = find_dir_tupid_dt(dt, w->filename, &last, NULL);
+			if(tmpdt <= 0) {
+				fprintf(stderr, "tup error: File '%s' was written to, but unable to find the directory node corresponding to it in .tup/db. This is for command '%s'\n", w->filename, debug_name);
+				return -1;
+			}
+			if(tmpdt != dt) {
+				fprintf(stderr, "tup error: File '%s' was written to by command '%s', but the command should only write files to directory %lli\n", w->filename, debug_name, dt);
+				return -1;
+			}
+			if(tup_db_select_dbn(dt, last, &dbn) < 0)
+				return -1;
+		} else {
+			if(tup_db_select_dbn(dt, w->filename, &dbn) < 0)
+				return -1;
+		}
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", w->filename, debug_name);
 			return -1;
@@ -146,6 +166,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 	while(!list_empty(&info->sym_list)) {
 		struct sym_entry *sym;
 		struct db_node dbn_link;
+		tupid_t dbn_tupid;
 
 		sym = list_entry(info->sym_list.next, struct sym_entry, list);
 
@@ -156,13 +177,16 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 			return -1;
 		}
 
-		/* TODO: curdt? */
 		/* TODO: Don't need symlist? */
 		/* TODO: symlinks to non-existent files - create new node? */
-		if(get_dbn_dt(dt, sym->from, &dbn_link, NULL) < 0) {
+		dbn_tupid = get_dbn_dt(dt, sym->from, &dbn_link, NULL);
+		if(dbn_tupid < 0) {
 			fprintf(stderr, "tup error: Attempting to create a symlink to file '%s' from dir %lli, but the destination file doesn't exist in .tup/db. Maybe you should link to an existing file?\n", sym->from, dt);
 			return -1;
 		}
+		/* Skip files outside of .tup */
+		if(dbn_tupid == 0)
+			goto skip_sym;
 
 		if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
@@ -182,6 +206,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 			}
 		}
 
+skip_sym:
 		list_del(&sym->list);
 		free(sym->from);
 		free(sym->to);
@@ -197,28 +222,21 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 
 	while(!list_empty(&info->read_list)) {
 		const char *path;
-		tupid_t curdt;
+		tupid_t dbn_tupid;
 		LIST_HEAD(symlist);
 
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
 		path = r->filename;
-		curdt = dt;
-		if(r->filename[0] == '/') {
-			int ttl = get_tup_top_len();
-			if(strncmp(r->filename, get_tup_top(), ttl) != 0 ||
-			   r->filename[ttl] != '/') {
-/*				fprintf(stderr, "Error: The path '%s' is not in the tup hierarchy.\n", r->filename);*/
-				goto out_skip;
-			}
-			path += ttl + 1;
-			curdt = DOT_DT;
-		}
 
-		if(get_dbn_dt(curdt, path, &dbn, &symlist) < 0) {
+		dbn_tupid = get_dbn_dt(dt, path, &dbn, &symlist);
+		if(dbn_tupid < 0) {
 			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
 			return -1;
 		}
+		/* Skip files outside of .tup */
+		if(dbn_tupid == 0)
+			goto skip_read;
 		while(!list_empty(&symlist)) {
 			he = list_entry(symlist.next, struct half_entry, list);
 			if(tup_db_create_link(he->tupid, cmdid, TUP_LINK_NORMAL) < 0)
@@ -228,7 +246,8 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		}
 		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
-out_skip:
+
+skip_read:
 		del_entry(r);
 	}
 

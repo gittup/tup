@@ -684,7 +684,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 		}
 		pl->path = p;
 		pl->dt = find_dir_tupid_dt(dt, p, &pl->file, symlist);
-		if(pl->dt < 0) {
+		if(pl->dt <= 0) {
 			fprintf(stderr, "Error: Failed to find directory ID for dir '%s'\n", p);
 			return -1;
 		}

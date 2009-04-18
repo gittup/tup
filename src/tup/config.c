@@ -1,6 +1,7 @@
 #include "config.h"
 #include "compat.h"
 #include "db.h"
+#include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,7 @@ static char tup_wd[PATH_MAX];
 static int tup_wd_offset;
 static int tup_top_len;
 static int tup_sub_len;
+static tupid_t tup_sub_dir_dt = -1;
 
 int find_tup_dir(void)
 {
@@ -48,6 +50,17 @@ int find_tup_dir(void)
 		}
 	}
 	return 0;
+}
+
+tupid_t get_sub_dir_dt(void)
+{
+	if(tup_sub_dir_dt < 0) {
+		tup_sub_dir_dt = find_dir_tupid(get_sub_dir());
+		if(tup_sub_dir_dt < 0) {
+			fprintf(stderr, "Error: Unable to find tupid for working directory: '%s'\n", get_sub_dir());
+		}
+	}
+	return tup_sub_dir_dt;
 }
 
 const char *get_tup_top(void)

@@ -84,7 +84,6 @@ static void *message_thread(void *arg)
 	filename = &s->msgbuf[sizeof(*event)];
 	while((rc = recv(s->sd[0], s->msgbuf, sizeof(s->msgbuf), 0)) > 0) {
 		int expected;
-		int i;
 
 		if(event->at == ACCESS_STOP_SERVER)
 			break;
@@ -115,34 +114,11 @@ static void *message_thread(void *arg)
 			continue;
 		}
 
-#if 0
-		len = canonicalize(filename, s->cname, sizeof(s->cname), NULL,
-				   s->cwd);
-		/* Skip the file if it's outside of our local tree */
-		if(len < 0)
-			continue;
-#endif
-
 		file2 = &s->msgbuf[sizeof(*event) + event->len];
-		/* TODO: Skip hidden file2? */
-
-		/* We skip any hidden files (including those in hidden
-		 * directories).
-		 */
-		if(filename[0] == '.' && strncmp(filename, "..", 2) != 0)
-			goto skip_hidden;
-		for(i = event->len; i >= 0; i--) {
-			if(filename[i] == '/') {
-				if(filename[i + 1] == '.' && 
-				   strncmp(filename+i+1, "..", 2) != 0)
-					goto skip_hidden;
-			}
-		}
 
 		if(handle_file(event->at, filename, file2, &s->finfo) < 0) {
 			return (void*)-1;
 		}
-skip_hidden:
 		/* Oh noes! An electric eel! */
 		;
 	}
