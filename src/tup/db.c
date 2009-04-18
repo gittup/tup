@@ -259,10 +259,12 @@ static int version_check(void)
 		case 3:
 			if(sqlite3_exec(tup_db, sql_3a, NULL, NULL, &errmsg) != 0) {
 				fprintf(stderr, "SQL error: %s\nQuery was: %s",
-					errmsg, sql_1a);
+					errmsg, sql_3a);
 				return -1;
 			}
-			fprintf(stderr, "WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\n");
+			if(tup_db_config_set_int("db_version", 4) < 0)
+				return -1;
+			fprintf(stderr, "WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.");
 		case DB_VERSION:
 			break;
 		default:
