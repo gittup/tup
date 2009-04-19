@@ -38,10 +38,6 @@ if create_name_file() is always in a (tupid < 0) block because we did a select, 
 
  tup_db_select_node shouldn't return -1 on error and a successful node-doesn't-exist? - maybe get rid of in favor of select_dbn
 
-get rid of canonicalize?
-
-get rid of get_dbn()?
-
 tup_file_mod() split?
 
 html:
