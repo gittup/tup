@@ -22,8 +22,9 @@ tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 tupid_t update_symlink_file(tupid_t dt, const char *file);
 tupid_t create_var_file(const char *var, const char *value);
-tupid_t tup_file_mod(tupid_t dt, const char *file, int flags);
-int tup_file_del(tupid_t tupid, tupid_t dt, int type);
+tupid_t tup_file_mod(tupid_t dt, const char *file);
+int tup_file_del(tupid_t dt, const char *file);
+int tup_del_id(tupid_t tupid, tupid_t dt, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,

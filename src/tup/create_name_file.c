@@ -107,55 +107,57 @@ tupid_t create_var_file(const char *var, const char *value)
 	return tup_db_set_var(dbn.tupid, value);
 }
 
-tupid_t tup_file_mod(tupid_t dt, const char *file, int flags)
+tupid_t tup_file_mod(tupid_t dt, const char *file)
 {
 	struct db_node dbn;
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 
-	if(flags == TUP_FLAGS_MODIFY) {
-		/* Need to re-parse the Tupfile if file is new to the database,
-		 * or if the file itself is the Tupfile.
-		 */
-		if(dbn.tupid < 0 || strcmp(file, "Tupfile") == 0) {
-			if(tup_db_add_create_list(dt) < 0)
-				return -1;
-		}
+	/* Need to re-parse the Tupfile if file is new to the database, or if
+	 * the file itself is the Tupfile.
+	 */
+	if(dbn.tupid < 0 || strcmp(file, "Tupfile") == 0) {
+		if(tup_db_add_create_list(dt) < 0)
+			return -1;
+	}
 
-		if(dbn.tupid < 0) {
-			dbn.tupid = create_name_file(dt, file);
-			if(dbn.tupid < 0)
-				return -1;
-		} else {
-			if(dbn.type != TUP_NODE_FILE &&
-			   dbn.type != TUP_NODE_GENERATED) {
-				fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
-				return -1;
-			}
-			if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
-				return -1;
-
-			/* It's possible this is a file that was included by a
-			 * Tupfile.  Try to set any dependent directory flags.
-			 */
-			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
-				return -1;
-		}
-		return dbn.tupid;
-	} else if(flags == TUP_FLAGS_DELETE) {
-		if(dbn.tupid < 0) {
-			fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
+	if(dbn.tupid < 0) {
+		dbn.tupid = create_name_file(dt, file);
+		if(dbn.tupid < 0)
+			return -1;
+	} else {
+		if(dbn.type != TUP_NODE_FILE &&
+		   dbn.type != TUP_NODE_GENERATED) {
+			fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
 			return -1;
 		}
-		return tup_file_del(dbn.tupid, dbn.dt, dbn.type);
-	} else {
-		fprintf(stderr, "tup error: Unknown flags argument to tup_file_mod(): %i\n", flags);
-		return -1;
+		if(tup_db_set_flags_by_id(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+
+		/* It's possible this is a file that was included by a Tupfile.
+		 * Try to set any dependent directory flags.
+		 */
+		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+			return -1;
 	}
+	return dbn.tupid;
 }
 
-int tup_file_del(tupid_t tupid, tupid_t dt, int type)
+int tup_file_del(tupid_t dt, const char *file)
+{
+	struct db_node dbn;
+
+	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0) {
+		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
+		return -1;
+	}
+	return tup_del_id(dbn.tupid, dbn.dt, dbn.type);
+}
+
+int tup_del_id(tupid_t tupid, tupid_t dt, int type)
 {
 	if(type == TUP_NODE_DIR) {
 		/* Directories are pretty simple, but we need to recurse and

@@ -548,7 +548,7 @@ static int touch(int argc, char **argv)
 			if(create_dir_file(dt, file) < 0)
 				return -1;
 		} else if(S_ISREG(buf.st_mode)) {
-			if(tup_file_mod(dt, file, TUP_FLAGS_MODIFY) < 0)
+			if(tup_file_mod(dt, file) < 0)
 				return -1;
 		} else if(S_ISLNK(buf.st_mode)) {
 			if(update_symlink_file(dt, file) < 0)
@@ -575,7 +575,7 @@ static int delete(int argc, char **argv)
 			fprintf(stderr, "Unable to find node '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_file_del(dbn.tupid, dbn.dt, dbn.type) < 0)
+		if(tup_del_id(dbn.tupid, dbn.dt, dbn.type) < 0)
 			return -1;
 	}
 	return 0;

@@ -191,7 +191,7 @@ int monitor(int argc, char **argv)
 		return -1;
 	while(!list_empty(&del_list)) {
 		he = list_entry(del_list.next, struct half_entry, list);
-		if(tup_file_del(he->tupid, he->dt, he->type) < 0)
+		if(tup_del_id(he->tupid, he->dt, he->type) < 0)
 			return -1;
 		list_del(&he->list);
 		free(he);
@@ -677,7 +677,6 @@ static struct moved_from_event *check_from_events(struct inotify_event *e)
 static void handle_event(struct monitor_event *m)
 {
 	struct dircache *dc;
-	int flags = 0;
 
 	dc = dircache_lookup(&mdb, m->e.wd);
 	if(!dc) {
@@ -712,8 +711,8 @@ static void handle_event(struct monitor_event *m)
 				return;
 			watch_path(dc->dt, dc->path, m->e.name, 0);
 		} else {
-			tup_file_mod(dc->dt, m->e.name, TUP_FLAGS_MODIFY);
-			tup_file_mod(from_dc->dt, mfe->m.e.name, TUP_FLAGS_DELETE);
+			tup_file_mod(dc->dt, m->e.name);
+			tup_file_del(from_dc->dt, mfe->m.e.name);
 		}
 		list_del(&mfe->list);
 		free(mfe);
@@ -728,13 +727,11 @@ static void handle_event(struct monitor_event *m)
 		return;
 	}
 	if(m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB) {
-		flags = TUP_FLAGS_MODIFY;
+		tup_file_mod(dc->dt, m->e.name);
 	}
 	if(m->e.mask & IN_DELETE) {
-		flags = TUP_FLAGS_DELETE;
+		tup_file_del(dc->dt, m->e.name);
 	}
-
-	tup_file_mod(dc->dt, m->e.name, flags);
 }
 
 static void sighandler(int sig)
