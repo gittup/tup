@@ -12,21 +12,6 @@ struct id_flags {
 	int flags;
 };
 
-struct path_element {
-	struct list_head list;
-	const char *path; /* Not nul-terminated */
-	int len;
-};
-
-struct pel_group {
-	struct list_head path_list;
-	int is_root;
-	int is_hidden;
-};
-
-static int get_path_elements(const char *dir, struct pel_group *pg);
-static void del_pel(struct path_element *pel);
-
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	return tup_db_create_node(dt, file, TUP_NODE_FILE);
@@ -273,27 +258,6 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 	if(pg.is_hidden)
 		return 0;
 
-	if(pg.is_root) {
-		const char *top = get_tup_top();
-
-		do {
-			/* Returns are 0 here to indicate file is outside of
-			 * .tup
-			 */
-			if(list_empty(&pg.path_list))
-				return 0;
-			if(top[0] != '/')
-				return 0;
-			top++;
-			pel = list_entry(pg.path_list.next, struct path_element, list);
-			if(strncmp(top, pel->path, pel->len) != 0)
-				return 0;
-			top += pel->len;
-
-			del_pel(pel);
-		} while(*top);
-	}
-
 	/* The list can be empty if dir is "." or something like "foo/..". In
 	 * this case just return dt (the start dir).
 	 */
@@ -347,16 +311,17 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 	return dt;
 }
 
-static int get_path_elements(const char *dir, struct pel_group *pg)
+int get_path_elements(const char *dir, struct pel_group *pg)
 {
 	struct path_element *pel;
 	const char *p = dir;
 	int num_elements = 0;
+	int is_root;
 
 	if(dir[0] == '/')
-		pg->is_root = 1;
+		is_root = 1;
 	else
-		pg->is_root = 0;
+		is_root = 0;
 	pg->is_hidden = 0;
 	INIT_LIST_HEAD(&pg->path_list);
 
@@ -396,10 +361,7 @@ static int get_path_elements(const char *dir, struct pel_group *pg)
 				goto skip_num_elements;
 			} else {
 				/* Ignore hidden paths */
-				while(!list_empty(&pg->path_list)) {
-					pel = list_entry(pg->path_list.prev, struct path_element, list);
-					del_pel(pel);
-				}
+				del_pel_list(&pg->path_list);
 				pg->is_hidden = 1;
 				return 0;
 			}
@@ -417,11 +379,69 @@ skip_num_elements:
 		pel->len = len;
 		list_add_tail(&pel->list, &pg->path_list);
 	}
+
+	if(is_root) {
+		const char *top = get_tup_top();
+
+		do {
+			/* Returns are 0 here to indicate file is outside of
+			 * .tup
+			 */
+			if(list_empty(&pg->path_list) || top[0] != '/') {
+				pg->is_hidden = 1;
+				return 0;
+			}
+			top++;
+			pel = list_entry(pg->path_list.next, struct path_element, list);
+			if(strncmp(top, pel->path, pel->len) != 0) {
+				pg->is_hidden = 1;
+				del_pel_list(&pg->path_list);
+				return 0;
+			}
+			top += pel->len;
+
+			del_pel(pel);
+		} while(*top);
+	}
 	return 0;
 }
 
-static void del_pel(struct path_element *pel)
+int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
+{
+	const struct list_head *la, *lb;
+	struct path_element *pela, *pelb;
+
+	la = &pga->path_list;
+	lb = &pgb->path_list;
+	while(la->next != &pga->path_list && lb->next != &pgb->path_list) {
+		pela = list_entry(la->next, struct path_element, list);
+		pelb = list_entry(lb->next, struct path_element, list);
+
+		if(pela->len != pelb->len)
+			return 0;
+		if(strncmp(pela->path, pelb->path, pela->len) != 0)
+			return 0;
+
+		la = la->next;
+		lb = lb->next;
+	}
+	if(la->next != &pga->path_list || lb->next != &pgb->path_list)
+		return 0;
+	return 1;
+}
+
+void del_pel(struct path_element *pel)
 {
 	list_del(&pel->list);
 	free(pel);
+}
+
+void del_pel_list(struct list_head *list)
+{
+	struct path_element *pel;
+
+	while(!list_empty(list)) {
+		pel = list_entry(list->prev, struct path_element, list);
+		del_pel(pel);
+	}
 }

@@ -4,13 +4,13 @@
 #include "list.h"
 #include "db.h"
 #include "fileio.h"
-#include "config.h" /* TODO */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 struct file_entry {
 	char *filename;
+	struct pel_group pg;
 	struct list_head list;
 };
 
@@ -26,7 +26,7 @@ static int handle_rename(const char *from, const char *to,
 			 struct file_info *info);
 static int handle_symlink(const char *from, const char *to,
 			  struct file_info *info);
-static void check_unlink_list(const char *filename, struct list_head *u_list);
+static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
 static void handle_unlink(struct file_info *info);
 
 int init_file_info(struct file_info *info)
@@ -48,7 +48,6 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	DEBUGP("received file '%s' in mode %i\n", filename, at);
 
 	if(at == ACCESS_RENAME) {
-		check_unlink_list(file2, &info->unlink_list);
 		return handle_rename(filename, file2, info);
 	}
 	if(at == ACCESS_SYMLINK) {
@@ -65,7 +64,7 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 			list_add(&fent->list, &info->read_list);
 			break;
 		case ACCESS_WRITE:
-			check_unlink_list(filename, &info->unlink_list);
+			check_unlink_list(&fent->pg, &info->unlink_list);
 			list_add(&fent->list, &info->write_list);
 			break;
 		case ACCESS_UNLINK:
@@ -276,12 +275,17 @@ static struct file_entry *new_entry(const char *filename)
 		perror("strdup");
 		return NULL;
 	}
+
+	if(get_path_elements(fent->filename, &fent->pg) < 0) {
+		return NULL;
+	}
 	return fent;
 }
 
 static void del_entry(struct file_entry *fent)
 {
 	list_del(&fent->list);
+	del_pel_list(&fent->pg.path_list);
 	free(fent->filename);
 	free(fent);
 }
@@ -290,27 +294,46 @@ static int handle_rename(const char *from, const char *to,
 			 struct file_info *info)
 {
 	struct file_entry *fent;
+	struct pel_group pg_from;
+	struct pel_group pg_to;
+
+	if(get_path_elements(from, &pg_from) < 0)
+		return -1;
+	if(get_path_elements(to, &pg_to) < 0)
+		return -1;
 
 	list_for_each_entry(fent, &info->write_list, list) {
-		if(strcmp(fent->filename, from) == 0) {
+		if(pg_eq(&fent->pg, &pg_from)) {
+			del_pel_list(&fent->pg.path_list);
 			free(fent->filename);
+
 			fent->filename = strdup(to);
 			if(!fent->filename) {
 				perror("strdup");
 				return -1;
 			}
+			if(get_path_elements(fent->filename, &fent->pg) < 0)
+				return -1;
 		}
 	}
 	list_for_each_entry(fent, &info->read_list, list) {
-		if(strcmp(fent->filename, from) == 0) {
+		if(pg_eq(&fent->pg, &pg_from)) {
+			del_pel_list(&fent->pg.path_list);
 			free(fent->filename);
+
 			fent->filename = strdup(to);
 			if(!fent->filename) {
 				perror("strdup");
 				return -1;
 			}
+			if(get_path_elements(fent->filename, &fent->pg) < 0)
+				return -1;
 		}
 	}
+
+	check_unlink_list(&pg_to, &info->unlink_list);
+	del_pel_list(&pg_to.path_list);
+	del_pel_list(&pg_from.path_list);
 	return 0;
 }
 
@@ -338,12 +361,12 @@ static int handle_symlink(const char *from, const char *to,
 	return 0;
 }
 
-static void check_unlink_list(const char *filename, struct list_head *u_list)
+static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list)
 {
 	struct file_entry *fent, *tmp;
 
 	list_for_each_entry_safe(fent, tmp, u_list, list) {
-		if(strcmp(fent->filename, filename) == 0) {
+		if(pg_eq(&fent->pg, pg)) {
 			del_entry(fent);
 		}
 	}
@@ -357,12 +380,12 @@ static void handle_unlink(struct file_info *info)
 		u = list_entry(info->unlink_list.next, struct file_entry, list);
 
 		list_for_each_entry_safe(fent, tmp, &info->write_list, list) {
-			if(strcmp(fent->filename, u->filename) == 0) {
+			if(pg_eq(&fent->pg, &u->pg)) {
 				del_entry(fent);
 			}
 		}
 		list_for_each_entry_safe(fent, tmp, &info->read_list, list) {
-			if(strcmp(fent->filename, u->filename) == 0) {
+			if(pg_eq(&fent->pg, &u->pg)) {
 				del_entry(fent);
 			}
 		}
