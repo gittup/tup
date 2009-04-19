@@ -113,39 +113,33 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		struct file_entry *tmp;
 		w = list_entry(info->write_list.next, struct file_entry, list);
 
-		if(strchr(w->filename, '/')) {
-			tupid_t tmpdt;
-			const char *last;
+		/* Some programs read from a file before writing over it. In
+		 * this case we don't want to have a link both to and from the
+		 * command, and writing takes precedence.
+		 */
+		list_for_each_entry_safe(r, tmp, &info->read_list, list) {
+			if(pg_eq(&w->pg, &r->pg))
+				del_entry(r);
+		}
 
-			/* TODO: need symlist here? What if a command writes to
-			 * a full-path that uses a symlink?
-			 */
-			tmpdt = find_dir_tupid_dt(dt, w->filename, &last, NULL);
-			if(tmpdt <= 0) {
-				fprintf(stderr, "tup error: File '%s' was written to, but unable to find the directory node corresponding to it in .tup/db. This is for command '%s'\n", w->filename, debug_name);
-				return -1;
-			}
-			if(tmpdt != dt) {
-				fprintf(stderr, "tup error: File '%s' was written to by command '%s', but the command should only write files to directory %lli\n", w->filename, debug_name, dt);
-				return -1;
-			}
-			if(tup_db_select_dbn(dt, last, &dbn) < 0)
-				return -1;
-		} else {
-			if(tup_db_select_dbn(dt, w->filename, &dbn) < 0)
-				return -1;
+		/* TODO: need symlist here? What if a command writes to a
+		 * full-path that uses a symlink?
+		 */
+		if(get_dbn_dt_pg(dt, &w->pg, &dbn, NULL) <= 0) {
+			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", w->filename, debug_name);
+			return -1;
 		}
 		if(dbn.tupid < 0) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", w->filename, debug_name);
+			fprintf(stderr, "[31mtup internal error: dbn.tupid < 0 in write_files() write_list?[0m\n");
+			return -1;
+		}
+		if(dbn.dt != dt) {
+			fprintf(stderr, "tup error: File '%s' was written to by command '%s', but the command should only write files to directory %lli\n", w->filename, debug_name, dt);
 			return -1;
 		}
 
 		if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
-		list_for_each_entry_safe(r, tmp, &info->read_list, list) {
-			if(strcmp(w->filename, r->filename) == 0)
-				del_entry(r);
-		}
 		list_for_each_entry(ide, &old_output_list, list) {
 			if(ide->tupid == dbn.tupid) {
 				/* Ok to do list_del without _safe because we
@@ -220,15 +214,12 @@ skip_sym:
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
-		const char *path;
 		tupid_t dbn_tupid;
 		LIST_HEAD(symlist);
 
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
-		path = r->filename;
-
-		dbn_tupid = get_dbn_dt(dt, path, &dbn, &symlist);
+		dbn_tupid = get_dbn_dt_pg(dt, &r->pg, &dbn, &symlist);
 		if(dbn_tupid < 0) {
 			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
 			return -1;

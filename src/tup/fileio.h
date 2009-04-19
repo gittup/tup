@@ -26,9 +26,13 @@ tupid_t tup_file_mod(tupid_t dt, const char *file, int flags);
 int tup_file_del(tupid_t tupid, tupid_t dt, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
+tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
+		      struct list_head *symlist);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 			  struct list_head *symlist);
+tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
+			     const char **last, struct list_head *symlist);
 
 int delete_name_file(tupid_t tupid);
 

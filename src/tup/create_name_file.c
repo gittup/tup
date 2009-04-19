@@ -12,6 +12,8 @@ struct id_flags {
 	int flags;
 };
 
+static int sym_follow(struct db_node *dbn, struct list_head *symlist);
+
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	return tup_db_create_node(dt, file, TUP_NODE_FILE);
@@ -214,29 +216,42 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 	if(file) {
 		if(tup_db_select_dbn(dt, file, dbn) < 0)
 			return -1;
-		while(dbn->sym != -1) {
-			if(symlist) {
-				struct half_entry *he;
-				he = malloc(sizeof *he);
-				if(!he) {
-					perror("malloc");
-					return -1;
-				}
-				he->tupid = dbn->tupid;
-				he->dt = dbn->dt;
-				he->type = dbn->type;
-				list_add(&he->list, symlist);
-			}
-
-			if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
-				return -1;
-		}
+		if(sym_follow(dbn, symlist) < 0)
+			return -1;
 		return dbn->tupid;
 	} else {
+		/* We get here if the path list ends up being empty (for
+		 * example, if the path is ".")
+		 */
 		if(tup_db_select_dbn_by_id(dt, dbn) < 0)
 			return -1;
 		dbn->name = path;
 		return dt;
+	}
+}
+
+tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
+		      struct list_head *symlist)
+{
+	const char *file = NULL;
+
+	dbn->tupid = -1;
+	dt = find_dir_tupid_dt_pg(dt, pg, &file, symlist);
+	if(dt < 0)
+		return -1;
+	/* File hidden from tup */
+	if(dt == 0)
+		return 0;
+
+	if(file) {
+		if(tup_db_select_dbn(dt, file, dbn) < 0)
+			return -1;
+		if(sym_follow(dbn, symlist) < 0)
+			return -1;
+		return dbn->tupid;
+	} else {
+		fprintf(stderr, "[31mtup internal error: get_dbn_dt_pg() didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
+		return -1;
 	}
 }
 
@@ -251,21 +266,31 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 			  struct list_head *symlist)
 {
 	struct pel_group pg;
-	struct path_element *pel;
+	tupid_t tupid;
 
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
-	if(pg.is_hidden)
+
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist);
+	return tupid;
+}
+
+tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
+			     const char **last, struct list_head *symlist)
+{
+	struct path_element *pel;
+
+	if(pg->is_hidden)
 		return 0;
 
 	/* The list can be empty if dir is "." or something like "foo/..". In
 	 * this case just return dt (the start dir).
 	 */
-	if(list_empty(&pg.path_list))
+	if(list_empty(&pg->path_list))
 		return dt;
 
 	if(last) {
-		pel = list_entry(pg.path_list.prev, struct path_element, list);
+		pel = list_entry(pg->path_list.prev, struct path_element, list);
 		*last = pel->path;
 		del_pel(pel);
 	} else {
@@ -274,10 +299,10 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 		exit(1);
 	}
 
-	while(!list_empty(&pg.path_list)) {
+	while(!list_empty(&pg->path_list)) {
 		struct db_node dbn;
 
-		pel = list_entry(pg.path_list.next, struct path_element, list);
+		pel = list_entry(pg->path_list.next, struct path_element, list);
 		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
 			dt = tup_db_parent(dt);
 			if(dt < 0)
@@ -285,23 +310,8 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 		} else {
 			if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
 				return -1;
-			while(dbn.sym != -1) {
-				if(symlist) {
-					struct half_entry *he;
-					he = malloc(sizeof *he);
-					if(!he) {
-						perror("malloc");
-						return -1;
-					}
-					he->tupid = dbn.tupid;
-					he->dt = dbn.dt;
-					he->type = dbn.type;
-					list_add(&he->list, symlist);
-				}
-
-				if(tup_db_select_dbn_by_id(dbn.sym, &dbn) < 0)
-					return -1;
-			}
+			if(sym_follow(&dbn, symlist) < 0)
+				return -1;
 			dt = dbn.tupid;
 		}
 
@@ -444,4 +454,26 @@ void del_pel_list(struct list_head *list)
 		pel = list_entry(list->prev, struct path_element, list);
 		del_pel(pel);
 	}
+}
+
+static int sym_follow(struct db_node *dbn, struct list_head *symlist)
+{
+	while(dbn->sym != -1) {
+		if(symlist) {
+			struct half_entry *he;
+			he = malloc(sizeof *he);
+			if(!he) {
+				perror("malloc");
+				return -1;
+			}
+			he->tupid = dbn->tupid;
+			he->dt = dbn->dt;
+			he->type = dbn->type;
+			list_add(&he->list, symlist);
+		}
+
+		if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
+			return -1;
+	}
+	return 0;
 }
