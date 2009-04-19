@@ -406,6 +406,7 @@ static int mlink(int argc, char **argv)
 static int node_exists(int argc, char **argv)
 {
 	int x;
+	struct db_node dbn;
 	tupid_t dt;
 
 	if(argc < 3) {
@@ -418,7 +419,9 @@ static int node_exists(int argc, char **argv)
 	argv++;
 	argc--;
 	for(x=1; x<argc; x++) {
-		if(tup_db_select_node(dt, argv[x]) < 0)
+		if(tup_db_select_dbn(dt, argv[x], &dbn) < 0)
+			return -1;
+		if(dbn.tupid < 0)
 			return -1;
 	}
 	return 0;
@@ -426,8 +429,8 @@ static int node_exists(int argc, char **argv)
 
 static int link_exists(int argc, char **argv)
 {
+	struct db_node dbna, dbnb;
 	tupid_t dta, dtb;
-	tupid_t a, b;
 
 	if(argc != 5) {
 		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
@@ -442,8 +445,9 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	a = tup_db_select_node(dta, argv[2]);
-	if(a < 0) {
+	if(tup_db_select_dbn(dta, argv[2], &dbna) < 0)
+		return -1;
+	if(dbna.tupid < 0) {
 		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[2]);
 		return -1;
 	}
@@ -457,12 +461,13 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	b = tup_db_select_node(dtb, argv[4]);
-	if(b < 0) {
+	if(tup_db_select_dbn(dtb, argv[4], &dbnb) < 0)
+		return -1;
+	if(dbnb.tupid < 0) {
 		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[4]);
 		return -1;
 	}
-	return tup_db_link_exists(a, b);
+	return tup_db_link_exists(dbna.tupid, dbnb.tupid);
 }
 
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col)

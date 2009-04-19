@@ -694,7 +694,7 @@ static int var_replace(struct node *n)
 	char *rbracket;
 	char *p, *e;
 	int rc = -1;
-	tupid_t input_id;
+	struct db_node dbn;
 
 	if(n->name[0] != ',') {
 		fprintf(stderr, "Error: var_replace command must begin with ','\n");
@@ -733,10 +733,11 @@ static int var_replace(struct node *n)
 	 * input file changes in the future we'll continue to process the
 	 * required parts of the DAG. See t3009.
 	 */
-	input_id = tup_db_select_node(n->dt, input);
-	if(input_id < 0)
+	if(tup_db_select_dbn(n->dt, input, &dbn) < 0)
 		return -1;
-	if(tup_db_create_link(input_id, n->tupid, TUP_LINK_NORMAL) < 0)
+	if(dbn.tupid < 0)
+		return -1;
+	if(tup_db_create_link(dbn.tupid, n->tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 
 	ifd = open(input, O_RDONLY);

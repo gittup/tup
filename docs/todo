@@ -35,8 +35,6 @@ symlinks pointing at each other
 if create_name_file() is always in a (tupid < 0) block because we did a select, maybe bypass the node_select() that happens in tup_db_create_node_part()?
  - also if create_name_file() is always creating a new node, it should always put dt in the create list?
 
- tup_db_select_node shouldn't return -1 on error and a successful node-doesn't-exist? - maybe get rid of in favor of select_dbn
-
 html:
   proof: big-o notation
   proof: no clean target

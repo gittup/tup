@@ -357,21 +357,22 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 	}
 
 	if(S_ISREG(buf.st_mode)) {
-		tupid_t tupid;
+		struct db_node dbn;
 
-		tupid = tup_db_select_node(dt, file);
-		if(tupid < 0) {
+		if(tup_db_select_dbn(dt, file, &dbn) < 0)
+			return -1;
+		if(dbn.tupid < 0) {
 			if(create_name_file(dt, file) < 0)
 				goto out_close;
 			if(tup_db_add_create_list(dt) < 0)
 				goto out_close;
 		} else {
 			if(tmpdb) {
-				if(tup_db_unflag_tmpdb(tupid) < 0)
+				if(tup_db_unflag_tmpdb(dbn.tupid) < 0)
 					goto out_close;
 			}
 			if(mon_time != -1 && buf.st_mtime > mon_time) {
-				if(tup_db_add_modify_list(tupid) < 0)
+				if(tup_db_add_modify_list(dbn.tupid) < 0)
 					goto out_close;
 			}
 		}
@@ -700,14 +701,15 @@ static void handle_event(struct monitor_event *m)
 			return;
 		}
 		if(m->e.mask & IN_ISDIR) {
-			tupid_t tupid;
+			struct db_node dbn;
 
-			tupid = tup_db_select_node(from_dc->dt, mfe->m.e.name);
-			if(tupid < 0)
+			if(tup_db_select_dbn(from_dc->dt, mfe->m.e.name, &dbn) < 0)
 				return;
-			if(tup_db_change_node_name(tupid, m->e.name) < 0)
+			if(dbn.tupid < 0)
 				return;
-			if(tup_db_modify_dir(tupid) < 0)
+			if(tup_db_change_node_name(dbn.tupid, m->e.name) < 0)
+				return;
+			if(tup_db_modify_dir(dbn.tupid) < 0)
 				return;
 			watch_path(dc->dt, dc->path, m->e.name, 0);
 		} else {

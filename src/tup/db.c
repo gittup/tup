@@ -432,17 +432,6 @@ tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type)
 	return tupid;
 }
 
-tupid_t tup_db_select_node(tupid_t dt, const char *name)
-{
-	struct db_node dbn;
-
-	if(node_select(dt, name, -1, &dbn) < 0) {
-		return -1;
-	}
-
-	return dbn.tupid;
-}
-
 int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn)
 {
 	int rc;
@@ -516,17 +505,6 @@ int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 	dbn->name = name;
 
 	return 0;
-}
-
-tupid_t tup_db_select_node_part(tupid_t dt, const char *name, int len)
-{
-	struct db_node dbn;
-
-	if(node_select(dt, name, len, &dbn) < 0) {
-		return -1;
-	}
-
-	return dbn.tupid;
 }
 
 int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,

@@ -32,15 +32,16 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 tupid_t update_symlink_file(tupid_t dt, const char *file)
 {
 	int rc;
-	tupid_t tupid;
+	struct db_node dbn;
+	struct db_node link_dbn;
 	tupid_t link_dt;
-	tupid_t link_tupid;
 	static char linkname[PATH_MAX];
 
-	tupid = tup_db_select_node(dt, file);
-	if(tupid < 0) {
-		tupid = create_name_file(dt, file);
-		if(tupid < 0)
+	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0) {
+		dbn.tupid = create_name_file(dt, file);
+		if(dbn.tupid < 0)
 			return -1;
 	}
 
@@ -61,16 +62,17 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 		fprintf(stderr, "Error: Unable to find directory ID for '%s' in update_symlink_file()\n", linkname);
 		return -1;
 	}
-	link_tupid = tup_db_select_node(link_dt, file);
-	if(link_tupid < 0) {
+	if(tup_db_select_dbn(link_dt, file, &link_dbn) < 0)
+		return -1;
+	if(link_dbn.tupid < 0) {
 		fprintf(stderr, "Error: Unable to find node '%s' in directory %lli in order to symlink %s\n", file, link_dt, file);
 		return -1;
 	}
-	if(tup_db_set_sym(tupid, link_tupid) < 0)
+	if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
 		return -1;
-	if(tup_db_add_modify_list(tupid) < 0)
+	if(tup_db_add_modify_list(dbn.tupid) < 0)
 		return -1;
-	return tupid;
+	return dbn.tupid;
 }
 
 tupid_t create_var_file(const char *var, const char *value)
