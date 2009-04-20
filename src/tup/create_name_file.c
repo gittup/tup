@@ -18,7 +18,7 @@ tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	tupid_t tupid;
 
-	tupid = tup_db_create_node(dt, file, TUP_NODE_FILE);
+	tupid = tup_db_node_insert(dt, file, -1, TUP_NODE_FILE);
 	if(tupid < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)

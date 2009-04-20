@@ -78,7 +78,7 @@ enum {
 	DB_FILES_TO_TMPDB,
 	DB_UNFLAG_TMPDB,
 	DB_GET_ALL_IN_TMPDB,
-	_DB_NODE_INSERT,
+	DB_NODE_INSERT,
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT,
 	_DB_LINK_UPDATE,
@@ -91,8 +91,6 @@ static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
 
 static int version_check(void);
-static tupid_t node_insert(tupid_t dt, const char *name, int len, int type,
-			   tupid_t sym);
 static int node_select(tupid_t dt, const char *name, int len,
 		       struct db_node *dbn);
 
@@ -415,7 +413,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 		return dbn.tupid;
 	}
 
-	tupid = node_insert(dt, name, len, type, -1);
+	tupid = tup_db_node_insert(dt, name, len, type);
 	if(tupid < 0)
 		return -1;
 	return tupid;
@@ -424,7 +422,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type)
 {
 	tupid_t tupid;
-	tupid = node_insert(dt, name, -1, type, -1);
+	tupid = tup_db_node_insert(dt, name, -1, type);
 	if(tupid < 0)
 		return -1;
 	if(tup_db_unflag_modify(tupid) < 0)
@@ -3111,12 +3109,11 @@ out_reset:
 	return rc;
 }
 
-static tupid_t node_insert(tupid_t dt, const char *name, int len, int type,
-			   tupid_t sym)
+tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_NODE_INSERT];
-	static char s[] = "insert into node(dir, type, name, sym) values(?, ?, ?, ?)";
+	sqlite3_stmt **stmt = &stmts[DB_NODE_INSERT];
+	static char s[] = "insert into node(dir, type, name, sym) values(?, ?, ?, -1)";
 	tupid_t tupid;
 
 	if(!*stmt) {
@@ -3136,10 +3133,6 @@ static tupid_t node_insert(tupid_t dt, const char *name, int len, int type,
 		return -1;
 	}
 	if(sqlite3_bind_text(*stmt, 3, name, len, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int64(*stmt, 4, sym) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
