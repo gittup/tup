@@ -353,7 +353,7 @@ static int mlink(int argc, char **argv)
 	int x;
 	tupid_t cmd_id;
 	tupid_t dotdt;
-	tupid_t id;
+	struct db_node dbn;
 
 	if(argc < 4) {
 		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
@@ -387,15 +387,16 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		id = create_name_file(dotdt, name+2);
-		if(id < 0)
+		if(tup_db_select_dbn(dotdt, name+2, &dbn) < 0)
+			return -1;
+		if(dbn.tupid < 0)
 			return 1;
 
 		if(type == 0) {
-			if(tup_db_create_link(id, cmd_id, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(dbn.tupid, cmd_id, TUP_LINK_NORMAL) < 0)
 				return -1;
 		} else {
-			if(tup_db_create_link(cmd_id, id, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(cmd_id, dbn.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}

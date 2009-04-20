@@ -16,7 +16,14 @@ static int sym_follow(struct db_node *dbn, struct list_head *symlist);
 
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
-	return tup_db_create_node(dt, file, TUP_NODE_FILE);
+	tupid_t tupid;
+
+	tupid = tup_db_create_node(dt, file, TUP_NODE_FILE);
+	if(tupid < 0)
+		return -1;
+	if(tup_db_add_create_list(dt) < 0)
+		return -1;
+	return tupid;
 }
 
 tupid_t create_command_file(tupid_t dt, const char *cmd)
@@ -116,10 +123,8 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 
-	/* Need to re-parse the Tupfile if file is new to the database, or if
-	 * the file itself is the Tupfile.
-	 */
-	if(dbn.tupid < 0 || strcmp(file, "Tupfile") == 0) {
+	/* Need to re-parse the Tupfile if it was changed. */
+	if(strcmp(file, "Tupfile") == 0) {
 		if(tup_db_add_create_list(dt) < 0)
 			return -1;
 	}

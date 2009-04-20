@@ -364,8 +364,6 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 		if(dbn.tupid < 0) {
 			if(create_name_file(dt, file) < 0)
 				goto out_close;
-			if(tup_db_add_create_list(dt) < 0)
-				goto out_close;
 		} else {
 			if(tmpdb) {
 				if(tup_db_unflag_tmpdb(dbn.tupid) < 0)
