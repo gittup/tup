@@ -21,8 +21,6 @@ if we do out of tree build, can we have the monitor kill the updater if a file m
 
 have an "include_rules" directive that will include a Rules.tup file in all parent directories? Could be useful for making directory-scoped variables. Also allow doing something like set LINUX_ROOT=. and have it get set to the current directory?
 
-"either it was deleted manually" in parser no longer true?
-
 tup build tup
 
 recursive grep kills monitor

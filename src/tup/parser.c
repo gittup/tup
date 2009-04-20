@@ -759,7 +759,7 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 			if(rc < 0)
 				return -1;
 			if(rc == 1) {
-				fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (either it was deleted manually, or the command that created it has been removed).\n", pl->file, pl->dt);
+				fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
 				return -1;
 			}
 			if(build_name_list_cb(&args, &dbn) < 0)
