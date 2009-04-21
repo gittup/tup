@@ -1110,11 +1110,11 @@ out_reset:
 	return rc;
 }
 
-int tup_db_change_node_name(tupid_t tupid, const char *name)
+int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
-	static char s[] = "update node set name=? where id=?";
+	static char s[] = "update node set name=?, dir=? where id=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1124,11 +1124,15 @@ int tup_db_change_node_name(tupid_t tupid, const char *name)
 		}
 	}
 
-	if(sqlite3_bind_text(*stmt, 1, name, -1, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_text(*stmt, 1, new_name, -1, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, new_dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 3, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

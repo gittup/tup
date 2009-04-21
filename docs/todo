@@ -30,6 +30,10 @@ will cp -Rp olddir newdir break everything if olddir already has a bunch of stuf
 symlink to non-existant file
 symlinks pointing at each other
 
+in touch() - remove get_tup_top stuff, should just find_dir_tupid_dt for dt now
+
+instead of using touch() in benchmarks, make something like mlink that just inserts the node to the database without creating a file? like "tup node foo.c"
+
 html:
   proof: big-o notation
   proof: no clean target

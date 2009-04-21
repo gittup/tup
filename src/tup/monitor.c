@@ -705,7 +705,7 @@ static void handle_event(struct monitor_event *m)
 				return;
 			if(dbn.tupid < 0)
 				return;
-			if(tup_db_change_node_name(dbn.tupid, m->e.name) < 0)
+			if(tup_db_change_node(dbn.tupid, m->e.name, dc->dt) < 0)
 				return;
 			if(tup_db_modify_dir(dbn.tupid) < 0)
 				return;
