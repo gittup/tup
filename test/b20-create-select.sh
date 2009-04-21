@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-seq 1 $1 | xargs tup touch
+seq 1 $1 | xargs tup node
 seq 1 $1 | xargs tup node_exists .
 if tup node_exists . 1 $1; then
 	:

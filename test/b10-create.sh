@@ -1,3 +1,3 @@
 #! /bin/sh -e
 
-seq 1 $1 | xargs tup touch
+seq 1 $1 | xargs tup node

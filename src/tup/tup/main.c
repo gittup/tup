@@ -29,6 +29,7 @@ static int link_exists(int argc, char **argv);
 static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
+static int node(int argc, char **argv);
 static int delete(int argc, char **argv);
 static int varset(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
@@ -105,6 +106,8 @@ int main(int argc, char **argv)
 		rc = flags_exists(argc, argv);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
+	} else if(strcmp(cmd, "node") == 0) {
+		rc = node(argc, argv);
 	} else if(strcmp(cmd, "delete") == 0) {
 		rc = delete(argc, argv);
 	} else if(strcmp(cmd, "varset") == 0) {
@@ -521,10 +524,8 @@ static int touch(int argc, char **argv)
 
 	for(x=1; x<argc; x++) {
 		struct stat buf;
-		const char *path;
 		const char *file;
 		tupid_t dt;
-		tupid_t curdt;
 
 		close(open(argv[x], O_WRONLY | O_CREAT, 0666));
 		if(lstat(argv[x], &buf) < 0) {
@@ -533,21 +534,9 @@ static int touch(int argc, char **argv)
 			return -1;
 		}
 
-		curdt = sub_dir_dt;
-		path = argv[x];
-		if(path[0] == '/') {
-			int ttl = get_tup_top_len();
-			if(strncmp(path, get_tup_top(), ttl) != 0 ||
-			   path[ttl] != '/') {
-				fprintf(stderr, "Error: The path '%s' is not in the tup hierarchy.\n", argv[x]);
-				return -1;
-			}
-			path += ttl + 1;
-			curdt = DOT_DT;
-		}
-		dt = find_dir_tupid_dt(curdt, path, &file, NULL);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
 		if(dt <= 0) {
-			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", path, curdt);
+			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
 		if(S_ISDIR(buf.st_mode)) {
@@ -567,16 +556,46 @@ static int touch(int argc, char **argv)
 	return 0;
 }
 
+static int node(int argc, char **argv)
+{
+	int x;
+	tupid_t sub_dir_dt;
+	sub_dir_dt = get_sub_dir_dt();
+	if(sub_dir_dt < 0)
+		return -1;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		tupid_t dt;
+		const char *file;
+
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
+		if(dt <= 0) {
+			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
+			return -1;
+		}
+		if(create_name_file(dt, file) < 0) {
+			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", file, dt);
+			return -1;
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
 static int delete(int argc, char **argv)
 {
 	int x;
+	tupid_t sub_dir_dt;
+	sub_dir_dt = get_sub_dir_dt();
+	if(sub_dir_dt < 0)
+		return -1;
+
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
-		tupid_t sub_dir_dt;
 
-		sub_dir_dt = get_sub_dir_dt();
-		if(sub_dir_dt < 0)
-			return -1;
 		if(get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL) < 0) {
 			fprintf(stderr, "Unable to find node '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
