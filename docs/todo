@@ -29,6 +29,7 @@ will cp -Rp olddir newdir break everything if olddir already has a bunch of stuf
 
 symlink to non-existant file
 symlinks pointing at each other
+symlink changed while monitor away
 
 html:
   proof: big-o notation

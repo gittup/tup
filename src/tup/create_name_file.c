@@ -75,10 +75,12 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 		fprintf(stderr, "Error: Unable to find node '%s' in directory %lli in order to symlink %s\n", file, link_dt, file);
 		return -1;
 	}
-	if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
-		return -1;
-	if(tup_db_add_modify_list(dbn.tupid) < 0)
-		return -1;
+	if(dbn.sym != link_dbn.tupid) {
+		if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
+			return -1;
+		if(tup_db_add_modify_list(dbn.tupid) < 0)
+			return -1;
+	}
 	return dbn.tupid;
 }
 

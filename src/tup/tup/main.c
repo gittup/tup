@@ -548,6 +548,8 @@ static int touch(int argc, char **argv)
 		} else if(S_ISLNK(buf.st_mode)) {
 			if(update_symlink_file(dt, file) < 0)
 				return -1;
+			if(tup_file_mod(dt, file) < 0)
+				return -1;
 		}
 	}
 	fchdir(fd);
