@@ -27,11 +27,11 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-symlink to non-existant file
+symlink to non-existent file
 symlinks pointing at each other
 symlink changed while monitor away
 
-ghost read from non-existant subdir
+ghost read from non-existent subdir
 make sure ghost from previous command doesn't stay
 
 compile on 64-bit

@@ -755,6 +755,10 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
 				return -1;
 			}
+			if(dbn.type == TUP_NODE_GHOST) {
+				fprintf(stderr, "Error: Explicitly named file '%s' is a ghost file, so it can't be used as an input.\n", pl->file);
+				return -1;
+			}
 			rc = tup_db_in_delete_list(dbn.tupid);
 			if(rc < 0)
 				return -1;

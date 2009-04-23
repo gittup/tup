@@ -8,9 +8,4 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile foo.c bar.c
-if tup parse; then
-	echo "Error: Shouldn't be able to parse a non-existant order-only prereq." 1>&2
-	exit 1
-else
-	echo "Hooray, parsing correctly failed."
-fi
+parse_fail "Shouldn't be able to parse a non-existent order-only prereq."

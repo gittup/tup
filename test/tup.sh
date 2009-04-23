@@ -153,6 +153,16 @@ update_fail()
 	fi
 }
 
+parse_fail()
+{
+	if tup parse; then
+		echo "Error: $1" 1>&2
+		exit 1
+	else
+		echo "Hooray, parsing correctly failed."
+	fi
+}
+
 check_same_link()
 {
 	if stat $* | grep Inode | awk 'BEGIN{x=-1} {if(x == -1) {x=$4} if(x != $4) {exit 1}}'; then
