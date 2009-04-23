@@ -36,6 +36,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->unlink_list);
 	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->sym_list);
+	INIT_LIST_HEAD(&info->ghost_list);
 	return 0;
 }
 
@@ -73,6 +74,9 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 		case ACCESS_VAR:
 			list_add(&fent->list, &info->var_list);
 			break;
+		case ACCESS_GHOST:
+			list_add(&fent->list, &info->ghost_list);
+			break;
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
 			rc = -1;
@@ -87,6 +91,8 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 {
 	struct file_entry *w;
 	struct file_entry *r;
+	struct file_entry *g;
+	struct file_entry *tmp;
 	struct db_node dbn;
 	struct id_entry *ide;
 	struct half_entry *he;
@@ -99,7 +105,6 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		return -1;
 
 	while(!list_empty(&info->write_list)) {
-		struct file_entry *tmp;
 		w = list_entry(info->write_list.next, struct file_entry, list);
 
 		/* Some programs read from a file before writing over it. In
@@ -109,6 +114,10 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		list_for_each_entry_safe(r, tmp, &info->read_list, list) {
 			if(pg_eq(&w->pg, &r->pg))
 				del_entry(r);
+		}
+		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
+			if(pg_eq(&w->pg, &g->pg))
+				del_entry(g);
 		}
 
 		/* TODO: need symlist here? What if a command writes to a
@@ -174,6 +183,16 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 			return -1;
 		if(tup_db_set_sym(dbn.tupid, dbn_link.tupid) < 0)
 			return -1;
+
+		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
+			/* Use strcmp instead of pg_eq because we don't have
+			 * the pgs for sym_entries. Also this should only
+			 * happen when 'ln' does a stat() before it does a
+			 * symlink().
+			 */
+			if(strcmp(sym->to, g->filename) == 0)
+				del_entry(g);
+		}
 
 		list_for_each_entry(ide, &old_output_list, list) {
 			if(ide->tupid == dbn.tupid) {
@@ -241,6 +260,47 @@ skip_read:
 		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
 		del_entry(r);
+	}
+
+	while(!list_empty(&info->ghost_list)) {
+		const char *file;
+		tupid_t newdt;
+		LIST_HEAD(symlist);
+
+		g = list_entry(info->ghost_list.next, struct file_entry, list);
+		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &file, &symlist);
+		if(newdt < 0) {
+			fprintf(stderr, "Error finding dir for '%s' relative to dir %lli\n", g->filename, dt);
+			return 0;
+		}
+		if(newdt == 0)
+			goto skip_ghost;
+
+		if(file) {
+			if(tup_db_select_dbn(dt, file, &dbn) < 0)
+				return -1;
+			if(dbn.tupid < 0) {
+				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST);
+				if(dbn.tupid < 0)
+					return -1;
+			}
+
+			while(!list_empty(&symlist)) {
+				he = list_entry(symlist.next, struct half_entry, list);
+				if(tup_db_create_link(he->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+					return -1;
+				list_del(&he->list);
+				free(he);
+			}
+			if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+				return -1;
+		} else {
+			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
+			return -1;
+		}
+
+skip_ghost:
+		del_entry(g);
 	}
 	return 0;
 }

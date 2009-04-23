@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <pthread.h>
+#include <errno.h>
 #include <sys/socket.h>
 
 static void handle_file(const char *file, const char *file2, int at);
@@ -28,6 +29,8 @@ static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
 		       char *const envp[]);
+static int (*s_xstat)(int vers, const char *name, struct stat *buf);
+static int (*s_xstat64)(int vers, const char *name, struct stat *buf);
 
 int open(const char *pathname, int flags, ...)
 {
@@ -42,8 +45,12 @@ int open(const char *pathname, int flags, ...)
 	}
 	/* O_ACCMODE is 0x3, which covers O_WRONLY and O_RDWR */
 	rc = s_open(pathname, flags, mode);
-	if(rc >= 0)
+	if(rc >= 0) {
 		handle_file(pathname, "", flags&O_ACCMODE);
+	} else {
+		if(errno == ENOENT)
+			handle_file(pathname, "", ACCESS_GHOST);
+	}
 	return rc;
 }
 
@@ -59,8 +66,12 @@ int open64(const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 	rc = s_open64(pathname, flags, mode);
-	if(rc >= 0)
+	if(rc >= 0) {
 		handle_file(pathname, "", flags&O_ACCMODE);
+	} else {
+		if(errno == ENOENT)
+			handle_file(pathname, "", ACCESS_GHOST);
+	}
 	return rc;
 }
 
@@ -69,8 +80,12 @@ FILE *fopen(const char *path, const char *mode)
 	FILE *f;
 
 	f = s_fopen(path, mode);
-	if(f)
+	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
+	} else {
+		if(errno == ENOENT)
+			handle_file(path, "", ACCESS_GHOST);
+	}
 	return f;
 }
 
@@ -79,8 +94,12 @@ FILE *fopen64(const char *path, const char *mode)
 	FILE *f;
 
 	f = s_fopen64(path, mode);
-	if(f)
+	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
+	} else {
+		if(errno == ENOENT)
+			handle_file(path, "", ACCESS_GHOST);
+	}
 	return f;
 }
 
@@ -89,8 +108,12 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 	FILE *f;
 
 	f = s_freopen(path, mode, stream);
-	if(f)
+	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
+	} else {
+		if(errno == ENOENT)
+			handle_file(path, "", ACCESS_GHOST);
+	}
 	return f;
 }
 
@@ -161,6 +184,31 @@ int execve(const char *filename, char *const argv[], char *const envp[])
 	return rc;
 }
 
+int __xstat(int vers, const char *name, struct stat *buf)
+{
+	int rc;
+	rc = s_xstat(vers, name, buf);
+	if(rc < 0) {
+		if(errno == ENOENT) {
+			handle_file(name, "", ACCESS_GHOST);
+		}
+	}
+	return rc;
+}
+
+int __xstat64 (int __ver, __const char *__filename,
+	       struct stat64 *__stat_buf)
+{
+	int rc;
+	rc = s_xstat64(__ver, __filename, __stat_buf);
+	if(rc < 0) {
+		if(errno == ENOENT) {
+			handle_file(__filename, "", ACCESS_GHOST);
+		}
+	}
+	return rc;
+}
+
 static void handle_file(const char *file, const char *file2, int at)
 {
 	struct access_event *event;
@@ -213,8 +261,11 @@ static void ldpre_init(void)
 	s_unlink = dlsym(RTLD_NEXT, "unlink");
 	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
 	s_execve = dlsym(RTLD_NEXT, "execve");
+	s_xstat = dlsym(RTLD_NEXT, "__xstat");
+	s_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
 	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
-	   !s_creat || !s_rename || !s_unlink || !s_unlinkat || !s_execve) {
+	   !s_creat || !s_rename || !s_unlink || !s_unlinkat || !s_execve ||
+	   !s_xstat || !s_xstat64) {
 		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
 		exit(1);
 	}

@@ -282,6 +282,9 @@ static int graph(int argc, char **argv)
 		if(n == g.root)
 			continue;
 
+		style = "solid";
+		color = 0;
+		fontcolor = 0;
 		switch(n->type) {
 			case TUP_NODE_FILE:
 			case TUP_NODE_GENERATED:
@@ -296,13 +299,17 @@ static int graph(int argc, char **argv)
 			case TUP_NODE_VAR:
 				shape = "octagon";
 				break;
+			case TUP_NODE_GHOST:
+				/* Ghost nodes won't have flags set */
+				color = 0x888888;
+				fontcolor = 0x888888;
+				style = "dotted";
+				shape = "oval";
+				break;
 			default:
 				shape="ellipse";
 		}
 
-		style = "solid";
-		color = 0;
-		fontcolor = 0;
 		if(n->flags & TUP_FLAGS_DELETE) {
 			color |= 0xff0000;
 			style = "dotted";

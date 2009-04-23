@@ -136,8 +136,11 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
-		if(dbn.type != TUP_NODE_FILE &&
-		   dbn.type != TUP_NODE_GENERATED) {
+		if(dbn.type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(dbn.tupid, TUP_NODE_FILE) < 0)
+				return -1;
+		} else if(dbn.type != TUP_NODE_FILE &&
+			  dbn.type != TUP_NODE_GENERATED) {
 			fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
 			return -1;
 		}

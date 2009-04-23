@@ -42,6 +42,7 @@ enum TUP_NODE_TYPE {
 	TUP_NODE_DIR,
 	TUP_NODE_VAR,
 	TUP_NODE_GENERATED,
+	TUP_NODE_GHOST,
 	TUP_NODE_ROOT,
 };
 
@@ -94,6 +95,7 @@ int tup_db_get_path(tupid_t tupid, char *path, int len);
 tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
+int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 
 /* Flag operations */

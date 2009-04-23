@@ -32,6 +32,7 @@ enum {
 	DB_PARENT,
 	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
+	DB_SET_TYPE,
 	DB_SET_SYM,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
@@ -427,6 +428,11 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 	}
 
 	if(dbn.tupid != -1) {
+		if(dbn.type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(dbn.tupid, type) < 0)
+				return -1;
+			return dbn.tupid;
+		}
 		if(dbn.type != type) {
 			/* Try to provide a more sane error message in this
 			 * case, since a user might come across it just by
@@ -1164,6 +1170,42 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 	if(sqlite3_bind_int64(*stmt, 3, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_set_type(tupid_t tupid, int type)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_TYPE];
+	static char s[] = "update node set type=? where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, type) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

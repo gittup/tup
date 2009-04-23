@@ -10,6 +10,7 @@ struct file_info {
 	struct list_head unlink_list;
 	struct list_head var_list;
 	struct list_head sym_list;
+	struct list_head ghost_list;
 };
 
 enum access_type;

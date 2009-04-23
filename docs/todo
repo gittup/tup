@@ -31,6 +31,11 @@ symlink to non-existant file
 symlinks pointing at each other
 symlink changed while monitor away
 
+ghost read from non-existant subdir
+make sure ghost from previous command doesn't stay
+
+compile on 64-bit
+
 html:
   proof: big-o notation
   proof: no clean target
