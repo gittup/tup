@@ -32,7 +32,6 @@ symlinks pointing at each other
 symlink changed while monitor away
 
 ghost read from non-existent subdir
-make sure ghost from previous command doesn't stay
 
 compile on 64-bit
 
