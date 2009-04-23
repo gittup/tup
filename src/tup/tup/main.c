@@ -540,11 +540,13 @@ static int touch(int argc, char **argv)
 		const char *file;
 		tupid_t dt;
 
-		close(open(argv[x], O_WRONLY | O_CREAT, 0666));
 		if(lstat(argv[x], &buf) < 0) {
-			fprintf(stderr, "stat: ");
-			perror(argv[x]);
-			return -1;
+			close(open(argv[x], O_WRONLY | O_CREAT, 0666));
+			if(lstat(argv[x], &buf) < 0) {
+				fprintf(stderr, "stat: ");
+				perror(argv[x]);
+				return -1;
+			}
 		}
 
 		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);

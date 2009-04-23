@@ -12,8 +12,6 @@ struct id_flags {
 	int flags;
 };
 
-static int sym_follow(struct db_node *dbn, struct list_head *symlist);
-
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	tupid_t tupid;
@@ -72,8 +70,11 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 	if(tup_db_select_dbn(link_dt, file, &link_dbn) < 0)
 		return -1;
 	if(link_dbn.tupid < 0) {
-		fprintf(stderr, "Error: Unable to find node '%s' in directory %lli in order to symlink %s\n", file, link_dt, file);
-		return -1;
+		link_dbn.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST);
+		if(link_dbn.tupid < 0) {
+			fprintf(stderr, "Error: Node '%s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", file, link_dt);
+			return -1;
+		}
 	}
 	if(dbn.sym != link_dbn.tupid) {
 		if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
@@ -470,7 +471,7 @@ void del_pel_list(struct list_head *list)
 	}
 }
 
-static int sym_follow(struct db_node *dbn, struct list_head *symlist)
+int sym_follow(struct db_node *dbn, struct list_head *symlist)
 {
 	while(dbn->sym != -1) {
 		if(symlist) {

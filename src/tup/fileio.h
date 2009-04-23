@@ -41,5 +41,6 @@ int get_path_elements(const char *dir, struct pel_group *pg);
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb);
 void del_pel(struct path_element *pel);
 void del_pel_list(struct list_head *list);
+int sym_follow(struct db_node *dbn, struct list_head *symlist);
 
 #endif

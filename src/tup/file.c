@@ -283,6 +283,9 @@ skip_read:
 				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST);
 				if(dbn.tupid < 0)
 					return -1;
+			} else {
+				if(sym_follow(&dbn, &symlist) < 0)
+					return -1;
 			}
 
 			while(!list_empty(&symlist)) {
