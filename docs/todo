@@ -4,13 +4,6 @@ multi-arch - when building a name-list, automatically include files in a separat
 
 import/export vars to file
 
-error cases:
-what if:
- /lib/libfoo.a
- gcc bar.c -lfoo -L/usr/lib -L/lib
- now create /usr/lib/libfoo.a
- should the link command execute again? after all, if it *did* execute again, it would pull a different lib.
-
 cross compiling
 
 out of tree build
