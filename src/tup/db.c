@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <sqlite3.h>
 
-#define DB_VERSION 4
+#define DB_VERSION 5
 
 enum {
 	DB_BEGIN,
@@ -143,7 +143,7 @@ int tup_db_create(int db_sync)
 		"create table modify_list (id integer primary key not null)",
 		"create table delete_list (id integer primary key not null)",
 		"create index node_dir_index on node(dir, name)",
-		"create index link_index on link(from_id)",
+		"create index link_index on link(from_id, to_id)",
 		"create index link_index2 on link(to_id)",
 		"insert into config values('show_progress', 1)",
 		"insert into config values('keep_going', 0)",
@@ -201,6 +201,9 @@ static int version_check(void)
 	char sql_2d[] = "delete from link where rowid not in (select rowid from link group by from_id, to_id having max(style))";
 
 	char sql_3a[] = "alter table node add column sym integer default -1";
+
+	char sql_4a[] = "drop index link_index";
+	char sql_4b[] = "create index link_index on link(from_id, to_id)";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -263,6 +266,21 @@ static int version_check(void)
 			if(tup_db_config_set_int("db_version", 4) < 0)
 				return -1;
 			fprintf(stderr, "WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
+		case 4:
+			if(sqlite3_exec(tup_db, sql_4a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_4a);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_4b, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_4b);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 5) < 0)
+				return -1;
+			fprintf(stderr, "WARNING: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
+
 		case DB_VERSION:
 			break;
 		default:

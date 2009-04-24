@@ -366,6 +366,8 @@ static int mlink(int argc, char **argv)
 		return 1;
 	}
 
+	if(tup_db_begin() < 0)
+		return -1;
 	cmd_id = create_command_file(DOT_DT, argv[1]);
 	if(cmd_id < 0) {
 		return -1;
@@ -401,6 +403,8 @@ static int mlink(int argc, char **argv)
 				return -1;
 		}
 	}
+	if(tup_db_commit() < 0)
+		return -1;
 
 	return 0;
 }
