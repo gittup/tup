@@ -35,6 +35,7 @@ static int varset(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
 static int flush(void);
+static void print_name(const char *s, char c);
 
 static void usage(void);
 
@@ -320,14 +321,16 @@ static int graph(int argc, char **argv)
 			}
 		}
 		printf("\tnode_%lli [label=\"", n->tupid);
-		for(s = n->name; *s; s++) {
-			if(*s == '"') {
-				printf("\\\"");
-			} else if(*s == '\\') {
-				printf("\\\\");
-			} else {
-				printf("%c", *s);
+		s = n->name;
+		if(s[0] == '^') {
+			s++;
+			while(*s && *s != ' ') {
+				/* Skip flags (Currently there are none) */
+				s++;
 			}
+			print_name(s, '^');
+		} else {
+			print_name(s, 0);
 		}
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
 		if(n->dt)
@@ -355,7 +358,6 @@ static int mlink(int argc, char **argv)
 	int type;
 	int x;
 	tupid_t cmd_id;
-	tupid_t dotdt;
 	struct db_node dbn;
 
 	if(argc < 4) {
@@ -364,11 +366,7 @@ static int mlink(int argc, char **argv)
 		return 1;
 	}
 
-	dotdt = create_dir_file(0, ".");
-	if(dotdt < 0)
-		return -1;
-
-	cmd_id = create_command_file(dotdt, argv[1]);
+	cmd_id = create_command_file(DOT_DT, argv[1]);
 	if(cmd_id < 0) {
 		return -1;
 	}
@@ -390,7 +388,7 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		if(tup_db_select_dbn(dotdt, name+2, &dbn) < 0)
+		if(tup_db_select_dbn(DOT_DT, name+2, &dbn) < 0)
 			return -1;
 		if(dbn.tupid < 0)
 			return 1;
@@ -667,6 +665,19 @@ static int flush(void)
 	}
 	printf("Flushed.\n");
 	return 0;
+}
+
+static void print_name(const char *s, char c)
+{
+	for(; *s && *s != c; s++) {
+		if(*s == '"') {
+			printf("\\\"");
+		} else if(*s == '\\') {
+			printf("\\\\");
+		} else {
+			printf("%c", *s);
+		}
+	}
 }
 
 static void usage(void)
