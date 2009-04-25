@@ -133,7 +133,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 		}
 		if(dbn.dt != dt) {
 			fprintf(stderr, "tup error: File '%s' was written to by command '%s', but the command should only write files to directory %lli\n", w->filename, debug_name, dt);
-			return -1;
+			goto write_fail;
 		}
 
 		if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
@@ -147,10 +147,20 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 				 */
 				list_del(&ide->list);
 				free(ide);
-				break;
+				goto write_ok;
 			}
 		}
 
+		/* Oops, wrote to a file that we're not allowed to. Make sure
+		 * we re-run whatever command was supposed to write to that
+		 * file.
+		 */
+		fprintf(stderr, "tup error: File '%s' was written to by command '%s', but this was not specified in the Tupfile in dir %lli.\n", w->filename, debug_name, dt);
+write_fail:
+		output_bork = 1;
+		tup_db_modify_cmds_by_output(dbn.tupid);
+
+write_ok:
 		del_entry(w);
 	}
 
@@ -203,9 +213,16 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 				 */
 				list_del(&ide->list);
 				free(ide);
-				break;
+				goto skip_sym;
 			}
 		}
+
+		/* Similar to the write case, make sure we were supposed to
+		 * actually create this file.
+		 */
+		fprintf(stderr, "tup error: File '%s' was made as a symlink by command '%s', but this was not specified in the Tupfile in dir %lli.\n", sym->to, debug_name, dt);
+		output_bork = 1;
+		tup_db_modify_cmds_by_output(dbn.tupid);
 
 skip_sym:
 		list_del(&sym->list);
