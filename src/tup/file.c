@@ -120,6 +120,13 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 				del_entry(g);
 		}
 
+		/* Remove duplicate write entries */
+		list_for_each_entry_safe(r, tmp, &info->write_list, list) {
+			if(r != w && pg_eq(&w->pg, &r->pg)) {
+				del_entry(r);
+			}
+		}
+
 		/* TODO: need symlist here? What if a command writes to a
 		 * full-path that uses a symlink?
 		 */
