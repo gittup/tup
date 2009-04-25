@@ -23,9 +23,6 @@ will cp -Rp olddir newdir break everything if olddir already has a bunch of stuf
 symlinks pointing at each other
 symlink changed while monitor away
 
-in tup_db_node_insert(): only care about TUP_NODE_CMD here?
-
-
 compile on 64-bit
 
 html:

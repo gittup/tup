@@ -3361,19 +3361,10 @@ tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type)
 
 	tupid = sqlite3_last_insert_rowid(tup_db);
 	switch(type) {
-		case TUP_NODE_DIR:
-			if(tup_db_add_create_list(tupid) < 0)
-				return -1;
-			break;
-		case TUP_NODE_FILE:
-		case TUP_NODE_GENERATED:
+		/* New commands go in the modify list so they are executed at
+		 * least once.
+		 */
 		case TUP_NODE_CMD:
-			if(tup_db_add_modify_list(tupid) < 0)
-				return -1;
-			break;
-		case TUP_NODE_VAR:
-			if(tup_db_add_create_list(tupid) < 0)
-				return -1;
 			if(tup_db_add_modify_list(tupid) < 0)
 				return -1;
 			break;
