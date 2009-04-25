@@ -24,7 +24,7 @@ tupid_t update_symlink_file(tupid_t dt, const char *file);
 tupid_t create_var_file(const char *var, const char *value);
 tupid_t tup_file_mod(tupid_t dt, const char *file);
 int tup_file_del(tupid_t dt, const char *file);
-int tup_del_id(tupid_t tupid, tupid_t dt, int type);
+int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
@@ -36,7 +36,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     const char **last, struct list_head *symlist,
 			     int sotgv);
 
-int delete_name_file(tupid_t tupid);
+int delete_name_file(tupid_t tupid, tupid_t dt, tupid_t sym);
 
 int get_path_elements(const char *dir, struct pel_group *pg);
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb);

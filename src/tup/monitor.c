@@ -191,7 +191,7 @@ int monitor(int argc, char **argv)
 		return -1;
 	while(!list_empty(&del_list)) {
 		he = list_entry(del_list.next, struct half_entry, list);
-		if(tup_del_id(he->tupid, he->dt, he->type) < 0)
+		if(tup_del_id(he->tupid, he->dt, he->sym, he->type) < 0)
 			return -1;
 		list_del(&he->list);
 		free(he);

@@ -483,7 +483,7 @@ static void *delete_work(void *arg)
 			if(n->type == TUP_NODE_GENERATED) {
 				rc = delete_file(n);
 			} else {
-				rc = delete_name_file(n->tupid);
+				rc = delete_name_file(n->tupid, n->dt, n->sym);
 			}
 
 			if(rc == 0) {
@@ -648,7 +648,7 @@ static int update(struct node *n, struct server *s)
 				rc = tup_db_yell_links(tupid, "Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created   from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could   randomly break in the future.");
 				if(rc == 0) {
 					/* Success! Delete the old node */
-					delete_name_file(n->tupid);
+					delete_name_file(n->tupid, -1, -1);
 				}
 				/* Yelled nodes are actually a failure */
 				if(rc == 1) {
@@ -684,7 +684,7 @@ err_close_dfd:
 	close(dfd);
 err_delete_node:
 	pthread_mutex_lock(&db_mutex);
-	delete_name_file(tupid);
+	delete_name_file(tupid, -1, -1);
 	pthread_mutex_unlock(&db_mutex);
 	return -1;
 }
@@ -820,7 +820,7 @@ static int delete_file(struct node *n)
 	int dirfd;
 	int rc = 0;
 
-	if(delete_name_file(n->tupid) < 0)
+	if(delete_name_file(n->tupid, n->dt, n->sym) < 0)
 		return -1;
 	dirfd = tup_db_open_tupid(n->dt);
 	if(dirfd < 0) {

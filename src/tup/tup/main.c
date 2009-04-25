@@ -612,12 +612,19 @@ static int delete(int argc, char **argv)
 		return -1;
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
+		const char *file;
+		tupid_t dt;
 
-		if(get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL) < 0) {
-			fprintf(stderr, "Unable to find node '%s' relative to %lli\n", argv[x], sub_dir_dt);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
+		if(dt < 0) {
+			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_del_id(dbn.tupid, dbn.dt, dbn.type) < 0)
+		if(tup_db_select_dbn(dt, file, &dbn) < 0) {
+			fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
+			return -1;
+		}
+		if(tup_del_id(dbn.tupid, dbn.dt, dbn.sym, dbn.type) < 0)
 			return -1;
 	}
 	if(tup_db_commit() < 0)

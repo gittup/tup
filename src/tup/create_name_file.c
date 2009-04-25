@@ -174,10 +174,10 @@ int tup_file_del(tupid_t dt, const char *file)
 		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 		return -1;
 	}
-	return tup_del_id(dbn.tupid, dbn.dt, dbn.type);
+	return tup_del_id(dbn.tupid, dbn.dt, dbn.sym, dbn.type);
 }
 
-int tup_del_id(tupid_t tupid, tupid_t dt, int type)
+int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type)
 {
 	if(type == TUP_NODE_DIR) {
 		/* Directories are pretty simple, but we need to recurse and
@@ -185,7 +185,7 @@ int tup_del_id(tupid_t tupid, tupid_t dt, int type)
 		 */
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
-		if(delete_name_file(tupid) < 0)
+		if(delete_name_file(tupid, dt, sym) < 0)
 			return -1;
 		return 0;
 	}
@@ -219,7 +219,7 @@ int tup_del_id(tupid_t tupid, tupid_t dt, int type)
 		return -1;
 	if(tup_db_unflag_modify(tupid) < 0)
 		return -1;
-	if(delete_name_file(tupid) < 0)
+	if(delete_name_file(tupid, dt, sym) < 0)
 		return -1;
 	return 0;
 }
@@ -500,6 +500,7 @@ int sym_follow(struct db_node *dbn, struct list_head *symlist)
 			}
 			he->tupid = dbn->tupid;
 			he->dt = dbn->dt;
+			he->sym = dbn->sym;
 			he->type = dbn->type;
 			list_add(&he->list, symlist);
 		}

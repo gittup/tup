@@ -277,7 +277,7 @@ skip_read:
 			goto skip_ghost;
 
 		if(file) {
-			if(tup_db_select_dbn(dt, file, &dbn) < 0)
+			if(tup_db_select_dbn(newdt, file, &dbn) < 0)
 				return -1;
 			if(dbn.tupid < 0) {
 				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST);

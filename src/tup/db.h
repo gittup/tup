@@ -33,6 +33,7 @@ struct half_entry {
 	struct list_head list;
 	tupid_t tupid;
 	tupid_t dt;
+	tupid_t sym;
 	int type;
 };
 
@@ -87,7 +88,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 				void *arg, tupid_t dt, const char *glob);
 int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags);
 int tup_db_set_flags_by_id(tupid_t tupid, int flags);
-int tup_db_delete_node(tupid_t tupid);
+int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
@@ -134,6 +135,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 					       int style),
 			       void *arg, tupid_t tupid);
 int tup_db_delete_dependent_dir_links(tupid_t tupid);
+int tup_db_reclaim_ghosts(void);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);
