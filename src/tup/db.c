@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <sqlite3.h>
 
-#define DB_VERSION 5
+#define DB_VERSION 6
 
 enum {
 	DB_BEGIN,
@@ -84,6 +84,7 @@ enum {
 	_DB_LINK_UPDATE,
 	_DB_COPY_FROM_STICKY_LINKS,
 	_DB_COPY_TO_STICKY_LINKS,
+	_DB_NODE_HAS_GHOSTS,
 	DB_NUM_STATEMENTS
 };
 
@@ -112,6 +113,7 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
 static int copy_src_sticky_links(tupid_t orig, tupid_t dest);
 static int copy_dest_sticky_links(tupid_t orig, tupid_t dest);
+static int node_has_ghosts(tupid_t tupid);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -157,6 +159,7 @@ int tup_db_create(int db_sync)
 		"create table modify_list (id integer primary key not null)",
 		"create table delete_list (id integer primary key not null)",
 		"create index node_dir_index on node(dir, name)",
+		"create index node_sym_index on node(sym)",
 		"create index link_index on link(from_id, to_id)",
 		"create index link_index2 on link(to_id)",
 		"insert into config values('show_progress', 1)",
@@ -218,6 +221,8 @@ static int version_check(void)
 
 	char sql_4a[] = "drop index link_index";
 	char sql_4b[] = "create index link_index on link(from_id, to_id)";
+
+	char sql_5a[] = "create index node_sym_index on node(sym)";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -293,7 +298,17 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 5) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
+			fprintf(stderr, "NOTE: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
+
+		case 5:
+			if(sqlite3_exec(tup_db, sql_5a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_5a);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 6) < 0)
+				return -1;
+			fprintf(stderr, "NOTE: Tup database updated to version 6.\nAnother minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.\n");
 
 		case DB_VERSION:
 			break;
@@ -791,6 +806,15 @@ int tup_db_delete_node(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_NODE];
 	static char s[] = "delete from node where id=?";
+
+	rc = node_has_ghosts(tupid);
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		if(tup_db_set_type(tupid, TUP_NODE_GHOST) < 0)
+			return -1;
+		return 0;
+	}
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3516,6 +3540,51 @@ static int copy_dest_sticky_links(tupid_t orig, tupid_t dest)
 	}
 
 	return 0;
+}
+
+static int node_has_ghosts(tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_NODE_HAS_GHOSTS];
+	static char s[] = "select id from node where dir=? or sym=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		rc = 0;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		rc = -1;
+		goto out_reset;
+	}
+	rc = 1;
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
 }
 
 static int no_sync(void)

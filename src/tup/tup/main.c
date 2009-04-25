@@ -262,12 +262,10 @@ static int graph(int argc, char **argv)
 			return -1;
 		list_move(&g.cur->list, &g.node_list);
 
-		if(g.cur->type == TUP_NODE_DIR) {
-			tupid = g.cur->tupid;
-			g.cur = NULL;
-			if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
-				return -1;
-		}
+		tupid = g.cur->tupid;
+		g.cur = NULL;
+		if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
+			return -1;
 	}
 
 	printf("digraph G {\n");
@@ -610,6 +608,8 @@ static int delete(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
 
@@ -620,6 +620,8 @@ static int delete(int argc, char **argv)
 		if(tup_del_id(dbn.tupid, dbn.dt, dbn.type) < 0)
 			return -1;
 	}
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 

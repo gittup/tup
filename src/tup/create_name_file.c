@@ -12,6 +12,8 @@ struct id_flags {
 	int flags;
 };
 
+static int ghost_to_file(struct db_node *dbn);
+
 tupid_t create_name_file(tupid_t dt, const char *file)
 {
 	tupid_t tupid;
@@ -48,6 +50,11 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 		dbn.tupid = create_name_file(dt, file);
 		if(dbn.tupid < 0)
 			return -1;
+	} else {
+		if(dbn.type == TUP_NODE_GHOST) {
+			if(ghost_to_file(&dbn) < 0)
+				return -1;
+		}
 	}
 
 	rc = readlink(file, linkname, sizeof(linkname));
@@ -138,7 +145,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 			return -1;
 	} else {
 		if(dbn.type == TUP_NODE_GHOST) {
-			if(tup_db_set_type(dbn.tupid, TUP_NODE_FILE) < 0)
+			if(ghost_to_file(&dbn) < 0)
 				return -1;
 		} else if(dbn.type != TUP_NODE_FILE &&
 			  dbn.type != TUP_NODE_GENERATED) {
@@ -251,7 +258,7 @@ tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
 	const char *file = NULL;
 
 	dbn->tupid = -1;
-	dt = find_dir_tupid_dt_pg(dt, pg, &file, symlist);
+	dt = find_dir_tupid_dt_pg(dt, pg, &file, symlist, 0);
 	if(dt < 0)
 		return -1;
 	/* File hidden from tup */
@@ -286,12 +293,13 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist);
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist, 0);
 	return tupid;
 }
 
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     const char **last, struct list_head *symlist)
+			     const char **last, struct list_head *symlist,
+			     int sotgv)
 {
 	struct path_element *pel;
 
@@ -325,6 +333,15 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 		} else {
 			if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
 				return -1;
+			if(dbn.tupid < 0) {
+				/* Secret of the ghost valley! */
+				if(sotgv == 0)
+					return -1;
+				dbn.tupid = tup_db_node_insert(dt, pel->path, pel->len, TUP_NODE_GHOST);
+				if(dbn.tupid < 0)
+					return -1;
+				dbn.sym = -1;
+			}
 			if(sym_follow(&dbn, symlist) < 0)
 				return -1;
 			dt = dbn.tupid;
@@ -490,5 +507,15 @@ int sym_follow(struct db_node *dbn, struct list_head *symlist)
 		if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
 			return -1;
 	}
+	return 0;
+}
+
+static int ghost_to_file(struct db_node *dbn)
+{
+	if(tup_db_set_type(dbn->tupid, TUP_NODE_FILE) < 0)
+		return -1;
+	if(tup_db_add_create_list(dbn->dt) < 0)
+		return -1;
+	dbn->type = TUP_NODE_FILE;
 	return 0;
 }

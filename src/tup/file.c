@@ -268,7 +268,7 @@ skip_read:
 		LIST_HEAD(symlist);
 
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
-		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &file, &symlist);
+		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &file, &symlist, 1);
 		if(newdt < 0) {
 			fprintf(stderr, "Error finding dir for '%s' relative to dir %lli\n", g->filename, dt);
 			return 0;
