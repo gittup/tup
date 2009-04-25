@@ -2947,7 +2947,7 @@ int tup_db_write_vars(void)
 	varlist.count = 0;
 
 	/* Already at the top of the tup hierarchy because of find_tup_dir() */
-	fd = creat(".tup/vardict", 0666);
+	fd = creat(TUP_VARDICT_FILE, 0666);
 	if(fd < 0) {
 		perror("creat");
 		return -1;

@@ -6,6 +6,7 @@
 
 #define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
+#define TUP_VARDICT_FILE ".tup/vardict"
 #define DOT_DT 1
 #define VAR_DT 2
 

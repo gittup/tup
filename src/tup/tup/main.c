@@ -182,6 +182,10 @@ static int init(int argc, char **argv)
 		perror(TUP_MONITOR_LOCK);
 		return -1;
 	}
+	if(creat(TUP_VARDICT_FILE, 0666) < 0) {
+		perror(TUP_VARDICT_FILE);
+		return -1;
+	}
 	return 0;
 }
 

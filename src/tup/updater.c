@@ -198,9 +198,9 @@ static int process_update_nodes(void)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 	tup_db_begin();
-	vardict_fd = open(".tup/vardict", O_RDONLY);
+	vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
-		perror(".tup/vardict");
+		perror(TUP_VARDICT_FILE);
 		return -1;
 	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
