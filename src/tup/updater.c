@@ -679,7 +679,7 @@ static int update(struct node *n, struct server *s)
 	return rc;
 
 err_cmd_failed:
-	fprintf(stderr, " *** Command %lli failed.\n", n->tupid);
+	fprintf(stderr, " *** Command %lli failed: %s\n", n->tupid, name);
 err_close_dfd:
 	close(dfd);
 err_delete_node:
