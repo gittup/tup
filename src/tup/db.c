@@ -88,6 +88,7 @@ enum {
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST,
 	_DB_ADD_GHOST_LINKS,
+	_DB_ADD_GHOST_DIRS,
 	_DB_CLEAR_GHOST_LIST,
 	DB_NUM_STATEMENTS
 };
@@ -121,6 +122,7 @@ static int copy_dest_sticky_links(tupid_t orig, tupid_t dest);
 static int node_has_ghosts(tupid_t tupid);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
+static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
@@ -2429,6 +2431,12 @@ int tup_db_reclaim_ghosts(void)
 	if(!num_ghosts)
 		return 0;
 
+	/* Make sure any ghost that is in a ghost directory also has its
+	 * parent directory checked (t2040).
+	 */
+	if(add_ghost_dirs() < 0)
+		return -1;
+
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -3721,6 +3729,40 @@ static int add_ghost_links(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GHOST) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	num_ghosts += sqlite3_changes(tup_db);
+
+	return 0;
+}
+
+static int add_ghost_dirs(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_DIRS];
+	static char s[] = "insert or replace into ghost_list select dir from node where id in (select id from ghost_list) and type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_GHOST) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

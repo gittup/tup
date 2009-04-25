@@ -547,7 +547,7 @@ static int touch(int argc, char **argv)
 			}
 		}
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", argv[x], sub_dir_dt);
 			return -1;
@@ -585,7 +585,7 @@ static int node(int argc, char **argv)
 		tupid_t dt;
 		const char *file;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
@@ -615,7 +615,7 @@ static int delete(int argc, char **argv)
 		const char *file;
 		tupid_t dt;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
 		if(dt < 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;

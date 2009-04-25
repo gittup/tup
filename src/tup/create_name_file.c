@@ -69,7 +69,7 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 	}
 	linkname[rc] = 0;
 
-	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL);
+	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL, 0);
 	if(link_dt <= 0) {
 		fprintf(stderr, "Error: Unable to find directory ID for '%s' in update_symlink_file()\n", linkname);
 		return -1;
@@ -231,7 +231,7 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 
 	dbn->tupid = -1;
 
-	dt = find_dir_tupid_dt(dt, path, &file, symlist);
+	dt = find_dir_tupid_dt(dt, path, &file, symlist, 0);
 	if(dt < 0)
 		return -1;
 
@@ -285,7 +285,7 @@ tupid_t find_dir_tupid(const char *dir)
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
-			  struct list_head *symlist)
+			  struct list_head *symlist, int sotgv)
 {
 	struct pel_group pg;
 	tupid_t tupid;
@@ -293,7 +293,7 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist, 0);
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist, sotgv);
 	return tupid;
 }
 
