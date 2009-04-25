@@ -480,16 +480,12 @@ static void *delete_work(void *arg)
 
 		if(n->flags & TUP_FLAGS_DELETE) {
 			pthread_mutex_lock(&db_mutex);
-			if(n->type == TUP_NODE_GENERATED) {
+
+			rc = delete_name_file(n->tupid, n->dt, n->sym);
+			if(rc == 0 && n->type == TUP_NODE_GENERATED) {
 				rc = delete_file(n);
-			} else {
-				rc = delete_name_file(n->tupid, n->dt, n->sym);
 			}
 
-			if(rc == 0) {
-				if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-					rc = -1;
-			}
 			pthread_mutex_unlock(&db_mutex);
 		}
 
@@ -820,8 +816,6 @@ static int delete_file(struct node *n)
 	int dirfd;
 	int rc = 0;
 
-	if(delete_name_file(n->tupid, n->dt, n->sym) < 0)
-		return -1;
 	dirfd = tup_db_open_tupid(n->dt);
 	if(dirfd < 0) {
 		if(dirfd == -ENOENT) {

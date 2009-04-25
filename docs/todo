@@ -25,14 +25,6 @@ symlink changed while monitor away
 
 in tup_db_node_insert(): only care about TUP_NODE_CMD here?
 
-in delete_work(), remove:
-                        if(rc == 0) {
-                                if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
-                                        rc = -1;
-                        }
- - since flags are cleared in delete_name_file() ?
- - also move delete_name_file outside of if, since it is always done (remove call from delete_file()
-
 
 compile on 64-bit
 
