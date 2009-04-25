@@ -2899,7 +2899,7 @@ tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 	int len;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[DB_WRITE_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and node.id and delete_list.id is null";
+	static char s[] = "select var.id, value, length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and delete_list.id is null";
 	tupid_t tupid = -1;
 
 	if(!*stmt) {
