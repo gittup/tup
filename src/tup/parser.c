@@ -937,7 +937,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	}
 	if(tup_db_delete_empty_links(cmd_id) < 0)
 		return -1;
-	rc = tup_db_yell_links(cmd_id, "You seem to have removed a required input file - please add it back. If  it truly isn't needed anymore, you can probably remove it after a successful    update.");
+	rc = tup_db_yell_links(cmd_id, "Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.");
 	if(rc < 0)
 		return -1;
 	if(rc == 0)
