@@ -125,8 +125,8 @@ int tup_db_unsticky_links(tupid_t tupid);
 int tup_db_copy_sticky_links(tupid_t orig, tupid_t dest);
 
 /* Combo operations */
-int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type);
-int tup_db_set_cmd_output_flags(tupid_t parent, int flags);
+int tup_db_flag_delete_in_dir(tupid_t dt, int type);
+int tup_db_flag_delete_cmd_outputs(tupid_t dt);
 int tup_db_modify_cmds_by_output(tupid_t output);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);

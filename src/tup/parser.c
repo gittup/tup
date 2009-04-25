@@ -156,9 +156,9 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_or_dircmd_flags(n->tupid, TUP_FLAGS_DELETE, TUP_NODE_CMD) < 0)
+	if(tup_db_flag_delete_in_dir(n->tupid, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_set_cmd_output_flags(n->tupid, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_flag_delete_cmd_outputs(n->tupid) < 0)
 		return -1;
 	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;

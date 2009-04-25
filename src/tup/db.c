@@ -52,8 +52,8 @@ enum {
 	DB_HAS_INCOMING_LINKS,
 	DB_DELETE_LINKS,
 	DB_UNSTICKY_LINKS,
-	DB_OR_DIRCMD_FLAGS,
-	DB_SET_CMD_OUTPUT_FLAGS,
+	DB_FLAG_DELETE_IN_DIR,
+	DB_FLAG_DELETE_CMD_OUTPUTS,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -2098,16 +2098,12 @@ int tup_db_copy_sticky_links(tupid_t orig, tupid_t dest)
 	return 0;
 }
 
-int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type)
+int tup_db_flag_delete_in_dir(tupid_t dt, int type)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_OR_DIRCMD_FLAGS];
+	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_IN_DIR];
 	static char s[] = "insert or replace into delete_list select id from node where dir=? and type=?";
 
-	if(flags != TUP_FLAGS_DELETE) {
-		fprintf(stderr, "Error: tup_db_or_dircmd_flags() now only works with DELETE.\n");
-		return -1;
-	}
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -2116,7 +2112,7 @@ int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type)
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, parent) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2139,16 +2135,12 @@ int tup_db_or_dircmd_flags(tupid_t parent, int flags, int type)
 	return 0;
 }
 
-int tup_db_set_cmd_output_flags(tupid_t parent, int flags)
+int tup_db_flag_delete_cmd_outputs(tupid_t dt)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_SET_CMD_OUTPUT_FLAGS];
+	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_CMD_OUTPUTS];
 	static char s[] = "insert or replace into delete_list select to_id from link where from_id in (select id from node where dir=? and type=?)";
 
-	if(flags != TUP_FLAGS_DELETE) {
-		fprintf(stderr, "Error: tup_db_set_cmd_output_flags() now only works with DELETE.\n");
-		return -1;
-	}
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -2157,7 +2149,7 @@ int tup_db_set_cmd_output_flags(tupid_t parent, int flags)
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, parent) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
