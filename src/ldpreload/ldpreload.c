@@ -219,10 +219,10 @@ static void ldpre_init(void)
 		exit(1);
 	}
 
-	path = getenv(SERVER_NAME);
+	path = getenv(TUP_SERVER_NAME);
 	if(!path) {
 		fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
-			"path from the environment.\n", SERVER_NAME);
+			"path from the environment.\n", TUP_SERVER_NAME);
 		exit(1);
 	}
 	sd = strtol(path, NULL, 0);

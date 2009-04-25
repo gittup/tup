@@ -34,7 +34,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->read_list);
 	INIT_LIST_HEAD(&info->write_list);
 	INIT_LIST_HEAD(&info->unlink_list);
-	INIT_LIST_HEAD(&info->tupid_list);
+	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->sym_list);
 	return 0;
 }
@@ -70,6 +70,9 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 		case ACCESS_UNLINK:
 			list_add(&fent->list, &info->unlink_list);
 			break;
+		case ACCESS_VAR:
+			list_add(&fent->list, &info->var_list);
+			break;
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
 			rc = -1;
@@ -77,20 +80,6 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	}
 
 	return rc;
-}
-
-int handle_tupid(tupid_t tupid, struct file_info *info)
-{
-	struct id_entry *ide;
-
-	ide = malloc(sizeof *ide);
-	if(!ide) {
-		perror("malloc");
-		return -1;
-	}
-	ide->tupid = tupid;
-	list_add(&ide->list, &info->tupid_list);
-	return 0;
 }
 
 int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
@@ -241,12 +230,17 @@ skip_read:
 		del_entry(r);
 	}
 
-	while(!list_empty(&info->tupid_list)) {
-		ide = list_entry(info->tupid_list.next, struct id_entry, list);
-		if(tup_db_create_link(ide->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+	while(!list_empty(&info->var_list)) {
+		r = list_entry(info->var_list.next, struct file_entry, list);
+		if(tup_db_select_dbn(VAR_DT, r->filename, &dbn) < 0)
 			return -1;
-		list_del(&ide->list);
-		free(ide);
+		if(dbn.tupid < 0) {
+			fprintf(stderr, "Error: Unable to find tupid for variable named '%s'\n", r->filename);
+			return -1;
+		}
+		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+			return -1;
+		del_entry(r);
 	}
 	return 0;
 }

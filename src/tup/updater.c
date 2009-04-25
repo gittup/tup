@@ -39,6 +39,7 @@ static void show_progress(int sum, int tot, struct node *n);
 static int do_show_progress;
 static int do_keep_going;
 static int num_jobs;
+static int vardict_fd;
 
 static int sig_quit = 0;
 static struct sigaction sigact = {
@@ -197,11 +198,17 @@ static int process_update_nodes(void)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 	tup_db_begin();
+	vardict_fd = open(".tup/vardict", O_RDONLY);
+	if(vardict_fd < 0) {
+		perror(".tup/vardict");
+		return -1;
+	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
 	if(rc == -2) {
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
+	close(vardict_fd);
 	tup_db_commit();
 	if(rc < 0)
 		return -1;
@@ -507,7 +514,6 @@ static void *update_work(void *arg)
 		perror("malloc");
 		return NULL;
 	}
-	s->db_mutex = &db_mutex;
 
 	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
 		struct edge *e;
@@ -619,7 +625,7 @@ static int update(struct node *n, struct server *s)
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGTERM, &sa, NULL);
 		fchdir(dfd);
-		server_setenv(s);
+		server_setenv(s, vardict_fd);
 		execl("/bin/sh", "/bin/sh", "-c", name, NULL);
 		perror("execl");
 		exit(1);

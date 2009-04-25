@@ -31,6 +31,8 @@ symlink to non-existant file
 symlinks pointing at each other
 symlink changed while monitor away
 
+print command out when it fails (minus ^ blah ^)
+
 html:
   proof: big-o notation
   proof: no clean target

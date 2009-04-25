@@ -69,7 +69,6 @@ enum {
 	DB_GET_VAR,
 	DB_GET_VAR_ID,
 	DB_GET_VARLEN,
-	DB_SEND_VAR,
 	DB_WRITE_VAR,
 	DB_FLAG_DELETED_VAR_DEPENDENT_DIRS,
 	DB_VAR_FOREACH,
@@ -87,8 +86,22 @@ enum {
 	DB_NUM_STATEMENTS
 };
 
+struct var_list {
+	struct list_head vars;
+	unsigned int count;
+};
+
+struct var_entry {
+	struct list_head list;
+	const char *var;
+	const char *value;
+	int varlen;
+	int vallen;
+};
+
 static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
+static int tup_db_var_changed = 0;
 
 static int version_check(void);
 static int node_select(tupid_t dt, const char *name, int len,
@@ -2572,6 +2585,8 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 		return -1;
 	}
 
+	tup_db_var_changed++;
+
 	return 0;
 }
 
@@ -2738,65 +2753,6 @@ out_reset:
 	return rc;
 }
 
-tupid_t tup_db_send_var(const char *var, int sd)
-{
-	int dbrc;
-	int len;
-	tupid_t tupid = -1;
-	const char *value;
-	sqlite3_stmt **stmt = &stmts[DB_SEND_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and node.id and delete_list.id is null";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, var, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable '%s' not found in .tup/db.\n",
-			var);
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		goto out_reset;
-	}
-
-	len = sqlite3_column_int(*stmt, 2);
-	if(len < 0) {
-		goto out_reset;
-	}
-	value = (const char *)sqlite3_column_text(*stmt, 1);
-	if(!value) {
-		goto out_reset;
-	}
-	send(sd, &len, sizeof(len), 0);
-	send(sd, value, len, 0);
-
-	tupid = sqlite3_column_int64(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return tupid;
-}
-
 tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 {
 	int dbrc;
@@ -2902,7 +2858,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_VAR_FOREACH];
-	static char s[] = "select name, value from var, node where node.dir=? and node.id=var.id";
+	static char s[] = "select name, value from var, node where node.dir=? and node.id=var.id order by name";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2946,6 +2902,98 @@ out_reset:
 		return -1;
 	}
 
+	return rc;
+}
+
+static int write_vars_cb(void *arg, const char *var, const char *value)
+{
+	struct var_list *varlist = arg;
+	struct var_entry *entry;
+
+	varlist->count++;
+	entry = malloc(sizeof *entry);
+	if(!entry) {
+		perror("malloc");
+		return -1;
+	}
+	entry->var = strdup(var);
+	if(!entry->var) {
+		perror("strdup");
+		return -1;
+	}
+	entry->value = strdup(value);
+	if(!entry->value) {
+		perror("strdup");
+		return -1;
+	}
+	entry->varlen = strlen(entry->var);
+	entry->vallen = strlen(entry->value);
+	list_add_tail(&entry->list, &varlist->vars);
+	return 0;
+}
+
+int tup_db_write_vars(void)
+{
+	int fd;
+	int rc = -1;
+	struct var_list varlist;
+	struct var_entry *ent;
+	unsigned int x;
+
+	if(tup_db_var_changed == 0)
+		return 0;
+
+	INIT_LIST_HEAD(&varlist.vars);
+	varlist.count = 0;
+
+	/* Already at the top of the tup hierarchy because of find_tup_dir() */
+	fd = creat(".tup/vardict", 0666);
+	if(fd < 0) {
+		perror("creat");
+		return -1;
+	}
+	if(tup_db_var_foreach(write_vars_cb, &varlist) < 0)
+		goto out_err;
+	if(write(fd, &varlist.count, sizeof(varlist.count)) != sizeof(varlist.count)) {
+		perror("write");
+		goto out_err;
+	}
+	/* Write out index */
+	x = 0;
+	list_for_each_entry(ent, &varlist.vars, list) {
+		if(write(fd, &x, sizeof(x)) != sizeof(x)) {
+			perror("write");
+			goto out_err;
+		}
+		/* each line is 'variable=value', so +1 for the equals sign,
+		 * and +1 for the newline.
+		 */
+		x += ent->varlen + 1 + ent->vallen + 1;
+	}
+
+	/* Write out the variables */
+	list_for_each_entry(ent, &varlist.vars, list) {
+		if(write(fd, ent->var, ent->varlen) != ent->varlen) {
+			perror("write");
+			goto out_err;
+		}
+		if(write(fd, "=", 1) != 1) {
+			perror("write");
+			goto out_err;
+		}
+		if(write(fd, ent->value, ent->vallen) != ent->vallen) {
+			perror("write");
+			goto out_err;
+		}
+		if(write(fd, "\0", 1) != 1) {
+			perror("write");
+			goto out_err;
+		}
+	}
+
+	rc = 0;
+out_err:
+	close(fd);
 	return rc;
 }
 

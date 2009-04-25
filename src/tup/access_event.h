@@ -4,7 +4,10 @@
 /** The environment variable used to pass the name of the UNIX socket server
  * to subprocesses.
  */
-#define SERVER_NAME "tup_master"
+#define TUP_SERVER_NAME "tup_master"
+
+/** The file descriptor for the variable dictionary. */
+#define TUP_VARDICT_NAME "tup_vardict"
 
 enum access_type {
 	ACCESS_READ,

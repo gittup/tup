@@ -24,12 +24,15 @@ int server_init(void)
 	return 0;
 }
 
-void server_setenv(struct server *s)
+void server_setenv(struct server *s, int vardict_fd)
 {
 	char fd_name[32];
 	snprintf(fd_name, sizeof(fd_name), "%i", s->sd[1]);
 	fd_name[31] = 0;
-	setenv(SERVER_NAME, fd_name, 1);
+	setenv(TUP_SERVER_NAME, fd_name, 1);
+	snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
+	fd_name[31] = 0;
+	setenv(TUP_VARDICT_NAME, fd_name, 1);
 	setenv("LD_PRELOAD", ldpreload_path, 1);
 }
 
@@ -94,24 +97,6 @@ static void *message_thread(void *arg)
 		if(rc != expected) {
 			fprintf(stderr, "Error: received %i bytes, expecting %i bytes.\n", rc, expected);
 			return (void*)-1;
-		}
-
-		if(event->at == ACCESS_VAR) {
-			tupid_t tupid;
-
-			pthread_mutex_lock(s->db_mutex);
-			tupid = tup_db_send_var(filename, s->sd[0]);
-			pthread_mutex_unlock(s->db_mutex);
-
-			if(tupid < 0) {
-				int len;
-				len = -1;
-				send(s->sd[0], &len, sizeof(len), 0);
-			} else {
-				if(handle_tupid(tupid, &s->finfo) < 0)
-					return (void*)-1;
-			}
-			continue;
 		}
 
 		file2 = &s->msgbuf[sizeof(*event) + event->len];
