@@ -1,5 +1,6 @@
 #! /bin/sh -e
 
+# Make sure we can use a symlink from the monitor
 . ../tup.sh
 tup monitor
 
