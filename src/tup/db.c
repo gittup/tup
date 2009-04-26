@@ -1014,8 +1014,10 @@ int tup_db_open_tupid(tupid_t tupid)
 	}
 
 	fd = tup_db_open_tupid(parent);
-	if(fd < 0)
+	if(fd < 0) {
+		free(path);
 		return fd;
+	}
 
 	rc = openat(fd, path, O_RDONLY);
 	if(rc < 0) {

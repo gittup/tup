@@ -183,11 +183,11 @@ int parse(struct node *n, struct graph *g)
 	free(b.s);
 out_close_file:
 	close(fd);
+out_close_dfd:
+	close(dfd);
 out_close_vdb:
 	if(vardb_close(&vdb) < 0)
 		rc = -1;
-out_close_dfd:
-	close(dfd);
 
 	if(rc == 0) {
 		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
