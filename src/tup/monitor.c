@@ -431,6 +431,7 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 	/* dircache assumes ownership of fullpath */
 
 	fchdir(curfd);
+	close(curfd);
 
 	flist_foreach(&f, fullpath) {
 		if(f.filename[0] == '.')
@@ -438,7 +439,8 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 		if(watch_path(newdt, fullpath, f.filename, tmpdb) < 0)
 			goto out_close;
 	}
-	rc = 0;
+	return 0;
+
 out_close:
 	fchdir(curfd);
 	close(curfd);
