@@ -839,7 +839,12 @@ int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym)
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
+		/* We're but a ghost now... make sure we don't point at
+		 * anybody (t5033). Ghosts don't have fingers, you know.
+		 */
 		if(tup_db_set_type(tupid, TUP_NODE_GHOST) < 0)
+			return -1;
+		if(tup_db_set_sym(tupid, -1) < 0)
 			return -1;
 		return 0;
 	}
