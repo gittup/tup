@@ -36,6 +36,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     const char **last, struct list_head *symlist,
 			     int sotgv);
 
+int delete_file(tupid_t dt, const char *name);
 int delete_name_file(tupid_t tupid, tupid_t dt, tupid_t sym);
 
 int get_path_elements(const char *dir, struct pel_group *pg);

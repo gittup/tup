@@ -1,4 +1,3 @@
-#define _ATFILE_SOURCE
 #include "updater.h"
 #include "graph.h"
 #include "fileio.h"
@@ -32,7 +31,6 @@ static void *delete_work(void *arg);
 static void *update_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
-static int delete_file(struct node *n);
 static void sighandler(int sig);
 static void show_progress(int sum, int tot, struct node *n);
 
@@ -483,7 +481,7 @@ static void *delete_work(void *arg)
 
 			rc = delete_name_file(n->tupid, n->dt, n->sym);
 			if(rc == 0 && n->type == TUP_NODE_GENERATED) {
-				rc = delete_file(n);
+				rc = delete_file(n->dt, n->name);
 			}
 
 			pthread_mutex_unlock(&db_mutex);
@@ -808,37 +806,6 @@ err_close_dfd:
 	close(dfd);
 err_close_curfd:
 	close(curfd);
-	return rc;
-}
-
-static int delete_file(struct node *n)
-{
-	int dirfd;
-	int rc = 0;
-
-	dirfd = tup_db_open_tupid(n->dt);
-	if(dirfd < 0) {
-		if(dirfd == -ENOENT) {
-			/* If the directory doesn't exist, the file can't
-			 * either
-			 */
-			return 0;
-		} else {
-			return -1;
-		}
-	}
-
-	if(unlinkat(dirfd, n->name, 0) < 0) {
-		/* Don't care if the file is already gone. */
-		if(errno != ENOENT) {
-			perror(n->name);
-			rc = -1;
-			goto out;
-		}
-	}
-
-out:
-	close(dirfd);
 	return rc;
 }
 
