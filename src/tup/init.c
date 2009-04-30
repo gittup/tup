@@ -21,7 +21,6 @@ int tup_init(void)
 
 void tup_cleanup(void)
 {
-	tup_db_reclaim_ghosts();
 	tup_db_write_vars();
 	tup_db_close();
 	tup_lock_exit();

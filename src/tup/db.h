@@ -135,7 +135,6 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 					       int style),
 			       void *arg, tupid_t tupid);
 int tup_db_delete_dependent_dir_links(tupid_t tupid);
-int tup_db_reclaim_ghosts(void);
 
 /* Config operations */
 int tup_db_config_set_int(const char *lval, int x);

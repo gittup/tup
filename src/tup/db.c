@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <sqlite3.h>
 
-#define DB_VERSION 7
+#define DB_VERSION 8
 
 enum {
 	DB_BEGIN,
@@ -60,7 +60,6 @@ enum {
 	DB_MODIFY_DELETED_DEPS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_DELETE_DEPENDENT_DIR_LINKS,
-	DB_RECLAIM_GHOSTS,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
 	DB_CONFIG_SET_INT64,
@@ -86,9 +85,11 @@ enum {
 	_DB_COPY_FROM_STICKY_LINKS,
 	_DB_COPY_TO_STICKY_LINKS,
 	_DB_NODE_HAS_GHOSTS,
+	_DB_CREATE_GHOST_LIST,
 	_DB_ADD_GHOST,
 	_DB_ADD_GHOST_LINKS,
 	_DB_ADD_GHOST_DIRS,
+	_DB_RECLAIM_GHOSTS,
 	_DB_CLEAR_GHOST_LIST,
 	DB_NUM_STATEMENTS
 };
@@ -120,10 +121,12 @@ static int link_update(tupid_t a, tupid_t b, int style);
 static int copy_src_sticky_links(tupid_t orig, tupid_t dest);
 static int copy_dest_sticky_links(tupid_t orig, tupid_t dest);
 static int node_has_ghosts(tupid_t tupid);
+static int create_ghost_list(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
+static int reclaim_ghosts(void);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -148,6 +151,9 @@ int tup_db_open(void)
 	if(version_check() < 0)
 		return -1;
 
+	if(create_ghost_list() < 0)
+		return -1;
+
 	return rc;
 }
 
@@ -168,7 +174,6 @@ int tup_db_create(int db_sync)
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
 		"create table delete_list (id integer primary key not null)",
-		"create table ghost_list (id integer primary key not null)",
 		"create index node_dir_index on node(dir, name)",
 		"create index node_sym_index on node(sym)",
 		"create index link_index on link(from_id, to_id)",
@@ -236,6 +241,8 @@ static int version_check(void)
 	char sql_5a[] = "create index node_sym_index on node(sym)";
 
 	char sql_6a[] = "create table ghost_list (id integer primary key not null)";
+
+	char sql_7a[] = "drop table ghost_list";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -333,6 +340,16 @@ static int version_check(void)
 				return -1;
 			fprintf(stderr, "NOTE: Tup database updated to version 7.\nThis includes a ghost_list for storing ghost ids so they can later be raptured.\n");
 
+		case 7:
+			if(sqlite3_exec(tup_db, sql_7a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_7a);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 8) < 0)
+				return -1;
+			fprintf(stderr, "NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
+
 		case DB_VERSION:
 			break;
 		default:
@@ -375,6 +392,9 @@ int tup_db_commit(void)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_COMMIT];
 	static char s[] = "commit";
+
+	if(reclaim_ghosts() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2409,57 +2429,6 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_reclaim_ghosts(void)
-{
-	int rc;
-	int changes;
-	sqlite3_stmt **stmt = &stmts[DB_RECLAIM_GHOSTS];
-	static char s[] = "delete from node where id in (select ghost_list.id from ghost_list left join node on dir=ghost_list.id or sym=ghost_list.id left join link on from_id=ghost_list.id where dir is null and sym is null and from_id is null)";
-	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
-	 * make sure they are no longer needed before deleting them by checking:
-	 *  - no other node references it in 'dir'
-	 *  - no other node references it in 'sym'
-	 *  - no other (command) node is pointed to by us
-	 *
-	 * If all those cases check out then the ghost can be removed. This is
-	 * done in a loop until no ghosts are removed in order to handle things
-	 * like a ghost dir having a ghost subdir - the subdir would be removed
-	 * in one pass, then the other dir in the next pass.
-	 */
-
-	if(!num_ghosts)
-		return 0;
-
-	/* Make sure any ghost that is in a ghost directory also has its
-	 * parent directory checked (t2040).
-	 */
-	if(add_ghost_dirs() < 0)
-		return -1;
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	do {
-		rc = sqlite3_step(*stmt);
-		if(sqlite3_reset(*stmt) != 0) {
-			fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
-		}
-		if(rc != SQLITE_DONE) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
-		}
-		changes = sqlite3_changes(tup_db);
-	} while(changes > 0);
-
-	return clear_ghost_list();
-}
-
 int tup_db_config_set_int(const char *lval, int x)
 {
 	int rc;
@@ -3665,6 +3634,34 @@ out_reset:
 	return rc;
 }
 
+static int create_ghost_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_CREATE_GHOST_LIST];
+	static char s[] = "create temporary table ghost_list (id integery primary key not null)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
 static int add_ghost(tupid_t tupid)
 {
 	int rc;
@@ -3779,6 +3776,57 @@ static int add_ghost_dirs(void)
 	num_ghosts += sqlite3_changes(tup_db);
 
 	return 0;
+}
+
+static int reclaim_ghosts(void)
+{
+	int rc;
+	int changes;
+	sqlite3_stmt **stmt = &stmts[_DB_RECLAIM_GHOSTS];
+	static char s[] = "delete from node where id in (select ghost_list.id from ghost_list left join node on dir=ghost_list.id or sym=ghost_list.id left join link on from_id=ghost_list.id where dir is null and sym is null and from_id is null)";
+	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
+	 * make sure they are no longer needed before deleting them by checking:
+	 *  - no other node references it in 'dir'
+	 *  - no other node references it in 'sym'
+	 *  - no other (command) node is pointed to by us
+	 *
+	 * If all those cases check out then the ghost can be removed. This is
+	 * done in a loop until no ghosts are removed in order to handle things
+	 * like a ghost dir having a ghost subdir - the subdir would be removed
+	 * in one pass, then the other dir in the next pass.
+	 */
+
+	if(!num_ghosts)
+		return 0;
+
+	/* Make sure any ghost that is in a ghost directory also has its
+	 * parent directory checked (t2040).
+	 */
+	if(add_ghost_dirs() < 0)
+		return -1;
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	do {
+		rc = sqlite3_step(*stmt);
+		if(sqlite3_reset(*stmt) != 0) {
+			fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+			return -1;
+		}
+		if(rc != SQLITE_DONE) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			return -1;
+		}
+		changes = sqlite3_changes(tup_db);
+	} while(changes > 0);
+
+	return clear_ghost_list();
 }
 
 static int clear_ghost_list(void)
