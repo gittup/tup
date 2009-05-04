@@ -20,6 +20,8 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
+remove dependency on sqlite3 command line
+
 compile on 64-bit
 
 html:

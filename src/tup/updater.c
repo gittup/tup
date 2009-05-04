@@ -198,8 +198,21 @@ static int process_update_nodes(void)
 	tup_db_begin();
 	vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
-		perror(TUP_VARDICT_FILE);
-		return -1;
+		/* Create vardict if it doesn't exist, since I forgot to add
+		 * that to the database update part whenever I added this file.
+		 * Not sure if this is the best approach, but it at least
+		 * prevents a useless error message from coming up.
+		 */
+		if(errno == ENOENT) {
+			vardict_fd = open(TUP_VARDICT_FILE, O_CREAT|O_RDONLY, 0666);
+			if(vardict_fd < 0) {
+				perror(TUP_VARDICT_FILE);
+				return -1;
+			}
+		} else {
+			perror(TUP_VARDICT_FILE);
+			return -1;
+		}
 	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
 	if(rc == -2) {

@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <errno.h>
@@ -30,7 +31,7 @@ static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
 		       char *const envp[]);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
-static int (*s_xstat64)(int vers, const char *name, struct stat *buf);
+static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 
 int open(const char *pathname, int flags, ...)
 {

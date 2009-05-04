@@ -4,7 +4,7 @@
 int db_close(sqlite3 *db, sqlite3_stmt **stmts, int num)
 {
 	int x;
-	for(x=0; x<num; x++)  {
+	for(x=0; x<num; x++) {
 		if(stmts[x])
 			sqlite3_finalize(stmts[x]);
 	}

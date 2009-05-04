@@ -104,3 +104,10 @@ Mike Gunderloy
 Friday, November 16, 2001
 
  - http://discuss.fogcreek.com/joelonsoftware/default.asp?cmd=show&ixPost=862
+#
+A crucial observation here is that you have to run through the loop again and
+again to write a program, and so it follows that the faster the
+Edit-Compile-Test loop, the more productive you will be, down to a natural
+limit of instantaneous compiles.
+ - Joel on Software "Daily Builds Are Your Friend"
+ - http://www.joelonsoftware.com/articles/fog0000000023.html
