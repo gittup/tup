@@ -1,8 +1,8 @@
 #! /usr/bin/perl
 &gen_data("initial", 2, 100, 1);
-&gen_data("c_file", 9, 107, 9);
-&gen_data("h_file", 40, 138, 9);
-&gen_data("nothing", 71, 169, 9);
+&gen_data("c_file", 6, 104, 10);
+&gen_data("h_file", 37, 135, 10);
+&gen_data("nothing", 68, 166, 10);
 
 sub gen_data
 {
@@ -13,30 +13,34 @@ sub gen_data
 		for($x=1; $x<$_[1]; $x++) {
 			$tmp = <FILE>;
 		}
-		$val1 = 0;
+		@vals = ();
 		for($x=0; $x<$_[3]; $x++) {
 			$tmp = <FILE>;
 			$tmp =~ s/real //;
-			$val1 += $tmp;
+			push @vals, $tmp;
 			$tmp = <FILE>;
 			$tmp = <FILE>;
 		}
-		$val1 /= $_[3];
+		@sort_vals = sort @vals;
+		# Take the median
+		$val1 = $sort_vals[$#sort_vals / 2];
 		close FILE;
 
 		open FILE, "out-$val.txt" or die "Can't open out-$val.txt!";
 		for($x=1; $x<$_[2]; $x++) {
 			$tmp = <FILE>;
 		}
-		$val2 = 0;
+		@vals = ();
 		for($x=0; $x<$_[3]; $x++) {
 			$tmp = <FILE>;
 			$tmp =~ s/real //;
-			$val2 += $tmp;
+			push @vals, $tmp;
 			$tmp = <FILE>;
 			$tmp = <FILE>;
 		}
-		$val2 /= $_[3];
+		@sort_vals = sort @vals;
+		# Take the median
+		$val2 = $sort_vals[$#sort_vals / 2];
 		close FILE;
 		chomp($val1);
 		chomp($val2);
