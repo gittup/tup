@@ -24,6 +24,10 @@ remove dependency on sqlite3 command line
 
 compile on 64-bit
 
+remove tmpdb in favor of just a temporary table?
+
+instead of doing delete_name_file() for each entry in delete_list, maybe change the sql to do 'delete from link where from_id in (select id from delete_list)' or some such. Would still need to iterate to actually unlink() files, though.
+
 html:
   proof: big-o notation
   proof: no clean target

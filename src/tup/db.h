@@ -150,9 +150,11 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest);
 int tup_db_get_var_id(tupid_t tupid, char **dest);
 int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
-int tup_db_flag_deleted_var_dependent_dirs(void);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);
 int tup_db_write_vars(void);
+int tup_db_var_pre(void);
+int tup_db_var_post(void);
+int tup_db_remove_var_list(tupid_t tupid);
 
 /* tmpdb operations */
 int tup_db_attach_tmpdb(void);

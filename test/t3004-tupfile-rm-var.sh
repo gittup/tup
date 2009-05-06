@@ -13,7 +13,7 @@ HERE
 echo hey > tmp/foo.c
 echo yo > tmp/bar.c
 tup touch tmp/foo.c tmp/bar.c tmp/Tupfile
-tup varset CONFIG_BAR y
+tup varset CONFIG_BAR=y
 update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"

@@ -117,10 +117,6 @@ int main(int argc, char **argv)
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
 		rc = flush();
-	} else if(strcmp(cmd, "kconfig_pre_delete") == 0) {
-		rc = tup_db_flag_delete_in_dir(VAR_DT, TUP_NODE_VAR);
-	} else if(strcmp(cmd, "kconfig_post_delete") == 0) {
-		rc = tup_db_flag_deleted_var_dependent_dirs();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
 		rc = 1;
@@ -634,11 +630,28 @@ static int delete(int argc, char **argv)
 
 static int varset(int argc, char **argv)
 {
-	if(argc != 3) {
-		fprintf(stderr, "Error: varset requires exactly two args\n");
+	int x;
+	if(tup_db_var_pre() < 0)
 		return -1;
+	for(x=1; x<argc; x++) {
+		char *var = strdup(argv[x]);
+		char *eq;
+		if(!var) {
+			perror("strdup");
+			return -1;
+		}
+		eq = strchr(var, '=');
+		if(!eq) {
+			fprintf(stderr, "Error: '%s' should be VAR=value\n",
+				var);
+			return -1;
+		}
+		*eq = 0;
+		if(create_var_file(var, eq+1) < 0)
+			return -1;
+		free(var);
 	}
-	if(create_var_file(argv[1], argv[2]) < 0)
+	if(tup_db_var_post() < 0)
 		return -1;
 	return 0;
 }

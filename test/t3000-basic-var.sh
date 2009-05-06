@@ -11,19 +11,19 @@ HERE
 echo hey > foo.c
 echo yo > bar.c
 tup touch foo.c bar.c Tupfile
-tup varset CONFIG_BAR n
+tup varset CONFIG_BAR=n
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
 
-tup varset CONFIG_BAR y
+tup varset CONFIG_BAR=y
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
 
-tup varset CONFIG_BAR y
+tup varset CONFIG_BAR=y
 if sqlite3 .tup/db 'select * from modify_list' 2>&1 | wc -l | grep 0 > /dev/null; then
 	:
 else

@@ -10,11 +10,10 @@ src-@BLAH@ = foo.c
 : foreach \$(src-y) |> echo gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile foo.c
-tup varset BLAH sup
+tup varset BLAH=sup
 update
 
-tup kconfig_pre_delete
-tup kconfig_post_delete
+tup varset
 
 # Update should now fail because @BLAH@ is undefined in the Tupfile.
 update_fail

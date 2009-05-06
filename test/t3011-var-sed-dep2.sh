@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
-# Make sure a var/sed command ends up propagating down the DAG. When I made the
-# sticky link change, it looks like this broke.
+# Similar to t3009, only make sure that if the variable is deleted the command
+# is still executed.
 
 . ../tup.sh
 cat > Tupfile << HERE
@@ -16,8 +16,10 @@ tup_object_exist . foo.txt out.txt new.txt
 (echo "hey sup yo") | diff out.txt -
 (echo "hey sup yo") | diff new.txt -
 
-echo "a @CONFIG_FOO@ b" > foo.txt
-tup touch foo.txt
+tup varset
+update_fail
+
+tup varset CONFIG_FOO=diggity
 update
-(echo "a sup b") | diff out.txt -
-(echo "a sup b") | diff new.txt -
+(echo "hey diggity yo") | diff out.txt -
+(echo "hey diggity yo") | diff new.txt -

@@ -71,8 +71,8 @@ enum {
 	DB_GET_VAR_ID,
 	DB_GET_VARLEN,
 	DB_WRITE_VAR,
-	DB_FLAG_DELETED_VAR_DEPENDENT_DIRS,
 	DB_VAR_FOREACH,
+	DB_REMOVE_VAR_LIST,
 	DB_ATTACH_TMPDB,
 	DB_DETACH_TMPDB,
 	DB_FILES_TO_TMPDB,
@@ -91,6 +91,15 @@ enum {
 	_DB_ADD_GHOST_DIRS,
 	_DB_RECLAIM_GHOSTS,
 	_DB_CLEAR_GHOST_LIST,
+	_DB_CREATE_VAR_LIST,
+	_DB_INIT_VAR_LIST,
+	_DB_VAR_LIST_FLAG_DIRS,
+	_DB_VAR_LIST_FLAG_CMDS,
+	_DB_VAR_LIST_UNFLAG_CREATE,
+	_DB_VAR_LIST_UNFLAG_MODIFY,
+	_DB_VAR_LIST_DELETE_LINKS,
+	_DB_VAR_LIST_DELETE_NODES,
+	_DB_DELETE_VAR_LIST,
 	DB_NUM_STATEMENTS
 };
 
@@ -127,6 +136,15 @@ static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
 static int reclaim_ghosts(void);
+static int create_var_list(void);
+static int init_var_list(void);
+static int var_list_flag_dirs(void);
+static int var_list_flag_cmds(void);
+static int var_list_unflag_create(void);
+static int var_list_unflag_modify(void);
+static int var_list_delete_links(void);
+static int var_list_delete_nodes(void);
+static int delete_var_list(void);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -2713,7 +2731,7 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	tupid_t tupid = -1;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[DB_GET_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and delete_list.id is null";
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2828,7 +2846,7 @@ int tup_db_get_varlen(const char *var, int varlen)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_VARLEN];
-	static char s[] = "select length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and delete_list.id is null";
+	static char s[] = "select length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2875,7 +2893,7 @@ tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 	int len;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[DB_WRITE_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node left join delete_list on delete_list.id=node.id where node.dir=? and node.name=? and node.id=var.id and delete_list.id is null";
+	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
 	tupid_t tupid = -1;
 
 	if(!*stmt) {
@@ -2925,48 +2943,6 @@ out_reset:
 	}
 
 	return tupid;
-}
-
-int tup_db_flag_deleted_var_dependent_dirs(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETED_VAR_DEPENDENT_DIRS];
-	static char s[] = "insert or replace into create_list select id from node where id in (select to_id from link where from_id in (select delete_list.id from delete_list inner join node on delete_list.id=node.id where node.type=?)) and type=?";
-	/* This should move directories into the create list that are dependent
-	 * on variables that are deleted. There's probably an easier way to do
-	 * it, since it takes much longer to say it in SQL that it does in
-	 * English.
-	 */
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_VAR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
 }
 
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg)
@@ -3111,6 +3087,72 @@ int tup_db_write_vars(void)
 out_err:
 	close(fd);
 	return rc;
+}
+
+int tup_db_var_pre(void)
+{
+	if(tup_db_begin() < 0)
+		return -1;
+	if(create_var_list() < 0)
+		return -1;
+	if(init_var_list() < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_var_post(void)
+{
+	/* This is similar to tup_del_id(), but specific to TUP_NODE_VAR. */
+	if(var_list_flag_dirs() < 0)
+		return -1;
+	if(var_list_flag_cmds() < 0)
+		return -1;
+	if(var_list_unflag_create() < 0)
+		return -1;
+	if(var_list_unflag_modify() < 0)
+		return -1;
+	if(var_list_delete_links() < 0)
+		return -1;
+	if(var_list_delete_nodes() < 0)
+		return -1;
+	if(delete_var_list() < 0)
+		return -1;
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_remove_var_list(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_REMOVE_VAR_LIST];
+	static char s[] = "delete from var_list where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_attach_tmpdb(void)
@@ -3854,6 +3896,273 @@ static int clear_ghost_list(void)
 		return -1;
 	}
 	num_ghosts = 0;
+
+	return 0;
+}
+
+static int create_var_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_CREATE_VAR_LIST];
+	static char s[] = "create temporary table var_list (id integery primary key not null)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int init_var_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_INIT_VAR_LIST];
+	static char s[] = "insert or replace into var_list select id from node where dir=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, VAR_DT) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_flag_dirs(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_DIRS];
+	static char s[] = "insert or replace into create_list select to_id from link, node where from_id in (select id from var_list) and to_id=node.id and node.type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_flag_cmds(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_CMDS];
+	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id in (select id from var_list) and to_id=node.id and node.type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_CMD) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_unflag_create(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_CREATE];
+	static char s[] = "delete from create_list where id in (select id from var_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_unflag_modify(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_MODIFY];
+	static char s[] = "delete from modify_list where id in (select id from var_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_delete_links(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_LINKS];
+	static char s[] = "delete from link where from_id in (select id from var_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_delete_nodes(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_NODES];
+	static char s[] = "delete from node where id in (select id from var_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int delete_var_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_VAR_LIST];
+	static char s[] = "drop table var_list";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
 
 	return 0;
 }
