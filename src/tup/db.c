@@ -3845,7 +3845,7 @@ static int reclaim_ghosts(void)
 	 * make sure they are no longer needed before deleting them by checking:
 	 *  - no other node references it in 'dir'
 	 *  - no other node references it in 'sym'
-	 *  - no other (command) node is pointed to by us
+	 *  - no other node is pointed to by us
 	 *
 	 * If all those cases check out then the ghost can be removed. This is
 	 * done in a loop until no ghosts are removed in order to handle things
