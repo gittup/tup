@@ -67,8 +67,8 @@ enum {
 	DB_CONFIG_SET_STRING,
 	DB_CONFIG_GET_STRING,
 	DB_SET_VAR,
-	DB_GET_VAR,
-	DB_GET_VAR_ID,
+	_DB_GET_VAR_ID,
+	DB_GET_VAR_ID_ALLOC,
 	DB_GET_VARLEN,
 	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
@@ -98,6 +98,7 @@ enum {
 	_DB_VAR_LIST_UNFLAG_CREATE,
 	_DB_VAR_LIST_UNFLAG_MODIFY,
 	_DB_VAR_LIST_DELETE_LINKS,
+	_DB_VAR_LIST_DELETE_VARS,
 	_DB_VAR_LIST_DELETE_NODES,
 	_DB_DELETE_VAR_LIST,
 	DB_NUM_STATEMENTS
@@ -143,6 +144,7 @@ static int var_list_flag_cmds(void);
 static int var_list_unflag_create(void);
 static int var_list_unflag_modify(void);
 static int var_list_delete_links(void);
+static int var_list_delete_vars(void);
 static int var_list_delete_nodes(void);
 static int delete_var_list(void);
 static int no_sync(void);
@@ -2415,7 +2417,10 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_DEPENDENT_DIR_LINKS];
-	static char s[] = "delete from link where to_id=? and from_id in (select from_id from link, node where to_id=? and from_id=id)";
+	static char s[] = "delete from link where to_id=?";
+
+	if(add_ghost_links(tupid) < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2426,10 +2431,6 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2724,14 +2725,14 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 	return 0;
 }
 
-tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
+static int get_var_id(tupid_t tupid, char **dest)
 {
+	int rc = -1;
 	int dbrc;
 	int len;
-	tupid_t tupid = -1;
 	const char *value;
-	sqlite3_stmt **stmt = &stmts[DB_GET_VAR];
-	static char s[] = "select var.id, value, length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	sqlite3_stmt **stmt = &stmts[_DB_GET_VAR_ID];
+	static char s[] = "select value, length(value) from var where var.id=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2741,19 +2742,14 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 		}
 	}
 
-	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, var, varlen, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable '%.*s' not found in .tup/db.\n",
-			varlen, var);
+		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tupid);
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -2761,18 +2757,17 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 		goto out_reset;
 	}
 
-	len = sqlite3_column_int(*stmt, 2);
+	len = sqlite3_column_int(*stmt, 1);
 	if(len < 0) {
 		goto out_reset;
 	}
-	value = (const char *)sqlite3_column_text(*stmt, 1);
+	value = (const char *)sqlite3_column_text(*stmt, 0);
 	if(!value) {
 		goto out_reset;
 	}
 	memcpy(*dest, value, len);
 	*dest += len;
-
-	tupid = sqlite3_column_int64(*stmt, 0);
+	rc = 0;
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -2780,16 +2775,32 @@ out_reset:
 		return -1;
 	}
 
-	return tupid;
+	return rc;
 }
 
-int tup_db_get_var_id(tupid_t tupid, char **dest)
+tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
+{
+	struct db_node dbn;
+
+	if(node_select(VAR_DT, var, varlen, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0) {
+		return tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST);
+	}
+	if(dbn.type == TUP_NODE_GHOST)
+		return dbn.tupid;
+	if(get_var_id(dbn.tupid, dest) < 0)
+		return -1;
+	return dbn.tupid;
+}
+
+int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
 {
 	int rc = -1;
 	int dbrc;
 	int len;
 	const char *value;
-	sqlite3_stmt **stmt = &stmts[DB_GET_VAR_ID];
+	sqlite3_stmt **stmt = &stmts[DB_GET_VAR_ID_ALLOC];
 	static char s[] = "select value, length(value) from var where var.id=?";
 
 	if(!*stmt) {
@@ -2867,8 +2878,10 @@ int tup_db_get_varlen(const char *var, int varlen)
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable '%.*s' not found in .tup/db.\n",
-			varlen, var);
+		/* Non-existent variable has zero length. This will be made
+		 * into a ghost node.
+		 */
+		rc = 0;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -3112,6 +3125,8 @@ int tup_db_var_post(void)
 	if(var_list_unflag_modify() < 0)
 		return -1;
 	if(var_list_delete_links() < 0)
+		return -1;
+	if(var_list_delete_vars() < 0)
 		return -1;
 	if(var_list_delete_nodes() < 0)
 		return -1;
@@ -4088,6 +4103,34 @@ static int var_list_delete_links(void)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_LINKS];
 	static char s[] = "delete from link where from_id in (select id from var_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+static int var_list_delete_vars(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_VARS];
+	static char s[] = "delete from var where id in (select id from var_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

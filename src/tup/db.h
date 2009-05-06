@@ -147,7 +147,7 @@ int tup_db_config_get_string(char **res, const char *lval, const char *def);
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);
 tupid_t tup_db_get_var(const char *var, int varlen, char **dest);
-int tup_db_get_var_id(tupid_t tupid, char **dest);
+int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);

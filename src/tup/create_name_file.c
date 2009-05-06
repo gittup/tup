@@ -104,18 +104,26 @@ tupid_t create_var_file(const char *var, const char *value)
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
-		char *orig_value;
-		if(tup_db_get_var_id(dbn.tupid, &orig_value) < 0)
-			return -1;
-		rc = strcmp(orig_value, value);
-		free(orig_value);
-		/* If the value hasn't changed, just make sure it isn't
-		 * scheduled for deletion.
-		 */
-		if(rc == 0) {
-			if(tup_db_remove_var_list(dbn.tupid) < 0)
+		if(dbn.type == TUP_NODE_VAR) {
+			char *orig_value;
+			if(tup_db_get_var_id_alloc(dbn.tupid, &orig_value) < 0)
 				return -1;
-			return 0;
+			rc = strcmp(orig_value, value);
+			free(orig_value);
+			/* If the value hasn't changed, just make sure it isn't
+			 * scheduled for deletion.
+			 */
+			if(rc == 0) {
+				if(tup_db_remove_var_list(dbn.tupid) < 0)
+					return -1;
+				return 0;
+			}
+		} else if(dbn.type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(dbn.tupid, TUP_NODE_VAR) < 0)
+				return -1;
+		} else {
+			fprintf(stderr, "tup error: Unexpected node type %i in create_var_file(). Should be TUP_NODE_VAR or TUP_NODE_GHOST.\n", dbn.type);
+			return -1;
 		}
 
 		if(tup_db_add_create_list(dbn.tupid) < 0)

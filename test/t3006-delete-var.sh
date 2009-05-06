@@ -7,13 +7,17 @@
 cat > Tupfile << HERE
 src-y:=
 src-@BLAH@ = foo.c
-: foreach \$(src-y) |> echo gcc -c %f -o %o |> %B.o
+: foreach \$(src-y) |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile foo.c
-tup varset BLAH=sup
+tup varset BLAH=y
 update
+tup_object_exist . "gcc -c foo.c -o foo.o"
+check_exist foo.o
 
 tup varset
 
-# Update should now fail because @BLAH@ is undefined in the Tupfile.
-update_fail
+# BLAH isn't set, so it is treated as empty
+update
+tup_object_no_exist . "gcc -c foo.c -o foo.o"
+check_not_exist foo.o

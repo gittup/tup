@@ -26,6 +26,8 @@ compile on 64-bit
 
 remove tmpdb in favor of just a temporary table?
 
+use temporary table instead of moving all commands to delete in parser? Should be easy to time the difference.
+
 instead of doing delete_name_file() for each entry in delete_list, maybe change the sql to do 'delete from link where from_id in (select id from delete_list)' or some such. Would still need to iterate to actually unlink() files, though.
 
 html:
