@@ -36,8 +36,6 @@ make a t6017 that's not dependent on gcj
 
 change Tupfile behind monitor, directory is not re-parsed
 
-somehow ended up with two commands pointing to the same node?
-
 somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not sure which one actually triggered the build :( ), but the build worked next try:
   [########## ] 1124/1129 ( 99%) 45498: OBJCOPY vmlinux.bin
   [########## ] 1125/1129 ( 99%) 45495: ASM header.S

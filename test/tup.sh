@@ -119,9 +119,13 @@ tup_dep_exist()
 
 tup_dep_no_exist()
 {
-	if tup link_exists "$1" "$2" "$3" "$4"; then
-		echo "*** Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
-		exit 1
+	if tup node_exists "$1" "$2"; then
+		if tup node_exists "$3" "$4"; then
+			if tup link_exists "$1" "$2" "$3" "$4"; then
+				echo "*** Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
+				exit 1
+			fi
+		fi
 	fi
 }
 

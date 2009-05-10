@@ -49,7 +49,7 @@ enum {
 	DB_YELL_LINKS,
 	DB_LINK_EXISTS,
 	DB_LINK_STYLE,
-	DB_HAS_INCOMING_LINKS,
+	DB_GET_INCOMING_LINK,
 	DB_DELETE_LINKS,
 	DB_UNSTICKY_LINKS,
 	DB_FLAG_DELETE_IN_DIR,
@@ -1782,18 +1782,23 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 int tup_db_create_unique_link(tupid_t a, tupid_t b)
 {
 	int rc;
-	if(tup_db_link_exists(a, b) == 0)
-		return 0;
-	rc = tup_db_has_incoming_links(b);
+	tupid_t incoming;
+
+	rc = tup_db_get_incoming_link(b, &incoming);
 	if(rc < 0)
 		return -1;
-	if(rc == 0) {
-		fprintf(stderr, "Error: Unable to create a unique link from %lli to %lli because the destination has other incoming links.\n", a, b);
-		return -1;
+	/* See if we already own the link */
+	if(a == incoming)
+		return 0;
+	/* Or if the link doesn't exist yet */
+	if(incoming == -1) {
+		if(link_insert(a, b, TUP_LINK_NORMAL) < 0)
+			return -1;
+		return 0;
 	}
-	if(link_insert(a, b, TUP_LINK_NORMAL) < 0)
-		return -1;
-	return 0;
+	/* Otherwise, someone else got the girl. Err, output file. */
+	fprintf(stderr, "Error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
+	return -1;
 }
 
 int tup_db_get_dest_links(tupid_t from_id, struct list_head *head)
@@ -2020,11 +2025,13 @@ out_reset:
 	return style;
 }
 
-int tup_db_has_incoming_links(tupid_t tupid)
+int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_HAS_INCOMING_LINKS];
+	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
 	static char s[] = "select from_id from link where to_id=? and not from_id in (select id from delete_list where id=from_id)";
+
+	*incoming = -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2040,15 +2047,29 @@ int tup_db_has_incoming_links(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
 	if(rc == SQLITE_DONE) {
-		return 1;
+		goto out_reset;
 	}
 	if(rc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	*incoming = sqlite3_column_int64(*stmt, 0);
+
+	/* Do a quick double-check to make sure there isn't a duplicate link. */
+	rc = sqlite3_step(*stmt);
+	if(rc != SQLITE_DONE) {
+		if(rc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			return -1;
+		}
+		fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
+		return -1;
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 

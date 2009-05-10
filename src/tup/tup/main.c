@@ -455,14 +455,14 @@ static int link_exists(int argc, char **argv)
 	else
 		dta = find_dir_tupid(argv[1]);
 	if(dta < 0) {
-		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[1]);
+		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[1]);
 		return -1;
 	}
 
 	if(tup_db_select_dbn(dta, argv[2], &dbna) < 0)
 		return -1;
 	if(dbna.tupid < 0) {
-		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[2]);
+		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[2]);
 		return -1;
 	}
 
@@ -471,14 +471,14 @@ static int link_exists(int argc, char **argv)
 	else
 		dtb = find_dir_tupid(argv[3]);
 	if(dtb < 0) {
-		fprintf(stderr, "Error: dir '%s' doesn't exist.\n", argv[3]);
+		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[3]);
 		return -1;
 	}
 
 	if(tup_db_select_dbn(dtb, argv[4], &dbnb) < 0)
 		return -1;
 	if(dbnb.tupid < 0) {
-		fprintf(stderr, "Error: node '%s' doesn't exist.\n", argv[4]);
+		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
 		return -1;
 	}
 	return tup_db_link_exists(dbna.tupid, dbnb.tupid);
