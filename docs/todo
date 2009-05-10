@@ -85,8 +85,7 @@ backslashes annoying in sed commands?
 
 plain $ should go through unmodified?
 
-tup parse shows too much info when a directory changes?
- - upon second look, I have no idea what this means
+'tup g' shows too much info when a directory changes?
 
 access(2) support in ldpreload?
 
