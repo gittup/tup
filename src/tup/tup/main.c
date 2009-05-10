@@ -32,6 +32,7 @@ static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int delete(int argc, char **argv);
 static int varset(int argc, char **argv);
+static int varchange(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
 static int flush(void);
@@ -113,6 +114,8 @@ int main(int argc, char **argv)
 		rc = delete(argc, argv);
 	} else if(strcmp(cmd, "varset") == 0) {
 		rc = varset(argc, argv);
+	} else if(strcmp(cmd, "varchange") == 0) {
+		rc = varchange(argc, argv);
 	} else if(strcmp(cmd, "config") == 0) {
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
@@ -652,6 +655,21 @@ static int varset(int argc, char **argv)
 		free(var);
 	}
 	if(tup_db_var_post() < 0)
+		return -1;
+	return 0;
+}
+
+static int varchange(int argc, char **argv)
+{
+	if(argc != 3) {
+		fprintf(stderr, "Error: varchange requires exactly two args\n");
+		return -1;
+	}
+	if(tup_db_create_var_list() < 0)
+		return -1;
+	if(create_var_file(argv[1], argv[2]) < 0)
+		return -1;
+	if(tup_db_delete_var_list() < 0)
 		return -1;
 	return 0;
 }

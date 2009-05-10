@@ -73,6 +73,8 @@ enum {
 	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
 	DB_REMOVE_VAR_LIST,
+	DB_CREATE_VAR_LIST,
+	DB_DELETE_VAR_LIST,
 	DB_ATTACH_TMPDB,
 	DB_DETACH_TMPDB,
 	DB_FILES_TO_TMPDB,
@@ -91,7 +93,6 @@ enum {
 	_DB_ADD_GHOST_DIRS,
 	_DB_RECLAIM_GHOSTS,
 	_DB_CLEAR_GHOST_LIST,
-	_DB_CREATE_VAR_LIST,
 	_DB_INIT_VAR_LIST,
 	_DB_VAR_LIST_FLAG_DIRS,
 	_DB_VAR_LIST_FLAG_CMDS,
@@ -100,7 +101,6 @@ enum {
 	_DB_VAR_LIST_DELETE_LINKS,
 	_DB_VAR_LIST_DELETE_VARS,
 	_DB_VAR_LIST_DELETE_NODES,
-	_DB_DELETE_VAR_LIST,
 	DB_NUM_STATEMENTS
 };
 
@@ -137,7 +137,6 @@ static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
 static int reclaim_ghosts(void);
-static int create_var_list(void);
 static int init_var_list(void);
 static int var_list_flag_dirs(void);
 static int var_list_flag_cmds(void);
@@ -146,7 +145,6 @@ static int var_list_unflag_modify(void);
 static int var_list_delete_links(void);
 static int var_list_delete_vars(void);
 static int var_list_delete_nodes(void);
-static int delete_var_list(void);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -3106,7 +3104,7 @@ int tup_db_var_pre(void)
 {
 	if(tup_db_begin() < 0)
 		return -1;
-	if(create_var_list() < 0)
+	if(tup_db_create_var_list() < 0)
 		return -1;
 	if(init_var_list() < 0)
 		return -1;
@@ -3130,7 +3128,7 @@ int tup_db_var_post(void)
 		return -1;
 	if(var_list_delete_nodes() < 0)
 		return -1;
-	if(delete_var_list() < 0)
+	if(tup_db_delete_var_list() < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
@@ -3154,6 +3152,62 @@ int tup_db_remove_var_list(tupid_t tupid)
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_create_var_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_CREATE_VAR_LIST];
+	static char s[] = "create temporary table var_list (id integery primary key not null)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_delete_var_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_DELETE_VAR_LIST];
+	static char s[] = "drop table var_list";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
 	}
 
 	rc = sqlite3_step(*stmt);
@@ -3915,34 +3969,6 @@ static int clear_ghost_list(void)
 	return 0;
 }
 
-static int create_var_list(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_CREATE_VAR_LIST];
-	static char s[] = "create temporary table var_list (id integery primary key not null)";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
 static int init_var_list(void)
 {
 	int rc;
@@ -4159,34 +4185,6 @@ static int var_list_delete_nodes(void)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_NODES];
 	static char s[] = "delete from node where id in (select id from var_list)";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int delete_var_list(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_DELETE_VAR_LIST];
-	static char s[] = "drop table var_list";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

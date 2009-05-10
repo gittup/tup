@@ -155,6 +155,8 @@ int tup_db_write_vars(void);
 int tup_db_var_pre(void);
 int tup_db_var_post(void);
 int tup_db_remove_var_list(tupid_t tupid);
+int tup_db_create_var_list(void);
+int tup_db_delete_var_list(void);
 
 /* tmpdb operations */
 int tup_db_attach_tmpdb(void);
