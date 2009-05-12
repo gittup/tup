@@ -357,22 +357,20 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 	}
 
 	if(S_ISREG(buf.st_mode)) {
-		struct db_node dbn;
-
-		if(tup_db_select_dbn(dt, file, &dbn) < 0)
-			return -1;
-		if(dbn.tupid < 0) {
-			if(create_name_file(dt, file) < 0)
+		if(tmpdb) {
+			tupid_t tupid;
+			if(mon_time != -1 && buf.st_mtime > mon_time) {
+				tupid = tup_file_mod(dt, file);
+			} else {
+				tupid = tup_file_exists(dt, file);
+			}
+			if(tupid < 0)
+				goto out_close;
+			if(tup_db_unflag_tmpdb(tupid) < 0)
 				goto out_close;
 		} else {
-			if(tmpdb) {
-				if(tup_db_unflag_tmpdb(dbn.tupid) < 0)
-					goto out_close;
-			}
-			if(mon_time != -1 && buf.st_mtime > mon_time) {
-				if(tup_db_add_modify_list(dbn.tupid) < 0)
-					goto out_close;
-			}
+			if(tup_file_exists(dt, file) < 0)
+				goto out_close;
 		}
 		rc = 0;
 		goto out_close;

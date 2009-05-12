@@ -12,6 +12,7 @@ struct id_flags {
 	int flags;
 };
 
+static tupid_t file_internal(tupid_t dt, const char *file, int modified);
 static int ghost_to_file(struct db_node *dbn);
 
 tupid_t create_name_file(tupid_t dt, const char *file)
@@ -138,15 +139,27 @@ tupid_t create_var_file(const char *var, const char *value)
 
 tupid_t tup_file_mod(tupid_t dt, const char *file)
 {
+	return file_internal(dt, file, 1);
+}
+
+tupid_t tup_file_exists(tupid_t dt, const char *file)
+{
+	return file_internal(dt, file, 0);
+}
+
+static tupid_t file_internal(tupid_t dt, const char *file, int modified)
+{
 	struct db_node dbn;
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 
 	/* Need to re-parse the Tupfile if it was changed. */
-	if(strcmp(file, "Tupfile") == 0) {
-		if(tup_db_add_create_list(dt) < 0)
-			return -1;
+	if(modified) {
+		if(strcmp(file, "Tupfile") == 0) {
+			if(tup_db_add_create_list(dt) < 0)
+				return -1;
+		}
 	}
 
 	if(dbn.tupid < 0) {
@@ -162,7 +175,11 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 			fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
 			return -1;
 		}
-		if(tup_db_set_flags_by_id(dbn.tupid, TUP_FLAGS_MODIFY) < 0)
+		if(modified) {
+			if(tup_db_add_modify_list(dbn.tupid) < 0)
+				return -1;
+		}
+		if(tup_db_unflag_delete(dbn.tupid) < 0)
 			return -1;
 
 		/* It's possible this is a file that was included by a Tupfile.
@@ -526,6 +543,8 @@ static int ghost_to_file(struct db_node *dbn)
 	if(tup_db_set_type(dbn->tupid, TUP_NODE_FILE) < 0)
 		return -1;
 	if(tup_db_add_create_list(dbn->dt) < 0)
+		return -1;
+	if(tup_db_add_modify_list(dbn->tupid) < 0)
 		return -1;
 	dbn->type = TUP_NODE_FILE;
 	return 0;

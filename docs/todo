@@ -34,8 +34,6 @@ ifneq
 
 make a t6017 that's not dependent on gcj
 
-change Tupfile behind monitor, directory is not re-parsed
-
 somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not sure which one actually triggered the build :( ), but the build worked next try:
   [########## ] 1124/1129 ( 99%) 45498: OBJCOPY vmlinux.bin
   [########## ] 1125/1129 ( 99%) 45495: ASM header.S
@@ -102,6 +100,13 @@ if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - namespace CONFIG under @/default, @/newconfig, etc?
 
 hidden file should be ignored if written to by a command
+
+run with sh -e? eg: (echo foo; bork; echo bar) > %o should exit with failure
+
+remove tup_db_set_flags_by_name() in favor of more targetting flag setting?
+
+remove include_root and TUP_TOP so Tupfiles are compositable?
+ - may need to provide include_rules directive so this isn't insane
 
 html:
   proof: big-o notation

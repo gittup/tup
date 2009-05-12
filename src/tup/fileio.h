@@ -22,6 +22,7 @@ tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 tupid_t update_symlink_file(tupid_t dt, const char *file);
 tupid_t create_var_file(const char *var, const char *value);
+tupid_t tup_file_exists(tupid_t dt, const char *file);
 tupid_t tup_file_mod(tupid_t dt, const char *file);
 int tup_file_del(tupid_t dt, const char *file);
 int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type);
