@@ -70,7 +70,7 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 	}
 	linkname[rc] = 0;
 
-	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL, 0);
+	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL, 1);
 	if(link_dt <= 0) {
 		fprintf(stderr, "Error: Unable to find directory ID for '%s' in update_symlink_file()\n", linkname);
 		return -1;
