@@ -178,14 +178,14 @@ static tupid_t file_internal(tupid_t dt, const char *file, int modified)
 		if(modified) {
 			if(tup_db_add_modify_list(dbn.tupid) < 0)
 				return -1;
+
+			/* It's possible this is a file that was included by a
+			 * Tupfile.  Try to set any dependent directory flags.
+			 */
+			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+				return -1;
 		}
 		if(tup_db_unflag_delete(dbn.tupid) < 0)
-			return -1;
-
-		/* It's possible this is a file that was included by a Tupfile.
-		 * Try to set any dependent directory flags.
-		 */
-		if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 			return -1;
 	}
 	return dbn.tupid;
