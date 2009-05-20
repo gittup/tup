@@ -22,6 +22,7 @@ recursive grep kills monitor
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
 remove dependency on sqlite3 command line
+ - update build page where it says SQLite is needed
 
 compile on 64-bit
 
@@ -32,8 +33,6 @@ use temporary table instead of moving all commands to delete in parser? Should b
 instead of doing delete_name_file() for each entry in delete_list, maybe change the sql to do 'delete from link where from_id in (select id from delete_list)' or some such. Would still need to iterate to actually unlink() files, though.
 
 ifneq
-
-make a t6017 that's not dependent on gcj
 
 somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not sure which one actually triggered the build :( ), but the build worked next try:
   [########## ] 1124/1129 ( 99%) 45498: OBJCOPY vmlinux.bin

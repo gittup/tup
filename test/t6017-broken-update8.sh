@@ -6,53 +6,32 @@
 # from B.class instead of B.java. Then B.class is deleted (because the command
 # to create it is gone, and we're creating .o files now) so the dependency is
 # gone. I solved this by moving the file deletions out into its own phase.
-if ! which gcj; then
-        echo "[33mSkip t6017 - gcj not found[0m" 1>&2
-        exit 0
-fi
-
-# Apparently if I have some crap in the classpath then it can't find anything
-# in the local directory. Seems to be an issue with javac too.
-export CLASSPATH=""
+#
+# This test case merely mimics this process because when I upgraded to gcc
+# 4.3.2 from 4.1.something, gcj became slow as crap. The 'ls | grep' part is
+# to mimic the getdents() syscall that javac and gcj appear to use.
 
 . ../tup.sh
+
 cat > Tupfile << HERE
-: B.java |> gcj -C %f |> %B.class
-: A.java | B.class |> gcj -C %f |> %B.class
+: B.java |> cat %f > %o |> B.class
+: A.java | B.class |> (if ls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.class
 HERE
-
-cat > A.java << HERE
-class A
-{  
-        public static void main(String args[])
-        {
-                System.out.println("Hello World!" + B.hey());
-        }
-}
-HERE
-
-cat > B.java << HERE
-class B
-{  
-        public static String hey()
-        {
-                return "Yo";
-        }
-}
-HERE
-
+echo "A" > A.java
+echo "B" > B.java
 tup touch A.java B.java Tupfile
 update
 check_exist A.class B.class
+echo 'B' | diff - B.class
+(echo 'Using B.class'; echo 'B'; echo 'A') | diff - A.class
 
 cat > Tupfile << HERE
-: foreach *.java |> gcj -c %f |> %B.o
+: B.java |> cat %f > %o |> B.o
+: A.java |> (if ls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.o
 HERE
-
 tup touch Tupfile
 update
 check_not_exist A.class B.class
 check_exist A.o B.o
-tup_dep_exist . A.java . "gcj -c A.java"
-tup_dep_exist . B.java . "gcj -c B.java"
-tup_dep_exist . B.java . "gcj -c A.java"
+echo 'B' | diff - B.o
+(echo 'Using B.java'; echo 'B'; echo 'A') | diff - A.o
