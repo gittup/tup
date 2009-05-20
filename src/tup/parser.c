@@ -1147,13 +1147,16 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			len++;
-			s++;
-			if(! *s) {
-				fprintf(stderr, "Error: Backslash at the end of a string is not escaping anything. String was: '%s'\n", string);
-				return NULL;
+			if((s[1] == '$' && s[2] == '(') ||
+			   s[1] == '@') {
+				/* \$( becomes $( */
+				/* \@ becomes @ */
+				len++;
+				s += 2;
+			} else {
+				len++;
+				s++;
 			}
-			s++;
 		} else if(*s == '$') {
 			const char *rparen;
 
@@ -1205,14 +1208,17 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			s++;
-			if(! *s) {
-				fprintf(stderr, "Error: Backslash at the end of a string is not escaping anything. String was: '%s'\n", string);
-				return NULL;
+			if((s[1] == '$' && s[2] == '(') ||
+			   s[1] == '@') {
+				/* \$( becomes $( */
+				/* \@ becomes @ */
+				*p = s[1];
+				s += 2;
+			} else {
+				*p = *s;
+				s++;
 			}
-			*p = *s;
 			p++;
-			s++;
 		} else if(*s == '$') {
 			const char *rparen;
 
@@ -1261,6 +1267,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 
 	if((signed)strlen(ret) != len) {
 		fprintf(stderr, "Length mismatch: expected %i bytes, wrote %i\n", len, strlen(ret));
+		return NULL;
 	}
 
 	return ret;
