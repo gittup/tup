@@ -1157,22 +1157,23 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 		} else if(*s == '$') {
 			const char *rparen;
 
-			if(s[1] != '(') {
-				expected = "$(";
-				goto syntax_error;
-			}
-			rparen = strchr(s+1, ')');
-			if(!rparen) {
-				expected = "ending variable paren ')'";
-				goto syntax_error;
-			}
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
 
-			var = s + 2;
-			vlen = vardb_len(v, var, rparen-var);
-			if(vlen < 0)
-				return NULL;
-			len += vlen;
-			s = rparen + 1;
+				var = s + 2;
+				vlen = vardb_len(v, var, rparen-var);
+				if(vlen < 0)
+					return NULL;
+				len += vlen;
+				s = rparen + 1;
+			} else {
+				s++;
+				len++;
+			}
 		} else if(*s == '@') {
 			const char *rat;
 
@@ -1215,21 +1216,23 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 		} else if(*s == '$') {
 			const char *rparen;
 
-			if(s[1] != '(') {
-				expected = "$(";
-				goto syntax_error;
-			}
-			rparen = strchr(s+1, ')');
-			if(!rparen) {
-				expected = "ending variable paren ')'";
-				goto syntax_error;
-			}
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
 
-			var = s + 2;
-			if(vardb_get(v, var, rparen-var, &p) < 0)
-				return NULL;
+				var = s + 2;
+				if(vardb_get(v, var, rparen-var, &p) < 0)
+					return NULL;
 
-			s = rparen + 1;
+				s = rparen + 1;
+			} else {
+				*p = *s;
+				p++;
+				s++;
+			}
 		} else if(*s == '@') {
 			const char *rat;
 			tupid_t vt;

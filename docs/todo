@@ -81,8 +81,6 @@ takes long time after re-parsing all linux directories (eg: Rules.tup changes)
 
 backslashes annoying in sed commands?
 
-plain $ should go through unmodified?
-
 'tup g' shows too much info when a directory changes?
 
 access(2) support in ldpreload?
