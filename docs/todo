@@ -57,8 +57,6 @@ somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not 
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
-syntax error if empty line after last rule?
-
 explicitly named file not found in id blah - print subdir!
 
 don't save new command in temp table and compare to old command instead of creating new command and deleting old?

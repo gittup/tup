@@ -211,28 +211,28 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 
 	while(p < e) {
 		char *newline;
+		/* Skip leading whitespace and empty lines */
 		while(isspace(*p) && p < e) {
 			if(*p == '\n')
 				lno++;
 			p++;
 		}
+		/* If we just had empty lines at the end, we're done */
+		if(p == e)
+			break;
 
 		line = p;
 		newline = strchr(p, '\n');
 		if(!newline)
 			goto syntax_error;
 		lno++;
-		if(line == newline) {
-			/* Skip empty lines */
-			p++;
-			continue;
-		}
 		while(newline[-1] == '\\') {
 			newline[-1] = ' ';
 			newline[0] = ' ';
 			newline = strchr(p, '\n');
 			if(!newline)
 				goto syntax_error;
+			lno++;
 		}
 
 		*newline = 0;
@@ -445,7 +445,7 @@ found_paren:
 	return 0;
 
 syntax_error:
-	fprintf(stderr, "Syntax error parsing Tupfile\n  Line was: %s\n", line);
+	fprintf(stderr, "Syntax error parsing Tupfile line %i\n  Line was: '%s'\n", lno, line);
 	return -1;
 }
 

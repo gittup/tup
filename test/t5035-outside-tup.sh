@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-# TODO
+# Make sure that files that go outside of tup are properly ignored.
 
 . ../tup.sh
 tmkdir foo
