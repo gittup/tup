@@ -59,10 +59,6 @@ when you include a generated file, print path relative to command that was execu
 
 syntax error if empty line after last rule?
 
-shouldn't see this error if we can't find the file? (it's outside of tup):
-[#########  ] 928/1096 ( 84%) 42660: ASM-OFFSET asm-offsets.s
-Error finding dir for '../../../../include/../../../drivers/lguest/lg.h' relative to dir 42625
-
 explicitly named file not found in id blah - print subdir!
 
 don't save new command in temp table and compare to old command instead of creating new command and deleting old?

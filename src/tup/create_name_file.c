@@ -355,6 +355,14 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 
 		pel = list_entry(pg->path_list.next, struct path_element, list);
 		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
+			if(dt == 0) {
+				/* If we're at the top of the tup hierarchy and
+				 * trying to go up a level, bail out and return
+				 * success since we don't keep track of files
+				 * in the great beyond.
+				 */
+				return 0;
+			}
 			dt = tup_db_parent(dt);
 			if(dt < 0)
 				return -1;
