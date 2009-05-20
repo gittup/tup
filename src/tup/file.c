@@ -89,7 +89,7 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 }
 
 int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
-		const char *debug_name, struct file_info *info)
+		const char *debug_name, struct file_info *info, int *warnings)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -133,6 +133,12 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 			}
 		}
 
+		if(w->pg.pg_flags & PG_HIDDEN) {
+			fprintf(stderr, "tup warning: Writing to hidden file '%s' from command '%s'\n", w->filename, debug_name);
+			(*warnings)++;
+			goto out_skip;
+		}
+
 		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &file, &symlist, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", w->filename, debug_name);
@@ -172,6 +178,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 				return -1;
 		}
 
+out_skip:
 		del_entry(w);
 	}
 
@@ -249,6 +256,11 @@ skip_sym:
 		tupid_t dbn_tupid;
 
 		r = list_entry(info->read_list.next, struct file_entry, list);
+
+		if(r->pg.pg_flags & PG_HIDDEN) {
+			fprintf(stderr, "tup error: Trying to read from hidden file '%s' in command '%s'\n", r->filename, debug_name);
+			return -1;
+		}
 
 		dbn_tupid = get_dbn_dt_pg(dt, &r->pg, &dbn, &symlist);
 		if(dbn_tupid < 0) {

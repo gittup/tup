@@ -98,8 +98,6 @@ if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - work if user code does '#define CONFIG_BLAH blah'?
  - namespace CONFIG under @/default, @/newconfig, etc?
 
-hidden file should be ignored if written to by a command
-
 run with sh -e? eg: (echo foo; bork; echo bar) > %o should exit with failure
 
 remove tup_db_set_flags_by_name() in favor of more targetting flag setting?
@@ -118,7 +116,9 @@ html:
   proof: big-o notation
   proof: no clean target
   when Tupfiles are parsed
-  hidden files are ignored
+  files outside of tup are ignored
+   - hidden files can be written to for testing (result in warnings)
+   - hidden files cannot be read from
   how files are deleted
   how dependencies are described/discovered
   tup bugs: build in state Q, change A->B, build in state R, change B->A, build must go back to state Q (not some other state S)

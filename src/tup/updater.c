@@ -38,6 +38,7 @@ static int do_show_progress;
 static int do_keep_going;
 static int num_jobs;
 static int vardict_fd;
+static int warnings;
 
 static int sig_quit = 0;
 static struct sigaction sigact = {
@@ -214,7 +215,11 @@ static int process_update_nodes(void)
 			return -1;
 		}
 	}
+	warnings = 0;
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
+	if(warnings) {
+		fprintf(stderr, "tup warning: Update resulted in %i warning%s\n", warnings, warnings == 1 ? "" : "s");
+	}
 	if(rc == -2) {
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
@@ -650,7 +655,7 @@ static int update(struct node *n, struct server *s)
 			pthread_mutex_lock(&db_mutex);
 			rc = tup_db_copy_sticky_links(n->tupid, tupid);
 			if(rc == 0)
-				rc = write_files(tupid, n->tupid, n->dt, name, &s->finfo);
+				rc = write_files(tupid, n->tupid, n->dt, name, &s->finfo, &warnings);
 			if(rc == 0) {
 				rc = tup_db_yell_links(tupid, "Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created   from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could   randomly break in the future.");
 				if(rc == 0) {

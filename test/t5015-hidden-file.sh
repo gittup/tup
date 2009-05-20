@@ -1,15 +1,13 @@
 #! /bin/sh -e
 
-# Make sure hidden files are ignored. I don't really remember why I do this,
-# but I guess it makes sense not to look at things like .git, .svn, etc. The
-# reason we don't want it to show up from the ld_preload wrapper is because
-# normally the hidden files won't be in the .tup/db since the monitor won't
-# put them there.
+# Make sure reading from hidden files causes a problem. Originally I let this
+# slip by ok, but I was incorrectly grouping hidden files (eg: .foo) along with
+# files that are outside of tup's view (eg: /usr/bin/gcc). Now I should be able
+# to give an error on the former while ignoring the latter.
 
 . ../tup.sh
 cat > Tupfile << HERE
 : |> cat .hidden |>
-: |> cat yo/.hidden_dir/foo |>
 HERE
 
 echo 'foo' > .hidden
@@ -30,6 +28,5 @@ if tup touch yo/.hidden_dir/foo; then
 	exit 1
 fi
 tup touch Tupfile
-update
+update_fail
 tup_dep_no_exist . .hidden . 'cat .hidden'
-tup_dep_no_exist yo/.hidden_dir foo . 'cat yo/.hidden_dir/foo'

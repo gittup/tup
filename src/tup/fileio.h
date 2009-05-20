@@ -12,9 +12,11 @@ struct path_element {
 	int len;
 };
 
+#define PG_HIDDEN 1
+#define PG_OUTSIDE_TUP 2
 struct pel_group {
 	struct list_head path_list;
-	int is_hidden;
+	int pg_flags;
 };
 
 tupid_t create_name_file(tupid_t dt, const char *file);

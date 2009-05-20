@@ -330,7 +330,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 {
 	struct path_element *pel;
 
-	if(pg->is_hidden)
+	/* Ignore if the file is hidden or outside of the tup hierarchy */
+	if(pg->pg_flags)
 		return 0;
 
 	/* The list can be empty if dir is "." or something like "foo/..". In
@@ -391,7 +392,7 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 		is_root = 1;
 	else
 		is_root = 0;
-	pg->is_hidden = 0;
+	pg->pg_flags = 0;
 	INIT_LIST_HEAD(&pg->path_list);
 
 	while(1) {
@@ -431,7 +432,7 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 			} else {
 				/* Ignore hidden paths */
 				del_pel_list(&pg->path_list);
-				pg->is_hidden = 1;
+				pg->pg_flags |= PG_HIDDEN;
 				return 0;
 			}
 		}
@@ -457,13 +458,13 @@ skip_num_elements:
 			 * .tup
 			 */
 			if(list_empty(&pg->path_list) || top[0] != '/') {
-				pg->is_hidden = 1;
+				pg->pg_flags |= PG_OUTSIDE_TUP;
 				return 0;
 			}
 			top++;
 			pel = list_entry(pg->path_list.next, struct path_element, list);
 			if(strncmp(top, pel->path, pel->len) != 0) {
-				pg->is_hidden = 1;
+				pg->pg_flags |= PG_OUTSIDE_TUP;
 				del_pel_list(&pg->path_list);
 				return 0;
 			}
