@@ -212,7 +212,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 	while(p < e) {
 		char *newline;
 		/* Skip leading whitespace and empty lines */
-		while(isspace(*p) && p < e) {
+		while(p < e && isspace(*p)) {
 			if(*p == '\n')
 				lno++;
 			p++;
