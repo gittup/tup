@@ -73,7 +73,6 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 /* Node operations */
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
-tupid_t tup_db_create_dup_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type);
 int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn);
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
@@ -114,7 +113,6 @@ int tup_db_unflag_delete(tupid_t tupid);
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
 int tup_db_create_unique_link(tupid_t a, tupid_t b);
-int tup_db_get_dest_links(tupid_t from_id, struct list_head *head);
 int tup_db_delete_empty_links(tupid_t tupid);
 int tup_db_yell_links(tupid_t tupid, const char *errmsg);
 int tup_db_link_exists(tupid_t a, tupid_t b);
@@ -122,7 +120,6 @@ int tup_db_link_style(tupid_t a, tupid_t b);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_unsticky_links(tupid_t tupid);
-int tup_db_copy_sticky_links(tupid_t orig, tupid_t dest);
 
 /* Combo operations */
 int tup_db_flag_delete_in_dir(tupid_t dt, int type);
@@ -164,5 +161,14 @@ int tup_db_detach_tmpdb(void);
 int tup_db_files_to_tmpdb(void);
 int tup_db_unflag_tmpdb(tupid_t tupid);
 int tup_db_get_all_in_tmpdb(struct list_head *list);
+
+/* updater temp operations */
+int tup_db_create_tmp_tables(void);
+int tup_db_drop_tmp_tables(void);
+int tup_db_clear_tmp_tables(void);
+int tup_db_add_write_list(tupid_t tupid);
+int tup_db_check_write_list(tupid_t cmdid);
+int tup_db_add_read_list(tupid_t tupid);
+int tup_db_check_read_list(tupid_t cmdid);
 
 #endif

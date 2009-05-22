@@ -20,8 +20,6 @@ struct sym_entry {
 	struct list_head list;
 };
 
-static void write_fail(tupid_t tupid, tupid_t dt, const char *file);
-static int remove_output_entry(struct list_head *head, tupid_t tupid);
 static struct file_entry *new_entry(const char *filename);
 static void del_entry(struct file_entry *fent);
 static int handle_rename(const char *from, const char *to,
@@ -88,24 +86,18 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
-		const char *debug_name, struct file_info *info, int *warnings)
+int write_files(tupid_t cmdid, tupid_t dt, const char *debug_name,
+		struct file_info *info, int *warnings)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 	struct file_entry *g;
 	struct file_entry *tmp;
 	struct db_node dbn;
-	struct id_entry *ide;
 	struct half_entry *he;
-	int output_bork = 0;
-	LIST_HEAD(old_output_list);
 	LIST_HEAD(symlist);
 
 	handle_unlink(info);
-
-	if(tup_db_get_dest_links(old_cmdid, &old_output_list) < 0)
-		return -1;
 
 	while(!list_empty(&info->write_list)) {
 		tupid_t newdt;
@@ -141,7 +133,7 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 
 		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &file, &symlist, 0);
 		if(newdt <= 0) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", w->filename, debug_name);
+			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
 		}
 		if(!file) {
@@ -162,21 +154,11 @@ int write_files(tupid_t cmdid, tupid_t old_cmdid, tupid_t dt,
 			return -1;
 		}
 		if(dbn.tupid < 0) {
-			fprintf(stderr, "[31mtup internal error: dbn.tupid < 0 in write_files() write_list?[0m\n");
+			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
 		}
-		if(dbn.dt != dt) {
-			fprintf(stderr, "tup error: File '%s' was written to by command '%s', but the command should only write files to directory %lli\n", w->filename, debug_name, dt);
-			write_fail(dbn.tupid, newdt, file);
-			output_bork = 1;
-		} else if(remove_output_entry(&old_output_list, dbn.tupid) < 0) {
-			fprintf(stderr, "tup error: File '%s' was written to by command '%s', but this was not specified in the Tupfile in dir %lli.\n", w->filename, debug_name, dt);
-			write_fail(dbn.tupid, newdt, file);
-			output_bork = 1;
-		} else {
-			if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
-				return -1;
-		}
+		if(tup_db_add_write_list(dbn.tupid) < 0)
+			return -1;
 
 out_skip:
 		del_entry(w);
@@ -197,46 +179,37 @@ out_skip:
 			return -1;
 		}
 
-		if(remove_output_entry(&old_output_list, dbn.tupid) < 0) {
-			/* Similar to the write case, make sure we were
-			 * supposed to actually create this file.
+		if(tup_db_add_write_list(dbn.tupid) < 0)
+			return -1;
+
+		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
+			/* Use strcmp instead of pg_eq because we don't have
+			 * the pgs for sym_entries. Also this should only
+			 * happen when 'ln' does a stat() before it does a
+			 * symlink().
 			 */
-			fprintf(stderr, "tup error: File '%s' was made as a symlink by command '%s', but this was not specified in the Tupfile in dir %lli.\n", sym->to, debug_name, dt);
-			write_fail(dbn.tupid, dt, sym->to);
-			output_bork = 1;
-		} else {
-			if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
-				return -1;
+			if(strcmp(sym->to, g->filename) == 0)
+				del_entry(g);
+		}
 
-			list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
-				/* Use strcmp instead of pg_eq because we don't
-				 * have the pgs for sym_entries. Also this
-				 * should only happen when 'ln' does a stat()
-				 * before it does a symlink().
-				 */
-				if(strcmp(sym->to, g->filename) == 0)
-					del_entry(g);
-			}
+		/* TODO: Don't need symlist? */
+		link_dt = find_dir_tupid_dt(dt, sym->from, &file, NULL, 1);
+		if(link_dt < 0)
+			return -1;
+		/* Skip files outside of .tup */
+		if(link_dt == 0)
+			goto skip_sym;
 
-			/* TODO: Don't need symlist? */
-			link_dt = find_dir_tupid_dt(dt, sym->from, &file, NULL, 1);
-			if(link_dt < 0)
-				return -1;
-			/* Skip files outside of .tup */
-			if(link_dt == 0)
-				goto skip_sym;
-
-			if(tup_db_select_dbn(link_dt, file, &dbn_link) < 0)
-				return -1;
-			if(dbn_link.tupid < 0) {
-				dbn_link.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST);
-				if(dbn_link.tupid < 0)
-					return -1;
-			}
-
-			if(tup_db_set_sym(dbn.tupid, dbn_link.tupid) < 0)
+		if(tup_db_select_dbn(link_dt, file, &dbn_link) < 0)
+			return -1;
+		if(dbn_link.tupid < 0) {
+			dbn_link.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST);
+			if(dbn_link.tupid < 0)
 				return -1;
 		}
+
+		if(tup_db_set_sym(dbn.tupid, dbn_link.tupid) < 0)
+			return -1;
 
 skip_sym:
 		list_del(&sym->list);
@@ -245,11 +218,9 @@ skip_sym:
 		free(sym);
 	}
 
-	list_for_each_entry(ide, &old_output_list, list) {
-		fprintf(stderr, "Error: Tupid %lli was supposed to be written to by command %lli, but it wasn't.\n", ide->tupid, old_cmdid);
-		output_bork = 1;
-	}
-	if(output_bork)
+	if(tup_db_check_write_list(cmdid) < 0)
+		return -1;
+	if(tup_db_clear_tmp_tables() < 0)
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
@@ -272,12 +243,12 @@ skip_sym:
 			goto skip_read;
 		while(!list_empty(&symlist)) {
 			he = list_entry(symlist.next, struct half_entry, list);
-			if(tup_db_create_link(he->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_add_read_list(he->tupid) < 0)
 				return -1;
 			list_del(&he->list);
 			free(he);
 		}
-		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+		if(tup_db_add_read_list(dbn.tupid) < 0)
 			return -1;
 
 skip_read:
@@ -292,7 +263,7 @@ skip_read:
 			fprintf(stderr, "Error: Unable to find tupid for variable named '%s'\n", r->filename);
 			return -1;
 		}
-		if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+		if(tup_db_add_read_list(dbn.tupid) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -324,12 +295,12 @@ skip_read:
 
 			while(!list_empty(&symlist)) {
 				he = list_entry(symlist.next, struct half_entry, list);
-				if(tup_db_create_link(he->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+				if(tup_db_add_read_list(he->tupid) < 0)
 					return -1;
 				list_del(&he->list);
 				free(he);
 			}
-			if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_add_read_list(dbn.tupid) < 0)
 				return -1;
 		} else {
 			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
@@ -339,36 +310,11 @@ skip_read:
 skip_ghost:
 		del_entry(g);
 	}
+	if(tup_db_check_read_list(cmdid) < 0)
+		return -1;
+	if(tup_db_clear_tmp_tables() < 0)
+		return -1;
 	return 0;
-}
-
-static void write_fail(tupid_t tupid, tupid_t dt, const char *file)
-{
-	/* Re-run whatever command was supposed to create this file (if any),
-	 * and remove the bad output. This is particularly helpful if a symlink
-	 * was created in the wrong spot.
-	 */
-	tup_db_modify_cmds_by_output(tupid);
-	fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n", file, dt);
-	delete_file(dt, file);
-}
-
-static int remove_output_entry(struct list_head *head, tupid_t tupid)
-{
-	struct id_entry *ide;
-	list_for_each_entry(ide, head, list) {
-		if(ide->tupid == tupid) {
-			/* Ok to do list_del without _safe because we break out
-			 * of the loop (links are unique, so there is only
-			 * going to be one matching tupid in the
-			 * old_output_list).
-			 */
-			list_del(&ide->list);
-			free(ide);
-			return 0;
-		}
-	}
-	return -1;
 }
 
 static struct file_entry *new_entry(const char *filename)

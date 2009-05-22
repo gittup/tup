@@ -59,11 +59,7 @@ when you include a generated file, print path relative to command that was execu
 
 explicitly named file not found in id blah - print subdir!
 
-don't save new command in temp table and compare to old command instead of creating new command and deleting old?
-
 print cwd when running a command (maybe instead of tupid)
-
-multiple files not specified as input dependencies - only print the error once, then multiple files
 
 can't have % flag in a var and then do : |> $(var) |>  ?
  - should it stay this way?
@@ -105,6 +101,15 @@ tup scan? - like initial monitor scan
  - tup scan && tup upd ? tup scan-upd? tup scanupd?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
+
+do_keep_going incorrectly used in execute_graph()
+
+print graph if not empty after execution
+ - make it "fatal tup error"?
+
+stale write link is deleted?
+
+use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
 html:
   proof: big-o notation

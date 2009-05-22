@@ -196,6 +196,8 @@ static int process_update_nodes(void)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
+	if(tup_db_create_tmp_tables() < 0)
+		return -1;
 	tup_db_begin();
 	vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
@@ -226,6 +228,8 @@ static int process_update_nodes(void)
 	}
 	close(vardict_fd);
 	tup_db_commit();
+	if(tup_db_drop_tmp_tables() < 0)
+		return -1;
 	if(rc < 0)
 		return -1;
 	if(destroy_graph(&g) < 0)
@@ -575,7 +579,6 @@ static int update(struct node *n, struct server *s)
 	int dfd = -1;
 	const char *name = n->name;
 	int rc;
-	tupid_t tupid;
 
 	/* Commands that begin with a ',' are special var/sed commands */
 	if(name[0] == ',') {
@@ -605,18 +608,11 @@ static int update(struct node *n, struct server *s)
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	tupid = tup_db_create_dup_node(n->dt, n->name, n->type);
-	if(tupid < 0) {
-		pthread_mutex_unlock(&db_mutex);
-		return -1;
-	}
-
 	dfd = tup_db_open_tupid(n->dt);
 	if(dfd < 0) {
 		pthread_mutex_unlock(&db_mutex);
-		goto err_delete_node;
+		goto err_out;
 	}
-
 	pthread_mutex_unlock(&db_mutex);
 
 	if(start_server(s) < 0) {
@@ -653,21 +649,7 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = tup_db_copy_sticky_links(n->tupid, tupid);
-			if(rc == 0)
-				rc = write_files(tupid, n->tupid, n->dt, name, &s->finfo, &warnings);
-			if(rc == 0) {
-				rc = tup_db_yell_links(tupid, "Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created   from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could   randomly break in the future.");
-				if(rc == 0) {
-					/* Success! Delete the old node */
-					delete_name_file(n->tupid, -1, -1);
-				}
-				/* Yelled nodes are actually a failure */
-				if(rc == 1) {
-					fprintf(stderr, " -- Command: '%s'\n", name);
-					rc = -1;
-				}
-			}
+			rc = write_files(n->tupid, n->dt, name, &s->finfo, &warnings);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
@@ -694,10 +676,7 @@ err_cmd_failed:
 	fprintf(stderr, " *** Command %lli failed: %s\n", n->tupid, name);
 err_close_dfd:
 	close(dfd);
-err_delete_node:
-	pthread_mutex_lock(&db_mutex);
-	delete_name_file(tupid, -1, -1);
-	pthread_mutex_unlock(&db_mutex);
+err_out:
 	return -1;
 }
 
