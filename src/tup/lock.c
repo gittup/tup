@@ -98,6 +98,13 @@ void tup_lock_exit(void)
 	close(sh_lock);
 }
 
+void tup_lock_close(void)
+{
+	close(obj_lock);
+	close(tri_lock);
+	close(sh_lock);
+}
+
 int tup_sh_lock(void)
 {
 	return sh_lock;

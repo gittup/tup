@@ -8,7 +8,6 @@ int tup_init(void)
 	if(find_tup_dir() != 0) {
 		return -1;
 	}
-
 	if(tup_lock_init() < 0) {
 		return -1;
 	}

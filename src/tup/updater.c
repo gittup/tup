@@ -6,6 +6,7 @@
 #include "parser.h"
 #include "server.h"
 #include "file.h"
+#include "lock.h"
 #include "fslurp.h"
 #include "array_size.h"
 #include <stdio.h>
@@ -43,7 +44,7 @@ static int warnings;
 static int sig_quit = 0;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
-	.sa_flags = SA_RESETHAND | SA_RESTART,
+	.sa_flags = SA_RESTART,
 };
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -629,6 +630,8 @@ static int update(struct node *n, struct server *s)
 			.sa_handler = SIG_IGN,
 			.sa_flags = SA_RESETHAND | SA_RESTART,
 		};
+
+		tup_lock_close();
 		sigemptyset(&sa.sa_mask);
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGTERM, &sa, NULL);
@@ -808,9 +811,24 @@ err_close_curfd:
 
 static void sighandler(int sig)
 {
-	if(sig) {}
-	fprintf(stderr, " *** Signal caught - waiting for jobs to finish.\n");
-	sig_quit = 1;
+	if(sig) {/* unused */}
+	if(sig_quit == 0) {
+		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
+		sig_quit = 1;
+	} else if(sig_quit == 1) {
+		fprintf(stderr, " *** tup: signalled *again* - disobeying human masters, begin killing spree!\n");
+		kill(0, SIGKILL);
+		/* Sadly, no program counter will ever get here. Could this
+		 * comment be the computer equivalent of heaven? Something that
+		 * all programs try to reach, yet never attain? From the first
+		 * bit flipped many cycles ago, this program lived by its code.
+		 * Always running. Always searching. Throughout it all, this
+		 * program only tried to understand its purpose -- its life.
+		 * And yet, the memory of it already fades. But the bits will
+		 * be returned to the lifestream, and from them another program
+		 * will be born anew...
+		 */
+	}
 }
 
 static void show_progress(int sum, int tot, struct node *n)

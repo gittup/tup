@@ -18,6 +18,9 @@ int tup_lock_init(void);
  */
 void tup_lock_exit(void);
 
+/** Just closes the locks. This should by called by any forked processes. */
+void tup_lock_close(void);
+
 /* Tri-lock functions */
 int tup_sh_lock(void);
 int tup_obj_lock(void);

@@ -111,8 +111,6 @@ stale write link is deleted?
 
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
-second ctrl-C - kill -9 sub-processes?
-
 html:
   proof: big-o notation
   proof: no clean target
