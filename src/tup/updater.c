@@ -418,7 +418,7 @@ keep_going:
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
 		printf("\n");
-		if(do_keep_going) {
+		if(keep_going) {
 			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
 		} else {
 			if(sig_quit) {
