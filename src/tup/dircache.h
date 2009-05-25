@@ -8,23 +8,19 @@ struct dircache {
 	struct list_head list;
 	int wd;
 	tupid_t dt;
-	char *path;
 };
 
 struct memdb;
 
-/** Adds the given wd -> path relationship to the dircache. This assumes
- * ownership of the memory pointed to by path, which must have been allocated
- * by malloc() or equivalent.
- */
-void dircache_add(struct memdb *m, int wd, char *path, tupid_t dt);
+/** Adds the given wd -> dt relationship to the dircache.  */
+void dircache_add(struct memdb *m, int wd, tupid_t dt);
 
-/** Returns the path given when wd was added to the dircache, or NULL if not
- * found.
+/** Returns the dircache given when wd was added to the dircache, or NULL if
+ * not found.
  */
 struct dircache *dircache_lookup(struct memdb *m, int wd);
 
-/** Deletes the wd from the dircache. */
+/** Deletes dc from the dircache. */
 void dircache_del(struct memdb *m, struct dircache *dc);
 
 #endif

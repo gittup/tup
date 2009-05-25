@@ -1,4 +1,6 @@
 #include "fileio.h"
+/* _ATFILE_SOURCE for readlinkat */
+#define _ATFILE_SOURCE
 #include "db.h"
 #include "compat.h"
 #include "config.h"
@@ -37,7 +39,7 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 	return tup_db_create_node(dt, path, TUP_NODE_DIR);
 }
 
-tupid_t update_symlink_file(tupid_t dt, const char *file)
+tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file)
 {
 	int rc;
 	struct db_node dbn;
@@ -58,9 +60,9 @@ tupid_t update_symlink_file(tupid_t dt, const char *file)
 		}
 	}
 
-	rc = readlink(file, linkname, sizeof(linkname));
+	rc = readlinkat(dfd, file, linkname, sizeof(linkname));
 	if(rc < 0) {
-		fprintf(stderr, "readlink: ");
+		fprintf(stderr, "readlinkat: ");
 		perror(file);
 		return -1;
 	}

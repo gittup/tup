@@ -157,6 +157,8 @@ int tup_db_create_var_list(void);
 int tup_db_delete_var_list(void);
 
 /* tmpdb operations */
+int tup_db_scan_begin(void);
+int tup_db_scan_end(void);
 int tup_db_attach_tmpdb(void);
 int tup_db_detach_tmpdb(void);
 int tup_db_files_to_tmpdb(void);

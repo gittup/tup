@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -13,6 +14,7 @@ static int tup_wd_offset;
 static int tup_top_len;
 static int tup_sub_len;
 static tupid_t tup_sub_dir_dt = -1;
+static int top_fd = -1;
 
 int find_tup_dir(void)
 {
@@ -49,6 +51,11 @@ int find_tup_dir(void)
 			return -1;
 		}
 	}
+	top_fd = open(".", O_RDONLY);
+	if(top_fd < 0) {
+		perror(".");
+		return -1;
+	}
 	return 0;
 }
 
@@ -83,4 +90,9 @@ const char *get_sub_dir(void)
 int get_sub_dir_len(void)
 {
 	return tup_sub_len;
+}
+
+int tup_top_fd(void)
+{
+	return top_fd;
 }

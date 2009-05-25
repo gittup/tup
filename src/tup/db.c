@@ -4,6 +4,7 @@
 #include "array_size.h"
 #include "list.h"
 #include "fileio.h" /* TODO: call delete_file elsewhere? */
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1026,7 +1027,7 @@ int tup_db_open_tupid(tupid_t tupid)
 		return -1;
 	}
 	if(tupid == 1) {
-		return open(".", O_RDONLY);
+		return dup(tup_top_fd());
 	}
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3220,6 +3221,38 @@ int tup_db_delete_var_list(void)
 		return -1;
 	}
 
+	return 0;
+}
+
+int tup_db_scan_begin(void)
+{
+	if(tup_db_attach_tmpdb() < 0)
+		return -1;
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_files_to_tmpdb() < 0)
+		return -1;
+	if(tup_db_unflag_tmpdb(DOT_DT) < 0)
+		return -1;
+	if(tup_db_unflag_tmpdb(VAR_DT) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_scan_end(void)
+{
+	struct half_entry *he;
+	LIST_HEAD(del_list);
+
+	if(tup_db_get_all_in_tmpdb(&del_list) < 0)
+		return -1;
+	while(!list_empty(&del_list)) {
+		he = list_entry(del_list.next, struct half_entry, list);
+		if(tup_del_id(he->tupid, he->dt, he->sym, he->type) < 0)
+			return -1;
+		list_del(&he->list);
+		free(he);
+	}
 	return 0;
 }
 

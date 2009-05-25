@@ -517,16 +517,10 @@ static int flags_exists(int argc, char **argv)
 static int touch(int argc, char **argv)
 {
 	int x;
-	int fd;
 	tupid_t sub_dir_dt;
 
 	if(tup_db_begin() < 0)
 		return -1;
-	fd = open(".", O_RDONLY);
-	if(fd < 0) {
-		perror(".");
-		return -1;
-	}
 	chdir(get_sub_dir());
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
@@ -558,13 +552,19 @@ static int touch(int argc, char **argv)
 			if(tup_file_mod(dt, file) < 0)
 				return -1;
 		} else if(S_ISLNK(buf.st_mode)) {
-			if(update_symlink_file(dt, file) < 0)
+			int fd;
+			fd = open(".", O_RDONLY);
+			if(fd < 0) {
+				perror(".");
 				return -1;
+			}
+			if(update_symlink_fileat(dt, fd, file) < 0)
+				return -1;
+			close(fd);
 			if(tup_file_mod(dt, file) < 0)
 				return -1;
 		}
 	}
-	fchdir(fd);
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;

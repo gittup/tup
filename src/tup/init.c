@@ -2,6 +2,7 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
+#include <unistd.h>
 
 int tup_init(void)
 {
@@ -23,4 +24,5 @@ void tup_cleanup(void)
 	tup_db_write_vars();
 	tup_db_close();
 	tup_lock_exit();
+	close(tup_top_fd());
 }

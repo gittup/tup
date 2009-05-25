@@ -9,6 +9,7 @@
 #include "lock.h"
 #include "fslurp.h"
 #include "array_size.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -686,7 +687,6 @@ err_out:
 static int var_replace(struct node *n)
 {
 	int dfd;
-	int curfd;
 	int ifd;
 	int ofd;
 	struct buf b;
@@ -704,13 +704,9 @@ static int var_replace(struct node *n)
 	while(isspace(*input))
 		input++;
 
-	curfd = open(".", O_RDONLY);
-	if(curfd < 0)
-		return -1;
-
 	dfd = tup_db_open_tupid(n->dt);
 	if(dfd < 0)
-		goto err_close_curfd;
+		return -1;
 	fchdir(dfd);
 
 	printf("%s\n", input);
@@ -802,10 +798,8 @@ err_free_buf:
 err_close_ifd:
 	close(ifd);
 err_close_dfd:
-	fchdir(curfd);
+	fchdir(tup_top_fd());
 	close(dfd);
-err_close_curfd:
-	close(curfd);
 	return rc;
 }
 

@@ -19,12 +19,16 @@
  */
 
 #include "monitor.h"
-/* _GNU_SOURCE for asprintf */
+/* _ATFILE_SOURCE for fstatat() */
+#define _ATFILE_SOURCE
+/* _GNU_SOURCE for fdopendir */
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/file.h>
 #include <sys/select.h>
@@ -56,8 +60,7 @@ struct moved_from_event {
 	struct monitor_event m;
 };
 
-static int watch_path(tupid_t dt, const char *path, const char *file,
-		      int tmpdb);
+static int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb);
 static int events_queued(void);
 static void queue_event(struct inotify_event *e);
 static void flush_queue(void);
@@ -94,8 +97,6 @@ int monitor(int argc, char **argv)
 	int mon_lock;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
-	struct half_entry *he;
-	LIST_HEAD(del_list);
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -173,29 +174,15 @@ int monitor(int argc, char **argv)
 	 * list. Anything leftover in the tmpdb must have been deleted while
 	 * the monitor wasn't looking.
 	 */
-	if(tup_db_attach_tmpdb() < 0)
+	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(tup_db_begin() < 0)
-		return -1;
-	if(tup_db_files_to_tmpdb() < 0)
-		return -1;
-	if(tup_db_unflag_tmpdb(DOT_DT) < 0)
-		return -1;
-	if(tup_db_unflag_tmpdb(VAR_DT) < 0)
-		return -1;
-	if(watch_path(0, "", ".", 1) < 0) {
+	if(watch_path(0, tup_top_fd(), ".", 1) < 0) {
 		rc = -1;
 		goto close_inot;
 	}
-	if(tup_db_get_all_in_tmpdb(&del_list) < 0)
+	if(tup_db_scan_end() < 0)
 		return -1;
-	while(!list_empty(&del_list)) {
-		he = list_entry(del_list.next, struct half_entry, list);
-		if(tup_del_id(he->tupid, he->dt, he->sym, he->type) < 0)
-			return -1;
-		list_del(&he->list);
-		free(he);
-	}
+
 	mon_time = time(NULL);
 	tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 	if(tup_db_commit() < 0)
@@ -331,29 +318,18 @@ int stop_monitor(int argc, char **argv)
 	return 0;
 }
 
-static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
+static int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb)
 {
 	int wd;
 	uint32_t mask;
 	struct flist f = {0, 0, 0};
 	struct stat buf;
-	int rc = -1;
-	char *fullpath;
-	int curfd;
 	tupid_t newdt;
 
-	curfd = open(".", O_RDONLY);
-	if(curfd < 0) {
-		perror(".");
-		return -1;
-	}
-	if(path[0] != 0)
-		chdir(path);
-
-	if(lstat(file, &buf) != 0) {
-		fprintf(stderr, "Hey wtf\n");
+	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
+		fprintf(stderr, "tup monitor error: fstatat failed\n");
 		perror(file);
-		goto out_close;
+		return -1;
 	}
 
 	if(S_ISREG(buf.st_mode)) {
@@ -365,85 +341,81 @@ static int watch_path(tupid_t dt, const char *path, const char *file, int tmpdb)
 				tupid = tup_file_exists(dt, file);
 			}
 			if(tupid < 0)
-				goto out_close;
+				return -1;
 			if(tup_db_unflag_tmpdb(tupid) < 0)
-				goto out_close;
+				return -1;
 		} else {
 			if(tup_file_exists(dt, file) < 0)
-				goto out_close;
+				return -1;
 		}
-		rc = 0;
-		goto out_close;
+		return 0;
 	} else if(S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
 
-		tupid = update_symlink_file(dt, file);
+		tupid = update_symlink_fileat(dt, dfd, file);
 		if(tupid < 0)
-			goto out_close;
+			return -1;
 		if(tmpdb) {
 			if(tup_db_unflag_tmpdb(tupid) < 0)
-				goto out_close;
+				return -1;
 			if(mon_time != -1 && buf.st_mtime > mon_time) {
 				if(tup_db_add_modify_list(tupid) < 0)
-					goto out_close;
+					return -1;
 			}
 		}
-		rc = 0;
-		goto out_close;
+		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
+		int newfd;
+		int flistfd;
+
 		newdt = create_dir_file(dt, file);
 		if(tmpdb) {
 			if(tup_db_unflag_tmpdb(newdt) < 0)
-				goto out_close;
+				return -1;
 		}
+
+		DEBUGP("add watch: '%s'\n", file);
+
+		fchdir(dfd);
+		mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
+		wd = inotify_add_watch(inot_fd, file, mask);
+		if(wd < 0) {
+			perror("inotify_add_watch");
+			return -1;
+		}
+
+		dircache_add(&mdb, wd, newdt);
+
+		newfd = openat(dfd, file, O_RDONLY);
+		if(newfd < 0) {
+			fprintf(stderr, "tup monitor error: Unable to openat() file.\n");
+			perror(file);
+			return -1;
+		}
+		flistfd = dup(newfd);
+		if(flistfd < 0) {
+			fprintf(stderr, "tup monitor error: Unable to dup file descriptor.\n");
+			perror("dup");
+			return -1;
+		}
+
+		/* flist_foreachfd uses fdopendir, which takes ownership of
+		 * flistfd and closes it for us. That's why it's dup'd and only
+		 * newfd is closed explicitly.
+		 */
+		flist_foreachfd(&f, flistfd) {
+			if(f.filename[0] == '.')
+				continue;
+			if(watch_path(newdt, newfd, f.filename, tmpdb) < 0)
+				return -1;
+		}
+		close(newfd);
+		return 0;
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
 			file);
-		goto out_close;
+		return -1;
 	}
-
-	DEBUGP("add watch: '%s'\n", file);
-
-	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
-	wd = inotify_add_watch(inot_fd, file, mask);
-	if(wd < 0) {
-		perror("inotify_add_watch");
-		goto out_close;
-	}
-
-	if(path[0] == 0) {
-		fullpath = strdup(".");
-	} else if(strcmp(path, ".") == 0) {
-		fullpath = strdup(file);
-	} else {
-		if(asprintf(&fullpath, "%s/%s", path, file) < 0) {
-			perror("asprintf");
-			goto out_close;
-		}
-	}
-	if(!fullpath) {
-		perror("Unable to allocate space for path.\n");
-		goto out_close;
-	}
-	dircache_add(&mdb, wd, fullpath, newdt);
-	/* dircache assumes ownership of fullpath */
-
-	fchdir(curfd);
-	close(curfd);
-
-	flist_foreach(&f, fullpath) {
-		if(f.filename[0] == '.')
-			continue;
-		if(watch_path(newdt, fullpath, f.filename, tmpdb) < 0)
-			goto out_close;
-	}
-	return 0;
-
-out_close:
-	fchdir(curfd);
-	close(curfd);
-
-	return rc;
 }
 
 static int events_queued(void)
@@ -700,6 +672,7 @@ static void handle_event(struct monitor_event *m)
 		}
 		if(m->e.mask & IN_ISDIR) {
 			struct db_node dbn;
+			int fd;
 
 			if(tup_db_select_dbn(from_dc->dt, mfe->m.e.name, &dbn) < 0)
 				return;
@@ -709,7 +682,11 @@ static void handle_event(struct monitor_event *m)
 				return;
 			if(tup_db_modify_dir(dbn.tupid) < 0)
 				return;
-			watch_path(dc->dt, dc->path, m->e.name, 0);
+			fd = tup_db_open_tupid(dc->dt);
+			if(fd < 0)
+				return;
+			watch_path(dc->dt, fd, m->e.name, 0);
+			close(fd);
 		} else {
 			tup_file_mod(dc->dt, m->e.name);
 			tup_file_del(from_dc->dt, mfe->m.e.name);
@@ -723,7 +700,13 @@ static void handle_event(struct monitor_event *m)
 	 * they are IN_CREATE.
 	 */
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
-		watch_path(dc->dt, dc->path, m->e.name, 0);
+		int fd;
+
+		fd = tup_db_open_tupid(dc->dt);
+		if(fd < 0)
+			return;
+		watch_path(dc->dt, fd, m->e.name, 0);
+		close(fd);
 		return;
 	}
 	if(m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB) {
