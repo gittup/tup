@@ -637,7 +637,7 @@ static int update(struct node *n, struct server *s)
 		sigaction(SIGTERM, &sa, NULL);
 		fchdir(dfd);
 		server_setenv(s, vardict_fd);
-		execl("/bin/sh", "/bin/sh", "-c", name, NULL);
+		execl("/bin/sh", "/bin/sh", "-e", "-c", name, NULL);
 		perror("execl");
 		exit(1);
 	}
