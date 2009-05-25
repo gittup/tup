@@ -160,6 +160,8 @@ int parse(struct node *n, struct graph *g)
 		return -1;
 	if(tup_db_flag_delete_cmd_outputs(n->tupid) < 0)
 		return -1;
+	if(tup_db_remove_output_links(n->tupid) < 0)
+		return -1;
 	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;
 

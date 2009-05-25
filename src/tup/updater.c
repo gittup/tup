@@ -816,6 +816,7 @@ static void sighandler(int sig)
 		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
 		sig_quit = 1;
 	} else if(sig_quit == 1) {
+		/* Shamelessly stolen from Andrew :) */
 		fprintf(stderr, " *** tup: signalled *again* - disobeying human masters, begin killing spree!\n");
 		kill(0, SIGKILL);
 		/* Sadly, no program counter will ever get here. Could this

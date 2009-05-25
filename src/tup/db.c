@@ -54,6 +54,7 @@ enum {
 	DB_UNSTICKY_LINKS,
 	DB_FLAG_DELETE_IN_DIR,
 	DB_FLAG_DELETE_CMD_OUTPUTS,
+	DB_REMOVE_OUTPUT_LINKS,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -2146,6 +2147,43 @@ int tup_db_flag_delete_cmd_outputs(tupid_t dt)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_CMD_OUTPUTS];
 	static char s[] = "insert or replace into delete_list select to_id from link where from_id in (select id from node where dir=? and type=?)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_remove_output_links(tupid_t dt)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_REMOVE_OUTPUT_LINKS];
+	static char s[] = "delete from link where from_id in (select id from node where dir=? and type=?)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

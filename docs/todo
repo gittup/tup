@@ -105,8 +105,6 @@ autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what 
 print graph if not empty after execution
  - make it "fatal tup error"?
 
-stale write link is deleted?
-
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
 html:
