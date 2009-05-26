@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 #include "list.h"
+#include <time.h>
 
 struct db_node;
 
@@ -19,13 +20,15 @@ struct pel_group {
 	int pg_flags;
 };
 
-tupid_t create_name_file(tupid_t dt, const char *file);
+tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
-tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file);
+tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
+			      time_t mtime, int force);
 tupid_t create_var_file(const char *var, const char *value);
-tupid_t tup_file_exists(tupid_t dt, const char *file);
 tupid_t tup_file_mod(tupid_t dt, const char *file);
+tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
+			   int force);
 int tup_file_del(tupid_t dt, const char *file);
 int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,

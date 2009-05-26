@@ -19,25 +19,16 @@
  */
 
 #include "monitor.h"
-/* _ATFILE_SOURCE for fstatat() */
-#define _ATFILE_SOURCE
-/* _GNU_SOURCE for fdopendir */
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
 #include <sys/inotify.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#include <sys/select.h>
 #include <errno.h>
 #include <signal.h>
-#include <time.h>
 #include <sys/resource.h>
 #include "dircache.h"
-#include "flist.h"
 #include "debug.h"
 #include "fileio.h"
 #include "config.h"
@@ -45,9 +36,7 @@
 #include "lock.h"
 #include "memdb.h"
 #include "updater.h"
-
-#define MONITOR_TIME_CFG "monitor time"
-#define MONITOR_PID_CFG "monitor pid"
+#include "path.h"
 
 struct moved_from_event;
 struct monitor_event {
@@ -60,7 +49,7 @@ struct moved_from_event {
 	struct monitor_event m;
 };
 
-static int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb);
+static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
 static void queue_event(struct inotify_event *e);
 static void flush_queue(void);
@@ -86,7 +75,6 @@ static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
 static int queue_start = 0;
 static int queue_end = 0;
 static struct monitor_event *queue_last_e = NULL;
-static sqlite3_int64 mon_time = 0;
 static LIST_HEAD(moved_from_list);
 
 int monitor(int argc, char **argv)
@@ -167,7 +155,6 @@ int monitor(int argc, char **argv)
 		exit(0);
 
 	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
-	mon_time = tup_db_config_get_int64(MONITOR_TIME_CFG);
 
 	/* Use tmpdb to store all file objects in a list. We then start to
 	 * watch the filesystem, and remove all existing objects from the tmpdb
@@ -176,18 +163,11 @@ int monitor(int argc, char **argv)
 	 */
 	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", 1) < 0) {
+	if(watch_path(0, tup_top_fd(), ".", 1, wp_callback) < 0) {
 		rc = -1;
 		goto close_inot;
 	}
 	if(tup_db_scan_end() < 0)
-		return -1;
-
-	mon_time = time(NULL);
-	tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
-	if(tup_db_commit() < 0)
-		return -1;
-	if(tup_db_detach_tmpdb() < 0)
 		return -1;
 
 	gettimeofday(&t2, NULL);
@@ -249,13 +229,6 @@ int monitor(int argc, char **argv)
 					}
 					locked = 1;
 					DEBUGP("monitor ON\n");
-
-					/* Make sure we update our time, since
-					 * if the updater ran then some files
-					 * will have newer timestamps.
-					 */
-					mon_time = time(NULL);
-					tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 				}
 			} else if(e->wd == mon_wd) {
 				goto close_inot;
@@ -318,104 +291,23 @@ int stop_monitor(int argc, char **argv)
 	return 0;
 }
 
-static int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb)
+static int wp_callback(tupid_t newdt, int dfd, const char *file)
 {
 	int wd;
 	uint32_t mask;
-	struct flist f = {0, 0, 0};
-	struct stat buf;
-	tupid_t newdt;
 
-	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		fprintf(stderr, "tup monitor error: fstatat failed\n");
-		perror(file);
+	DEBUGP("add watch: '%s'\n", file);
+
+	fchdir(dfd);
+	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
+	wd = inotify_add_watch(inot_fd, file, mask);
+	if(wd < 0) {
+		perror("inotify_add_watch");
 		return -1;
 	}
 
-	if(S_ISREG(buf.st_mode)) {
-		if(tmpdb) {
-			tupid_t tupid;
-			if(mon_time != -1 && buf.st_mtime > mon_time) {
-				tupid = tup_file_mod(dt, file);
-			} else {
-				tupid = tup_file_exists(dt, file);
-			}
-			if(tupid < 0)
-				return -1;
-			if(tup_db_unflag_tmpdb(tupid) < 0)
-				return -1;
-		} else {
-			if(tup_file_exists(dt, file) < 0)
-				return -1;
-		}
-		return 0;
-	} else if(S_ISLNK(buf.st_mode)) {
-		tupid_t tupid;
-
-		tupid = update_symlink_fileat(dt, dfd, file);
-		if(tupid < 0)
-			return -1;
-		if(tmpdb) {
-			if(tup_db_unflag_tmpdb(tupid) < 0)
-				return -1;
-			if(mon_time != -1 && buf.st_mtime > mon_time) {
-				if(tup_db_add_modify_list(tupid) < 0)
-					return -1;
-			}
-		}
-		return 0;
-	} else if(S_ISDIR(buf.st_mode)) {
-		int newfd;
-		int flistfd;
-
-		newdt = create_dir_file(dt, file);
-		if(tmpdb) {
-			if(tup_db_unflag_tmpdb(newdt) < 0)
-				return -1;
-		}
-
-		DEBUGP("add watch: '%s'\n", file);
-
-		fchdir(dfd);
-		mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
-		wd = inotify_add_watch(inot_fd, file, mask);
-		if(wd < 0) {
-			perror("inotify_add_watch");
-			return -1;
-		}
-
-		dircache_add(&mdb, wd, newdt);
-
-		newfd = openat(dfd, file, O_RDONLY);
-		if(newfd < 0) {
-			fprintf(stderr, "tup monitor error: Unable to openat() file.\n");
-			perror(file);
-			return -1;
-		}
-		flistfd = dup(newfd);
-		if(flistfd < 0) {
-			fprintf(stderr, "tup monitor error: Unable to dup file descriptor.\n");
-			perror("dup");
-			return -1;
-		}
-
-		/* flist_foreachfd uses fdopendir, which takes ownership of
-		 * flistfd and closes it for us. That's why it's dup'd and only
-		 * newfd is closed explicitly.
-		 */
-		flist_foreachfd(&f, flistfd) {
-			if(f.filename[0] == '.')
-				continue;
-			if(watch_path(newdt, newfd, f.filename, tmpdb) < 0)
-				return -1;
-		}
-		close(newfd);
-		return 0;
-	} else {
-		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
-			file);
-		return -1;
-	}
+	dircache_add(&mdb, wd, newdt);
+	return 0;
 }
 
 static int events_queued(void)
@@ -491,10 +383,6 @@ static void flush_queue(void)
 			handle_event(m);
 		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
-	}
-	if(events_handled) {
-		mon_time = time(NULL);
-		tup_db_config_set_int64(MONITOR_TIME_CFG, mon_time);
 	}
 	tup_db_commit();
 
@@ -685,7 +573,7 @@ static void handle_event(struct monitor_event *m)
 			fd = tup_db_open_tupid(dc->dt);
 			if(fd < 0)
 				return;
-			watch_path(dc->dt, fd, m->e.name, 0);
+			watch_path(dc->dt, fd, m->e.name, 0, wp_callback);
 			close(fd);
 		} else {
 			tup_file_mod(dc->dt, m->e.name);
@@ -705,7 +593,7 @@ static void handle_event(struct monitor_event *m)
 		fd = tup_db_open_tupid(dc->dt);
 		if(fd < 0)
 			return;
-		watch_path(dc->dt, fd, m->e.name, 0);
+		watch_path(dc->dt, fd, m->e.name, 0, wp_callback);
 		close(fd);
 		return;
 	}

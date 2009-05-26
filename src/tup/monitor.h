@@ -9,6 +9,7 @@
 #define TUP_MONITOR_LOCK ".tup/monitor"
 
 #define AUTOUPDATE_PID "autoupdate pid"
+#define MONITOR_PID_CFG "monitor pid"
 
 int monitor(int argc, char **argv);
 int stop_monitor(int argc, char **argv);

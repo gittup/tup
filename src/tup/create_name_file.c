@@ -1,27 +1,28 @@
-#include "fileio.h"
 /* _ATFILE_SOURCE for readlinkat */
 #define _ATFILE_SOURCE
+#include "fileio.h"
 #include "db.h"
 #include "compat.h"
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 struct id_flags {
 	tupid_t tupid;
 	int flags;
 };
 
-static tupid_t file_internal(tupid_t dt, const char *file, int modified);
 static int ghost_to_file(struct db_node *dbn);
 
-tupid_t create_name_file(tupid_t dt, const char *file)
+tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime)
 {
 	tupid_t tupid;
 
-	tupid = tup_db_node_insert(dt, file, -1, TUP_NODE_FILE);
+	tupid = tup_db_node_insert(dt, file, -1, TUP_NODE_FILE, mtime);
 	if(tupid < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
@@ -39,7 +40,8 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 	return tup_db_create_node(dt, path, TUP_NODE_DIR);
 }
 
-tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file)
+tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
+			      time_t mtime, int force)
 {
 	int rc;
 	struct db_node dbn;
@@ -50,7 +52,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file)
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0) {
-		dbn.tupid = create_name_file(dt, file);
+		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
@@ -80,7 +82,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file)
 	if(tup_db_select_dbn(link_dt, file, &link_dbn) < 0)
 		return -1;
 	if(link_dbn.tupid < 0) {
-		link_dbn.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST);
+		link_dbn.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST, -1);
 		if(link_dbn.tupid < 0) {
 			fprintf(stderr, "Error: Node '%s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", file, link_dt);
 			return -1;
@@ -89,6 +91,8 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file)
 	if(dbn.sym != link_dbn.tupid) {
 		if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
 			return -1;
+	}
+	if(dbn.sym != link_dbn.tupid || dbn.mtime != mtime || force) {
 		if(tup_db_add_modify_list(dbn.tupid) < 0)
 			return -1;
 	}
@@ -141,20 +145,32 @@ tupid_t create_var_file(const char *var, const char *value)
 
 tupid_t tup_file_mod(tupid_t dt, const char *file)
 {
-	return file_internal(dt, file, 1);
+	int fd;
+	struct stat buf;
+
+	fd = tup_db_open_tupid(dt);
+	if(fd < 0)
+		return -1;
+	if(fstatat(fd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
+		fprintf(stderr, "tup error: tup_file_mod() fstatat failed.\n");
+		perror(file);
+		return -1;
+	}
+	close(fd);
+	return tup_file_mod_mtime(dt, file, buf.st_mtime, 1);
 }
 
-tupid_t tup_file_exists(tupid_t dt, const char *file)
-{
-	return file_internal(dt, file, 0);
-}
-
-static tupid_t file_internal(tupid_t dt, const char *file, int modified)
+tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
+			   int force)
 {
 	struct db_node dbn;
+	int modified = 0;
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
+
+	if(dbn.mtime != mtime || force)
+		modified = 1;
 
 	/* Need to re-parse the Tupfile if it was changed. */
 	if(modified) {
@@ -165,7 +181,7 @@ static tupid_t file_internal(tupid_t dt, const char *file, int modified)
 	}
 
 	if(dbn.tupid < 0) {
-		dbn.tupid = create_name_file(dt, file);
+		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
@@ -178,6 +194,11 @@ static tupid_t file_internal(tupid_t dt, const char *file, int modified)
 			return -1;
 		}
 		if(modified) {
+			if(dbn.type == TUP_NODE_GENERATED) {
+				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file may be overwritten on the next update.\n", file);
+				if(tup_db_modify_cmds_by_output(dbn.tupid) < 0)
+					return -1;
+			}
 			if(tup_db_add_modify_list(dbn.tupid) < 0)
 				return -1;
 
@@ -186,6 +207,9 @@ static tupid_t file_internal(tupid_t dt, const char *file, int modified)
 			 */
 			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 				return -1;
+			if(dbn.mtime != mtime)
+				if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+					return -1;
 		}
 		if(tup_db_unflag_delete(dbn.tupid) < 0)
 			return -1;
@@ -225,9 +249,11 @@ int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type)
 	 * This is really just to mimic what people would expect from make.
 	 * Randomly deleting object files is pretty stupid.
 	 */
-	if(type == TUP_NODE_GENERATED)
+	if(type == TUP_NODE_GENERATED) {
+		fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
 		if(tup_db_modify_cmds_by_output(tupid) < 0)
 			return -1;
+	}
 
 	/* We also have to run any command that used this file as an input, so
 	 * we can yell at the user if they haven't already fixed that command.
@@ -375,7 +401,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				/* Secret of the ghost valley! */
 				if(sotgv == 0)
 					return -1;
-				dbn.tupid = tup_db_node_insert(dt, pel->path, pel->len, TUP_NODE_GHOST);
+				dbn.tupid = tup_db_node_insert(dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
 				if(dbn.tupid < 0)
 					return -1;
 				dbn.sym = -1;

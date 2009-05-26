@@ -90,7 +90,7 @@ struct edge *remove_edge(struct edge *e)
 
 int create_graph(struct graph *g, int count_flags)
 {
-	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT, -1};
+	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT, -1, -1};
 
 	if(sizeof(struct node *) != 4) {
 		fprintf(stderr, "Error: sizeof node pointer is not 32 bits (size = %i bytes). This needs to be fixed.\n", sizeof(struct node *));

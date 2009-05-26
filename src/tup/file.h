@@ -17,7 +17,8 @@ enum access_type;
 int init_file_info(struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info);
-int write_files(tupid_t cmdid, tupid_t dt, const char *debug_name,
+int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 		struct file_info *info, int *warnings);
+int file_set_mtime(tupid_t tupid, int dfd, const char *file);
 
 #endif

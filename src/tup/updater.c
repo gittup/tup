@@ -653,7 +653,7 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = write_files(n->tupid, n->dt, name, &s->finfo, &warnings);
+			rc = write_files(n->tupid, n->dt, dfd, name, &s->finfo, &warnings);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
@@ -692,9 +692,11 @@ static int var_replace(struct node *n)
 	struct buf b;
 	char *input;
 	char *rbracket;
+	char *output;
 	char *p, *e;
 	int rc = -1;
 	struct db_node dbn;
+	struct db_node odbn;
 
 	if(n->name[0] != ',') {
 		fprintf(stderr, "Error: var_replace command must begin with ','\n");
@@ -744,9 +746,10 @@ static int var_replace(struct node *n)
 	if(fslurp(ifd, &b) < 0) {
 		goto err_close_ifd;
 	}
-	ofd = creat(rbracket+2, 0666);
+	output = rbracket+2;
+	ofd = creat(output, 0666);
 	if(ofd < 0) {
-		perror(rbracket+2);
+		perror(output);
 		goto err_free_buf;
 	}
 
@@ -789,7 +792,11 @@ static int var_replace(struct node *n)
 		
 	} while(p < e);
 
-	rc = 0;
+	if(tup_db_select_dbn(n->dt, output, &odbn) < 0)
+		return -1;
+	if(odbn.tupid < 0)
+		return -1;
+	rc = file_set_mtime(odbn.tupid, dfd, output);
 
 err_close_ofd:
 	close(ofd);

@@ -1,3 +1,5 @@
+/* _ATFILE_SOURCE for fstatat */
+#define _ATFILE_SOURCE
 #include "file.h"
 #include "access_event.h"
 #include "debug.h"
@@ -7,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 struct file_entry {
 	char *filename;
@@ -86,7 +90,7 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, tupid_t dt, const char *debug_name,
+int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 		struct file_info *info, int *warnings)
 {
 	struct file_entry *w;
@@ -159,6 +163,8 @@ int write_files(tupid_t cmdid, tupid_t dt, const char *debug_name,
 		}
 		if(tup_db_add_write_list(dbn.tupid) < 0)
 			return -1;
+		if(file_set_mtime(dbn.tupid, dfd, w->filename) < 0)
+			return -1;
 
 out_skip:
 		del_entry(w);
@@ -180,6 +186,8 @@ out_skip:
 		}
 
 		if(tup_db_add_write_list(dbn.tupid) < 0)
+			return -1;
+		if(file_set_mtime(dbn.tupid, dfd, sym->to) < 0)
 			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
@@ -203,7 +211,7 @@ out_skip:
 		if(tup_db_select_dbn(link_dt, file, &dbn_link) < 0)
 			return -1;
 		if(dbn_link.tupid < 0) {
-			dbn_link.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST);
+			dbn_link.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST, -1);
 			if(dbn_link.tupid < 0)
 				return -1;
 		}
@@ -285,7 +293,7 @@ skip_read:
 			if(tup_db_select_dbn(newdt, file, &dbn) < 0)
 				return -1;
 			if(dbn.tupid < 0) {
-				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST);
+				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST, -1);
 				if(dbn.tupid < 0)
 					return -1;
 			} else {
@@ -313,6 +321,19 @@ skip_ghost:
 	if(tup_db_check_read_list(cmdid) < 0)
 		return -1;
 	if(tup_db_clear_tmp_tables() < 0)
+		return -1;
+	return 0;
+}
+
+int file_set_mtime(tupid_t tupid, int dfd, const char *file)
+{
+	struct stat buf;
+	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
+		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
+		perror(file);
+		return -1;
+	}
+	if(tup_db_set_mtime(tupid, buf.st_mtime) < 0)
 		return -1;
 	return 0;
 }

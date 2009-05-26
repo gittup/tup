@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 #include "list.h"
+#include <time.h>
 
 #define TUP_DIR ".tup"
 #define TUP_DB_FILE ".tup/db"
@@ -16,6 +17,7 @@ struct db_node {
 	const char *name;
 	int type;
 	tupid_t sym;
+	time_t mtime;
 };
 
 struct id_entry {
@@ -73,7 +75,8 @@ int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 /* Node operations */
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
-tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type);
+tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
+			   time_t mtime);
 int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn);
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
 int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
@@ -97,6 +100,7 @@ int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
+int tup_db_set_mtime(tupid_t tupid, time_t mtime);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);

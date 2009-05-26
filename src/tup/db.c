@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <sqlite3.h>
 
-#define DB_VERSION 8
+#define DB_VERSION 9
 
 enum {
 	DB_BEGIN,
@@ -36,6 +36,7 @@ enum {
 	DB_CHANGE_NODE_NAME,
 	DB_SET_TYPE,
 	DB_SET_SYM,
+	DB_SET_MTIME,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_DELETE_LIST,
@@ -200,7 +201,7 @@ int tup_db_create(int db_sync)
 	int rc;
 	int x;
 	const char *sql[] = {
-		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, name varchar(4096))",
+		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096))",
 		"create table link (from_id integer, to_id integer, style integer)",
 		"create table var (id integer primary key not null, value varchar(4096))",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
@@ -217,8 +218,8 @@ int tup_db_create(int db_sync)
 		"insert into config values('db_version', 0)",
 		"insert into config values('autoupdate', 0)",
 		"insert into config values('num_jobs', 1)",
-		"insert into node values(1, 0, 2, -1, '.')",
-		"insert into node values(2, 1, 2, -1, '@')",
+		"insert into node values(1, 0, 2, -1, -1, '.')",
+		"insert into node values(2, 1, 2, -1, -1, '@')",
 	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
@@ -276,6 +277,8 @@ static int version_check(void)
 	char sql_6a[] = "create table ghost_list (id integer primary key not null)";
 
 	char sql_7a[] = "drop table ghost_list";
+
+	char sql_8a[] = "alter table node add column mtime integer default -1";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -382,6 +385,16 @@ static int version_check(void)
 			if(tup_db_config_set_int("db_version", 8) < 0)
 				return -1;
 			fprintf(stderr, "NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
+
+		case 8:
+			if(sqlite3_exec(tup_db, sql_8a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_8a);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 9) < 0)
+				return -1;
+			fprintf(stderr, "WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
 
 		case DB_VERSION:
 			break;
@@ -541,7 +554,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 		return dbn.tupid;
 	}
 
-	tupid = tup_db_node_insert(dt, name, len, type);
+	tupid = tup_db_node_insert(dt, name, len, type, -1);
 	if(tupid < 0)
 		return -1;
 	return tupid;
@@ -629,9 +642,9 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt;
-	static char s1[] = "select id, dir, name, type, sym from node where id in (select * from create_list)";
-	static char s2[] = "select id, dir, name, type, sym from node where id in (select * from modify_list)";
-	static char s3[] = "select id, dir, name, type, sym from node where id in (select * from delete_list)";
+	static char s1[] = "select id, dir, name, type, sym, mtime from node where id in (select * from create_list)";
+	static char s2[] = "select id, dir, name, type, sym, mtime from node where id in (select * from modify_list)";
+	static char s3[] = "select id, dir, name, type, sym, mtime from node where id in (select * from delete_list)";
 	char *sql;
 	int sqlsize;
 
@@ -679,6 +692,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 		dbn.name = (const char *)sqlite3_column_text(*stmt, 2);
 		dbn.type = sqlite3_column_int(*stmt, 3);
 		dbn.sym = sqlite3_column_int64(*stmt, 4);
+		dbn.mtime = sqlite3_column_int64(*stmt, 5);
 
 		/* Since this is used to build the initial part of the DAG,
 		 * we use TUP_LINK_NORMAL so the nodes that are returned will
@@ -704,7 +718,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR];
-	static char s[] = "select id, name, type, sym from node where dir=?";
+	static char s[] = "select id, name, type, sym, mtime from node where dir=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -738,6 +752,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
 		dbn.name = (const char *)sqlite3_column_text(*stmt, 1);
 		dbn.type = sqlite3_column_int(*stmt, 2);
 		dbn.sym = sqlite3_column_int64(*stmt, 3);
+		dbn.mtime = sqlite3_column_int64(*stmt, 4);
 
 		/* This is used by the 'tup g' function if the user wants to
 		 * graph a directory. Since we want to expand all nodes in the
@@ -764,7 +779,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR_GLOB];
-	static char s[] = "select id, name, type, sym from node where dir=? and (type=? or type=?) and name glob ?";
+	static char s[] = "select id, name, type, sym, mtime from node where dir=? and (type=? or type=?) and name glob ?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -810,6 +825,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 		dbn.name = (const char *)sqlite3_column_text(*stmt, 1);
 		dbn.type = sqlite3_column_int(*stmt, 2);
 		dbn.sym = sqlite3_column_int64(*stmt, 3);
+		dbn.mtime = sqlite3_column_int64(*stmt, 4);
 
 		if(callback(arg, &dbn) < 0) {
 			rc = -1;
@@ -1339,6 +1355,42 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, sym) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_set_mtime(tupid_t tupid, time_t mtime)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_MTIME];
+	static char s[] = "update node set mtime=? where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, mtime) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -2359,7 +2411,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_LINK];
-	static char s[] = "select id, dir, name, type, sym, style from node, link where from_id=? and id=to_id";
+	static char s[] = "select id, dir, name, type, sym, mtime, style from node, link where from_id=? and id=to_id";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2394,7 +2446,8 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 		dbn.name = (const char *)sqlite3_column_text(*stmt, 2);
 		dbn.type = sqlite3_column_int(*stmt, 3);
 		dbn.sym = sqlite3_column_int64(*stmt, 4);
-		style = sqlite3_column_int(*stmt, 5);
+		dbn.mtime = sqlite3_column_int64(*stmt, 5);
+		style = sqlite3_column_int(*stmt, 6);
 
 		if(callback(arg, &dbn, style) < 0) {
 			rc = -1;
@@ -2783,7 +2836,7 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	if(node_select(VAR_DT, var, varlen, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0) {
-		return tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST);
+		return tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
 	}
 	if(dbn.type == TUP_NODE_GHOST)
 		return dbn.tupid;
@@ -3253,6 +3306,11 @@ int tup_db_scan_end(void)
 		list_del(&he->list);
 		free(he);
 	}
+
+	if(tup_db_commit() < 0)
+		return -1;
+	if(tup_db_detach_tmpdb() < 0)
+		return -1;
 	return 0;
 }
 
@@ -3556,11 +3614,12 @@ int tup_db_check_read_list(tupid_t cmdid)
 	return 0;
 }
 
-tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type)
+tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
+			   time_t mtime)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_NODE_INSERT];
-	static char s[] = "insert into node(dir, type, name, sym) values(?, ?, ?, -1)";
+	static char s[] = "insert into node(dir, type, name, sym, mtime) values(?, ?, ?, -1, ?)";
 	tupid_t tupid;
 
 	if(!*stmt) {
@@ -3580,6 +3639,10 @@ tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type)
 		return -1;
 	}
 	if(sqlite3_bind_text(*stmt, 3, name, len, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 4, mtime) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -3615,13 +3678,14 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
-	static char s[] = "select id, type, sym from node where dir=? and name=?";
+	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
 
 	dbn->tupid = -1;
 	dbn->dt = -1;
 	dbn->name = NULL;
 	dbn->type = 0;
 	dbn->sym = -1;
+	dbn->mtime = -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3655,6 +3719,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	dbn->tupid = sqlite3_column_int64(*stmt, 0);
 	dbn->type = sqlite3_column_int64(*stmt, 1);
 	dbn->sym = sqlite3_column_int64(*stmt, 2);
+	dbn->mtime = sqlite3_column_int64(*stmt, 3);
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {

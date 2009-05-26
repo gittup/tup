@@ -6,6 +6,7 @@
 #include <time.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/getexecwd.h"
@@ -16,12 +17,14 @@
 #include "tup/init.h"
 #include "tup/compat.h"
 #include "tup/version.h"
+#include "tup/path.h"
 
 static int file_exists(const char *s);
 
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct db_node *dbn, int style);
 static int graph(int argc, char **argv);
+static int scan(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
 static int node_exists(int argc, char **argv);
@@ -94,6 +97,8 @@ int main(int argc, char **argv)
 		rc = stop_monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
 		rc = graph(argc, argv);
+	} else if(strcmp(cmd, "scan") == 0) {
+		rc = scan(argc, argv);
 	} else if(strcmp(cmd, "link") == 0) {
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "parse") == 0) {
@@ -357,6 +362,28 @@ static int graph(int argc, char **argv)
 	return 0;
 }
 
+static int scan(int argc, char **argv)
+{
+	int pid;
+
+	if(argc) {/* unused */}
+	if(argv) {/* unused */}
+
+	pid = tup_db_config_get_int(MONITOR_PID_CFG);
+	if(pid > 0) {
+		fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
+		return -1;
+	}
+
+	if(tup_db_scan_begin() < 0)
+		return -1;
+	if(watch_path(0, tup_top_fd(), ".", 1, NULL) < 0)
+		return -1;
+	if(tup_db_scan_end() < 0)
+		return -1;
+	return 0;
+}
+
 static int mlink(int argc, char **argv)
 {
 	/* This only works for files in the top-level directory. It's only
@@ -534,10 +561,24 @@ static int touch(int argc, char **argv)
 		if(lstat(argv[x], &buf) < 0) {
 			close(open(argv[x], O_WRONLY | O_CREAT, 0666));
 			if(lstat(argv[x], &buf) < 0) {
-				fprintf(stderr, "stat: ");
+				fprintf(stderr, "lstat: ");
 				perror(argv[x]);
 				return -1;
 			}
+		} else {
+			struct timeval tv[2];
+
+			tv[0].tv_sec = buf.st_atime;
+			tv[0].tv_usec = 0;
+			tv[1].tv_sec = time(NULL);
+			tv[1].tv_usec = 0;
+
+			if(lutimes(argv[x], tv) < 0) {
+				fprintf(stderr, "lutimes: ");
+				perror(argv[x]);
+				return -1;
+			}
+			buf.st_mtime = tv[1].tv_sec;
 		}
 
 		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
@@ -549,7 +590,7 @@ static int touch(int argc, char **argv)
 			if(create_dir_file(dt, file) < 0)
 				return -1;
 		} else if(S_ISREG(buf.st_mode)) {
-			if(tup_file_mod(dt, file) < 0)
+			if(tup_file_mod_mtime(dt, file, buf.st_mtime, 1) < 0)
 				return -1;
 		} else if(S_ISLNK(buf.st_mode)) {
 			int fd;
@@ -558,11 +599,9 @@ static int touch(int argc, char **argv)
 				perror(".");
 				return -1;
 			}
-			if(update_symlink_fileat(dt, fd, file) < 0)
+			if(update_symlink_fileat(dt, fd, file, buf.st_mtime, 1) < 0)
 				return -1;
 			close(fd);
-			if(tup_file_mod(dt, file) < 0)
-				return -1;
 		}
 	}
 	if(tup_db_commit() < 0)
@@ -589,7 +628,7 @@ static int node(int argc, char **argv)
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(create_name_file(dt, file) < 0) {
+		if(create_name_file(dt, file, -1) < 0) {
 			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", file, dt);
 			return -1;
 		}

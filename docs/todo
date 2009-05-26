@@ -95,9 +95,6 @@ remove include_root and TUP_TOP so Tupfiles are compositable?
 
 tup todo command
 
-tup scan? - like initial monitor scan
- - tup scan && tup upd ? tup scan-upd? tup scanupd?
-
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
 print graph if not empty after execution
