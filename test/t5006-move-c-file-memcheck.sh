@@ -22,7 +22,7 @@ sym_check libfoo.a foo bar1
 
 # Rename bar.c to realbar.c.
 mv bar.c realbar.c
-tup delete bar.c
+tup rm bar.c
 tup touch realbar.c
 MALLOC_TRACE=mout tup upd
 

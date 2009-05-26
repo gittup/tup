@@ -33,7 +33,7 @@ update_fail
 
 # First try: remove the offending files and update again
 rm foo.o built-in.o
-tup delete foo.o built-in.o
+tup rm foo.o built-in.o
 update
 
 # Go back to our error scenario
@@ -44,7 +44,7 @@ update_fail
 
 # Second try: remove only foo.o for now, we'll just deal with built-in.o
 rm foo.o
-tup delete foo.o
+tup rm foo.o
 update_fail
 
 # Now we assume built-in.o is actually a user file, and then change our command

@@ -33,7 +33,7 @@ static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
 static int flags_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
-static int delete(int argc, char **argv);
+static int rm(int argc, char **argv);
 static int varset(int argc, char **argv);
 static int varchange(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
@@ -103,8 +103,12 @@ int main(int argc, char **argv)
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "parse") == 0) {
 		rc = updater(argc, argv, 1);
+	} else if(strcmp(cmd, "delete") == 0) {
+		rc = updater(argc, argv, 2);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv, 0);
+	} else if(strcmp(cmd, "todo") == 0) {
+		rc = todo(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {
@@ -115,8 +119,8 @@ int main(int argc, char **argv)
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "node") == 0) {
 		rc = node(argc, argv);
-	} else if(strcmp(cmd, "delete") == 0) {
-		rc = delete(argc, argv);
+	} else if(strcmp(cmd, "rm") == 0) {
+		rc = rm(argc, argv);
 	} else if(strcmp(cmd, "varset") == 0) {
 		rc = varset(argc, argv);
 	} else if(strcmp(cmd, "varchange") == 0) {
@@ -672,7 +676,7 @@ static int node(int argc, char **argv)
 	return 0;
 }
 
-static int delete(int argc, char **argv)
+static int rm(int argc, char **argv)
 {
 	int x;
 	tupid_t sub_dir_dt;

@@ -10,10 +10,10 @@ tup touch foo bar
 tup_object_exist . ghost foo bar
 
 rm -f foo
-tup delete foo
+tup rm foo
 tup_object_no_exist . foo
 tup_object_exist . ghost bar
 
 rm -f bar
-tup delete bar
+tup rm bar
 tup_object_no_exist . ghost foo bar

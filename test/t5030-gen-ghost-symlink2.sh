@@ -12,7 +12,7 @@ tup_object_exist . foo secret
 tup_object_exist secret ghost
 
 rm -f Tupfile
-tup delete Tupfile
+tup rm Tupfile
 update
 tup_object_no_exist secret ghost
 tup_object_no_exist . foo secret

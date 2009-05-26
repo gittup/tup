@@ -7,7 +7,7 @@
 touch foo
 tup touch foo
 rm foo
-tup delete foo
+tup rm foo
 
 tmkdir foo
 touch foo/bar

@@ -14,7 +14,7 @@ tup_object_exist . foo.o
 tup_object_exist . prog
 
 rm Tupfile
-tup delete Tupfile
+tup rm Tupfile
 update
 
 check_not_exist foo.o prog

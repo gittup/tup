@@ -18,7 +18,7 @@ update
 echo nofile | diff output.txt -
 
 rm -f foo
-tup delete foo
+tup rm foo
 tup_object_exist . ghost
 
 echo 'alive' > ghost

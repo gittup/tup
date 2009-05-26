@@ -12,7 +12,7 @@ else
 	exit 1
 fi
 seq 1 $1 | sed 's/$/.c/' | xargs rm -f
-seq 1 $1 | sed 's/$/.c/' | xargs tup delete
+seq 1 $1 | sed 's/$/.c/' | xargs tup rm
 tup upd
 if [ -f prog ]; then
 	echo "Main program not deleted!" 1>&2

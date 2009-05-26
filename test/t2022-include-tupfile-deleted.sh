@@ -19,9 +19,9 @@ tup_object_exist . 'echo foo'
 tup_object_exist . 'echo bar'
 
 rm yo/Install.tup
-tup delete yo/Install.tup
+tup rm yo/Install.tup
 rmdir yo
-tup delete yo
+tup rm yo
 
 cat > Tupfile << HERE
 : |> echo foo |>

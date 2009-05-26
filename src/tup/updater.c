@@ -23,6 +23,10 @@
 static int process_create_nodes(void);
 static int process_delete_nodes(void);
 static int process_update_nodes(void);
+static int check_create_todo(void);
+static int check_delete_todo(void);
+static int check_update_todo(void);
+static void print_node(struct node *n);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
@@ -31,6 +35,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 static void *create_work(void *arg);
 static void *delete_work(void *arg);
 static void *update_work(void *arg);
+static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static void sighandler(int sig);
@@ -72,7 +77,7 @@ static const char *signal_err[] = {
 struct worker_thread {
 	pthread_t pid;
 	int sock;        /* 1 sock and no shoes? What a life... */
-	struct graph *g; /* This should only be used in create_work() */
+	struct graph *g; /* This should only be used in create_work() and todo_work */
 };
 
 struct work_rc {
@@ -80,7 +85,7 @@ struct work_rc {
 	int rc;
 };
 
-int updater(int argc, char **argv, int parse_only)
+int updater(int argc, char **argv, int phase)
 {
 	int x;
 
@@ -114,12 +119,48 @@ int updater(int argc, char **argv, int parse_only)
 		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
-	if(parse_only)
+	if(phase == 1) /* Collect underpants */
 		return 0;
 	if(process_delete_nodes() < 0)
 		return -1;
+	if(phase == 2) /* ? */
+		return 0;
 	if(process_update_nodes() < 0)
 		return -1;
+	return 0; /* Profit! */
+}
+
+int todo(int argc, char **argv)
+{
+	int rc;
+
+	if(argc) {/* unused */}
+	if(argv) {/* unused */}
+
+	rc = check_create_todo();
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		printf("Run 'tup parse' to proceed to phase 2.\n");
+		return 0;
+	}
+
+	rc = check_delete_todo();
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		printf("Run 'tup delete' to proceed to phase 3.\n");
+		return 0;
+	}
+
+	rc = check_update_todo();
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		printf("Run 'tup upd' to bring the system up-to-date.\n");
+		return 0;
+	}
+	printf("tup: Everything is up-to-date.\n");
 	return 0;
 }
 
@@ -237,6 +278,99 @@ static int process_update_nodes(void)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	return 0;
+}
+
+static int check_create_todo(void)
+{
+	struct graph g;
+	int rc;
+	int stuff_todo = 0;
+
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
+		return -1;
+	if(g.num_nodes) {
+		printf("Tup phase 1: The following directories must be parsed:\n");
+		stuff_todo = 1;
+	}
+	rc = execute_graph(&g, 0, 1, todo_work);
+	if(rc == 0) {
+		rc = stuff_todo;
+	} else if(rc == -1) {
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return rc;
+}
+
+static int check_delete_todo(void)
+{
+	struct graph g;
+	int rc;
+	int stuff_todo = 0;
+
+	if(create_graph(&g, TUP_NODE_GENERATED) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
+		return -1;
+	if(g.num_nodes) {
+		printf("Tup phase 2: The following %i file%s will be deleted:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
+		stuff_todo = 1;
+	}
+	rc = execute_graph(&g, 0, 1, todo_work);
+	if(rc == 0) {
+		rc = stuff_todo;
+	} else if(rc == -1) {
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return rc;
+}
+
+static int check_update_todo(void)
+{
+	struct graph g;
+	int rc;
+	int stuff_todo = 0;
+
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
+		return -1;
+	if(g.num_nodes) {
+		printf("Tup phase 3: The following %i command%s will be executed:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
+		stuff_todo = 1;
+	}
+	rc = execute_graph(&g, 0, 1, todo_work);
+	if(rc == 0) {
+		rc = stuff_todo;
+	} else if(rc == -1) {
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return rc;
+}
+
+static void print_node(struct node *n)
+{
+	printf(" - [%lli] %s\n", n->tupid, n->name);
 }
 
 static int build_graph(struct graph *g)
@@ -571,6 +705,31 @@ static void *update_work(void *arg)
 		}
 	}
 	free(s);
+	return NULL;
+}
+
+static void *todo_work(void *arg)
+{
+	struct worker_thread *wt = arg;
+	struct graph *g = wt->g;
+	struct node *n;
+
+	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
+		struct work_rc wrc;
+
+		if(n == NULL)
+			break;
+
+		if(n->type == g->count_flags)
+			print_node(n);
+
+		wrc.rc = 0;
+		wrc.n = n;
+		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
+			perror("write");
+			return NULL;
+		}
+	}
 	return NULL;
 }
 

@@ -14,7 +14,7 @@ sym_check a/prog main
 
 # Move directory a to b
 mv a b
-tup delete a
+tup rm a
 tup touch b b/foo.c b/Tupfile
 update
 tup_object_exist . b

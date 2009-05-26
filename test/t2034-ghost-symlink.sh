@@ -9,5 +9,5 @@ tup touch foo
 tup_object_exist . ghost foo
 
 rm -f foo
-tup delete foo
+tup rm foo
 tup_object_no_exist . ghost foo

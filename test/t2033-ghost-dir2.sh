@@ -30,7 +30,7 @@ check_not_exist output.txt
 
 # Delete the file - ghost should still be reachable
 rm -f secret
-tup delete secret
+tup rm secret
 update
 tup_object_exist secret ghost
 check_not_exist output.txt

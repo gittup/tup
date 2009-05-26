@@ -9,9 +9,9 @@ tmkdir foo
 touch foo/a
 tup touch foo/a
 rm foo/a
-tup delete foo/a
+tup rm foo/a
 rmdir foo
-tup delete foo
+tup rm foo
 
 touch foo
 tup touch foo

@@ -17,7 +17,7 @@ sym_check prog main bar1 baz1
 # When baz.c is deleted, baz.o should be deleted as well, and prog should be
 # re-linked. The baz.[co] objects should be removed from .tup
 rm baz.c
-tup delete baz.c
+tup rm baz.c
 update
 check_not_exist baz.o
 sym_check prog main bar1 ~baz1
@@ -26,7 +26,7 @@ tup_object_exist . foo.c foo.o bar.c bar.o prog
 tup_object_no_exist . baz.c baz.o
 
 rm foo.c bar.c
-tup delete foo.c bar.c
+tup rm foo.c bar.c
 update
 check_not_exist foo.o bar.o prog
 tup_object_no_exist . foo.c foo.o bar.c bar.o prog

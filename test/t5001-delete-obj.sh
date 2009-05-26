@@ -13,12 +13,12 @@ sym_check prog main bar1
 
 # When bar.o is deleted, it should be re-generated
 rm bar.o
-tup delete bar.o
+tup rm bar.o
 update
 sym_check bar.o bar1
 
 # Similar for prog
 rm prog
-tup delete prog
+tup rm prog
 update
 sym_check prog main bar1

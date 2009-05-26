@@ -18,11 +18,11 @@ sym_check a/a2/prog main
 
 # Move directory a to b
 mv a b
-tup delete a
+tup rm a
 tup touch b b/a2 b/a2/foo.c b/a2/Tupfile
 # And back
 mv b a
-tup delete b
+tup rm b
 tup touch a a/a2 a/a2/foo.c a/a2/Tupfile
 update
 tup_object_exist . a

@@ -10,6 +10,6 @@ tup touch foo
 tup_object_exist . real foo
 
 rm -f foo
-tup delete foo
+tup rm foo
 tup_object_no_exist . foo
 tup_object_exist . real

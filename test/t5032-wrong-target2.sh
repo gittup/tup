@@ -21,7 +21,7 @@ tup touch Tupfile
 update_fail
 
 # The echo 'foo' > file1 command should run again. Note that file1 was a
-# symlink to file2, but tup deletes file1 so the command should succeed again.
+# symlink to file2, but tup rm file1 so the command should succeed again.
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
 : |> ln -sf file1 file2 |> file2

@@ -17,7 +17,7 @@ tup_object_exist . secret
 tup_object_exist secret ghost
 
 rm -f Tupfile
-tup delete Tupfile
+tup rm Tupfile
 update
 
 tup_object_no_exist . secret

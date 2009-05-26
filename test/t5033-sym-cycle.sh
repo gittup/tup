@@ -19,7 +19,7 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 rm -f a b
-tup delete a b
+tup rm a b
 update
 echo yoi | diff - output.txt
 tup_object_no_exist . a b

@@ -16,6 +16,6 @@ update
 tup_object_exist . ghost
 
 rm -f Tupfile
-tup delete Tupfile
+tup rm Tupfile
 update
 tup_object_no_exist . ghost

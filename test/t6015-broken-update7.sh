@@ -13,7 +13,7 @@ touch bar.c
 tup touch foo.c bar.c Tupfile
 tup parse
 rm foo.c
-tup delete foo.c
+tup rm foo.c
 update
 tup_object_exist . bar.c bar.o
 tup_object_no_exist . foo.c foo.o

@@ -15,7 +15,7 @@ sym_check a/a2/foo.o main
 sym_check a/a2/prog main
 
 rm -rf a
-tup delete a
+tup rm a
 update
 tup_object_no_exist . a
 tup_object_no_exist a a2
