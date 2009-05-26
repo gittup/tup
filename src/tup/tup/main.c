@@ -544,6 +544,7 @@ static int flags_exists(int argc, char **argv)
 static int touch(int argc, char **argv)
 {
 	int x;
+	static char linkname[PATH_MAX];
 	tupid_t sub_dir_dt;
 
 	if(tup_db_begin() < 0)
@@ -566,19 +567,52 @@ static int touch(int argc, char **argv)
 				return -1;
 			}
 		} else {
-			struct timeval tv[2];
+			int rc;
 
-			tv[0].tv_sec = buf.st_atime;
-			tv[0].tv_usec = 0;
-			tv[1].tv_sec = time(NULL);
-			tv[1].tv_usec = 0;
+			if(S_ISLNK(buf.st_mode)) {
+				rc = readlink(argv[x], linkname, sizeof(linkname));
+				if(rc < 0) {
+					fprintf(stderr, "readlink: ");
+					perror(argv[x]);
+					return -1;
+				}
+				if(rc >= (signed)sizeof(linkname)) {
+					fprintf(stderr, "tup error: linkname buffer too small for symlink of '%s'\n", argv[x]);
+					return -1;
+				}
+				linkname[rc] = 0;
 
-			if(lutimes(argv[x], tv) < 0) {
-				fprintf(stderr, "lutimes: ");
+				unlink(argv[x]);
+				if(symlink(linkname, argv[x]) < 0) {
+					fprintf(stderr, "symlink: ");
+					perror(argv[x]);
+					return -1;
+				}
+			} else {
+				struct timeval tv[2];
+				int fd;
+
+				tv[0].tv_sec = buf.st_atime;
+				tv[0].tv_usec = 0;
+				tv[1].tv_sec = time(NULL);
+				tv[1].tv_usec = 0;
+				fd = open(argv[x], O_RDONLY);
+				if(fd < 0) {
+					fprintf(stderr, "open: ");
+					perror(argv[x]);
+					return -1;
+				}
+				if(futimes(fd, tv) < 0) {
+					fprintf(stderr, "futimes: ");
+					perror(argv[x]);
+					return -1;
+				}
+			}
+			if(lstat(argv[x], &buf) < 0) {
+				fprintf(stderr, "lstat: ");
 				perror(argv[x]);
 				return -1;
 			}
-			buf.st_mtime = tv[1].tv_sec;
 		}
 
 		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
