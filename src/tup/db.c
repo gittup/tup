@@ -20,6 +20,7 @@ enum {
 	DB_BEGIN,
 	DB_COMMIT,
 	DB_ROLLBACK,
+	DB_CHECK_DUP_LINKS,
 	DB_SELECT_DBN_BY_ID,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
@@ -514,6 +515,50 @@ int tup_db_select(int (*callback)(void *, int, char **, char **),
 		sqlite3_free(errmsg);
 	}
 	sqlite3_free(buf);
+	return rc;
+}
+
+int tup_db_check_dup_links(void)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_CHECK_DUP_LINKS];
+	static char s[] = "select from_id, to_id, count(from_id) from link group by from_id, to_id";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	while(1) {
+		int num;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		num = sqlite3_column_int(*stmt, 2);
+		if(num != 1) {
+			fprintf(stderr, "tup error: Duplicate link %lli -> %lli exists %i times\n", sqlite3_column_int64(*stmt, 0), sqlite3_column_int64(*stmt, 1), num);
+			rc = -1;
+		}
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
 	return rc;
 }
 
@@ -1821,10 +1866,9 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 {
 	int curstyle;
 
-	curstyle = tup_db_link_style(a, b);
-	if(curstyle < 0)
+	if(tup_db_link_style(a, b, &curstyle) < 0)
 		return -1;
-	if(curstyle == 0)
+	if(curstyle == -1)
 		if(link_insert(a, b, style) < 0)
 			return -1;
 	if(! (curstyle & style)) {
@@ -1985,12 +2029,13 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 	return 0;
 }
 
-int tup_db_link_style(tupid_t a, tupid_t b)
+int tup_db_link_style(tupid_t a, tupid_t b, int *style)
 {
 	int rc;
-	int style = 0;
 	sqlite3_stmt **stmt = &stmts[DB_LINK_STYLE];
 	static char s[] = "select style from link where from_id=? and to_id=?";
+
+	*style = -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2017,7 +2062,7 @@ int tup_db_link_style(tupid_t a, tupid_t b)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	style = sqlite3_column_int(*stmt, 0);
+	*style = sqlite3_column_int(*stmt, 0);
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -2025,7 +2070,7 @@ out_reset:
 		return -1;
 	}
 
-	return style;
+	return 0;
 }
 
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)

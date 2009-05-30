@@ -71,6 +71,7 @@ int tup_db_rollback(void);
 
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
+int tup_db_check_dup_links(void);
 
 /* Node operations */
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
@@ -120,7 +121,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b);
 int tup_db_delete_empty_links(tupid_t tupid);
 int tup_db_yell_links(tupid_t tupid, const char *errmsg);
 int tup_db_link_exists(tupid_t a, tupid_t b);
-int tup_db_link_style(tupid_t a, tupid_t b);
+int tup_db_link_style(tupid_t a, tupid_t b, int *style);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_unsticky_links(tupid_t tupid);
