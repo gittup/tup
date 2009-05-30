@@ -38,6 +38,7 @@ static int varset(int argc, char **argv);
 static int varchange(int argc, char **argv);
 static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
+static int fake_mtime(int argc, char **argv);
 static int flush(void);
 static void print_name(const char *s, char c);
 
@@ -127,6 +128,8 @@ int main(int argc, char **argv)
 		rc = varchange(argc, argv);
 	} else if(strcmp(cmd, "config") == 0) {
 		rc = config(argc, argv);
+	} else if(strcmp(cmd, "fake_mtime") == 0) {
+		rc = fake_mtime(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
 		rc = flush();
 	} else {
@@ -780,6 +783,36 @@ static int config(int argc, char **argv)
 		fprintf(stderr, "Error: config requires either 0 or 2 arguments.\n");
 		return -1;
 	}
+	return 0;
+}
+
+static int fake_mtime(int argc, char **argv)
+{
+	struct db_node dbn;
+	time_t mtime;
+	tupid_t dt;
+	tupid_t sub_dir_dt;
+	const char *file;
+
+	if(argc != 3) {
+		fprintf(stderr, "Error: fake_mtime requires a file and an mtime.\n");
+		return -1;
+	}
+	sub_dir_dt = get_sub_dir_dt();
+	if(sub_dir_dt < 0)
+		return -1;
+	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &file, NULL, 0);
+	if(dt < 0) {
+		fprintf(stderr, "Error: Unable to find dt for node: %s\n", argv[1]);
+		return -1;
+	}
+	if(tup_db_select_dbn(dt, file, &dbn) < 0) {
+		fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
+		return -1;
+	}
+	mtime = strtol(argv[2], NULL, 0);
+	if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+		return -1;
 	return 0;
 }
 

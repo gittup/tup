@@ -96,6 +96,9 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 		if(tup_db_add_modify_list(dbn.tupid) < 0)
 			return -1;
 	}
+	if(dbn.mtime != mtime)
+		if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+			return -1;
 	return dbn.tupid;
 }
 
