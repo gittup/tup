@@ -100,7 +100,9 @@ print graph if not empty after execution
 
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
-input pattern using a generated symlink dir?
+directly support symlinks in tup? Might make t5037 usable.
+
+%f with no inputs doesn't work
 
 no bins if not foreach?
 missing bin in input?
