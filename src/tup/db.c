@@ -523,7 +523,7 @@ int tup_db_check_dup_links(void)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_CHECK_DUP_LINKS];
-	static char s[] = "select from_id, to_id, count(from_id) from link group by from_id, to_id";
+	static char s[] = "select from_id, to_id, count(from_id) from link group by from_id, to_id having count(from_id) > 1";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -534,8 +534,6 @@ int tup_db_check_dup_links(void)
 	}
 
 	while(1) {
-		int num;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			goto out_reset;
@@ -546,11 +544,8 @@ int tup_db_check_dup_links(void)
 			goto out_reset;
 		}
 
-		num = sqlite3_column_int(*stmt, 2);
-		if(num != 1) {
-			fprintf(stderr, "tup error: Duplicate link %lli -> %lli exists %i times\n", sqlite3_column_int64(*stmt, 0), sqlite3_column_int64(*stmt, 1), num);
-			rc = -1;
-		}
+		fprintf(stderr, "tup error: Duplicate link %lli -> %lli exists %i times\n", sqlite3_column_int64(*stmt, 0), sqlite3_column_int64(*stmt, 1), sqlite3_column_int(*stmt, 2));
+		rc = -1;
 	}
 
 out_reset:
