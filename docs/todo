@@ -100,6 +100,14 @@ print graph if not empty after execution
 
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
+input pattern using a generated symlink dir?
+
+no bins if not foreach?
+missing bin in input?
+varsed bins?
+order-only bins?
+include bin should fail
+
 html:
   proof: big-o notation
   proof: no clean target

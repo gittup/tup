@@ -3,25 +3,20 @@
 . ../tup.sh
 cp ../testTupfile.tup Tupfile
 
-# Admittedly, I don't really know how the order these files are created
-# determines the order in which they are processed in the updater. I just
-# ran it and saw the order they go in (should be bar.c, foo.c, foo2.c) and then
-# made the middle one (foo.c) break. Seemingly innocuous changes to the updater
-# could break this test. If so, they could just be re-ordered, or I could
-# figure out how it's supposed to be done. Obviously, these files can't be
-# made dependent on each other, since we're supposed to test the keep_going
-# logic, which requires independent commands.
+# Since the 'foreach *.c' in the Tupfile will process the files in alphabetical
+# order, these files should be built in the order (bar.c, foo.c, zap.c). Then
+# we make the middle file break in order to test the keep-going logic.
 
 tup config num_jobs 1
 echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
-echo "void foo2(void) {}" > foo2.c
-tup touch bar.c foo.c foo2.c
+echo "void zap(void) {}" > zap.c
+tup touch bar.c foo.c zap.c
 update_fail
 
-check_exist foo2.o
-check_not_exist bar.o foo.o prog
+check_exist bar.o
+check_not_exist foo.o zap.o prog
 
 update_fail -k
-check_exist bar.o foo2.o
+check_exist bar.o zap.o
 check_not_exist foo.o prog

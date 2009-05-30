@@ -10,6 +10,7 @@
 #include "vardb.h"
 #include "graph.h"
 #include "config.h"
+#include "bin.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,9 +44,12 @@ struct name_list_entry {
 
 struct path_list {
 	struct list_head list;
+	/* For files: */
 	char *path;
 	const char *file;
 	tupid_t dt;
+	/* For bins: */
+	struct bin *bin;
 };
 
 struct rule {
@@ -53,6 +57,7 @@ struct rule {
 	int foreach;
 	char *input_pattern;
 	char *output_pattern;
+	struct bin *bin;
 	char *command;
 	struct name_list namelist;
 	int line_number;
@@ -67,17 +72,20 @@ struct build_name_list_args {
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			 tupid_t curdir, struct graph *g);
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb);
+		      struct vardb *vdb, struct bin_list *bl);
 static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb);
+			struct vardb *vdb, struct bin_list *bl);
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid);
-static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g);
-static int get_path_list(char *p, struct list_head *head, tupid_t dt,
-			 struct list_head *symlist);
+			tupid_t tupid, struct bin_list *bl);
+static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
+				struct graph *g, struct bin_list *bl);
+static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
+			 struct bin_list *bl, struct list_head *symlist);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 				    struct graph *g);
 static int get_name_list(struct list_head *plist, struct name_list *nl);
+static int nl_add_path(struct path_list *pl, struct name_list *nl);
+static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
@@ -207,12 +215,17 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 	int if_true = 1;
 	int lno = 0;
 	int linelen;
+	struct bin_list bl;
+
+	if(bin_list_init(&bl) < 0)
+		return -1;
 
 	p = b->s;
 	e = b->s + b->len;
 
 	while(p < e) {
 		char *newline;
+
 		/* Skip leading whitespace and empty lines */
 		while(p < e && isspace(*p)) {
 			if(*p == '\n')
@@ -274,7 +287,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			file = eval(vdb, file, tupid);
 			if(!file)
 				return -1;
-			if(get_path_list(file, &plist, incdir, &symlist) < 0)
+			if(get_path_list(file, &plist, incdir, NULL, &symlist) < 0)
 				return -1;
 			while(!list_empty(&symlist)) {
 				struct half_entry *he;
@@ -384,10 +397,10 @@ found_paren:
 			free(lval);
 			free(rval);
 		} else if(line[0] == ':') {
-			if(parse_rule(line+1, tupid, lno, g, vdb) < 0)
+			if(parse_rule(line+1, tupid, lno, g, vdb, &bl) < 0)
 				goto syntax_error;
 		} else if(line[0] == ',') {
-			if(parse_varsed(line+1, tupid, lno, g, vdb) < 0)
+			if(parse_varsed(line+1, tupid, lno, g, vdb, &bl) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -444,6 +457,8 @@ found_paren:
 		}
 	}
 
+	bin_list_del(&bl);
+
 	return 0;
 
 syntax_error:
@@ -452,10 +467,10 @@ syntax_error:
 }
 
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb)
+		      struct vardb *vdb, struct bin_list *bl)
 {
 	char *input, *cmd, *output;
-	char *ie, *ce;
+	char *ie, *ce, *oe;
 	struct rule r;
 	char empty[] = "";
 	int rc;
@@ -489,6 +504,29 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 	while(isspace(*output))
 		output++;
 	ce[1] = 0;
+	p = strchr(p, '[');
+	if(!p) {
+		r.bin = NULL;
+	} else {
+		char *bin;
+		oe = p - 1;
+		while(isspace(*oe))
+			oe--;
+		oe[1] = 0;
+
+		bin = p+1;
+		p = strchr(p, ']');
+		if(!p) {
+			fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
+			return -1;
+		}
+		*p = 0;
+
+		r.bin = bin_add(bin, bl);
+		if(!r.bin) {
+			return -1;
+		}
+	}
 
 	r.foreach = 0;
 	if(input) {
@@ -506,12 +544,12 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.line_number = lno;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid);
+	rc = execute_rule(&r, g, vdb, tupid, bl);
 	return rc;
 }
 
 static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb)
+			struct vardb *vdb, struct bin_list *bl)
 {
 	char *input, *output;
 	char *ie;
@@ -543,14 +581,15 @@ static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.output_pattern = output;
 	r.command = command;
 	r.line_number = lno;
+	r.bin = NULL;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid);
+	rc = execute_rule(&r, g, vdb, tupid, bl);
 	return rc;
 }
 
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid)
+			tupid_t tupid, struct bin_list *bl)
 {
 	char *oosep;
 	struct name_list order_only_nl;
@@ -575,10 +614,10 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 			*oosep = 0;
 			oosep++;
 		}
-		if(parse_input_patterns(oosep, tupid, &order_only_nl, g) < 0)
+		if(parse_input_patterns(oosep, tupid, &order_only_nl, g, bl) < 0)
 			return -1;
 	}
-	if(parse_input_patterns(input_pattern, tupid, &r->namelist, g) < 0)
+	if(parse_input_patterns(input_pattern, tupid, &r->namelist, g, bl) < 0)
 		return -1;
 
 	if(r->foreach) {
@@ -591,14 +630,9 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 		 * allocating a separate nle, which is why we don't have to do
 		 * a delete_name_list_entry for the temporary list and can just
 		 * reinitialize the pointers using init_name_list.
-		 *
-		 * The reason I use .prev instead of .next is because it
-		 * matches the order I used to do it in, which some test cases
-		 * (specifically, t8000) depend on. Other than that it is
-		 * completely irrelevant.
 		 */
 		while(!list_empty(&r->namelist.entries)) {
-			nle = list_entry(r->namelist.entries.prev,
+			nle = list_entry(r->namelist.entries.next,
 					 struct name_list_entry, list);
 			init_name_list(&tmp_nl);
 			memcpy(&tmp_nle, nle, sizeof(*nle));
@@ -646,12 +680,13 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 	return 0;
 }
 
-static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struct graph *g)
+static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
+				struct graph *g, struct bin_list *bl)
 {
 	LIST_HEAD(plist);
 	struct path_list *pl, *tmp;
 
-	if(get_path_list(p, &plist, dt, NULL) < 0)
+	if(get_path_list(p, &plist, dt, bl, NULL) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, dt, g) < 0)
 		return -1;
@@ -665,7 +700,7 @@ static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl, struc
 }
 
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
-			 struct list_head *symlist)
+			 struct bin_list *bl, struct list_head *symlist)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -684,19 +719,48 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			perror("malloc");
 			return -1;
 		}
-		pl->path = p;
-		pl->dt = find_dir_tupid_dt(dt, p, &pl->file, symlist, 0);
-		if(pl->dt <= 0) {
-			fprintf(stderr, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
-			return -1;
-		}
-		if(pl->path == pl->file) {
-			pl->path = NULL;
+		pl->path = NULL;
+		pl->file = NULL;
+		pl->dt = 0;
+		pl->bin = NULL;
+
+		if(p[0] == '[') {
+			/* Bin */
+			char *endb;
+
+			if(!bl) {
+				fprintf(stderr, "Parse error: Bins are only usable in an input or output list.\n");
+				return -1;
+			}
+
+			endb = strchr(p, ']');
+			if(!endb) {
+				fprintf(stderr, "Parse error: Expecting end bracket for input bin.\n");
+				return -1;
+			}
+			*endb = 0;
+			p++;
+			pl->bin = bin_find(p, bl);
+			if(!pl->bin) {
+				fprintf(stderr, "Parse error: Unable to find bin '%s'\n", p);
+				return -1;
+			}
 		} else {
-			/* File points to somewhere later in the path, so set
-			 * the last '/' to 0.
-			 */
-			pl->path[pl->file-pl->path-1] = 0;
+			/* Path */
+			pl->path = p;
+			pl->dt = find_dir_tupid_dt(dt, p, &pl->file, symlist, 0);
+			if(pl->dt <= 0) {
+				fprintf(stderr, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
+				return -1;
+			}
+			if(pl->path == pl->file) {
+				pl->path = NULL;
+			} else {
+				/* File points to somewhere later in the path,
+				 * so set the last '/' to 0.
+				 */
+				pl->path[pl->file-pl->path-1] = 0;
+			}
 		}
 		list_add_tail(&pl->list, plist);
 
@@ -732,48 +796,98 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 static int get_name_list(struct list_head *plist, struct name_list *nl)
 {
 	struct path_list *pl;
-	struct build_name_list_args args;
 
 	list_for_each_entry(pl, plist, list) {
-		if(pl->path != NULL) {
-			/* Note that dirlen should be pl->file - pl->path - 1,
-			 * but we add 1 to account for the trailing '/' that
-			 * will be added.
-			 */
-			args.dir = pl->path;
-			args.dirlen = pl->file-pl->path;
-		} else {
-			args.dir = "";
-			args.dirlen = 0;
-		}
-		args.nl = nl;
-		if(strchr(pl->file, '*') == NULL) {
-			struct db_node dbn;
-			int rc;
-			if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
-				return -1;
-			}
-			if(dbn.tupid < 0) {
-				fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
-				return -1;
-			}
-			if(dbn.type == TUP_NODE_GHOST) {
-				fprintf(stderr, "Error: Explicitly named file '%s' is a ghost file, so it can't be used as an input.\n", pl->file);
-				return -1;
-			}
-			rc = tup_db_in_delete_list(dbn.tupid);
-			if(rc < 0)
-				return -1;
-			if(rc == 1) {
-				fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
-				return -1;
-			}
-			if(build_name_list_cb(&args, &dbn) < 0)
+		if(pl->bin) {
+			if(nl_add_bin(pl->bin, pl->dt, nl) < 0)
 				return -1;
 		} else {
-			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->file) < 0)
+			if(nl_add_path(pl, nl) < 0)
 				return -1;
 		}
+	}
+	return 0;
+}
+
+static int nl_add_path(struct path_list *pl, struct name_list *nl)
+{
+	struct build_name_list_args args;
+
+	if(pl->path != NULL) {
+		/* Note that dirlen should be pl->file - pl->path - 1,
+		 * but we add 1 to account for the trailing '/' that
+		 * will be added.
+		 */
+		args.dir = pl->path;
+		args.dirlen = pl->file-pl->path;
+	} else {
+		args.dir = "";
+		args.dirlen = 0;
+	}
+	args.nl = nl;
+	if(strchr(pl->file, '*') == NULL) {
+		struct db_node dbn;
+		int rc;
+		if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
+			return -1;
+		}
+		if(dbn.tupid < 0) {
+			fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
+			return -1;
+		}
+		if(dbn.type == TUP_NODE_GHOST) {
+			fprintf(stderr, "Error: Explicitly named file '%s' is a ghost file, so it can't be used as an input.\n", pl->file);
+			return -1;
+		}
+		rc = tup_db_in_delete_list(dbn.tupid);
+		if(rc < 0)
+			return -1;
+		if(rc == 1) {
+			fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
+			return -1;
+		}
+		if(build_name_list_cb(&args, &dbn) < 0)
+			return -1;
+	} else {
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->file) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl)
+{
+	struct bin_entry *be;
+	struct name_list_entry *nle;
+	int extlesslen;
+
+	list_for_each_entry(be, &b->entries, list) {
+		extlesslen = be->len - 1;
+		while(extlesslen > 0 && be->name[extlesslen] != '.')
+			extlesslen--;
+		if(extlesslen == 0)
+			extlesslen = be->len;
+
+		nle = malloc(sizeof *nle);
+		if(!nle) {
+			perror("malloc");
+			return -1;
+		}
+
+		nle->path = malloc(be->len + 1);
+		if(!nle->path)
+			return -1;
+		memcpy(nle->path, be->name, be->len+1);
+
+		/* All binned nodes are generated from commands */
+		nle->len = be->len;
+		nle->extlesslen = extlesslen;
+		nle->tupid = be->tupid;
+		nle->dt = dt;
+		nle->type = TUP_NODE_GENERATED;
+		set_nle_base(nle);
+
+		add_name_list_entry(nl, nle);
 	}
 	return 0;
 }
@@ -865,7 +979,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	output_pattern = eval(vdb, r->output_pattern, tupid);
 	if(!output_pattern)
 		return -1;
-	if(get_path_list(output_pattern, &oplist, tupid, NULL) < 0)
+	if(get_path_list(output_pattern, &oplist, tupid, NULL, NULL) < 0)
 		return -1;
 	while(!list_empty(&oplist)) {
 		pl = list_entry(oplist.next, struct path_list, list);
@@ -892,6 +1006,11 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 			return -1;
 
 		add_name_list_entry(&onl, onle);
+
+		if(r->bin) {
+			if(bin_add_entry(r->bin, onle->path, onle->len, onle->tupid) < 0)
+				return -1;
+		}
 
 		list_del(&pl->list);
 		free(pl);
