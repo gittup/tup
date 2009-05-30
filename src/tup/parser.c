@@ -1157,12 +1157,28 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 			spc++;
 		paste_chars = (nl->num_entries - 1) * (spc - p);
 		if(*p == 'f') {
+			if(nl->num_entries == 0) {
+				fprintf(stderr, "Error: %%f used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
 			clen += nl->totlen + paste_chars;
 		} else if(*p == 'F') {
+			if(nl->num_entries == 0) {
+				fprintf(stderr, "Error: %%F used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
 			clen += nl->extlesstotlen + paste_chars;
 		} else if(*p == 'b') {
+			if(nl->num_entries == 0) {
+				fprintf(stderr, "Error: %%b used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
 			clen += nl->basetotlen + paste_chars;
 		} else if(*p == 'B') {
+			if(nl->num_entries == 0) {
+				fprintf(stderr, "Error: %%B used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
 			clen += nl->extlessbasetotlen + paste_chars;
 		} else if(*p == 'o') {
 			if(!onl) {
