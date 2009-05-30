@@ -597,6 +597,12 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 	}
 	*p = 0;
 
+	/* Bin must be at the end of the line */
+	if(p[1] != 0) {
+		fprintf(stderr, "Parse error line %i: Trailing characters after output bin: '%s'\n", lno, p+1);
+		return -1;
+	}
+
 	*b = bin_add(bin, bl);
 	if(!*b)
 		return -1;
