@@ -102,7 +102,6 @@ use single scratch list instead of all the various temporary lists? or at least 
 
 directly support symlinks in tup? Might make t5037 usable.
 
-order-only bins?
 include bin should fail
 multiple bins should fail
 
