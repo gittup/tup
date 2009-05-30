@@ -75,6 +75,7 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 		      struct vardb *vdb, struct bin_list *bl);
 static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
 			struct vardb *vdb, struct bin_list *bl);
+static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 			tupid_t tupid, struct bin_list *bl);
 static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
@@ -470,7 +471,7 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 		      struct vardb *vdb, struct bin_list *bl)
 {
 	char *input, *cmd, *output;
-	char *ie, *ce, *oe;
+	char *ie, *ce;
 	struct rule r;
 	char empty[] = "";
 	int rc;
@@ -504,29 +505,9 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 	while(isspace(*output))
 		output++;
 	ce[1] = 0;
-	p = strchr(p, '[');
-	if(!p) {
-		r.bin = NULL;
-	} else {
-		char *bin;
-		oe = p - 1;
-		while(isspace(*oe))
-			oe--;
-		oe[1] = 0;
-
-		bin = p+1;
-		p = strchr(p, ']');
-		if(!p) {
-			fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
-			return -1;
-		}
-		*p = 0;
-
-		r.bin = bin_add(bin, bl);
-		if(!r.bin) {
-			return -1;
-		}
-	}
+	if(parse_bin(p, bl, &r.bin, lno) < 0)
+		return -1;
+	/* Don't rely on p now, since parse_bin fiddles with things */
 
 	r.foreach = 0;
 	if(input) {
@@ -575,17 +556,51 @@ static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
 	output = p;
 	while(isspace(*output))
 		output++;
+	if(parse_bin(p, bl, &r.bin, lno) < 0)
+		return -1;
+	/* Don't rely on p now, since parse_bin fiddles with things */
 
 	r.foreach = 1;
 	r.input_pattern = input;
 	r.output_pattern = output;
 	r.command = command;
 	r.line_number = lno;
-	r.bin = NULL;
 	init_name_list(&r.namelist);
 
 	rc = execute_rule(&r, g, vdb, tupid, bl);
 	return rc;
+}
+
+static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
+{
+	char *oe;
+	char *bin;
+
+	*b = NULL;
+
+	p = strchr(p, '[');
+	/* No bin is ok */
+	if(!p)
+		return 0;
+
+	/* Terminate the real end of the output list */
+	oe = p - 1;
+	while(isspace(*oe))
+		oe--;
+	oe[1] = 0;
+
+	bin = p+1;
+	p = strchr(p, ']');
+	if(!p) {
+		fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
+		return -1;
+	}
+	*p = 0;
+
+	*b = bin_add(bin, bl);
+	if(!*b)
+		return -1;
+	return 0;
 }
 
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
