@@ -1301,7 +1301,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 	}
 	strcpy(&s[x], p);
 	if((signed)strlen(s) != clen) {
-		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%i). String is: '%s'.\n", clen, strlen(s), s);
+		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
 		return NULL;
 	}
 	return s;
@@ -1439,7 +1439,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	strcpy(p, s);
 
 	if((signed)strlen(ret) != len) {
-		fprintf(stderr, "Length mismatch: expected %i bytes, wrote %i\n", len, strlen(ret));
+		fprintf(stderr, "Length mismatch: expected %i bytes, wrote %li\n", len, (long)strlen(ret));
 		return NULL;
 	}
 

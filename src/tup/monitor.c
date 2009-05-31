@@ -182,8 +182,8 @@ int monitor(int argc, char **argv)
 		for(offset = 0; offset < x; offset += sizeof(*e) + e->len) {
 			e = (void*)((char*)buf + offset);
 
-			DEBUGP("%c[%i: %i]: '%s' %08x [%i, %i]\n", locked? 'E' : 'e', e->wd,
-			       sizeof(*e) + e->len, e->len ? e->name : "", e->mask, tup_wd, obj_wd);
+			DEBUGP("%c[%i: %li]: '%s' %08x [%i, %i]\n", locked? 'E' : 'e', e->wd,
+			       (long)sizeof(*e) + e->len, e->len ? e->name : "", e->mask, tup_wd, obj_wd);
 			/* If the object lock file is opened, assume we are now
 			 * locked out. We take the tri lock before releasing
 			 * the object lock, so we can make sure we are the
@@ -341,8 +341,8 @@ static void queue_event(struct inotify_event *e)
 		 * is just a single file-creation event.
 		 */
 	}
-	DEBUGP("Queue[%i]: '%s' %08x\n",
-	       sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
+	DEBUGP("Queue[%li]: '%s' %08x\n",
+	       (long)sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
 
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
@@ -377,8 +377,8 @@ static void flush_queue(void)
 
 		m = (struct monitor_event*)&queue_buf[queue_start];
 		e = &m->e;
-		DEBUGP("Handle[%i]: '%s' %08x\n",
-		       sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
+		DEBUGP("Handle[%li]: '%s' %08x\n",
+		       (long)sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
 		if(e->mask != 0)
 			handle_event(m);
 		queue_start += sizeof(*m) + e->len;

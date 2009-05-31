@@ -3,6 +3,10 @@
 #include "array_size.h"
 #include <stdio.h>
 
+/* TODO: This should probably just be replaced by a normal balanced binary
+ * tree. I tried to use tsearch/tfind/etc, but that failed miserably.
+ */
+
 int memdb_init(struct memdb *m)
 {
 	int x;
@@ -54,7 +58,7 @@ int memdb_add(struct memdb *m, tupid_t id, void *n)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(m->db));
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 2, (int)n) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, (unsigned long)n) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(m->db));
 		return -1;
 	}
@@ -111,7 +115,7 @@ int memdb_find(struct memdb *m, tupid_t id, void *p)
 	int dbrc;
 	sqlite3_stmt **stmt = &m->stmt[MEMDB_FIND];
 	static char s[] = "select ptr from node_map where id=?";
-	int res;
+	unsigned long res;
 	int rc = -1;
 
 	if(!*stmt) {
@@ -138,7 +142,7 @@ int memdb_find(struct memdb *m, tupid_t id, void *p)
 		goto out_reset;
 	}
 
-	res = sqlite3_column_int(*stmt, 0);
+	res = sqlite3_column_int64(*stmt, 0);
 	*(void**)p = (void*)res;
 	rc = 0;
 

@@ -21,7 +21,7 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-compile on 64-bit
+run on 64-bit
 
 remove tmpdb in favor of just a temporary table?
 
