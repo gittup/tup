@@ -29,8 +29,6 @@ static int scan(int argc, char **argv);
 static int mlink(int argc, char **argv);
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
-static int flags_exists_cb(void *arg, int argc, char **argv, char **col);
-static int flags_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
@@ -115,7 +113,7 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "link_exists") == 0) {
 		rc = link_exists(argc, argv);
 	} else if(strcmp(cmd, "flags_exists") == 0) {
-		rc = flags_exists(argc, argv);
+		rc = tup_db_check_flags();
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "node") == 0) {
@@ -518,36 +516,6 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 	return tup_db_link_exists(dbna.tupid, dbnb.tupid);
-}
-
-static int flags_exists_cb(void *arg, int argc, char **argv, char **col)
-{
-	int *iptr = arg;
-	if(argc) {}
-	if(argv) {}
-	if(col) {}
-
-	*iptr = 1;
-
-	return 0;
-}
-
-static int flags_exists(int argc, char **argv)
-{
-	int x = 0;
-	if(argc) {}
-	if(argv) {}
-
-	if(tup_db_select(flags_exists_cb, &x,
-			 "select * from create_list") != 0)
-		return -1;
-	if(tup_db_select(flags_exists_cb, &x,
-			 "select * from modify_list") != 0)
-		return -1;
-	if(tup_db_select(flags_exists_cb, &x,
-			 "select * from delete_list") != 0)
-		return -1;
-	return x;
 }
 
 static int touch(int argc, char **argv)

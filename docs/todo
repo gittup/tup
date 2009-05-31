@@ -21,9 +21,6 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-remove dependency on sqlite3 command line
- - update build page where it says SQLite is needed
-
 compile on 64-bit
 
 remove tmpdb in favor of just a temporary table?
@@ -103,6 +100,7 @@ use single scratch list instead of all the various temporary lists? or at least 
 directly support symlinks in tup? Might make t5037 usable.
 
 html:
+  update build page where it says SQLite is needed
   proof: big-o notation
   proof: no clean target
   when Tupfiles are parsed

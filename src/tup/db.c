@@ -518,6 +518,51 @@ int tup_db_select(int (*callback)(void *, int, char **, char **),
 	return rc;
 }
 
+static const char *check_flags_name;
+static int check_flags_cb(void *arg, int argc, char **argv, char **col)
+{
+	int *iptr = arg;
+	if(argc) {}
+	if(argv) {}
+	if(col) {}
+	if(check_flags_name) {
+		fprintf(stderr, "*** %s_list:\n", check_flags_name);
+		check_flags_name = NULL;
+	}
+	fprintf(stderr, "%s\n", argv[0]);
+	*iptr = 1;
+	return 0;
+}
+
+int tup_db_check_flags(void)
+{
+	int rc = 0;
+	char *errmsg;
+	char s1[] = "select * from create_list";
+	char s2[] = "select * from modify_list";
+	char s3[] = "select * from delete_list";
+
+	check_flags_name = "create";
+	if(sqlite3_exec(tup_db, s1, check_flags_cb, &rc, &errmsg) != 0) {
+		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+			errmsg, s1);
+		sqlite3_free(errmsg);
+	}
+	check_flags_name = "modify";
+	if(sqlite3_exec(tup_db, s2, check_flags_cb, &rc, &errmsg) != 0) {
+		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+			errmsg, s2);
+		sqlite3_free(errmsg);
+	}
+	check_flags_name = "delete";
+	if(sqlite3_exec(tup_db, s3, check_flags_cb, &rc, &errmsg) != 0) {
+		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+			errmsg, s3);
+		sqlite3_free(errmsg);
+	}
+	return rc;
+}
+
 int tup_db_check_dup_links(void)
 {
 	int rc = 0;

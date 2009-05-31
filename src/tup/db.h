@@ -71,6 +71,7 @@ int tup_db_rollback(void);
 
 int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
 		  const char *sql, ...);
+int tup_db_check_flags(void);
 int tup_db_check_dup_links(void);
 
 /* Node operations */
