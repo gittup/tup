@@ -157,11 +157,10 @@ static void dump_node(FILE *f, struct node *n)
 		color |= 0xff0000;
 	if(n->flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
-	fprintf(f, "tup%lli [label=\"%s (%i)\",color=\"#%06x\"];\n",
-		n->tupid, n->name, n->incoming_count, color);
+	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
+		n, n->name, n->tupid, n->incoming_count, n->expanded, color);
 	/* TODO: slist_for_each? */
 	for(e=n->edges; e; e=e->next) {
-		fprintf(f, "tup%lli -> tup%lli [dir=back];\n",
-			e->dest->tupid, n->tupid);
+		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
 	}
 }
