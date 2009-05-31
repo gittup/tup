@@ -491,33 +491,6 @@ int tup_db_rollback(void)
 	return 0;
 }
 
-int tup_db_select(int (*callback)(void *, int, char **, char **),
-		  void *arg, const char *sql, ...)
-{
-	va_list ap;
-	int rc;
-	char *buf;
-	char *errmsg;
-
-	if(!tup_db) {
-		fprintf(stderr, "Error: tup_db not opened.\n");
-		return -1;
-	}
-
-	va_start(ap, sql);
-	buf = sqlite3_vmprintf(sql, ap);
-	va_end(ap);
-
-	rc = sqlite3_exec(tup_db, buf, callback, arg, &errmsg);
-	if(rc != 0) {
-		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
-			errmsg, buf);
-		sqlite3_free(errmsg);
-	}
-	sqlite3_free(buf);
-	return rc;
-}
-
 static const char *check_flags_name;
 static int check_flags_cb(void *arg, int argc, char **argv, char **col)
 {
@@ -547,18 +520,21 @@ int tup_db_check_flags(void)
 		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
 			errmsg, s1);
 		sqlite3_free(errmsg);
+		return -1;
 	}
 	check_flags_name = "modify";
 	if(sqlite3_exec(tup_db, s2, check_flags_cb, &rc, &errmsg) != 0) {
 		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
 			errmsg, s2);
 		sqlite3_free(errmsg);
+		return -1;
 	}
 	check_flags_name = "delete";
 	if(sqlite3_exec(tup_db, s3, check_flags_cb, &rc, &errmsg) != 0) {
 		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
 			errmsg, s3);
 		sqlite3_free(errmsg);
+		return -1;
 	}
 	return rc;
 }
@@ -2581,6 +2557,37 @@ int tup_db_delete_dependent_dir_links(tupid_t tupid)
 		return -1;
 	}
 
+	return 0;
+}
+
+static int config_cb(void *arg, int argc, char **argv, char **col)
+{
+	int x;
+	char *lval = NULL;
+	char *rval = NULL;
+	if(arg) {/* unused */}
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(col[x], "lval") == 0)
+			lval = argv[x];
+		if(strcmp(col[x], "rval") == 0)
+			rval = argv[x];
+	}
+	printf("%s: '%s'\n", lval, rval);
+	return 0;
+}
+
+int tup_db_show_config(void)
+{
+	char *errmsg;
+	char s[] = "select * from config";
+
+	if(sqlite3_exec(tup_db, s, config_cb, NULL, &errmsg) != 0) {
+		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+			errmsg, s);
+		sqlite3_free(errmsg);
+		return -1;
+	}
 	return 0;
 }
 

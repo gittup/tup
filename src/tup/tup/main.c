@@ -34,7 +34,6 @@ static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
 static int varset(int argc, char **argv);
 static int varchange(int argc, char **argv);
-static int config_cb(void *arg, int argc, char **argv, char **col);
 static int config(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int flush(void);
@@ -724,27 +723,10 @@ static int varchange(int argc, char **argv)
 	return 0;
 }
 
-static int config_cb(void *arg, int argc, char **argv, char **col)
-{
-	int x;
-	char *lval = NULL;
-	char *rval = NULL;
-	if(arg) {/* unused */}
-
-	for(x=0; x<argc; x++) {
-		if(strcmp(col[x], "lval") == 0)
-			lval = argv[x];
-		if(strcmp(col[x], "rval") == 0)
-			rval = argv[x];
-	}
-	printf("%s: '%s'\n", lval, rval);
-	return 0;
-}
-
 static int config(int argc, char **argv)
 {
 	if(argc == 1) {
-		if(tup_db_select(config_cb, NULL, "select * from config") != 0)
+		if(tup_db_show_config() < 0)
 			return -1;
 	} else if(argc == 3) {
 		if(tup_db_config_set_string(argv[1], argv[2]) < 0)

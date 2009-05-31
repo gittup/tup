@@ -68,9 +68,6 @@ int tup_db_create(int db_sync);
 int tup_db_begin(void);
 int tup_db_commit(void);
 int tup_db_rollback(void);
-
-int tup_db_select(int (*callback)(void *, int, char **, char **), void *arg,
-		  const char *sql, ...);
 int tup_db_check_flags(void);
 int tup_db_check_dup_links(void);
 
@@ -141,6 +138,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 int tup_db_delete_dependent_dir_links(tupid_t tupid);
 
 /* Config operations */
+int tup_db_show_config(void);
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
 int tup_db_config_set_int64(const char *lval, sqlite3_int64 x);
