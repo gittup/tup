@@ -15,7 +15,6 @@
 
 static void handle_file(const char *file, const char *file2, int at);
 static int ignore_file(const char *file);
-static void ldpre_init(void) __attribute__((constructor));
 static int sd;
 
 static int (*s_open)(const char *, int, ...);
@@ -33,11 +32,22 @@ static int (*s_execve)(const char *filename, char *const argv[],
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 
+#define WRAP(ptr, name) \
+	if(!ptr) { \
+		ptr = dlsym(RTLD_NEXT, name); \
+		if(!ptr) { \
+			fprintf(stderr, "tup.ldpreload: Unable to wrap '%s'\n", \
+				name); \
+			exit(1); \
+		} \
+	}
+
 int open(const char *pathname, int flags, ...)
 {
 	int rc;
-
 	mode_t mode = 0;
+
+	WRAP(s_open, "open");
 	if(flags & O_CREAT) {
 		va_list ap;
 		va_start(ap, flags);
@@ -58,8 +68,9 @@ int open(const char *pathname, int flags, ...)
 int open64(const char *pathname, int flags, ...)
 {
 	int rc;
-
 	mode_t mode = 0;
+
+	WRAP(s_open64, "open64");
 	if(flags & O_CREAT) {
 		va_list ap;
 		va_start(ap, flags);
@@ -80,6 +91,7 @@ FILE *fopen(const char *path, const char *mode)
 {
 	FILE *f;
 
+	WRAP(s_fopen, "fopen");
 	f = s_fopen(path, mode);
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
@@ -94,6 +106,7 @@ FILE *fopen64(const char *path, const char *mode)
 {
 	FILE *f;
 
+	WRAP(s_fopen64, "fopen64");
 	f = s_fopen64(path, mode);
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
@@ -108,6 +121,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 {
 	FILE *f;
 
+	WRAP(s_freopen, "freopen");
 	f = s_freopen(path, mode, stream);
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
@@ -122,6 +136,7 @@ int creat(const char *pathname, mode_t mode)
 {
 	int rc;
 
+	WRAP(s_creat, "creat");
 	rc = s_creat(pathname, mode);
 	if(rc >= 0)
 		handle_file(pathname, "", ACCESS_WRITE);
@@ -131,6 +146,7 @@ int creat(const char *pathname, mode_t mode)
 int symlink(const char *oldpath, const char *newpath)
 {
 	int rc;
+	WRAP(s_symlink, "symlink");
 	rc = s_symlink(oldpath, newpath);
 	if(rc == 0)
 		handle_file(oldpath, newpath, ACCESS_SYMLINK);
@@ -141,6 +157,7 @@ int rename(const char *old, const char *new)
 {
 	int rc;
 
+	WRAP(s_rename, "rename");
 	rc = s_rename(old, new);
 	if(rc == 0) {
 		if(!ignore_file(old) && !ignore_file(new)) {
@@ -154,6 +171,7 @@ int unlink(const char *pathname)
 {
 	int rc;
 
+	WRAP(s_unlink, "unlink");
 	rc = s_unlink(pathname);
 	if(rc == 0)
 		handle_file(pathname, "", ACCESS_UNLINK);
@@ -164,6 +182,7 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 {
 	int rc;
 
+	WRAP(s_unlinkat, "unlinkat");
 	rc = s_unlinkat(dirfd, pathname, flags);
 	if(rc == 0) {
 		if(dirfd == AT_FDCWD) {
@@ -180,6 +199,7 @@ int execve(const char *filename, char *const argv[], char *const envp[])
 {
 	int rc;
 
+	WRAP(s_execve, "execve");
 	handle_file(filename, "", ACCESS_READ);
 	rc = s_execve(filename, argv, envp);
 	return rc;
@@ -188,6 +208,7 @@ int execve(const char *filename, char *const argv[], char *const envp[])
 int __xstat(int vers, const char *name, struct stat *buf)
 {
 	int rc;
+	WRAP(s_xstat, "__xstat");
 	rc = s_xstat(vers, name, buf);
 	if(rc < 0) {
 		if(errno == ENOENT) {
@@ -201,6 +222,7 @@ int __xstat64 (int __ver, __const char *__filename,
 	       struct stat64 *__stat_buf)
 {
 	int rc;
+	WRAP(s_xstat64, "__xstat64");
 	rc = s_xstat64(__ver, __filename, __stat_buf);
 	if(rc < 0) {
 		if(errno == ENOENT) {
@@ -221,6 +243,21 @@ static void handle_file(const char *file, const char *file2, int at)
 		return;
 
 	pthread_mutex_lock(&mutex);
+	if(!sd) {
+		char *path;
+
+		path = getenv(TUP_SERVER_NAME);
+		if(!path) {
+			fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
+				"path from the environment.\n", TUP_SERVER_NAME);
+			exit(1);
+		}
+		sd = strtol(path, NULL, 0);
+		if(sd <= 0) {
+			fprintf(stderr, "tup.ldpreload: Unable to get valid socket descriptor.\n");
+			exit(1);
+		}
+	}
 	event = (struct access_event*)msgbuf;
 	event->at = at;
 	event->len = strlen(file) + 1;
@@ -246,40 +283,4 @@ static int ignore_file(const char *file)
 	if(strncmp(file, "/dev/", 5) == 0)
 		return 1;
 	return 0;
-}
-
-static void ldpre_init(void)
-{
-	char *path;
-	s_open = dlsym(RTLD_NEXT, "open");
-	s_open64 = dlsym(RTLD_NEXT, "open64");
-	s_fopen = dlsym(RTLD_NEXT, "fopen");
-	s_fopen64 = dlsym(RTLD_NEXT, "fopen64");
-	s_freopen = dlsym(RTLD_NEXT, "freopen");
-	s_creat = dlsym(RTLD_NEXT, "creat");
-	s_symlink = dlsym(RTLD_NEXT, "symlink");
-	s_rename = dlsym(RTLD_NEXT, "rename");
-	s_unlink = dlsym(RTLD_NEXT, "unlink");
-	s_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
-	s_execve = dlsym(RTLD_NEXT, "execve");
-	s_xstat = dlsym(RTLD_NEXT, "__xstat");
-	s_xstat64 = dlsym(RTLD_NEXT, "__xstat64");
-	if(!s_open || !s_open64 || !s_fopen || !s_fopen64 || !s_freopen ||
-	   !s_creat || !s_rename || !s_unlink || !s_unlinkat || !s_execve ||
-	   !s_xstat || !s_xstat64) {
-		fprintf(stderr, "tup.ldpreload: Unable to get real symbols!\n");
-		exit(1);
-	}
-
-	path = getenv(TUP_SERVER_NAME);
-	if(!path) {
-		fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
-			"path from the environment.\n", TUP_SERVER_NAME);
-		exit(1);
-	}
-	sd = strtol(path, NULL, 0);
-	if(sd <= 0) {
-		fprintf(stderr, "tup.ldpreload: Unable to get valid socket descriptor.\n");
-		exit(1);
-	}
 }
