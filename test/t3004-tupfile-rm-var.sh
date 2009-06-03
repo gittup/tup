@@ -7,7 +7,7 @@
 tmkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
-file-@CONFIG_BAR@ += bar.c
+file-@(CONFIG_BAR) += bar.c
 : foreach \$(file-y) |> cat %f > %o |> %F.o
 HERE
 echo hey > tmp/foo.c

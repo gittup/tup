@@ -1323,10 +1323,9 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' && s[2] == '(') ||
-			   s[1] == '@') {
+			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
-				/* \@ becomes @ */
+				/* \@( becomes @ */
 				len++;
 				s += 2;
 			} else {
@@ -1354,20 +1353,25 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 				len++;
 			}
 		} else if(*s == '@') {
-			const char *rat;
+			const char *rparen;
 
-			rat = strchr(s+1, '@');
-			if(!rat) {
-				expected = "ending @-symbol";
-				goto syntax_error;
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
+
+				var = s + 2;
+				vlen = tup_db_get_varlen(var, rparen-var);
+				if(vlen < 0)
+					return NULL;
+				len += vlen;
+				s = rparen + 1;
+			} else {
+				s++;
+				len++;
 			}
-
-			var = s + 1;
-			vlen = tup_db_get_varlen(var, rat-s-1);
-			if(vlen < 0)
-				return NULL;
-			len += vlen;
-			s = rat + 1;
 		} else {
 			s++;
 			len++;
@@ -1384,10 +1388,9 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' && s[2] == '(') ||
-			   s[1] == '@') {
+			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
-				/* \@ becomes @ */
+				/* \@( becomes @ */
 				*p = s[1];
 				s += 2;
 			} else {
@@ -1416,23 +1419,28 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 				s++;
 			}
 		} else if(*s == '@') {
-			const char *rat;
+			const char *rparen;
 			tupid_t vt;
 
-			rat = strchr(s+1, '@');
-			if(!rat) {
-				expected = "ending @-symbol";
-				goto syntax_error;
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
+
+				var = s + 2;
+				vt = tup_db_get_var(var, rparen-var, &p);
+				if(vt < 0)
+					return NULL;
+				if(tup_db_create_link(vt, tupid, TUP_LINK_NORMAL) < 0)
+					return NULL;
+				s = rparen + 1;
+			} else {
+				*p = *s;
+				p++;
+				s++;
 			}
-
-			var = s + 1;
-			vt = tup_db_get_var(var, rat-s-1, &p);
-			if(vt < 0)
-				return NULL;
-			if(tup_db_create_link(vt, tupid, TUP_LINK_NORMAL) < 0)
-				return NULL;
-
-			s = rat + 1;
 		} else {
 			*p = *s;
 			p++;

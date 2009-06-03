@@ -15,8 +15,7 @@ syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match separator /|>/
 syntax match format display "%\([FfoBb]\)" contained
-syntax match variable /$([^)]*)/
-syntax match variable /@[a-zA-Z0-9_]*@/
+syntax match variable /[$@]([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_root\>\)"
 syntax keyword keys foreach

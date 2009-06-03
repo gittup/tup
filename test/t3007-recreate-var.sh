@@ -5,7 +5,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-var = @CONFIG_FOO@
+var = @(CONFIG_FOO)
 HERE
 tup touch Tupfile
 tup varset CONFIG_FOO=n

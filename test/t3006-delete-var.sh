@@ -6,7 +6,7 @@
 . ../tup.sh
 cat > Tupfile << HERE
 src-y:=
-src-@BLAH@ = foo.c
+src-@(BLAH) = foo.c
 : foreach \$(src-y) |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile foo.c

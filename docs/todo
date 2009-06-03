@@ -64,9 +64,6 @@ can't have % flag in a var and then do : |> $(var) |>  ?
 takes long time after re-parsing all linux directories (eg: Rules.tup changes)
   - parser fix will change that?
 
-change @ variables to mimic $() variable syntax?
- - only escape \@(, not just \@
-
 'tup g' shows too much info when a directory changes?
 
 access(2) support in ldpreload?

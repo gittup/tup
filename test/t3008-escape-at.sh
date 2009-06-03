@@ -5,8 +5,10 @@
 . ../tup.sh
 cat > Tupfile << HERE
 : |> echo "\@hey" |>
+: |> echo "\@(hey" |>
 HERE
 tup touch Tupfile
 tup upd
 
-tup_object_exist . 'echo "@hey"'
+tup_object_exist . 'echo "\@hey"'
+tup_object_exist . 'echo "@(hey"'
