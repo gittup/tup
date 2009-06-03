@@ -80,8 +80,6 @@ if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - work if user code does '#define CONFIG_BLAH blah'?
  - namespace CONFIG under @/default, @/newconfig, etc?
 
-remove tup_db_set_flags_by_name() in favor of more targetting flag setting?
-
 remove include_root and TUP_TOP so Tupfiles are compositable?
  - may need to provide include_rules directive so this isn't insane
 

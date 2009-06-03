@@ -903,46 +903,6 @@ out_reset:
 	return rc;
 }
 
-int tup_db_set_flags_by_name(tupid_t dt, const char *name, int flags)
-{
-	struct db_node dbn;
-
-	if(node_select(dt, name, -1, &dbn) < 0)
-		return -1;
-	if(dbn.tupid == -1)
-		return -1;
-
-	if(tup_db_set_flags_by_id(dbn.tupid, flags) < 0)
-		return -1;
-	return 0;
-}
-
-int tup_db_set_flags_by_id(tupid_t tupid, int flags)
-{
-	if(flags & TUP_FLAGS_CREATE) {
-		if(tup_db_add_create_list(tupid) < 0)
-			return -1;
-	} else {
-		if(tup_db_unflag_create(tupid) < 0)
-			return -1;
-	}
-	if(flags & TUP_FLAGS_MODIFY) {
-		if(tup_db_add_modify_list(tupid) < 0)
-			return -1;
-	} else {
-		if(tup_db_unflag_modify(tupid) < 0)
-			return -1;
-	}
-	if(flags & TUP_FLAGS_DELETE) {
-		if(tup_db_add_delete_list(tupid) < 0)
-			return -1;
-	} else {
-		if(tup_db_unflag_delete(tupid) < 0)
-			return -1;
-	}
-	return 0;
-}
-
 int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym)
 {
 	int rc;
@@ -1001,7 +961,9 @@ int tup_db_delete_dir(tupid_t dt)
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_DIR];
 	static char s[] = "insert or replace into delete_list select id from node where dir=?";
 
-	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_DELETE) < 0)
+	if(tup_db_unflag_create(dt) < 0)
+		return -1;
+	if(tup_db_add_delete_list(dt) < 0)
 		return -1;
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1046,7 +1008,9 @@ int tup_db_modify_dir(tupid_t dt)
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
 	static char s[] = "insert or replace into modify_list select id from node where dir=? and type!=?";
 
-	if(tup_db_set_flags_by_id(dt, TUP_FLAGS_CREATE) < 0)
+	if(tup_db_unflag_delete(dt) < 0)
+		return -1;
+	if(tup_db_add_create_list(dt) < 0)
 		return -1;
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

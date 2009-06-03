@@ -692,7 +692,7 @@ static void *update_work(void *arg)
 				}
 				e = e->next;
 			}
-			if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
+			if(tup_db_unflag_modify(n->tupid) < 0)
 				rc = -1;
 			pthread_mutex_unlock(&db_mutex);
 		}

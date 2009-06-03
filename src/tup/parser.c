@@ -201,7 +201,7 @@ out_close_vdb:
 		rc = -1;
 
 	if(rc == 0) {
-		if(tup_db_set_flags_by_id(n->tupid, TUP_FLAGS_NONE) < 0)
+		if(tup_db_unflag_create(n->tupid) < 0)
 			return -1;
 	}
 
