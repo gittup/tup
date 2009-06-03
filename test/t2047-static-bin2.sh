@@ -5,9 +5,9 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foo.c |> gcc -c %f -o %o |> %B.o [objs]
-: bar.S |> as %f -o %o |> %B.o [objs]
-: [objs] |> gcc %f -o %o |> prog
+: foo.c |> gcc -c %f -o %o |> %B.o {objs}
+: bar.S |> as %f -o %o |> %B.o {objs}
+: {objs} |> gcc %f -o %o |> prog
 HERE
 tup touch foo.c bar.S Tupfile
 tup parse
@@ -16,9 +16,9 @@ tup_dep_exist . 'bar.o' . 'gcc foo.o bar.o -o prog'
 
 # Re-order the first two rules.
 cat > Tupfile << HERE
-: bar.S |> as %f -o %o |> %B.o [objs]
-: foo.c |> gcc -c %f -o %o |> %B.o [objs]
-: [objs] |> gcc %f -o %o |> prog
+: bar.S |> as %f -o %o |> %B.o {objs}
+: foo.c |> gcc -c %f -o %o |> %B.o {objs}
+: {objs} |> gcc %f -o %o |> prog
 HERE
 tup touch Tupfile
 # Parse and delete here to remove the old command

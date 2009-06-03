@@ -1,12 +1,12 @@
 #! /bin/sh -e
 
-# Check that static binning (using brackets to dump output files into a bin)
+# Check that static binning (using braces to dump output files into a bin)
 # works.
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o [objs]
-: [objs] |> gcc %f -o %o |> prog
+: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs}
+: {objs} |> gcc %f -o %o |> prog
 : *.o |> test %f |>
 HERE
 tup touch foo.c bar.c Tupfile

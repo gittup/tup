@@ -4,8 +4,8 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-, foo.txt |> out.txt [txt]
-: foreach [txt] |> cp %f %o |> %B.copied
+, foo.txt |> out.txt {txt}
+: foreach {txt} |> cp %f %o |> %B.copied
 HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile

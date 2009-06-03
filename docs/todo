@@ -21,8 +21,6 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-run on 64-bit
-
 remove tmpdb in favor of just a temporary table?
 
 use temporary table instead of moving all commands to delete in parser? Should be easy to time the difference.
@@ -98,6 +96,13 @@ print graph if not empty after execution
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
 directly support symlinks in tup? Might make t5037 usable.
+
+move start_server/stop_server outside so its done once per update thread, rather than once per update()?
+
+compile with -DSQLITE_THREADSAFE=0? my locking should be sufficient
+ - examine other sqlite flags?
+
+ Add %1, %2, etc to reference first, second prereq?
 
 html:
   update build page where it says SQLite is needed

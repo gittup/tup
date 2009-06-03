@@ -578,7 +578,7 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 
 	*b = NULL;
 
-	p = strchr(p, '[');
+	p = strchr(p, '{');
 	/* No bin is ok */
 	if(!p)
 		return 0;
@@ -590,7 +590,7 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 	oe[1] = 0;
 
 	bin = p+1;
-	p = strchr(p, ']');
+	p = strchr(p, '}');
 	if(!p) {
 		fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
 		return -1;
@@ -760,7 +760,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 		pl->dt = 0;
 		pl->bin = NULL;
 
-		if(p[0] == '[') {
+		if(p[0] == '{') {
 			/* Bin */
 			char *endb;
 
@@ -769,7 +769,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 				return -1;
 			}
 
-			endb = strchr(p, ']');
+			endb = strchr(p, '}');
 			if(!endb) {
 				fprintf(stderr, "Parse error: Expecting end bracket for input bin.\n");
 				return -1;
@@ -848,6 +848,7 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 static int nl_add_path(struct path_list *pl, struct name_list *nl)
 {
 	struct build_name_list_args args;
+	int pos;
 
 	if(pl->path != NULL) {
 		/* Note that dirlen should be pl->file - pl->path - 1,
@@ -861,7 +862,9 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 		args.dirlen = 0;
 	}
 	args.nl = nl;
-	if(strchr(pl->file, '*') == NULL) {
+	pos = strcspn(pl->file, "*?[");
+	/* If no wildcard characters are found, pos is set to the ending nul */
+	if(pl->file[pos] == 0) {
 		struct db_node dbn;
 		int rc;
 		if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
