@@ -100,7 +100,6 @@ compile with -DSQLITE_THREADSAFE=0? my locking should be sufficient
  Add %1, %2, etc to reference first, second prereq?
 
 html:
-  update build page where it says SQLite is needed
   proof: big-o notation
   proof: no clean target
   when Tupfiles are parsed

@@ -64,13 +64,13 @@ Tupfile    foo.o      bar.o      hello_world      src/
 </pre>
 
 <h1>@@@@@@@@@@@@@@@@@@@@@@</h1>
-<p>The @ variables are super special - they actually appear in the DAG. You use them by doing something like @FOO@. By appearing in the DAG, if you change the variable, any Tupfiles that use them will be re-parsed. Also, you can use a special sed rule to convert an input file that has @FOO@ references and replaces them with their values in the output file. You would want to use these for any global configuration options in your program. One way you could use them is to enable or disable rules based on their value:</p>
+<p>The @ variables are super special - they actually appear in the DAG. You use them by doing something like @(FOO). By appearing in the DAG, if you change the variable, any Tupfiles that use them will be re-parsed. Also, you can use a special sed rule to convert an input file that has @FOO@ references and replaces them with their values in the output file. You would want to use these for any global configuration options in your program. One way you could use them is to enable or disable rules based on their value:</p>
 <pre>
-ifeq (@NCURSES@,y)
+ifeq (@(NCURSES),y)
 : foreach blah blah blah
 endif
 </pre>
-<p>If @NCURSES@ is set to y, then those rules take effect. If we later change @NCURSES@ to n, then this Tupfile will be parsed again during the update, and those rules will be deleted.</p>
+<p>If @(NCURSES) is set to y, then those rules take effect. If we later change @(NCURSES) to n, then this Tupfile will be parsed again during the update, and those rules will be deleted.</p>
 <p>Using them in a sed rule is pretty easy too. You could make a file like so:</p>
 <pre>
 $ cat Tupfile
@@ -78,9 +78,9 @@ $ cat Tupfile
 $ cat foo.h.in
 #define SPEED @SPEED@
 </pre>
-<p>Assuming there is a variable called @SPEED@ and it's set to "fast", then when we update you would get:</p>
+<p>Assuming there is a variable called @(SPEED) and it's set to "fast", then when we update you would get:</p>
 <pre>
 $ cat foo.h
 #define SPEED "fast"
 </pre>
-<p>If we then change @SPEED@ to "super fast", foo.h would be re-generated with the new value. Of course, since this is tup, the file would be re-generated at ludicrous speed, no matter what the variable @SPEED@ is set to.</p>
+<p>If we then change @(SPEED) to "super fast", foo.h would be re-generated with the new value. Of course, since this is tup, the file would be re-generated at ludicrous speed, no matter what the variable @(SPEED) is set to.</p>
