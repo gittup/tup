@@ -73,6 +73,11 @@ struct build_name_list_args {
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			 tupid_t curdir, const char *cwd, int clen,
 			 struct graph *g);
+static int include_rules(tupid_t tupid, tupid_t curdir, struct vardb *vdb,
+			 const char *cwd, int clen, struct graph *g);
+static int include_name_list(struct name_list *nl, tupid_t tupid,
+			     struct vardb *vdb, const char *cwd, int clen,
+			     struct graph *g);
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 		      struct vardb *vdb, struct bin_list *bl,
 		      const char *cwd, int clen);
@@ -231,12 +236,8 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 		}
 
 		if(strncmp(line, "include ", 8) == 0) {
-			struct buf incb;
-			int fd;
-			int rc;
 			char *file;
 			struct name_list nl;
-			struct name_list_entry *nle, *tmpnle;
 			struct path_list *pl, *tmppl;
 			int sym_bork = 0;
 			LIST_HEAD(plist);
@@ -271,74 +272,11 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			}
 			/* Can only be freed after plist */
 			free(file);
-			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
-				const char *cnc;
-				char *newcwd = NULL;
-				int newclen;
-
-				if(nle->type != TUP_NODE_FILE) {
-					if(nle->type == TUP_NODE_GENERATED) {
-						fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
-						return -1;
-					} else {
-						fprintf(stderr, "tup error: Attempt to include node (ID %lli, name='%s') of type %i?\n", nle->tupid, nle->path, nle->type);
-						return -1;
-					}
-				}
-
-				if(nle->dirlen) {
-					/* Dirlen includes room for a trailing
-					 * slash, which we move in between the
-					 * two strings.
-					 */
-					newclen = clen + nle->dirlen;
-					newcwd = malloc(newclen + 1);
-					if(!newcwd) {
-						perror("malloc");
-						return -1;
-					}
-					memcpy(newcwd, cwd, clen);
-					newcwd[clen] = '/';
-					memcpy(newcwd+clen+1, nle->path, nle->dirlen-1);
-					newcwd[newclen] = 0;
-					cnc = newcwd;
-				} else {
-					cnc = cwd;
-					newclen = clen;
-				}
-
-				fd = tup_db_open_tupid(nle->tupid);
-				if(fd < 0) {
-					fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
-					return -1;
-				}
-				rc = fslurp(fd, &incb);
-				close(fd);
-				if(rc < 0) {
-					fprintf(stderr, "Error slurping file.\n");
-					return -1;
-				}
-
-				/* When parsing the included Tupfile, any files
-				 * it includes will be relative to it
-				 * (nle->dt), not to the parent dir (tupid).
-				 * However, we want all links to be made to the
-				 * parent tupid.
-				 */
-				rc = parse_tupfile(&incb, vdb, tupid, nle->dt,
-						   cnc, newclen, g);
-				free(incb.s);
-				if(newcwd)
-					free(newcwd);
-				if(rc < 0) {
-					fprintf(stderr, "Error parsing included file '%s'\n", line);
-					return -1;
-				}
-
-				if(tup_db_create_link(nle->tupid, tupid, TUP_LINK_NORMAL) < 0)
-					return -1;
-				delete_name_list_entry(&nl, nle);
-			}
+			if(include_name_list(&nl, tupid, vdb, cwd, clen, g) < 0)
+				return -1;
+		} else if(strcmp(line, "include_rules") == 0) {
+			if(include_rules(tupid, curdir, vdb, cwd, clen, g) < 0)
+				return -1;
 		} else if(strcmp(line, "else") == 0) {
 			if_true = !if_true;
 		} else if(strcmp(line, "endif") == 0) {
@@ -453,6 +391,177 @@ found_paren:
 syntax_error:
 	fprintf(stderr, "Syntax error parsing Tupfile line %i\n  Line was: '%s'\n", lno, line);
 	return -1;
+}
+
+static int include_rules(tupid_t tupid, tupid_t curdir, struct vardb *vdb,
+			 const char *cwd, int clen, struct graph *g)
+{
+	tupid_t parent;
+	int num_dotdots;
+	int x;
+	char *p;
+	char *path;
+	int plen;
+	char tuprules[] = "Tuprules.tup";
+	int trlen = sizeof(tuprules) - 1;
+	struct name_list nl;
+	struct build_name_list_args args;
+
+	if(tupid) {}
+
+	parent = curdir;
+	num_dotdots = 0;
+	while(parent != DOT_DT) {
+		tupid_t new;
+		new = tup_db_parent(parent);
+		if(new < 0) {
+			fprintf(stderr, "Error finding parent node of ID %lli. Database might be hosed.\n", parent);
+			return -1;
+		}
+		parent = new;
+		num_dotdots++;
+	}
+	path = malloc(num_dotdots * 3 + trlen + 1);
+	if(!path) {
+		perror("malloc");
+		return -1;
+	}
+	p = path;
+	for(x=0; x<num_dotdots; x++) {
+		strcpy(p, "../");
+		p += 3;
+	}
+	strcpy(path + num_dotdots*3, tuprules);
+	/* Plen only includes the length of the path */
+	plen = num_dotdots*3;
+
+	init_name_list(&nl);
+	args.nl = &nl;
+
+	p = path;
+	for(x=0; x<=num_dotdots; x++, p+=3, plen-=3) {
+		struct db_node dbn;
+		tupid_t dt;
+		const char *last;
+		LIST_HEAD(sym_list);
+
+		dt = find_dir_tupid_dt(curdir, p, &last, &sym_list, 0);
+		if(dt < 0) {
+			fprintf(stderr, "Error: Unable to find directory for '%s' relative to dir %lli\n", p, curdir);
+			return -1;
+		}
+		if(tup_db_select_dbn(dt, last, &dbn) < 0) {
+			return -1;
+		}
+		if(dbn.tupid < 0) {
+			/* Tuprules.tup doesn't exist here, go to the next
+			 * dir.
+			 */
+			continue;
+		}
+
+		args.dir = p;
+		args.dirlen = plen;
+		if(build_name_list_cb(&args, &dbn) < 0)
+			return -1;
+	}
+	free(path);
+	return include_name_list(&nl, tupid, vdb, cwd, clen, g);
+}
+
+static int include_name_list(struct name_list *nl, tupid_t tupid,
+			     struct vardb *vdb, const char *cwd, int clen,
+			     struct graph *g)
+{
+	struct name_list_entry *nle, *tmpnle;
+	struct buf incb;
+	int fd;
+	int rc;
+
+	list_for_each_entry_safe(nle, tmpnle, &nl->entries, list) {
+		const char *cnc;
+		char *newcwd = NULL;
+		int newclen;
+
+		if(nle->type != TUP_NODE_FILE) {
+			if(nle->type == TUP_NODE_GENERATED) {
+				fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
+				return -1;
+			} else {
+				fprintf(stderr, "tup error: Attempt to include node (ID %lli, name='%s') of type %i?\n", nle->tupid, nle->path, nle->type);
+				return -1;
+			}
+		}
+
+		if(nle->dirlen) {
+			/* Just make a quick check to get rid of the annoying
+			 * leading "./" that would pop up.
+			 */
+			if(clen == 1) {
+				/* Remove trailing slash */
+				newclen = nle->dirlen - 1;
+				newcwd = malloc(newclen + 1);
+				if(!newcwd) {
+					perror("malloc");
+					return -1;
+				}
+				memcpy(newcwd, nle->path, nle->dirlen-1);
+				newcwd[newclen] = 0;
+			} else {
+				/* Dirlen includes room for a trailing
+				 * slash, which we move in between the
+				 * two strings.
+				 */
+				newclen = clen + nle->dirlen;
+				newcwd = malloc(newclen + 1);
+				if(!newcwd) {
+					perror("malloc");
+					return -1;
+				}
+				memcpy(newcwd, cwd, clen);
+				newcwd[clen] = '/';
+				memcpy(newcwd+clen+1, nle->path, nle->dirlen-1);
+				newcwd[newclen] = 0;
+			}
+			cnc = newcwd;
+		} else {
+			cnc = cwd;
+			newclen = clen;
+		}
+
+		fd = tup_db_open_tupid(nle->tupid);
+		if(fd < 0) {
+			fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
+			return -1;
+		}
+		rc = fslurp(fd, &incb);
+		close(fd);
+		if(rc < 0) {
+			fprintf(stderr, "Error slurping file.\n");
+			return -1;
+		}
+
+		/* When parsing the included Tupfile, any files
+		 * it includes will be relative to it
+		 * (nle->dt), not to the parent dir (tupid).
+		 * However, we want all links to be made to the
+		 * parent tupid.
+		 */
+		rc = parse_tupfile(&incb, vdb, tupid, nle->dt,
+				   cnc, newclen, g);
+		free(incb.s);
+		if(newcwd)
+			free(newcwd);
+		if(rc < 0) {
+			fprintf(stderr, "Error parsing included file '%s'\n", nle->path);
+			return -1;
+		}
+
+		if(tup_db_create_link(nle->tupid, tupid, TUP_LINK_NORMAL) < 0)
+			return -1;
+		delete_name_list_entry(nl, nle);
+	}
+	return 0;
 }
 
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
