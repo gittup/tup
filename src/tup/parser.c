@@ -37,6 +37,7 @@ struct name_list_entry {
 	int extlesslen;
 	int baselen;
 	int extlessbaselen;
+	int dirlen;
 	tupid_t tupid;
 	tupid_t dt;
 	int type;
@@ -70,14 +71,18 @@ struct build_name_list_args {
 };
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, struct graph *g);
+			 tupid_t curdir, const char *cwd, int clen,
+			 struct graph *g);
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb, struct bin_list *bl);
+		      struct vardb *vdb, struct bin_list *bl,
+		      const char *cwd, int clen);
 static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb, struct bin_list *bl);
+			struct vardb *vdb, struct bin_list *bl,
+			const char *cwd, int clen);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid, struct bin_list *bl);
+			tupid_t tupid, struct bin_list *bl,
+			const char *cwd, int clen);
 static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
 				struct graph *g, struct bin_list *bl, int lno);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
@@ -90,7 +95,7 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
-		   struct vardb *vdb, tupid_t tupid);
+		   struct vardb *vdb, tupid_t tupid, const char *cwd, int clen);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -99,15 +104,14 @@ static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
-static char *eval(struct vardb *v, const char *string, tupid_t tupid);
+static char *eval(struct vardb *v, const char *string, tupid_t tupid,
+		  const char *cwd, int clen);
 
 int parse(struct node *n, struct graph *g)
 {
 	int dfd;
 	int fd;
 	int rc = -1;
-	tupid_t parent;
-	int num_dotdots;
 	struct buf b;
 	struct vardb vdb;
 
@@ -119,42 +123,6 @@ int parse(struct node *n, struct graph *g)
 
 	if(vardb_init(&vdb) < 0)
 		return -1;
-	parent = n->tupid;
-	num_dotdots = 0;
-	while(parent != DOT_DT) {
-		tupid_t new;
-		new = tup_db_parent(parent);
-		if(new < 0) {
-			fprintf(stderr, "Error finding parent node of node ID %lli. Database might be hosed.\n", parent);
-			return -1;
-		}
-		parent = new;
-		num_dotdots++;
-	}
-	if(num_dotdots) {
-		/* No +1 because we leave off the trailing '/' */
-		char *path = malloc(num_dotdots * 3);
-		char *p;
-		if(!path) {
-			perror("malloc");
-			return -1;
-		}
-		p = path;
-		for(; num_dotdots; num_dotdots--) {
-			strcpy(p, "..");
-			p += 2;
-			if(num_dotdots > 1) {
-				strcpy(p, "/");
-				p++;
-			}
-		}
-		if(vardb_set(&vdb, "TUP_TOP", path) < 0)
-			return -1;
-		free(path);
-	} else {
-		if(vardb_set(&vdb, "TUP_TOP", ".") < 0)
-			return -1;
-	}
 
 	/* Move all existing commands over to delete - then the ones that are
 	 * re-created will be moved back out to modify or none when parsing the
@@ -190,7 +158,7 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, g);
+	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, ".", 1, g);
 	free(b.s);
 out_close_file:
 	close(fd);
@@ -209,7 +177,8 @@ out_close_vdb:
 }
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, struct graph *g)
+			 tupid_t curdir, const char *cwd, int clen,
+			 struct graph *g)
 {
 	char *p, *e;
 	char *line;
@@ -261,34 +230,25 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			continue;
 		}
 
-		if(strncmp(line, "include ", 8) == 0 ||
-		   strncmp(line, "include_root ", 13) == 0) {
+		if(strncmp(line, "include ", 8) == 0) {
 			struct buf incb;
 			int fd;
 			int rc;
-			int include_root = (line[7] == '_');
 			char *file;
 			struct name_list nl;
 			struct name_list_entry *nle, *tmpnle;
 			struct path_list *pl, *tmppl;
 			int sym_bork = 0;
-			tupid_t incdir;
 			LIST_HEAD(plist);
 			LIST_HEAD(symlist);
 
 			init_name_list(&nl);
 
-			if(include_root) {
-				file = line + 13;
-				incdir = DOT_DT;
-			} else {
-				file = line + 8;
-				incdir = curdir;
-			}
-			file = eval(vdb, file, tupid);
+			file = line + 8;
+			file = eval(vdb, file, tupid, NULL, 0);
 			if(!file)
 				return -1;
-			if(get_path_list(file, &plist, incdir, NULL, &symlist) < 0)
+			if(get_path_list(file, &plist, curdir, NULL, &symlist) < 0)
 				return -1;
 			while(!list_empty(&symlist)) {
 				struct half_entry *he;
@@ -312,6 +272,10 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			/* Can only be freed after plist */
 			free(file);
 			list_for_each_entry_safe(nle, tmpnle, &nl.entries, list) {
+				const char *cnc;
+				char *newcwd = NULL;
+				int newclen;
+
 				if(nle->type != TUP_NODE_FILE) {
 					if(nle->type == TUP_NODE_GENERATED) {
 						fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
@@ -321,6 +285,28 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 						return -1;
 					}
 				}
+
+				if(nle->dirlen) {
+					/* Dirlen includes room for a trailing
+					 * slash, which we move in between the
+					 * two strings.
+					 */
+					newclen = clen + nle->dirlen;
+					newcwd = malloc(newclen + 1);
+					if(!newcwd) {
+						perror("malloc");
+						return -1;
+					}
+					memcpy(newcwd, cwd, clen);
+					newcwd[clen] = '/';
+					memcpy(newcwd+clen+1, nle->path, nle->dirlen-1);
+					newcwd[newclen] = 0;
+					cnc = newcwd;
+				} else {
+					cnc = cwd;
+					newclen = clen;
+				}
+
 				fd = tup_db_open_tupid(nle->tupid);
 				if(fd < 0) {
 					fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
@@ -340,8 +326,10 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 				 * parent tupid.
 				 */
 				rc = parse_tupfile(&incb, vdb, tupid, nle->dt,
-						   g);
+						   cnc, newclen, g);
 				free(incb.s);
+				if(newcwd)
+					free(newcwd);
 				if(rc < 0) {
 					fprintf(stderr, "Error parsing included file '%s'\n", line);
 					return -1;
@@ -384,10 +372,10 @@ found_paren:
 			*comma = 0;
 			*paren = 0;
 
-			lval = eval(vdb, lval, tupid);
+			lval = eval(vdb, lval, tupid, NULL, 0);
 			if(!lval)
 				return -1;
-			rval = eval(vdb, rval, tupid);
+			rval = eval(vdb, rval, tupid, NULL, 0);
 			if(!rval)
 				return -1;
 			if(strcmp(lval, rval) == 0) {
@@ -398,10 +386,10 @@ found_paren:
 			free(lval);
 			free(rval);
 		} else if(line[0] == ':') {
-			if(parse_rule(line+1, tupid, lno, g, vdb, &bl) < 0)
+			if(parse_rule(line+1, tupid, lno, g, vdb, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else if(line[0] == ',') {
-			if(parse_varsed(line+1, tupid, lno, g, vdb, &bl) < 0)
+			if(parse_varsed(line+1, tupid, lno, g, vdb, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -442,10 +430,10 @@ found_paren:
 				eq--;
 			}
 
-			var = eval(vdb, line, tupid);
+			var = eval(vdb, line, tupid, cwd, clen);
 			if(!var)
 				return -1;
-			value = eval(vdb, value, tupid);
+			value = eval(vdb, value, tupid, cwd, clen);
 			if(!value)
 				return -1;
 
@@ -468,7 +456,8 @@ syntax_error:
 }
 
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb, struct bin_list *bl)
+		      struct vardb *vdb, struct bin_list *bl,
+		      const char *cwd, int clen)
 {
 	char *input, *cmd, *output;
 	char *ie, *ce;
@@ -525,12 +514,13 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.line_number = lno;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid, bl);
+	rc = execute_rule(&r, g, vdb, tupid, bl, cwd, clen);
 	return rc;
 }
 
 static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb, struct bin_list *bl)
+			struct vardb *vdb, struct bin_list *bl,
+			const char *cwd, int clen)
 {
 	char *input, *output;
 	char *ie;
@@ -567,7 +557,7 @@ static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.line_number = lno;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid, bl);
+	rc = execute_rule(&r, g, vdb, tupid, bl, cwd, clen);
 	return rc;
 }
 
@@ -610,7 +600,8 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 }
 
 static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid, struct bin_list *bl)
+			tupid_t tupid, struct bin_list *bl,
+			const char *cwd, int clen)
 {
 	char *oosep;
 	struct name_list order_only_nl;
@@ -619,7 +610,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 
 	init_name_list(&order_only_nl);
 
-	input_pattern = eval(vdb, r->input_pattern, tupid);
+	input_pattern = eval(vdb, r->input_pattern, tupid, cwd, clen);
 	if(!input_pattern)
 		return -1;
 	oosep = strchr(input_pattern, '|');
@@ -658,7 +649,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 			init_name_list(&tmp_nl);
 			memcpy(&tmp_nle, nle, sizeof(*nle));
 			add_name_list_entry(&tmp_nl, &tmp_nle);
-			if(do_rule(r, &tmp_nl, &order_only_nl, vdb, tupid) < 0)
+			if(do_rule(r, &tmp_nl, &order_only_nl, vdb, tupid, cwd, clen) < 0)
 				return -1;
 
 			delete_name_list_entry(&r->namelist, nle);
@@ -681,7 +672,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 	if(!r->foreach && (r->namelist.num_entries > 0 ||
 			   strcmp(r->input_pattern, "") == 0)) {
 
-		if(do_rule(r, &r->namelist, &order_only_nl, vdb, tupid) < 0)
+		if(do_rule(r, &r->namelist, &order_only_nl, vdb, tupid, cwd, clen) < 0)
 			return -1;
 
 		while(!list_empty(&r->namelist.entries)) {
@@ -853,7 +844,7 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 	if(pl->path != NULL) {
 		/* Note that dirlen should be pl->file - pl->path - 1,
 		 * but we add 1 to account for the trailing '/' that
-		 * will be added.
+		 * will be added (since it won't be added in the next case).
 		 */
 		args.dir = pl->path;
 		args.dirlen = pl->file-pl->path;
@@ -966,6 +957,7 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	nle->tupid = dbn->tupid;
 	nle->dt = dbn->dt;
 	nle->type = dbn->type;
+	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
 
 	add_name_list_entry(args->nl, nle);
@@ -1001,7 +993,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 }
 
 static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
-		   struct vardb *vdb, tupid_t tupid)
+		   struct vardb *vdb, tupid_t tupid, const char *cwd, int clen)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
@@ -1015,7 +1007,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 
 	init_name_list(&onl);
 
-	output_pattern = eval(vdb, r->output_pattern, tupid);
+	output_pattern = eval(vdb, r->output_pattern, tupid, cwd, clen);
 	if(!output_pattern)
 		return -1;
 	if(get_path_list(output_pattern, &oplist, tupid, NULL, NULL) < 0)
@@ -1060,7 +1052,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	tcmd = tup_printf(r->command, nl, &onl);
 	if(!tcmd)
 		return -1;
-	cmd = eval(vdb, tcmd, tupid);
+	cmd = eval(vdb, tcmd, tupid, cwd, clen);
 	if(!cmd)
 		return -1;
 	free(tcmd);
@@ -1310,7 +1302,8 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 	return s;
 }
 
-static char *eval(struct vardb *v, const char *string, tupid_t tupid)
+static char *eval(struct vardb *v, const char *string, tupid_t tupid,
+		  const char *cwd, int clen)
 {
 	int len = 0;
 	char *ret;
@@ -1343,10 +1336,19 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 				}
 
 				var = s + 2;
-				vlen = vardb_len(v, var, rparen-var);
-				if(vlen < 0)
-					return NULL;
-				len += vlen;
+				if(rparen-var == 7 &&
+				   strncmp(var, "TUP_CWD", 7) == 0) {
+					if(!cwd) {
+						fprintf(stderr, "Error: TUP_CWD is only valid in variable and rule definitions.\n");
+						return NULL;
+					}
+					len += clen;
+				} else {
+					vlen = vardb_len(v, var, rparen-var);
+					if(vlen < 0)
+						return NULL;
+					len += vlen;
+				}
 				s = rparen + 1;
 			} else {
 				s++;
@@ -1409,9 +1411,18 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid)
 				}
 
 				var = s + 2;
-				if(vardb_get(v, var, rparen-var, &p) < 0)
-					return NULL;
-
+				if(rparen-var == 7 &&
+				   strncmp(var, "TUP_CWD", 7) == 0) {
+					if(!cwd) {
+						fprintf(stderr, "Error: TUP_CWD is only valid in variable definitions.\n");
+						return NULL;
+					}
+					memcpy(p, cwd, clen);
+					p += clen;
+				} else {
+					if(vardb_get(v, var, rparen-var, &p) < 0)
+						return NULL;
+				}
 				s = rparen + 1;
 			} else {
 				*p = *s;

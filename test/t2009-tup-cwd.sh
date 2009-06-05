@@ -1,22 +1,22 @@
 #! /bin/sh -e
 
-# Test the TUP_TOP variable and include_root keywords
+# Test the TUP_CWD variable
 
 . ../tup.sh
 tmkdir fs
 cat > fs/Tupfile << HERE
-include_root bar/Install.tup
-include_root tab/Install.tup
+include ../bar/Install.tup
+include ../tab/Install.tup
 : foreach \$(lib) |> cp %f %o |> %b
 HERE
 tmkdir bar
 cat > bar/Install.tup << HERE
-lib += \$(TUP_TOP)/bar/foo.so
+lib += \$(TUP_CWD)/foo.so
 HERE
 
 tmkdir tab
 cat > tab/Install.tup << HERE
-lib += \$(TUP_TOP)/tab/blah.so
+lib += \$(TUP_CWD)/blah.so
 HERE
 
 touch bar/foo.so
