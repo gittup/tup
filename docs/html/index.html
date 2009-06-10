@@ -12,7 +12,7 @@ git clone http://gittup.org/tup.git
 <a href="config.html">Configuration Options</a><br>
 <a href="make_vs_tup.html">Make vs. tup</a><br>
 <a href="tup_vs_mordor.html">tup vs. The All-Seeing Eye of Mordor</a><br>
-<a href="logic_smackdown.html">Logic Smackdown</a><br>
+<a href="build_system_rules_and_algorithms.pdf">The Build System Algorithmic Revolution (PDF)</a>
 <p>The <a href="http://groups.google.com/group/tup-users">tup-users mailing list</a> is hosted by Google Groups. Feel free to join or email it. Be warned, though: you may be overwhelmed by all the cool people who frequent this list. Some of them post while surfing or skydiving or doing other cool things. At a minimum, sunglasses are required.</p>
 
 <h2>What is tup?</h2>
@@ -40,7 +40,7 @@ git clone http://gittup.org/tup.git
    </tr>
 </table>
 <p>See the difference? The arrows go up. This makes it very fast. The reason it is so fast is because you tell tup ahead of time what file you changed. So if you change foo.h here, in make you have to look at all the dependencies trying to find arrows that go to foo.h. With tup, it will start at foo.h and follow the arrows until there aren't any more arrows to follow. In this case, it doesn't have to ever look at foo.c or bar.c. Instead of just foo.c or bar.c, imagine if that was a whole part of the build tree that had a million nodes. Can you imagine a million nodes? If you stacked a million nodes up end to end, it would go around the earth 12 times and then up to the moon and back. Clearly, this would take a long time to find all the arrows.</p>
-<p>In reality, the tup graph is a little more complex. See the <a href="logic_smackdown.html">logic smackdown</a> for more info.</p>
+<p>In reality, the tup graph is a little more complex. Soon there will be a whole page dedicated to graphs in tup.</p>
 
 <h2>How do I (person reading this) give you (marf) millions of dollars ($$$) to buy the awesomeness (tup)?</h2>
 <p>Tup is currently released under the same conditions as <a href="http://www.erestar.net/games/marfitude/">marfitude</a>. So, the source code is free to download and use under the conditions of the GPL. Also, you are encouraged to donate some of your millions or your time to some place worthy, rather than to me, since I am but a pale ghost of my former self, and may be hit by a bus at anytime. Just think of all the time you saved with tup, and how much that is worth to you, and maybe do something about it.</p>

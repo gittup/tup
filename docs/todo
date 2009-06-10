@@ -12,8 +12,6 @@ change progress bar: Only print bar on lowest line, then backspace and print com
 
 if we do out of tree build, can we have the monitor kill the updater if a file modification is detected? or restart it?
 
-have an "include_rules" directive that will include a Rules.tup file in all parent directories? Could be useful for making directory-scoped variables. Also allow doing something like set LINUX_ROOT=. and have it get set to the current directory?
-
 tup build tup
 
 recursive grep kills monitor
@@ -80,13 +78,11 @@ if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - work if user code does '#define CONFIG_BLAH blah'?
  - namespace CONFIG under @/default, @/newconfig, etc?
 
-remove include_root and TUP_TOP so Tupfiles are compositable?
- - may need to provide include_rules directive so this isn't insane
-
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
 print graph if not empty after execution
  - make it "fatal tup error"?
+ - also rollback database?
 
 use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
@@ -102,14 +98,15 @@ compile with -DSQLITE_THREADSAFE=0? my locking should be sufficient
  SOCK_DGRAM in server.c but SOCK_SEQPACKET in updater.c?
 
 html:
-  proof: big-o notation
   proof: no clean target
+  graphs
+   - re-use tup_dag_*.png and partial_dag_*.png
+   - link styles
   when Tupfiles are parsed
   files outside of tup are ignored
    - hidden files can be written to for testing (result in warnings)
    - hidden files cannot be read from
   how files are deleted
   how dependencies are described/discovered
-  tup bugs: build in state Q, change A->B, build in state R, change B->A, build must go back to state Q (not some other state S)
   man pages: tup command line, tup_api
   error messages (eg: you get this error message if...)
