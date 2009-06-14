@@ -1,2 +1,3 @@
-: foreach *.c |> gcc -I$(TUP_TOP) -c %f -o %o |> %F.o
+include_rules
+: foreach *.c |> gcc -I$(TEST_TOP) -c %f -o %o |> %F.o
 : *.o |> gcc %f -o %o |> prog

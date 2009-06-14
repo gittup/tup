@@ -37,6 +37,9 @@ while(@ARGV) {
 
 #mkdir "tmake";
 mkdir "ttup";
+open FILE, ">ttup/Tuprules.tup" or die "Can't open ttup/Tuprules.tup for write.\n";
+print FILE "TEST_TOP = \$(TUP_CWD)\n";
+close FILE;
 for($x=0; $x<$num_files; $x++) {
 	$path_names{$x} = &generate_path($x);
 	if($path_names{$x} ne "") {
