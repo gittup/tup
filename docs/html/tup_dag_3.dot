@@ -1,0 +1,23 @@
+digraph g {
+	main_o [label="main.o"];
+	parse_o [label="parse.o"];
+	parse_c [label="parse.c"];
+	parse_h [label="parse.h"];
+	parse_y [label="parse.y"];
+	main_c [label="main.c"];
+	prog [label="prog"];
+
+	link [label="gcc main.o parse.o -o prog", shape="rectangle"];
+	cmain [label="gcc -c main.c -o main.o", shape="rectangle"];
+	cparse [label="gcc -c parse.c -o parse.o", shape="rectangle"];
+	bison [label="bison -blah parse.y", shape="rectangle"];
+
+	prog -> link [dir=back];
+	link -> {main_o parse_o} [dir=back];
+	main_o -> cmain [dir=back];
+	parse_o -> cparse [dir=back];
+	cmain -> {main_c parse_h} [dir=back];
+	cparse -> {parse_c parse_h} [dir=back];
+	{parse_h parse_c} -> bison [dir=back];
+	bison -> parse_y [dir=back];
+};
