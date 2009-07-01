@@ -28,6 +28,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
+#include <pthread.h>
 #include "dircache.h"
 #include "debug.h"
 #include "fileio.h"
@@ -53,6 +55,7 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
 static void queue_event(struct inotify_event *e);
 static void flush_queue(void);
+static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
 static int same_event(struct inotify_event *e1, struct inotify_event *e2);
@@ -409,9 +412,32 @@ static void flush_queue(void)
 			tup_lock_exit();
 			exit(0);
 		} else {
+			pthread_t tid;
+
+			if(pthread_create(&tid, NULL, wait_thread, (void*)pid) < 0) {
+				perror("pthread_create");
+				return;
+			}
+			if(pthread_detach(tid) < 0) {
+				perror("pthread_detach");
+				return;
+			}
 			tup_db_config_set_int(AUTOUPDATE_PID, pid);
 		}
 	}
+}
+
+static void *wait_thread(void *arg)
+{
+	/* Apparently setting SIGCHLD to SIG_IGN isn't particularly portable,
+	 * so I use this stupid thread instead. Maybe there's a better way.
+	 */
+	int pid = (int)arg;
+
+	if(waitpid(pid, NULL, 0) < 0) {
+		perror("waitpid");
+	}
+	return NULL;
 }
 
 static int skip_event(struct inotify_event *e)
