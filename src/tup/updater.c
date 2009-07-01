@@ -738,6 +738,7 @@ static int update(struct node *n, struct server *s)
 	int status;
 	int pid;
 	int dfd = -1;
+	int exit_status = -1;
 	const char *name = n->name;
 	int rc;
 
@@ -817,6 +818,7 @@ static int update(struct node *n, struct server *s)
 			if(rc < 0)
 				goto err_cmd_failed;
 		} else {
+			exit_status = WEXITSTATUS(status);
 			goto err_cmd_failed;
 		}
 	} else if(WIFSIGNALED(status)) {
@@ -836,7 +838,10 @@ static int update(struct node *n, struct server *s)
 	return rc;
 
 err_cmd_failed:
-	fprintf(stderr, " *** Command %lli failed: %s\n", n->tupid, name);
+	if(exit_status == -1)
+		fprintf(stderr, " *** Command %lli failed: %s\n", n->tupid, name);
+	else
+		fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tupid, exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:
