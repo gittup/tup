@@ -25,6 +25,16 @@ use temporary table instead of moving all commands to delete in parser? Should b
 
 instead of doing delete_name_file() for each entry in delete_list, maybe change the sql to do 'delete from link where from_id in (select id from delete_list)' or some such. Would still need to iterate to actually unlink() files, though.
 
+perror("pipe") should be perror("socketpair")
+
+command fails: print return value
+
+autoupdate process not waited on
+
+autoupdate doesn't autoupdate when first starting the monitor if files have changed while tup wasn't watching
+
+give user an option to kill an autoupdate updater
+
 ifneq
 
 somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not sure which one actually triggered the build :( ), but the build worked next try:
