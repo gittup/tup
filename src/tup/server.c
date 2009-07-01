@@ -39,7 +39,7 @@ void server_setenv(struct server *s, int vardict_fd)
 int start_server(struct server *s)
 {
 	if(socketpair(AF_UNIX, SOCK_DGRAM, 0, s->sd) < 0) {
-		perror("pipe");
+		perror("socketpair");
 		return -1;
 	}
 
