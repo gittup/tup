@@ -99,6 +99,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	struct file_entry *tmp;
 	struct db_node dbn;
 	struct half_entry *he;
+	int write_bork = 0;
 	LIST_HEAD(symlist);
 
 	handle_unlink(info);
@@ -161,12 +162,13 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
 			unlink(w->filename);
-			return -1;
+			write_bork = 1;
+		} else {
+			if(tup_db_add_write_list(dbn.tupid) < 0)
+				return -1;
+			if(file_set_mtime(dbn.tupid, dfd, w->filename) < 0)
+				return -1;
 		}
-		if(tup_db_add_write_list(dbn.tupid) < 0)
-			return -1;
-		if(file_set_mtime(dbn.tupid, dfd, w->filename) < 0)
-			return -1;
 
 out_skip:
 		del_entry(w);
@@ -227,6 +229,9 @@ skip_sym:
 		free(sym->to);
 		free(sym);
 	}
+
+	if(write_bork)
+		return -1;
 
 	if(tup_db_check_write_list(cmdid) < 0)
 		return -1;
