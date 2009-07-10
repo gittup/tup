@@ -186,7 +186,10 @@ out_skip:
 			return -1;
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym->to, debug_name);
-			return -1;
+			fprintf(stderr, " Unlink: [35m%s[0m\n", sym->to);
+			unlink(sym->to);
+			write_bork = 1;
+			goto skip_sym;
 		}
 
 		if(tup_db_add_write_list(dbn.tupid) < 0)
