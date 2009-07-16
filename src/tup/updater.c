@@ -117,6 +117,8 @@ int updater(int argc, char **argv, int phase)
 
 	if(server_init() < 0)
 		return -1;
+	if(tup_db_create_tmp_tables() < 0)
+		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
 	if(phase == 1) /* Collect underpants */
@@ -126,6 +128,8 @@ int updater(int argc, char **argv, int phase)
 	if(phase == 2) /* ? */
 		return 0;
 	if(process_update_nodes() < 0)
+		return -1;
+	if(tup_db_drop_tmp_tables() < 0)
 		return -1;
 	return 0; /* Profit! */
 }
@@ -239,8 +243,6 @@ static int process_update_nodes(void)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
-	if(tup_db_create_tmp_tables() < 0)
-		return -1;
 	tup_db_begin();
 	vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
@@ -271,8 +273,6 @@ static int process_update_nodes(void)
 	}
 	close(vardict_fd);
 	tup_db_commit();
-	if(tup_db_drop_tmp_tables() < 0)
-		return -1;
 	if(rc < 0)
 		return -1;
 	if(destroy_graph(&g) < 0)

@@ -142,8 +142,6 @@ int parse(struct node *n, struct graph *g)
 		return -1;
 	if(tup_db_flag_delete_cmd_outputs(n->tupid) < 0)
 		return -1;
-	if(tup_db_remove_output_links(n->tupid) < 0)
-		return -1;
 	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;
 
@@ -1187,6 +1185,11 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 		}
 		delete_name_list_entry(&onl, onle);
 	}
+
+	if(tup_db_write_outputs(cmd_id) < 0)
+		return -1;
+	if(tup_db_clear_tmp_tables() < 0)
+		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
 		if(tup_db_create_link(nle->tupid, cmd_id, TUP_LINK_STICKY) < 0)

@@ -125,7 +125,6 @@ int tup_db_unsticky_links(tupid_t tupid);
 /* Combo operations */
 int tup_db_flag_delete_in_dir(tupid_t dt, int type);
 int tup_db_flag_delete_cmd_outputs(tupid_t dt);
-int tup_db_remove_output_links(tupid_t dt);
 int tup_db_modify_cmds_by_output(tupid_t output);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
@@ -175,5 +174,6 @@ int tup_db_add_write_list(tupid_t tupid);
 int tup_db_check_write_list(tupid_t cmdid);
 int tup_db_add_read_list(tupid_t tupid);
 int tup_db_check_read_list(tupid_t cmdid);
+int tup_db_write_outputs(tupid_t cmdid);
 
 #endif

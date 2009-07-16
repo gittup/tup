@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <sqlite3.h>
 
-#define DB_VERSION 9
+#define DB_VERSION 10
 
 enum {
 	DB_BEGIN,
@@ -57,7 +57,6 @@ enum {
 	DB_UNSTICKY_LINKS,
 	DB_FLAG_DELETE_IN_DIR,
 	DB_FLAG_DELETE_CMD_OUTPUTS,
-	DB_REMOVE_OUTPUT_LINKS,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -113,6 +112,8 @@ enum {
 	_DB_STYLE_INPUT_LINKS,
 	_DB_DROP_OLD_LINKS,
 	_DB_UNSTYLE_OLD_LINKS,
+	_DB_ADD_OUTPUTS,
+	_DB_REMOVE_OUTPUTS,
 	DB_NUM_STATEMENTS
 };
 
@@ -162,6 +163,8 @@ static int add_input_links(tupid_t cmdid);
 static int style_input_links(tupid_t cmdid);
 static int drop_old_links(tupid_t cmdid);
 static int unstyle_old_links(tupid_t cmdid);
+static int add_outputs(tupid_t cmdid, int *outputs_differ);
+static int remove_outputs(tupid_t cmdid, int *outputs_differ);
 static int no_sync(void);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -203,7 +206,7 @@ int tup_db_create(int db_sync)
 	int x;
 	const char *sql[] = {
 		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096))",
-		"create table link (from_id integer, to_id integer, style integer)",
+		"create table link (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
 		"create table var (id integer primary key not null, value varchar(4096))",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
 		"create table create_list (id integer primary key not null)",
@@ -211,7 +214,6 @@ int tup_db_create(int db_sync)
 		"create table delete_list (id integer primary key not null)",
 		"create index node_dir_index on node(dir, name)",
 		"create index node_sym_index on node(sym)",
-		"create index link_index on link(from_id, to_id)",
 		"create index link_index2 on link(to_id)",
 		"insert into config values('show_progress', 1)",
 		"insert into config values('keep_going', 0)",
@@ -280,6 +282,14 @@ static int version_check(void)
 	char sql_7a[] = "drop table ghost_list";
 
 	char sql_8a[] = "alter table node add column mtime integer default -1";
+
+	char sql_9a[] = "create table link_new (from_id integer, to_id integer, style integer, unique(from_id, to_id))";
+	char sql_9b[] = "insert or ignore into link_new select from_id, to_id, style from link";
+	char sql_9c[] = "drop index link_index";
+	char sql_9d[] = "drop index link_index2";
+	char sql_9e[] = "drop table link";
+	char sql_9f[] = "alter table link_new rename to link";
+	char sql_9g[] = "create index link_index2 on link(to_id)";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -396,6 +406,46 @@ static int version_check(void)
 			if(tup_db_config_set_int("db_version", 9) < 0)
 				return -1;
 			fprintf(stderr, "WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
+
+		case 9:
+			if(sqlite3_exec(tup_db, sql_9a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9a);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9b, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9b);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9c, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9c);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9d, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9d);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9e, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9e);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9f, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9f);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_9g, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_9g);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 10) < 0)
+				return -1;
+			fprintf(stderr, "NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
 
 		case DB_VERSION:
 			break;
@@ -1867,12 +1917,9 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 	rc = tup_db_get_incoming_link(b, &incoming);
 	if(rc < 0)
 		return -1;
-	/* See if we already own the link */
-	if(a == incoming)
-		return 0;
-	/* Or if the link doesn't exist yet */
-	if(incoming == -1) {
-		if(link_insert(a, b, TUP_LINK_NORMAL) < 0)
+	/* See if we already own the link, or if the link doesn't exist yet */
+	if(a == incoming || incoming == -1) {
+		if(tup_db_add_write_list(b) < 0)
 			return -1;
 		return 0;
 	}
@@ -2225,43 +2272,6 @@ int tup_db_flag_delete_cmd_outputs(tupid_t dt)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_CMD_OUTPUTS];
 	static char s[] = "insert or replace into delete_list select to_id from link where from_id in (select id from node where dir=? and type=?)";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_remove_output_links(tupid_t dt)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_REMOVE_OUTPUT_LINKS];
-	static char s[] = "delete from link where from_id in (select id from node where dir=? and type=?)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3670,6 +3680,21 @@ int tup_db_check_read_list(tupid_t cmdid)
 	return 0;
 }
 
+int tup_db_write_outputs(tupid_t cmdid)
+{
+	int outputs_differ = 0;
+
+	if(add_outputs(cmdid, &outputs_differ) < 0)
+		return -1;
+	if(remove_outputs(cmdid, &outputs_differ) < 0)
+		return -1;
+	if(outputs_differ == 1) {
+		if(tup_db_add_modify_list(cmdid) < 0)
+			return -1;
+	}
+	return 0;
+}
+
 tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			   time_t mtime)
 {
@@ -4737,6 +4762,80 @@ static int unstyle_old_links(tupid_t cmdid)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	return 0;
+}
+
+static int add_outputs(tupid_t cmdid, int *outputs_differ)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_OUTPUTS];
+	static char s[] = "insert or ignore into link select ?, write_id, ? from write_list";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, TUP_LINK_NORMAL) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(sqlite3_changes(tup_db))
+		*outputs_differ = 1;
+
+	return 0;
+}
+
+static int remove_outputs(tupid_t cmdid, int *outputs_differ)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_REMOVE_OUTPUTS];
+	static char s[] = "delete from link where from_id=? and to_id not in (select write_id from write_list)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(sqlite3_changes(tup_db))
+		*outputs_differ = 1;
 
 	return 0;
 }
