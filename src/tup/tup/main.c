@@ -357,10 +357,10 @@ static int graph(int argc, char **argv)
 			if(find_node(&g, n->dt, &tmp) < 0)
 				return -1;
 			if(tmp)
-				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
+				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tupid, n->dt);
 		}
 		if(n->sym != -1)
-			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\"]\n", n->sym, n->tupid);
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->sym, n->tupid);
 
 		e = n->edges;
 		while(e) {
