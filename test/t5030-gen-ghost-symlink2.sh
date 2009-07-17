@@ -4,7 +4,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: |> ln -sf secret/ghost %o |> foo
+: |> rm -f %o; ln -s secret/ghost %o |> foo
 HERE
 tup touch Tupfile
 update

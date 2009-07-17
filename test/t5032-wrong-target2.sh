@@ -24,7 +24,7 @@ update_fail
 # symlink to file2, but tup rm file1 so the command should succeed again.
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
-: |> ln -sf file1 file2 |> file2
+: |> rm -f %o; ln -s file1 %o |> file2
 HERE
 tup touch Tupfile
 update
