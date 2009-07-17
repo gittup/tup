@@ -352,8 +352,13 @@ static int graph(int argc, char **argv)
 			print_name(s, 0);
 		}
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
-		if(n->dt)
-			printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
+		if(n->dt) {
+			struct node *tmp;
+			if(find_node(&g, n->dt, &tmp) < 0)
+				return -1;
+			if(tmp)
+				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\"]\n", n->tupid, n->dt);
+		}
 		if(n->sym != -1)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\"]\n", n->sym, n->tupid);
 
