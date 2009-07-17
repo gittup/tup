@@ -503,7 +503,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			list_del(&n->list);
 			pop_node(g, n);
 			remove_node(g, n);
-			continue;
+			goto check_empties;
 		}
 
 		if(n->type == g->count_flags) {
@@ -559,7 +559,16 @@ keep_going:
 			if(sig_quit) {
 				fprintf(stderr, "Remaining nodes skipped due to caught signal.\n");
 			} else {
-				fprintf(stderr, "Error: Graph is not empty after execution.\n");
+				struct node *n;
+				fprintf(stderr, "fatal tup error: Graph is not empty after execution.\n");
+				fprintf(stderr, "Node list:\n");
+				list_for_each_entry(n, &g->node_list, list) {
+					fprintf(stderr, " Node[%lli]: %s\n", n->tupid, n->name);
+				}
+				fprintf(stderr, "plist:\n");
+				list_for_each_entry(n, &g->node_list, list) {
+					fprintf(stderr, " Node[%lli]: %s\n", n->tupid, n->name);
+				}
 			}
 		}
 		goto out;
