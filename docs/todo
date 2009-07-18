@@ -91,8 +91,6 @@ use single scratch list instead of all the various temporary lists? or at least 
 directly support symlinks in tup? Might make t5037 usable.
  - also t5032 when building in parallel and using the 'ln -sf %f %o' pattern rather than 'rm -f %o; ln -s %f %o'
 
-move start_server/stop_server outside so its done once per update thread, rather than once per update()?
-
  Add %1, %2, etc to reference first, second prereq?
 
  SOCK_DGRAM in server.c but SOCK_SEQPACKET in updater.c?
