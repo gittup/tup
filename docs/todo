@@ -76,8 +76,6 @@ tup show to list the Tupfile as read in the current dir?
 
 read in +/- in order to add/remove worker threads?
 
-'tup scan' may incorrectly say a file was deleted outside of tup if it was never created in the first place
-
 tup-gcc:
 if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - make sure it's culled

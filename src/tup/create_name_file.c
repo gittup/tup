@@ -199,7 +199,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		if(modified) {
 			if(dbn.type == TUP_NODE_GENERATED) {
 				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file may be overwritten on the next update.\n", file);
-				if(tup_db_modify_cmds_by_output(dbn.tupid) < 0)
+				if(tup_db_modify_cmds_by_output(dbn.tupid, NULL) < 0)
 					return -1;
 			}
 			if(tup_db_add_modify_list(dbn.tupid) < 0)
@@ -253,9 +253,15 @@ int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type)
 	 * Randomly deleting object files is pretty stupid.
 	 */
 	if(type == TUP_NODE_GENERATED) {
-		fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
-		if(tup_db_modify_cmds_by_output(tupid) < 0)
+		int modified = 0;
+		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
 			return -1;
+		/* Only display a warning if the command isn't already in the
+		 * modify list. It's possible that the command hasn't actually
+		 * been executed yet.
+		 */
+		if(modified == 1)
+			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
 	}
 
 	/* We also have to run any command that used this file as an input, so

@@ -2304,11 +2304,11 @@ int tup_db_flag_delete_cmd_outputs(tupid_t dt)
 	return 0;
 }
 
-int tup_db_modify_cmds_by_output(tupid_t output)
+int tup_db_modify_cmds_by_output(tupid_t output, int *modified)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_CMDS_BY_OUTPUT];
-	static char s[] = "insert or replace into modify_list select from_id from link where to_id=?";
+	static char s[] = "insert or ignore into modify_list select from_id from link where to_id=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -2333,6 +2333,9 @@ int tup_db_modify_cmds_by_output(tupid_t output)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	if(modified)
+		*modified = sqlite3_changes(tup_db);
 
 	return 0;
 }
@@ -4539,7 +4542,7 @@ static int check_actual_outputs(tupid_t cmdid)
 		 * any), and remove the bad output. This is particularly
 		 * helpful if a symlink was created in the wrong spot.
 		 */
-		tup_db_modify_cmds_by_output(de->tupid);
+		tup_db_modify_cmds_by_output(de->tupid, NULL);
 		fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
 			de->name, de->dt);
 		delete_file(de->dt, de->name);
