@@ -31,13 +31,13 @@ enum {
 	DB_DELETE_DIR,
 	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
-	DB_GET_PATH,
 	DB_PARENT,
 	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
 	DB_SET_TYPE,
 	DB_SET_SYM,
 	DB_SET_MTIME,
+	DB_PRINT,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_DELETE_LIST,
@@ -166,6 +166,7 @@ static int unstyle_old_links(tupid_t cmdid);
 static int add_outputs(tupid_t cmdid, int *outputs_differ);
 static int remove_outputs(tupid_t cmdid, int *outputs_differ);
 static int no_sync(void);
+static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
 int tup_db_open(void)
@@ -1146,6 +1147,11 @@ int tup_db_open_tupid(tupid_t tupid)
 
 	parent = sqlite3_column_int64(*stmt, 0);
 	path = strdup((const char *)sqlite3_column_text(*stmt, 1));
+	if(!path) {
+		perror("strdup");
+		rc = -1;
+		goto out_reset;
+	}
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
@@ -1167,78 +1173,7 @@ int tup_db_open_tupid(tupid_t tupid)
 	close(fd);
 	free(path);
 
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
 	return rc;
-}
-
-int tup_db_get_path(tupid_t tupid, char *path, int size)
-{
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_GET_PATH];
-	static char s[] = "select dir, name from node where id=?";
-	tupid_t parent;
-	char *name;
-	int len = 0;
-	int namelen;
-
-	if(tupid == 0) {
-		fprintf(stderr, "Error: Trying to tup_db_get_path(0)\n");
-		return -1;
-	}
-	if(tupid == 1) {
-		if(size > 2) {
-			strcpy(path, ".");
-			return 1;
-		} else {
-			fprintf(stderr, "tup_db_get_path() - Out of space for path of ID %lli\n", tupid);
-			return -1;
-		}
-	}
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		rc = -ENOENT;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	parent = sqlite3_column_int64(*stmt, 0);
-	name = strdup((const char *)sqlite3_column_text(*stmt, 1));
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	/* Include space for prefixed '/' */
-	namelen = strlen(name) + 1;
-	len = tup_db_get_path(parent, path, size - namelen);
-	path[len] = '/';
-	/* Here we use namelen (which has +1) to get the nul */
-	memcpy(path+len+1, name, namelen);
-	rc = len + namelen;
-	free(name);
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -1485,6 +1420,106 @@ int tup_db_set_mtime(tupid_t tupid, time_t mtime)
 	}
 
 	return 0;
+}
+
+int tup_db_print(FILE *stream, tupid_t tupid)
+{
+	int rc;
+
+	fprintf(stream, " - [%lli] ", tupid);
+	rc = db_print(stream, tupid);
+	fprintf(stream, "\n");
+	return rc;
+}
+
+static int db_print(FILE *stream, tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_PRINT];
+	static char s[] = "select dir, type, name from node where id=?";
+	tupid_t parent;
+	int type;
+	char *path;
+
+	if(tupid == 0) {
+		fprintf(stderr, "Error: Trying to tup_db_print(0)\n");
+		return -1;
+	}
+	if(tupid == 1) {
+		return 0;
+	}
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		rc = -ENOENT;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	parent = sqlite3_column_int64(*stmt, 0);
+	type = sqlite3_column_int(*stmt, 1);
+	path = strdup((const char *)sqlite3_column_text(*stmt, 2));
+	if(!path) {
+		perror("strdup");
+		rc = -1;
+		goto out_reset;
+	}
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(db_print(stream, parent) < 0)
+		return -1;
+
+	if(parent != 1) {
+		fprintf(stream, "/");
+	}
+	switch(type) {
+		case TUP_NODE_DIR:
+			fprintf(stream, "%s", path);
+			break;
+		case TUP_NODE_CMD:
+			fprintf(stream, "[[34m%s[0m]", path);
+			break;
+		case TUP_NODE_GHOST:
+			fprintf(stream, "[47;30m%s[0m", path);
+			break;
+		case TUP_NODE_FILE:
+		case TUP_NODE_GENERATED:
+		case TUP_NODE_VAR:
+		default:
+			fprintf(stream, "%s", path);
+			break;
+	}
+
+	free(path);
+	return 0;
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
 }
 
 int tup_db_get_node_flags(tupid_t tupid)

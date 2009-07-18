@@ -26,7 +26,6 @@ static int process_update_nodes(void);
 static int check_create_todo(void);
 static int check_delete_todo(void);
 static int check_update_todo(void);
-static void print_node(struct node *n);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
@@ -368,11 +367,6 @@ static int check_update_todo(void)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	return rc;
-}
-
-static void print_node(struct node *n)
-{
-	printf(" - [%lli] %s\n", n->tupid, n->name);
 }
 
 static int build_graph(struct graph *g)
@@ -728,7 +722,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->type == g->count_flags)
-			print_node(n);
+			tup_db_print(stdout, n->tupid);
 
 		wrc.rc = 0;
 		wrc.n = n;

@@ -970,10 +970,12 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 		}
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
+			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
 		if(dbn.type == TUP_NODE_GHOST) {
 			fprintf(stderr, "Error: Explicitly named file '%s' is a ghost file, so it can't be used as an input.\n", pl->file);
+			tup_db_print(stderr, dbn.tupid);
 			return -1;
 		}
 		rc = tup_db_in_delete_list(dbn.tupid);
@@ -981,6 +983,7 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 			return -1;
 		if(rc == 1) {
 			fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
+			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
 		if(build_name_list_cb(&args, &dbn) < 0)

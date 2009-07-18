@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 #include "list.h"
+#include <stdio.h>
 #include <time.h>
 
 #define TUP_DIR ".tup"
@@ -91,13 +92,13 @@ int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
-int tup_db_get_path(tupid_t tupid, char *path, int len);
 tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 int tup_db_set_mtime(tupid_t tupid, time_t mtime);
+int tup_db_print(FILE *stream, tupid_t tupid);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
