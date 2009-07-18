@@ -4104,7 +4104,7 @@ static int add_ghost_dirs(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_DIRS];
-	static char s[] = "insert or replace into ghost_list select dir from node where id in (select id from ghost_list) and type=?";
+	static char s[] = "insert or replace into ghost_list select id from node where id in (select dir from ghost_list left join node on ghost_list.id=node.id) and type=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
