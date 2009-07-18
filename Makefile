@@ -15,7 +15,7 @@ libtup.a: CCFLAGS := $(WARNINGS)
 ldpreload.so: CCFLAGS := $(WARNINGS) -fpic
 ldpreload.so: LDFLAGS := -ldl
 
-tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c) src/sqlite3/sqlite3.c) libtup.a
+tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
 ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
 
 # The git status command seems to get rid of files that may have been touched
@@ -34,7 +34,7 @@ ldpreload.so:
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 
-libtup.a: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/*.c))
+libtup.a: $(patsubst %.c,$(BUILD)%.o,src/sqlite3/sqlite3.c $(wildcard src/tup/*.c))
 	$Qecho "  AR      $@";\
 	rm -f $@ ;\
 	ar cru $@ $^
