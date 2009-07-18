@@ -101,6 +101,7 @@ html:
    - re-use tup_dag_*.png and partial_dag_*.png
    - link styles
   when Tupfiles are parsed
+  supported tools / how to use things like ar and ln
   files outside of tup are ignored
    - hidden files can be written to for testing (result in warnings)
    - hidden files cannot be read from
