@@ -780,11 +780,10 @@ static int update(struct node *n, struct server *s)
 
 	pthread_mutex_lock(&db_mutex);
 	dfd = tup_db_open_tupid(n->dt);
+	pthread_mutex_unlock(&db_mutex);
 	if(dfd < 0) {
-		pthread_mutex_unlock(&db_mutex);
 		goto err_out;
 	}
-	pthread_mutex_unlock(&db_mutex);
 
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
