@@ -4139,7 +4139,7 @@ static int reclaim_ghosts(void)
 	int rc;
 	int changes;
 	sqlite3_stmt **stmt = &stmts[_DB_RECLAIM_GHOSTS];
-	static char s[] = "delete from node where id in (select ghost_list.id from ghost_list left join node on dir=ghost_list.id or sym=ghost_list.id left join link on from_id=ghost_list.id where dir is null and sym is null and from_id is null)";
+	static char s[] = "delete from node where id in (select gid from (select ghost_list.id as gid from ghost_list left join node on dir=ghost_list.id left join link on from_id=ghost_list.id where dir is null and from_id is null) left join node on sym=gid where sym is null)";
 	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
 	 * make sure they are no longer needed before deleting them by checking:
 	 *  - no other node references it in 'dir'
