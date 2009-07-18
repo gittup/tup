@@ -9,7 +9,7 @@ Q=@
 
 WARNINGS = -W -Wall -Werror -Wbad-function-cast -Wcast-align -Wcast-qual -Wchar-subscripts -Wmissing-prototypes -Wnested-externs -Wpointer-arith -Wredundant-decls -Wshadow -Wstrict-prototypes -Wwrite-strings -fno-common
 $(BUILD)src/tup/tup/main.o: CCFLAGS := $(WARNINGS)
-$(BUILD)src/sqlite3/sqlite3.o: CCFLAGS := -DSQLITE_TEMP_STORE=2
+$(BUILD)src/sqlite3/sqlite3.o: CCFLAGS := -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0
 tup: LDFLAGS := -lpthread -ldl
 libtup.a: CCFLAGS := $(WARNINGS)
 ldpreload.so: CCFLAGS := $(WARNINGS) -fpic

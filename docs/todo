@@ -93,9 +93,6 @@ directly support symlinks in tup? Might make t5037 usable.
 
 move start_server/stop_server outside so its done once per update thread, rather than once per update()?
 
-compile with -DSQLITE_THREADSAFE=0? my locking should be sufficient
- - examine other sqlite flags?
-
  Add %1, %2, etc to reference first, second prereq?
 
  SOCK_DGRAM in server.c but SOCK_SEQPACKET in updater.c?
