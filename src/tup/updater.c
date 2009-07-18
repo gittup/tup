@@ -182,6 +182,7 @@ static int process_create_nodes(void)
 	if(g.num_nodes)
 		printf("Parsing Tupfiles\n");
 	tup_db_begin();
+	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
 	if(rc == 0) {
 		tup_db_commit();
@@ -212,6 +213,7 @@ static int process_delete_nodes(void)
 		printf("Deleting %i file%s\n", g.num_nodes,
 		       g.num_nodes == 1 ? "" : "s");
 	tup_db_begin();
+	/* delete_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, delete_work);
 	if(rc == 0) {
 		tup_db_commit();
@@ -644,14 +646,10 @@ static void *delete_work(void *arg)
 			break;
 
 		if(n->flags & TUP_FLAGS_DELETE) {
-			pthread_mutex_lock(&db_mutex);
-
 			rc = delete_name_file(n->tupid, n->dt, n->sym);
 			if(rc == 0 && n->type == TUP_NODE_GENERATED) {
 				rc = delete_file(n->dt, n->name);
 			}
-
-			pthread_mutex_unlock(&db_mutex);
 		}
 
 		wrc.rc = rc;
