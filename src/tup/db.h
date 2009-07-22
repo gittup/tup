@@ -99,6 +99,8 @@ int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 int tup_db_set_mtime(tupid_t tupid, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt);
+int tup_db_delete_gitignore(tupid_t dt);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);

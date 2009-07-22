@@ -71,11 +71,13 @@ struct build_name_list_args {
 };
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, const char *cwd, int clen,
+			 tupid_t curdir, int dfd, const char *cwd, int clen,
 			 struct graph *g);
-static int include_rules(tupid_t tupid, tupid_t curdir, struct vardb *vdb,
-			 const char *cwd, int clen, struct graph *g);
-static int include_name_list(struct name_list *nl, tupid_t tupid,
+static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
+			 struct vardb *vdb, const char *cwd, int clen,
+			 struct graph *g);
+static int gitignore(tupid_t dt, int dfd);
+static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 			     struct vardb *vdb, const char *cwd, int clen,
 			     struct graph *g);
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
@@ -144,6 +146,8 @@ int parse(struct node *n, struct graph *g)
 		return -1;
 	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
 		return -1;
+	if(tup_db_delete_gitignore(n->tupid) < 0)
+		return -1;
 
 	dfd = tup_db_open_tupid(n->tupid);
 	if(dfd < 0) {
@@ -161,7 +165,7 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, ".", 1, g);
+	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, dfd, ".", 1, g);
 	free(b.s);
 out_close_file:
 	close(fd);
@@ -180,7 +184,7 @@ out_close_vdb:
 }
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, const char *cwd, int clen,
+			 tupid_t curdir, int dfd, const char *cwd, int clen,
 			 struct graph *g)
 {
 	char *p, *e;
@@ -270,10 +274,13 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			}
 			/* Can only be freed after plist */
 			free(file);
-			if(include_name_list(&nl, tupid, vdb, cwd, clen, g) < 0)
+			if(include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g) < 0)
 				return -1;
 		} else if(strcmp(line, "include_rules") == 0) {
-			if(include_rules(tupid, curdir, vdb, cwd, clen, g) < 0)
+			if(include_rules(tupid, curdir, dfd, vdb, cwd, clen, g) < 0)
+				return -1;
+		} else if(strcmp(line, ".gitignore") == 0) {
+			if(gitignore(tupid, dfd) < 0)
 				return -1;
 		} else if(strcmp(line, "else") == 0) {
 			if_true = !if_true;
@@ -391,8 +398,9 @@ syntax_error:
 	return -1;
 }
 
-static int include_rules(tupid_t tupid, tupid_t curdir, struct vardb *vdb,
-			 const char *cwd, int clen, struct graph *g)
+static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
+			 struct vardb *vdb, const char *cwd, int clen,
+			 struct graph *g)
 {
 	tupid_t parent;
 	int num_dotdots;
@@ -464,10 +472,45 @@ static int include_rules(tupid_t tupid, tupid_t curdir, struct vardb *vdb,
 			return -1;
 	}
 	free(path);
-	return include_name_list(&nl, tupid, vdb, cwd, clen, g);
+	return include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g);
 }
 
-static int include_name_list(struct name_list *nl, tupid_t tupid,
+static int gitignore(tupid_t dt, int dfd)
+{
+	char *s;
+	int len;
+	int fd;
+
+	if(tup_db_alloc_generated_nodelist(&s, &len, dt) < 0)
+		return -1;
+	if(s) {
+		struct db_node dbn;
+
+		if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
+			return -1;
+		if(dbn.tupid < 0) {
+			if(tup_db_node_insert(dt, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
+				return -1;
+		}
+
+		fd = openat(dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
+		if(fd < 0) {
+			perror(".gitignore");
+			return -1;
+		}
+		if(dt == 1) {
+			write(fd, ".tup\n", 5);
+			write(fd, ".*.swp\n", 7);
+			write(fd, ".gitignore\n", 11);
+		}
+		write(fd, s, len);
+		close(fd);
+		free(s); /* Freeze gopher! */
+	}
+	return 0;
+}
+
+static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 			     struct vardb *vdb, const char *cwd, int clen,
 			     struct graph *g)
 {
@@ -545,7 +588,7 @@ static int include_name_list(struct name_list *nl, tupid_t tupid,
 		 * However, we want all links to be made to the
 		 * parent tupid.
 		 */
-		rc = parse_tupfile(&incb, vdb, tupid, nle->dt,
+		rc = parse_tupfile(&incb, vdb, tupid, nle->dt, dfd,
 				   cnc, newclen, g);
 		free(incb.s);
 		if(newcwd)

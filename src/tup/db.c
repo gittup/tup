@@ -38,6 +38,9 @@ enum {
 	DB_SET_SYM,
 	DB_SET_MTIME,
 	DB_PRINT,
+	_DB_NODELIST_LEN,
+	_DB_GET_NODELIST,
+	DB_DELETE_GITIGNORE,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_DELETE_LIST,
@@ -166,6 +169,8 @@ static int unstyle_old_links(tupid_t cmdid);
 static int add_outputs(tupid_t cmdid, int *outputs_differ);
 static int remove_outputs(tupid_t cmdid, int *outputs_differ);
 static int no_sync(void);
+static int generated_nodelist_len(tupid_t dt);
+static int get_generated_nodelist(char *dest, tupid_t dt);
 static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 
@@ -1430,6 +1435,164 @@ int tup_db_print(FILE *stream, tupid_t tupid)
 	rc = db_print(stream, tupid);
 	fprintf(stream, "\n");
 	return rc;
+}
+
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt)
+{
+	*s = NULL;
+	*len = 0;
+	*len = generated_nodelist_len(dt);
+	if(*len < 0)
+		return -1;
+	if(*len == 0)
+		return 0;
+	*s = malloc(*len);
+	if(!*s) {
+		perror("malloc");
+		return -1;
+	}
+	if(get_generated_nodelist(*s, dt) < 0)
+		return -1;
+	return 0;
+}
+
+static int generated_nodelist_len(tupid_t dt)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_NODELIST_LEN];
+	static char s[] = "select sum(length(name) + 2) from node where dir=? and type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		rc = 0;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	rc = sqlite3_column_int(*stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+static int get_generated_nodelist(char *dest, tupid_t dt)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_NODELIST];
+	static char s[] = "select length(name), name from node where dir=? and type=?";
+	char *p;
+	int len;
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	p = dest;
+	while(1) {
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+		*p = '/';
+		p++;
+		len = sqlite3_column_int(*stmt, 0);
+		memcpy(p, sqlite3_column_text(*stmt, 1), len);
+		p += len;
+		*p = '\n';
+		p++;
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_delete_gitignore(tupid_t dt)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_DELETE_GITIGNORE];
+	static char s[] = "insert or ignore into delete_list select id from node where dir=? and name='.gitignore' and type=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 static int db_print(FILE *stream, tupid_t tupid)
