@@ -72,14 +72,14 @@ struct build_name_list_args {
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			 tupid_t curdir, int dfd, const char *cwd, int clen,
-			 struct graph *g);
+			 struct graph *g, int *ign);
 static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			 struct vardb *vdb, const char *cwd, int clen,
-			 struct graph *g);
+			 struct graph *g, int *ign);
 static int gitignore(tupid_t dt, int dfd);
 static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 			     struct vardb *vdb, const char *cwd, int clen,
-			     struct graph *g);
+			     struct graph *g, int *ign);
 static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 		      struct vardb *vdb, struct bin_list *bl,
 		      const char *cwd, int clen);
@@ -121,6 +121,7 @@ int parse(struct node *n, struct graph *g)
 	int rc = -1;
 	struct buf b;
 	struct vardb vdb;
+	int ign = 0;
 
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tupid, n->name);
@@ -165,8 +166,12 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, dfd, ".", 1, g);
+	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, dfd, ".", 1, g, &ign);
 	free(b.s);
+	if(ign) {
+		if(gitignore(n->tupid, dfd) < 0)
+			rc = -1;
+	}
 out_close_file:
 	close(fd);
 out_close_dfd:
@@ -185,7 +190,7 @@ out_close_vdb:
 
 static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			 tupid_t curdir, int dfd, const char *cwd, int clen,
-			 struct graph *g)
+			 struct graph *g, int *ign)
 {
 	char *p, *e;
 	char *line;
@@ -274,14 +279,16 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			}
 			/* Can only be freed after plist */
 			free(file);
-			if(include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g) < 0)
+			if(include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g, ign) < 0)
 				return -1;
 		} else if(strcmp(line, "include_rules") == 0) {
-			if(include_rules(tupid, curdir, dfd, vdb, cwd, clen, g) < 0)
+			if(include_rules(tupid, curdir, dfd, vdb, cwd, clen, g, ign) < 0)
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
-			if(gitignore(tupid, dfd) < 0)
-				return -1;
+			if(*ign) {
+				fprintf(stderr, "Warning: .gitignore already specified earlier in the Tupfile (line %i is redundant).\n", lno);
+			}
+			*ign = 1;
 		} else if(strcmp(line, "else") == 0) {
 			if_true = !if_true;
 		} else if(strcmp(line, "endif") == 0) {
@@ -400,7 +407,7 @@ syntax_error:
 
 static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			 struct vardb *vdb, const char *cwd, int clen,
-			 struct graph *g)
+			 struct graph *g, int *ign)
 {
 	tupid_t parent;
 	int num_dotdots;
@@ -472,7 +479,7 @@ static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			return -1;
 	}
 	free(path);
-	return include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g);
+	return include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g, ign);
 }
 
 static int gitignore(tupid_t dt, int dfd)
@@ -483,7 +490,7 @@ static int gitignore(tupid_t dt, int dfd)
 
 	if(tup_db_alloc_generated_nodelist(&s, &len, dt) < 0)
 		return -1;
-	if(s) {
+	if(s || dt == 1) {
 		struct db_node dbn;
 
 		if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
@@ -506,16 +513,18 @@ static int gitignore(tupid_t dt, int dfd)
 			write(fd, ".*.swp\n", 7);
 			write(fd, ".gitignore\n", 11);
 		}
-		write(fd, s, len);
-		close(fd);
-		free(s); /* Freeze gopher! */
+		if(s) {
+			write(fd, s, len);
+			close(fd);
+			free(s); /* Freeze gopher! */
+		}
 	}
 	return 0;
 }
 
 static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 			     struct vardb *vdb, const char *cwd, int clen,
-			     struct graph *g)
+			     struct graph *g, int *ign)
 {
 	struct name_list_entry *nle, *tmpnle;
 	struct buf incb;
@@ -592,7 +601,7 @@ static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 		 * parent tupid.
 		 */
 		rc = parse_tupfile(&incb, vdb, tupid, nle->dt, dfd,
-				   cnc, newclen, g);
+				   cnc, newclen, g, ign);
 		free(incb.s);
 		if(newcwd)
 			free(newcwd);
