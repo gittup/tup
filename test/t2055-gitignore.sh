@@ -2,24 +2,6 @@
 
 # Try to use the .gitignore directive
 
-function bad()
-{
-	if grep $1 $2 > /dev/null; then
-		echo "Error: $1 found in .gitignore" 1>&2
-		exit 1
-	fi
-}
-
-function good()
-{
-	if grep $1 $2 > /dev/null; then
-		:
-	else
-		echo "Error: $1 not found in .gitignore" 1>&2
-		exit 1
-	fi
-}
-
 . ../tup.sh
 cat > Tuprules.tup << HERE
 .gitignore
@@ -51,16 +33,16 @@ if [ ! -f sub/.gitignore ]; then
 	exit 1
 fi
 
-bad foo.c .gitignore
-bad bar.c .gitignore
-bad Tupfile .gitignore
-good foo.o .gitignore
-good bar.o .gitignore
-good prog .gitignore
-bad shazam.c sub/.gitignore
-bad Tupfile sub/.gitignore
-good shazam.o sub/.gitignore
-good libsub.a sub/.gitignore
+gitignore_bad foo.c .gitignore
+gitignore_bad bar.c .gitignore
+gitignore_bad Tupfile .gitignore
+gitignore_good foo.o .gitignore
+gitignore_good bar.o .gitignore
+gitignore_good prog .gitignore
+gitignore_bad shazam.c sub/.gitignore
+gitignore_bad Tupfile sub/.gitignore
+gitignore_good shazam.o sub/.gitignore
+gitignore_good libsub.a sub/.gitignore
 
 rm -f Tuprules.tup
 tup rm Tuprules.tup

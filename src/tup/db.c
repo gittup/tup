@@ -1461,7 +1461,7 @@ static int generated_nodelist_len(tupid_t dt)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODELIST_LEN];
-	static char s[] = "select sum(length(name) + 2) from node where dir=? and type=?";
+	static char s[] = "select sum(length(name) + 2) from node left join delete_list on delete_list.id=node.id where dir=? and type=? and delete_list.id is null";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1507,7 +1507,7 @@ static int get_generated_nodelist(char *dest, tupid_t dt)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_NODELIST];
-	static char s[] = "select length(name), name from node where dir=? and type=?";
+	static char s[] = "select length(name), name from node left join delete_list on delete_list.id=node.id where dir=? and type=? and delete_list.id is null";
 	char *p;
 	int len;
 

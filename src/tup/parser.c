@@ -491,6 +491,9 @@ static int gitignore(tupid_t dt, int dfd)
 		if(dbn.tupid < 0) {
 			if(tup_db_node_insert(dt, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
 				return -1;
+		} else {
+			if(tup_db_unflag_delete(dbn.tupid) < 0)
+				return -1;
 		}
 
 		fd = openat(dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);

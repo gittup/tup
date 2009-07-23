@@ -68,6 +68,8 @@ takes long time after re-parsing all linux directories (eg: Rules.tup changes)
 
 access(2) support in ldpreload?
 
+treat ENOTDIR as ENOENT? eg: touch foo; if [ -f foo/secret/ghost ]; ...
+
 command that reads from stdin?
 
 tup show to list the Tupfile as read in the current dir?

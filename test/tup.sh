@@ -214,3 +214,21 @@ check_no_updates()
 	fi
 	mv $2_check_no_updates.bak $2
 }
+
+function gitignore_bad()
+{
+	if grep $1 $2 > /dev/null; then
+		echo "Error: $1 found in $2" 1>&2
+		exit 1
+	fi
+}
+
+function gitignore_good()
+{
+	if grep $1 $2 > /dev/null; then
+		:
+	else
+		echo "Error: $1 not found in $2" 1>&2
+		exit 1
+	fi
+}
