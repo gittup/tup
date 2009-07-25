@@ -31,38 +31,11 @@ give user an option to kill an autoupdate updater
 
 ifneq
 
-somehow graph not empty when I 'varchanged' a bunch of variables with -j2? (not sure which one actually triggered the build :( ), but the build worked next try:
-  [########## ] 1124/1129 ( 99%) 45498: OBJCOPY vmlinux.bin
-  [########## ] 1125/1129 ( 99%) 45495: ASM header.S
-
-  Error: Graph is not empty after execution.
-
-  real    6m52.091s
-  user    7m58.446s
-  sys     0m42.199s
-  [marf linux-2.6.27]$ tup upd
-  Executing Commands
-  [   ] 0/3 (  0%) 45888: LD setup.elf
-  [=  ] 1/3 ( 33%) 45889: OBJCOPY setup.bin
-  [== ] 2/3 ( 66%) 45890: ./build -b setup.bin vmlinux.bin CURRENT > bzImage
-  Root device is (8, 3)
-  Setup is 11704 bytes (padded to 11776 bytes).
-  System is 1830 kB
-  CRC b517552e
-  [===] 3/3 (100%)
-  [marf linux-2.6.27]$
-
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
 print cwd when running a command (maybe instead of tupid)
 
-can't have % flag in a var and then do : |> $(var) |>  ?
- - should it stay this way?
-
 % flag for suffix so I can do CFLAGS_%(suffix) and set CFLAGS_S for assembly flags
-
-takes long time after re-parsing all linux directories (eg: Rules.tup changes)
-  - parser fix will change that?
 
 'tup g' shows too much info when a directory changes?
 
@@ -90,8 +63,6 @@ directly support symlinks in tup? Might make t5037 usable.
  - also t5032 when building in parallel and using the 'ln -sf %f %o' pattern rather than 'rm -f %o; ln -s %f %o'
 
  Add %1, %2, etc to reference first, second prereq?
-
- SOCK_DGRAM in server.c but SOCK_SEQPACKET in updater.c?
 
 html:
   proof: no clean target
