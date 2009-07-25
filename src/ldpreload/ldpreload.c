@@ -59,7 +59,7 @@ int open(const char *pathname, int flags, ...)
 	if(rc >= 0) {
 		handle_file(pathname, "", flags&O_ACCMODE);
 	} else {
-		if(errno == ENOENT)
+		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(pathname, "", ACCESS_GHOST);
 	}
 	return rc;
@@ -81,7 +81,7 @@ int open64(const char *pathname, int flags, ...)
 	if(rc >= 0) {
 		handle_file(pathname, "", flags&O_ACCMODE);
 	} else {
-		if(errno == ENOENT)
+		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(pathname, "", ACCESS_GHOST);
 	}
 	return rc;
@@ -96,7 +96,7 @@ FILE *fopen(const char *path, const char *mode)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT)
+		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(path, "", ACCESS_GHOST);
 	}
 	return f;
@@ -111,7 +111,7 @@ FILE *fopen64(const char *path, const char *mode)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT)
+		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(path, "", ACCESS_GHOST);
 	}
 	return f;
@@ -126,7 +126,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT)
+		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(path, "", ACCESS_GHOST);
 	}
 	return f;
@@ -211,7 +211,7 @@ int __xstat(int vers, const char *name, struct stat *buf)
 	WRAP(s_xstat, "__xstat");
 	rc = s_xstat(vers, name, buf);
 	if(rc < 0) {
-		if(errno == ENOENT) {
+		if(errno == ENOENT || errno == ENOTDIR) {
 			handle_file(name, "", ACCESS_GHOST);
 		}
 	}
@@ -225,7 +225,7 @@ int __xstat64 (int __ver, __const char *__filename,
 	WRAP(s_xstat64, "__xstat64");
 	rc = s_xstat64(__ver, __filename, __stat_buf);
 	if(rc < 0) {
-		if(errno == ENOENT) {
+		if(errno == ENOENT || errno == ENOTDIR) {
 			handle_file(__filename, "", ACCESS_GHOST);
 		}
 	}
