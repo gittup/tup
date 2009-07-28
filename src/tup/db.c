@@ -3646,7 +3646,7 @@ int tup_db_files_to_tmpdb(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TMPDB];
-	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=? or type=?";
+	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=? or type=? and name <> '.gitignore'";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
