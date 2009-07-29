@@ -159,10 +159,10 @@ int monitor(int argc, char **argv)
 
 	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
 
-	/* Use tmpdb to store all file objects in a list. We then start to
-	 * watch the filesystem, and remove all existing objects from the tmpdb
-	 * list. Anything leftover in the tmpdb must have been deleted while
-	 * the monitor wasn't looking.
+	/* Use tmp_list to store all file objects in a list. We then start to
+	 * watch the filesystem, and remove all existing objects from the tmp
+	 * list. Anything leftover in tmp must have been deleted while the
+	 * monitor wasn't looking.
 	 */
 	if(tup_db_scan_begin() < 0)
 		return -1;

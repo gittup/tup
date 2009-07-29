@@ -19,8 +19,6 @@ recursive grep kills monitor
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-remove tmpdb in favor of just a temporary table?
-
 use temporary table instead of moving all commands to delete in parser? Should be easy to time the difference.
 
 instead of doing delete_name_file() for each entry in delete_list, maybe change the sql to do 'delete from link where from_id in (select id from delete_list)' or some such. Would still need to iterate to actually unlink() files, though.
@@ -54,8 +52,6 @@ if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - namespace CONFIG under @/default, @/newconfig, etc?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
-
-use single scratch list instead of all the various temporary lists? or at least re-use ones that don't overlap
 
 directly support symlinks in tup? Might make t5037 usable.
  - also t5032 when building in parallel and using the 'ln -sf %f %o' pattern rather than 'rm -f %o; ln -s %f %o'

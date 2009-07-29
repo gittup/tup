@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb,
+int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 	       int (*callback)(tupid_t newdt, int dfd, const char *file))
 {
 	struct flist f = {0, 0, 0};
@@ -29,8 +29,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb,
 		tupid = tup_file_mod_mtime(dt, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
-		if(tmpdb) {
-			if(tup_db_unflag_tmpdb(tupid) < 0)
+		if(tmp_list) {
+			if(tup_db_unflag_tmp(tupid) < 0)
 				return -1;
 		}
 		return 0;
@@ -40,8 +40,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb,
 		tupid = update_symlink_fileat(dt, dfd, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
-		if(tmpdb) {
-			if(tup_db_unflag_tmpdb(tupid) < 0)
+		if(tmp_list) {
+			if(tup_db_unflag_tmp(tupid) < 0)
 				return -1;
 		}
 		return 0;
@@ -50,8 +50,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb,
 		int flistfd;
 
 		newdt = create_dir_file(dt, file);
-		if(tmpdb) {
-			if(tup_db_unflag_tmpdb(newdt) < 0)
+		if(tmp_list) {
+			if(tup_db_unflag_tmp(newdt) < 0)
 				return -1;
 		}
 
@@ -78,7 +78,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmpdb,
 		flist_foreachfd(&f, flistfd) {
 			if(f.filename[0] == '.')
 				continue;
-			if(watch_path(newdt, newfd, f.filename, tmpdb,
+			if(watch_path(newdt, newfd, f.filename, tmp_list,
 				      callback) < 0)
 				return -1;
 		}

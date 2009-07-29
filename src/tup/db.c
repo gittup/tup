@@ -78,23 +78,18 @@ enum {
 	DB_GET_VARLEN,
 	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
-	DB_REMOVE_VAR_LIST,
-	DB_CREATE_VAR_LIST,
-	DB_DELETE_VAR_LIST,
-	DB_ATTACH_TMPDB,
-	DB_DETACH_TMPDB,
-	DB_FILES_TO_TMPDB,
-	DB_UNFLAG_TMPDB,
-	DB_GET_ALL_IN_TMPDB,
-	DB_CLEAR_TMP_TABLES,
+	DB_FILES_TO_TMP,
+	DB_UNFLAG_TMP,
+	DB_GET_ALL_IN_TMP,
+	DB_CLEAR_TMP_TABLE,
 	DB_ADD_WRITE_LIST,
-	DB_ADD_READ_LIST,
 	DB_NODE_INSERT,
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT,
 	_DB_LINK_UPDATE,
 	_DB_NODE_HAS_GHOSTS,
 	_DB_CREATE_GHOST_LIST,
+	_DB_CREATE_TMP_LIST,
 	_DB_ADD_GHOST,
 	_DB_ADD_GHOST_LINKS,
 	_DB_ADD_GHOST_DIRS,
@@ -146,6 +141,8 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
 static int node_has_ghosts(tupid_t tupid);
 static int create_ghost_list(void);
+static int create_tmp_list(void);
+static int check_tmp_requested(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
@@ -196,6 +193,8 @@ int tup_db_open(void)
 		return -1;
 
 	if(create_ghost_list() < 0)
+		return -1;
+	if(create_tmp_list() < 0)
 		return -1;
 
 	return rc;
@@ -3424,7 +3423,7 @@ int tup_db_var_pre(void)
 {
 	if(tup_db_begin() < 0)
 		return -1;
-	if(tup_db_create_var_list() < 0)
+	if(tup_db_request_tmp_list() < 0)
 		return -1;
 	if(init_var_list() < 0)
 		return -1;
@@ -3448,113 +3447,26 @@ int tup_db_var_post(void)
 		return -1;
 	if(var_list_delete_nodes() < 0)
 		return -1;
-	if(tup_db_delete_var_list() < 0)
+	if(tup_db_clear_tmp_table() < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
-	return 0;
-}
-
-int tup_db_remove_var_list(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_REMOVE_VAR_LIST];
-	static char s[] = "delete from var_list where id=?";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+	if(tup_db_release_tmp_list() < 0)
 		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_create_var_list(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CREATE_VAR_LIST];
-	static char s[] = "create temporary table var_list (id integer primary key not null)";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_delete_var_list(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DELETE_VAR_LIST];
-	static char s[] = "drop table var_list";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
 	return 0;
 }
 
 int tup_db_scan_begin(void)
 {
-	if(tup_db_attach_tmpdb() < 0)
+	if(tup_db_request_tmp_list() < 0)
 		return -1;
 	if(tup_db_begin() < 0)
 		return -1;
-	if(tup_db_files_to_tmpdb() < 0)
+	if(tup_db_files_to_tmp() < 0)
 		return -1;
-	if(tup_db_unflag_tmpdb(DOT_DT) < 0)
+	if(tup_db_unflag_tmp(DOT_DT) < 0)
 		return -1;
-	if(tup_db_unflag_tmpdb(VAR_DT) < 0)
+	if(tup_db_unflag_tmp(VAR_DT) < 0)
 		return -1;
 	return 0;
 }
@@ -3564,7 +3476,7 @@ int tup_db_scan_end(void)
 	struct half_entry *he;
 	LIST_HEAD(del_list);
 
-	if(tup_db_get_all_in_tmpdb(&del_list) < 0)
+	if(tup_db_get_all_in_tmp(&del_list) < 0)
 		return -1;
 	while(!list_empty(&del_list)) {
 		he = list_entry(del_list.next, struct half_entry, list);
@@ -3576,77 +3488,49 @@ int tup_db_scan_end(void)
 
 	if(tup_db_commit() < 0)
 		return -1;
-	if(tup_db_detach_tmpdb() < 0)
+	if(tup_db_release_tmp_list() < 0)
 		return -1;
 	return 0;
 }
 
-int tup_db_attach_tmpdb(void)
+static int tmp_list_out = 0;
+int tup_db_request_tmp_list(void)
 {
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_ATTACH_TMPDB];
-	static char s[] = "attach ':memory:' as tmpdb";
-	char *errmsg;
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+	if(tmp_list_out) {
+		fprintf(stderr, "[31mtup internal error: tmp list already in use.[0m\n");
 		return -1;
 	}
+	tmp_list_out = 1;
+	return 0;
+}
 
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+int tup_db_release_tmp_list(void)
+{
+	if(!tmp_list_out) {
+		fprintf(stderr, "[31mtup internal error: tmp list not in use[0m\n");
 		return -1;
 	}
+	tmp_list_out = 0;
+	return 0;
+}
 
-	if(sqlite3_exec(tup_db, "create table tmpdb.tmp_list (id integer primary key not null)", NULL, NULL, &errmsg) != 0) {
-		fprintf(stderr, "SQL error creating tmp_list table: %s\n",
-			errmsg);
+static int check_tmp_requested(void)
+{
+	if(!tmp_list_out) {
+		fprintf(stderr, "[31mtup internal error: tmp list hasn't been requested before use[0m\n");
 		return -1;
 	}
 	return 0;
 }
 
-int tup_db_detach_tmpdb(void)
+int tup_db_files_to_tmp(void)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DETACH_TMPDB];
-	static char s[] = "detach tmpdb";
+	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TMP];
+	static char s[] = "insert into tmp_list select id from node where type=? or type=? or type=? and name <> '.gitignore'";
 
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+	if(check_tmp_requested() < 0)
 		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	return 0;
-}
-
-int tup_db_files_to_tmpdb(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TMPDB];
-	static char s[] = "insert into tmpdb.tmp_list select id from node where type=? or type=? or type=? and name <> '.gitignore'";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3683,11 +3567,14 @@ int tup_db_files_to_tmpdb(void)
 	return 0;
 }
 
-int tup_db_unflag_tmpdb(tupid_t tupid)
+int tup_db_unflag_tmp(tupid_t tupid)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_TMPDB];
-	static char s[] = "delete from tmpdb.tmp_list where id=?";
+	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_TMP];
+	static char s[] = "delete from tmp_list where tmpid=?";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3716,13 +3603,16 @@ int tup_db_unflag_tmpdb(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_get_all_in_tmpdb(struct list_head *list)
+int tup_db_get_all_in_tmp(struct list_head *list)
 {
 	int rc;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_GET_ALL_IN_TMPDB];
-	static char s[] = "select node.id, dir, sym, type from tmpdb.tmp_list, node where tmp_list.id = node.id";
+	sqlite3_stmt **stmt = &stmts[DB_GET_ALL_IN_TMP];
+	static char s[] = "select node.id, dir, sym, type from tmp_list, node where tmp_list.tmpid = node.id";
 	struct half_entry *he;
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3764,37 +3654,14 @@ out_reset:
 	return rc;
 }
 
-int tup_db_create_tmp_tables(void)
-{
-	char sql_tmp1[] = "create temporary table write_list (write_id integer primary key not null)";
-	char *errmsg;
-
-	if(sqlite3_exec(tup_db, sql_tmp1, NULL, NULL, &errmsg) != 0) {
-		fprintf(stderr, "SQL error: %s\nQuery was: %s",
-			errmsg, sql_tmp1);
-		return -1;
-	}
-	return 0;
-}
-
-int tup_db_drop_tmp_tables(void)
-{
-	char sql_tmp1[] = "drop table write_list";
-	char *errmsg;
-
-	if(sqlite3_exec(tup_db, sql_tmp1, NULL, NULL, &errmsg) != 0) {
-		fprintf(stderr, "SQL error: %s\nQuery was: %s",
-			errmsg, sql_tmp1);
-		return -1;
-	}
-	return 0;
-}
-
-int tup_db_clear_tmp_tables(void)
+int tup_db_clear_tmp_table(void)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CLEAR_TMP_TABLES];
-	static char s[] = "delete from write_list";
+	sqlite3_stmt **stmt = &stmts[DB_CLEAR_TMP_TABLE];
+	static char s[] = "delete from tmp_list";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -3822,7 +3689,10 @@ int tup_db_add_write_list(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_ADD_WRITE_LIST];
-	static char s[] = "insert or replace into write_list values(?)";
+	static char s[] = "insert or replace into tmp_list values(?)";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4181,6 +4051,34 @@ static int create_ghost_list(void)
 	return 0;
 }
 
+static int create_tmp_list(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_CREATE_TMP_LIST];
+	static char s[] = "create temporary table tmp_list (tmpid integer primary key not null)";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
+}
+
 static int add_ghost(tupid_t tupid)
 {
 	int rc;
@@ -4381,7 +4279,7 @@ static int init_var_list(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_INIT_VAR_LIST];
-	static char s[] = "insert or replace into var_list select id from node where dir=?";
+	static char s[] = "insert or replace into tmp_list select id from node where dir=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4414,7 +4312,7 @@ static int var_list_flag_dirs(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_DIRS];
-	static char s[] = "insert or replace into create_list select to_id from link, node where from_id in (select id from var_list) and to_id=node.id and node.type=?";
+	static char s[] = "insert or replace into create_list select to_id from link, node where from_id in (select tmpid from tmp_list) and to_id=node.id and node.type=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4447,7 +4345,7 @@ static int var_list_flag_cmds(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_CMDS];
-	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id in (select id from var_list) and to_id=node.id and node.type=?";
+	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id in (select tmpid from tmp_list) and to_id=node.id and node.type=?";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4480,7 +4378,7 @@ static int var_list_unflag_create(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_CREATE];
-	static char s[] = "delete from create_list where id in (select id from var_list)";
+	static char s[] = "delete from create_list where id in (select tmpid from tmp_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4508,7 +4406,7 @@ static int var_list_unflag_modify(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_MODIFY];
-	static char s[] = "delete from modify_list where id in (select id from var_list)";
+	static char s[] = "delete from modify_list where id in (select tmpid from tmp_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4536,7 +4434,7 @@ static int var_list_delete_links(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_LINKS];
-	static char s[] = "delete from link where from_id in (select id from var_list)";
+	static char s[] = "delete from link where from_id in (select tmpid from tmp_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4564,7 +4462,7 @@ static int var_list_delete_vars(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_VARS];
-	static char s[] = "delete from var where id in (select id from var_list)";
+	static char s[] = "delete from var where id in (select tmpid from tmp_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4592,7 +4490,7 @@ static int var_list_delete_nodes(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_NODES];
-	static char s[] = "delete from node where id in (select id from var_list)";
+	static char s[] = "delete from node where id in (select tmpid from tmp_list)";
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4621,7 +4519,10 @@ static int check_expected_outputs(tupid_t cmdid)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_CHECK_EXPECTED_OUTPUTS];
-	static char s[] = "select to_id, name from link, node left join write_list on write_id=to_id where from_id=? and id=to_id and write_id is null";
+	static char s[] = "select to_id, name from link, node left join tmp_list on tmpid=to_id where from_id=? and id=to_id and tmpid is null";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4669,9 +4570,12 @@ static int check_actual_outputs(tupid_t cmdid)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_CHECK_ACTUAL_OUTPUTS];
-	static char s[] = "select write_id, dir, name from write_list, node where write_id not in (select to_id from link where from_id=?) and write_id=id";
+	static char s[] = "select tmpid, dir, name from tmp_list, node where tmpid not in (select to_id from link where from_id=?) and tmpid=id";
 	struct del_entry *de;
 	LIST_HEAD(del_list);
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4756,7 +4660,10 @@ static int check_actual_inputs(tupid_t cmdid)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_CHECK_ACTUAL_INPUTS];
-	static char s[] = "select write_id, dir, name from write_list, node where write_id not in (select id from node where id=write_id and type!=?) and write_id not in (select from_id from link where from_id=write_id and to_id=? and style&?) and write_id=id";
+	static char s[] = "select tmpid, dir, name from tmp_list, node where tmpid not in (select id from node where id=tmpid and type!=?) and tmpid not in (select from_id from link where from_id=tmpid and to_id=? and style&?) and tmpid=id";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4811,7 +4718,10 @@ static int add_input_links(tupid_t cmdid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_INPUT_LINKS];
-	static char s[] = "insert into link select write_id, ?, ? from write_list where write_id not in (select from_id from link where to_id=?)";
+	static char s[] = "insert into link select tmpid, ?, ? from tmp_list where tmpid not in (select from_id from link where to_id=?)";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4852,7 +4762,10 @@ static int style_input_links(tupid_t cmdid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_STYLE_INPUT_LINKS];
-	static char s[] = "update link set style=? where from_id in (select write_id from write_list) and to_id=? and style=?";
+	static char s[] = "update link set style=? where from_id in (select tmpid from tmp_list) and to_id=? and style=?";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4893,7 +4806,10 @@ static int drop_old_links(tupid_t cmdid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_DROP_OLD_LINKS];
-	static char s[] = "delete from link where from_id not in (select write_id from write_list) and to_id=? and style=?";
+	static char s[] = "delete from link where from_id not in (select tmpid from tmp_list) and to_id=? and style=?";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4930,7 +4846,10 @@ static int unstyle_old_links(tupid_t cmdid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_UNSTYLE_OLD_LINKS];
-	static char s[] = "update link set style=? where from_id not in (select write_id from write_list) and to_id=? and style=?";
+	static char s[] = "update link set style=? where from_id not in (select tmpid from tmp_list) and to_id=? and style=?";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4971,7 +4890,10 @@ static int add_outputs(tupid_t cmdid, int *outputs_differ)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_OUTPUTS];
-	static char s[] = "insert or ignore into link select ?, write_id, ? from write_list";
+	static char s[] = "insert or ignore into link select ?, tmpid, ? from tmp_list";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -5010,7 +4932,10 @@ static int remove_outputs(tupid_t cmdid, int *outputs_differ)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_REMOVE_OUTPUTS];
-	static char s[] = "delete from link where from_id=? and to_id not in (select write_id from write_list)";
+	static char s[] = "delete from link where from_id=? and to_id not in (select tmpid from tmp_list)";
+
+	if(check_tmp_requested() < 0)
+		return -1;
 
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

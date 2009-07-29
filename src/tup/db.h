@@ -154,25 +154,24 @@ int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);
 int tup_db_write_vars(void);
+
+/* tmp table management */
+int tup_db_request_tmp_list(void);
+int tup_db_release_tmp_list(void);
+int tup_db_clear_tmp_table(void);
+
+/* var tmp operations */
 int tup_db_var_pre(void);
 int tup_db_var_post(void);
-int tup_db_remove_var_list(tupid_t tupid);
-int tup_db_create_var_list(void);
-int tup_db_delete_var_list(void);
 
-/* tmpdb operations */
+/* monitor tmp operations */
 int tup_db_scan_begin(void);
 int tup_db_scan_end(void);
-int tup_db_attach_tmpdb(void);
-int tup_db_detach_tmpdb(void);
-int tup_db_files_to_tmpdb(void);
-int tup_db_unflag_tmpdb(tupid_t tupid);
-int tup_db_get_all_in_tmpdb(struct list_head *list);
+int tup_db_files_to_tmp(void);
+int tup_db_unflag_tmp(tupid_t tupid);
+int tup_db_get_all_in_tmp(struct list_head *list);
 
-/* updater temp operations */
-int tup_db_create_tmp_tables(void);
-int tup_db_drop_tmp_tables(void);
-int tup_db_clear_tmp_tables(void);
+/* updater tmp operations */
 int tup_db_add_write_list(tupid_t tupid);
 int tup_db_check_write_list(tupid_t cmdid);
 int tup_db_add_read_list(tupid_t tupid);

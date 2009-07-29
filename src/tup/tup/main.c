@@ -719,11 +719,11 @@ static int varchange(int argc, char **argv)
 		fprintf(stderr, "Error: varchange requires exactly two args\n");
 		return -1;
 	}
-	if(tup_db_create_var_list() < 0)
+	if(tup_db_request_tmp_list() < 0)
 		return -1;
 	if(create_var_file(argv[1], argv[2]) < 0)
 		return -1;
-	if(tup_db_delete_var_list() < 0)
+	if(tup_db_release_tmp_list() < 0)
 		return -1;
 	return 0;
 }

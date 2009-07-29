@@ -124,7 +124,7 @@ tupid_t create_var_file(const char *var, const char *value)
 			 * scheduled for deletion.
 			 */
 			if(rc == 0) {
-				if(tup_db_remove_var_list(dbn.tupid) < 0)
+				if(tup_db_unflag_tmp(dbn.tupid) < 0)
 					return -1;
 				return 0;
 			}
@@ -140,7 +140,7 @@ tupid_t create_var_file(const char *var, const char *value)
 			return -1;
 		if(tup_db_add_modify_list(dbn.tupid) < 0)
 			return -1;
-		if(tup_db_remove_var_list(dbn.tupid) < 0)
+		if(tup_db_unflag_tmp(dbn.tupid) < 0)
 			return -1;
 	}
 	return tup_db_set_var(dbn.tupid, value);

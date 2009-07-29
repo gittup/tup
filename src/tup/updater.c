@@ -116,7 +116,7 @@ int updater(int argc, char **argv, int phase)
 
 	if(server_init() < 0)
 		return -1;
-	if(tup_db_create_tmp_tables() < 0)
+	if(tup_db_request_tmp_list() < 0)
 		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
@@ -128,7 +128,7 @@ int updater(int argc, char **argv, int phase)
 		return 0;
 	if(process_update_nodes() < 0)
 		return -1;
-	if(tup_db_drop_tmp_tables() < 0)
+	if(tup_db_release_tmp_list() < 0)
 		return -1;
 	return 0; /* Profit! */
 }
