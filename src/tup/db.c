@@ -2,7 +2,7 @@
 #include "db.h"
 #include "db_util.h"
 #include "array_size.h"
-#include "list.h"
+#include "linux/list.h"
 #include "fileio.h" /* TODO: call delete_file elsewhere? */
 #include "config.h"
 #include <stdio.h>
@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
-#include <sqlite3.h>
+#include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 10
 

@@ -32,6 +32,9 @@ ifneq
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
 print cwd when running a command (maybe instead of tupid)
+ - instead of tup_db_open_tupid, load a list of directories in each struct node
+ - for performance, probably want to share dirlists among nodes in the same dir (ie: store in cache, and reference the cache)
+ - something simpler than memdb for cache?
 
 % flag for suffix so I can do CFLAGS_%(suffix) and set CFLAGS_S for assembly flags
 
@@ -44,6 +47,8 @@ command that reads from stdin?
 tup show to list the Tupfile as read in the current dir?
 
 read in +/- in order to add/remove worker threads?
+
+rule without a : should be an error?
 
 tup-gcc:
 if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?

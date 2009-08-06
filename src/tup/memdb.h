@@ -2,7 +2,7 @@
 #define tup_memdb_h
 
 #include "tupid.h"
-#include <sqlite3.h>
+#include "sqlite3/sqlite3.h"
 
 enum {
 	MEMDB_ADD,

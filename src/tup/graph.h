@@ -1,7 +1,7 @@
 #ifndef tup_graph_h
 #define tup_graph_h
 
-#include "list.h"
+#include "linux/list.h"
 #include "tupid.h"
 #include "db.h"
 #include "memdb.h"

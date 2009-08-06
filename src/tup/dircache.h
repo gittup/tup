@@ -1,7 +1,7 @@
 #ifndef dircache_h
 #define dircache_h
 
-#include "list.h"
+#include "linux/list.h"
 #include "tupid.h"
 
 struct dircache {

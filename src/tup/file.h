@@ -2,7 +2,7 @@
 #define file_h
 
 #include "tupid.h"
-#include "list.h"
+#include "linux/list.h"
 
 struct file_info {
 	struct list_head read_list;

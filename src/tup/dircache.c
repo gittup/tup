@@ -1,6 +1,6 @@
 #include "dircache.h"
 #include "debug.h"
-#include "list.h"
+#include "linux/list.h"
 #include "memdb.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -42,7 +42,7 @@ libtup.a: $(patsubst %.c,$(BUILD)%.o,src/sqlite3/sqlite3.c $(wildcard src/tup/*.
 $(objs): $(BUILD)%.o: %.c Makefile
 	$Qecho "  CC      $<";\
 	mkdir -p $(@D);\
-	gcc -Os -MMD $(CCFLAGS) -Isrc -Isrc/sqlite3 -c $< -o $@
+	gcc -Os -MMD $(CCFLAGS) -Isrc -c $< -o $@
 
 -include $(deps)
 
