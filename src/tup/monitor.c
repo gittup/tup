@@ -36,9 +36,9 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
-#include "memdb.h"
 #include "updater.h"
 #include "path.h"
+#include "linux/rbtree.h"
 
 struct moved_from_event;
 struct monitor_event {
@@ -69,7 +69,7 @@ static int inot_fd;
 static int tup_wd;
 static int obj_wd;
 static int mon_wd;
-static struct memdb mdb;
+static struct rb_root tree = RB_ROOT;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
@@ -94,9 +94,6 @@ int monitor(int argc, char **argv)
 			debug_enable("monitor");
 		}
 	}
-
-	if(memdb_init(&mdb) < 0)
-		return -1;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -309,7 +306,7 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 		return -1;
 	}
 
-	dircache_add(&mdb, wd, newdt);
+	dircache_add(&tree, wd, newdt);
 	return 0;
 }
 
@@ -563,7 +560,7 @@ static void handle_event(struct monitor_event *m)
 {
 	struct dircache *dc;
 
-	dc = dircache_lookup(&mdb, m->e.wd);
+	dc = dircache_lookup(&tree, m->e.wd);
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
 			m->e.wd);
@@ -571,7 +568,7 @@ static void handle_event(struct monitor_event *m)
 	}
 
 	if(m->e.mask & IN_IGNORED) {
-		dircache_del(&mdb, dc);
+		dircache_del(&tree, dc);
 		return;
 	}
 
@@ -579,7 +576,7 @@ static void handle_event(struct monitor_event *m)
 		struct moved_from_event *mfe = m->from_event;
 		struct dircache *from_dc;
 
-		from_dc = dircache_lookup(&mdb, mfe->m.e.wd);
+		from_dc = dircache_lookup(&tree, mfe->m.e.wd);
 		if(!from_dc) {
 			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m.e.wd);
 			return;

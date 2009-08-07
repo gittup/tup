@@ -376,13 +376,13 @@ static int build_graph(struct graph *g)
 	while(!list_empty(&g->plist)) {
 		cur = list_entry(g->plist.next, struct node, list);
 		if(cur->state == STATE_INITIALIZED) {
-			DEBUGP("find deps for node: %lli\n", cur->tupid);
+			DEBUGP("find deps for node: %lli\n", cur->tnode.tupid);
 			g->cur = cur;
-			if(tup_db_select_node_by_link(add_file_cb, g, cur->tupid) < 0)
+			if(tup_db_select_node_by_link(add_file_cb, g, cur->tnode.tupid) < 0)
 				return -1;
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
-			DEBUGP("remove node from stack: %lli\n", cur->tupid);
+			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
 			list_del(&cur->list);
 			list_add_tail(&cur->list, &g->node_list);
 			cur->state = STATE_FINISHED;
@@ -409,7 +409,7 @@ edge_create:
 	if(n->state == STATE_PROCESSING) {
 		fprintf(stderr, "Error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
-			g->cur->tupid, dbn->tupid);
+			g->cur->tnode.tupid, dbn->tupid);
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
@@ -476,7 +476,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	}
 
 	root = list_entry(g->node_list.next, struct node, list);
-	DEBUGP("root node: %lli\n", root->tupid);
+	DEBUGP("root node: %lli\n", root->tnode.tupid);
 	list_del(&root->list);
 	pop_node(g, root);
 	remove_node(g, root);
@@ -484,7 +484,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	while(!list_empty(&g->plist) && !sig_quit) {
 		struct node *n;
 		n = list_entry(g->plist.next, struct node, list);
-		DEBUGP("cur node: %lli [%i]\n", n->tupid, n->incoming_count);
+		DEBUGP("cur node: %lli [%i]\n", n->tnode.tupid, n->incoming_count);
 		if(n->incoming_count) {
 			/* Here STATE_FINISHED means we're on the node_list,
 			 * therefore not ready for processing.
@@ -558,11 +558,11 @@ keep_going:
 				fprintf(stderr, "fatal tup error: Graph is not empty after execution.\n");
 				fprintf(stderr, "Node list:\n");
 				list_for_each_entry(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tupid, n->name);
+					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);
 				}
 				fprintf(stderr, "plist:\n");
 				list_for_each_entry(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tupid, n->name);
+					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);
 				}
 			}
 		}
@@ -599,7 +599,7 @@ static void *create_work(void *arg)
 
 		if(n->type == TUP_NODE_DIR) {
 			if(n->already_used) {
-				printf("Already parsed[%lli]: '%s'\n", n->tupid, n->name);
+				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->name);
 				rc = 0;
 			} else {
 				rc = parse(n, g);
@@ -610,10 +610,10 @@ static void *create_work(void *arg)
 			  n->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
-			fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tupid, n->name);
+			fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tnode.tupid, n->name);
 			rc = -1;
 		}
-		if(tup_db_unflag_create(n->tupid) < 0)
+		if(tup_db_unflag_create(n->tnode.tupid) < 0)
 			rc = -1;
 
 		wrc.rc = rc;
@@ -639,7 +639,7 @@ static void *delete_work(void *arg)
 			break;
 
 		if(n->flags & TUP_FLAGS_DELETE) {
-			rc = delete_name_file(n->tupid, n->dt, n->sym);
+			rc = delete_name_file(n->tnode.tupid, n->dt, n->sym);
 			if(rc == 0 && n->type == TUP_NODE_GENERATED) {
 				rc = delete_file(n->dt, n->name);
 			}
@@ -687,12 +687,12 @@ static void *update_work(void *arg)
 				 * an error - we'll need to pick up there.
 				 */
 				if(e->style & TUP_LINK_NORMAL) {
-					if(tup_db_add_modify_list(e->dest->tupid) < 0)
+					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
 						rc = -1;
 				}
 				e = e->next;
 			}
-			if(tup_db_unflag_modify(n->tupid) < 0)
+			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
 			pthread_mutex_unlock(&db_mutex);
 		}
@@ -721,7 +721,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->type == g->count_flags)
-			tup_db_print(stdout, n->tupid);
+			tup_db_print(stdout, n->tnode.tupid);
 
 		wrc.rc = 0;
 		wrc.n = n;
@@ -762,7 +762,7 @@ static int update(struct node *n, struct server *s)
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
-			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tupid, n->name);
+			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->name);
 			return -1;
 		}
 		name++;
@@ -812,7 +812,7 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = write_files(n->tupid, n->dt, dfd, name, &s->finfo, &warnings);
+			rc = write_files(n->tnode.tupid, n->dt, dfd, name, &s->finfo, &warnings);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
@@ -838,9 +838,9 @@ static int update(struct node *n, struct server *s)
 
 err_cmd_failed:
 	if(exit_status == -1)
-		fprintf(stderr, " *** Command %lli failed: %s\n", n->tupid, name);
+		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 	else
-		fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tupid, exit_status, name);
+		fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:
@@ -898,7 +898,7 @@ static int var_replace(struct node *n)
 		return -1;
 	if(dbn.tupid < 0)
 		return -1;
-	if(tup_db_create_link(dbn.tupid, n->tupid, TUP_LINK_NORMAL) < 0)
+	if(tup_db_create_link(dbn.tupid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 
 	ifd = open(input, O_RDONLY);
@@ -942,7 +942,7 @@ static int var_replace(struct node *n)
 			varid = tup_db_write_var(p+1, rat-(p+1), ofd);
 			if(varid < 0)
 				return -1;
-			if(tup_db_create_link(varid, n->tupid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(varid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			p = rat + 1;
 		} else {
@@ -1041,7 +1041,7 @@ static void show_progress(int sum, int tot, struct node *n)
 			printf("[%.*s%.*s] %i/%i (%3i%%) %lli: %s%.*s%s\n",
 			       a, ident, b-a, spaces,
 			       sum, tot, sum*100/tot,
-			       n->tupid, color, name_sz, name, endcolor);
+			       n->tnode.tupid, color, name_sz, name, endcolor);
 		} else {
 			printf("[%.*s%.*s] [32m%i/%i (%3i%%)[0m\n",
 			       a, ident, b-a, spaces,

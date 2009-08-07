@@ -2,9 +2,8 @@
 #define tup_graph_h
 
 #include "linux/list.h"
-#include "tupid.h"
 #include "db.h"
-#include "linux/rbtree.h"
+#include "tupid_tree.h"
 
 struct edge {
 	struct edge *next;
@@ -19,12 +18,11 @@ struct edge {
 struct node {
 	struct list_head list;
 	struct edge *edges;
-	tupid_t tupid;
 	tupid_t dt;
 	tupid_t sym;
 	char *name;
 	int incoming_count;
-	struct rb_node rbn;
+	struct tupid_tree tnode;
 
 	char state;
 	char type; /* One of TUP_NODE_* */

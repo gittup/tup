@@ -266,11 +266,11 @@ static int graph(int argc, char **argv)
 
 	while(!list_empty(&g.plist)) {
 		g.cur = list_entry(g.plist.next, struct node, list);
-		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tupid) < 0)
+		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tnode.tupid) < 0)
 			return -1;
 		list_move(&g.cur->list, &g.node_list);
 
-		tupid = g.cur->tupid;
+		tupid = g.cur->tnode.tupid;
 		g.cur = NULL;
 		if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
 			return -1;
@@ -333,11 +333,11 @@ static int graph(int argc, char **argv)
 				color = 0x888888;
 				fontcolor = 0x888888;
 			} else {
-				fprintf(stderr, "tup error: How is color non-zero, but the node isn't expanded? Node is %lli\n", n->tupid);
+				fprintf(stderr, "tup error: How is color non-zero, but the node isn't expanded? Node is %lli\n", n->tnode.tupid);
 				return -1;
 			}
 		}
-		printf("\tnode_%lli [label=\"", n->tupid);
+		printf("\tnode_%lli [label=\"", n->tnode.tupid);
 		s = n->name;
 		if(s[0] == '^') {
 			s++;
@@ -349,19 +349,19 @@ static int graph(int argc, char **argv)
 		} else {
 			print_name(s, 0);
 		}
-		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
+		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
 		if(n->dt) {
 			struct node *tmp;
 			tmp = find_node(&g, n->dt);
 			if(tmp)
-				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tupid, n->dt);
+				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->dt);
 		}
 		if(n->sym != -1)
-			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->sym, n->tupid);
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->sym, n->tnode.tupid);
 
 		e = n->edges;
 		while(e) {
-			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tupid, n->tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid");
+			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid");
 			e = e->next;
 		}
 	}

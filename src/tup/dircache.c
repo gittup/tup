@@ -1,21 +1,16 @@
 #include "dircache.h"
-#include "debug.h"
-#include "linux/list.h"
-#include "memdb.h"
+#include "linux/rbtree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static void dump_dircache(void);
-static LIST_HEAD(dclist);
-
-void dircache_add(struct memdb *m, int wd, tupid_t dt)
+void dircache_add(struct rb_root *tree, int wd, tupid_t dt)
 {
 	struct dircache *dc;
 
-	dc = dircache_lookup(m, wd);
+	dc = dircache_lookup(tree, wd);
 	if(dc) {
-		dircache_del(m, dc);
+		dircache_del(tree, dc);
 	}
 
 	dc = malloc(sizeof *dc);
@@ -24,40 +19,24 @@ void dircache_add(struct memdb *m, int wd, tupid_t dt)
 		return;
 	}
 
-	DEBUGP("add %i:'%lli'\n", wd, dt);
-
-	dc->wd = wd;
 	dc->dt = dt;
-	list_add(&dc->list, &dclist);
-	memdb_add(m, wd, dc);
+	dc->tnode.tupid = wd;
+	tupid_tree_insert(tree, &dc->tnode);
 	return;
 }
 
-void dircache_del(struct memdb *m, struct dircache *dc)
+void dircache_del(struct rb_root *tree, struct dircache *dc)
 {
-	DEBUGP("del %i\n", dc->wd);
-	memdb_remove(m, dc->wd);
-	list_del(&dc->list);
+	rb_erase(&dc->tnode.rbn, tree);
 	free(dc);
-	if(0)
-		dump_dircache();
 }
 
-struct dircache *dircache_lookup(struct memdb *m, int wd)
+struct dircache *dircache_lookup(struct rb_root *tree, int wd)
 {
-	struct dircache *dc;
-	if(memdb_find(m, wd, &dc) < 0)
+	struct tupid_tree *tnode;
+
+	tnode = tupid_tree_search(tree, wd);
+	if(!tnode)
 		return NULL;
-	return dc;
-}
-
-static void dump_dircache(void)
-{
-	struct dircache *dc;
-
-	printf("Dircache:\n");
-	list_for_each_entry(dc, &dclist, list) {
-		printf("  %i: '%lli'\n", dc->wd, dc->dt);
-	}
-	printf("\n");
+	return container_of(tnode, struct dircache, tnode);
 }

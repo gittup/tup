@@ -6,7 +6,6 @@
 #include "fileio.h"
 #include "fslurp.h"
 #include "db.h"
-#include "memdb.h"
 #include "vardb.h"
 #include "graph.h"
 #include "config.h"
@@ -124,7 +123,7 @@ int parse(struct node *n, struct graph *g)
 	int ign = 0;
 
 	if(n->parsing) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tupid, n->name);
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->name);
 		return -1;
 	}
 	n->parsing = 1;
@@ -141,18 +140,18 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_flag_delete_in_dir(n->tupid, TUP_NODE_CMD) < 0)
+	if(tup_db_flag_delete_in_dir(n->tnode.tupid, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_flag_delete_cmd_outputs(n->tupid) < 0)
+	if(tup_db_flag_delete_cmd_outputs(n->tnode.tupid) < 0)
 		return -1;
-	if(tup_db_delete_dependent_dir_links(n->tupid) < 0)
+	if(tup_db_delete_dependent_dir_links(n->tnode.tupid) < 0)
 		return -1;
-	if(tup_db_delete_gitignore(n->tupid) < 0)
+	if(tup_db_delete_gitignore(n->tnode.tupid) < 0)
 		return -1;
 
-	dfd = tup_db_open_tupid(n->tupid);
+	dfd = tup_db_open_tupid(n->tnode.tupid);
 	if(dfd < 0) {
-		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tupid);
+		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tnode.tupid);
 		goto out_close_vdb;
 	}
 
@@ -166,10 +165,10 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, n->tupid, n->tupid, dfd, ".", 1, g, &ign);
+	rc = parse_tupfile(&b, &vdb, n->tnode.tupid, n->tnode.tupid, dfd, ".", 1, g, &ign);
 	free(b.s);
 	if(ign) {
-		if(gitignore(n->tupid, dfd) < 0)
+		if(gitignore(n->tnode.tupid, dfd) < 0)
 			rc = -1;
 	}
 out_close_file:
@@ -181,7 +180,7 @@ out_close_vdb:
 		rc = -1;
 
 	if(rc == 0) {
-		if(tup_db_unflag_create(n->tupid) < 0)
+		if(tup_db_unflag_create(n->tnode.tupid) < 0)
 			return -1;
 	}
 
