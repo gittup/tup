@@ -470,6 +470,16 @@ static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			/* Tuprules.tup doesn't exist here, go to the next
 			 * dir.
 			 */
+			dbn.tupid = tup_db_node_insert(dt, tuprules, -1, TUP_NODE_GHOST, -1);
+			if(dbn.tupid < 0)
+				return -1;
+			dbn.type = TUP_NODE_GHOST;
+
+			/* Fall through to next if */
+		}
+		if(dbn.type == TUP_NODE_GHOST) {
+			if(tup_db_create_link(dbn.tupid, tupid, TUP_LINK_NORMAL) < 0)
+				return -1;
 			continue;
 		}
 
