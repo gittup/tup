@@ -34,7 +34,7 @@ ldpreload.so:
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 
-libtup.a: $(patsubst %.c,$(BUILD)%.o,src/sqlite3/sqlite3.c $(wildcard src/tup/*.c))
+libtup.a: $(patsubst %.c,$(BUILD)%.o,src/sqlite3/sqlite3.c $(wildcard src/tup/*.c src/linux/*.c))
 	$Qecho "  AR      $@";\
 	rm -f $@ ;\
 	ar cru $@ $^

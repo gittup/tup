@@ -7,10 +7,12 @@
 #include <string.h>
 
 static void dump_node(FILE *f, struct node *n);
+static struct node *rbnode_search(struct rb_root *root, tupid_t tupid);
+static int rbnode_insert(struct rb_root *root, struct node *data);
 
-int find_node(struct graph *g, tupid_t tupid, struct node **n)
+struct node *find_node(struct graph *g, tupid_t tupid)
 {
-	return memdb_find(&g->memdb, tupid, n);
+	return rbnode_search(&g->tree, tupid);
 }
 
 struct node *create_node(struct graph *g, struct db_node *dbn)
@@ -40,7 +42,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->parsing = 0;
 	list_add_tail(&n->list, &g->node_list);
 
-	if(memdb_add(&g->memdb, n->tupid, n) < 0)
+	if(rbnode_insert(&g->tree, n) < 0)
 		return NULL;
 	return n;
 }
@@ -50,7 +52,7 @@ void remove_node(struct graph *g, struct node *n)
 	if(n->edges) {
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tupid);
 	}
-	memdb_remove(&g->memdb, n->tupid);
+	rb_erase(&n->rbn, &g->tree);
 	/* TODO: block pool */
 	free(n->name);
 	free(n);
@@ -95,8 +97,7 @@ int create_graph(struct graph *g, int count_flags)
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
 
-	if(memdb_init(&g->memdb) < 0)
-		return -1;
+	g->tree.rb_node = NULL;
 
 	g->cur = g->root = create_node(g, &dbn_root);
 	if(!g->root)
@@ -108,8 +109,7 @@ int create_graph(struct graph *g, int count_flags)
 
 int destroy_graph(struct graph *g)
 {
-	if(memdb_close(&g->memdb) < 0)
-		return -1;
+	if(g) {/* TODO */}
 	return 0;
 }
 
@@ -158,4 +158,49 @@ static void dump_node(FILE *f, struct node *n)
 	for(e=n->edges; e; e=e->next) {
 		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
 	}
+}
+
+static struct node *rbnode_search(struct rb_root *root, tupid_t tupid)
+{
+	struct rb_node *node = root->rb_node;
+
+	while (node) {
+		struct node *data = rb_entry(node, struct node, rbn);
+		int result;
+
+		result = tupid - data->tupid;
+
+		if (result < 0)
+			node = node->rb_left;
+		else if (result > 0)
+			node = node->rb_right;
+		else
+			return data;
+	}
+	return NULL;
+}
+
+static int rbnode_insert(struct rb_root *root, struct node *data)
+{
+	struct rb_node **new = &(root->rb_node), *parent = NULL;
+
+	/* Figure out where to put new node */
+	while (*new) {
+		struct node *this = rb_entry(*new, struct node, rbn);
+		int result = data->tupid - this->tupid;
+
+		parent = *new;
+		if (result < 0)
+			new = &((*new)->rb_left);
+		else if (result > 0)
+			new = &((*new)->rb_right);
+		else
+			return -1;
+	}
+
+	/* Add new node and rebalance tree. */
+	rb_link_node(&data->rbn, parent, new);
+	rb_insert_color(&data->rbn, root);
+
+	return 0;
 }

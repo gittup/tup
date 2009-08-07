@@ -204,8 +204,7 @@ static int graph_cb(void *arg, struct db_node *dbn, int style)
 	struct graph *g = arg;
 	struct node *n;
 
-	if(find_node(g, dbn->tupid, &n) < 0)
-		return -1;
+	n = find_node(g, dbn->tupid);
 	if(n != NULL)
 		goto edge_create;
 	n = create_node(g, dbn);
@@ -255,8 +254,7 @@ static int graph(int argc, char **argv)
 			return -1;
 		}
 
-		if(find_node(&g, dbn.tupid, &n) < 0)
-			return -1;
+		n = find_node(&g, dbn.tupid);
 		if(n == NULL) {
 			n = create_node(&g, &dbn);
 			if(!n)
@@ -354,8 +352,7 @@ static int graph(int argc, char **argv)
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tupid, shape, color, fontcolor, style);
 		if(n->dt) {
 			struct node *tmp;
-			if(find_node(&g, n->dt, &tmp) < 0)
-				return -1;
+			tmp = find_node(&g, n->dt);
 			if(tmp)
 				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tupid, n->dt);
 		}

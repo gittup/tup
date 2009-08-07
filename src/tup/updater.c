@@ -397,8 +397,7 @@ static int add_file_cb(void *arg, struct db_node *dbn, int style)
 	struct graph *g = arg;
 	struct node *n;
 
-	if(find_node(g, dbn->tupid, &n) < 0)
-		return -1;
+	n = find_node(g, dbn->tupid);
 	if(n != NULL)
 		goto edge_create;
 	n = create_node(g, dbn);

@@ -4,7 +4,7 @@
 #include "linux/list.h"
 #include "tupid.h"
 #include "db.h"
-#include "memdb.h"
+#include "linux/rbtree.h"
 
 struct edge {
 	struct edge *next;
@@ -24,6 +24,7 @@ struct node {
 	tupid_t sym;
 	char *name;
 	int incoming_count;
+	struct rb_node rbn;
 
 	char state;
 	char type; /* One of TUP_NODE_* */
@@ -41,11 +42,11 @@ struct graph {
 	struct node *root;
 	struct node *cur;
 	int num_nodes;
-	struct memdb memdb;
+	struct rb_root tree;
 	int count_flags;
 };
 
-int find_node(struct graph *g, tupid_t tupid, struct node **n);
+struct node *find_node(struct graph *g, tupid_t tupid);
 struct node *create_node(struct graph *g, struct db_node *dbn);
 void remove_node(struct graph *g, struct node *n);
 
