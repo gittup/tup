@@ -46,5 +46,8 @@ $(objs): $(BUILD)%.o: %.c Makefile
 
 -include $(deps)
 
+%.h:
+	@echo "  ??      $@"
+
 clean:
 	rm -f tup ldpreload.so; rm -rf build
