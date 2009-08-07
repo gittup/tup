@@ -11,6 +11,8 @@ struct edge {
 	int style;
 };
 
+struct dirtree;
+
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
 #define STATE_FINISHED 2
@@ -23,6 +25,7 @@ struct node {
 	char *name;
 	int incoming_count;
 	struct tupid_tree tnode;
+	struct dirtree *dirtree;
 
 	char state;
 	char type; /* One of TUP_NODE_* */

@@ -78,6 +78,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			   time_t mtime);
 int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn);
+tupid_t tup_db_select_dirname(tupid_t tupid, char **name);
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
 int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 			   struct db_node *dbn);

@@ -31,6 +31,7 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	n->dt = dbn->dt;
 	n->sym = dbn->sym;
 	n->incoming_count = 0;
+	n->dirtree = NULL;
 	n->name = strdup(dbn->name);
 	if(!n->name) {
 		perror("strdup");

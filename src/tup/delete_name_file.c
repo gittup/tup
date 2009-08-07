@@ -1,6 +1,7 @@
 #define _ATFILE_SOURCE
 #include "fileio.h"
 #include "db.h"
+#include "dirtree.h"
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ int delete_file(tupid_t dt, const char *name)
 	int dirfd;
 	int rc = 0;
 
-	dirfd = tup_db_open_tupid(dt);
+	dirfd = dirtree_open(dt);
 	if(dirfd < 0) {
 		if(dirfd == -ENOENT) {
 			/* If the directory doesn't exist, the file can't

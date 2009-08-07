@@ -22,6 +22,7 @@ enum {
 	DB_ROLLBACK,
 	DB_CHECK_DUP_LINKS,
 	DB_SELECT_DBN_BY_ID,
+	DB_SELECT_DIRNAME,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
 	DB_SELECT_NODE_BY_FLAGS_3,
@@ -726,6 +727,51 @@ out_reset:
 	}
 
 	return rc;
+}
+
+tupid_t tup_db_select_dirname(tupid_t tupid, char **name)
+{
+	tupid_t dt = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_SELECT_DIRNAME];
+	static char s[] = "select dir, name from node where id=?";
+
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		goto out_reset;
+	}
+
+	*name = strdup((const char *)sqlite3_column_text(*stmt, 1));
+	if(!*name) {
+		perror("strdup");
+		goto out_reset;
+	}
+	dt = sqlite3_column_int64(*stmt, 0);
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return dt;
 }
 
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)

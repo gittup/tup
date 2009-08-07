@@ -10,6 +10,7 @@
 #include "graph.h"
 #include "config.h"
 #include "bin.h"
+#include "dirtree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,7 +150,7 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_delete_gitignore(n->tnode.tupid) < 0)
 		return -1;
 
-	dfd = tup_db_open_tupid(n->tnode.tupid);
+	dfd = dirtree_open(n->tnode.tupid);
 	if(dfd < 0) {
 		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tnode.tupid);
 		goto out_close_vdb;

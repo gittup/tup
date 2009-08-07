@@ -3,6 +3,7 @@
 #include "fileio.h"
 #include "debug.h"
 #include "db.h"
+#include "dirtree.h"
 #include "parser.h"
 #include "server.h"
 #include "file.h"
@@ -403,6 +404,15 @@ static int add_file_cb(void *arg, struct db_node *dbn, int style)
 	n = create_node(g, dbn);
 	if(!n)
 		return -1;
+	if(dirtree_add(n->dt, &n->dirtree) < 0)
+		return -1;
+	/* For directories, put the futh path in the dirtree since the parser
+	 * may need them.
+	 */
+	if(n->type == TUP_NODE_DIR) {
+		if(dirtree_add(n->tnode.tupid, NULL) < 0)
+			return -1;
+	}
 	DEBUGP("create node: %lli (0x%x)\n", dbn->tupid, dbn->type);
 
 edge_create:
@@ -769,9 +779,7 @@ static int update(struct node *n, struct server *s)
 		while(isspace(*name)) name++;
 	}
 
-	pthread_mutex_lock(&db_mutex);
-	dfd = tup_db_open_tupid(n->dt);
-	pthread_mutex_unlock(&db_mutex);
+	dfd = dirtree_open(n->dt);
 	if(dfd < 0) {
 		goto err_out;
 	}
@@ -869,7 +877,7 @@ static int var_replace(struct node *n)
 	while(isspace(*input))
 		input++;
 
-	dfd = tup_db_open_tupid(n->dt);
+	dfd = dirtree_open(n->dt);
 	if(dfd < 0)
 		return -1;
 	fchdir(dfd);
