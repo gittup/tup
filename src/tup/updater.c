@@ -40,6 +40,7 @@ static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static void sighandler(int sig);
 static void show_progress(int sum, int tot, struct node *n);
+static void print_dirtree(struct dirtree *dirt);
 
 static int do_show_progress;
 static int do_keep_going;
@@ -1050,11 +1051,26 @@ static void show_progress(int sum, int tot, struct node *n)
 			if(n->type == TUP_NODE_DIR) {
 				color = "[33m";
 				endcolor = "[0m";
+			} else if(n->type == TUP_NODE_CMD) {
+				color = "[34m";
+				endcolor = "[0m";
 			}
-			printf("[[07m%.*s[0m] %s%.*s%s\n", sizeof(buf), buf,
-			       color, name_sz, name, endcolor);
+			printf("[[07m%.*s[0m] ", sizeof(buf), buf);
+			if(n->dirtree && n->dirtree->parent) {
+				print_dirtree(n->dirtree);
+			}
+			printf("%s%.*s%s\n", color, name_sz, name, endcolor);
 		} else {
 			printf("[[07;32m%.*s[0m]\n", sizeof(buf), buf);
 		}
 	}
+}
+
+static void print_dirtree(struct dirtree *dirt)
+{
+	/* Skip empty dirtrees, and skip '.' here (dirt->parent == NULL) */
+	if(!dirt || !dirt->parent)
+		return;
+	print_dirtree(dirt->parent);
+	printf("%s/", dirt->name);
 }

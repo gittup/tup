@@ -5,7 +5,7 @@ testnum = $(firstword $(subst -, ,$1))
 all: $T
 bench: $B
 	@echo " ----------------------------------"; \
-	echo -n "[34m Summary:[0m		"; \
+	echo -n "[36m Summary:[0m		"; \
 	t=`cat tupbenchtmps.t | awk '{x+=$$1} END{print x}'`; \
 	d=`cat tupbenchtmps.d | awk '{x+=$$1} END{print x}'`; \
 	echo "$${t}s $${d}k"; \
@@ -15,7 +15,7 @@ NUM := 100
 $T:
 	@n=$(call testnum,$@); \
 	echo ;\
-	echo "[34m --- Run $@ ---[0m"; \
+	echo "[36m --- Run $@ ---[0m"; \
 	dir=$$PWD; \
 	rm -rf tuptesttmp-$$n; \
 	mkdir tuptesttmp-$$n; \
@@ -31,7 +31,7 @@ $T:
 
 $B: clearmarks
 	@n=$(call testnum,$@); \
-	echo -n "[34m Bench[$(@:.sh=)]:[0m	"; \
+	echo -n "[36m Bench[$(@:.sh=)]:[0m	"; \
 	dir=$$PWD; \
 	rm -rf tupbenchtmp-$$n; \
 	mkdir tupbenchtmp-$$n; \
