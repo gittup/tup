@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
-# Make sure .gitignore generates the standard list in dt==1
+# Make sure .gitignore generates the standard list if a .git directory is
+# present.
 
 . ../tup.sh
 
@@ -8,6 +9,7 @@ cat > Tupfile << HERE
 .gitignore
 HERE
 
+mkdir .git
 tup touch Tupfile
 update
 

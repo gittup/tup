@@ -6,6 +6,7 @@
 . ../tup.sh
 tup monitor
 
+mkdir .git
 echo ".gitignore" > Tupfile
 update
 tup stop
