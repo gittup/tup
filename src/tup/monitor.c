@@ -620,7 +620,8 @@ static void handle_event(struct monitor_event *m)
 		close(fd);
 		return;
 	}
-	if(m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB) {
+	if(!(m->e.mask & IN_ISDIR) &&
+	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
 		tup_file_mod(dc->dt, m->e.name);
 	}
 	if(m->e.mask & IN_DELETE) {
