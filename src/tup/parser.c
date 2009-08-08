@@ -507,7 +507,7 @@ static int gitignore(tupid_t dt, int dfd)
 
 	if(tup_db_alloc_generated_nodelist(&s, &len, dt) < 0)
 		return -1;
-	if(s || git_root == 1) {
+	if(s || git_root == 1 || dt == 1) {
 		struct db_node dbn;
 
 		if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
@@ -525,8 +525,10 @@ static int gitignore(tupid_t dt, int dfd)
 			perror(".gitignore");
 			return -1;
 		}
-		if(git_root == 1) {
+		if(dt == 1) {
 			write(fd, ".tup\n", 5);
+		}
+		if(git_root == 1) {
 			write(fd, ".*.swp\n", 7);
 			write(fd, ".gitignore\n", 11);
 		}
