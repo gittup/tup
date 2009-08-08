@@ -1007,26 +1007,31 @@ static void sighandler(int sig)
 static void show_progress(int sum, int tot, struct node *n)
 {
 	if(do_show_progress && tot) {
-		int a, b;
 		const int max = 11;
-		const char *equals = "===========";
-		const char *hashes = "###########";
-		const char *spaces = "           ";
 		const char *color = "";
 		const char *endcolor = "";
-		const char *ident;
 		char *name;
 		int name_sz = 0;
+		int fill;
+		char buf[16];
 
-		if(tot > max) {
-			a = sum * max / tot;
-			b = max;
-			ident = hashes;
+		/* If it's a good enough limit for Final Fantasy VII, it's good
+		 * enough for me.
+		 */
+		if(tot > 9999) {
+			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/tot);
 		} else {
-			a = sum;
-			b = tot;
-			ident = equals;
+			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, tot);
 		}
+		/* Now that we know how the text in between the []'s should
+		 * look, stick an extra five bytes in the middle somewhere
+		 * (based on the current % complete) to cancel the color
+		 * inversion.
+		 */
+		fill = max * sum / tot;
+		memmove(buf+fill+5, buf+fill, 11-fill);
+		memcpy(buf+fill, "[00m", 5);
+
 		if(n) {
 			name = n->name;
 			name_sz = strlen(n->name);
@@ -1046,14 +1051,10 @@ static void show_progress(int sum, int tot, struct node *n)
 				color = "[33m";
 				endcolor = "[0m";
 			}
-			printf("[%.*s%.*s] %i/%i (%3i%%) %lli: %s%.*s%s\n",
-			       a, ident, b-a, spaces,
-			       sum, tot, sum*100/tot,
-			       n->tnode.tupid, color, name_sz, name, endcolor);
+			printf("[[07m%.*s[0m] %s%.*s%s\n", sizeof(buf), buf,
+			       color, name_sz, name, endcolor);
 		} else {
-			printf("[%.*s%.*s] [32m%i/%i (%3i%%)[0m\n",
-			       a, ident, b-a, spaces,
-			       sum, tot, sum*100/tot);
+			printf("[[07;32m%.*s[0m]\n", sizeof(buf), buf);
 		}
 	}
 }
