@@ -27,11 +27,6 @@ autoupdate doesn't autoupdate when first starting the monitor if files have chan
 
 give user an option to kill an autoupdate updater
 
-this didn't work (file still exists):
-[    0/3    ] kconfig/flex -L -Pzconf -o lex.zconf.c zconf.l
-tup error: File 'lex.backup' was written to, but is not in .tup/db. You probably should specify it as an output for the command 'flex -L -Pzconf -o lex.zconf.c zconf.l'
- Unlink: lex.backup
-
 .gitignore should be re-generated if removed by user?
 
 ifneq

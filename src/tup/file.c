@@ -6,6 +6,7 @@
 #include "linux/list.h"
 #include "db.h"
 #include "fileio.h"
+#include "dirtree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,9 +160,16 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			return -1;
 		}
 		if(dbn.tupid < 0) {
+			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
-			unlink(w->filename);
+			dirfd = dirtree_open(dt);
+			if(dirfd < 0) {
+				fprintf(stderr, "Unable to automatically unlink file.\n");
+			} else {
+				unlinkat(dirfd, w->filename, 0);
+				close(dirfd);
+			}
 			write_bork = 1;
 		} else {
 			if(tup_db_add_write_list(dbn.tupid) < 0)
@@ -185,9 +193,16 @@ out_skip:
 		if(tup_db_select_dbn(dt, sym->to, &dbn) < 0)
 			return -1;
 		if(dbn.tupid < 0) {
+			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym->to, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", sym->to);
-			unlink(sym->to);
+			dirfd = dirtree_open(dt);
+			if(dirfd < 0) {
+				fprintf(stderr, "Unable to automatically unlink file.\n");
+			} else {
+				unlinkat(dirfd, sym->to, 0);
+				close(dirfd);
+			}
 			write_bork = 1;
 			goto skip_sym;
 		}
