@@ -4556,6 +4556,7 @@ static int var_list_delete_nodes(void)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+	tup_db_var_changed += sqlite3_changes(tup_db);
 
 	return 0;
 }

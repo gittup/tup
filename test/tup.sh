@@ -232,3 +232,21 @@ function gitignore_good()
 		exit 1
 	fi
 }
+
+vardict_exist()
+{
+	if grep "\<$1\>" .tup/vardict > /dev/null; then
+		:
+	else
+		echo "Error: $1 not found in vardict file" 1>&2
+		exit 1
+	fi
+}
+
+vardict_no_exist()
+{
+	if grep "\<$1\>" .tup/vardict > /dev/null; then
+		echo "Error: $1 found in vardict file when it shouldn't" 1>&2
+		exit 1
+	fi
+}
