@@ -947,10 +947,9 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 				return -1;
 			}
 			*endb = 0;
-			p++;
-			pl->bin = bin_find(p, bl);
+			pl->bin = bin_find(p+1, bl);
 			if(!pl->bin) {
-				fprintf(stderr, "Parse error: Unable to find bin '%s'\n", p);
+				fprintf(stderr, "Parse error: Unable to find bin '%s'\n", p+1);
 				return -1;
 			}
 		} else {
