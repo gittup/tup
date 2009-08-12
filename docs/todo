@@ -16,6 +16,8 @@ if we do out of tree build, can we have the monitor kill the updater if a file m
 
 tup build tup
 
+unlinkat(AT_FDCWD) to do the same thing as unlink() (eg: rm -f foo.o in a badly behaving command should cause foo.o to be re-generated)?
+
 recursive grep kills monitor
  - print message when monitor exits?
 
