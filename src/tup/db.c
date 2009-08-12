@@ -3309,6 +3309,14 @@ tupid_t tup_db_write_var(const char *var, int varlen, int fd)
 		goto out_reset;
 	}
 
+	/* Hack for binary values in varsed rules? Used for binutils */
+	if(len == 1) {
+		if(value[0] == 'y')
+			value = "1";
+		else if(value[0] == 'n')
+			value = "0";
+	}
+
 	if(write(fd, value, len) == len)
 		tupid = sqlite3_column_int64(*stmt, 0);
 
