@@ -1,300 +1,148 @@
 #include "vardb.h"
-#include "db_util.h"
-#include "array_size.h"
+#include "string_tree.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-static int append(struct vardb *v, const char *var, const char *value);
-static int var_exists(struct vardb *v, const char *var);
+struct var_entry {
+	struct string_tree var;
+	char *value;
+	int vallen;
+};
 
 int vardb_init(struct vardb *v)
 {
-	int x;
-	int rc;
-	const char *sql[] = {
-		"create table vars (var varchar(256) primary key not null, value varchar(4096))",
-	};
-
-	rc = sqlite3_open(":memory:", &v->db);
-	if(rc != 0) {
-		fprintf(stderr, "Unable to create in-memory database: %s\n",
-			sqlite3_errmsg(v->db));
-		return -1;
-	}
-	for(x=0; x<ARRAY_SIZE(sql); x++) {
-		char *errmsg;
-		if(sqlite3_exec(v->db, sql[x], NULL, NULL, &errmsg) != 0) {
-			fprintf(stderr, "SQL error: %s\nQuery was: %s",
-				errmsg, sql[x]);
-			return -1;
-		}
-	}
-	for(x=0; x<ARRAY_SIZE(v->stmt); x++) {
-		v->stmt[x] = NULL;
-	}
-
+	v->tree.rb_node = NULL;
 	return 0;
 }
 
 int vardb_close(struct vardb *v)
 {
-	return db_close(v->db, v->stmt, ARRAY_SIZE(v->stmt));
+	struct rb_node *rbn;
+
+	while((rbn = rb_first(&v->tree)) != NULL) {
+		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		rb_erase(rbn, &v->tree);
+		free(st->s);
+		free(ve->value);
+		free(ve);
+	}
+	return 0;
 }
 
 int vardb_set(struct vardb *v, const char *var, const char *value)
 {
-	int rc;
-	sqlite3_stmt **stmt = &v->stmt[VARDB_SET];
-	static char s[] = "insert or replace into vars(var, value) values(?, ?)";
+	struct string_tree *st;
+	struct var_entry *ve;
 
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
+	st = string_tree_search(&v->tree, var, -1);
+	if(st) {
+		ve = container_of(st, struct var_entry, var);
+		free(ve->value);
+		ve->vallen = strlen(value);
+		ve->value = malloc(ve->vallen + 1);
+		if(!ve->value) {
+			perror("malloc");
 			return -1;
 		}
+		strcpy(ve->value, value);
+		return 0;
+	} else {
+		ve = malloc(sizeof *ve);
+		if(!ve) {
+			perror("malloc");
+			return -1;
+		}
+		ve->var.len = strlen(var);
+		ve->var.s = malloc(ve->var.len + 1);
+		if(!ve->var.s) {
+			perror("malloc");
+			return -1;
+		}
+		strcpy(ve->var.s, var);
+		ve->vallen = strlen(value);
+		ve->value = malloc(ve->vallen + 1);
+		if(!ve->value) {
+			perror("malloc");
+			return -1;
+		}
+		strcpy(ve->value, value);
+		if(string_tree_insert(&v->tree, &ve->var) < 0) {
+			fprintf(stderr, "vardb_set: Error inserting into tree\n");
+			return -1;
+		}
+		return 0;
 	}
-
-	if(sqlite3_bind_text(*stmt, 1, var, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, value, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	return 0;
 }
 
 int vardb_append(struct vardb *v, const char *var, const char *value)
 {
-	int rc;
+	struct string_tree *st;
 
-	if(var_exists(v, var) == 0)
-		rc = append(v, var, value);
-	else
-		rc = vardb_set(v, var, value);
-	return rc;
+	st = string_tree_search(&v->tree, var, -1);
+	if(st) {
+		int vallen;
+		char *new;
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+
+		vallen = strlen(value);
+		new = malloc(ve->vallen + vallen + 2);
+		if(!new) {
+			perror("malloc");
+			return -1;
+		}
+		memcpy(new, ve->value, ve->vallen);
+		new[ve->vallen] = ' ';
+		memcpy(new+ve->vallen+1, value, vallen);
+		new[ve->vallen+vallen+1] = 0;
+		free(ve->value);
+		ve->value = new;
+		ve->vallen += vallen + 1;
+		return 0;
+	} else {
+		return vardb_set(v, var, value);
+	}
 }
 
 int vardb_len(struct vardb *v, const char *var, int varlen)
 {
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &v->stmt[VARDB_LEN];
-	static char s[] = "select length(value) from vars where var=?";
+	struct string_tree *st;
 
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
-			return -1;
-		}
+	st = string_tree_search(&v->tree, var, varlen);
+	if(st) {
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		return ve->vallen;
 	}
-
-	if(sqlite3_bind_text(*stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		/* Variable not found: length of "" == 0 */
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	rc = sqlite3_column_int(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	return rc;
+	/* Variable not found: length of "" == 0 */
+	return 0;
 }
 
 int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
 {
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &v->stmt[VARDB_GET];
-	static char s[] = "select value, length(value) from vars where var=?";
-	int valen;
-	const char *value;
+	struct string_tree *st;
 
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
-			return -1;
-		}
+	st = string_tree_search(&v->tree, var, varlen);
+	if(st) {
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		memcpy(*dest, ve->value, ve->vallen);
+		*dest += ve->vallen;
+		return 0;
 	}
-
-	if(sqlite3_bind_text(*stmt, 1, var, varlen, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		/* Variable not found: length of "" == 0 */
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	valen = sqlite3_column_int(*stmt, 1);
-	if(valen < 0) {
-		rc = -1;
-		goto out_reset;
-	}
-	value = (const char *)sqlite3_column_text(*stmt, 0);
-	if(!value) {
-		rc = -1;
-		goto out_reset;
-	}
-	memcpy(*dest, value, valen);
-	*dest += valen;
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	return rc;
-}
-
-int vardb_dump(struct vardb *v)
-{
-	int rc;
-	sqlite3_stmt **stmt = &v->stmt[VARDB_DUMP];
-	static char s[] = "select * from vars";
-
-	printf("Variables:\n");
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
-			return -1;
-		}
-	}
-
-	while(1) {
-		rc = sqlite3_step(*stmt);
-		if(rc == SQLITE_DONE) {
-			rc = 0;
-			goto out_reset;
-		}
-		if(rc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-			rc = -1;
-			goto out_reset;
-		}
-
-		printf(" - '%s' = '%s'\n", sqlite3_column_text(*stmt, 0),
-		       sqlite3_column_text(*stmt, 1));
-	}
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
+	/* Variable not found: string is "" */
 	return 0;
 }
 
-int append(struct vardb *v, const char *var, const char *value)
+void vardb_dump(struct vardb *v)
 {
-	int rc;
-	sqlite3_stmt **stmt = &v->stmt[_VARDB_APPEND];
-	static char s[] = "update vars set value=value||' '||? where var=?";
+	struct rb_node *rbn;
 
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
-			return -1;
-		}
+	rbn = rb_first(&v->tree);
+	printf(" ----------- VARDB -----------\n");
+	while(rbn) {
+		struct string_tree *st = container_of(rbn, struct string_tree, rbn);
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		printf(" [%i] '%s' [33m=[0m [%i] '%s'\n", st->len, st->s, ve->vallen, ve->value);
+		rbn = rb_next(rbn);
 	}
-
-	if(sqlite3_bind_text(*stmt, 1, value, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, var, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_exists(struct vardb *v, const char *var)
-{
-	int rc;
-	sqlite3_stmt **stmt = &v->stmt[_VARDB_EXISTS];
-	static char s[] = "select var from vars where var=?";
-
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(v->db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(v->db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, var, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-	if(rc == SQLITE_DONE) {
-		return -1;
-	}
-	if(rc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(v->db));
-		return -1;
-	}
-
-	return 0;
 }
