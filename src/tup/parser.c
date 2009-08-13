@@ -70,28 +70,31 @@ struct build_name_list_args {
 	int dirlen;
 };
 
-static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, int dfd, const char *cwd, int clen,
-			 struct graph *g, int *ign);
-static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
-			 struct vardb *vdb, const char *cwd, int clen,
-			 struct graph *g, int *ign);
+struct tupfile {
+	tupid_t tupid;
+	int dfd;
+	struct graph *g;
+	struct vardb vdb;
+	int ign;
+};
+
+static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
+			 const char *cwd, int clen);
+static int include_rules(struct tupfile *tf, tupid_t curdir,
+			 const char *cwd, int clen);
 static int gitignore(tupid_t dt, int dfd);
-static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
-			     struct vardb *vdb, const char *cwd, int clen,
-			     struct graph *g, int *ign);
-static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb, struct bin_list *bl,
+static int include_name_list(struct tupfile *tf, struct name_list *nl,
+			     const char *cwd, int clen);
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen);
-static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb, struct bin_list *bl,
-			const char *cwd, int clen);
+static int parse_varsed(struct tupfile *tf, char *p, int lno,
+			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
-static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid, struct bin_list *bl,
-			const char *cwd, int clen);
-static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
-				struct graph *g, struct bin_list *bl, int lno);
+static int execute_rule(struct tupfile *tf, struct rule *r,
+			struct bin_list *bl, const char *cwd, int clen);
+static int parse_input_patterns(struct tupfile *tf, char *p,
+				struct name_list *nl, struct bin_list *bl,
+				int lno);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct list_head *symlist);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
@@ -101,8 +104,8 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl);
 static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
-static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
-		   struct vardb *vdb, tupid_t tupid, const char *cwd, int clen);
+static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+		   struct name_list *oonl, const char *cwd, int clen);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -111,17 +114,15 @@ static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(const char *cmd, struct name_list *nl,
 			struct name_list *onl);
-static char *eval(struct vardb *v, const char *string, tupid_t tupid,
+static char *eval(struct tupfile *tf, const char *string,
 		  const char *cwd, int clen);
 
 int parse(struct node *n, struct graph *g)
 {
-	int dfd;
+	struct tupfile tf;
 	int fd;
 	int rc = -1;
 	struct buf b;
-	struct vardb vdb;
-	int ign = 0;
 
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->name);
@@ -129,7 +130,10 @@ int parse(struct node *n, struct graph *g)
 	}
 	n->parsing = 1;
 
-	if(vardb_init(&vdb) < 0)
+	tf.tupid = n->tnode.tupid;
+	tf.g = g;
+	tf.ign = 0;
+	if(vardb_init(&tf.vdb) < 0)
 		return -1;
 
 	/* Move all existing commands over to delete - then the ones that are
@@ -141,22 +145,22 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_flag_delete_in_dir(n->tnode.tupid, TUP_NODE_CMD) < 0)
+	if(tup_db_flag_delete_in_dir(tf.tupid, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_flag_delete_cmd_outputs(n->tnode.tupid) < 0)
+	if(tup_db_flag_delete_cmd_outputs(tf.tupid) < 0)
 		return -1;
-	if(tup_db_delete_dependent_dir_links(n->tnode.tupid) < 0)
+	if(tup_db_delete_dependent_dir_links(tf.tupid) < 0)
 		return -1;
-	if(tup_db_delete_gitignore(n->tnode.tupid) < 0)
+	if(tup_db_delete_gitignore(tf.tupid) < 0)
 		return -1;
 
-	dfd = dirtree_open(n->tnode.tupid);
-	if(dfd < 0) {
-		fprintf(stderr, "Error: Unable to open directory ID %lli\n", n->tnode.tupid);
+	tf.dfd = dirtree_open(tf.tupid);
+	if(tf.dfd < 0) {
+		fprintf(stderr, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;
 	}
 
-	fd = openat(dfd, "Tupfile", O_RDONLY);
+	fd = openat(tf.dfd, "Tupfile", O_RDONLY);
 	/* No Tupfile means we have nothing to do */
 	if(fd < 0) {
 		rc = 0;
@@ -166,31 +170,30 @@ int parse(struct node *n, struct graph *g)
 	if((rc = fslurp(fd, &b)) < 0) {
 		goto out_close_file;
 	}
-	rc = parse_tupfile(&b, &vdb, n->tnode.tupid, n->tnode.tupid, dfd, ".", 1, g, &ign);
+	rc = parse_tupfile(&tf, &b, tf.tupid, ".", 1);
 	free(b.s);
-	if(ign) {
-		if(gitignore(n->tnode.tupid, dfd) < 0)
+	if(tf.ign) {
+		if(gitignore(tf.tupid, tf.dfd) < 0)
 			rc = -1;
 	}
 out_close_file:
 	close(fd);
 out_close_dfd:
-	close(dfd);
+	close(tf.dfd);
 out_close_vdb:
-	if(vardb_close(&vdb) < 0)
+	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
 
 	if(rc == 0) {
-		if(tup_db_unflag_create(n->tnode.tupid) < 0)
+		if(tup_db_unflag_create(tf.tupid) < 0)
 			return -1;
 	}
 
 	return rc;
 }
 
-static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
-			 tupid_t curdir, int dfd, const char *cwd, int clen,
-			 struct graph *g, int *ign)
+static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
+			 const char *cwd, int clen)
 {
 	char *p, *e;
 	char *line;
@@ -253,7 +256,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			init_name_list(&nl);
 
 			file = line + 8;
-			file = eval(vdb, file, tupid, NULL, 0);
+			file = eval(tf, file, NULL, 0);
 			if(!file)
 				return -1;
 			if(get_path_list(file, &plist, curdir, NULL, &symlist) < 0)
@@ -263,7 +266,7 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 
 				he = list_entry(symlist.next, struct half_entry, list);
 				if(he->type == TUP_NODE_GENERATED) {
-					fprintf(stderr, "Error: Attempted to include a Tupfile from a path that contains a symlink generated by tup. Directory %lli, symlink used was %lli, line number %i\n", tupid, he->tupid, lno);
+					fprintf(stderr, "Error: Attempted to include a Tupfile from a path that contains a symlink generated by tup. Directory %lli, symlink used was %lli, line number %i\n", tf->tupid, he->tupid, lno);
 					sym_bork = 1;
 				}
 				list_del(&he->list);
@@ -279,16 +282,16 @@ static int parse_tupfile(struct buf *b, struct vardb *vdb, tupid_t tupid,
 			}
 			/* Can only be freed after plist */
 			free(file);
-			if(include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g, ign) < 0)
+			if(include_name_list(tf, &nl, cwd, clen) < 0)
 				return -1;
 		} else if(strcmp(line, "include_rules") == 0) {
-			if(include_rules(tupid, curdir, dfd, vdb, cwd, clen, g, ign) < 0)
+			if(include_rules(tf, curdir, cwd, clen) < 0)
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
-			if(*ign) {
+			if(tf->ign) {
 				fprintf(stderr, "Warning: .gitignore already specified earlier in the Tupfile (line %i is redundant).\n", lno);
 			}
-			*ign = 1;
+			tf->ign = 1;
 		} else if(strcmp(line, "else") == 0) {
 			if_true = !if_true;
 		} else if(strcmp(line, "endif") == 0) {
@@ -322,10 +325,10 @@ found_paren:
 			*comma = 0;
 			*paren = 0;
 
-			lval = eval(vdb, lval, tupid, NULL, 0);
+			lval = eval(tf, lval, NULL, 0);
 			if(!lval)
 				return -1;
-			rval = eval(vdb, rval, tupid, NULL, 0);
+			rval = eval(tf, rval, NULL, 0);
 			if(!rval)
 				return -1;
 			if(strcmp(lval, rval) == 0) {
@@ -336,10 +339,10 @@ found_paren:
 			free(lval);
 			free(rval);
 		} else if(line[0] == ':') {
-			if(parse_rule(line+1, tupid, lno, g, vdb, &bl, cwd, clen) < 0)
+			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else if(line[0] == ',') {
-			if(parse_varsed(line+1, tupid, lno, g, vdb, &bl, cwd, clen) < 0)
+			if(parse_varsed(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -380,17 +383,17 @@ found_paren:
 				eq--;
 			}
 
-			var = eval(vdb, line, tupid, cwd, clen);
+			var = eval(tf, line, cwd, clen);
 			if(!var)
 				return -1;
-			value = eval(vdb, value, tupid, cwd, clen);
+			value = eval(tf, value, cwd, clen);
 			if(!value)
 				return -1;
 
 			if(append)
-				vardb_append(vdb, var, value);
+				vardb_append(&tf->vdb, var, value);
 			else
-				vardb_set(vdb, var, value);
+				vardb_set(&tf->vdb, var, value);
 			free(var);
 			free(value);
 		}
@@ -405,9 +408,8 @@ syntax_error:
 	return -1;
 }
 
-static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
-			 struct vardb *vdb, const char *cwd, int clen,
-			 struct graph *g, int *ign)
+static int include_rules(struct tupfile *tf, tupid_t curdir,
+			 const char *cwd, int clen)
 {
 	tupid_t parent;
 	int num_dotdots;
@@ -419,8 +421,6 @@ static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 	int trlen = sizeof(tuprules) - 1;
 	struct name_list nl;
 	struct build_name_list_args args;
-
-	if(tupid) {}
 
 	parent = curdir;
 	num_dotdots = 0;
@@ -478,7 +478,7 @@ static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			/* Fall through to next if */
 		}
 		if(dbn.type == TUP_NODE_GHOST) {
-			if(tup_db_create_link(dbn.tupid, tupid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(dbn.tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			continue;
 		}
@@ -489,7 +489,7 @@ static int include_rules(tupid_t tupid, tupid_t curdir, int dfd,
 			return -1;
 	}
 	free(path);
-	return include_name_list(&nl, tupid, dfd, vdb, cwd, clen, g, ign);
+	return include_name_list(tf, &nl, cwd, clen);
 }
 
 static int gitignore(tupid_t dt, int dfd)
@@ -541,9 +541,8 @@ static int gitignore(tupid_t dt, int dfd)
 	return 0;
 }
 
-static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
-			     struct vardb *vdb, const char *cwd, int clen,
-			     struct graph *g, int *ign)
+static int include_name_list(struct tupfile *tf, struct name_list *nl,
+			     const char *cwd, int clen)
 {
 	struct name_list_entry *nle, *tmpnle;
 	struct buf incb;
@@ -619,8 +618,7 @@ static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 		 * However, we want all links to be made to the
 		 * parent tupid.
 		 */
-		rc = parse_tupfile(&incb, vdb, tupid, nle->dt, dfd,
-				   cnc, newclen, g, ign);
+		rc = parse_tupfile(tf, &incb, nle->dt, cnc, newclen);
 		free(incb.s);
 		if(newcwd)
 			free(newcwd);
@@ -629,15 +627,14 @@ static int include_name_list(struct name_list *nl, tupid_t tupid, int dfd,
 			return -1;
 		}
 
-		if(tup_db_create_link(nle->tupid, tupid, TUP_LINK_NORMAL) < 0)
+		if(tup_db_create_link(nle->tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
 		delete_name_list_entry(nl, nle);
 	}
 	return 0;
 }
 
-static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
-		      struct vardb *vdb, struct bin_list *bl,
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen)
 {
 	char *input, *cmd, *output;
@@ -695,13 +692,12 @@ static int parse_rule(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.line_number = lno;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid, bl, cwd, clen);
+	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
-static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
-			struct vardb *vdb, struct bin_list *bl,
-			const char *cwd, int clen)
+static int parse_varsed(struct tupfile *tf, char *p, int lno,
+			struct bin_list *bl, const char *cwd, int clen)
 {
 	char *input, *output;
 	char *ie;
@@ -738,7 +734,7 @@ static int parse_varsed(char *p, tupid_t tupid, int lno, struct graph *g,
 	r.line_number = lno;
 	init_name_list(&r.namelist);
 
-	rc = execute_rule(&r, g, vdb, tupid, bl, cwd, clen);
+	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
@@ -780,9 +776,8 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 	return 0;
 }
 
-static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
-			tupid_t tupid, struct bin_list *bl,
-			const char *cwd, int clen)
+static int execute_rule(struct tupfile *tf, struct rule *r,
+			struct bin_list *bl, const char *cwd, int clen)
 {
 	char *oosep;
 	struct name_list order_only_nl;
@@ -791,7 +786,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 
 	init_name_list(&order_only_nl);
 
-	input_pattern = eval(vdb, r->input_pattern, tupid, cwd, clen);
+	input_pattern = eval(tf, r->input_pattern, cwd, clen);
 	if(!input_pattern)
 		return -1;
 	oosep = strchr(input_pattern, '|');
@@ -807,10 +802,10 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 			*oosep = 0;
 			oosep++;
 		}
-		if(parse_input_patterns(oosep, tupid, &order_only_nl, g, bl, r->line_number) < 0)
+		if(parse_input_patterns(tf, oosep, &order_only_nl, bl, r->line_number) < 0)
 			return -1;
 	}
-	if(parse_input_patterns(input_pattern, tupid, &r->namelist, g, bl, r->line_number) < 0)
+	if(parse_input_patterns(tf, input_pattern, &r->namelist, bl, r->line_number) < 0)
 		return -1;
 
 	if(r->foreach) {
@@ -830,7 +825,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 			init_name_list(&tmp_nl);
 			memcpy(&tmp_nle, nle, sizeof(*nle));
 			add_name_list_entry(&tmp_nl, &tmp_nle);
-			if(do_rule(r, &tmp_nl, &order_only_nl, vdb, tupid, cwd, clen) < 0)
+			if(do_rule(tf, r, &tmp_nl, &order_only_nl, cwd, clen) < 0)
 				return -1;
 
 			delete_name_list_entry(&r->namelist, nle);
@@ -853,7 +848,7 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 	if(!r->foreach && (r->namelist.num_entries > 0 ||
 			   strcmp(r->input_pattern, "") == 0)) {
 
-		if(do_rule(r, &r->namelist, &order_only_nl, vdb, tupid, cwd, clen) < 0)
+		if(do_rule(tf, r, &r->namelist, &order_only_nl, cwd, clen) < 0)
 			return -1;
 
 		while(!list_empty(&r->namelist.entries)) {
@@ -873,22 +868,23 @@ static int execute_rule(struct rule *r, struct graph *g, struct vardb *vdb,
 	return 0;
 }
 
-static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
-				struct graph *g, struct bin_list *bl, int lno)
+static int parse_input_patterns(struct tupfile *tf, char *p,
+				struct name_list *nl, struct bin_list *bl,
+				int lno)
 {
 	LIST_HEAD(plist);
 	LIST_HEAD(symlist);
 	struct path_list *pl, *tmp;
 	int sym_bork = 0;
 
-	if(get_path_list(p, &plist, dt, bl, &symlist) < 0)
+	if(get_path_list(p, &plist, tf->tupid, bl, &symlist) < 0)
 		return -1;
 	while(!list_empty(&symlist)) {
 		struct half_entry *he;
 
 		he = list_entry(symlist.next, struct half_entry, list);
 		if(he->type == TUP_NODE_GENERATED) {
-			fprintf(stderr, "Error: Attempted to input files using a symlink that was generated by tup. Directory %lli, symlink used was %lli, line number %i\n", dt, he->tupid, lno);
+			fprintf(stderr, "Error: Attempted to input files using a symlink that was generated by tup. Directory %lli, symlink used was %lli, line number %i\n", tf->tupid, he->tupid, lno);
 			sym_bork = 1;
 		}
 		list_del(&he->list);
@@ -896,7 +892,7 @@ static int parse_input_patterns(char *p, tupid_t dt, struct name_list *nl,
 	}
 	if(sym_bork)
 		return -1;
-	if(parse_dependent_tupfiles(&plist, dt, g) < 0)
+	if(parse_dependent_tupfiles(&plist, tf->tupid, tf->g) < 0)
 		return -1;
 	if(get_name_list(&plist, nl) < 0)
 		return -1;
@@ -1175,8 +1171,8 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
-		   struct vardb *vdb, tupid_t tupid, const char *cwd, int clen)
+static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+		   struct name_list *oonl, const char *cwd, int clen)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
@@ -1190,15 +1186,15 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 
 	init_name_list(&onl);
 
-	output_pattern = eval(vdb, r->output_pattern, tupid, cwd, clen);
+	output_pattern = eval(tf, r->output_pattern, cwd, clen);
 	if(!output_pattern)
 		return -1;
-	if(get_path_list(output_pattern, &oplist, tupid, NULL, NULL) < 0)
+	if(get_path_list(output_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
 		return -1;
 	while(!list_empty(&oplist)) {
 		pl = list_entry(oplist.next, struct path_list, list);
 		if(pl->path) {
-			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tupid, r->line_number, r->command);
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
 			return -1;
 		}
 		onle = malloc(sizeof *onle);
@@ -1214,7 +1210,7 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
 
-		onle->tupid = tup_db_create_node_part(tupid, onle->path, -1,
+		onle->tupid = tup_db_create_node_part(tf->tupid, onle->path, -1,
 						      TUP_NODE_GENERATED);
 		if(onle->tupid < 0)
 			return -1;
@@ -1235,12 +1231,12 @@ static int do_rule(struct rule *r, struct name_list *nl, struct name_list *oonl,
 	tcmd = tup_printf(r->command, nl, &onl);
 	if(!tcmd)
 		return -1;
-	cmd = eval(vdb, tcmd, tupid, cwd, clen);
+	cmd = eval(tf, tcmd, cwd, clen);
 	if(!cmd)
 		return -1;
 	free(tcmd);
 
-	cmd_id = create_command_file(tupid, cmd);
+	cmd_id = create_command_file(tf->tupid, cmd);
 	free(cmd);
 	if(cmd_id < 0)
 		return -1;
@@ -1490,7 +1486,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 	return s;
 }
 
-static char *eval(struct vardb *v, const char *string, tupid_t tupid,
+static char *eval(struct tupfile *tf, const char *string,
 		  const char *cwd, int clen)
 {
 	int len = 0;
@@ -1532,7 +1528,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid,
 					}
 					len += clen;
 				} else {
-					vlen = vardb_len(v, var, rparen-var);
+					vlen = vardb_len(&tf->vdb, var, rparen-var);
 					if(vlen < 0)
 						return NULL;
 					len += vlen;
@@ -1608,7 +1604,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid,
 					memcpy(p, cwd, clen);
 					p += clen;
 				} else {
-					if(vardb_get(v, var, rparen-var, &p) < 0)
+					if(vardb_get(&tf->vdb, var, rparen-var, &p) < 0)
 						return NULL;
 				}
 				s = rparen + 1;
@@ -1632,7 +1628,7 @@ static char *eval(struct vardb *v, const char *string, tupid_t tupid,
 				vt = tup_db_get_var(var, rparen-var, &p);
 				if(vt < 0)
 					return NULL;
-				if(tup_db_create_link(vt, tupid, TUP_LINK_NORMAL) < 0)
+				if(tup_db_create_link(vt, tf->tupid, TUP_LINK_NORMAL) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {
