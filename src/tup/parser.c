@@ -1193,6 +1193,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	while(!list_empty(&oplist)) {
 		pl = list_entry(oplist.next, struct path_list, list);
+
 		if(pl->path) {
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
 			return -1;
@@ -1205,6 +1206,13 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		onle->path = tup_printf(pl->file, nl, NULL);
 		if(!onle->path)
 			return -1;
+		if(strchr(onle->path, '/')) {
+			/* Same error as above...uhh, I guess I should rework
+			 * this.
+			 */
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
+			return -1;
+		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')

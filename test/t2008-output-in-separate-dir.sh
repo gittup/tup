@@ -6,7 +6,7 @@
 # different directory.
 
 . ../tup.sh
-mkdir bar
+tmkdir bar
 cat > Tupfile << HERE
 : |> echo hey %o |> bar/foo.o
 HERE
