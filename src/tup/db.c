@@ -4754,10 +4754,10 @@ static int check_actual_inputs(tupid_t cmdid)
 		if(rc != -1) {
 			/* rc test used to only print this once */
 			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not         specified as an input link for the command. This is an issue because the file   was created from another command, and without the input link the commands may   execute out of order. You should add this file as an input, since it is         possible this could randomly break in the future.\n");
-			fprintf(stderr, " -- Command ID: %lli\n", cmdid);
+			fprintf(stderr, " - Command ID: %lli\n", cmdid);
 		}
 
-		fprintf(stderr, " -- File: '%s' [%lli in dir %lli]\n", sqlite3_column_text(*stmt, 2), sqlite3_column_int64(*stmt, 0), sqlite3_column_int64(*stmt, 1));
+		tup_db_print(stderr, sqlite3_column_int64(*stmt, 0));
 		rc = -1;
 	} while(1);
 
