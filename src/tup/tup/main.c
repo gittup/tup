@@ -32,6 +32,7 @@ static int link_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
+static int varshow(int argc, char **argv);
 static int varset(int argc, char **argv);
 static int varchange(int argc, char **argv);
 static int config(int argc, char **argv);
@@ -119,6 +120,8 @@ int main(int argc, char **argv)
 		rc = node(argc, argv);
 	} else if(strcmp(cmd, "rm") == 0) {
 		rc = rm(argc, argv);
+	} else if(strcmp(cmd, "varshow") == 0) {
+		rc = varshow(argc, argv);
 	} else if(strcmp(cmd, "varset") == 0) {
 		rc = varset(argc, argv);
 	} else if(strcmp(cmd, "varchange") == 0) {
@@ -679,6 +682,38 @@ static int rm(int argc, char **argv)
 	}
 	if(tup_db_commit() < 0)
 		return -1;
+	return 0;
+}
+
+static int varshow_cb(void *arg, const char *var, const char *value)
+{
+	if(arg) {}
+	printf(" - Var[%s] = '%s'\n", var, value);
+	return 0;
+}
+
+static int varshow(int argc, char **argv)
+{
+	if(argc == 1) {
+		if(tup_db_var_foreach(varshow_cb, NULL) < 0)
+			return -1;
+	} else {
+		int x;
+		struct db_node dbn;
+		for(x=1; x<argc; x++) {
+			char *value;
+			if(tup_db_select_dbn(VAR_DT, argv[x], &dbn) < 0)
+				return -1;
+			if(dbn.tupid < 0) {
+				fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
+				return -1;
+			}
+			if(tup_db_get_var_id_alloc(dbn.tupid, &value) < 0)
+				return -1;
+			printf(" - Var[%s] = '%s'\n", argv[x], value);
+			free(value);
+		}
+	}
 	return 0;
 }
 
