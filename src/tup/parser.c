@@ -105,7 +105,8 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   struct name_list *oonl, const char *cwd, int clen);
+		   struct name_list *oonl, const char *cwd, int clen,
+		   const char *ext, int extlen);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -113,7 +114,7 @@ static void add_name_list_entry(struct name_list *nl,
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(const char *cmd, struct name_list *nl,
-			struct name_list *onl);
+			struct name_list *onl, const char *ext, int extlen);
 static char *eval(struct tupfile *tf, const char *string,
 		  const char *cwd, int clen);
 
@@ -822,10 +823,18 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 		while(!list_empty(&r->namelist.entries)) {
 			nle = list_entry(r->namelist.entries.next,
 					 struct name_list_entry, list);
+			const char *ext = NULL;
+			int extlen = 0;
+
 			init_name_list(&tmp_nl);
 			memcpy(&tmp_nle, nle, sizeof(*nle));
 			add_name_list_entry(&tmp_nl, &tmp_nle);
-			if(do_rule(tf, r, &tmp_nl, &order_only_nl, cwd, clen) < 0)
+			if(tmp_nle.base &&
+			   tmp_nle.extlessbaselen != tmp_nle.baselen) {
+				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
+				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
+			}
+			if(do_rule(tf, r, &tmp_nl, &order_only_nl, cwd, clen, ext, extlen) < 0)
 				return -1;
 
 			delete_name_list_entry(&r->namelist, nle);
@@ -848,7 +857,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 	if(!r->foreach && (r->namelist.num_entries > 0 ||
 			   strcmp(r->input_pattern, "") == 0)) {
 
-		if(do_rule(tf, r, &r->namelist, &order_only_nl, cwd, clen) < 0)
+		if(do_rule(tf, r, &r->namelist, &order_only_nl, cwd, clen, NULL, 0) < 0)
 			return -1;
 
 		while(!list_empty(&r->namelist.entries)) {
@@ -1172,7 +1181,8 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 }
 
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   struct name_list *oonl, const char *cwd, int clen)
+		   struct name_list *oonl, const char *cwd, int clen,
+		   const char *ext, int extlen)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
@@ -1203,7 +1213,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			perror("malloc");
 			return -1;
 		}
-		onle->path = tup_printf(pl->file, nl, NULL);
+		onle->path = tup_printf(pl->file, nl, NULL, NULL, 0);
 		if(!onle->path)
 			return -1;
 		if(strchr(onle->path, '/')) {
@@ -1236,7 +1246,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
 
-	tcmd = tup_printf(r->command, nl, &onl);
+	tcmd = tup_printf(r->command, nl, &onl, ext, extlen);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, cwd, clen);
@@ -1344,7 +1354,7 @@ static void delete_name_list_entry(struct name_list *nl,
 }
 
 static char *tup_printf(const char *cmd, struct name_list *nl,
-			struct name_list *onl)
+			struct name_list *onl, const char *ext, int extlen)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -1388,6 +1398,12 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 				return NULL;
 			}
 			clen += nl->extlessbasetotlen + paste_chars;
+		} else if(*p == 'e') {
+			if(!ext) {
+				fprintf(stderr, "Error: %%e is only valid with a foreach rule for files that have extensions.\n");
+				return NULL;
+			}
+			clen += extlen;
 		} else if(*p == 'o') {
 			if(!onl) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
@@ -1470,6 +1486,11 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 				x += spc - p;
 				first = 0;
 			}
+		} else if(*next == 'e') {
+			memcpy(&s[x], ext, extlen);
+			x += extlen;
+			memcpy(&s[x], p, spc - p);
+			x += spc - p;
 		} else if(*next == 'o') {
 			int first = 1;
 			list_for_each_entry(nle, &onl->entries, list) {
