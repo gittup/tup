@@ -68,6 +68,12 @@ directly support symlinks in tup? Might make t5037 usable.
 
  Add %1, %2, etc to reference first, second prereq?
 
+ rm -rf of gcc tree put the monitor and database kinda outta whack (had to create gcctest/gcc, then rm -rf gcctest again)
+	 - [    2/17   ] gcctest
+	 Error: Unable to open directory ID 236376
+	 -[    1/2    ] uClibc/include
+	 Error: Unknown node 295915 named 'gcc' in create graph.
+
 html:
   proof: no clean target
   graphs
