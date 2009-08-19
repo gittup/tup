@@ -33,7 +33,7 @@ static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
-static int varset(int argc, char **argv);
+static int varsetall(int argc, char **argv);
 static int varchange(int argc, char **argv);
 static int config(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
@@ -122,8 +122,8 @@ int main(int argc, char **argv)
 		rc = rm(argc, argv);
 	} else if(strcmp(cmd, "varshow") == 0) {
 		rc = varshow(argc, argv);
-	} else if(strcmp(cmd, "varset") == 0) {
-		rc = varset(argc, argv);
+	} else if(strcmp(cmd, "varsetall") == 0) {
+		rc = varsetall(argc, argv);
 	} else if(strcmp(cmd, "varchange") == 0) {
 		rc = varchange(argc, argv);
 	} else if(strcmp(cmd, "config") == 0) {
@@ -717,7 +717,7 @@ static int varshow(int argc, char **argv)
 	return 0;
 }
 
-static int varset(int argc, char **argv)
+static int varsetall(int argc, char **argv)
 {
 	int x;
 	if(tup_db_var_pre() < 0)

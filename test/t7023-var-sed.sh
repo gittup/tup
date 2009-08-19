@@ -11,7 +11,7 @@ cat > Tupfile << HERE
 : out.txt |> cat %f > %o |> new.txt
 HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
-tup varset CONFIG_FOO=sup
+tup varsetall CONFIG_FOO=sup
 update
 tup_object_exist . foo.txt out.txt new.txt
 (echo "hey sup yo") | diff out.txt -

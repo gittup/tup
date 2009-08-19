@@ -9,7 +9,7 @@ cat > Tupfile << HERE
 HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile
-tup varset CONFIG_FOO=sup
+tup varsetall CONFIG_FOO=sup
 update
 
 echo "hey sup yo" | diff out.copied -

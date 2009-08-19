@@ -10,16 +10,16 @@ cat > Tupfile << HERE
 HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile
-tup varset CONFIG_FOO=sup
+tup varsetall CONFIG_FOO=sup
 update
 tup_object_exist . foo.txt out.txt new.txt
 (echo "hey sup yo") | diff out.txt -
 (echo "hey sup yo") | diff new.txt -
 
-tup varset
+tup varsetall
 update_fail
 
-tup varset CONFIG_FOO=diggity
+tup varsetall CONFIG_FOO=diggity
 update
 (echo "hey diggity yo") | diff out.txt -
 (echo "hey diggity yo") | diff new.txt -

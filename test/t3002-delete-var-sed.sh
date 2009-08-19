@@ -9,7 +9,7 @@ HERE
 echo "hey @CONFIG_FOO@ yo" > foo.txt
 echo "This is an email@address.com" >> foo.txt
 tup touch foo.txt Tupfile
-tup varset CONFIG_FOO=sup
+tup varsetall CONFIG_FOO=sup
 update
 tup_object_exist . foo.txt out.txt
 tup_object_exist . ", foo.txt > out.txt"

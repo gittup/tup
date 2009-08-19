@@ -8,10 +8,10 @@ cat > Tupfile << HERE
 var = @(CONFIG_FOO)
 HERE
 tup touch Tupfile
-tup varset CONFIG_FOO=n
+tup varsetall CONFIG_FOO=n
 update
 tup_object_exist @ CONFIG_FOO
 
-tup varset CONFIG_FOO=y
+tup varsetall CONFIG_FOO=y
 update
 tup_object_exist @ CONFIG_FOO
