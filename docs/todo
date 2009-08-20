@@ -76,8 +76,6 @@ directly support symlinks in tup? Might make t5037 usable.
 
 sqlite style graphs for parser
 
-color a line-continuing backslash so it stands out
-
 debug sql mode
 
 try: -Ifoo -Ibar, where both foo and bar have test.h, then delete foo/test.h - should become a ghost
