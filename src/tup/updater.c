@@ -1055,7 +1055,7 @@ static void show_progress(int sum, int tot, struct node *n)
 				color = "[34m";
 				endcolor = "[0m";
 			}
-			printf("[[07m%.*s[0m] ", sizeof(buf), buf);
+			printf("[[34;07m%.*s[0m] ", sizeof(buf), buf);
 			if(n->dirtree && n->dirtree->parent) {
 				print_dirtree(n->dirtree);
 			}
