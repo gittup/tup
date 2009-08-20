@@ -74,8 +74,6 @@ directly support symlinks in tup? Might make t5037 usable.
 	 -[    1/2    ] uClibc/include
 	 Error: Unknown node 295915 named 'gcc' in create graph.
 
-better error message when you 'tup varshow X' where X is a ghost variable
-
 sqlite style graphs for parser
 
 make @-variables bold or something

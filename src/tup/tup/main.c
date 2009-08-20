@@ -706,12 +706,18 @@ static int varshow(int argc, char **argv)
 				return -1;
 			if(dbn.tupid < 0) {
 				fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
-				return -1;
+				continue;
 			}
-			if(tup_db_get_var_id_alloc(dbn.tupid, &value) < 0)
-				return -1;
-			printf(" - Var[%s] = '%s'\n", argv[x], value);
-			free(value);
+			if(dbn.type == TUP_NODE_VAR) {
+				if(tup_db_get_var_id_alloc(dbn.tupid, &value) < 0)
+					return -1;
+				printf(" - Var[%s] = '%s'\n", argv[x], value);
+				free(value);
+			} else if(dbn.type == TUP_NODE_GHOST) {
+				printf(" - Var[[47;30m%s[0m] is a ghost\n", argv[x]);
+			} else {
+				fprintf(stderr, "Variable '%s' has unknown type %i\n", argv[x], dbn.type);
+			}
 		}
 	}
 	return 0;
