@@ -15,8 +15,9 @@ syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match separator /|>/
 syntax match format display "%\([FfoBb]\)" contained
-syntax match variable /[$@]([^)]*)/
+syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
+syntax match atvar /@([^)]*)/
 syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\)"
 syntax keyword keys foreach
 syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable
@@ -30,3 +31,4 @@ highlight link keys Keyword
 highlight link format Special
 highlight link variable Special
 highlight link control Include
+highlight def atvar ctermfg=red cterm=bold
