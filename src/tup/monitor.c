@@ -42,13 +42,14 @@
 
 struct moved_from_event;
 struct monitor_event {
-	struct moved_from_event *from_event; /* valid if mask & IN_MOVED_TO */
+	/* from_event is valid if mask is IN_MOVED_TO or IN_MOVED_FROM */
+	struct moved_from_event *from_event;
 	struct inotify_event e;
 };
 
 struct moved_from_event {
 	struct list_head list;
-	struct monitor_event m;
+	struct monitor_event *m;
 };
 
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
@@ -60,7 +61,7 @@ static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
 static int same_event(struct inotify_event *e1, struct inotify_event *e2);
 static int ephemeral_event(struct inotify_event *e);
-static int add_from_event(struct inotify_event *e);
+static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void handle_event(struct monitor_event *m);
 static void sighandler(int sig);
@@ -328,10 +329,6 @@ static void queue_event(struct inotify_event *e)
 		return;
 	if(ephemeral_event(e) == 0)
 		return;
-	if(e->mask & IN_MOVED_FROM) {
-		add_from_event(e);
-		return;
-	}
 
 	if(e->mask & IN_MOVED_TO) {
 		mfe = check_from_events(e);
@@ -362,6 +359,10 @@ static void queue_event(struct inotify_event *e)
 	memcpy(&m->e, e, sizeof(*e));
 	memcpy(m->e.name, e->name, e->len);
 	m->from_event = mfe;
+
+	if(e->mask & IN_MOVED_FROM) {
+		m->from_event = add_from_event(m);
+	}
 
 	queue_end += sizeof(*m) + e->len;
 }
@@ -526,30 +527,32 @@ static int ephemeral_event(struct inotify_event *e)
 	return rc;
 }
 
-static int add_from_event(struct inotify_event *e)
+static struct moved_from_event *add_from_event(struct monitor_event *m)
 {
 	struct moved_from_event *mfe;
 
-	mfe = malloc(sizeof *mfe + e->len);
+	mfe = malloc(sizeof *mfe);
 	if(!mfe) {
 		perror("malloc");
-		return -1;
+		return NULL;
 	}
 
-	memcpy(&mfe->m.e, e, sizeof(*e));
-	memcpy(mfe->m.e.name, e->name, e->len);
-
-	mfe->m.from_event = NULL;
+	mfe->m = m;
+	/* The mfe is removed from the list in either check_from_events, or in
+	 * handle_event if this event is never claimed.
+	 */
 	list_add(&mfe->list, &moved_from_list);
 
-	return 0;
+	return mfe;
 }
 
 static struct moved_from_event *check_from_events(struct inotify_event *e)
 {
 	struct moved_from_event *mfe;
 	list_for_each_entry(mfe, &moved_from_list, list) {
-		if(mfe->m.e.cookie == e->cookie) {
+		if(mfe->m->e.cookie == e->cookie) {
+			mfe->m->e.mask = 0;
+			list_del(&mfe->list);
 			return mfe;
 		}
 	}
@@ -576,16 +579,16 @@ static void handle_event(struct monitor_event *m)
 		struct moved_from_event *mfe = m->from_event;
 		struct dircache *from_dc;
 
-		from_dc = dircache_lookup(&tree, mfe->m.e.wd);
+		from_dc = dircache_lookup(&tree, mfe->m->e.wd);
 		if(!from_dc) {
-			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m.e.wd);
+			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
 			return;
 		}
 		if(m->e.mask & IN_ISDIR) {
 			struct db_node dbn;
 			int fd;
 
-			if(tup_db_select_dbn(from_dc->dt, mfe->m.e.name, &dbn) < 0)
+			if(tup_db_select_dbn(from_dc->dt, mfe->m->e.name, &dbn) < 0)
 				return;
 			if(dbn.tupid < 0)
 				return;
@@ -600,9 +603,8 @@ static void handle_event(struct monitor_event *m)
 			close(fd);
 		} else {
 			tup_file_mod(dc->dt, m->e.name);
-			tup_file_del(from_dc->dt, mfe->m.e.name);
+			tup_file_del(from_dc->dt, mfe->m->e.name);
 		}
-		list_del(&mfe->list);
 		free(mfe);
 		return;
 	}
@@ -624,8 +626,20 @@ static void handle_event(struct monitor_event *m)
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
 		tup_file_mod(dc->dt, m->e.name);
 	}
-	if(m->e.mask & IN_DELETE) {
+	if(m->e.mask & IN_DELETE || m->e.mask & IN_MOVED_FROM) {
 		tup_file_del(dc->dt, m->e.name);
+	}
+	if(m->e.mask & IN_MOVED_FROM) {
+		/* IN_MOVED_FROM only happens here if the event is never
+		 * claimed by a corresponding IN_MOVED_TO event. For example,
+		 * if a directory tree or file is moved outside of tup's
+		 * jurisdiction, or if the event is simply unloved and dies
+		 * alone.
+		 */
+		tup_file_del(dc->dt, m->e.name);
+
+		/* An IN_MOVED_FROM event points to itself */
+		list_del(&m->from_event->list);
 	}
 }
 
