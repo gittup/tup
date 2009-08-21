@@ -42,8 +42,6 @@ static void print_name(const char *s, char c);
 
 static void usage(void);
 
-static int start_fd;
-
 int main(int argc, char **argv)
 {
 	int rc = 0;
@@ -52,19 +50,6 @@ int main(int argc, char **argv)
 	if(argc < 2) {
 		usage();
 		return 1;
-	}
-	for (start_fd = 4; start_fd < (int) FD_SETSIZE; start_fd++) {
-		int flags;
-		errno = 0;
-		flags = fcntl(start_fd, F_GETFD, 0);
-		if (flags == -1 && errno) {
-			if (errno != EBADF) {
-				perror("fcntl");
-				return -1;
-			}
-			else
-				break;
-		}
 	}
 
 	if(strcmp(argv[1], "init") == 0) {
