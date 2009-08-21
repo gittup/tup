@@ -72,6 +72,16 @@ int main(int argc, char **argv)
 	if(tup_init() < 0)
 		return 1;
 
+	if(strcmp(argv[1], "--debug-sql") == 0) {
+		tup_db_enable_sql_debug();
+		argc--;
+		argv++;
+		if(argc < 2) {
+			usage();
+			return 1;
+		}
+	}
+
 	cmd = argv[1];
 	argc--;
 	argv++;
@@ -120,7 +130,7 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "check_dup_links") == 0) {
 		rc = tup_db_check_dup_links();
 	} else {
-		fprintf(stderr, "Unknown tup command: %s\n", argv[0]);
+		fprintf(stderr, "Unknown tup command: %s\n", cmd);
 		rc = 1;
 	}
 
