@@ -22,10 +22,8 @@
 #include <sys/socket.h>
 
 static int process_create_nodes(void);
-static int process_delete_nodes(void);
 static int process_update_nodes(void);
 static int check_create_todo(void);
-static int check_delete_todo(void);
 static int check_update_todo(void);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct db_node *dbn, int style);
@@ -33,7 +31,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 
 static void *create_work(void *arg);
-static void *delete_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
@@ -124,8 +121,6 @@ int updater(int argc, char **argv, int phase)
 		return -1;
 	if(phase == 1) /* Collect underpants */
 		return 0;
-	if(process_delete_nodes() < 0)
-		return -1;
 	if(phase == 2) /* ? */
 		return 0;
 	if(process_update_nodes() < 0)
@@ -147,14 +142,6 @@ int todo(int argc, char **argv)
 		return -1;
 	if(rc == 1) {
 		printf("Run 'tup parse' to proceed to phase 2.\n");
-		return 0;
-	}
-
-	rc = check_delete_todo();
-	if(rc < 0)
-		return -1;
-	if(rc == 1) {
-		printf("Run 'tup delete' to proceed to phase 3.\n");
 		return 0;
 	}
 
@@ -185,37 +172,6 @@ static int process_create_nodes(void)
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
-	if(rc == 0) {
-		tup_db_commit();
-	} else if(rc == -1) {
-		tup_db_rollback();
-		return -1;
-	} else {
-		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
-		return -1;
-	}
-	if(destroy_graph(&g) < 0)
-		return -1;
-	return 0;
-}
-
-static int process_delete_nodes(void)
-{
-	struct graph g;
-	int rc;
-
-	if(create_graph(&g, TUP_NODE_GENERATED) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
-		return -1;
-	if(tup_db_modify_deleted_deps() < 0)
-		return -1;
-	if(g.num_nodes)
-		printf("Deleting %i file%s\n", g.num_nodes,
-		       g.num_nodes == 1 ? "" : "s");
-	tup_db_begin();
-	/* delete_work must always use only 1 thread since no locking is done */
-	rc = execute_graph(&g, 0, 1, delete_work);
 	if(rc == 0) {
 		tup_db_commit();
 	} else if(rc == -1) {
@@ -297,34 +253,6 @@ static int check_create_todo(void)
 		return -1;
 	if(g.num_nodes) {
 		printf("Tup phase 1: The following directories must be parsed:\n");
-		stuff_todo = 1;
-	}
-	rc = execute_graph(&g, 0, 1, todo_work);
-	if(rc == 0) {
-		rc = stuff_todo;
-	} else if(rc == -1) {
-		return -1;
-	} else {
-		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
-		return -1;
-	}
-	if(destroy_graph(&g) < 0)
-		return -1;
-	return rc;
-}
-
-static int check_delete_todo(void)
-{
-	struct graph g;
-	int rc;
-	int stuff_todo = 0;
-
-	if(create_graph(&g, TUP_NODE_GENERATED) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_DELETE) < 0)
-		return -1;
-	if(g.num_nodes) {
-		printf("Tup phase 2: The following %i file%s will be deleted:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
 		stuff_todo = 1;
 	}
 	rc = execute_graph(&g, 0, 1, todo_work);
@@ -626,35 +554,6 @@ static void *create_work(void *arg)
 		}
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)
 			rc = -1;
-
-		wrc.rc = rc;
-		wrc.n = n;
-		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
-			perror("write");
-			return NULL;
-		}
-	}
-	return NULL;
-}
-
-static void *delete_work(void *arg)
-{
-	struct worker_thread *wt = arg;
-	struct node *n;
-
-	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
-		int rc = 0;
-		struct work_rc wrc;
-
-		if(n == NULL)
-			break;
-
-		if(n->flags & TUP_FLAGS_DELETE) {
-			rc = delete_name_file(n->tnode.tupid, n->dt, n->sym);
-			if(rc == 0 && n->type == TUP_NODE_GENERATED) {
-				rc = delete_file(n->dt, n->name);
-			}
-		}
 
 		wrc.rc = rc;
 		wrc.n = n;
@@ -1043,10 +942,6 @@ static void show_progress(int sum, int tot, struct node *n)
 				name_sz = 0;
 				while(name[name_sz] && name[name_sz] != '^')
 					name_sz++;
-			}
-			if(n->flags & TUP_FLAGS_DELETE) {
-				color = "[35m";
-				endcolor = "[0m";
 			}
 			if(n->type == TUP_NODE_DIR) {
 				color = "[33m";

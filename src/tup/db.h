@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 #include "linux/list.h"
+#include "linux/rbtree.h"
 #include <stdio.h>
 #include <time.h>
 
@@ -54,7 +55,6 @@ enum TUP_FLAGS_TYPE {
 	TUP_FLAGS_NONE=0,
 	TUP_FLAGS_MODIFY=1,
 	TUP_FLAGS_CREATE=2,
-	TUP_FLAGS_DELETE=4,
 };
 
 enum TUP_LINK_TYPE {
@@ -90,37 +90,38 @@ int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
 			   void *arg, tupid_t dt);
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 				void *arg, tupid_t dt, const char *glob);
-int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym);
+int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
+int tup_db_delete_file(tupid_t tupid);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
 tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
+int tup_db_get_type(tupid_t tupid, int *type);
 int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 int tup_db_set_mtime(tupid_t tupid, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);
-int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt);
-int tup_db_delete_gitignore(tupid_t dt);
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
+				    struct rb_root *tree);
+int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
+int tup_db_add_dir_create_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
 int tup_db_add_modify_list(tupid_t tupid);
-int tup_db_add_delete_list(tupid_t tupid);
 int tup_db_in_create_list(tupid_t tupid);
 int tup_db_in_modify_list(tupid_t tupid);
-int tup_db_in_delete_list(tupid_t tupid);
 int tup_db_unflag_create(tupid_t tupid);
 int tup_db_unflag_modify(tupid_t tupid);
-int tup_db_unflag_delete(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
-int tup_db_create_unique_link(tupid_t a, tupid_t b);
+int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree);
 int tup_db_delete_empty_links(tupid_t tupid);
-int tup_db_yell_links(tupid_t tupid, const char *errmsg);
+int tup_db_yell_links(tupid_t tupid, struct rb_root *tree, const char *errmsg);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_link_style(tupid_t a, tupid_t b, int *style);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
@@ -128,12 +129,9 @@ int tup_db_delete_links(tupid_t tupid);
 int tup_db_unsticky_links(tupid_t tupid);
 
 /* Combo operations */
-int tup_db_flag_delete_in_dir(tupid_t dt, int type);
-int tup_db_flag_delete_cmd_outputs(tupid_t dt);
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
-int tup_db_modify_deleted_deps(void);
 int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 					       int style),
 			       void *arg, tupid_t tupid);
@@ -156,6 +154,10 @@ int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);
 int tup_db_write_vars(void);
+
+/* Tree operations */
+int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree);
+int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree);
 
 /* tmp table management */
 int tup_db_request_tmp_list(void);

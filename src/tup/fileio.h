@@ -30,7 +30,8 @@ tupid_t tup_file_mod(tupid_t dt, const char *file);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force);
 int tup_file_del(tupid_t dt, const char *file);
-int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type);
+int tup_del_id(tupid_t tupid);
+int tup_del_id_quiet(tupid_t tupid);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
@@ -43,7 +44,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     int sotgv);
 
 int delete_file(tupid_t dt, const char *name);
-int delete_name_file(tupid_t tupid, tupid_t dt, tupid_t sym);
+int delete_name_file(tupid_t tupid);
 
 int get_path_elements(const char *dir, struct pel_group *pg);
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb);

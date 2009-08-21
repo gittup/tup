@@ -65,6 +65,7 @@ struct rule {
 };
 
 struct build_name_list_args {
+	struct tupfile *tf;
 	struct name_list *nl;
 	const char *dir;
 	int dirlen;
@@ -75,6 +76,7 @@ struct tupfile {
 	int dfd;
 	struct graph *g;
 	struct vardb vdb;
+	struct rb_root tree;
 	int ign;
 };
 
@@ -82,7 +84,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			 const char *cwd, int clen);
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen);
-static int gitignore(tupid_t dt, int dfd);
+static int gitignore(struct tupfile *tf);
 static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			     const char *cwd, int clen);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
@@ -99,8 +101,10 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct list_head *symlist);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 				    struct graph *g);
-static int get_name_list(struct list_head *plist, struct name_list *nl);
-static int nl_add_path(struct path_list *pl, struct name_list *nl);
+static int get_name_list(struct tupfile *tf, struct list_head *plist,
+			 struct name_list *nl);
+static int nl_add_path(struct tupfile *tf, struct path_list *pl,
+		       struct name_list *nl);
 static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
@@ -134,6 +138,7 @@ int parse(struct node *n, struct graph *g)
 	tf.tupid = n->tnode.tupid;
 	tf.g = g;
 	tf.ign = 0;
+	tf.tree.rb_node = NULL;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
 
@@ -146,13 +151,13 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_flag_delete_in_dir(tf.tupid, TUP_NODE_CMD) < 0)
+	if(tup_db_cmds_to_tree(tf.tupid, &tf.tree) < 0)
 		return -1;
-	if(tup_db_flag_delete_cmd_outputs(tf.tupid) < 0)
+	if(tup_db_cmd_outputs_to_tree(tf.tupid, &tf.tree) < 0)
 		return -1;
 	if(tup_db_delete_dependent_dir_links(tf.tupid) < 0)
 		return -1;
-	if(tup_db_delete_gitignore(tf.tupid) < 0)
+	if(tup_db_delete_gitignore(tf.tupid, &tf.tree) < 0)
 		return -1;
 
 	tf.dfd = dirtree_open(tf.tupid);
@@ -174,7 +179,7 @@ int parse(struct node *n, struct graph *g)
 	rc = parse_tupfile(&tf, &b, tf.tupid, ".", 1);
 	free(b.s);
 	if(tf.ign) {
-		if(gitignore(tf.tupid, tf.dfd) < 0)
+		if(gitignore(&tf) < 0)
 			rc = -1;
 	}
 out_close_file:
@@ -186,6 +191,14 @@ out_close_vdb:
 		rc = -1;
 
 	if(rc == 0) {
+		struct rb_node *rbn;
+		while((rbn = rb_first(&tf.tree)) != NULL) {
+			struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+			if(tup_del_id_quiet(tt->tupid) < 0)
+				return -1;
+			rb_erase(rbn, &tf.tree);
+			free(tt);
+		}
 		if(tup_db_unflag_create(tf.tupid) < 0)
 			return -1;
 	}
@@ -275,7 +288,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			}
 			if(sym_bork)
 				return -1;
-			if(get_name_list(&plist, &nl) < 0)
+			if(get_name_list(tf, &plist, &nl) < 0)
 				return -1;
 			list_for_each_entry_safe(pl, tmppl, &plist, list) {
 				list_del(&pl->list);
@@ -450,6 +463,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	plen = num_dotdots*3;
 
 	init_name_list(&nl);
+	args.tf = tf;
 	args.nl = &nl;
 
 	p = path;
@@ -493,7 +507,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	return include_name_list(tf, &nl, cwd, clen);
 }
 
-static int gitignore(tupid_t dt, int dfd)
+static int gitignore(struct tupfile *tf)
 {
 	char *s;
 	int len;
@@ -501,32 +515,31 @@ static int gitignore(tupid_t dt, int dfd)
 	struct stat buf;
 	int git_root = 0;
 
-	if(fstatat(dfd, ".git", &buf, 0) == 0) {
+	if(fstatat(tf->dfd, ".git", &buf, 0) == 0) {
 		if(S_ISDIR(buf.st_mode))
 			git_root = 1;
 	}
 
-	if(tup_db_alloc_generated_nodelist(&s, &len, dt) < 0)
+	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->tree) < 0)
 		return -1;
-	if(s || git_root == 1 || dt == 1) {
+	if(s || git_root == 1 || tf->tupid == 1) {
 		struct db_node dbn;
 
-		if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
+		if(tup_db_select_dbn(tf->tupid, ".gitignore", &dbn) < 0)
 			return -1;
 		if(dbn.tupid < 0) {
-			if(tup_db_node_insert(dt, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
+			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
 				return -1;
 		} else {
-			if(tup_db_unflag_delete(dbn.tupid) < 0)
-				return -1;
+			tupid_tree_remove(&tf->tree, dbn.tupid);
 		}
 
-		fd = openat(dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
+		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
 		if(fd < 0) {
 			perror(".gitignore");
 			return -1;
 		}
-		if(dt == 1) {
+		if(tf->tupid == 1) {
 			write(fd, ".tup\n", 5);
 		}
 		if(git_root == 1) {
@@ -903,7 +916,7 @@ static int parse_input_patterns(struct tupfile *tf, char *p,
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf->tupid, tf->g) < 0)
 		return -1;
-	if(get_name_list(&plist, nl) < 0)
+	if(get_name_list(tf, &plist, nl) < 0)
 		return -1;
 	list_for_each_entry_safe(pl, tmp, &plist, list) {
 		list_del(&pl->list);
@@ -1005,7 +1018,8 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 	return 0;
 }
 
-static int get_name_list(struct list_head *plist, struct name_list *nl)
+static int get_name_list(struct tupfile *tf, struct list_head *plist,
+			 struct name_list *nl)
 {
 	struct path_list *pl;
 
@@ -1014,14 +1028,15 @@ static int get_name_list(struct list_head *plist, struct name_list *nl)
 			if(nl_add_bin(pl->bin, pl->dt, nl) < 0)
 				return -1;
 		} else {
-			if(nl_add_path(pl, nl) < 0)
+			if(nl_add_path(tf, pl, nl) < 0)
 				return -1;
 		}
 	}
 	return 0;
 }
 
-static int nl_add_path(struct path_list *pl, struct name_list *nl)
+static int nl_add_path(struct tupfile *tf, struct path_list *pl,
+		       struct name_list *nl)
 {
 	struct build_name_list_args args;
 	int pos;
@@ -1038,11 +1053,12 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 		args.dirlen = 0;
 	}
 	args.nl = nl;
+	args.tf = tf;
 	pos = strcspn(pl->file, "*?[");
 	/* If no wildcard characters are found, pos is set to the ending nul */
 	if(pl->file[pos] == 0) {
 		struct db_node dbn;
-		int rc;
+
 		if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
 			return -1;
 		}
@@ -1056,10 +1072,7 @@ static int nl_add_path(struct path_list *pl, struct name_list *nl)
 			tup_db_print(stderr, dbn.tupid);
 			return -1;
 		}
-		rc = tup_db_in_delete_list(dbn.tupid);
-		if(rc < 0)
-			return -1;
-		if(rc == 1) {
+		if(tupid_tree_search(&tf->tree, dbn.tupid) != NULL) {
 			fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
@@ -1118,7 +1131,7 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	int namelen;
 	struct name_list_entry *nle;
 
-	if(tup_db_in_delete_list(dbn->tupid))
+	if(tupid_tree_search(&args->tf->tree, dbn->tupid) != NULL)
 		return 0;
 
 	namelen = strlen(dbn->name);
@@ -1259,6 +1272,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(cmd_id < 0)
 		return -1;
 
+	tupid_tree_remove(&tf->tree, cmd_id);
 	if(tup_db_unsticky_links(cmd_id) < 0)
 		return -1;
 
@@ -1269,11 +1283,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * commands still work (since they don't go through the normal
 		 * server process to create links).
 		 */
-		if(tup_db_create_unique_link(cmd_id, onle->tupid) < 0) {
+		if(tup_db_create_unique_link(cmd_id, onle->tupid, &tf->tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
 		delete_name_list_entry(&onl, onle);
+		tupid_tree_remove(&tf->tree, onle->tupid);
 	}
 
 	if(tup_db_write_outputs(cmd_id) < 0)
@@ -1291,7 +1306,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 	if(tup_db_delete_empty_links(cmd_id) < 0)
 		return -1;
-	rc = tup_db_yell_links(cmd_id, "Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.");
+	rc = tup_db_yell_links(cmd_id, &tf->tree, "Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.");
 	if(rc < 0)
 		return -1;
 	if(rc == 0)

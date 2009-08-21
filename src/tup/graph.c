@@ -154,8 +154,6 @@ static void dump_node(FILE *f, struct node *n)
 	int color = 0;
 	if(n->flags & TUP_FLAGS_CREATE)
 		color |= 0x00bb00;
-	if(n->flags & TUP_FLAGS_DELETE)
-		color |= 0xff0000;
 	if(n->flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",

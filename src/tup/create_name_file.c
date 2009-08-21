@@ -16,6 +16,8 @@ struct id_flags {
 	int flags;
 };
 
+static int tup_del_id_internal(tupid_t tupid, int quiet);
+static int tup_del_id_type(tupid_t tupid, int type, int quiet);
 static int ghost_to_file(struct db_node *dbn);
 
 tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime)
@@ -214,8 +216,6 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
 					return -1;
 		}
-		if(tup_db_unflag_delete(dbn.tupid) < 0)
-			return -1;
 	}
 	return dbn.tupid;
 }
@@ -230,21 +230,42 @@ int tup_file_del(tupid_t dt, const char *file)
 		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 		return -1;
 	}
-	return tup_del_id(dbn.tupid, dbn.dt, dbn.sym, dbn.type);
+	return tup_del_id_type(dbn.tupid, dbn.type, 0);
 }
 
-int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type)
+int tup_del_id(tupid_t tupid)
+{
+	return tup_del_id_internal(tupid, 0);
+}
+
+int tup_del_id_quiet(tupid_t tupid)
+{
+	return tup_del_id_internal(tupid, 1);
+}
+
+static int tup_del_id_internal(tupid_t tupid, int quiet)
+{
+	int type;
+
+	if(tup_db_get_type(tupid, &type) < 0)
+		return -1;
+	if(type < 0) {
+		fprintf(stderr, "Unable to find type of node: %lli\n", tupid);
+		return -1;
+	}
+	return tup_del_id_type(tupid, type, quiet);
+}
+
+static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 {
 	if(type == TUP_NODE_DIR) {
-		/* Directories are pretty simple, but we need to recurse and
-		 * kill anything underneath the diretory as well.
+		/* Recurse and kill anything below this dir. Note that
+		 * tup_db_delete_dir() calls back to this function.
 		 */
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
-		if(delete_name_file(tupid, dt, sym) < 0)
-			return -1;
-		return 0;
 	}
+
 	/* If a file was deleted and it was created by a command, set the
 	 * command's flags to modify. For example, if foo.o was deleted, we set
 	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed.
@@ -254,36 +275,40 @@ int tup_del_id(tupid_t tupid, tupid_t dt, tupid_t sym, int type)
 	 */
 	if(type == TUP_NODE_GENERATED) {
 		int modified = 0;
+
 		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
 			return -1;
 		/* Only display a warning if the command isn't already in the
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.
 		 */
-		if(modified == 1)
+		if(modified == 1 && !quiet)
 			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
+		if(tup_db_delete_file(tupid) < 0)
+			return -1;
 	}
 
-	/* We also have to run any command that used this file as an input, so
-	 * we can yell at the user if they haven't already fixed that command.
-	 */
-	if(tup_db_modify_cmds_by_input(tupid) < 0)
-		return -1;
+	if(type == TUP_NODE_FILE || type == TUP_NODE_GENERATED) {
+		/* We also have to run any command that used this file as an
+		 * input, so we can yell at the user if they haven't already
+		 * fixed that command.
+		 */
+		if(tup_db_modify_cmds_by_input(tupid) < 0)
+			return -1;
 
-	/* Re-parse the current Tupfile (the updater automatically parses any
-	 * dependent directories).
-	 */
-	if(tup_db_add_create_list(dt) < 0)
-		return -1;
+		/* Re-parse the current Tupfile (the updater automatically
+		 * parses any dependent directories).
+		 */
+		if(tup_db_add_dir_create_list(tupid) < 0)
+			return -1;
 
-	/* It's possible this is a file that was included by a Tupfile.  Try to
-	 * set any dependent directory flags.
-	 */
-	if(tup_db_set_dependent_dir_flags(tupid) < 0)
-		return -1;
-	if(tup_db_unflag_modify(tupid) < 0)
-		return -1;
-	if(delete_name_file(tupid, dt, sym) < 0)
+		/* It's possible this is a file that was included by a Tupfile.
+		 * Try to set any dependent directory flags.
+		 */
+		if(tup_db_set_dependent_dir_flags(tupid) < 0)
+			return -1;
+	}
+	if(delete_name_file(tupid) < 0)
 		return -1;
 	return 0;
 }

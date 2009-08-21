@@ -626,7 +626,7 @@ static void handle_event(struct monitor_event *m)
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
 		tup_file_mod(dc->dt, m->e.name);
 	}
-	if(m->e.mask & IN_DELETE || m->e.mask & IN_MOVED_FROM) {
+	if(m->e.mask & IN_DELETE) {
 		tup_file_del(dc->dt, m->e.name);
 	}
 	if(m->e.mask & IN_MOVED_FROM) {

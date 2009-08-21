@@ -3,7 +3,8 @@
 #include "db_util.h"
 #include "array_size.h"
 #include "linux/list.h"
-#include "fileio.h" /* TODO: call delete_file elsewhere? */
+#include "tupid_tree.h"
+#include "fileio.h"
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +15,7 @@
 #include <sys/socket.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 10
+#define DB_VERSION 11
 
 enum {
 	DB_BEGIN,
@@ -29,29 +30,27 @@ enum {
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
-	DB_DELETE_DIR,
 	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
 	DB_PARENT,
 	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
+	DB_GET_TYPE,
 	DB_SET_TYPE,
 	DB_SET_SYM,
 	DB_SET_MTIME,
 	DB_PRINT,
 	_DB_NODELIST_LEN,
 	_DB_GET_NODELIST,
-	DB_DELETE_GITIGNORE,
+	DB_ADD_DIR_CREATE_LIST,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
-	DB_ADD_DELETE_LIST,
 	DB_IN_CREATE_LIST,
 	DB_IN_MODIFY_LIST,
-	DB_IN_DELETE_LIST,
 	DB_UNFLAG_CREATE,
 	DB_UNFLAG_MODIFY,
-	DB_UNFLAG_DELETE,
 	_DB_GET_RECURSE_DIRS,
+	_DB_GET_DIR_ENTRIES,
 	DB_DELETE_EMPTY_LINKS,
 	DB_YELL_LINKS,
 	DB_LINK_EXISTS,
@@ -59,12 +58,11 @@ enum {
 	DB_GET_INCOMING_LINK,
 	DB_DELETE_LINKS,
 	DB_UNSTICKY_LINKS,
-	DB_FLAG_DELETE_IN_DIR,
-	DB_FLAG_DELETE_CMD_OUTPUTS,
+	DB_CMDS_TO_TREE,
+	DB_CMD_OUTPUTS_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
-	DB_MODIFY_DELETED_DEPS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_DELETE_DEPENDENT_DIR_LINKS,
 	DB_CONFIG_SET_INT,
@@ -91,7 +89,7 @@ enum {
 	_DB_NODE_HAS_GHOSTS,
 	_DB_CREATE_GHOST_LIST,
 	_DB_CREATE_TMP_LIST,
-	_DB_ADD_GHOST,
+	_DB_ADD_GHOST_DT_SYM,
 	_DB_ADD_GHOST_LINKS,
 	_DB_ADD_GHOST_DIRS,
 	_DB_RECLAIM_GHOSTS,
@@ -145,7 +143,7 @@ static int node_has_ghosts(tupid_t tupid);
 static int create_ghost_list(void);
 static int create_tmp_list(void);
 static int check_tmp_requested(void);
-static int add_ghost(tupid_t tupid);
+static int add_ghost_dt_sym(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
@@ -169,9 +167,10 @@ static int add_outputs(tupid_t cmdid, int *outputs_differ);
 static int remove_outputs(tupid_t cmdid, int *outputs_differ);
 static int no_sync(void);
 static int generated_nodelist_len(tupid_t dt);
-static int get_generated_nodelist(char *dest, tupid_t dt);
+static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree);
 static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
+static int get_dir_entries(tupid_t dt, struct list_head *list);
 
 int tup_db_open(void)
 {
@@ -218,7 +217,6 @@ int tup_db_create(int db_sync)
 		"create table config(lval varchar(256) unique, rval varchar(256))",
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
-		"create table delete_list (id integer primary key not null)",
 		"create index node_dir_index on node(dir, name)",
 		"create index node_sym_index on node(sym)",
 		"create index link_index2 on link(to_id)",
@@ -297,6 +295,8 @@ static int version_check(void)
 	char sql_9e[] = "drop table link";
 	char sql_9f[] = "alter table link_new rename to link";
 	char sql_9g[] = "create index link_index2 on link(to_id)";
+
+	char sql_10[] = "drop table delete_list";
 
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
@@ -454,6 +454,16 @@ static int version_check(void)
 				return -1;
 			fprintf(stderr, "NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
 
+		case 10:
+			if(sqlite3_exec(tup_db, sql_10, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+					errmsg, sql_10);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 11) < 0)
+				return -1;
+			fprintf(stderr, "NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
+
 		case DB_VERSION:
 			break;
 		default:
@@ -573,7 +583,6 @@ int tup_db_check_flags(void)
 	char *errmsg;
 	char s1[] = "select * from create_list";
 	char s2[] = "select * from modify_list";
-	char s3[] = "select * from delete_list";
 
 	if(sql_debug) fprintf(stderr, "%s\n", s1);
 	check_flags_name = "create";
@@ -588,14 +597,6 @@ int tup_db_check_flags(void)
 	if(sqlite3_exec(tup_db, s2, check_flags_cb, &rc, &errmsg) != 0) {
 		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
 			errmsg, s2);
-		sqlite3_free(errmsg);
-		return -1;
-	}
-	if(sql_debug) fprintf(stderr, "%s\n", s3);
-	check_flags_name = "delete";
-	if(sqlite3_exec(tup_db, s3, check_flags_cb, &rc, &errmsg) != 0) {
-		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
-			errmsg, s3);
 		sqlite3_free(errmsg);
 		return -1;
 	}
@@ -679,8 +680,6 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
 			return -1;
 		}
-		if(tup_db_unflag_delete(dbn.tupid) < 0)
-			return -1;
 		return dbn.tupid;
 	}
 
@@ -821,7 +820,6 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 	sqlite3_stmt **stmt;
 	static char s1[] = "select id, dir, name, type, sym, mtime from node where id in (select * from create_list)";
 	static char s2[] = "select id, dir, name, type, sym, mtime from node where id in (select * from modify_list)";
-	static char s3[] = "select id, dir, name, type, sym, mtime from node where id in (select * from delete_list)";
 	char *sql;
 	int sqlsize;
 
@@ -833,12 +831,8 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 		stmt = &stmts[DB_SELECT_NODE_BY_FLAGS_2];
 		sql = s2;
 		sqlsize = sizeof(s2);
-	} else if(flags == TUP_FLAGS_DELETE) {
-		stmt = &stmts[DB_SELECT_NODE_BY_FLAGS_3];
-		sql = s3;
-		sqlsize = sizeof(s3);
 	} else {
-		fprintf(stderr, "Error: tup_db_select_node_by_flags() must specify exactly one of TUP_FLAGS_CREATE/MODIFY/DELETE\n");
+		fprintf(stderr, "Error: tup_db_select_node_by_flags() must specify exactly one of TUP_FLAGS_CREATE/TUP_FLAGS_MODIFY\n");
 		return -1;
 	}
 
@@ -1022,15 +1016,13 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym)
+int tup_db_delete_node(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_NODE];
 	static char s[] = "delete from node where id=?";
 
-	if(add_ghost(dt) < 0)
-		return -1;
-	if(add_ghost(sym) < 0)
+	if(add_ghost_dt_sym(tupid) < 0)
 		return -1;
 
 	rc = node_has_ghosts(tupid);
@@ -1077,49 +1069,34 @@ int tup_db_delete_node(tupid_t tupid, tupid_t dt, tupid_t sym)
 int tup_db_delete_dir(tupid_t dt)
 {
 	LIST_HEAD(subdir_list);
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DELETE_DIR];
-	static char s[] = "insert or replace into delete_list select id from node where dir=?";
 
-	if(tup_db_unflag_create(dt) < 0)
-		return -1;
-	if(tup_db_add_delete_list(dt) < 0)
-		return -1;
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, dt);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(get_recurse_dirs(dt, &subdir_list) < 0)
+	if(get_dir_entries(dt, &subdir_list) < 0)
 		return -1;
 	while(!list_empty(&subdir_list)) {
 		struct id_entry *ide = list_entry(subdir_list.next,
 						  struct id_entry, list);
-		tup_db_delete_dir(ide->tupid);
+		/* tup_del_id may call back to tup_db_delete_dir() */
+		if(tup_del_id(ide->tupid) < 0)
+			return -1;
 		list_del(&ide->list);
 		free(ide);
 	}
 
 	return 0;
+}
+
+int tup_db_delete_file(tupid_t tupid)
+{
+	int rc;
+	char *name;
+	tupid_t dt;
+
+	dt = tup_db_select_dirname(tupid, &name);
+	if(dt < 0)
+		return -1;
+	rc = delete_file(dt, name);
+	free(name);
+	return rc;
 }
 
 int tup_db_modify_dir(tupid_t dt)
@@ -1129,8 +1106,6 @@ int tup_db_modify_dir(tupid_t dt)
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
 	static char s[] = "insert or replace into modify_list select id from node where dir=? and type!=?";
 
-	if(tup_db_unflag_delete(dt) < 0)
-		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_DIR);
@@ -1389,6 +1364,52 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	return 0;
 }
 
+int tup_db_get_type(tupid_t tupid, int *type)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_GET_TYPE];
+	static char s[] = "select type from node where id=?";
+
+	*type = -1;
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		rc = 0;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		rc = -1;
+		goto out_reset;
+	}
+
+	*type = sqlite3_column_int(*stmt, 0);
+	rc = 0;
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 int tup_db_set_type(tupid_t tupid, int type)
 {
 	int rc;
@@ -1510,7 +1531,8 @@ int tup_db_print(FILE *stream, tupid_t tupid)
 	return rc;
 }
 
-int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt)
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
+				    struct rb_root *tree)
 {
 	*s = NULL;
 	*len = 0;
@@ -1519,12 +1541,15 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt)
 		return -1;
 	if(*len == 0)
 		return 0;
+	/* The length may be an over-estimate, since it also contains any
+	 * nodes scheduled to be deleted.
+	 */
 	*s = malloc(*len);
 	if(!*s) {
 		perror("malloc");
 		return -1;
 	}
-	if(get_generated_nodelist(*s, dt) < 0)
+	if(get_generated_nodelist(*s, dt, tree) < 0)
 		return -1;
 	return 0;
 }
@@ -1534,7 +1559,7 @@ static int generated_nodelist_len(tupid_t dt)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODELIST_LEN];
-	static char s[] = "select sum(length(name) + 2) from node left join delete_list on delete_list.id=node.id where dir=? and type=? and delete_list.id is null";
+	static char s[] = "select sum(length(name) + 2) from node where dir=? and type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_GENERATED);
 	if(!*stmt) {
@@ -1576,12 +1601,12 @@ out_reset:
 	return rc;
 }
 
-static int get_generated_nodelist(char *dest, tupid_t dt)
+static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_NODELIST];
-	static char s[] = "select length(name), name from node left join delete_list on delete_list.id=node.id where dir=? and type=? and delete_list.id is null";
+	static char s[] = "select length(name), name, id from node where dir=? and type=?";
 	char *p;
 	int len;
 
@@ -1615,6 +1640,9 @@ static int get_generated_nodelist(char *dest, tupid_t dt)
 			rc = -1;
 			goto out_reset;
 		}
+		if(tupid_tree_search(tree, sqlite3_column_int64(*stmt, 2)) != NULL) {
+			continue;
+		}
 		*p = '/';
 		p++;
 		len = sqlite3_column_int(*stmt, 0);
@@ -1633,40 +1661,24 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_gitignore(tupid_t dt)
+int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree)
 {
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DELETE_GITIGNORE];
-	static char s[] = "insert or ignore into delete_list select id from node where dir=? and name='.gitignore' and type=?";
+	struct db_node dbn;
+	struct tupid_tree *tt;
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_GENERATED);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
+	if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
+		return -1;
+	/* Fine if the .gitignore file isn't present. */
+	if(dbn.tupid < 0)
+		return 0;
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+	tt = malloc(sizeof *tt);
+	if(!tt) {
+		perror("malloc");
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
+	tt->tupid = dbn.tupid;
+	tupid_tree_insert(tree, tt);
 
 	return 0;
 }
@@ -1779,12 +1791,41 @@ int tup_db_get_node_flags(tupid_t tupid)
 	if(rc == 1)
 		flags |= TUP_FLAGS_MODIFY;
 
-	rc = tup_db_in_delete_list(tupid);
-	if(rc < 0)
-		return -1;
-	if(rc == 1)
-		flags |= TUP_FLAGS_DELETE;
 	return flags;
+}
+
+int tup_db_add_dir_create_list(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_ADD_DIR_CREATE_LIST];
+	static char s[] = "insert or ignore into create_list select dir from node where id=?";
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return 0;
 }
 
 int tup_db_add_create_list(tupid_t tupid)
@@ -1826,40 +1867,6 @@ int tup_db_add_modify_list(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_ADD_MODIFY_LIST];
 	static char s[] = "insert or replace into modify_list values(?)";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_add_delete_list(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_ADD_DELETE_LIST];
-	static char s[] = "insert or replace into delete_list values(?)";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -1975,49 +1982,6 @@ out_reset:
 	return rc;
 }
 
-int tup_db_in_delete_list(tupid_t tupid)
-{
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_IN_DELETE_LIST];
-	static char s[] = "select id from delete_list where id=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		rc = 0;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	rc = 1;
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return rc;
-}
-
 int tup_db_unflag_create(tupid_t tupid)
 {
 	int rc;
@@ -2057,40 +2021,6 @@ int tup_db_unflag_modify(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_MODIFY];
 	static char s[] = "delete from modify_list where id=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_unflag_delete(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_DELETE];
-	static char s[] = "delete from delete_list where id=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -2177,6 +2107,59 @@ out_reset:
 	return rc;
 }
 
+static int get_dir_entries(tupid_t dt, struct list_head *list)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_DIR_ENTRIES];
+	static char s[] = "select id from node where dir=?";
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, dt);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	while(1) {
+		struct id_entry *ide;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		ide = malloc(sizeof *ide);
+		if(ide == NULL) {
+			perror("malloc");
+			return -1;
+		}
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&ide->list, list);
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 int tup_db_create_link(tupid_t a, tupid_t b, int style)
 {
 	int curstyle;
@@ -2194,7 +2177,7 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b)
+int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree)
 {
 	int rc;
 	tupid_t incoming;
@@ -2202,6 +2185,10 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 	rc = tup_db_get_incoming_link(b, &incoming);
 	if(rc < 0)
 		return -1;
+	if(incoming != -1) {
+		if(tupid_tree_search(tree, incoming) != NULL)
+			incoming = -1;
+	}
 	/* See if we already own the link, or if the link doesn't exist yet */
 	if(a == incoming || incoming == -1) {
 		if(tup_db_add_write_list(b) < 0)
@@ -2246,12 +2233,12 @@ int tup_db_delete_empty_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_yell_links(tupid_t tupid, const char *errmsg)
+int tup_db_yell_links(tupid_t tupid, struct rb_root *tree, const char *errmsg)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_YELL_LINKS];
-	static char s[] = "select from_id, name from link, node left join delete_list on delete_list.id=from_id where to_id=? and style=? and node.id=from_id and node.type=? and delete_list.id is null";
+	static char s[] = "select from_id, name from link, node where to_id=? and style=? and node.id=from_id and node.type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i, %i][0m\n", s, tupid, TUP_LINK_NORMAL, TUP_NODE_GENERATED);
 	if(!*stmt) {
@@ -2277,6 +2264,8 @@ int tup_db_yell_links(tupid_t tupid, const char *errmsg)
 
 	rc = 0;
 	while(1) {
+		tupid_t badid;
+
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			goto out_reset;
@@ -2287,11 +2276,14 @@ int tup_db_yell_links(tupid_t tupid, const char *errmsg)
 			goto out_reset;
 		}
 
+		badid = sqlite3_column_int64(*stmt, 0);
+		if(tupid_tree_search(tree, badid) != NULL)
+			continue;
+
 		fprintf(stderr, "Error: %s\n", errmsg);
 		fprintf(stderr, " -- File '%s' [%lli]\n",
-			sqlite3_column_text(*stmt, 1),
-			sqlite3_column_int64(*stmt, 0));
-		fprintf(stderr, " -- Command ID: %lli\n", tupid);
+			sqlite3_column_text(*stmt, 1), badid);
+		fprintf(stderr, " -- Command ID: %lli\n", badid);
 		rc = 1;
 	}
 
@@ -2393,7 +2385,7 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
-	static char s[] = "select from_id from link where to_id=? and not from_id in (select id from delete_list where id=from_id)";
+	static char s[] = "select from_id from link where to_id=?";
 
 	*incoming = -1;
 
@@ -2522,49 +2514,37 @@ int tup_db_unsticky_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_flag_delete_in_dir(tupid_t dt, int type)
+static int tree_add_tupids(struct rb_root *tree, sqlite3_stmt *stmt)
 {
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_IN_DIR];
-	static char s[] = "insert or replace into delete_list select id from node where dir=? and type=?";
+	int dbrc;
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, type);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
+	while(1) {
+		struct tupid_tree *tt;
+
+		dbrc = sqlite3_step(stmt);
+		if(dbrc == SQLITE_DONE) {
+			return 0;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 			return -1;
 		}
-	}
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		tt = malloc(sizeof *tt);
+		if(!tt) {
+			perror("malloc");
+			return -1;
+		}
+		tt->tupid = sqlite3_column_int64(stmt, 0);
+		tupid_tree_insert(tree, tt);
 	}
-	if(sqlite3_bind_int(*stmt, 2, type) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
 }
 
-int tup_db_flag_delete_cmd_outputs(tupid_t dt)
+int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_FLAG_DELETE_CMD_OUTPUTS];
-	static char s[] = "insert or replace into delete_list select to_id from link where from_id in (select id from node where dir=? and type=?)";
+	sqlite3_stmt **stmt = &stmts[DB_CMDS_TO_TREE];
+	static char s[] = "select id from node where dir=? and type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_CMD);
 	if(!*stmt) {
@@ -2584,18 +2564,48 @@ int tup_db_flag_delete_cmd_outputs(tupid_t dt)
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
+	rc = tree_add_tupids(tree, *stmt);
+
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+	return rc;
+}
+
+int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_CMD_OUTPUTS_TO_TREE];
+	static char s[] = "select to_id from link where from_id in (select id from node where dir=? and type=?)";
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_CMD);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
-	return 0;
+	rc = tree_add_tupids(tree, *stmt);
+
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
 }
 
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified)
@@ -2695,35 +2705,6 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_modify_deleted_deps(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DELETED_DEPS];
-	static char s[] = "insert or replace into modify_list select to_id from link where from_id in (select id from delete_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
 	}
 
 	rc = sqlite3_step(*stmt);
@@ -3603,7 +3584,7 @@ int tup_db_scan_end(void)
 		return -1;
 	while(!list_empty(&del_list)) {
 		he = list_entry(del_list.next, struct half_entry, list);
-		if(tup_del_id(he->tupid, he->dt, he->sym, he->type) < 0)
+		if(tup_del_id(he->tupid) < 0)
 			return -1;
 		list_del(&he->list);
 		free(he);
@@ -4214,16 +4195,16 @@ static int create_tmp_list(void)
 	return 0;
 }
 
-static int add_ghost(tupid_t tupid)
+static int add_ghost_dt_sym(tupid_t tupid)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST];
-	static char s[] = "insert or replace into ghost_list select id from node where id=? and type=?";
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_DT_SYM];
+	static char s[] = "insert or ignore into ghost_list select id from node where id in (select dir from node where id=? union select sym from node where id=?) and type=?";
 
 	if(tupid < 0)
 		return 0;
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, tupid, TUP_NODE_GHOST);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %lli, %i][0m\n", s, tupid, tupid, TUP_NODE_GHOST);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -4236,7 +4217,11 @@ static int add_ghost(tupid_t tupid)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GHOST) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GHOST) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}

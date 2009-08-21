@@ -97,8 +97,6 @@ int main(int argc, char **argv)
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "parse") == 0) {
 		rc = updater(argc, argv, 1);
-	} else if(strcmp(cmd, "delete") == 0) {
-		rc = updater(argc, argv, 2);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv, 0);
 	} else if(strcmp(cmd, "todo") == 0) {
@@ -240,8 +238,6 @@ static int graph(int argc, char **argv)
 			return -1;
 		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 			return -1;
-		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_DELETE) < 0)
-			return -1;
 	}
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
@@ -314,10 +310,6 @@ static int graph(int argc, char **argv)
 				shape="ellipse";
 		}
 
-		if(n->flags & TUP_FLAGS_DELETE) {
-			color |= 0xff0000;
-			style = "dotted";
-		}
 		if(n->flags & TUP_FLAGS_MODIFY) {
 			color |= 0x0000ff;
 			style = "dashed";
@@ -672,7 +664,7 @@ static int rm(int argc, char **argv)
 			fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
 			return -1;
 		}
-		if(tup_del_id(dbn.tupid, dbn.dt, dbn.sym, dbn.type) < 0)
+		if(tup_del_id(dbn.tupid) < 0)
 			return -1;
 	}
 	if(tup_db_commit() < 0)

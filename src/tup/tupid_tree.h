@@ -11,5 +11,6 @@ struct tupid_tree {
 
 struct tupid_tree *tupid_tree_search(struct rb_root *root, tupid_t tupid);
 int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data);
+void tupid_tree_remove(struct rb_root *root, tupid_t tupid);
 
 #endif

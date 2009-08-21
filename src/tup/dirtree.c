@@ -63,9 +63,10 @@ int dirtree_open(tupid_t dt)
 {
 	struct dirtree *dirt;
 
-	dirt = dirtree_find(dt);
+	if(dirtree_add(dt, &dirt) < 0)
+		return -1;
 	if(!dirt) {
-		fprintf(stderr, "tup error: Unable to find dirtree to open for dir %lli\n", dt);
+		fprintf(stderr, "tup error: dirtree(%lli) is NULL\n", dt);
 		return -1;
 	}
 	return do_open(dirt);
