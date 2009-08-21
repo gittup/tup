@@ -78,8 +78,6 @@ sqlite style graphs for parser
 
 debug sql mode
 
-try: -Ifoo -Ibar, where both foo and bar have test.h, then delete foo/test.h - should become a ghost
-
 tup try: ': |> echo foo > %o |> bar', then change the Tupfile to remove the rule and replace bar with a manually created file before doing an update. Does the new manual file stay?
 
 gittup try: generated header becomes a regular file (eg: replace a symlinked header with a regular copy) - does this hose someone who clones gittup?
