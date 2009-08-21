@@ -39,7 +39,10 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	}
 	n->state = STATE_INITIALIZED;
 	n->type = dbn->type;
-	n->flags = tup_db_get_node_flags(dbn->tupid);
+	if(n->type == TUP_NODE_ROOT)
+		n->flags = 0;
+	else
+		n->flags = tup_db_get_node_flags(dbn->tupid);
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
