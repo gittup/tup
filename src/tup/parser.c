@@ -1278,7 +1278,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	if(tup_db_write_outputs(cmd_id) < 0)
 		return -1;
-	if(tup_db_clear_tmp_table() < 0)
+	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {

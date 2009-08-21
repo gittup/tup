@@ -82,7 +82,7 @@ enum {
 	DB_FILES_TO_TMP,
 	DB_UNFLAG_TMP,
 	DB_GET_ALL_IN_TMP,
-	DB_CLEAR_TMP_TABLE,
+	DB_CLEAR_TMP_LIST,
 	DB_ADD_WRITE_LIST,
 	DB_NODE_INSERT,
 	_DB_NODE_SELECT,
@@ -3570,7 +3570,7 @@ int tup_db_var_post(void)
 		return -1;
 	if(var_list_delete_nodes() < 0)
 		return -1;
-	if(tup_db_clear_tmp_table() < 0)
+	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
@@ -3780,10 +3780,10 @@ out_reset:
 	return rc;
 }
 
-int tup_db_clear_tmp_table(void)
+int tup_db_clear_tmp_list(void)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CLEAR_TMP_TABLE];
+	sqlite3_stmt **stmt = &stmts[DB_CLEAR_TMP_LIST];
 	static char s[] = "delete from tmp_list";
 
 	if(check_tmp_requested() < 0)

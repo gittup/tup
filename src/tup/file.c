@@ -253,7 +253,7 @@ skip_sym:
 
 	if(tup_db_check_write_list(cmdid) < 0)
 		return -1;
-	if(tup_db_clear_tmp_table() < 0)
+	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
@@ -345,7 +345,7 @@ skip_ghost:
 	}
 	if(tup_db_check_read_list(cmdid) < 0)
 		return -1;
-	if(tup_db_clear_tmp_table() < 0)
+	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 	return 0;
 }

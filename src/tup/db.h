@@ -160,7 +160,7 @@ int tup_db_write_vars(void);
 /* tmp table management */
 int tup_db_request_tmp_list(void);
 int tup_db_release_tmp_list(void);
-int tup_db_clear_tmp_table(void);
+int tup_db_clear_tmp_list(void);
 
 /* var tmp operations */
 int tup_db_var_pre(void);
