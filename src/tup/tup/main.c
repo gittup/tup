@@ -278,6 +278,7 @@ static int graph(int argc, char **argv)
 		const char *style;
 		char *s;
 		struct edge *e;
+		int flags;
 
 		if(n == g.root)
 			continue;
@@ -310,11 +311,12 @@ static int graph(int argc, char **argv)
 				shape="ellipse";
 		}
 
-		if(n->flags & TUP_FLAGS_MODIFY) {
+		flags = tup_db_get_node_flags(n->tnode.tupid);
+		if(flags & TUP_FLAGS_MODIFY) {
 			color |= 0x0000ff;
 			style = "dashed";
 		}
-		if(n->flags & TUP_FLAGS_CREATE) {
+		if(flags & TUP_FLAGS_CREATE) {
 			color |= 0x00ff00;
 			style = "dashed peripheries=2";
 		}

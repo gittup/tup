@@ -39,10 +39,6 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 	}
 	n->state = STATE_INITIALIZED;
 	n->type = dbn->type;
-	if(n->type == TUP_NODE_ROOT)
-		n->flags = 0;
-	else
-		n->flags = tup_db_get_node_flags(dbn->tupid);
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
@@ -152,9 +148,12 @@ static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
 	int color = 0;
-	if(n->flags & TUP_FLAGS_CREATE)
+	int flags;
+
+	flags = tup_db_get_node_flags(n->tnode.tupid);
+	if(flags & TUP_FLAGS_CREATE)
 		color |= 0x00bb00;
-	if(n->flags & TUP_FLAGS_MODIFY)
+	if(flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
 		n, n->name, n->tnode.tupid, n->incoming_count, n->expanded, color);
