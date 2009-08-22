@@ -1207,6 +1207,19 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
+static int add_tupid_tree(tupid_t tupid, struct rb_root *tree)
+{
+	struct tupid_tree *tt;
+
+	tt = malloc(sizeof *tt);
+	if(!tt) {
+		perror("malloc");
+		return -1;
+	}
+	tt->tupid = tupid;
+	return tupid_tree_insert(tree, tt);
+}
+
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   struct name_list *oonl, const char *cwd, int clen,
 		   const char *ext, int extlen)
@@ -1217,9 +1230,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
-	int rc;
 	tupid_t cmd_id;
 	LIST_HEAD(oplist);
+	struct rb_root tree = {NULL};
 
 	init_name_list(&onl);
 
@@ -1287,8 +1300,6 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 
 	tree_entry_remove(&tf->tree, cmd_id);
-	if(tup_db_unsticky_links(cmd_id) < 0)
-		return -1;
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
@@ -1311,21 +1322,16 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tup_db_create_link(nle->tupid, cmd_id, TUP_LINK_STICKY) < 0)
+		if(add_tupid_tree(nle->tupid, &tree) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
-		if(tup_db_create_link(nle->tupid, cmd_id, TUP_LINK_STICKY) < 0)
+		if(add_tupid_tree(nle->tupid, &tree) < 0)
 			return -1;
 	}
-	if(tup_db_delete_empty_links(cmd_id) < 0)
+	if(tup_db_write_inputs(cmd_id, &tree, &tf->tree) < 0)
 		return -1;
-	rc = tup_db_yell_links(cmd_id, &tf->tree, "Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.");
-	if(rc < 0)
-		return -1;
-	if(rc == 0)
-		return 0;
-	return -1;
+	return 0;
 }
 
 static void init_name_list(struct name_list *nl)

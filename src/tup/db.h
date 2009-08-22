@@ -125,13 +125,10 @@ int tup_db_unflag_modify(tupid_t tupid);
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
 int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree);
-int tup_db_delete_empty_links(tupid_t tupid);
-int tup_db_yell_links(tupid_t tupid, struct rb_root *tree, const char *errmsg);
 int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_link_style(tupid_t a, tupid_t b, int *style);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_unsticky_links(tupid_t tupid);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -186,5 +183,7 @@ int tup_db_check_write_list(tupid_t cmdid);
 int tup_db_add_read_list(tupid_t tupid);
 int tup_db_check_read_list(tupid_t cmdid);
 int tup_db_write_outputs(tupid_t cmdid);
+int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
+			struct rb_root *ignore_tree);
 
 #endif
