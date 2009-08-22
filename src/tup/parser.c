@@ -200,8 +200,6 @@ out_close_vdb:
 			if(te->type == TUP_NODE_GENERATED)
 				g->delete_count++;
 		}
-		if(tup_db_unflag_create(tf.tupid) < 0)
-			return -1;
 	}
 
 	return rc;
