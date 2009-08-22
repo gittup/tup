@@ -42,6 +42,8 @@ struct graph {
 	int num_nodes;
 	struct rb_root tree;
 	int count_flags;
+	struct list_head delete_list;
+	int delete_count;
 };
 
 struct node *find_node(struct graph *g, tupid_t tupid);

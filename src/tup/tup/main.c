@@ -666,7 +666,7 @@ static int rm(int argc, char **argv)
 			fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
 			return -1;
 		}
-		if(tup_del_id(dbn.tupid) < 0)
+		if(tup_del_id(dbn.tupid, dbn.type) < 0)
 			return -1;
 	}
 	if(tup_db_commit() < 0)

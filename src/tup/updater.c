@@ -156,6 +156,48 @@ int todo(int argc, char **argv)
 	return 0;
 }
 
+static int delete_files(struct graph *g)
+{
+	struct tree_entry *te;
+	int num_deleted = 0;
+
+	if(g->delete_count) {
+		printf("Deleting %i file%s\n", g->delete_count,
+		       g->delete_count == 1 ? "" : "s");
+	}
+	while(!list_empty(&g->delete_list)) {
+		te = list_entry(g->delete_list.next, struct tree_entry, list);
+
+		if(te->type == TUP_NODE_GENERATED) {
+			struct node tmpn;
+			int rc;
+
+			tmpn.dt = tup_db_select_dirname(te->tnode.tupid, &tmpn.name);
+			if(tmpn.dt < 0)
+				return -1;
+			if(dirtree_add(tmpn.dt, &tmpn.dirtree) < 0)
+				return -1;
+			tmpn.type = te->type;
+
+			show_progress(num_deleted, g->delete_count, &tmpn);
+			num_deleted++;
+
+			rc = delete_file(tmpn.dt, tmpn.name);
+			free(tmpn.name);
+			if(rc < 0)
+				return -1;
+		}
+		if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
+			return -1;
+		list_del(&te->list);
+		free(te);
+	}
+	if(g->delete_count) {
+		show_progress(g->delete_count, g->delete_count, NULL);
+	}
+	return 0;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
@@ -172,6 +214,8 @@ static int process_create_nodes(void)
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
+	if(rc == 0)
+		rc = delete_files(&g);
 	if(rc == 0) {
 		tup_db_commit();
 	} else if(rc == -1) {
@@ -909,7 +953,6 @@ static void show_progress(int sum, int tot, struct node *n)
 	if(do_show_progress && tot) {
 		const int max = 11;
 		const char *color = "";
-		const char *endcolor = "";
 		char *name;
 		int name_sz = 0;
 		int fill;
@@ -944,17 +987,17 @@ static void show_progress(int sum, int tot, struct node *n)
 					name_sz++;
 			}
 			if(n->type == TUP_NODE_DIR) {
-				color = "[33m";
-				endcolor = "[0m";
+				color = "[33";
 			} else if(n->type == TUP_NODE_CMD) {
-				color = "[34m";
-				endcolor = "[0m";
+				color = "[34";
+			} else if(n->type == TUP_NODE_GENERATED) {
+				color = "[35";
 			}
-			printf("[[34;07m%.*s[0m] ", sizeof(buf), buf);
+			printf("[%s;07m%.*s[0m] ", color, sizeof(buf), buf);
 			if(n->dirtree && n->dirtree->parent) {
 				print_dirtree(n->dirtree);
 			}
-			printf("%s%.*s%s\n", color, name_sz, name, endcolor);
+			printf("%sm%.*s[0m\n", color, name_sz, name);
 		} else {
 			printf("[[07;32m%.*s[0m]\n", sizeof(buf), buf);
 		}

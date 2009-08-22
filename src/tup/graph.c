@@ -98,6 +98,8 @@ int create_graph(struct graph *g, int count_flags)
 
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
+	INIT_LIST_HEAD(&g->delete_list);
+	g->delete_count = 0;
 
 	g->tree.rb_node = NULL;
 

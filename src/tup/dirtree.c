@@ -10,6 +10,7 @@
 
 static struct rb_root tree = RB_ROOT;
 
+static struct dirtree *dirtree_find(tupid_t dt);
 static int do_open(struct dirtree *dirt);
 
 int dirtree_add(tupid_t dt, struct dirtree **dest)
@@ -50,15 +51,6 @@ int dirtree_add(tupid_t dt, struct dirtree **dest)
 	return 0;
 }
 
-struct dirtree *dirtree_find(tupid_t dt)
-{
-	struct tupid_tree *tnode;
-	tnode = tupid_tree_search(&tree, dt);
-	if(!tnode)
-		return NULL;
-	return container_of(tnode, struct dirtree, tnode);
-}
-
 int dirtree_open(tupid_t dt)
 {
 	struct dirtree *dirt;
@@ -70,6 +62,15 @@ int dirtree_open(tupid_t dt)
 		return -1;
 	}
 	return do_open(dirt);
+}
+
+static struct dirtree *dirtree_find(tupid_t dt)
+{
+	struct tupid_tree *tnode;
+	tnode = tupid_tree_search(&tree, dt);
+	if(!tnode)
+		return NULL;
+	return container_of(tnode, struct dirtree, tnode);
 }
 
 static int do_open(struct dirtree *dirt)

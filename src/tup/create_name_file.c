@@ -16,7 +16,6 @@ struct id_flags {
 	int flags;
 };
 
-static int tup_del_id_internal(tupid_t tupid, int quiet);
 static int tup_del_id_type(tupid_t tupid, int type, int quiet);
 static int ghost_to_file(struct db_node *dbn);
 
@@ -233,27 +232,14 @@ int tup_file_del(tupid_t dt, const char *file)
 	return tup_del_id_type(dbn.tupid, dbn.type, 0);
 }
 
-int tup_del_id(tupid_t tupid)
+int tup_del_id(tupid_t tupid, int type)
 {
-	return tup_del_id_internal(tupid, 0);
+	return tup_del_id_type(tupid, type, 0);
 }
 
-int tup_del_id_quiet(tupid_t tupid)
+int tup_del_id_quiet(tupid_t tupid, int type)
 {
-	return tup_del_id_internal(tupid, 1);
-}
-
-static int tup_del_id_internal(tupid_t tupid, int quiet)
-{
-	int type;
-
-	if(tup_db_get_type(tupid, &type) < 0)
-		return -1;
-	if(type < 0) {
-		fprintf(stderr, "Unable to find type of node: %lli\n", tupid);
-		return -1;
-	}
-	return tup_del_id_type(tupid, type, quiet);
+	return tup_del_id_type(tupid, type, 1);
 }
 
 static int tup_del_id_type(tupid_t tupid, int type, int quiet)
@@ -262,18 +248,23 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
+		if(quiet) {
+			fprintf(stderr, "tup error: tup_del_id_type() with TUP_NODE_DIR shouldn't be quiet.\n");
+			return -1;
+		}
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
 	}
 
 	/* If a file was deleted and it was created by a command, set the
 	 * command's flags to modify. For example, if foo.o was deleted, we set
-	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed.
+	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed. This
+	 * only happens if a file was deleted outside of the parser (!quiet).
 	 *
 	 * This is really just to mimic what people would expect from make.
 	 * Randomly deleting object files is pretty stupid.
 	 */
-	if(type == TUP_NODE_GENERATED) {
+	if(type == TUP_NODE_GENERATED && !quiet) {
 		int modified = 0;
 
 		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
@@ -282,9 +273,15 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.
 		 */
-		if(modified == 1 && !quiet)
+		if(modified == 1)
 			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
-		if(tup_db_delete_file(tupid) < 0)
+	}
+
+	if(type == TUP_NODE_FILE) {
+		/* It's possible this is a file that was included by a Tupfile.
+		 * Try to set any dependent directory flags.
+		 */
+		if(tup_db_set_dependent_dir_flags(tupid) < 0)
 			return -1;
 	}
 
@@ -296,17 +293,13 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 		if(tup_db_modify_cmds_by_input(tupid) < 0)
 			return -1;
 
-		/* Re-parse the current Tupfile (the updater automatically
-		 * parses any dependent directories).
-		 */
-		if(tup_db_add_dir_create_list(tupid) < 0)
-			return -1;
-
-		/* It's possible this is a file that was included by a Tupfile.
-		 * Try to set any dependent directory flags.
-		 */
-		if(tup_db_set_dependent_dir_flags(tupid) < 0)
-			return -1;
+		if(!quiet) {
+			/* Re-parse the current Tupfile (the updater
+			 * automatically parses any dependent directories).
+			 */
+			if(tup_db_add_dir_create_list(tupid) < 0)
+				return -1;
+		}
 	}
 	if(delete_name_file(tupid) < 0)
 		return -1;

@@ -45,14 +45,3 @@ int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data)
 
 	return 0;
 }
-
-void tupid_tree_remove(struct rb_root *root, tupid_t tupid)
-{
-	struct tupid_tree *tt;
-
-	tt = tupid_tree_search(root, tupid);
-	if(!tt)
-		return;
-	rb_erase(&tt->rbn, root);
-	free(tt);
-}

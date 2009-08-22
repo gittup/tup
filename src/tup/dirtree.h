@@ -10,7 +10,6 @@ struct dirtree {
 };
 
 int dirtree_add(tupid_t dt, struct dirtree **dest);
-struct dirtree *dirtree_find(tupid_t dt);
 int dirtree_open(tupid_t dt);
 
 #endif

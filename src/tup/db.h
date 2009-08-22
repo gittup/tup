@@ -2,6 +2,7 @@
 #define tup_db_h
 
 #include "tupid.h"
+#include "tupid_tree.h"
 #include "linux/list.h"
 #include "linux/rbtree.h"
 #include <stdio.h>
@@ -39,6 +40,12 @@ struct half_entry {
 	tupid_t dt;
 	tupid_t sym;
 	int type;
+};
+
+struct tree_entry {
+	struct tupid_tree tnode;
+	int type;
+	struct list_head list;
 };
 
 enum TUP_NODE_TYPE {
@@ -92,13 +99,11 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 				void *arg, tupid_t dt, const char *glob);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
-int tup_db_delete_file(tupid_t tupid);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
 tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
-int tup_db_get_type(tupid_t tupid, int *type);
 int tup_db_set_type(tupid_t tupid, int type);
 int tup_db_set_sym(tupid_t tupid, tupid_t sym);
 int tup_db_set_mtime(tupid_t tupid, time_t mtime);
