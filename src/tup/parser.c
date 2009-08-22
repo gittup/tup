@@ -438,13 +438,15 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	parent = curdir;
 	num_dotdots = 0;
 	while(parent != DOT_DT) {
-		tupid_t new;
-		new = tup_db_parent(parent);
-		if(new < 0) {
+		struct dirtree *dirt;
+
+		if(dirtree_add(parent, &dirt) < 0)
+			return -1;
+		if(!dirt || !dirt->parent) {
 			fprintf(stderr, "Error finding parent node of ID %lli. Database might be hosed.\n", parent);
 			return -1;
 		}
-		parent = new;
+		parent = dirt->parent->tnode.tupid;
 		num_dotdots++;
 	}
 	path = malloc(num_dotdots * 3 + trlen + 1);

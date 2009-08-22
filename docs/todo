@@ -80,6 +80,8 @@ tup try: ': |> echo foo > %o |> bar', then change the Tupfile to remove the rule
 
 gittup try: generated header becomes a regular file (eg: replace a symlinked header with a regular copy) - does this hose someone who clones gittup?
 
+indent dependent dirs while parsing?
+
 html:
   proof: no clean target
   graphs
