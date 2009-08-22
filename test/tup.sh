@@ -158,9 +158,25 @@ update_fail()
 		exit 1
 	else
 		echo "Update expected to fail, and did"
-		:
 	fi
 	check_dup_links
+}
+
+update_fail_msg()
+{
+	if tup upd 2>.tupoutput; then
+		echo "*** Expected update to fail, but didn't" 1>&2
+		exit 1
+	else
+		if grep "$1" .tupoutput > /dev/null; then
+			echo "Update expected to fail, and failed for the right reason."
+		else
+			echo "*** Update expect to fail because of: $1" 1>&2
+			echo "*** But failed because of:" 1>&2
+			cat .tupoutput 1>&2
+			exit 1
+		fi
+	fi
 }
 
 parse_fail()

@@ -3813,19 +3813,25 @@ static int new_sticky(struct tupid_tree *tt, void *data)
 static int del_sticky(struct tupid_tree *tt, void *data)
 {
 	struct write_input_data *wid = data;
-	struct db_node dbn;
 
-	/* Removing a sticky link is fine if the node is going to be deleted. */
-	if(tupid_tree_search(wid->ignore_tree, tt->tupid) != NULL)
-		return 0;
+	/* Removing a sticky link is fine if the node is going to be deleted,
+	 * but we have to run the command again to make sure the link wasn't
+	 * still required.
+	 */
+	if(tupid_tree_search(wid->ignore_tree, tt->tupid) != NULL) {
+		if(tup_db_add_modify_list(wid->cmdid) < 0)
+			return -1;
+	} else {
+		struct db_node dbn;
 
-	if(tup_db_select_dbn_by_id(tt->tupid, &dbn) < 0)
-		return -1;
-	if(dbn.type == TUP_NODE_GENERATED) {
-		fprintf(stderr, "Error: Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.\n");
-		fprintf(stderr, " -- Command ID: %lli\n", wid->cmdid);
-		tup_db_print(stderr, tt->tupid);
-		return -1;
+		if(tup_db_select_dbn_by_id(tt->tupid, &dbn) < 0)
+			return -1;
+		if(dbn.type == TUP_NODE_GENERATED) {
+			fprintf(stderr, "Error: Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.\n");
+			fprintf(stderr, " -- Command ID: %lli\n", wid->cmdid);
+			tup_db_print(stderr, tt->tupid);
+			return -1;
+		}
 	}
 	if(tupid_tree_search(wid->normal_tree, tt->tupid) == NULL) {
 		/* Not a normal link, kill it */
