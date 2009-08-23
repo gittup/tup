@@ -1483,9 +1483,9 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 	/* The length may be an over-estimate, since it also contains any
 	 * nodes scheduled to be deleted.
 	 */
-	*s = malloc(*len);
+	*s = calloc(*len, 1);
 	if(!*s) {
-		perror("malloc");
+		perror("calloc");
 		return -1;
 	}
 	if(get_generated_nodelist(*s, dt, tree) < 0)
