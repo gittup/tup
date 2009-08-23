@@ -3788,6 +3788,7 @@ static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 				na = rb_next(na);
 			} else {
 				if(extra_b(ttb, data) < 0)
+					return -1;
 				nb = rb_next(nb);
 			}
 		}
