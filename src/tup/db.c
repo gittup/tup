@@ -2230,7 +2230,8 @@ out_reset:
 
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 {
-	int rc;
+	int rc = 0;
+	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
 	static char s[] = "select from_id from link where to_id=?";
 
@@ -2250,25 +2251,26 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
-	if(rc == SQLITE_DONE) {
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
 		goto out_reset;
 	}
-	if(rc != SQLITE_ROW) {
+	if(dbrc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 	*incoming = sqlite3_column_int64(*stmt, 0);
 
 	/* Do a quick double-check to make sure there isn't a duplicate link. */
-	rc = sqlite3_step(*stmt);
-	if(rc != SQLITE_DONE) {
-		if(rc != SQLITE_ROW) {
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc != SQLITE_DONE) {
+		if(dbrc != SQLITE_ROW) {
 			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 			return -1;
 		}
 		fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
-		return -1;
+		rc = -1;
+		goto out_reset;
 	}
 
 out_reset:
@@ -2277,7 +2279,7 @@ out_reset:
 		return -1;
 	}
 
-	return 0;
+	return rc;
 }
 
 int tup_db_delete_links(tupid_t tupid)
