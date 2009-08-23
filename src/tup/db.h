@@ -45,7 +45,6 @@ struct half_entry {
 struct tree_entry {
 	struct tupid_tree tnode;
 	int type;
-	struct list_head list;
 };
 
 enum TUP_NODE_TYPE {
@@ -110,7 +109,7 @@ int tup_db_set_mtime(tupid_t tupid, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 				    struct rb_root *tree);
-int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree);
+int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree, int *count);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
@@ -158,8 +157,8 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 int tup_db_write_vars(void);
 
 /* Tree operations */
-int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree);
-int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree);
+int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree, int *count);
+int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree, int *count);
 
 /* tmp table management */
 int tup_db_request_tmp_list(void);

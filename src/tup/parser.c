@@ -76,7 +76,6 @@ struct tupfile {
 	int dfd;
 	struct graph *g;
 	struct vardb vdb;
-	struct rb_root tree;
 	int ign;
 };
 
@@ -138,7 +137,6 @@ int parse(struct node *n, struct graph *g)
 	tf.tupid = n->tnode.tupid;
 	tf.g = g;
 	tf.ign = 0;
-	tf.tree.rb_node = NULL;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
 
@@ -151,13 +149,13 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_cmds_to_tree(tf.tupid, &tf.tree) < 0)
+	if(tup_db_cmds_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
-	if(tup_db_cmd_outputs_to_tree(tf.tupid, &tf.tree) < 0)
+	if(tup_db_cmd_outputs_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
 	if(tup_db_delete_dependent_dir_links(tf.tupid) < 0)
 		return -1;
-	if(tup_db_delete_gitignore(tf.tupid, &tf.tree) < 0)
+	if(tup_db_delete_gitignore(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
 
 	tf.dfd = dirtree_open(tf.tupid);
@@ -189,18 +187,6 @@ out_close_dfd:
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
-
-	if(rc == 0) {
-		struct rb_node *rbn;
-		while((rbn = rb_first(&tf.tree)) != NULL) {
-			struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
-			struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
-			rb_erase(rbn, &tf.tree);
-			list_add(&te->list, &g->delete_list);
-			if(te->type == TUP_NODE_GENERATED)
-				g->delete_count++;
-		}
-	}
 
 	return rc;
 }
@@ -508,16 +494,18 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	return include_name_list(tf, &nl, cwd, clen);
 }
 
-static void tree_entry_remove(struct rb_root *tree, tupid_t tupid)
+static void tree_entry_remove(struct graph *g, tupid_t tupid)
 {
 	struct tree_entry *te;
 	struct tupid_tree *tt;
 
-	tt = tupid_tree_search(tree, tupid);
+	tt = tupid_tree_search(&g->delete_tree, tupid);
 	if(!tt)
 		return;
-	rb_erase(&tt->rbn, tree);
+	rb_erase(&tt->rbn, &g->delete_tree);
 	te = container_of(tt, struct tree_entry, tnode);
+	if(te->type == TUP_NODE_GENERATED)
+		g->delete_count--;
 	free(te);
 }
 
@@ -534,7 +522,7 @@ static int gitignore(struct tupfile *tf)
 			git_root = 1;
 	}
 
-	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->tree) < 0)
+	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_tree) < 0)
 		return -1;
 	if(s || git_root == 1 || tf->tupid == 1) {
 		struct db_node dbn;
@@ -545,7 +533,7 @@ static int gitignore(struct tupfile *tf)
 			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
 				return -1;
 		} else {
-			tree_entry_remove(&tf->tree, dbn.tupid);
+			tree_entry_remove(tf->g, dbn.tupid);
 		}
 
 		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
@@ -1086,7 +1074,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			tup_db_print(stderr, dbn.tupid);
 			return -1;
 		}
-		if(tupid_tree_search(&tf->tree, dbn.tupid) != NULL) {
+		if(tupid_tree_search(&tf->g->delete_tree, dbn.tupid) != NULL) {
 			fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
@@ -1145,7 +1133,7 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 	int namelen;
 	struct name_list_entry *nle;
 
-	if(tupid_tree_search(&args->tf->tree, dbn->tupid) != NULL)
+	if(tupid_tree_search(&args->tf->g->delete_tree, dbn->tupid) != NULL)
 		return 0;
 
 	namelen = strlen(dbn->name);
@@ -1306,7 +1294,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(cmdid < 0)
 		return -1;
 
-	tree_entry_remove(&tf->tree, cmdid);
+	tree_entry_remove(tf->g, cmdid);
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
@@ -1315,12 +1303,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * commands still work (since they don't go through the normal
 		 * server process to create links).
 		 */
-		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->g->delete_tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
 		delete_name_list_entry(&onl, onle);
-		tree_entry_remove(&tf->tree, onle->tupid);
+		tree_entry_remove(tf->g, onle->tupid);
 	}
 
 	if(tup_db_write_outputs(cmdid) < 0)
@@ -1336,7 +1324,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(add_tupid_tree(nle, &tree, cmdid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &tree, &tf->tree) < 0)
+	if(tup_db_write_inputs(cmdid, &tree, &tf->g->delete_tree) < 0)
 		return -1;
 	return 0;
 }

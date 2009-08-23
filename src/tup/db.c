@@ -1600,10 +1600,31 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree)
+static int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type,
+			  int *count)
+{
+	struct tree_entry *te;
+
+	te = malloc(sizeof *te);
+	if(!te) {
+		perror("malloc");
+		return -1;
+	}
+	te->tnode.tupid = tupid;
+	te->type = type;
+	if(tupid_tree_insert(tree, &te->tnode) < 0) {
+		fprintf(stderr, "[31m DUP IN DELETE LIST[0m\n");
+		free(te);
+	} else {
+		if(type == TUP_NODE_GENERATED)
+			(*count)++;
+	}
+	return 0;
+}
+
+int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree, int *count)
 {
 	struct db_node dbn;
-	struct tree_entry *te;
 
 	if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
 		return -1;
@@ -1611,14 +1632,8 @@ int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree)
 	if(dbn.tupid < 0)
 		return 0;
 
-	te = malloc(sizeof *te);
-	if(!te) {
-		perror("malloc");
+	if(tree_entry_add(tree, dbn.tupid, dbn.type, count) < 0)
 		return -1;
-	}
-	te->tnode.tupid = dbn.tupid;
-	te->type = dbn.type;
-	tupid_tree_insert(tree, &te->tnode);
 
 	return 0;
 }
@@ -2326,12 +2341,13 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-static int tree_add_tupids(struct rb_root *tree, sqlite3_stmt *stmt)
+static int tree_add_tupids(struct rb_root *tree, sqlite3_stmt *stmt, int *count)
 {
 	int dbrc;
 
 	while(1) {
-		struct tree_entry *te;
+		tupid_t tupid;
+		int type;
 
 		dbrc = sqlite3_step(stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -2342,18 +2358,15 @@ static int tree_add_tupids(struct rb_root *tree, sqlite3_stmt *stmt)
 			return -1;
 		}
 
-		te = malloc(sizeof *te);
-		if(!te) {
-			perror("malloc");
+		tupid = sqlite3_column_int64(stmt, 0);
+		type = sqlite3_column_int(stmt, 1);
+
+		if(tree_entry_add(tree, tupid, type, count) < 0)
 			return -1;
-		}
-		te->tnode.tupid = sqlite3_column_int64(stmt, 0);
-		te->type = sqlite3_column_int(stmt, 1);
-		tupid_tree_insert(tree, &te->tnode);
 	}
 }
 
-int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree)
+int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree, int *count)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_CMDS_TO_TREE];
@@ -2377,7 +2390,7 @@ int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree)
 		return -1;
 	}
 
-	rc = tree_add_tupids(tree, *stmt);
+	rc = tree_add_tupids(tree, *stmt, count);
 
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
@@ -2387,7 +2400,7 @@ int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree)
 	return rc;
 }
 
-int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree)
+int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree, int *count)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_CMD_OUTPUTS_TO_TREE];
@@ -2411,7 +2424,7 @@ int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree)
 		return -1;
 	}
 
-	rc = tree_add_tupids(tree, *stmt);
+	rc = tree_add_tupids(tree, *stmt, count);
 
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));

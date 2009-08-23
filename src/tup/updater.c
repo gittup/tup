@@ -158,15 +158,16 @@ int todo(int argc, char **argv)
 
 static int delete_files(struct graph *g)
 {
-	struct tree_entry *te;
+	struct rb_node *rbn;
 	int num_deleted = 0;
 
 	if(g->delete_count) {
 		printf("Deleting %i file%s\n", g->delete_count,
 		       g->delete_count == 1 ? "" : "s");
 	}
-	while(!list_empty(&g->delete_list)) {
-		te = list_entry(g->delete_list.next, struct tree_entry, list);
+	while((rbn = rb_first(&g->delete_tree)) != NULL) {
+		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 
 		if(te->type == TUP_NODE_GENERATED) {
 			struct node tmpn;
@@ -189,7 +190,7 @@ static int delete_files(struct graph *g)
 		}
 		if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
 			return -1;
-		list_del(&te->list);
+		rb_erase(rbn, &g->delete_tree);
 		free(te);
 	}
 	if(g->delete_count) {

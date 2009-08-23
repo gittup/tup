@@ -42,7 +42,7 @@ struct graph {
 	int num_nodes;
 	struct rb_root tree;
 	int count_flags;
-	struct list_head delete_list;
+	struct rb_root delete_tree;
 	int delete_count;
 };
 
