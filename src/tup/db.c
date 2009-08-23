@@ -2129,8 +2129,12 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree)
 	if(rc < 0)
 		return -1;
 	if(incoming != -1) {
-		if(tupid_tree_search(tree, incoming) != NULL)
+		if(tupid_tree_search(tree, incoming) != NULL) {
+			/* Delete any old links (t6029) */
+			if(link_remove(incoming, b) < 0)
+				return -1;
 			incoming = -1;
+		}
 	}
 	/* See if we already own the link, or if the link doesn't exist yet */
 	if(a == incoming || incoming == -1) {
