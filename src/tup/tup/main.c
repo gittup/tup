@@ -526,7 +526,7 @@ static int touch(int argc, char **argv)
 
 	for(x=1; x<argc; x++) {
 		struct stat buf;
-		const char *file;
+		struct path_element *pel = NULL;
 		tupid_t dt;
 
 		if(lstat(argv[x], &buf) < 0) {
@@ -585,16 +585,16 @@ static int touch(int argc, char **argv)
 			}
 		}
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, NULL, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
 		if(S_ISDIR(buf.st_mode)) {
-			if(create_dir_file(dt, file) < 0)
+			if(create_dir_file(dt, pel->path) < 0)
 				return -1;
 		} else if(S_ISREG(buf.st_mode)) {
-			if(tup_file_mod_mtime(dt, file, buf.st_mtime, 1) < 0)
+			if(tup_file_mod_mtime(dt, pel->path, buf.st_mtime, 1) < 0)
 				return -1;
 		} else if(S_ISLNK(buf.st_mode)) {
 			int fd;
@@ -603,10 +603,11 @@ static int touch(int argc, char **argv)
 				perror(".");
 				return -1;
 			}
-			if(update_symlink_fileat(dt, fd, file, buf.st_mtime, 1) < 0)
+			if(update_symlink_fileat(dt, fd, pel->path, buf.st_mtime, 1) < 0)
 				return -1;
 			close(fd);
 		}
+		free(pel);
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -625,17 +626,18 @@ static int node(int argc, char **argv)
 		return -1;
 	for(x=1; x<argc; x++) {
 		tupid_t dt;
-		const char *file;
+		struct path_element *pel = NULL;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, NULL, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(create_name_file(dt, file, -1) < 0) {
-			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", file, dt);
+		if(create_name_file(dt, pel->path, -1) < 0) {
+			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", pel->path, dt);
 			return -1;
 		}
+		free(pel);
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -654,20 +656,21 @@ static int rm(int argc, char **argv)
 		return -1;
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
-		const char *file;
+		struct path_element *pel = NULL;
 		tupid_t dt;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &file, NULL, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, NULL, 0);
 		if(dt < 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_db_select_dbn(dt, file, &dbn) < 0) {
-			fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
+		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
+			fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 			return -1;
 		}
 		if(tup_del_id(dbn.tupid, dbn.type) < 0)
 			return -1;
+		free(pel);
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -776,7 +779,7 @@ static int fake_mtime(int argc, char **argv)
 	time_t mtime;
 	tupid_t dt;
 	tupid_t sub_dir_dt;
-	const char *file;
+	struct path_element *pel = NULL;
 
 	if(argc != 3) {
 		fprintf(stderr, "Error: fake_mtime requires a file and an mtime.\n");
@@ -785,18 +788,19 @@ static int fake_mtime(int argc, char **argv)
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
-	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &file, NULL, 0);
+	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &pel, NULL, 0);
 	if(dt < 0) {
 		fprintf(stderr, "Error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
-	if(tup_db_select_dbn(dt, file, &dbn) < 0) {
-		fprintf(stderr, "Unable to find node '%s' in dir %lli\n", file, dt);
+	if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
+		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
 	mtime = strtol(argv[2], NULL, 0);
 	if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
 		return -1;
+	free(pel);
 	return 0;
 }
 

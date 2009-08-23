@@ -108,7 +108,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 
 	while(!list_empty(&info->write_list)) {
 		tupid_t newdt;
-		const char *file;
+		struct path_element *pel = NULL;
 
 		w = list_entry(info->write_list.next, struct file_entry, list);
 
@@ -138,17 +138,18 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &file, &symlist, 0);
+		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, &symlist, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
 		}
-		if(!file) {
-			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final file pointer.[0m\n");
+		if(!pel) {
+			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
-		if(tup_db_select_dbn(newdt, file, &dbn) < 0)
+		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
 			return -1;
+		free(pel);
 		if(sym_follow(&dbn, &symlist) < 0)
 			return -1;
 		if(!list_empty(&symlist)) {
@@ -186,7 +187,7 @@ out_skip:
 	while(!list_empty(&info->sym_list)) {
 		struct sym_entry *sym;
 		struct db_node dbn_link;
-		const char *file;
+		struct path_element *pel = NULL;
 		tupid_t link_dt;
 
 		sym = list_entry(info->sym_list.next, struct sym_entry, list);
@@ -224,20 +225,25 @@ out_skip:
 		}
 
 		/* TODO: Don't need symlist? */
-		link_dt = find_dir_tupid_dt(dt, sym->from, &file, NULL, 1);
+		link_dt = find_dir_tupid_dt(dt, sym->from, &pel, NULL, 1);
 		if(link_dt < 0)
 			return -1;
 		/* Skip files outside of .tup */
 		if(link_dt == 0)
 			goto skip_sym;
 
-		if(tup_db_select_dbn(link_dt, file, &dbn_link) < 0)
+		if(!pel) {
+			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
+			return -1;
+		}
+		if(tup_db_select_dbn_part(link_dt, pel->path, pel->len, &dbn_link) < 0)
 			return -1;
 		if(dbn_link.tupid < 0) {
-			dbn_link.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST, -1);
+			dbn_link.tupid = tup_db_node_insert(link_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
 			if(dbn_link.tupid < 0)
 				return -1;
 		}
+		free(pel);
 
 		if(tup_db_set_sym(dbn.tupid, dbn_link.tupid) < 0)
 			return -1;
@@ -303,11 +309,11 @@ skip_read:
 	}
 
 	while(!list_empty(&info->ghost_list)) {
-		const char *file;
+		struct path_element *pel;
 		tupid_t newdt;
 
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
-		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &file, &symlist, 1);
+		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &pel, &symlist, 1);
 		if(newdt < 0) {
 			fprintf(stderr, "Error finding dir for '%s' relative to dir %lli\n", g->filename, dt);
 			return 0;
@@ -315,31 +321,32 @@ skip_read:
 		if(newdt == 0)
 			goto skip_ghost;
 
-		if(file) {
-			if(tup_db_select_dbn(newdt, file, &dbn) < 0)
-				return -1;
-			if(dbn.tupid < 0) {
-				dbn.tupid = tup_db_node_insert(newdt, file, -1, TUP_NODE_GHOST, -1);
-				if(dbn.tupid < 0)
-					return -1;
-			} else {
-				if(sym_follow(&dbn, &symlist) < 0)
-					return -1;
-			}
-
-			while(!list_empty(&symlist)) {
-				he = list_entry(symlist.next, struct half_entry, list);
-				if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
-					return -1;
-				list_del(&he->list);
-				free(he);
-			}
-			if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
-				return -1;
-		} else {
-			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
+		if(!pel) {
+			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final pel pointer in find_dir_tupid_dt_pg()[0m\n");
 			return -1;
 		}
+
+		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
+			return -1;
+		if(dbn.tupid < 0) {
+			dbn.tupid = tup_db_node_insert(newdt, pel->path, pel->len, TUP_NODE_GHOST, -1);
+			if(dbn.tupid < 0)
+				return -1;
+		} else {
+			if(sym_follow(&dbn, &symlist) < 0)
+				return -1;
+		}
+		free(pel);
+
+		while(!list_empty(&symlist)) {
+			he = list_entry(symlist.next, struct half_entry, list);
+			if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
+				return -1;
+			list_del(&he->list);
+			free(he);
+		}
+		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
+			return -1;
 
 skip_ghost:
 		del_entry(g);

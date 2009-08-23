@@ -47,7 +47,7 @@ struct path_list {
 	struct list_head list;
 	/* For files: */
 	char *path;
-	const char *file;
+	struct path_element *pel;
 	tupid_t dt;
 	/* For bins: */
 	struct bin *bin;
@@ -116,7 +116,7 @@ static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
-static char *tup_printf(const char *cmd, struct name_list *nl,
+static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			struct name_list *onl, const char *ext, int extlen);
 static char *eval(struct tupfile *tf, const char *string,
 		  const char *cwd, int clen);
@@ -457,17 +457,22 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	for(x=0; x<=num_dotdots; x++, p+=3, plen-=3) {
 		struct db_node dbn;
 		tupid_t dt;
-		const char *last;
+		struct path_element *pel = NULL;
 		LIST_HEAD(sym_list);
 
-		dt = find_dir_tupid_dt(curdir, p, &last, &sym_list, 0);
+		dt = find_dir_tupid_dt(curdir, p, &pel, &sym_list, 0);
 		if(dt < 0) {
 			fprintf(stderr, "Error: Unable to find directory for '%s' relative to dir %lli\n", p, curdir);
 			return -1;
 		}
-		if(tup_db_select_dbn(dt, last, &dbn) < 0) {
+		if(!pel) {
+			fprintf(stderr, "[31mtup internal error: didn't get a final pel pointer in include_rules()[0m\n");
 			return -1;
 		}
+		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
+			return -1;
+		}
+		free(pel);
 		if(dbn.tupid < 0) {
 			/* Tuprules.tup doesn't exist here, go to the next
 			 * dir.
@@ -948,7 +953,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			return -1;
 		}
 		pl->path = NULL;
-		pl->file = NULL;
+		pl->pel = NULL;
 		pl->dt = 0;
 		pl->bin = NULL;
 
@@ -975,18 +980,18 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 		} else {
 			/* Path */
 			pl->path = p;
-			pl->dt = find_dir_tupid_dt(dt, p, &pl->file, symlist, 0);
+			pl->dt = find_dir_tupid_dt(dt, p, &pl->pel, symlist, 0);
 			if(pl->dt <= 0) {
 				fprintf(stderr, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
 			}
-			if(pl->path == pl->file) {
+			if(pl->path == pl->pel->path) {
 				pl->path = NULL;
 			} else {
 				/* File points to somewhere later in the path,
 				 * so set the last '/' to 0.
 				 */
-				pl->path[pl->file-pl->path-1] = 0;
+				pl->path[pl->pel->path - pl->path - 1] = 0;
 			}
 		}
 		list_add_tail(&pl->list, plist);
@@ -1037,52 +1042,62 @@ static int get_name_list(struct tupfile *tf, struct list_head *plist,
 	return 0;
 }
 
+static int char_find(const char *s, int len, const char *list)
+{
+	int x;
+	for(x=0; x<len; x++) {
+		const char *p;
+		for(p=list; *p; p++) {
+			if(s[x] == *p)
+				return 1;
+		}
+	}
+	return 0;
+}
+
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl)
 {
 	struct build_name_list_args args;
-	int pos;
 
 	if(pl->path != NULL) {
-		/* Note that dirlen should be pl->file - pl->path - 1,
+		/* Note that dirlen should be pl->pel->path - pl->path - 1,
 		 * but we add 1 to account for the trailing '/' that
 		 * will be added (since it won't be added in the next case).
 		 */
 		args.dir = pl->path;
-		args.dirlen = pl->file-pl->path;
+		args.dirlen = pl->pel->path - pl->path;
 	} else {
 		args.dir = "";
 		args.dirlen = 0;
 	}
 	args.nl = nl;
 	args.tf = tf;
-	pos = strcspn(pl->file, "*?[");
-	/* If no wildcard characters are found, pos is set to the ending nul */
-	if(pl->file[pos] == 0) {
+	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct db_node dbn;
 
-		if(tup_db_select_dbn(pl->dt, pl->file, &dbn) < 0) {
+		if(tup_db_select_dbn_part(pl->dt, pl->pel->path, pl->pel->len, &dbn) < 0) {
 			return -1;
 		}
 		if(dbn.tupid < 0) {
-			fprintf(stderr, "Error: Explicitly named file '%s' not found in subdir %lli.\n", pl->file, pl->dt);
+			fprintf(stderr, "Error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
 		if(dbn.type == TUP_NODE_GHOST) {
-			fprintf(stderr, "Error: Explicitly named file '%s' is a ghost file, so it can't be used as an input.\n", pl->file);
+			fprintf(stderr, "Error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			tup_db_print(stderr, dbn.tupid);
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->delete_tree, dbn.tupid) != NULL) {
-			fprintf(stderr, "Error: Explicitly named file '%s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->file, pl->dt);
+			fprintf(stderr, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
 		if(build_name_list_cb(&args, &dbn) < 0)
 			return -1;
 	} else {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->file) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len) < 0)
 			return -1;
 	}
 	return 0;
@@ -1228,7 +1243,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			perror("malloc");
 			return -1;
 		}
-		onle->path = tup_printf(pl->file, nl, NULL, NULL, 0);
+		onle->path = tup_printf(pl->pel->path, pl->pel->len, nl, NULL, NULL, 0);
 		if(!onle->path)
 			return -1;
 		if(strchr(onle->path, '/')) {
@@ -1261,7 +1276,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
 
-	tcmd = tup_printf(r->command, nl, &onl, ext, extlen);
+	tcmd = tup_printf(r->command, -1, nl, &onl, ext, extlen);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, cwd, clen);
@@ -1363,7 +1378,17 @@ static void delete_name_list_entry(struct name_list *nl,
 	free(nle);
 }
 
-static char *tup_printf(const char *cmd, struct name_list *nl,
+static const char *find_char(const char *s, int len, char c)
+{
+	int x;
+	for(x=0; x<len; x++) {
+		if(s[x] == c)
+			return &s[x];
+	}
+	return NULL;
+}
+
+static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			struct name_list *onl, const char *ext, int extlen)
 {
 	struct name_list_entry *nle;
@@ -1374,8 +1399,13 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 	const char *spc;
 	int clen = strlen(cmd);
 
+	if(cmd_len == -1) {
+		cmd_len = strlen(cmd);
+	}
+	clen = cmd_len;
+
 	p = cmd;
-	while((p = strchr(p, '%')) !=  NULL) {
+	while((p = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
 		int paste_chars;
 
 		clen -= 2;
@@ -1435,7 +1465,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 
 	p = cmd;
 	x = 0;
-	while((next = strchr(p, '%')) !=  NULL) {
+	while((next = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
 		memcpy(&s[x], p, next-p);
 		x += next-p;
 
@@ -1517,7 +1547,7 @@ static char *tup_printf(const char *cmd, struct name_list *nl,
 		}
 		p = spc;
 	}
-	strcpy(&s[x], p);
+	memcpy(&s[x], p, cmd+cmd_len - p + 1);
 	if((signed)strlen(s) != clen) {
 		fprintf(stderr, "Error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
 		return NULL;

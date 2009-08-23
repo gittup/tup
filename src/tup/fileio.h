@@ -37,11 +37,12 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
 		      struct list_head *symlist);
 tupid_t find_dir_tupid(const char *dir);
-tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
-			  struct list_head *symlist, int sotgv);
+tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
+			  struct path_element **last, struct list_head *symlist,
+			  int sotgv);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     const char **last, struct list_head *symlist,
-			     int sotgv);
+			     struct path_element **last,
+			     struct list_head *symlist, int sotgv);
 
 int delete_file(tupid_t dt, const char *name);
 int delete_name_file(tupid_t tupid);

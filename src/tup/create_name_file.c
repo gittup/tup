@@ -49,6 +49,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 	struct db_node dbn;
 	struct db_node link_dbn;
 	tupid_t link_dt;
+	struct path_element *pel = NULL;
 	static char linkname[PATH_MAX];
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
@@ -76,17 +77,17 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 	}
 	linkname[rc] = 0;
 
-	link_dt = find_dir_tupid_dt(dt, linkname, &file, NULL, 1);
+	link_dt = find_dir_tupid_dt(dt, linkname, &pel, NULL, 1);
 	if(link_dt <= 0) {
 		fprintf(stderr, "Error: Unable to find directory ID for '%s' in update_symlink_file()\n", linkname);
 		return -1;
 	}
-	if(tup_db_select_dbn(link_dt, file, &link_dbn) < 0)
+	if(tup_db_select_dbn_part(link_dt, pel->path, pel->len, &link_dbn) < 0)
 		return -1;
 	if(link_dbn.tupid < 0) {
-		link_dbn.tupid = tup_db_node_insert(link_dt, file, -1, TUP_NODE_GHOST, -1);
+		link_dbn.tupid = tup_db_node_insert(link_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
 		if(link_dbn.tupid < 0) {
-			fprintf(stderr, "Error: Node '%s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", file, link_dt);
+			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, link_dt);
 			return -1;
 		}
 	}
@@ -310,17 +311,18 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist)
 {
-	const char *file = NULL;
+	struct path_element *pel = NULL;
 
 	dbn->tupid = -1;
 
-	dt = find_dir_tupid_dt(dt, path, &file, symlist, 0);
+	dt = find_dir_tupid_dt(dt, path, &pel, symlist, 0);
 	if(dt < 0)
 		return -1;
 
-	if(file) {
-		if(tup_db_select_dbn(dt, file, dbn) < 0)
+	if(pel) {
+		if(tup_db_select_dbn_part(dt, pel->path, pel->len, dbn) < 0)
 			return -1;
+		free(pel);
 		if(sym_follow(dbn, symlist) < 0)
 			return -1;
 		return dbn->tupid;
@@ -338,24 +340,25 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
 		      struct list_head *symlist)
 {
-	const char *file = NULL;
+	struct path_element *pel = NULL;
 
 	dbn->tupid = -1;
-	dt = find_dir_tupid_dt_pg(dt, pg, &file, symlist, 0);
+	dt = find_dir_tupid_dt_pg(dt, pg, &pel, symlist, 0);
 	if(dt < 0)
 		return -1;
 	/* File hidden from tup */
 	if(dt == 0)
 		return 0;
 
-	if(file) {
-		if(tup_db_select_dbn(dt, file, dbn) < 0)
+	if(pel) {
+		if(tup_db_select_dbn_part(dt, pel->path, pel->len, dbn) < 0)
 			return -1;
+		free(pel);
 		if(sym_follow(dbn, symlist) < 0)
 			return -1;
 		return dbn->tupid;
 	} else {
-		fprintf(stderr, "[31mtup internal error: get_dbn_dt_pg() didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
+		fprintf(stderr, "[31mtup internal error: get_dbn_dt_pg() didn't get a final pel pointer in find_dir_tupid_dt_pg()[0m\n");
 		return -1;
 	}
 }
@@ -367,8 +370,9 @@ tupid_t find_dir_tupid(const char *dir)
 	return get_dbn_dt(DOT_DT, dir, &dbn, NULL);
 }
 
-tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
-			  struct list_head *symlist, int sotgv)
+tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
+			  struct path_element **last, struct list_head *symlist,
+			  int sotgv)
 {
 	struct pel_group pg;
 	tupid_t tupid;
@@ -381,8 +385,8 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir, const char **last,
 }
 
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     const char **last, struct list_head *symlist,
-			     int sotgv)
+			     struct path_element **last,
+			     struct list_head *symlist, int sotgv)
 {
 	struct path_element *pel;
 	struct dirtree *dirt;
@@ -399,8 +403,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 
 	if(last) {
 		pel = list_entry(pg->path_list.prev, struct path_element, list);
-		*last = pel->path;
-		del_pel(pel);
+		*last = pel;
+		list_del(&pel->list);
 	} else {
 		/* TODO */
 		fprintf(stderr, "[31mBork[0m\n");

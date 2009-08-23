@@ -935,7 +935,8 @@ out_reset:
 }
 
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
-				void *arg, tupid_t dt, const char *glob)
+				void *arg, tupid_t dt, const char *glob,
+				int len)
 {
 	int rc;
 	int dbrc;
@@ -963,7 +964,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_text(*stmt, 4, glob, -1, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_text(*stmt, 4, glob, len, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
