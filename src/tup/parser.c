@@ -1195,26 +1195,6 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int add_tupid_tree(struct name_list_entry *nle, struct rb_root *tree,
-			  tupid_t cmdid)
-{
-	struct tupid_tree *tt;
-
-	tt = malloc(sizeof *tt);
-	if(!tt) {
-		perror("malloc");
-		return -1;
-	}
-	tt->tupid = nle->tupid;
-	if(tupid_tree_insert(tree, tt) < 0) {
-		fprintf(stderr, "Error: Duplicate input %lli found for command %lli: '%s'\n", nle->tupid, cmdid, nle->path);
-		tup_db_print(stderr, cmdid);
-		tup_db_print(stderr, nle->tupid);
-		return -1;
-	}
-	return 0;
-}
-
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   struct name_list *oonl, const char *cwd, int clen,
 		   const char *ext, int extlen)
@@ -1317,11 +1297,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(add_tupid_tree(nle, &tree, cmdid) < 0)
+		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
-		if(add_tupid_tree(nle, &tree, cmdid) < 0)
+		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
 	if(tup_db_write_inputs(cmdid, &tree, &tf->g->delete_tree) < 0)

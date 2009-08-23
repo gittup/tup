@@ -101,6 +101,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	struct db_node dbn;
 	struct half_entry *he;
 	int write_bork = 0;
+	struct rb_root read_tree = {NULL};
 	LIST_HEAD(symlist);
 
 	handle_unlink(info);
@@ -276,12 +277,12 @@ skip_sym:
 			goto skip_read;
 		while(!list_empty(&symlist)) {
 			he = list_entry(symlist.next, struct half_entry, list);
-			if(tup_db_add_read_list(he->tupid) < 0)
+			if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
 				return -1;
 			list_del(&he->list);
 			free(he);
 		}
-		if(tup_db_add_read_list(dbn.tupid) < 0)
+		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
 			return -1;
 
 skip_read:
@@ -296,7 +297,7 @@ skip_read:
 			fprintf(stderr, "Error: Unable to find tupid for variable named '%s'\n", r->filename);
 			return -1;
 		}
-		if(tup_db_add_read_list(dbn.tupid) < 0)
+		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -328,12 +329,12 @@ skip_read:
 
 			while(!list_empty(&symlist)) {
 				he = list_entry(symlist.next, struct half_entry, list);
-				if(tup_db_add_read_list(he->tupid) < 0)
+				if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
 					return -1;
 				list_del(&he->list);
 				free(he);
 			}
-			if(tup_db_add_read_list(dbn.tupid) < 0)
+			if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
 				return -1;
 		} else {
 			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final file pointer in find_dir_tupid_dt_pg()[0m\n");
@@ -343,10 +344,9 @@ skip_read:
 skip_ghost:
 		del_entry(g);
 	}
-	if(tup_db_check_read_list(cmdid) < 0)
+	if(tup_db_check_actual_inputs(cmdid, &read_tree) < 0)
 		return -1;
-	if(tup_db_clear_tmp_list() < 0)
-		return -1;
+	free_tupid_tree(&read_tree);
 	return 0;
 }
 
