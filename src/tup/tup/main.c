@@ -392,7 +392,7 @@ static int mlink(int argc, char **argv)
 	 */
 	int type;
 	int x;
-	tupid_t cmd_id;
+	tupid_t cmdid;
 	struct db_node dbn;
 
 	if(argc < 4) {
@@ -403,8 +403,8 @@ static int mlink(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	cmd_id = create_command_file(DOT_DT, argv[1]);
-	if(cmd_id < 0) {
+	cmdid = create_command_file(DOT_DT, argv[1]);
+	if(cmdid < 0) {
 		return -1;
 	}
 
@@ -431,10 +431,10 @@ static int mlink(int argc, char **argv)
 			return 1;
 
 		if(type == 0) {
-			if(tup_db_create_link(dbn.tupid, cmd_id, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		} else {
-			if(tup_db_create_link(cmd_id, dbn.tupid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}

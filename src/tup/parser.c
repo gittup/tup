@@ -1237,7 +1237,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
-	tupid_t cmd_id;
+	tupid_t cmdid;
 	LIST_HEAD(oplist);
 	struct rb_root tree = {NULL};
 
@@ -1301,12 +1301,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	free(tcmd);
 
-	cmd_id = create_command_file(tf->tupid, cmd);
+	cmdid = create_command_file(tf->tupid, cmd);
 	free(cmd);
-	if(cmd_id < 0)
+	if(cmdid < 0)
 		return -1;
 
-	tree_entry_remove(&tf->tree, cmd_id);
+	tree_entry_remove(&tf->tree, cmdid);
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
@@ -1315,7 +1315,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * commands still work (since they don't go through the normal
 		 * server process to create links).
 		 */
-		if(tup_db_create_unique_link(cmd_id, onle->tupid, &tf->tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -1323,20 +1323,20 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		tree_entry_remove(&tf->tree, onle->tupid);
 	}
 
-	if(tup_db_write_outputs(cmd_id) < 0)
+	if(tup_db_write_outputs(cmdid) < 0)
 		return -1;
 	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(add_tupid_tree(nle, &tree, cmd_id) < 0)
+		if(add_tupid_tree(nle, &tree, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &oonl->entries, list) {
-		if(add_tupid_tree(nle, &tree, cmd_id) < 0)
+		if(add_tupid_tree(nle, &tree, cmdid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmd_id, &tree, &tf->tree) < 0)
+	if(tup_db_write_inputs(cmdid, &tree, &tf->tree) < 0)
 		return -1;
 	return 0;
 }
