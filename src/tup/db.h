@@ -100,7 +100,6 @@ int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_open_tupid(tupid_t dt);
-tupid_t tup_db_parent(tupid_t tupid);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_type(tupid_t tupid, int type);

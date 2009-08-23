@@ -32,7 +32,6 @@ enum {
 	DB_DELETE_NODE,
 	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
-	DB_PARENT,
 	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
 	DB_SET_TYPE,
@@ -1214,49 +1213,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-tupid_t tup_db_parent(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_PARENT];
-	static char s[] = "select dir from node where id=?";
-	tupid_t parent;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(rc == SQLITE_DONE) {
-		parent = -1;
-		goto out_reset;
-	}
-	if(rc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		parent = -1;
-		goto out_reset;
-	}
-
-	parent = sqlite3_column_int64(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return parent;
 }
 
 int tup_db_is_root_node(tupid_t tupid)
