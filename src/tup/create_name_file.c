@@ -201,7 +201,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		}
 		if(modified) {
 			if(dbn.type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file may be overwritten on the next update.\n", file);
+				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
 				if(tup_db_modify_cmds_by_output(dbn.tupid, NULL) < 0)
 					return -1;
 			}

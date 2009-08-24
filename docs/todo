@@ -41,8 +41,6 @@ ifneq
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
-% flag for suffix so I can do CFLAGS_%(suffix) and set CFLAGS_S for assembly flags
-
 'tup g' shows too much info when a directory changes?
 
 access(2) support in ldpreload?
@@ -75,8 +73,6 @@ directly support symlinks in tup? Might make t5037 usable.
 	 Error: Unknown node 295915 named 'gcc' in create graph.
 
 sqlite style graphs for parser
-
-tup try: ': |> echo foo > %o |> bar', then change the Tupfile to remove the rule and replace bar with a manually created file before doing an update. Does the new manual file stay?
 
 gittup try: generated header becomes a regular file (eg: replace a symlinked header with a regular copy) - does this hose someone who clones gittup?
 

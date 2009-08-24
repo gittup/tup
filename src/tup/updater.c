@@ -173,20 +173,31 @@ static int delete_files(struct graph *g)
 			struct node tmpn;
 			int rc;
 
-			tmpn.dt = tup_db_select_dirname(te->tnode.tupid, &tmpn.name);
+			tmpn.dt = tup_db_select_dirname(tt->tupid, &tmpn.name);
 			if(tmpn.dt < 0)
 				return -1;
 			if(dirtree_add(tmpn.dt, &tmpn.dirtree) < 0)
 				return -1;
 			tmpn.type = te->type;
 
+			rc = tup_db_in_modify_list(tt->tupid);
+			if(rc < 0)
+				return -1;
+			if(rc == 1) {
+				if(tup_db_set_type(tt->tupid, TUP_NODE_FILE) < 0)
+					return -1;
+				tmpn.type = TUP_NODE_FILE;
+			}
+
 			show_progress(num_deleted, g->delete_count, &tmpn);
 			num_deleted++;
 
-			rc = delete_file(tmpn.dt, tmpn.name);
+			/* Only delete if the file wasn't modified (t6031) */
+			if(rc == 0) {
+				if(delete_file(tmpn.dt, tmpn.name) < 0)
+					return -1;
+			}
 			free(tmpn.name);
-			if(rc < 0)
-				return -1;
 		}
 		if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
 			return -1;
@@ -993,6 +1004,11 @@ static void show_progress(int sum, int tot, struct node *n)
 				color = "[34";
 			} else if(n->type == TUP_NODE_GENERATED) {
 				color = "[35";
+			} else if(n->type == TUP_NODE_FILE) {
+				/* If a generated node becomes a normal file
+				 * (t6031)
+				 */
+				color = "[37";
 			}
 			printf("[%s;07m%.*s[0m] ", color, sizeof(buf), buf);
 			if(n->dirtree && n->dirtree->parent) {
