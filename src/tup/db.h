@@ -181,7 +181,6 @@ int tup_db_add_write_list(tupid_t tupid);
 int tup_db_check_write_list(tupid_t cmdid);
 int tup_db_check_actual_inputs(tupid_t cmdid, struct rb_root *read_tree);
 int tup_db_write_outputs(tupid_t cmdid);
-int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
-			struct rb_root *ignore_tree);
+int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree);
 
 #endif

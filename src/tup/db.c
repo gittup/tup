@@ -3734,7 +3734,6 @@ static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 struct write_input_data {
 	tupid_t cmdid;
 	struct rb_root *normal_tree;
-	struct rb_root *ignore_tree;
 };
 
 static int new_sticky(struct tupid_tree *tt, void *data)
@@ -3756,46 +3755,29 @@ static int del_sticky(struct tupid_tree *tt, void *data)
 {
 	struct write_input_data *wid = data;
 
-	/* Removing a sticky link is fine if the node is going to be deleted,
-	 * but we have to run the command again to make sure the link wasn't
-	 * still required.
-	 */
-	if(tupid_tree_search(wid->ignore_tree, tt->tupid) != NULL) {
-		if(tup_db_add_modify_list(wid->cmdid) < 0)
-			return -1;
-	} else {
-		struct db_node dbn;
-
-		if(tup_db_select_dbn_by_id(tt->tupid, &dbn) < 0)
-			return -1;
-		if(dbn.type == TUP_NODE_GENERATED) {
-			fprintf(stderr, "Error: Missing a required input file. If you removed an input file from a rule  that isn't needed anymore, you should be able to remove it after a successful   update. Another possibility is a command is now writing to a node that was      previously a ghost.\n");
-			fprintf(stderr, " -- Command ID: %lli\n", wid->cmdid);
-			tup_db_print(stderr, tt->tupid);
-			return -1;
-		}
-	}
 	if(tupid_tree_search(wid->normal_tree, tt->tupid) == NULL) {
 		/* Not a normal link, kill it */
 		if(link_remove(tt->tupid, wid->cmdid) < 0)
 			return -1;
 	} else {
-		/* Demote to a normal link */
+		/* Demote to a normal link - make sure we run the command again
+		 * to check for required inputs.
+		 */
 		if(link_update(tt->tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+			return -1;
+		if(tup_db_add_modify_list(wid->cmdid) < 0)
 			return -1;
 	}
 	return 0;
 }
 
-int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
-			struct rb_root *ignore_tree)
+int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree)
 {
 	struct rb_root sticky_tree = {NULL};
 	struct rb_root normal_tree = {NULL};
 	struct write_input_data wid = {
 		.cmdid = cmdid,
 		.normal_tree = &normal_tree,
-		.ignore_tree = ignore_tree,
 	};
 
 	if(get_links(cmdid, &sticky_tree, &normal_tree) < 0)

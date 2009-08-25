@@ -1319,7 +1319,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &tree, &tf->g->delete_tree) < 0)
+	if(tup_db_write_inputs(cmdid, &tree) < 0)
 		return -1;
 	return 0;
 }

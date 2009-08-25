@@ -23,4 +23,4 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE
 tup touch Tupfile
-update_fail
+update_fail_msg "Missing input dependency"
