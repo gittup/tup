@@ -40,6 +40,8 @@
 #include "path.h"
 #include "linux/rbtree.h"
 
+#define MONITOR_LOOP_RETRY -2
+
 struct moved_from_event;
 struct monitor_event {
 	/* from_event is valid if mask is IN_MOVED_TO or IN_MOVED_FROM */
@@ -52,10 +54,11 @@ struct moved_from_event {
 	struct monitor_event *m;
 };
 
+static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
-static void queue_event(struct inotify_event *e);
-static void flush_queue(void);
+static int queue_event(struct inotify_event *e);
+static int flush_queue(void);
 static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
@@ -85,10 +88,7 @@ int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
-	int locked = 0;
 	int mon_lock;
-	struct timeval t1, t2;
-	static char buf[(sizeof(struct inotify_event) + 16) * 1024];
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -110,8 +110,6 @@ int monitor(int argc, char **argv)
 		rc = -1;
 		goto close_monlock;
 	}
-
-	gettimeofday(&t1, NULL);
 
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
@@ -150,24 +148,71 @@ int monitor(int argc, char **argv)
 		rc = -1;
 		goto close_inot;
 	}
-	locked = 1;
 
 	if(fork() > 0)
 		exit(0);
 
 	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
 
+	do {
+		rc = monitor_loop();
+		if(rc == MONITOR_LOOP_RETRY) {
+			struct rb_node *rbn;
+			struct timeval tv = {0, 0};
+			int ret;
+			fd_set rfds;
+
+			while((rbn = rb_first(&tree)) != NULL) {
+				struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+				struct dircache *dc = container_of(tt, struct dircache, tnode);
+				inotify_rm_watch(inot_fd, dc->tnode.tupid);
+				rb_erase(rbn, &tree);
+				free(dc);
+			}
+
+			/* Flush the inotify queue */
+			while(1) {
+				char buf[1024];
+				FD_ZERO(&rfds);
+				FD_SET(inot_fd, &rfds);
+				ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
+				if(ret < 0) {
+					perror("select");
+					return -1;
+				}
+				if(ret == 0)
+					break;
+				read(inot_fd, buf, sizeof(buf));
+			}
+		}
+	} while(rc == MONITOR_LOOP_RETRY);
+
+close_inot:
+	close(inot_fd);
+close_monlock:
+	close(mon_lock);
+	return rc;
+}
+
+static int monitor_loop(void)
+{
+	int x;
+	int rc;
+	struct timeval t1, t2;
+	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
+	int locked = 1;
+
 	/* Use tmp_list to store all file objects in a list. We then start to
 	 * watch the filesystem, and remove all existing objects from the tmp
 	 * list. Anything leftover in tmp must have been deleted while the
 	 * monitor wasn't looking.
 	 */
+	gettimeofday(&t1, NULL);
+
 	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", 1, wp_callback) < 0) {
-		rc = -1;
-		goto close_inot;
-	}
+	if(watch_path(0, tup_top_fd(), ".", 1, wp_callback) < 0)
+		return -1;
 	if(tup_db_scan_end() < 0)
 		return -1;
 
@@ -204,38 +249,43 @@ int monitor(int argc, char **argv)
 				if(e->len && strncmp(e->name, "db-", 3) == 0)
 					continue;
 				printf("tup monitor: .tup file '%s' deleted - shutting down.\n", e->len ? e->name : "");
-				goto close_inot;
+				return 0;
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
-					flush_queue();
+					rc = flush_queue();
+					if(rc < 0)
+						return rc;
 					locked = 0;
 					if(flock(tup_tri_lock(), LOCK_EX) < 0) {
 						perror("flock");
-						goto close_inot;
+						return -1;
 					}
 					if(flock(tup_obj_lock(), LOCK_UN) < 0) {
 						perror("flock");
-						goto close_inot;
+						return -1;
 					}
 					DEBUGP("monitor off\n");
 				}
 				if((e->mask & IN_CLOSE) && !locked) {
 					if(flock(tup_obj_lock(), LOCK_EX) < 0) {
 						perror("flock");
-						goto close_inot;
+						return -1;
 					}
 					if(flock(tup_tri_lock(), LOCK_UN) < 0) {
 						perror("flock");
-						goto close_inot;
+						return -1;
 					}
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
 			} else if(e->wd == mon_wd) {
-				goto close_inot;
+				return 0;
 			} else {
-				if(locked)
-					queue_event(e);
+				if(locked) {
+					rc = queue_event(e);
+					if(rc < 0)
+						return rc;
+				}
 			}
 		}
 
@@ -249,16 +299,13 @@ int monitor(int argc, char **argv)
 			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
 			if(ret == 0) {
 				/* Timeout, flush queue */
-				flush_queue();
+				rc = flush_queue();
+				if(rc < 0)
+					return rc;
 			}
 		}
 	}
-
-close_inot:
-	close(inot_fd);
-close_monlock:
-	close(mon_lock);
-	return rc;
+	return 0;
 }
 
 int stop_monitor(int argc, char **argv)
@@ -316,19 +363,20 @@ static int events_queued(void)
 	return queue_start != queue_end;
 }
 
-static void queue_event(struct inotify_event *e)
+static int queue_event(struct inotify_event *e)
 {
 	int new_start;
 	int new_end;
 	struct moved_from_event *mfe = NULL;
 	struct monitor_event *m;
+	int rc;
 
 	if(skip_event(e))
-		return;
+		return 0;
 	if(queue_last_e && eventcmp(&queue_last_e->e, e) == 0)
-		return;
+		return 0;
 	if(ephemeral_event(e) == 0)
-		return;
+		return 0;
 
 	if(e->mask & IN_MOVED_TO) {
 		mfe = check_from_events(e);
@@ -344,12 +392,14 @@ static void queue_event(struct inotify_event *e)
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
-		flush_queue();
+		rc = flush_queue();
+		if(rc < 0)
+			return rc;
 		new_start = queue_end;
 		new_end = new_start + sizeof(*m) + e->len;
 		if(new_end >= (signed)sizeof(queue_buf)) {
 			fprintf(stderr, "Error: Event dropped\n");
-			return;
+			return MONITOR_LOOP_RETRY;
 		}
 	}
 
@@ -365,11 +415,13 @@ static void queue_event(struct inotify_event *e)
 	}
 
 	queue_end += sizeof(*m) + e->len;
+	return 0;
 }
 
-static void flush_queue(void)
+static int flush_queue(void)
 {
 	int events_handled = 0;
+	int overflow = 0;
 
 	tup_db_begin();
 	while(queue_start < queue_end) {
@@ -380,8 +432,12 @@ static void flush_queue(void)
 		e = &m->e;
 		DEBUGP("Handle[%li]: '%s' %08x\n",
 		       (long)sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
-		if(e->mask != 0)
-			handle_event(m);
+		if(e->wd == -1) {
+			overflow = 1;
+		} else {
+			if(e->mask != 0)
+				handle_event(m);
+		}
 		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
 	}
@@ -390,6 +446,12 @@ static void flush_queue(void)
 	queue_start = 0;
 	queue_end = 0;
 	queue_last_e = NULL;
+
+	if(overflow) {
+		fprintf(stderr, "Received overflow event - restarting monitor.\n");
+		return MONITOR_LOOP_RETRY;
+	}
+
 	if(events_handled && tup_db_config_get_int("autoupdate") == 1) {
 		/* This runs in a separate process (as opposed to just calling
 		 * updater() directly) so it can properly get the lock from us
@@ -400,7 +462,7 @@ static void flush_queue(void)
 		int pid = fork();
 		if(pid < 0) {
 			perror("fork");
-			return;
+			return -1;
 		}
 		if(pid == 0) {
 			if(tup_lock_init() < 0)
@@ -414,15 +476,16 @@ static void flush_queue(void)
 
 			if(pthread_create(&tid, NULL, wait_thread, (void*)pid) < 0) {
 				perror("pthread_create");
-				return;
+				return -1;
 			}
 			if(pthread_detach(tid) < 0) {
 				perror("pthread_detach");
-				return;
+				return -1;
 			}
 			tup_db_config_set_int(AUTOUPDATE_PID, pid);
 		}
 	}
+	return 0;
 }
 
 static void *wait_thread(void *arg)

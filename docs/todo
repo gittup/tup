@@ -53,6 +53,8 @@ read in +/- in order to add/remove worker threads?
 
 rule without a : should be an error?
 
+reverse of tup g: give it a file, print the dir/command to create it?
+
 tup-gcc:
 if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
  - make sure it's culled
@@ -65,12 +67,6 @@ directly support symlinks in tup? Might make t5037 usable.
  - also t5032 when building in parallel and using the 'ln -sf %f %o' pattern rather than 'rm -f %o; ln -s %f %o'
 
  Add %1, %2, etc to reference first, second prereq?
-
- rm -rf of gcc tree put the monitor and database kinda outta whack (had to create gcctest/gcc, then rm -rf gcctest again)
-	 - [    2/17   ] gcctest
-	 Error: Unable to open directory ID 236376
-	 -[    1/2    ] uClibc/include
-	 Error: Unknown node 295915 named 'gcc' in create graph.
 
 sqlite style graphs for parser
 
