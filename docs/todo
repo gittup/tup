@@ -37,6 +37,10 @@ syntax: color %flags in output
 
 file: 'tcc' [150 in dir 3] - use dirtree?
 
+monitor rbtree instead of tmplist?
+
+print directories of Tupfiles when parsing fails
+
 ifneq
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
