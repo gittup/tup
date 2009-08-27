@@ -529,7 +529,7 @@ static int gitignore(struct tupfile *tf)
 
 	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_tree) < 0)
 		return -1;
-	if(s || git_root == 1 || tf->tupid == 1) {
+	if((s && len) || git_root == 1 || tf->tupid == 1) {
 		struct db_node dbn;
 
 		if(tup_db_select_dbn(tf->tupid, ".gitignore", &dbn) < 0)
@@ -553,11 +553,13 @@ static int gitignore(struct tupfile *tf)
 			write(fd, ".*.swp\n", 7);
 			write(fd, ".gitignore\n", 11);
 		}
-		if(s) {
+		if(s && len) {
 			write(fd, s, len);
-			close(fd);
-			free(s); /* Freeze gopher! */
 		}
+		close(fd);
+	}
+	if(s) {
+		free(s); /* Freeze gopher! */
 	}
 	return 0;
 }
