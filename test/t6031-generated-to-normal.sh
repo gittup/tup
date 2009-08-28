@@ -33,3 +33,5 @@ update
 check_exist foo.txt bar.txt
 
 echo 'new file' | diff - bar.txt
+
+tup_object_exist . bar.txt

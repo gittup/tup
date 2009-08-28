@@ -168,7 +168,9 @@ static int delete_files(struct graph *g)
 	while((rbn = rb_first(&g->delete_tree)) != NULL) {
 		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
+		int do_delete;
 
+		do_delete = 1;
 		if(te->type == TUP_NODE_GENERATED) {
 			struct node tmpn;
 			int rc;
@@ -187,20 +189,23 @@ static int delete_files(struct graph *g)
 				if(tup_db_set_type(tt->tupid, TUP_NODE_FILE) < 0)
 					return -1;
 				tmpn.type = TUP_NODE_FILE;
+				do_delete = 0;
 			}
 
 			show_progress(num_deleted, g->delete_count, &tmpn);
 			num_deleted++;
 
 			/* Only delete if the file wasn't modified (t6031) */
-			if(rc == 0) {
+			if(do_delete) {
 				if(delete_file(tmpn.dt, tmpn.name) < 0)
 					return -1;
 			}
 			free(tmpn.name);
 		}
-		if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
-			return -1;
+		if(do_delete) {
+			if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
+				return -1;
+		}
 		rb_erase(rbn, &g->delete_tree);
 		free(te);
 	}
