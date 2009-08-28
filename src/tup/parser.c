@@ -679,10 +679,8 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen)
 {
 	char *input, *cmd, *output, *bin;
-	char *input_pattern;
 	void *bang_mem = NULL;
 	struct rule r;
-	char empty[] = "";
 	int rc;
 
 	if(split_input_pattern(p, &input, &cmd, &output, &bin) < 0)
@@ -701,10 +699,8 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 			input += 7;
 			while(*input == ' ') input++;
 		}
-		input_pattern = input;
 		r.empty_input = 0;
 	} else {
-		input_pattern = empty;
 		r.empty_input = 1;
 	}
 	r.output_pattern = output;
@@ -713,7 +709,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	init_name_list(&r.inputs);
 	init_name_list(&r.order_only_inputs);
 
-	if(parse_input_pattern(tf, input_pattern, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
 		return -1;
 
 	if(cmd[0] == '!') {
@@ -734,7 +730,6 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	char *ie;
 	int rc;
 	struct rule r;
-	char *input_pattern;
 	char command[] = ", %f > %o";
 
 	input = p;
@@ -767,9 +762,7 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	init_name_list(&r.inputs);
 	init_name_list(&r.order_only_inputs);
 
-	input_pattern = input;
-
-	if(parse_input_pattern(tf, input_pattern, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
 		return -1;
 
 	rc = execute_rule(tf, &r, cwd, clen);
@@ -964,6 +957,9 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 {
 	char *eval_pattern;
 	char *oosep;
+
+	if(!input_pattern)
+		return 0;
 
 	eval_pattern = eval(tf, input_pattern, cwd, clen);
 	if(!eval_pattern)
