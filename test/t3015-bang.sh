@@ -14,7 +14,7 @@ echo '#include "foo.h"' > foo.c
 tup touch foo.h.in foo.c bar.c Tupfile
 update
 
-check_exist foo.o bar.o 
+check_exist foo.o bar.o
 tup_dep_exist . foo.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . foo.h . 'gcc -c bar.c -o bar.o'
 
