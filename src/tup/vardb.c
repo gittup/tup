@@ -118,7 +118,7 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 	return 0;
 }
 
-int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
+int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest)
 {
 	struct string_tree *st;
 
@@ -131,6 +131,18 @@ int vardb_get(struct vardb *v, const char *var, int varlen, char **dest)
 	}
 	/* Variable not found: string is "" */
 	return 0;
+}
+
+const char *vardb_get(struct vardb *v, const char *var)
+{
+	struct string_tree *st;
+
+	st = string_tree_search(&v->tree, var, -1);
+	if(st) {
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		return ve->value;
+	}
+	return NULL;
 }
 
 void vardb_dump(struct vardb *v)

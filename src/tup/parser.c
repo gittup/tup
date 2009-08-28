@@ -56,11 +56,12 @@ struct path_list {
 struct rule {
 	struct list_head list;
 	int foreach;
-	char *input_pattern;
 	char *output_pattern;
 	struct bin *bin;
 	char *command;
-	struct name_list namelist;
+	struct name_list inputs;
+	struct name_list order_only_inputs;
+	int empty_input;
 	int line_number;
 };
 
@@ -90,12 +91,22 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen);
 static int parse_varsed(struct tupfile *tf, char *p, int lno,
 			struct bin_list *bl, const char *cwd, int clen);
+static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
+static int parse_bang_rule(struct tupfile *tf, struct rule *r, void **mem,
+			   const char *cwd, int clen);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
+static int split_input_pattern(char *p, char **o_input, char **o_cmd,
+			       char **o_output, char **o_bin);
+static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
+			       struct name_list *inputs,
+			       struct name_list *order_only_inputs,
+			       struct bin_list *bl, int lno,
+			       const char *cwd, int clen);
 static int execute_rule(struct tupfile *tf, struct rule *r,
-			struct bin_list *bl, const char *cwd, int clen);
-static int parse_input_patterns(struct tupfile *tf, char *p,
-				struct name_list *nl, struct bin_list *bl,
-				int lno);
+			const char *cwd, int clen);
+static int input_pattern_to_nl(struct tupfile *tf, char *p,
+			       struct name_list *nl, struct bin_list *bl,
+			       int lno);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct list_head *symlist);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
@@ -108,8 +119,7 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct db_node *dbn);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   struct name_list *oonl, const char *cwd, int clen,
-		   const char *ext, int extlen);
+		   const char *cwd, int clen, const char *ext, int extlen);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -343,11 +353,15 @@ found_paren:
 		} else if(line[0] == ',') {
 			if(parse_varsed(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
+		} else if(line[0] == '!') {
+			if(parse_bang_definition(tf, line, lno) < 0)
+				goto syntax_error;
 		} else {
 			char *eq;
 			char *var;
 			char *value;
 			int append;
+			int rc;
 
 			/* Find the += or = sign, and point value to the start
 			 * of the string after that op.
@@ -390,9 +404,13 @@ found_paren:
 				return -1;
 
 			if(append)
-				vardb_append(&tf->vdb, var, value);
+				rc = vardb_append(&tf->vdb, var, value);
 			else
-				vardb_set(&tf->vdb, var, value);
+				rc = vardb_set(&tf->vdb, var, value);
+			if(rc < 0) {
+				fprintf(stderr, "Error setting variable '%s'\n", var);
+				return -1;
+			}
 			free(var);
 			free(value);
 		}
@@ -660,44 +678,21 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen)
 {
-	char *input, *cmd, *output;
-	char *ie, *ce;
+	char *input, *cmd, *output, *bin;
+	char *input_pattern;
+	void *bang_mem = NULL;
 	struct rule r;
 	char empty[] = "";
 	int rc;
 
-	input = p;
-	while(isspace(*input))
-		input++;
-	p = strstr(p, "|>");
-	if(!p)
+	if(split_input_pattern(p, &input, &cmd, &output, &bin) < 0)
 		return -1;
-	if(input < p) {
-		ie = p - 1;
-		while(isspace(*ie))
-			ie--;
-		ie[1] = 0;
+	if(bin) {
+		if((r.bin = bin_add(bin, bl)) == NULL)
+			return -1;
 	} else {
-		input = NULL;
+		r.bin = NULL;
 	}
-	p += 2;
-	cmd = p;
-	while(isspace(*cmd))
-		cmd++;
-	p = strstr(p, "|>");
-	if(!p)
-		return -1;
-	ce = p - 1;
-	while(isspace(*ce))
-		ce--;
-	p += 2;
-	output = p;
-	while(isspace(*output))
-		output++;
-	ce[1] = 0;
-	if(parse_bin(p, bl, &r.bin, lno) < 0)
-		return -1;
-	/* Don't rely on p now, since parse_bin fiddles with things */
 
 	r.foreach = 0;
 	if(input) {
@@ -706,16 +701,29 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 			input += 7;
 			while(*input == ' ') input++;
 		}
-		r.input_pattern = input;
+		input_pattern = input;
+		r.empty_input = 0;
 	} else {
-		r.input_pattern = empty;
+		input_pattern = empty;
+		r.empty_input = 1;
 	}
 	r.output_pattern = output;
 	r.command = cmd;
 	r.line_number = lno;
-	init_name_list(&r.namelist);
+	init_name_list(&r.inputs);
+	init_name_list(&r.order_only_inputs);
 
-	rc = execute_rule(tf, &r, bl, cwd, clen);
+	if(parse_input_pattern(tf, input_pattern, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
+		return -1;
+
+	if(cmd[0] == '!') {
+		if(parse_bang_rule(tf, &r, &bang_mem, cwd, clen) < 0)
+			return -1;
+	}
+
+	rc = execute_rule(tf, &r, cwd, clen);
+	if(bang_mem)
+		free(bang_mem);
 	return rc;
 }
 
@@ -726,6 +734,7 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	char *ie;
 	int rc;
 	struct rule r;
+	char *input_pattern;
 	char command[] = ", %f > %o";
 
 	input = p;
@@ -751,14 +760,95 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	/* Don't rely on p now, since parse_bin fiddles with things */
 
 	r.foreach = 1;
-	r.input_pattern = input;
 	r.output_pattern = output;
 	r.command = command;
 	r.line_number = lno;
-	init_name_list(&r.namelist);
+	r.empty_input = 0;
+	init_name_list(&r.inputs);
+	init_name_list(&r.order_only_inputs);
 
-	rc = execute_rule(tf, &r, bl, cwd, clen);
+	input_pattern = input;
+
+	if(parse_input_pattern(tf, input_pattern, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
+		return -1;
+
+	rc = execute_rule(tf, &r, cwd, clen);
 	return rc;
+}
+
+static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
+{
+	char *eq;
+	char *value;
+
+	eq = strchr(p, '=');
+	if(!eq) {
+		fprintf(stderr, "Parse error line %i: Expecting '=' to set the bang rule.\n", lno);
+		return -1;
+	}
+	value = eq + 1;
+	while(*value && isspace(*value))
+		value++;
+	eq--;
+	while(isspace(*eq))
+		eq--;
+	eq[1] = 0;
+
+	if(vardb_set(&tf->vdb, p, value) < 0) {
+		fprintf(stderr, "Error setting variable: '%s'\n", p);
+		return -1;
+	}
+	return 0;
+}
+
+static int parse_bang_rule(struct tupfile *tf, struct rule *r, void **mem,
+			   const char *cwd, int clen)
+{
+	const char *value;
+	char *bangtext;
+	char *input;
+	char *cmd;
+	char *output;
+	char *bin;
+
+	value = vardb_get(&tf->vdb, r->command);
+	if(!value) {
+		fprintf(stderr, "Error finding bang variable: '%s'\n", r->command);
+		return -1;
+	}
+
+	bangtext = strdup(value);
+	if(!bangtext) {
+		perror("strdup");
+		return -1;
+	}
+
+	/* Must be freed after execute_rule */
+	*mem = bangtext;
+
+	if(split_input_pattern(bangtext, &input, &cmd, &output, &bin) < 0)
+		return -1;
+	if(bin != NULL) {
+		fprintf(stderr, "Error: bins aren't allowed in bang rules. Rule was: %s = %s\n", r->command, value);
+		return -1;
+	}
+
+	/* Add any order only inputs to the list */
+	if(parse_input_pattern(tf, input, NULL, &r->order_only_inputs, NULL,
+			       r->line_number, cwd, clen) < 0)
+		return -1;
+
+	/* The command gets replaced whole-sale */
+	r->command = cmd;
+
+	/* Output only makes sense if one of them specifies it */
+	if(r->output_pattern[0] && output[0]) {
+		fprintf(stderr, "Error: Both the bang macro and rule specify output patterns.\n");
+		return -1;
+	}
+	if(!r->output_pattern[0])
+		r->output_pattern = output;
+	return 0;
 }
 
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
@@ -799,24 +889,90 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r,
-			struct bin_list *bl, const char *cwd, int clen)
+static int split_input_pattern(char *p, char **o_input, char **o_cmd,
+			       char **o_output, char **o_bin)
 {
-	char *oosep;
-	struct name_list order_only_nl;
-	struct name_list_entry *nle;
-	char *input_pattern;
+	char *input;
+	char *cmd;
+	char *output;
+	char *bin = NULL;
+	char *brace;
+	char *ie, *ce, *oe;
 
-	init_name_list(&order_only_nl);
-
-	input_pattern = eval(tf, r->input_pattern, cwd, clen);
-	if(!input_pattern)
+	input = p;
+	while(isspace(*input))
+		input++;
+	p = strstr(p, "|>");
+	if(!p)
 		return -1;
-	oosep = strchr(input_pattern, '|');
+	if(input < p) {
+		ie = p - 1;
+		while(isspace(*ie))
+			ie--;
+		ie[1] = 0;
+	} else {
+		input = NULL;
+	}
+	p += 2;
+	cmd = p;
+	while(isspace(*cmd))
+		cmd++;
+	p = strstr(p, "|>");
+	if(!p)
+		return -1;
+	ce = p - 1;
+	while(isspace(*ce))
+		ce--;
+	p += 2;
+	output = p;
+	while(isspace(*output))
+		output++;
+	ce[1] = 0;
+
+	brace = strchr(output, '{');
+	if(brace) {
+		oe = brace - 1;
+		while(oe > output && isspace(*oe))
+			oe--;
+		oe[1] = 0;
+		bin = brace + 1;
+
+		brace = strchr(bin, '}');
+		if(!brace) {
+			fprintf(stderr, "Missing '}' to finish bin\n");
+			return -1;
+		}
+		if(brace[1]) {
+			fprintf(stderr, "Error: bin must be at the end of the line\n");
+			return -1;
+		}
+		*brace = 0;
+	}
+
+	*o_input = input;
+	*o_cmd = cmd;
+	*o_output = output;
+	*o_bin = bin;
+	return 0;
+}
+
+static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
+			       struct name_list *inputs,
+			       struct name_list *order_only_inputs,
+			       struct bin_list *bl, int lno,
+			       const char *cwd, int clen)
+{
+	char *eval_pattern;
+	char *oosep;
+
+	eval_pattern = eval(tf, input_pattern, cwd, clen);
+	if(!eval_pattern)
+		return -1;
+	oosep = strchr(eval_pattern, '|');
 	if(oosep) {
 		char *p = oosep;
 		*p = 0;
-		while(p >= input_pattern && isspace(*p)) {
+		while(p >= eval_pattern && isspace(*p)) {
 			*p = 0;
 			p--;
 		}
@@ -825,11 +981,26 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 			*oosep = 0;
 			oosep++;
 		}
-		if(parse_input_patterns(tf, oosep, &order_only_nl, bl, r->line_number) < 0)
+		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, lno) < 0)
 			return -1;
 	}
-	if(parse_input_patterns(tf, input_pattern, &r->namelist, bl, r->line_number) < 0)
-		return -1;
+	if(inputs) {
+		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, lno) < 0)
+			return -1;
+	} else {
+		if(eval_pattern[0]) {
+			fprintf(stderr, "Error: bang rules can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
+			return -1;
+		}
+	}
+	free(eval_pattern);
+	return 0;
+}
+
+static int execute_rule(struct tupfile *tf, struct rule *r,
+			const char *cwd, int clen)
+{
+	struct name_list_entry *nle;
 
 	if(r->foreach) {
 		struct name_list tmp_nl;
@@ -842,8 +1013,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 		 * a delete_name_list_entry for the temporary list and can just
 		 * reinitialize the pointers using init_name_list.
 		 */
-		while(!list_empty(&r->namelist.entries)) {
-			nle = list_entry(r->namelist.entries.next,
+		while(!list_empty(&r->inputs.entries)) {
+			nle = list_entry(r->inputs.entries.next,
 					 struct name_list_entry, list);
 			const char *ext = NULL;
 			int extlen = 0;
@@ -856,10 +1027,10 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
 				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
 			}
-			if(do_rule(tf, r, &tmp_nl, &order_only_nl, cwd, clen, ext, extlen) < 0)
+			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext, extlen) < 0)
 				return -1;
 
-			delete_name_list_entry(&r->namelist, nle);
+			delete_name_list_entry(&r->inputs, nle);
 		}
 	}
 
@@ -871,37 +1042,34 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 	 * still want to do the rule for that case.
 	 *
 	 * Also note that we check that the original user string is empty
-	 * (r->input_pattern), not the eval'd string (input_pattern). This way
-	 * if the user specifies the input as $(foo) and it evaluates to empty,
-	 * we won't try to execute do_rule(). But an empty user string implies
-	 * that no input is required.
+	 * (r->empty_input), not the eval'd string. This way if the user
+	 * specifies the input as $(foo) and it evaluates to empty, we won't
+	 * try to execute do_rule(). But an empty user string implies that no
+	 * input is required.
 	 */
-	if(!r->foreach && (r->namelist.num_entries > 0 ||
-			   strcmp(r->input_pattern, "") == 0)) {
-
-		if(do_rule(tf, r, &r->namelist, &order_only_nl, cwd, clen, NULL, 0) < 0)
+	if(!r->foreach && (r->inputs.num_entries > 0 || r->empty_input)) {
+		if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0) < 0)
 			return -1;
 
-		while(!list_empty(&r->namelist.entries)) {
-			nle = list_entry(r->namelist.entries.next,
+		while(!list_empty(&r->inputs.entries)) {
+			nle = list_entry(r->inputs.entries.next,
 					 struct name_list_entry, list);
-			delete_name_list_entry(&r->namelist, nle);
+			delete_name_list_entry(&r->inputs, nle);
 		}
 	}
 
-	while(!list_empty(&order_only_nl.entries)) {
-		nle = list_entry(order_only_nl.entries.next,
+	while(!list_empty(&r->order_only_inputs.entries)) {
+		nle = list_entry(r->order_only_inputs.entries.next,
 				 struct name_list_entry, list);
-		delete_name_list_entry(&order_only_nl, nle);
+		delete_name_list_entry(&r->order_only_inputs, nle);
 	}
 
-	free(input_pattern);
 	return 0;
 }
 
-static int parse_input_patterns(struct tupfile *tf, char *p,
-				struct name_list *nl, struct bin_list *bl,
-				int lno)
+static int input_pattern_to_nl(struct tupfile *tf, char *p,
+			       struct name_list *nl, struct bin_list *bl,
+			       int lno)
 {
 	LIST_HEAD(plist);
 	LIST_HEAD(symlist);
@@ -1213,8 +1381,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 }
 
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   struct name_list *oonl, const char *cwd, int clen,
-		   const char *ext, int extlen)
+		   const char *cwd, int clen, const char *ext, int extlen)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
@@ -1317,7 +1484,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
-	list_for_each_entry(nle, &oonl->entries, list) {
+	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
 		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
@@ -1675,7 +1842,7 @@ static char *eval(struct tupfile *tf, const char *string,
 					memcpy(p, cwd, clen);
 					p += clen;
 				} else {
-					if(vardb_get(&tf->vdb, var, rparen-var, &p) < 0)
+					if(vardb_copy(&tf->vdb, var, rparen-var, &p) < 0)
 						return NULL;
 				}
 				s = rparen + 1;
