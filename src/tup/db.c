@@ -4014,6 +4014,10 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 		fprintf(stderr, "tup error: Attempt to insert unstyled link %lli -> %lli\n", a, b);
 		return -1;
 	}
+	if(a <= 0 || b <= 0) {
+		fprintf(stderr, "tup error: Attmept to insert invalid link: %lli -> %lli\n", a, b);
+		return -1;
+	}
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %lli, %i][0m\n", s, a, b, style);
 	if(!*stmt) {

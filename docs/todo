@@ -31,6 +31,8 @@ autoupdate doesn't autoupdate when first starting the monitor if files have chan
 
 give user an option to kill an autoupdate updater
 
+check inputs and outputs even if command fails
+
 .gitignore should be re-generated if removed by user?
 
 syntax: color %flags in output
@@ -58,6 +60,8 @@ read in +/- in order to add/remove worker threads?
 rule without a : should be an error?
 
 reverse of tup g: give it a file, print the dir/command to create it?
+
+non-existent nodes in create_list ?
 
 tup-gcc:
 if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?

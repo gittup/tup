@@ -1175,7 +1175,10 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 	struct path_list *pl;
 
 	list_for_each_entry(pl, plist, list) {
-		if(pl->dt != dt) {
+		/* Only care about non-bins, and directories that are not our
+		 * own.
+		 */
+		if(!pl->bin && pl->dt != dt) {
 			struct node *n;
 
 			n = find_node(g, pl->dt);
