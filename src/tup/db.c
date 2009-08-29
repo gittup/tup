@@ -3368,6 +3368,8 @@ int tup_db_scan_end(void)
 		free(he);
 	}
 
+	if(tup_db_clear_tmp_list() < 0)
+		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
 	if(tup_db_release_tmp_list() < 0)
