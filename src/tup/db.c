@@ -4455,9 +4455,9 @@ static int init_var_list(void)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_INIT_VAR_LIST];
-	static char s[] = "insert or replace into tmp_list select id from node where dir=?";
+	static char s[] = "insert or replace into tmp_list select id from node where dir=? and type=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, VAR_DT);
+	if(sql_debug) fprintf(stderr, "%s [37m[%i, %i][0m\n", s, VAR_DT, TUP_NODE_VAR);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -4467,6 +4467,10 @@ static int init_var_list(void)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, VAR_DT) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_VAR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
