@@ -279,7 +279,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
 	}
 
-	if(type == TUP_NODE_FILE) {
+	if(type == TUP_NODE_FILE || type == TUP_NODE_DIR) {
 		/* It's possible this is a file that was included by a Tupfile.
 		 * Try to set any dependent directory flags.
 		 */
