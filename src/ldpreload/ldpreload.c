@@ -30,6 +30,7 @@ static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
 		       char *const envp[]);
 static int (*s_execv)(const char *path, char *const argv[]);
+static int (*s_execvp)(const char *file, char *const argv[]);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 
@@ -214,6 +215,54 @@ int execv(const char *path, char *const argv[])
 	handle_file(path, "", ACCESS_READ);
 	rc = s_execv(path, argv);
 	return rc;
+}
+
+int execl(const char *path, const char *arg, ...)
+{
+	fprintf(stderr, "tup error: execl() is not supported.\n");
+	return -ENOSYS;
+}
+
+int execlp(const char *file, const char *arg, ...)
+{
+	fprintf(stderr, "tup error: execlp() is not supported.\n");
+	return -ENOSYS;
+}
+
+int execle(const char *file, const char *arg, ...)
+{
+	fprintf(stderr, "tup error: execle() is not supported.\n");
+	return -ENOSYS;
+}
+
+int execvp(const char *file, char *const argv[])
+{
+	int rc;
+	const char *p;
+
+	WRAP(s_execvp, "execvp");
+	for(p = file; *p; p++) {
+		if(*p == '/') {
+			handle_file(file, "", ACCESS_READ);
+			rc = s_execvp(file, argv);
+			return rc;
+		}
+	}
+	fprintf(stderr, "EXECVP: %s\n", file);
+	fprintf(stderr, "tup error: execvp() with path searching is not supported.\n");
+	return -ENOSYS;
+}
+
+int chdir(const char *path)
+{
+	fprintf(stderr, "tup error: chdir() is not supported.\n");
+	return -ENOSYS;
+}
+
+int fchdir(int fd)
+{
+	fprintf(stderr, "tup error: fchdir() is not supported.\n");
+	return -ENOSYS;
 }
 
 int __xstat(int vers, const char *name, struct stat *buf)

@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-# Like t5013, but now with execv (at least gcc uses execv).
+# Like t5013, but now with execvp.
 
 . ../tup.sh
 cat > Tupfile << HERE
@@ -13,7 +13,7 @@ cat > exec_test.c << HERE
 int main(void)
 {
 	char * const args[] = {"exe", NULL};
-	execv("./exe", args);
+	execvp("./exe", args);
 	return 1;
 }
 HERE
