@@ -29,6 +29,7 @@ static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
 		       char *const envp[]);
+static int (*s_execv)(const char *path, char *const argv[]);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 
@@ -202,6 +203,16 @@ int execve(const char *filename, char *const argv[], char *const envp[])
 	WRAP(s_execve, "execve");
 	handle_file(filename, "", ACCESS_READ);
 	rc = s_execve(filename, argv, envp);
+	return rc;
+}
+
+int execv(const char *path, char *const argv[])
+{
+	int rc;
+
+	WRAP(s_execv, "execv");
+	handle_file(path, "", ACCESS_READ);
+	rc = s_execv(path, argv);
 	return rc;
 }
 
