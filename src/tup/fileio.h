@@ -15,6 +15,7 @@ struct path_element {
 
 #define PG_HIDDEN 1
 #define PG_OUTSIDE_TUP 2
+#define PG_ROOT 4
 struct pel_group {
 	struct list_head path_list;
 	int pg_flags;
