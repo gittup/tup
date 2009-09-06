@@ -325,8 +325,11 @@ static int graph(int argc, char **argv)
 				color = 0x888888;
 				fontcolor = 0x888888;
 			} else {
-				fprintf(stderr, "tup error: How is color non-zero, but the node isn't expanded? Node is %lli\n", n->tnode.tupid);
-				return -1;
+				/* Might only be graphing a subset. Ie:
+				 * graph node foo, which points to command bar,
+				 * and command bar is in the modify list. In
+				 * this case, bar won't be expanded.
+				 */
 			}
 		}
 		printf("\tnode_%lli [label=\"", n->tnode.tupid);
