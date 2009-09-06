@@ -561,8 +561,8 @@ keep_going:
 					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);
 				}
 				fprintf(stderr, "plist:\n");
-				list_for_each_entry(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);
+				list_for_each_entry(n, &g->plist, list) {
+					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->name);
 				}
 			}
 		}
