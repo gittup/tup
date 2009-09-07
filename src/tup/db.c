@@ -87,6 +87,7 @@ enum {
 	_DB_CREATE_GHOST_LIST,
 	_DB_CREATE_TMP_LIST,
 	_DB_ADD_GHOST_DT_SYM,
+	_DB_ADD_GHOST,
 	_DB_ADD_GHOST_LINKS,
 	_DB_ADD_GHOST_DIRS,
 	_DB_RECLAIM_GHOSTS,
@@ -137,6 +138,7 @@ static int create_ghost_list(void);
 static int create_tmp_list(void);
 static int check_tmp_requested(void);
 static int add_ghost_dt_sym(tupid_t tupid);
+static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
@@ -3845,8 +3847,12 @@ static int del_normal_link(struct tupid_tree *tt, void *data)
 	struct actual_input_data *aid = data;
 
 	if(tupid_tree_search(&aid->sticky_tree, tt->tupid) == NULL) {
-		/* Not a sticky link, kill it */
+		/* Not a sticky link, kill it. Also check if it was a ghost
+		 * (t5054).
+		 */
 		if(link_remove(tt->tupid, aid->cmdid) < 0)
+			return -1;
+		if(add_ghost(tt->tupid) < 0)
 			return -1;
 	} else {
 		/* Demote to a sticky link */
@@ -4273,6 +4279,48 @@ static int add_ghost_dt_sym(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GHOST) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	num_ghosts += sqlite3_changes(tup_db);
+
+	return 0;
+}
+
+static int add_ghost(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST];
+	static char s[] = "insert or ignore into ghost_list select id from node where id=? and type=?";
+
+	if(tupid < 0)
+		return 0;
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, tupid, TUP_NODE_GHOST);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GHOST) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
