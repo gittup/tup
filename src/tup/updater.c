@@ -377,6 +377,10 @@ static int build_graph(struct graph *g)
 			list_del(&cur->list);
 			list_add_tail(&cur->list, &g->node_list);
 			cur->state = STATE_FINISHED;
+		} else if(cur->state == STATE_FINISHED) {
+			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", cur->tnode.tupid);
+			tup_db_print(stderr, cur->tnode.tupid);
+			return -1;
 		}
 	}
 
@@ -407,6 +411,9 @@ static int add_file_cb(void *arg, struct db_node *dbn, int style)
 
 edge_create:
 	if(n->state == STATE_PROCESSING) {
+		/* A circular dependency is not guaranteed to trigger this,
+		 * but it is easy to check before going through the graph.
+		 */
 		fprintf(stderr, "Error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
 			g->cur->tnode.tupid, dbn->tupid);
@@ -418,6 +425,7 @@ edge_create:
 		n->expanded = 1;
 		list_move(&n->list, &g->plist);
 	}
+
 	if(create_edge(g->cur, n, style) < 0)
 		return -1;
 	return 0;
@@ -555,7 +563,7 @@ keep_going:
 				fprintf(stderr, "Remaining nodes skipped due to caught signal.\n");
 			} else {
 				struct node *n;
-				fprintf(stderr, "fatal tup error: Graph is not empty after execution.\n");
+				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
 				fprintf(stderr, "Node list:\n");
 				list_for_each_entry(n, &g->node_list, list) {
 					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);

@@ -77,6 +77,7 @@ struct tupfile {
 	int dfd;
 	struct graph *g;
 	struct vardb vdb;
+	struct rb_root cmd_tree;
 	int ign;
 };
 
@@ -146,6 +147,7 @@ int parse(struct node *n, struct graph *g)
 
 	tf.tupid = n->tnode.tupid;
 	tf.g = g;
+	tf.cmd_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
@@ -197,6 +199,7 @@ out_close_dfd:
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
+	free_tupid_tree(&tf.cmd_tree);
 
 	return rc;
 }
@@ -1388,6 +1391,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
+	struct tupid_tree *cmd_tt;
 	tupid_t cmdid;
 	LIST_HEAD(oplist);
 	struct rb_root tree = {NULL};
@@ -1457,6 +1461,17 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(cmdid < 0)
 		return -1;
 
+	cmd_tt = malloc(sizeof *cmd_tt);
+	if(!cmd_tt) {
+		perror("malloc");
+		return -1;
+	}
+	cmd_tt->tupid = cmdid;
+	if(tupid_tree_insert(&tf->cmd_tree, cmd_tt) < 0) {
+		fprintf(stderr, "Error: Attempted to add duplicate command ID %lli\n", cmdid);
+		tup_db_print(stderr, cmdid);
+		return -1;
+	}
 	tree_entry_remove(tf->g, cmdid);
 
 	while(!list_empty(&onl.entries)) {

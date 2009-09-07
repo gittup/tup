@@ -171,7 +171,7 @@ update_fail_msg()
 		if grep "$1" .tupoutput > /dev/null; then
 			echo "Update expected to fail, and failed for the right reason."
 		else
-			echo "*** Update expect to fail because of: $1" 1>&2
+			echo "*** Update expected to fail because of: $1" 1>&2
 			echo "*** But failed because of:" 1>&2
 			cat .tupoutput 1>&2
 			exit 1
