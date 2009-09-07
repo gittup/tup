@@ -33,6 +33,8 @@ autoupdate doesn't autoupdate when first starting the monitor if files have chan
 
 vartree isn't created if no variables?
 
+put dirtree in a list for things like tup_db_select_node_by_flags to avoid callback?
+
 don't continue down re-parse tree unless outputs of the dir have changed.
 
 give user an option to kill an autoupdate updater

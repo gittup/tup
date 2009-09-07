@@ -4337,8 +4337,9 @@ static int add_ghost_links(tupid_t tupid)
 static int add_ghost_dirs(void)
 {
 	int rc;
+	int changes;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_DIRS];
-	static char s[] = "insert or replace into ghost_list select id from node where id in (select dir from ghost_list left join node on ghost_list.id=node.id) and type=?";
+	static char s[] = "insert or ignore into ghost_list select id from node where id in (select dir from ghost_list left join node on ghost_list.id=node.id) and type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, TUP_NODE_GHOST);
 	if(!*stmt) {
@@ -4354,17 +4355,20 @@ static int add_ghost_dirs(void)
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
+	do {
+		rc = sqlite3_step(*stmt);
+		if(sqlite3_reset(*stmt) != 0) {
+			fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+			return -1;
+		}
 
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	num_ghosts += sqlite3_changes(tup_db);
+		if(rc != SQLITE_DONE) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			return -1;
+		}
+		changes = sqlite3_changes(tup_db);
+		num_ghosts += changes;
+	} while(changes > 0);
 
 	return 0;
 }
