@@ -78,6 +78,7 @@ int tup_db_rollback(void);
 int tup_db_check_flags(void);
 int tup_db_check_dup_links(void);
 void tup_db_enable_sql_debug(void);
+int tup_db_debug_add_all_ghosts(void);
 
 /* Node operations */
 tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);

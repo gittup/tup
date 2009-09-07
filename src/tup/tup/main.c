@@ -38,6 +38,7 @@ static int varchange(int argc, char **argv);
 static int config(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int flush(void);
+static int ghost_check(void);
 static void print_name(const char *s, char c);
 
 static void usage(void);
@@ -127,6 +128,8 @@ int main(int argc, char **argv)
 		rc = flush();
 	} else if(strcmp(cmd, "check_dup_links") == 0) {
 		rc = tup_db_check_dup_links();
+	} else if(strcmp(cmd, "ghost_check") == 0) {
+		rc = ghost_check();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", cmd);
 		rc = 1;
@@ -247,6 +250,7 @@ static int graph(int argc, char **argv)
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
 			return -1;
 		}
+		dbn.name = argv[x];
 
 		n = find_node(&g, dbn.tupid);
 		if(n == NULL) {
@@ -822,6 +826,17 @@ static int flush(void)
 		tup_init();
 	}
 	printf("Flushed.\n");
+	return 0;
+}
+
+static int ghost_check(void)
+{
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_debug_add_all_ghosts() < 0)
+		return -1;
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
