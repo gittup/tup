@@ -16,7 +16,7 @@
 #include <sys/socket.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 11
+#define DB_VERSION 12
 
 enum {
 	DB_BEGIN,
@@ -216,13 +216,12 @@ int tup_db_create(int db_sync)
 	int rc;
 	int x;
 	const char *sql[] = {
-		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096))",
+		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
 		"create table link (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
 		"create table var (id integer primary key not null, value varchar(4096))",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
-		"create index node_dir_index on node(dir, name)",
 		"create index node_sym_index on node(sym)",
 		"create index link_index2 on link(to_id)",
 		"insert into config values('show_progress', 1)",
@@ -251,7 +250,7 @@ int tup_db_create(int db_sync)
 	for(x=0; x<ARRAY_SIZE(sql); x++) {
 		char *errmsg;
 		if(sqlite3_exec(tup_db, sql[x], NULL, NULL, &errmsg) != 0) {
-			fprintf(stderr, "SQL error: %s\nQuery was: %s",
+			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 				errmsg, sql[x]);
 			return -1;
 		}
@@ -303,26 +302,39 @@ static int version_check(void)
 
 	char sql_10[] = "drop table delete_list";
 
+	char sql_11a[] = "drop index node_dir_index";
+	char sql_11b[] = "create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))";
+	char sql_11c[] = "insert or ignore into node_new select id, dir, type, sym, mtime, name from node";
+	char sql_11d[] = "drop index node_sym_index";
+	char sql_11e[] = "drop table node";
+	char sql_11f[] = "alter table node_new rename to node";
+	char sql_11g[] = "create index node_sym_index on node(sym)";
+
 	version = tup_db_config_get_int("db_version");
 	if(version < 0) {
 		fprintf(stderr, "Error getting .tup/db version.\n");
 		return -1;
 	}
 
+	if(version != DB_VERSION) {
+		printf("Updating tup database from version %i to %i. This may take a while...\n", version, DB_VERSION);
+		if(tup_db_begin() < 0)
+			return -1;
+	}
 	switch(version) {
 		case 1:
 			if(sqlite3_exec(tup_db, sql_1a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_1a);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_1b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_1b);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_1c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_1c);
 				return -1;
 			}
@@ -333,22 +345,22 @@ static int version_check(void)
 			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
 		case 2:
 			if(sqlite3_exec(tup_db, sql_2a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_2a);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_2b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_2b);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_2c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_2c);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_2d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_2d);
 				return -1;
 			}
@@ -357,7 +369,7 @@ static int version_check(void)
 			fprintf(stderr, "WARNING: Tup database updated to version 3.\nThe style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.\n");
 		case 3:
 			if(sqlite3_exec(tup_db, sql_3a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_3a);
 				return -1;
 			}
@@ -366,12 +378,12 @@ static int version_check(void)
 			fprintf(stderr, "WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
 		case 4:
 			if(sqlite3_exec(tup_db, sql_4a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_4a);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_4b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_4b);
 				return -1;
 			}
@@ -381,7 +393,7 @@ static int version_check(void)
 
 		case 5:
 			if(sqlite3_exec(tup_db, sql_5a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_5a);
 				return -1;
 			}
@@ -391,7 +403,7 @@ static int version_check(void)
 
 		case 6:
 			if(sqlite3_exec(tup_db, sql_6a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_6a);
 				return -1;
 			}
@@ -401,7 +413,7 @@ static int version_check(void)
 
 		case 7:
 			if(sqlite3_exec(tup_db, sql_7a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_7a);
 				return -1;
 			}
@@ -411,7 +423,7 @@ static int version_check(void)
 
 		case 8:
 			if(sqlite3_exec(tup_db, sql_8a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_8a);
 				return -1;
 			}
@@ -421,37 +433,37 @@ static int version_check(void)
 
 		case 9:
 			if(sqlite3_exec(tup_db, sql_9a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9a);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9b);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9c);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9d);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9e, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9e);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9f, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9f);
 				return -1;
 			}
 			if(sqlite3_exec(tup_db, sql_9g, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_9g);
 				return -1;
 			}
@@ -461,7 +473,7 @@ static int version_check(void)
 
 		case 10:
 			if(sqlite3_exec(tup_db, sql_10, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s",
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 					errmsg, sql_10);
 				return -1;
 			}
@@ -469,6 +481,62 @@ static int version_check(void)
 				return -1;
 			fprintf(stderr, "NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
 
+		case 11:
+			/* First clear out any ghosts that shouldn't be there.
+			 * We don't want them to take precedence over real
+			 * nodes that may have been moved over them.
+			 */
+			if(create_ghost_list() < 0)
+				return -1;
+			if(tup_db_debug_add_all_ghosts() < 0)
+				return -1;
+			if(tup_db_commit() < 0)
+				return -1;
+			if(tup_db_begin() < 0)
+				return -1;
+			if(sqlite3_exec(tup_db, sql_11a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11a);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11b, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11b);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11c, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11c);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11d, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11d);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11e, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11e);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11f, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11f);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_11g, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_11g);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 12) < 0)
+				return -1;
+			fprintf(stderr, "NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
+
+			/***************************************/
+			/* Last case must fall through to here */
+			if(tup_db_commit() < 0)
+				return -1;
 		case DB_VERSION:
 			break;
 		default:
@@ -1134,8 +1202,9 @@ int tup_db_delete_dir(tupid_t dt)
 	return 0;
 }
 
-static int recurse_delete_ghost_tree(tupid_t tupid)
+static int recurse_delete_ghost_tree(tupid_t tupid, struct list_head *list)
 {
+	struct half_entry *he;
 	LIST_HEAD(subdir_list);
 
 	if(get_dir_entries(tupid, &subdir_list) < 0)
@@ -1143,7 +1212,7 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 
 	/* This is a subset of tup_del_id() that we need for ghost files. Note
 	 * that we also don't call tup_db_delete_node() directly because that
-	 * makes a check to see if we need to conver the node into a ghost.
+	 * makes a check to see if we need to convert the node into a ghost.
 	 * Since we already know the node is going to become a regular
 	 * directory or file, we don't want to do that check.
 	 *
@@ -1162,25 +1231,16 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 	if(delete_node(tupid) < 0)
 		return -1;
 
-	while(!list_empty(&subdir_list)) {
-		struct half_entry *he = list_entry(subdir_list.next,
-						   struct half_entry, list);
+	list_for_each_entry(he, &subdir_list, list) {
 		if(he->type != TUP_NODE_GHOST) {
 			fprintf(stderr, "tup internal error: Why does a node of type %i have a ghost dir?\n", he->type);
 			tup_db_print(stderr, he->tupid);
 			return -1;
 		}
-		if(recurse_delete_ghost_tree(he->tupid) < 0)
+		if(recurse_delete_ghost_tree(he->tupid, list) < 0)
 			return -1;
-		list_del(&he->list);
-		free(he);
 	}
-	/* This must be last, since we have to make sure the ghosts previous
-	 * directory ghosts are gone before adjusting symlinks. Otherwise there
-	 * can still be two nodes in the DAG with the same dt and name.
-	 */
-	if(adjust_ghost_symlinks(tupid) < 0)
-		return -1;
+	list_splice(&subdir_list, list);
 	return 0;
 }
 
@@ -1371,9 +1431,20 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	struct db_node dbn;
 	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
 	static char s[] = "update node set name=?, dir=? where id=?";
+	LIST_HEAD(ghost_list);
 
 	if(node_select(new_dt, new_name, -1, &dbn) < 0) {
 		return -1;
+	}
+	if(dbn.tupid != -1) {
+		if(dbn.type == TUP_NODE_GHOST) {
+			if(recurse_delete_ghost_tree(dbn.tupid, &ghost_list) < 0)
+				return -1;
+		} else {
+			fprintf(stderr, "Error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
+			tup_db_print(stderr, new_dt);
+			return -1;
+		}
 	}
 
 	if(sql_debug) fprintf(stderr, "%s [37m['%s', %lli, %lli][0m\n", s, new_name, new_dt, tupid);
@@ -1408,15 +1479,18 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 
-	if(dbn.tupid != -1) {
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(recurse_delete_ghost_tree(dbn.tupid) < 0)
-				return -1;
-		} else {
-			fprintf(stderr, "Error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
-			tup_db_print(stderr, new_dt);
+	while(!list_empty(&ghost_list)) {
+		struct half_entry *he = list_entry(ghost_list.next,
+						   struct half_entry, list);
+		/* This must be last, since we have to make sure the ghosts
+		 * previous directory ghosts are gone before adjusting
+		 * symlinks. Otherwise there can still be two nodes in the DAG
+		 * with the same dt and name.
+		 */
+		if(adjust_ghost_symlinks(he->tupid) < 0)
 			return -1;
-		}
+		list_del(&he->list);
+		free(he);
 	}
 
 	return 0;
@@ -4322,7 +4396,10 @@ static int create_ghost_list(void)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_CREATE_GHOST_LIST];
 	static char s[] = "create temporary table ghost_list (id integer primary key not null)";
+	static int created = 0;
 
+	if(created)
+		return 0;
 	if(sql_debug) fprintf(stderr, "%s\n", s);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -4342,6 +4419,7 @@ static int create_ghost_list(void)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+	created = 1;
 
 	return 0;
 }
@@ -5183,7 +5261,7 @@ static int no_sync(void)
 
 	if(sql_debug) fprintf(stderr, "%s\n", sql);
 	if(sqlite3_exec(tup_db, sql, NULL, NULL, &errmsg) != 0) {
-		fprintf(stderr, "SQL error: %s\nQuery was: %s",
+		fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 			errmsg, sql);
 		return -1;
 	}
