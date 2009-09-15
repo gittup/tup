@@ -13,7 +13,7 @@ syntax case match
 
 syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
-syntax match bang ,![a-zA-Z0-9_-]*,
+syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match separator /|>/
 syntax match format display "%\([FfoBb]\)" contained
 syntax match variable /$([^)]*)/

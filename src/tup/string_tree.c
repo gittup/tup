@@ -28,6 +28,33 @@ struct string_tree *string_tree_search(struct rb_root *root, const char *s,
 	return NULL;
 }
 
+struct string_tree *string_tree_search2(struct rb_root *root, const char *s1,
+					int s1len, const char *s2)
+{
+	struct rb_node *node = root->rb_node;
+
+	while (node) {
+		struct string_tree *data = rb_entry(node, struct string_tree, rbn);
+		int result;
+
+		result = strncmp(s1, data->s, s1len);
+		if(result == 0) {
+			if(s2)
+				result = strcmp(s2, data->s + s1len);
+			else
+				result = s1len - data->len;
+		}
+
+		if (result < 0)
+			node = node->rb_left;
+		else if (result > 0)
+			node = node->rb_right;
+		else
+			return data;
+	}
+	return NULL;
+}
+
 int string_tree_insert(struct rb_root *root, struct string_tree *data)
 {
 	struct rb_node **new = &(root->rb_node), *parent = NULL;

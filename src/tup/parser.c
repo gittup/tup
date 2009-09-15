@@ -11,6 +11,7 @@
 #include "config.h"
 #include "bin.h"
 #include "dirtree.h"
+#include "string_tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,10 +60,21 @@ struct rule {
 	char *output_pattern;
 	struct bin *bin;
 	char *command;
+	int command_len;
 	struct name_list inputs;
 	struct name_list order_only_inputs;
+	struct name_list bang_oo_inputs;
 	int empty_input;
 	int line_number;
+};
+
+struct bang_rule {
+	struct string_tree st;
+	char *value;
+	char *input;
+	char *command;
+	int command_len;
+	char *output_pattern;
 };
 
 struct build_name_list_args {
@@ -78,6 +90,7 @@ struct tupfile {
 	struct graph *g;
 	struct vardb vdb;
 	struct rb_root cmd_tree;
+	struct rb_root bang_tree;
 	int ign;
 };
 
@@ -93,11 +106,12 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 static int parse_varsed(struct tupfile *tf, char *p, int lno,
 			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
-static int parse_bang_rule(struct tupfile *tf, struct rule *r, void **mem,
+static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 			   const char *cwd, int clen);
+static void free_bang_tree(struct rb_root *root);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
-			       char **o_output, char **o_bin);
+			       int *o_cmdlen, char **o_output, char **o_bin);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
@@ -125,6 +139,7 @@ static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
+static void delete_name_list(struct name_list *nl);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
@@ -148,6 +163,7 @@ int parse(struct node *n, struct graph *g)
 	tf.tupid = n->tnode.tupid;
 	tf.g = g;
 	tf.cmd_tree.rb_node = NULL;
+	tf.bang_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
@@ -200,6 +216,7 @@ out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
 	free_tupid_tree(&tf.cmd_tree);
+	free_bang_tree(&tf.bang_tree);
 
 	return rc;
 }
@@ -682,11 +699,11 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen)
 {
 	char *input, *cmd, *output, *bin;
-	void *bang_mem = NULL;
+	int cmd_len;
 	struct rule r;
 	int rc;
 
-	if(split_input_pattern(p, &input, &cmd, &output, &bin) < 0)
+	if(split_input_pattern(p, &input, &cmd, &cmd_len, &output, &bin) < 0)
 		return -1;
 	if(bin) {
 		if((r.bin = bin_add(bin, bl)) == NULL)
@@ -708,21 +725,16 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	}
 	r.output_pattern = output;
 	r.command = cmd;
+	r.command_len = cmd_len;
 	r.line_number = lno;
 	init_name_list(&r.inputs);
 	init_name_list(&r.order_only_inputs);
+	init_name_list(&r.bang_oo_inputs);
 
 	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
 		return -1;
 
-	if(cmd[0] == '!') {
-		if(parse_bang_rule(tf, &r, &bang_mem, cwd, clen) < 0)
-			return -1;
-	}
-
 	rc = execute_rule(tf, &r, cwd, clen);
-	if(bang_mem)
-		free(bang_mem);
 	return rc;
 }
 
@@ -760,10 +772,12 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	r.foreach = 1;
 	r.output_pattern = output;
 	r.command = command;
+	r.command_len = sizeof(command) - 1;
 	r.line_number = lno;
 	r.empty_input = 0;
 	init_name_list(&r.inputs);
 	init_name_list(&r.order_only_inputs);
+	init_name_list(&r.bang_oo_inputs);
 
 	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
 		return -1;
@@ -774,8 +788,15 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 {
+	struct string_tree *st;
+	char *input;
+	char *command;
+	int command_len;
+	char *output;
 	char *eq;
 	char *value;
+	char *alloc_value;
+	char *bin;
 
 	eq = strchr(p, '=');
 	if(!eq) {
@@ -790,61 +811,104 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		eq--;
 	eq[1] = 0;
 
-	if(vardb_set(&tf->vdb, p, value) < 0) {
-		fprintf(stderr, "Error setting variable: '%s'\n", p);
-		return -1;
-	}
-	return 0;
-}
-
-static int parse_bang_rule(struct tupfile *tf, struct rule *r, void **mem,
-			   const char *cwd, int clen)
-{
-	const char *value;
-	char *bangtext;
-	char *input;
-	char *cmd;
-	char *output;
-	char *bin;
-
-	value = vardb_get(&tf->vdb, r->command);
-	if(!value) {
-		fprintf(stderr, "Error finding bang variable: '%s'\n", r->command);
-		return -1;
-	}
-
-	bangtext = strdup(value);
-	if(!bangtext) {
+	alloc_value = strdup(value);
+	if(!alloc_value) {
 		perror("strdup");
 		return -1;
 	}
 
-	/* Must be freed after execute_rule */
-	*mem = bangtext;
-
-	if(split_input_pattern(bangtext, &input, &cmd, &output, &bin) < 0)
+	if(split_input_pattern(alloc_value, &input, &command, &command_len, &output,
+			       &bin) < 0)
 		return -1;
 	if(bin != NULL) {
-		fprintf(stderr, "Error: bins aren't allowed in bang rules. Rule was: %s = %s\n", r->command, value);
+		fprintf(stderr, "Error: bins aren't allowed in bang rules. Rule was: %s = %s\n", p, alloc_value);
 		return -1;
 	}
 
+	st = string_tree_search(&tf->bang_tree, p, -1);
+	if(st) {
+		struct bang_rule *cur_br;
+
+		cur_br = container_of(st, struct bang_rule, st);
+		free(cur_br->value);
+		cur_br->value = alloc_value;
+		cur_br->input = input;
+		cur_br->command = command;
+		cur_br->command_len = command_len;
+		cur_br->output_pattern = output;
+	} else {
+		struct bang_rule *br;
+
+		br = malloc(sizeof *br);
+		if(!br) {
+			perror("malloc");
+			return -1;
+		}
+		br->input = input;
+		br->command = command;
+		br->command_len = command_len;
+		br->output_pattern = output;
+		br->value = alloc_value;
+		br->st.s = strdup(p);
+		if(!br->st.s) {
+			perror("strdup");
+			return -1;
+		}
+		br->st.len = eq - p + 1;
+		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
+			fprintf(stderr, "Error inserting bang rule into tree\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
+			   const char *cwd, int clen)
+{
+	struct bang_rule *br;
+	struct string_tree *st;
+
+	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
+				 ext);
+	if(!st) {
+		fprintf(stderr, "Error finding bang variable: '%s'\n",
+			r->command);
+		return -1;
+	}
+	br = container_of(st, struct bang_rule, st);
+
 	/* Add any order only inputs to the list */
-	if(parse_input_pattern(tf, input, NULL, &r->order_only_inputs, NULL,
+	if(parse_input_pattern(tf, br->input, NULL, &r->bang_oo_inputs, NULL,
 			       r->line_number, cwd, clen) < 0)
 		return -1;
 
 	/* The command gets replaced whole-sale */
-	r->command = cmd;
+	r->command = br->command;
+	r->command_len = br->command_len;
 
 	/* Output only makes sense if one of them specifies it */
-	if(r->output_pattern[0] && output[0]) {
+	if(r->output_pattern[0] && br->output_pattern[0]) {
 		fprintf(stderr, "Error: Both the bang macro and rule specify output patterns.\n");
 		return -1;
 	}
 	if(!r->output_pattern[0])
-		r->output_pattern = output;
+		r->output_pattern = br->output_pattern;
 	return 0;
+}
+
+static void free_bang_tree(struct rb_root *root)
+{
+	struct rb_node *rbn;
+
+	while((rbn = rb_first(root)) != NULL) {
+		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+		struct bang_rule *br = container_of(st, struct bang_rule, st);
+		rb_erase(rbn, root);
+		free(st->s);
+		free(br->value);
+		free(br);
+	}
 }
 
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
@@ -886,7 +950,7 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 }
 
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
-			       char **o_output, char **o_bin)
+			       int *o_cmdlen, char **o_output, char **o_bin)
 {
 	char *input;
 	char *cmd;
@@ -903,7 +967,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 		return -1;
 	if(input < p) {
 		ie = p - 1;
-		while(isspace(*ie))
+		while(isspace(*ie) && ie > input)
 			ie--;
 		ie[1] = 0;
 	} else {
@@ -917,7 +981,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	if(!p)
 		return -1;
 	ce = p - 1;
-	while(isspace(*ce))
+	while(isspace(*ce) && ce > cmd)
 		ce--;
 	p += 2;
 	output = p;
@@ -928,7 +992,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	brace = strchr(output, '{');
 	if(brace) {
 		oe = brace - 1;
-		while(oe > output && isspace(*oe))
+		while(isspace(*oe) && oe > output)
 			oe--;
 		oe[1] = 0;
 		bin = brace + 1;
@@ -947,6 +1011,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 
 	*o_input = input;
 	*o_cmd = cmd;
+	*o_cmdlen = ce - cmd + 1;
 	*o_output = output;
 	*o_bin = bin;
 	return 0;
@@ -1004,6 +1069,22 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 	if(r->foreach) {
 		struct name_list tmp_nl;
 		struct name_list_entry tmp_nle;
+		char *old_command = NULL;
+		char *old_output_pattern = NULL;
+		int old_command_len = 0;
+		int per_bang = 0;
+
+		if(r->command[0] == '!') {
+			if(r->command[r->command_len-1] == '.') {
+				per_bang = 1;
+				old_command = r->command;
+				old_command_len = r->command_len;
+				old_output_pattern = r->output_pattern;
+			} else {
+				if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
+					return -1;
+			}
+		}
 
 		/* For a foreach loop, iterate over each entry in the rule's
 		 * namelist and do a shallow copy over into a single-entry
@@ -1026,8 +1107,19 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
 				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
 			}
+			if(per_bang) {
+				if(parse_bang_rule(tf, r, ext, cwd, clen) < 0)
+					return -1;
+			}
 			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext, extlen) < 0)
 				return -1;
+
+			if(per_bang) {
+				r->command = old_command;
+				r->command_len = old_command_len;
+				r->output_pattern = old_output_pattern;
+				delete_name_list(&r->bang_oo_inputs);
+			}
 
 			delete_name_list_entry(&r->inputs, nle);
 		}
@@ -1047,21 +1139,19 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 	 * input is required.
 	 */
 	if(!r->foreach && (r->inputs.num_entries > 0 || r->empty_input)) {
+		if(r->command[0] == '!') {
+			if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
+				return -1;
+		}
+
 		if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0) < 0)
 			return -1;
 
-		while(!list_empty(&r->inputs.entries)) {
-			nle = list_entry(r->inputs.entries.next,
-					 struct name_list_entry, list);
-			delete_name_list_entry(&r->inputs, nle);
-		}
+		delete_name_list(&r->inputs);
 	}
 
-	while(!list_empty(&r->order_only_inputs.entries)) {
-		nle = list_entry(r->order_only_inputs.entries.next,
-				 struct name_list_entry, list);
-		delete_name_list_entry(&r->order_only_inputs, nle);
-	}
+	delete_name_list(&r->order_only_inputs);
+	delete_name_list(&r->bang_oo_inputs);
 
 	return 0;
 }
@@ -1396,6 +1486,19 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	LIST_HEAD(oplist);
 	struct rb_root tree = {NULL};
 
+	/* t3017 - empty rules are just pass-through to get the input into the
+	 * bin.
+	 */
+	if(r->command_len == 0) {
+		if(r->bin) {
+			list_for_each_entry(nle, &nl->entries, list) {
+				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tupid) < 0)
+					return -1;
+			}
+		}
+		return 0;
+	}
+
 	init_name_list(&onl);
 
 	output_pattern = eval(tf, r->output_pattern, cwd, clen);
@@ -1502,6 +1605,10 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
+	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
+		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
+			return -1;
+	}
 	if(tup_db_write_inputs(cmdid, &tree) < 0)
 		return -1;
 	return 0;
@@ -1545,6 +1652,16 @@ static void add_name_list_entry(struct name_list *nl,
 	nl->extlesstotlen += nle->extlesslen;
 	nl->basetotlen += nle->baselen;
 	nl->extlessbasetotlen += nle->extlessbaselen;
+}
+
+static void delete_name_list(struct name_list *nl)
+{
+	struct name_list_entry *nle;
+	while(!list_empty(&nl->entries)) {
+		nle = list_entry(nl->entries.next, struct name_list_entry,
+				 list);
+		delete_name_list_entry(nl, nle);
+	}
 }
 
 static void delete_name_list_entry(struct name_list *nl,

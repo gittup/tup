@@ -11,6 +11,8 @@ unlinkat(AT_FDCWD) to do the same thing as unlink() (eg: rm -f foo.o in a badly 
 recursive grep kills monitor
  - print message when monitor exits?
 
+kill monitor if you ctrl-c twice? (maybe SIGHUP?) that way user has to restart it, which should catch any out of place files
+
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
 instead of keeping both files and commands in delete list, put them in separate lists. Make the command thing just a progress bar.
@@ -46,6 +48,9 @@ kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try 
 monitor rbtree instead of tmplist?
 
 print directories of Tupfiles when parsing fails
+
+when changing a command, instead of deleting the old and creating a new one, just change the name of the existing one? Should be able to uniquely identify command based on the output file(s). This would save on the database churn by not deleting all the old links, then re-creating them next time.
+ - time test: Change CFLAGS in linux/compiler.tup
 
 ifneq
 
