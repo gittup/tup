@@ -106,6 +106,8 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 static int parse_varsed(struct tupfile *tf, char *p, int lno,
 			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
+static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
+				 const char *cwd, int clen);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 			   const char *cwd, int clen);
 static void free_bang_tree(struct rb_root *root);
@@ -864,19 +866,10 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	return 0;
 }
 
-static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
-			   const char *cwd, int clen)
+static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
+			     struct string_tree *st, const char *cwd, int clen)
 {
 	struct bang_rule *br;
-	struct string_tree *st;
-
-	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
-				 ext);
-	if(!st) {
-		fprintf(stderr, "Error finding bang variable: '%s'\n",
-			r->command);
-		return -1;
-	}
 	br = container_of(st, struct bang_rule, st);
 
 	/* Add any order only inputs to the list */
@@ -896,6 +889,33 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 	if(!r->output_pattern[0])
 		r->output_pattern = br->output_pattern;
 	return 0;
+}
+
+static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
+				 const char *cwd, int clen)
+{
+	struct string_tree *st;
+
+	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
+				 ".EMPTY");
+	if(!st)
+		return 1;
+	return __parse_bang_rule(tf, r, st, cwd, clen);
+}
+
+static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
+			   const char *cwd, int clen)
+{
+	struct string_tree *st;
+
+	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
+				 ext);
+	if(!st) {
+		fprintf(stderr, "Error finding bang variable: '%s'\n",
+			r->command);
+		return -1;
+	}
+	return __parse_bang_rule(tf, r, st, cwd, clen);
 }
 
 static void free_bang_tree(struct rb_root *root)
@@ -1139,16 +1159,36 @@ static int execute_rule(struct tupfile *tf, struct rule *r,
 	 * try to execute do_rule(). But an empty user string implies that no
 	 * input is required.
 	 */
-	if(!r->foreach && (r->inputs.num_entries > 0 || r->empty_input)) {
-		if(r->command[0] == '!') {
-			if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
+	if(!r->foreach) {
+		if((r->inputs.num_entries > 0 || r->empty_input)) {
+			if(r->command[0] == '!') {
+				if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
+					return -1;
+			}
+
+			if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0) < 0)
 				return -1;
+
+			delete_name_list(&r->inputs);
+		} else {
+			/* t2066 - if the inputs evaluate to empty, see if
+			 * the command was a bang rule. If so, then invoke the
+			 * .EMPTY rule if one was specified. If no empty rule
+			 * is specified, then no command is generated.
+			 */
+			if(r->command[0] == '!') {
+				int rc;
+
+				rc = parse_empty_bang_rule(tf, r, cwd, clen);
+				if(rc < 0)
+					return -1;
+				if(rc == 0) {
+					if(do_rule(tf, r, &r->inputs, cwd, clen,
+						   NULL, 0) < 0)
+						return -1;
+				}
+			}
 		}
-
-		if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0) < 0)
-			return -1;
-
-		delete_name_list(&r->inputs);
 	}
 
 	delete_name_list(&r->order_only_inputs);
