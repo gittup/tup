@@ -6,9 +6,9 @@
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 HERE
-echo "hey @CONFIG_FOO@ yo" > foo.txt
+echo "hey @FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile
-tup varsetall CONFIG_FOO=sup
+varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt
 echo "hey sup yo" | diff out.txt -

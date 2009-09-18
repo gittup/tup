@@ -7,6 +7,8 @@
 #include "fileio.h"
 #include "dirtree.h"
 #include "config.h"
+#include "vardb.h"
+#include "fslurp.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -95,32 +97,15 @@ enum {
 	_DB_RECLAIM_GHOSTS,
 	_DB_ADJUST_GHOST_SYMLINKS,
 	_DB_CLEAR_GHOST_LIST,
-	_DB_INIT_VAR_LIST,
-	_DB_VAR_LIST_FLAG_DIRS,
-	_DB_VAR_LIST_FLAG_CMDS,
-	_DB_VAR_LIST_UNFLAG_CREATE,
-	_DB_VAR_LIST_UNFLAG_MODIFY,
-	_DB_VAR_LIST_DELETE_LINKS,
-	_DB_VAR_LIST_DELETE_VARS,
-	_DB_VAR_LIST_DELETE_NODES,
+	_DB_GET_DB_VAR_TREE,
+	_DB_VAR_FLAG_DIRS,
+	_DB_VAR_FLAG_CMDS,
+	_DB_DELETE_VAR_ENTRY,
 	_DB_CHECK_EXPECTED_OUTPUTS,
 	_DB_CHECK_ACTUAL_OUTPUTS,
 	_DB_ADD_OUTPUTS,
 	_DB_REMOVE_OUTPUTS,
 	DB_NUM_STATEMENTS
-};
-
-struct var_list {
-	struct list_head vars;
-	unsigned int count;
-};
-
-struct var_entry {
-	struct list_head list;
-	const char *var;
-	const char *value;
-	int varlen;
-	int vallen;
 };
 
 struct del_entry {
@@ -156,14 +141,11 @@ static int add_ghost_dirs(void);
 static int clear_ghost_list(void);
 static int adjust_ghost_symlinks(tupid_t tupid);
 static int reclaim_ghosts(void);
-static int init_var_list(void);
-static int var_list_flag_dirs(void);
-static int var_list_flag_cmds(void);
-static int var_list_unflag_create(void);
-static int var_list_unflag_modify(void);
-static int var_list_delete_links(void);
-static int var_list_delete_vars(void);
-static int var_list_delete_nodes(void);
+static int get_db_var_tree(struct vardb *vdb);
+static int get_file_var_tree(struct vardb *vdb, int fd);
+static int var_flag_dirs(tupid_t tupid);
+static int var_flag_cmds(tupid_t tupid);
+static int delete_var_entry(tupid_t tupid);
 static int check_expected_outputs(tupid_t cmdid);
 static int check_actual_outputs(tupid_t cmdid);
 static int add_outputs(tupid_t cmdid, int *outputs_differ);
@@ -3105,8 +3087,6 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 		return -1;
 	}
 
-	tup_db_var_changed++;
-
 	return 0;
 }
 
@@ -3171,7 +3151,15 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	if(node_select(VAR_DT, var, varlen, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0) {
-		return tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
+		dbn.tupid = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
+		if(dbn.tupid < 0)
+			return -1;
+		/* I was gonna put "BOO" here, but then I realized that would
+		 * waste space and cure hiccups.
+		 */
+		if(tup_db_set_var(dbn.tupid, "") < 0)
+			return -1;
+		return dbn.tupid;
 	}
 	if(dbn.type == TUP_NODE_GHOST)
 		return dbn.tupid;
@@ -3408,62 +3396,38 @@ out_reset:
 	return rc;
 }
 
-static int write_vars_cb(void *arg, const char *var, const char *value)
+static int save_vardict_file(struct vardb *vdb)
 {
-	struct var_list *varlist = arg;
-	struct var_entry *entry;
-
-	varlist->count++;
-	entry = malloc(sizeof *entry);
-	if(!entry) {
-		perror("malloc");
-		return -1;
-	}
-	entry->var = strdup(var);
-	if(!entry->var) {
-		perror("strdup");
-		return -1;
-	}
-	entry->value = strdup(value);
-	if(!entry->value) {
-		perror("strdup");
-		return -1;
-	}
-	entry->varlen = strlen(entry->var);
-	entry->vallen = strlen(entry->value);
-	list_add_tail(&entry->list, &varlist->vars);
-	return 0;
-}
-
-int tup_db_write_vars(void)
-{
+	int dfd;
 	int fd;
 	int rc = -1;
-	struct var_list varlist;
-	struct var_entry *ent;
+	struct rb_node *rbn;
 	unsigned int x;
 
 	if(tup_db_var_changed == 0)
 		return 0;
 
-	INIT_LIST_HEAD(&varlist.vars);
-	varlist.count = 0;
-
-	/* Already at the top of the tup hierarchy because of find_tup_dir() */
-	fd = creat(TUP_VARDICT_FILE, 0666);
-	if(fd < 0) {
-		perror("creat");
+	dfd = tup_db_open_tupid(DOT_DT);
+	if(dfd < 0) {
 		return -1;
 	}
-	if(tup_db_var_foreach(write_vars_cb, &varlist) < 0)
-		goto out_err;
-	if(write(fd, &varlist.count, sizeof(varlist.count)) != sizeof(varlist.count)) {
+	fd = openat(dfd, TUP_VARDICT_FILE, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+	close(dfd);
+	if(fd < 0) {
+		perror("openat");
+		return -1;
+	}
+	if(write(fd, &vdb->count, sizeof(vdb->count)) != sizeof(vdb->count)) {
 		perror("write");
 		goto out_err;
 	}
 	/* Write out index */
 	x = 0;
-	list_for_each_entry(ent, &varlist.vars, list) {
+	for(rbn = rb_first(&vdb->tree); rbn; rbn = rb_next(rbn)) {
+		struct string_tree *st;
+		struct var_entry *ve;
+		st = rb_entry(rbn, struct string_tree, rbn);
+		ve = container_of(st, struct var_entry, var);
 		if(write(fd, &x, sizeof(x)) != sizeof(x)) {
 			perror("write");
 			goto out_err;
@@ -3471,12 +3435,17 @@ int tup_db_write_vars(void)
 		/* each line is 'variable=value', so +1 for the equals sign,
 		 * and +1 for the newline.
 		 */
-		x += ent->varlen + 1 + ent->vallen + 1;
+		x += st->len + 1 + ve->vallen + 1;
 	}
 
 	/* Write out the variables */
-	list_for_each_entry(ent, &varlist.vars, list) {
-		if(write(fd, ent->var, ent->varlen) != ent->varlen) {
+	for(rbn = rb_first(&vdb->tree); rbn; rbn = rb_next(rbn)) {
+		struct string_tree *st;
+		struct var_entry *ve;
+		st = rb_entry(rbn, struct string_tree, rbn);
+		ve = container_of(st, struct var_entry, var);
+
+		if(write(fd, st->s, st->len) != st->len) {
 			perror("write");
 			goto out_err;
 		}
@@ -3484,7 +3453,7 @@ int tup_db_write_vars(void)
 			perror("write");
 			goto out_err;
 		}
-		if(write(fd, ent->value, ent->vallen) != ent->vallen) {
+		if(write(fd, ve->value, ve->vallen) != ve->vallen) {
 			perror("write");
 			goto out_err;
 		}
@@ -3495,45 +3464,106 @@ int tup_db_write_vars(void)
 	}
 
 	rc = 0;
+	tup_db_var_changed = 0;
 out_err:
 	close(fd);
 	return rc;
 }
 
-int tup_db_var_pre(void)
+static int remove_var(struct var_entry *ve)
 {
-	if(tup_db_begin() < 0)
+	/* Skip ghosts (t3016) - they won't exist in the config (obviously),
+	 * but we want to keep them around in case they point somewhere. They
+	 * will be cleaned up naturally as part of ghost reclaimation.
+	 */
+	if(ve->type == TUP_NODE_GHOST)
+		return 0;
+	tup_db_var_changed++;
+
+	if(var_flag_dirs(ve->tupid) < 0)
 		return -1;
-	if(tup_db_request_tmp_list() < 0)
+	if(var_flag_cmds(ve->tupid) < 0)
 		return -1;
-	if(init_var_list() < 0)
+	if(delete_var_entry(ve->tupid) < 0)
+		return -1;
+	if(delete_name_file(ve->tupid) < 0)
 		return -1;
 	return 0;
 }
 
-int tup_db_var_post(void)
+static int add_var(struct var_entry *ve)
 {
-	/* This is similar to tup_del_id(), but specific to TUP_NODE_VAR. */
-	if(var_list_flag_dirs() < 0)
+	tupid_t tupid;
+
+	tup_db_var_changed++;
+
+	tupid = tup_db_create_node(VAR_DT, ve->var.s, TUP_NODE_VAR);
+	if(tupid < 0)
 		return -1;
-	if(var_list_flag_cmds() < 0)
+	return tup_db_set_var(tupid, ve->value);
+}
+
+static int compare_vars(struct var_entry *vea, struct var_entry *veb)
+{
+	if(vea->type == TUP_NODE_VAR && vea->vallen == veb->vallen &&
+	   strcmp(vea->value, veb->value) == 0) {
+		return 0;
+	}
+	tup_db_var_changed++;
+	if(vea->type == TUP_NODE_GHOST) {
+		if(tup_db_set_type(vea->tupid, TUP_NODE_VAR) < 0)
+			return -1;
+	}
+	if(tup_db_add_create_list(vea->tupid) < 0)
 		return -1;
-	if(var_list_unflag_create() < 0)
+	if(tup_db_add_modify_list(vea->tupid) < 0)
 		return -1;
-	if(var_list_unflag_modify() < 0)
+	return tup_db_set_var(vea->tupid, veb->value);
+}
+
+int tup_db_read_vars(tupid_t dt, const char *file)
+{
+	struct vardb db_tree;
+	struct vardb file_tree;
+	int dfd;
+	int fd;
+	int rc;
+
+	vardb_init(&db_tree);
+	vardb_init(&file_tree);
+	if(get_db_var_tree(&db_tree) < 0)
 		return -1;
-	if(var_list_delete_links() < 0)
+	dfd = tup_db_open_tupid(dt);
+	if(dfd < 0) {
+		fprintf(stderr, "Unable to open directory containing tup config\n");
 		return -1;
-	if(var_list_delete_vars() < 0)
+	}
+	fd = openat(dfd, file, O_RDONLY);
+	if(fd < 0) {
+		if(errno != ENOENT) {
+			perror(file);
+			return -1;
+		}
+		/* No tup.config == empty file_tree */
+		rc = 0;
+	} else {
+		rc = get_file_var_tree(&file_tree, fd);
+		close(fd);
+	}
+	close(dfd);
+	if(rc < 0)
 		return -1;
-	if(var_list_delete_nodes() < 0)
+
+	if(vardb_compare(&db_tree, &file_tree, remove_var, add_var,
+			 compare_vars) < 0)
 		return -1;
-	if(tup_db_clear_tmp_list() < 0)
+
+	if(save_vardict_file(&file_tree) < 0)
 		return -1;
-	if(tup_db_commit() < 0)
-		return -1;
-	if(tup_db_release_tmp_list() < 0)
-		return -1;
+
+	vardb_close(&file_tree);
+	vardb_close(&db_tree);
+
 	return 0;
 }
 
@@ -4781,13 +4811,14 @@ static int clear_ghost_list(void)
 	return 0;
 }
 
-static int init_var_list(void)
+static int get_db_var_tree(struct vardb *vdb)
 {
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_INIT_VAR_LIST];
-	static char s[] = "insert or replace into tmp_list select id from node where dir=? and type=?";
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_DB_VAR_TREE];
+	static char s[] = "select node.id, name, value, type from node, var where dir=? and node.id=var.id";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i, %i][0m\n", s, VAR_DT, TUP_NODE_VAR);
+	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, VAR_DT);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -4800,7 +4831,131 @@ static int init_var_list(void)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_VAR) != 0) {
+
+	do {
+		tupid_t tupid;
+		const char *var;
+		const char *value;
+		int type;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			goto out_reset;
+		}
+
+		tupid = sqlite3_column_int64(*stmt, 0);
+		var = (const char*)sqlite3_column_text(*stmt, 1);
+		value = (const char*)sqlite3_column_text(*stmt, 2);
+		type = sqlite3_column_int(*stmt, 3);
+		if(vardb_set(vdb, var, value, type, tupid) < 0)
+			return -1;
+	} while(1);
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
+static int get_file_var_tree(struct vardb *vdb, int fd)
+{
+	struct buf b;
+	char *p;
+
+	if(fslurp(fd, &b) < 0)
+		return -1;
+
+	p = b.s;
+	while(p < b.s + b.len) {
+		char *nl;
+
+		nl = strchr(p, '\n');
+		if(!nl) {
+			fprintf(stderr, "Error: No newline found in tup config file\n");
+			return -1;
+		}
+		*nl = 0;
+
+		if(nl == p)
+			goto skip;
+
+		if(p[0] == '#') {
+			if(strncmp(p, "# CONFIG_", 9) == 0) {
+				char *space;
+				space = strchr(p+9, ' ');
+				if(!space) {
+					fprintf(stderr, "Error: No space found in tup config.\nLine was: '%s'\n", p);
+					return -1;
+				}
+				*space = 0;
+				if(vardb_set(vdb, p+9, "n", TUP_NODE_VAR, -1) < 0)
+					return -1;
+			}
+		} else  {
+			char *eq;
+			char *value;
+			if(strncmp(p, "CONFIG_", 7) != 0) {
+				fprintf(stderr, "Error: Non-comment line in tup config doesn't begin with \"CONFIG_\"\nLine was: '%s'\n", p);
+				return -1;
+			}
+			eq = strchr(p, '=');
+			if(!eq) {
+				fprintf(stderr, "Error: No equals sign found in tup config.\nLine was: '%s'\n", p);
+				return -1;
+			}
+			if(eq[1] == '"') {
+				char *quote;
+				value = eq+2;
+				quote = strchr(value, '"');
+				if(!quote) {
+					fprintf(stderr, "Error: No end quote found in tup config.\nLine was: '%s'\n", p);
+					return -1;
+				}
+				*quote = 0;
+			} else {
+				value = eq+1;
+			}
+			*eq = 0;
+			if(vardb_set(vdb, p+7, value, TUP_NODE_VAR, -1) < 0)
+				return -1;
+		}
+
+skip:
+		p = nl + 1;
+	}
+
+	free(b.s);
+	return 0;
+}
+
+static int var_flag_dirs(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_FLAG_DIRS];
+	static char s[] = "insert or ignore into create_list select to_id from link, node where from_id=? and to_id=node.id and node.type=?";
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, tupid, TUP_NODE_DIR);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -4819,13 +4974,13 @@ static int init_var_list(void)
 	return 0;
 }
 
-static int var_list_flag_dirs(void)
+static int var_flag_cmds(tupid_t tupid)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_DIRS];
-	static char s[] = "insert or replace into create_list select to_id from link, node where from_id in (select tmpid from tmp_list) and to_id=node.id and node.type=?";
+	sqlite3_stmt **stmt = &stmts[_DB_VAR_FLAG_CMDS];
+	static char s[] = "insert or ignore into modify_list select to_id from link, node where from_id=? and to_id=node.id and node.type=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, TUP_NODE_DIR);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, tupid, TUP_NODE_CMD);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -4834,7 +4989,11 @@ static int var_list_flag_dirs(void)
 		}
 	}
 
-	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_DIR) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -4853,13 +5012,13 @@ static int var_list_flag_dirs(void)
 	return 0;
 }
 
-static int var_list_flag_cmds(void)
+static int delete_var_entry(tupid_t tupid)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_FLAG_CMDS];
-	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id in (select tmpid from tmp_list) and to_id=node.id and node.type=?";
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_VAR_ENTRY];
+	static char s[] = "delete from var where id=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, TUP_NODE_CMD);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -4868,7 +5027,7 @@ static int var_list_flag_cmds(void)
 		}
 	}
 
-	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_CMD) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -4883,152 +5042,6 @@ static int var_list_flag_cmds(void)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-
-	return 0;
-}
-
-static int var_list_unflag_create(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_CREATE];
-	static char s[] = "delete from create_list where id in (select tmpid from tmp_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_list_unflag_modify(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_UNFLAG_MODIFY];
-	static char s[] = "delete from modify_list where id in (select tmpid from tmp_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_list_delete_links(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_LINKS];
-	static char s[] = "delete from link where from_id in (select tmpid from tmp_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_list_delete_vars(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_VARS];
-	static char s[] = "delete from var where id in (select tmpid from tmp_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_list_delete_nodes(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_LIST_DELETE_NODES];
-	static char s[] = "delete from node where id in (select tmpid from tmp_list)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	tup_db_var_changed += sqlite3_changes(tup_db);
 
 	return 0;
 }

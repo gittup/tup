@@ -5,13 +5,13 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-var = @(CONFIG_FOO)
+var = @(FOO)
 HERE
 tup touch Tupfile
-tup varsetall CONFIG_FOO=n
+varsetall FOO=n
 update
-tup_object_exist @ CONFIG_FOO
+tup_object_exist @ FOO
 
-tup varsetall CONFIG_FOO=y
+varsetall FOO=y
 update
-tup_object_exist @ CONFIG_FOO
+tup_object_exist @ FOO

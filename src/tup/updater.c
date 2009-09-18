@@ -19,8 +19,10 @@
 #include <pthread.h>
 #include <sys/file.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 
+static int update_tup_config(void);
 static int process_create_nodes(void);
 static int process_update_nodes(void);
 static int check_create_todo(void);
@@ -115,12 +117,14 @@ int updater(int argc, char **argv, int phase)
 
 	if(server_init() < 0)
 		return -1;
+	if(update_tup_config() < 0)
+		return -1;
+	if(phase == 1) /* Collect underpants */
+		return 0;
 	if(tup_db_request_tmp_list() < 0)
 		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
-	if(phase == 1) /* Collect underpants */
-		return 0;
 	if(phase == 2) /* ? */
 		return 0;
 	if(process_update_nodes() < 0)
@@ -212,6 +216,24 @@ static int delete_files(struct graph *g)
 	if(g->delete_count) {
 		show_progress(g->delete_count, g->delete_count, NULL);
 	}
+	return 0;
+}
+
+static int update_tup_config(void)
+{
+	struct stat buf;
+
+	if(stat(TUP_CONFIG_REPARSE, &buf) < 0) {
+		if(errno == ENOENT) {
+			return 0;
+		}
+		perror(TUP_CONFIG_REPARSE);
+		return -1;
+	}
+	if(tup_db_read_vars(DOT_DT, TUP_CONFIG) < 0)
+		return -1;
+
+	unlink(TUP_CONFIG_REPARSE);
 	return 0;
 }
 
@@ -618,7 +640,7 @@ static void *create_work(void *arg)
 			  n->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
-			fprintf(stderr, "Error: Unknown node %lli named '%s' in create graph.\n", n->tnode.tupid, n->name);
+			fprintf(stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->type, n->tnode.tupid, n->name);
 			rc = -1;
 		}
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)

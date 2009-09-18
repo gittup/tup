@@ -428,7 +428,7 @@ found_paren:
 			if(append)
 				rc = vardb_append(&tf->vdb, var, value);
 			else
-				rc = vardb_set(&tf->vdb, var, value);
+				rc = vardb_set(&tf->vdb, var, value, 0, -1);
 			if(rc < 0) {
 				fprintf(stderr, "Error setting variable '%s'\n", var);
 				return -1;
@@ -1912,7 +1912,7 @@ static char *eval(struct tupfile *tf, const char *string,
 		if(*s == '\\') {
 			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
-				/* \@( becomes @ */
+				/* \@( becomes @( */
 				len++;
 				s += 2;
 			} else {
@@ -1986,7 +1986,7 @@ static char *eval(struct tupfile *tf, const char *string,
 		if(*s == '\\') {
 			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
-				/* \@( becomes @ */
+				/* \@( becomes @( */
 				*p = s[1];
 				s += 2;
 			} else {

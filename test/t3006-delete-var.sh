@@ -10,12 +10,12 @@ src-@(BLAH) = foo.c
 : foreach \$(src-y) |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile foo.c
-tup varsetall BLAH=y
+varsetall BLAH=y
 update
 tup_object_exist . "gcc -c foo.c -o foo.o"
 check_exist foo.o
 
-tup varsetall
+varsetall
 
 # BLAH isn't set, so it is treated as empty
 update

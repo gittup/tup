@@ -4,15 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct var_entry {
-	struct string_tree var;
-	char *value;
-	int vallen;
-};
-
 int vardb_init(struct vardb *v)
 {
 	v->tree.rb_node = NULL;
+	v->count = 0;
 	return 0;
 }
 
@@ -31,7 +26,8 @@ int vardb_close(struct vardb *v)
 	return 0;
 }
 
-int vardb_set(struct vardb *v, const char *var, const char *value)
+int vardb_set(struct vardb *v, const char *var, const char *value, int type,
+	      tupid_t tupid)
 {
 	struct string_tree *st;
 	struct var_entry *ve;
@@ -47,6 +43,8 @@ int vardb_set(struct vardb *v, const char *var, const char *value)
 			return -1;
 		}
 		strcpy(ve->value, value);
+		ve->type = type;
+		ve->tupid = tupid;
 		return 0;
 	} else {
 		ve = malloc(sizeof *ve);
@@ -72,6 +70,10 @@ int vardb_set(struct vardb *v, const char *var, const char *value)
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
 			return -1;
 		}
+		ve->type = type;
+		ve->tupid = tupid;
+
+		v->count++;
 		return 0;
 	}
 }
@@ -101,7 +103,7 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		ve->vallen += vallen + 1;
 		return 0;
 	} else {
-		return vardb_set(v, var, value);
+		return vardb_set(v, var, value, 0, -1);
 	}
 }
 
@@ -143,6 +145,62 @@ const char *vardb_get(struct vardb *v, const char *var)
 		return ve->value;
 	}
 	return NULL;
+}
+
+int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
+		  int (*extra_a)(struct var_entry *ve),
+		  int (*extra_b)(struct var_entry *ve),
+		  int (*same)(struct var_entry *vea, struct var_entry *veb))
+{
+	struct rb_node *na;
+	struct rb_node *nb;
+	struct string_tree *sta;
+	struct string_tree *stb;
+	struct var_entry *vea;
+	struct var_entry *veb;
+	struct rb_root *a = &vdba->tree;
+	struct rb_root *b = &vdbb->tree;
+
+	na = rb_first(a);
+	nb = rb_first(b);
+
+	while(na || nb) {
+		if(!na) {
+			stb = container_of(nb, struct string_tree, rbn);
+			veb = container_of(stb, struct var_entry, var);
+			if(extra_b && extra_b(veb) < 0)
+				return -1;
+			nb = rb_next(nb);
+		} else if(!nb) {
+			sta = container_of(na, struct string_tree, rbn);
+			vea = container_of(sta, struct var_entry, var);
+			if(extra_a && extra_a(vea) < 0)
+				return -1;
+			na = rb_next(na);
+		} else {
+			int rc;
+			sta = container_of(na, struct string_tree, rbn);
+			stb = container_of(nb, struct string_tree, rbn);
+			vea = container_of(sta, struct var_entry, var);
+			veb = container_of(stb, struct var_entry, var);
+			rc = strcmp(sta->s, stb->s);
+			if(rc == 0) {
+				if(same && same(vea, veb) < 0)
+					return -1;
+				na = rb_next(na);
+				nb = rb_next(nb);
+			} else if(rc < 0) {
+				if(extra_a && extra_a(vea) < 0)
+					return -1;
+				na = rb_next(na);
+			} else {
+				if(extra_b && extra_b(veb) < 0)
+					return -1;
+				nb = rb_next(nb);
+			}
+		}
+	}
+	return 0;
 }
 
 void vardb_dump(struct vardb *v)

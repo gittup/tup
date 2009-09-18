@@ -1,19 +1,35 @@
 #ifndef tup_vardb_h
 #define tup_vardb_h
 
+#include "tupid.h"
 #include "linux/rbtree.h"
+#include "string_tree.h"
 
 struct vardb {
 	struct rb_root tree;
+	int count;
+};
+
+struct var_entry {
+	struct string_tree var;
+	char *value;
+	int vallen;
+	int type;
+	tupid_t tupid;
 };
 
 int vardb_init(struct vardb *v);
 int vardb_close(struct vardb *v);
-int vardb_set(struct vardb *v, const char *var, const char *value);
+int vardb_set(struct vardb *v, const char *var, const char *value, int type,
+	      tupid_t tupid);
 int vardb_append(struct vardb *v, const char *var, const char *value);
 int vardb_len(struct vardb *v, const char *var, int varlen);
 int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest);
 const char *vardb_get(struct vardb *v, const char *var);
+int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
+		  int (*extra_a)(struct var_entry *ve),
+		  int (*extra_b)(struct var_entry *ve),
+		  int (*same)(struct var_entry *vea, struct var_entry *veb));
 void vardb_dump(struct vardb *v);
 
 #endif

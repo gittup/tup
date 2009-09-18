@@ -33,8 +33,6 @@ static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
-static int varsetall(int argc, char **argv);
-static int varchange(int argc, char **argv);
 static int config(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int flush(void);
@@ -96,8 +94,10 @@ int main(int argc, char **argv)
 		rc = scan(argc, argv);
 	} else if(strcmp(cmd, "link") == 0) {
 		rc = mlink(argc, argv);
-	} else if(strcmp(cmd, "parse") == 0) {
+	} else if(strcmp(cmd, "read") == 0) {
 		rc = updater(argc, argv, 1);
+	} else if(strcmp(cmd, "parse") == 0) {
+		rc = updater(argc, argv, 2);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv, 0);
 	} else if(strcmp(cmd, "todo") == 0) {
@@ -116,10 +116,6 @@ int main(int argc, char **argv)
 		rc = rm(argc, argv);
 	} else if(strcmp(cmd, "varshow") == 0) {
 		rc = varshow(argc, argv);
-	} else if(strcmp(cmd, "varsetall") == 0) {
-		rc = varsetall(argc, argv);
-	} else if(strcmp(cmd, "varchange") == 0) {
-		rc = varchange(argc, argv);
 	} else if(strcmp(cmd, "config") == 0) {
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "fake_mtime") == 0) {
@@ -662,7 +658,6 @@ static int rm(int argc, char **argv)
 	if(tup_db_begin() < 0)
 		return -1;
 	for(x=1; x<argc; x++) {
-		struct db_node dbn;
 		struct path_element *pel = NULL;
 		tupid_t dt;
 
@@ -671,11 +666,7 @@ static int rm(int argc, char **argv)
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
-			fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
-			return -1;
-		}
-		if(tup_del_id(dbn.tupid, dbn.type) < 0)
+		if(tup_file_del(dt, pel->path, pel->len) < 0)
 			return -1;
 		free(pel);
 	}
@@ -719,49 +710,6 @@ static int varshow(int argc, char **argv)
 			}
 		}
 	}
-	return 0;
-}
-
-static int varsetall(int argc, char **argv)
-{
-	int x;
-	if(tup_db_var_pre() < 0)
-		return -1;
-	for(x=1; x<argc; x++) {
-		char *var = strdup(argv[x]);
-		char *eq;
-		if(!var) {
-			perror("strdup");
-			return -1;
-		}
-		eq = strchr(var, '=');
-		if(!eq) {
-			fprintf(stderr, "Error: '%s' should be VAR=value\n",
-				var);
-			return -1;
-		}
-		*eq = 0;
-		if(create_var_file(var, eq+1) < 0)
-			return -1;
-		free(var);
-	}
-	if(tup_db_var_post() < 0)
-		return -1;
-	return 0;
-}
-
-static int varchange(int argc, char **argv)
-{
-	if(argc != 3) {
-		fprintf(stderr, "Error: varchange requires exactly two args\n");
-		return -1;
-	}
-	if(tup_db_request_tmp_list() < 0)
-		return -1;
-	if(create_var_file(argv[1], argv[2]) < 0)
-		return -1;
-	if(tup_db_release_tmp_list() < 0)
-		return -1;
 	return 0;
 }
 

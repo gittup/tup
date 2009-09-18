@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-# Check if we can remove a variable.
+# Make sure we can remove the tup.config file to clear all the variables.
 
 . ../tup.sh
 varsetall FOO=n BAR=n
@@ -11,10 +11,12 @@ tup_object_exist @ BAR
 vardict_exist FOO
 vardict_exist BAR
 
-varsetall BAR=n
+rm tup.config
+tup rm tup.config
 tup read
-tup_object_exist @ BAR
+
+tup_object_no_exist @ BAR
 tup_object_no_exist @ FOO
 
-vardict_exist BAR
+vardict_no_exist BAR
 vardict_no_exist FOO

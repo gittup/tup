@@ -2,10 +2,10 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-CONFIG_FOO := 1
+FOO := 1
 
 srcs := bar.c
-ifeq (1,\$(CONFIG_FOO))
+ifeq (1,\$(FOO))
 srcs += foo.c
 endif
 
@@ -21,7 +21,7 @@ sym_check foo.o foo
 sym_check bar.o bar main
 sym_check prog foo bar main
 
-cat Tupfile | sed 's/CONFIG_FOO := 1/CONFIG_FOO := 0/' > tmpTupfile
+cat Tupfile | sed 's/FOO := 1/FOO := 0/' > tmpTupfile
 mv tmpTupfile Tupfile
 tup touch Tupfile
 update

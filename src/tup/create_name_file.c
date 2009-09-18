@@ -105,50 +105,6 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 	return dbn.tupid;
 }
 
-tupid_t create_var_file(const char *var, const char *value)
-{
-	int rc;
-	struct db_node dbn;
-
-	if(tup_db_select_dbn(VAR_DT, var, &dbn) < 0)
-		return -1;
-	if(dbn.tupid < 0) {
-		dbn.tupid = tup_db_create_node(VAR_DT, var, TUP_NODE_VAR);
-		if(dbn.tupid < 0)
-			return -1;
-	} else {
-		if(dbn.type == TUP_NODE_VAR) {
-			char *orig_value;
-			if(tup_db_get_var_id_alloc(dbn.tupid, &orig_value) < 0)
-				return -1;
-			rc = strcmp(orig_value, value);
-			free(orig_value);
-			/* If the value hasn't changed, just make sure it isn't
-			 * scheduled for deletion.
-			 */
-			if(rc == 0) {
-				if(tup_db_unflag_tmp(dbn.tupid) < 0)
-					return -1;
-				return 0;
-			}
-		} else if(dbn.type == TUP_NODE_GHOST) {
-			if(tup_db_set_type(dbn.tupid, TUP_NODE_VAR) < 0)
-				return -1;
-		} else {
-			fprintf(stderr, "tup error: Unexpected node type %i in create_var_file(). Should be TUP_NODE_VAR or TUP_NODE_GHOST.\n", dbn.type);
-			return -1;
-		}
-
-		if(tup_db_add_create_list(dbn.tupid) < 0)
-			return -1;
-		if(tup_db_add_modify_list(dbn.tupid) < 0)
-			return -1;
-		if(tup_db_unflag_tmp(dbn.tupid) < 0)
-			return -1;
-	}
-	return tup_db_set_var(dbn.tupid, value);
-}
-
 tupid_t tup_file_mod(tupid_t dt, const char *file)
 {
 	int fd;
@@ -166,6 +122,22 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 	return tup_file_mod_mtime(dt, file, buf.st_mtime, 1);
 }
 
+static int create_reparse_file(void)
+{
+	int dfd;
+	int fd;
+	dfd = tup_db_open_tupid(DOT_DT);
+	if(dfd < 0)
+		return -1;
+	fd = openat(dfd, TUP_CONFIG_REPARSE, O_CREAT|O_WRONLY|O_TRUNC,
+		    0666);
+	if(fd < 0)
+		return -1;
+	close(fd);
+	close(dfd);
+	return 0;
+}
+
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force)
 {
@@ -178,6 +150,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(dbn.mtime != mtime || force)
 		modified = 1;
 
+	/* Need to check variables if tup.config changed. */
+	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+		return create_reparse_file();
+	}
+
 	if(dbn.tupid < 0) {
 		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
@@ -188,7 +165,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				return -1;
 		} else if(dbn.type != TUP_NODE_FILE &&
 			  dbn.type != TUP_NODE_GENERATED) {
-			fprintf(stderr, "tup error: tup_file_mod() expecting to move a file to the modify_list, but got type: %i\n", dbn.type);
+			fprintf(stderr, "tup error: tup_file_mod(%lli, %s) expecting to move a file to the modify_list, but got type: %i\n", dt, file, dbn.type);
 			return -1;
 		}
 		if(modified) {
@@ -220,11 +197,17 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	return dbn.tupid;
 }
 
-int tup_file_del(tupid_t dt, const char *file)
+int tup_file_del(tupid_t dt, const char *file, int len)
 {
 	struct db_node dbn;
 
-	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+		if(create_reparse_file() < 0)
+			return -1;
+		return 0;
+	}
+
+	if(tup_db_select_dbn_part(dt, file, len, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0) {
 		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);

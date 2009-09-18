@@ -11,7 +11,7 @@ HERE
 echo hey > foo.c
 echo yo > bar.c
 tup touch foo.c bar.c Tupfile
-tup varsetall FOO=3
+varsetall FOO=3
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
@@ -20,6 +20,6 @@ tup_object_exist @ FOO
 tup_dep_exist @ GHOST 0 .
 
 # The GHOST variable should still exist and point to the directory
-tup varsetall FOO=4
+varsetall FOO=4
 tup_object_exist @ GHOST
 tup_dep_exist @ GHOST 0 .

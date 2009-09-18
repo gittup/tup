@@ -231,7 +231,7 @@ check_no_updates()
 	mv $2_check_no_updates.bak $2
 }
 
-function gitignore_bad()
+gitignore_bad()
 {
 	if grep $1 $2 > /dev/null; then
 		echo "Error: $1 found in $2" 1>&2
@@ -239,7 +239,7 @@ function gitignore_bad()
 	fi
 }
 
-function gitignore_good()
+gitignore_good()
 {
 	if grep $1 $2 > /dev/null; then
 		:
@@ -265,4 +265,18 @@ vardict_no_exist()
 		echo "Error: $1 found in vardict file when it shouldn't" 1>&2
 		exit 1
 	fi
+}
+
+varsetall()
+{
+	rm -f tup.config
+	while [ $# -gt 0 ]; do
+		if echo "$1" | grep "=n$" > /dev/null; then
+			(echo -n "# CONFIG_"; echo -n "$1" | sed 's/=.*//'; echo " is not set") >> tup.config
+		else
+			echo CONFIG_$1 >> tup.config
+		fi
+		shift
+	done
+	tup touch tup.config
 }

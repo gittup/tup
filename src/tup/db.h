@@ -155,7 +155,7 @@ int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(const char *var, int varlen);
 tupid_t tup_db_write_var(const char *var, int varlen, int fd);
 int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg);
-int tup_db_write_vars(void);
+int tup_db_read_vars(tupid_t dt, const char *file);
 
 /* Tree operations */
 int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree, int *count);
@@ -165,10 +165,6 @@ int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree, int *count);
 int tup_db_request_tmp_list(void);
 int tup_db_release_tmp_list(void);
 int tup_db_clear_tmp_list(void);
-
-/* var tmp operations */
-int tup_db_var_pre(void);
-int tup_db_var_post(void);
 
 /* monitor tmp operations */
 int tup_db_scan_begin(void);

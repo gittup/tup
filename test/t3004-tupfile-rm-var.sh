@@ -7,18 +7,18 @@
 tmkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
-file-@(CONFIG_BAR) += bar.c
+file-@(BAR) += bar.c
 : foreach \$(file-y) |> cat %f > %o |> %F.o
 HERE
 echo hey > tmp/foo.c
 echo yo > tmp/bar.c
 tup touch tmp/foo.c tmp/bar.c tmp/Tupfile
-tup varsetall CONFIG_BAR=y
+varsetall BAR=y
 update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"
 tup_object_exist tmp "cat bar.c > bar.o"
-tup_dep_exist @ CONFIG_BAR . tmp
+tup_dep_exist @ BAR . tmp
 
 cat > tmp/Tupfile << HERE
 file-y = foo.c
@@ -29,4 +29,4 @@ update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"
 tup_object_no_exist tmp "cat bar.c > bar.o"
-tup_dep_no_exist @ CONFIG_BAR . tmp
+tup_dep_no_exist @ BAR . tmp

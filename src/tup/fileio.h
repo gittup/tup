@@ -5,6 +5,9 @@
 #include "linux/list.h"
 #include <time.h>
 
+#define TUP_CONFIG "tup.config"
+#define TUP_CONFIG_REPARSE ".tup/db-parse-config-needed"
+
 struct db_node;
 
 struct path_element {
@@ -26,11 +29,10 @@ tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 			      time_t mtime, int force);
-tupid_t create_var_file(const char *var, const char *value);
 tupid_t tup_file_mod(tupid_t dt, const char *file);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force);
-int tup_file_del(tupid_t dt, const char *file);
+int tup_file_del(tupid_t dt, const char *file, int len);
 int tup_del_id(tupid_t tupid, int type);
 int tup_del_id_quiet(tupid_t tupid, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,

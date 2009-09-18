@@ -666,7 +666,7 @@ static void handle_event(struct monitor_event *m)
 			close(fd);
 		} else {
 			tup_file_mod(dc->dt, m->e.name);
-			tup_file_del(from_dc->dt, mfe->m->e.name);
+			tup_file_del(from_dc->dt, mfe->m->e.name, -1);
 		}
 		free(mfe);
 		return;
@@ -690,7 +690,7 @@ static void handle_event(struct monitor_event *m)
 		tup_file_mod(dc->dt, m->e.name);
 	}
 	if(m->e.mask & IN_DELETE) {
-		tup_file_del(dc->dt, m->e.name);
+		tup_file_del(dc->dt, m->e.name, -1);
 	}
 	if(m->e.mask & IN_MOVED_FROM) {
 		/* IN_MOVED_FROM only happens here if the event is never
@@ -699,7 +699,7 @@ static void handle_event(struct monitor_event *m)
 		 * jurisdiction, or if the event is simply unloved and dies
 		 * alone.
 		 */
-		tup_file_del(dc->dt, m->e.name);
+		tup_file_del(dc->dt, m->e.name, -1);
 
 		/* An IN_MOVED_FROM event points to itself */
 		list_del(&m->from_event->list);

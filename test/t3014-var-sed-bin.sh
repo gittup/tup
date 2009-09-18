@@ -7,9 +7,9 @@ cat > Tupfile << HERE
 , foo.txt |> out.txt {txt}
 : foreach {txt} |> cp %f %o |> %B.copied
 HERE
-echo "hey @CONFIG_FOO@ yo" > foo.txt
+echo "hey @FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile
-tup varsetall CONFIG_FOO=sup
+varsetall FOO=sup
 update
 
 echo "hey sup yo" | diff out.copied -
