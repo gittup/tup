@@ -178,14 +178,6 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(dbn.mtime != mtime || force)
 		modified = 1;
 
-	/* Need to re-parse the Tupfile if it was changed. */
-	if(modified) {
-		if(strcmp(file, "Tupfile") == 0) {
-			if(tup_db_add_create_list(dt) < 0)
-				return -1;
-		}
-	}
-
 	if(dbn.tupid < 0) {
 		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
@@ -213,6 +205,13 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			 */
 			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
 				return -1;
+
+			/* Need to re-parse the Tupfile if it was changed. */
+			if(strcmp(file, "Tupfile") == 0) {
+				if(tup_db_add_create_list(dt) < 0)
+					return -1;
+			}
+
 			if(dbn.mtime != mtime)
 				if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
 					return -1;
