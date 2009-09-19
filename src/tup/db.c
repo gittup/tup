@@ -3343,12 +3343,12 @@ out_reset:
 	return tupid;
 }
 
-int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value), void *arg)
+int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value, int type), void *arg)
 {
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_VAR_FOREACH];
-	static char s[] = "select name, value from var, node where node.dir=? and node.id=var.id order by name";
+	static char s[] = "select name, value, type from var, node where node.dir=? and node.id=var.id order by name";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, VAR_DT);
 	if(!*stmt) {
@@ -3367,6 +3367,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 	while(1) {
 		const char *var;
 		const char *value;
+		int type;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -3381,8 +3382,9 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 
 		var = (const char *)sqlite3_column_text(*stmt, 0);
 		value = (const char *)sqlite3_column_text(*stmt, 1);
+		type = sqlite3_column_int(*stmt, 2);
 
-		if((rc = callback(arg, var, value)) < 0) {
+		if((rc = callback(arg, var, value, type)) < 0) {
 			goto out_reset;
 		}
 	}

@@ -675,10 +675,16 @@ static int rm(int argc, char **argv)
 	return 0;
 }
 
-static int varshow_cb(void *arg, const char *var, const char *value)
+static int varshow_cb(void *arg, const char *var, const char *value, int type)
 {
+	const char *color1 = "";
+	const char *color2 = "";
 	if(arg) {}
-	printf(" - Var[%s] = '%s'\n", var, value);
+	if(type == TUP_NODE_GHOST) {
+		color1 = "[47;30m";
+		color2 = "[0m";
+	}
+	printf(" - Var[%s%s%s] = '%s'\n", color1, var, color2, value);
 	return 0;
 }
 
