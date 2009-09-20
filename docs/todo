@@ -37,6 +37,7 @@ check inputs and outputs even if command fails
 
 new node gets stuck in modify (probably due to mtime)
  - not a big deal, just unnecessary
+ - maybe big deal for ghost that becomes normal file
 
 inotify out of space - print sensible error and quit?
 
