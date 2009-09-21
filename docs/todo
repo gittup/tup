@@ -97,6 +97,13 @@ indent dependent dirs while parsing?
 symlink becomes normal file retains sym field?
  - ie: foo -> bar; command does: rm foo; touch foo
 
+with -j2:
+ - start gcc -c foo.c, gcc -c bar.c
+ - bar.c fails
+ - foo.o exists, but file is marked modify?
+ - change config to remove foo.o, bar.o
+ - foo.o left lying around
+
 html:
   proof: no clean target
   graphs

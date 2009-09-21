@@ -296,14 +296,15 @@ skip_read:
 	}
 
 	while(!list_empty(&info->var_list)) {
+		tupid_t tupid;
+
 		r = list_entry(info->var_list.next, struct file_entry, list);
-		if(tup_db_select_dbn(VAR_DT, r->filename, &dbn) < 0)
-			return -1;
-		if(dbn.tupid < 0) {
+		tupid = tup_db_get_var(r->filename, -1, NULL);
+		if(tupid < 0) {
 			fprintf(stderr, "Error: Unable to find tupid for variable named '%s'\n", r->filename);
 			return -1;
 		}
-		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
+		if(tupid_tree_add_dup(&read_tree, tupid) < 0)
 			return -1;
 		del_entry(r);
 	}
