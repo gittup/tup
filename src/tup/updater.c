@@ -881,7 +881,6 @@ static int var_replace(struct node *n)
 		return -1;
 	fchdir(dfd);
 
-	printf("%s\n", input);
 	rbracket = strchr(input, '>');
 	if(rbracket == NULL) {
 		fprintf(stderr, "Unable to find '>' in var/sed command '%s'\n",
