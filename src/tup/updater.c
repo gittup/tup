@@ -686,20 +686,41 @@ static void *update_work(void *arg)
 
 		if(n->type == TUP_NODE_CMD) {
 			rc = update(n, s);
-		}
 
-		if(rc == 0) {
-			e = n->edges;
+			/* If the command succeeds, mark any next commands (ie:
+			 * our output files' output links) as modify in case we
+			 * hit an error. Note we don't just mark the output
+			 * file as modify since we aren't actually changing the
+			 * file. Doing so would muddy the semantics of the
+			 * modify list, which is needed in order to convert
+			 * generated files to normal files (t6035).
+			 */
+			if(rc == 0) {
+				pthread_mutex_lock(&db_mutex);
+				for(e=n->edges; e; e=e->next) {
+					struct edge *f;
+
+					for(f=e->dest->edges; f; f=f->next) {
+						if(f->style & TUP_LINK_NORMAL) {
+							if(tup_db_add_modify_list(f->dest->tnode.tupid) < 0)
+								rc = -1;
+						}
+					}
+				}
+				if(tup_db_unflag_modify(n->tnode.tupid) < 0)
+					rc = -1;
+				pthread_mutex_unlock(&db_mutex);
+			}
+		} else {
 			pthread_mutex_lock(&db_mutex);
-			while(e) {
-				/* Mark the next nodes as modify in case we hit
-				 * an error - we'll need to pick up there.
-				 */
+			/* Mark the next nodes as modify in case we hit
+			 * an error - we'll need to pick up there (t6006).
+			 */
+			for(e=n->edges; e; e=e->next) {
 				if(e->style & TUP_LINK_NORMAL) {
 					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
 						rc = -1;
 				}
-				e = e->next;
 			}
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;

@@ -43,6 +43,8 @@ inotify out of space - print sensible error and quit?
 
 .gitignore should be re-generated if removed by user?
 
+'tup todo': check for config update
+
 syntax: color %flags in output
 
 file: 'tcc' [150 in dir 3] - use dirtree?
