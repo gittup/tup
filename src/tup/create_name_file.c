@@ -142,13 +142,9 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force)
 {
 	struct db_node dbn;
-	int modified = 0;
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
-
-	if(dbn.mtime != mtime || force)
-		modified = 1;
 
 	/* Need to check variables if tup.config changed. */
 	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
@@ -160,6 +156,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		if(dbn.tupid < 0)
 			return -1;
 	} else {
+		int modified = 0;
+
+		if(dbn.mtime != mtime || force)
+			modified = 1;
+
 		if(dbn.type == TUP_NODE_GHOST) {
 			if(ghost_to_file(&dbn) < 0)
 				return -1;
