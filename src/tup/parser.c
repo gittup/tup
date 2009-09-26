@@ -1737,7 +1737,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 	int x;
 	const char *p;
 	const char *next;
-	const char *spc;
 	int clen = strlen(cmd);
 
 	if(cmd_len == -1) {
@@ -1746,46 +1745,44 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 	clen = cmd_len;
 
 	p = cmd;
-	while((p = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
-		int paste_chars;
+	while((next = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
+		int space_chars;
 
 		clen -= 2;
-		p++;
-		spc = p + 1;
-		while(*spc && *spc != ' ')
-			spc++;
-		paste_chars = (nl->num_entries - 1) * (spc - p);
-		if(*p == 'f') {
+		next++;
+		p = next+1;
+		space_chars = nl->num_entries - 1;
+		if(*next == 'f') {
 			if(nl->num_entries == 0) {
 				fprintf(stderr, "Error: %%f used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->totlen + paste_chars;
-		} else if(*p == 'F') {
+			clen += nl->totlen + space_chars;
+		} else if(*next == 'F') {
 			if(nl->num_entries == 0) {
 				fprintf(stderr, "Error: %%F used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->extlesstotlen + paste_chars;
-		} else if(*p == 'b') {
+			clen += nl->extlesstotlen + space_chars;
+		} else if(*next == 'b') {
 			if(nl->num_entries == 0) {
 				fprintf(stderr, "Error: %%b used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->basetotlen + paste_chars;
-		} else if(*p == 'B') {
+			clen += nl->basetotlen + space_chars;
+		} else if(*next == 'B') {
 			if(nl->num_entries == 0) {
 				fprintf(stderr, "Error: %%B used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->extlessbasetotlen + paste_chars;
-		} else if(*p == 'e') {
+			clen += nl->extlessbasetotlen + space_chars;
+		} else if(*next == 'e') {
 			if(!ext) {
 				fprintf(stderr, "Error: %%e is only valid with a foreach rule for files that have extensions.\n");
 				return NULL;
 			}
 			clen += extlen;
-		} else if(*p == 'o') {
+		} else if(*next == 'o') {
 			if(!onl) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
 				return NULL;
@@ -1812,9 +1809,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 
 		next++;
 		p = next + 1;
-		spc = p;
-		while(*spc && *spc != ' ')
-			spc++;
 		if(*next == 'f') {
 			int first = 1;
 			list_for_each_entry(nle, &nl->entries, list) {
@@ -1824,8 +1818,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->path, nle->len);
 				x += nle->len;
-				memcpy(&s[x], p, spc - p);
-				x += spc - p;
 				first = 0;
 			}
 		} else if(*next == 'F') {
@@ -1837,8 +1829,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->path, nle->extlesslen);
 				x += nle->extlesslen;
-				memcpy(&s[x], p, spc - p);
-				x += spc - p;
 				first = 0;
 			}
 		} else if(*next == 'b') {
@@ -1850,8 +1840,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->base, nle->baselen);
 				x += nle->baselen;
-				memcpy(&s[x], p, spc - p);
-				x += spc - p;
 				first = 0;
 			}
 		} else if(*next == 'B') {
@@ -1863,15 +1851,11 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->base, nle->extlessbaselen);
 				x += nle->extlessbaselen;
-				memcpy(&s[x], p, spc - p);
-				x += spc - p;
 				first = 0;
 			}
 		} else if(*next == 'e') {
 			memcpy(&s[x], ext, extlen);
 			x += extlen;
-			memcpy(&s[x], p, spc - p);
-			x += spc - p;
 		} else if(*next == 'o') {
 			int first = 1;
 			list_for_each_entry(nle, &onl->entries, list) {
@@ -1883,10 +1867,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				x += nle->len;
 				first = 0;
 			}
-			memcpy(&s[x], p, spc - p);
-			x += spc - p;
 		}
-		p = spc;
 	}
 	memcpy(&s[x], p, cmd+cmd_len - p + 1);
 	if((signed)strlen(s) != clen) {

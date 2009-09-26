@@ -41,6 +41,8 @@ new node gets stuck in modify (probably due to mtime)
 
 inotify out of space - print sensible error and quit?
 
+generated symlink becomes generated file - sym field still points somewhere which screws things up? or the actual symlink does?
+
 .gitignore should be re-generated if removed by user?
 
 'tup todo': check for config update
