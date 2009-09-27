@@ -1,0 +1,25 @@
+.gitignore
+
+CC = gcc
+
+CFLAGS += -Os
+CFLAGS += -W
+CFLAGS += -Wall
+CFLAGS += -Werror
+CFLAGS += -Wbad-function-cast
+CFLAGS += -Wcast-align
+CFLAGS += -Wcast-qual
+CFLAGS += -Wchar-subscripts
+CFLAGS += -Wmissing-prototypes
+CFLAGS += -Wnested-externs
+CFLAGS += -Wpointer-arith
+CFLAGS += -Wredundant-decls
+CFLAGS += -Wshadow
+CFLAGS += -Wstrict-prototypes
+CFLAGS += -Wwrite-strings
+CFLAGS += -fno-common
+CFLAGS += -I$(TUP_CWD)/src
+
+!cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |>
+!ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
+!ar = |> ^ AR %o^ rm -f %o; ar crs %o %f |>

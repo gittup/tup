@@ -1,0 +1,4 @@
+include_rules
+
+CFLAGS += -fpic
+: foreach *.c |> !cc |> %B.o
