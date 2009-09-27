@@ -220,18 +220,24 @@ int execv(const char *path, char *const argv[])
 
 int execl(const char *path, const char *arg, ...)
 {
+	if(path) {}
+	if(arg) {}
 	fprintf(stderr, "tup error: execl() is not supported.\n");
 	return -ENOSYS;
 }
 
 int execlp(const char *file, const char *arg, ...)
 {
+	if(file) {}
+	if(arg) {}
 	fprintf(stderr, "tup error: execlp() is not supported.\n");
 	return -ENOSYS;
 }
 
 int execle(const char *file, const char *arg, ...)
 {
+	if(file) {}
+	if(arg) {}
 	fprintf(stderr, "tup error: execle() is not supported.\n");
 	return -ENOSYS;
 }
@@ -249,19 +255,20 @@ int execvp(const char *file, char *const argv[])
 			return rc;
 		}
 	}
-	fprintf(stderr, "EXECVP: %s\n", file);
-	fprintf(stderr, "tup error: execvp() with path searching is not supported.\n");
-	return -ENOSYS;
+	rc = s_execvp(file, argv);
+	return rc;
 }
 
 int chdir(const char *path)
 {
+	if(path) {}
 	fprintf(stderr, "tup error: chdir() is not supported.\n");
 	return -ENOSYS;
 }
 
 int fchdir(int fd)
 {
+	if(fd) {}
 	fprintf(stderr, "tup error: fchdir() is not supported.\n");
 	return -ENOSYS;
 }
