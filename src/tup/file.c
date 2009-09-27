@@ -269,8 +269,7 @@ skip_sym:
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
 		if(r->pg.pg_flags & PG_HIDDEN) {
-			fprintf(stderr, "tup error: Trying to read from hidden file '%s' in command '%s'\n", r->filename, debug_name);
-			return -1;
+			goto skip_read;
 		}
 
 		dbn_tupid = get_dbn_dt_pg(dt, &r->pg, &dbn, &symlist);

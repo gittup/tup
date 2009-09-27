@@ -1,9 +1,8 @@
 #! /bin/sh -e
 
-# Make sure reading from hidden files causes a problem. Originally I let this
-# slip by ok, but I was incorrectly grouping hidden files (eg: .foo) along with
-# files that are outside of tup's view (eg: /usr/bin/gcc). Now I should be able
-# to give an error on the former while ignoring the latter.
+# Make sure we can't create hidden file nodes, or get dependencies from them
+# in commands. The commands should still work to allow things like git describe
+# to function, but in general reading from hidden files is discouraged.
 
 . ../tup.sh
 cat > Tupfile << HERE
@@ -28,5 +27,5 @@ if tup touch yo/.hidden_dir/foo; then
 	exit 1
 fi
 tup touch Tupfile
-update_fail
+update
 tup_dep_no_exist . .hidden . 'cat .hidden'
