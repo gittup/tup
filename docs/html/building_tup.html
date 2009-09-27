@@ -1,5 +1,9 @@
-<p>Once you have tup downloaded, you can try to build it by running the included Makefile. Yes, I realize it is quite hypocritical to build a build-system program with another build-system program. Maybe someday it will bootstrap. For now you can just ignore that fact. There is no configure script, so you just have to hope my C is portable, or let me know where it breaks so it can get fixed.</p>
-<p>Assuming it builds, you should have an executable named 'tup', and a library named 'ldpreload.so'. For now I just leave those there and add the tup directory to my PATH by adding a few lines to my .bashrc file. Of course you will have to change this line if your name is not marf.</p>
+<p>Once you have tup downloaded, you can bootstrap it using the bootstrap.sh script:</p>
+<pre>
+tup$ sh bootstrap.sh
+</pre>
+<p>This should build a temporary tup and tup-ldpreload.so in the build/ directory, then use that to re-build itself using the supplied Tupfiles.</p>
+<p>Assuming it builds, you should have an executable named <em>tup</em>, and a library named <em>tup-ldpreload.so</em>. For now I just leave those there and add the tup directory to my PATH by adding a few lines to my .bashrc file. Of course you will have to change this line if your name is not marf.</p>
 <pre>
 # TODO: Install somewhere real
 export PATH=$PATH:/home/marf/tup
