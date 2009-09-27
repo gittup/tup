@@ -276,7 +276,14 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			continue;
 		}
 
-		if(strncmp(line, "include ", 8) == 0) {
+		if(strcmp(line, "else") == 0) {
+			if_true = !if_true;
+		} else if(strcmp(line, "endif") == 0) {
+			/* TODO: Nested if */
+			if_true = 1;
+		} else if(!if_true) {
+			/* Skip the false part of an if block */
+		} else if(strncmp(line, "include ", 8) == 0) {
 			char *file;
 			struct name_list nl;
 			struct path_list *pl, *tmppl;
@@ -323,13 +330,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 				fprintf(stderr, "Warning: .gitignore already specified earlier in the Tupfile (line %i is redundant).\n", lno);
 			}
 			tf->ign = 1;
-		} else if(strcmp(line, "else") == 0) {
-			if_true = !if_true;
-		} else if(strcmp(line, "endif") == 0) {
-			/* TODO: Nested if */
-			if_true = 1;
-		} else if(!if_true) {
-			/* Skip the false part of an if block */
 		} else if(strncmp(line, "ifeq ", 5) == 0) {
 			char *paren;
 			char *comma;
