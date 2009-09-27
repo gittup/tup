@@ -15,10 +15,11 @@ static char ldpreload_path[PATH_MAX];
 
 int server_init(void)
 {
-	if(snprintf(ldpreload_path, sizeof(ldpreload_path), "%s/ldpreload.so",
+	if(snprintf(ldpreload_path, sizeof(ldpreload_path),
+		    "%s/tup-ldpreload.so",
 		    getexecwd()) >= (signed)sizeof(ldpreload_path)) {
-		fprintf(stderr, "Error: path for ldpreload.so library is too "
-			"long.\n");
+		fprintf(stderr, "Error: path for tup-ldpreload.so library is "
+			"too long.\n");
 		return -1;
 	}
 	return 0;

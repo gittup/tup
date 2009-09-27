@@ -3,7 +3,7 @@ srcs := $(wildcard src/*/*.c src/tup/tup/*.c)
 objs := $(addprefix $(BUILD),$(srcs:.c=.o))
 deps := $(objs:.o=.d)
 
-all: tup ldpreload.so
+all: tup tup-ldpreload.so
 
 Q=@
 
@@ -12,11 +12,11 @@ $(BUILD)src/tup/tup/main.o: CCFLAGS := $(WARNINGS)
 $(BUILD)src/sqlite3/sqlite3.o: CCFLAGS := -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0
 tup: LDFLAGS := -lpthread -ldl
 libtup.a: CCFLAGS := $(WARNINGS)
-ldpreload.so: CCFLAGS := $(WARNINGS) -fpic
-ldpreload.so: LDFLAGS := -ldl
+tup-ldpreload.so: CCFLAGS := $(WARNINGS) -fpic
+tup-ldpreload.so: LDFLAGS := -ldl
 
 tup: $(patsubst %.c,$(BUILD)%.o,$(wildcard src/tup/tup/*.c)) libtup.a
-ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
+tup-ldpreload.so: $(filter $(BUILD)src/ldpreload/%,$(objs))
 
 # The git status command seems to get rid of files that may have been touched
 # but aren't modified. Not really sure why that is, or if there's a better way
@@ -30,7 +30,7 @@ tup:
 	echo "  LD      $@";\
 	gcc -o $@ $^ $(BUILD)tup_version.o $(LDFLAGS)
 
-ldpreload.so:
+tup-ldpreload.so:
 	$Qecho "  LD.so   $@";\
 	gcc $(CCFLAGS) $(LDFLAGS) -shared -o $@ $^
 
@@ -50,4 +50,4 @@ $(objs): $(BUILD)%.o: %.c Makefile
 	@echo "  ??      $@"
 
 clean:
-	rm -f tup ldpreload.so; rm -rf build
+	rm -f tup tup-ldpreload.so; rm -rf build

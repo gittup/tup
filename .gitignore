@@ -1,5 +1,5 @@
 /build
-/ldpreload.so
+/tup-ldpreload.so
 /libtup.a
 /tup
 *.swp
