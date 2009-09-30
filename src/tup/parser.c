@@ -1513,6 +1513,34 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
+static int find_existing_command(const struct name_list *onl,
+				 struct rb_root *del_tree,
+				 tupid_t *cmdid)
+{
+	struct name_list_entry *onle;
+	list_for_each_entry(onle, &onl->entries, list) {
+		int rc;
+		tupid_t incoming;
+
+		rc = tup_db_get_incoming_link(onle->tupid, &incoming);
+		if(rc < 0)
+			return -1;
+		/* Only want commands that are still in the del_tree. Any
+		 * command not in the del_tree will mean it has already been
+		 * parsed, and so will probably cause an error later in the
+		 * duplicate link check.
+		 */
+		if(incoming != -1) {
+			if(tupid_tree_search(del_tree, incoming) != NULL) {
+				*cmdid = incoming;
+				return 0;
+			}
+		}
+	}
+	*cmdid = -1;
+	return 0;
+}
+
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *cwd, int clen, const char *ext, int extlen)
 {
@@ -1523,7 +1551,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *cmd;
 	struct path_list *pl;
 	struct tupid_tree *cmd_tt;
-	tupid_t cmdid;
+	tupid_t cmdid = -1;
 	LIST_HEAD(oplist);
 	struct rb_root tree = {NULL};
 
@@ -1600,7 +1628,15 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	free(tcmd);
 
-	cmdid = create_command_file(tf->tupid, cmd);
+	if(find_existing_command(&onl, &tf->g->delete_tree, &cmdid) < 0)
+		return -1;
+	if(cmdid == -1) {
+		cmdid = create_command_file(tf->tupid, cmd);
+	} else {
+		if(tup_db_set_name(cmdid, cmd) < 0)
+			return -1;
+	}
+
 	free(cmd);
 	if(cmdid < 0)
 		return -1;

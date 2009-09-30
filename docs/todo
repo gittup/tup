@@ -48,9 +48,6 @@ monitor rbtree instead of tmplist?
 
 print directories of Tupfiles when parsing fails
 
-when changing a command, instead of deleting the old and creating a new one, just change the name of the existing one? Should be able to uniquely identify command based on the output file(s). This would save on the database churn by not deleting all the old links, then re-creating them next time.
- - time test: Change CFLAGS in linux/compiler.tup
-
 ifneq
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c

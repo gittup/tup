@@ -38,6 +38,7 @@ enum {
 	DB_OPEN_TUPID,
 	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
+	DB_SET_NAME,
 	DB_SET_TYPE,
 	DB_SET_SYM,
 	DB_SET_MTIME,
@@ -1474,6 +1475,54 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		list_del(&he->list);
 		free(he);
 	}
+
+	return 0;
+}
+
+int tup_db_set_name(tupid_t tupid, const char *new_name)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_NAME];
+	static char s[] = "update node set name=? where id=?";
+	char *old_name;
+
+	if(tup_db_select_dirname(tupid, &old_name) < 0)
+		return -1;
+	if(strcmp(old_name, new_name) == 0) {
+		return 0;
+	}
+
+	if(sql_debug) fprintf(stderr, "%s [37m['%s', %lli][0m\n", s, new_name, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_text(*stmt, 1, new_name, -1, SQLITE_STATIC) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	/* Since we changed the name, we have to run the command again. */
+	if(tup_db_add_modify_list(tupid) < 0)
+		return -1;
 
 	return 0;
 }
