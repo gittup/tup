@@ -112,7 +112,9 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "link_exists") == 0) {
 		rc = link_exists(argc, argv);
 	} else if(strcmp(cmd, "flags_exists") == 0) {
-		rc = tup_db_check_flags();
+		rc = tup_db_check_flags(TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY);
+	} else if(strcmp(cmd, "create_flags_exists") == 0) {
+		rc = tup_db_check_flags(TUP_FLAGS_CREATE);
 	} else if(strcmp(cmd, "touch") == 0) {
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "node") == 0) {

@@ -219,7 +219,7 @@ static int delete_files(struct graph *g)
 			free(tmpn.name);
 		}
 		if(do_delete) {
-			if(tup_del_id_quiet(te->tnode.tupid, te->type) < 0)
+			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				return -1;
 		}
 		rb_erase(rbn, &g->delete_tree);

@@ -34,7 +34,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force);
 int tup_file_del(tupid_t dt, const char *file, int len);
 int tup_del_id(tupid_t tupid, int type);
-int tup_del_id_quiet(tupid_t tupid, int type);
+int tup_del_id_force(tupid_t tupid, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
 tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,

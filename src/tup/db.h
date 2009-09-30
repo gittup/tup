@@ -75,7 +75,7 @@ int tup_db_create(int db_sync);
 int tup_db_begin(void);
 int tup_db_commit(void);
 int tup_db_rollback(void);
-int tup_db_check_flags(void);
+int tup_db_check_flags(int flags);
 int tup_db_check_dup_links(void);
 void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);

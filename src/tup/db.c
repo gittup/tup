@@ -633,28 +633,32 @@ static int check_flags_cb(void *arg, int argc, char **argv, char **col)
 	return 0;
 }
 
-int tup_db_check_flags(void)
+int tup_db_check_flags(int flags)
 {
 	int rc = 0;
 	char *errmsg;
 	char s1[] = "select * from create_list";
 	char s2[] = "select * from modify_list";
 
-	if(sql_debug) fprintf(stderr, "%s\n", s1);
-	check_flags_name = "create";
-	if(sqlite3_exec(tup_db, s1, check_flags_cb, &rc, &errmsg) != 0) {
-		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
-			errmsg, s1);
-		sqlite3_free(errmsg);
-		return -1;
+	if(flags & TUP_FLAGS_CREATE) {
+		if(sql_debug) fprintf(stderr, "%s\n", s1);
+		check_flags_name = "create";
+		if(sqlite3_exec(tup_db, s1, check_flags_cb, &rc, &errmsg) != 0) {
+			fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+				errmsg, s1);
+			sqlite3_free(errmsg);
+			return -1;
+		}
 	}
-	if(sql_debug) fprintf(stderr, "%s\n", s2);
-	check_flags_name = "modify";
-	if(sqlite3_exec(tup_db, s2, check_flags_cb, &rc, &errmsg) != 0) {
-		fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
-			errmsg, s2);
-		sqlite3_free(errmsg);
-		return -1;
+	if(flags & TUP_FLAGS_MODIFY) {
+		if(sql_debug) fprintf(stderr, "%s\n", s2);
+		check_flags_name = "modify";
+		if(sqlite3_exec(tup_db, s2, check_flags_cb, &rc, &errmsg) != 0) {
+			fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+				errmsg, s2);
+			sqlite3_free(errmsg);
+			return -1;
+		}
 	}
 	return rc;
 }
@@ -1175,8 +1179,8 @@ int tup_db_delete_dir(tupid_t dt)
 	while(!list_empty(&subdir_list)) {
 		struct half_entry *he = list_entry(subdir_list.next,
 						   struct half_entry, list);
-		/* tup_del_id may call back to tup_db_delete_dir() */
-		if(tup_del_id(he->tupid, he->type) < 0)
+		/* tup_del_id_force may call back to tup_db_delete_dir() */
+		if(tup_del_id_force(he->tupid, he->type) < 0)
 			return -1;
 		list_del(&he->list);
 		free(he);

@@ -17,7 +17,7 @@ struct id_flags {
 	int flags;
 };
 
-static int tup_del_id_type(tupid_t tupid, int type, int quiet);
+static int tup_del_id_type(tupid_t tupid, int type, int force);
 static int ghost_to_file(struct db_node *dbn);
 
 tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime)
@@ -222,21 +222,17 @@ int tup_del_id(tupid_t tupid, int type)
 	return tup_del_id_type(tupid, type, 0);
 }
 
-int tup_del_id_quiet(tupid_t tupid, int type)
+int tup_del_id_force(tupid_t tupid, int type)
 {
 	return tup_del_id_type(tupid, type, 1);
 }
 
-static int tup_del_id_type(tupid_t tupid, int type, int quiet)
+static int tup_del_id_type(tupid_t tupid, int type, int force)
 {
 	if(type == TUP_NODE_DIR) {
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
-		if(quiet) {
-			fprintf(stderr, "tup error: tup_del_id_type() with TUP_NODE_DIR shouldn't be quiet.\n");
-			return -1;
-		}
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
 	}
@@ -244,12 +240,12 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 	/* If a file was deleted and it was created by a command, set the
 	 * command's flags to modify. For example, if foo.o was deleted, we set
 	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed. This
-	 * only happens if a file was deleted outside of the parser (!quiet).
+	 * only happens if a file was deleted outside of the parser (!force).
 	 *
 	 * This is really just to mimic what people would expect from make.
 	 * Randomly deleting object files is pretty stupid.
 	 */
-	if(type == TUP_NODE_GENERATED && !quiet) {
+	if(type == TUP_NODE_GENERATED && !force) {
 		int modified = 0;
 
 		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
@@ -260,6 +256,12 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 		 */
 		if(modified == 1)
 			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
+		/* If we're not forcing the deletion, just return here (the
+		 * node won't actually be removed from tup). The fact that the
+		 * command is in modify will take care of dependencies, and
+		 * we don't want to put the directory back in create (t6036).
+		 */
+		return 0;
 	}
 
 	if(type == TUP_NODE_FILE || type == TUP_NODE_DIR) {
@@ -278,7 +280,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int quiet)
 		if(tup_db_modify_cmds_by_input(tupid) < 0)
 			return -1;
 
-		if(!quiet) {
+		if(!force) {
 			/* Re-parse the current Tupfile (the updater
 			 * automatically parses any dependent directories).
 			 */
