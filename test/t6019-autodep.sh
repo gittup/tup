@@ -28,7 +28,7 @@ check_exist foo.o bar.o
 rm foo.o bar.o
 
 tup touch foo.h.in
-update
+update --no-scan
 check_exist foo.o
 check_not_exist bar.o
 
@@ -38,10 +38,10 @@ cat > bar.c << HERE
 int bar(void) {return FOO;}
 HERE
 tup touch bar.c
-update
+update --no-scan
 check_exist bar.o
 
 rm foo.o bar.o
 tup touch foo.h.in
-update
+update --no-scan
 check_exist foo.o bar.o

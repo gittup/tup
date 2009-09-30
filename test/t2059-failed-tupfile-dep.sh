@@ -13,7 +13,7 @@ cat > bar/Tupfile << HERE
 : ../foo/*.c |> cp %f %o |> output
 HERE
 tup touch foo/Tupfile bar/Tupfile foo/ok.txt
-tup upd
+update
 
 # Change yo.h to yo.c so the second rule in bar/Tupfile is triggered to also
 # hit the same output file (thus causing an error).

@@ -8,4 +8,4 @@ cat > Tupfile << HERE
 : |> echo foo > .hidden |>
 HERE
 tup touch Tupfile
-tup upd
+update

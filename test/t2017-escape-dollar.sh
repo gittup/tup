@@ -8,6 +8,6 @@ cat > Tupfile << HERE
 : |> echo \\\$(ls) |>
 HERE
 tup touch Tupfile
-tup upd
+update
 tup_object_exist . 'FOO="hey"; export FOO; echo $FOO'
 tup_object_exist . 'echo $(ls)'

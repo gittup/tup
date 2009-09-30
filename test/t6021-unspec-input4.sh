@@ -27,4 +27,4 @@ cat > foo.c << HERE
 int main(void) {return 7;}
 HERE
 tup touch Tupfile foo.c
-tup upd
+update

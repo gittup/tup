@@ -208,7 +208,7 @@ check_updates()
 	fi
 	rm $2
 	tup touch $1
-	update
+	update --no-scan
 	if [ ! -f $2 ]; then
 		echo "check_updates($1, $2) failed to re-create $2"
 		exit 1
@@ -223,7 +223,7 @@ check_no_updates()
 	fi
 	mv $2 $2_check_no_updates.bak
 	tup touch $1
-	update
+	update --no-scan
 	if [ -f $2 ]; then
 		echo "check_no_updates($1, $2) re-created $2 when it shouldn't have"
 		exit 1

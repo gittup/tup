@@ -16,5 +16,5 @@ cat > Tupfile << HERE
 HERE
 cat Tupfile
 tup touch Tupfile
-tup upd
+update
 echo 'fo3' | diff - out.txt

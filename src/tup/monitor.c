@@ -18,6 +18,7 @@
  *                 not yet created on bar, repeat step 1 on bar.
  */
 
+#define _ATFILE_SOURCE
 #include "monitor.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@
 #include "lock.h"
 #include "updater.h"
 #include "path.h"
+#include "fslurp.h"
 #include "linux/rbtree.h"
 
 #define MONITOR_LOOP_RETRY -2
@@ -54,6 +56,7 @@ struct moved_from_event {
 	struct monitor_event *m;
 };
 
+static int monitor_set_pid(int pid);
 static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
@@ -100,7 +103,7 @@ int monitor(int argc, char **argv)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 
-	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
+	mon_lock = openat(tup_top_fd(), TUP_MONITOR_LOCK, O_WRONLY);
 	if(mon_lock < 0) {
 		perror(TUP_MONITOR_LOCK);
 		return -1;
@@ -152,7 +155,10 @@ int monitor(int argc, char **argv)
 	if(fork() > 0)
 		exit(0);
 
-	tup_db_config_set_int(MONITOR_PID_CFG, getpid());
+	if(monitor_set_pid(getpid()) < 0) {
+		rc = -1;
+		goto close_inot;
+	}
 
 	do {
 		rc = monitor_loop();
@@ -191,6 +197,82 @@ close_inot:
 	close(inot_fd);
 close_monlock:
 	close(mon_lock);
+	return rc;
+}
+
+static int monitor_set_pid(int pid)
+{
+	char buf[32];
+	int len;
+	int fd;
+
+	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+	if(fd < 0) {
+		perror(MONITOR_PID_FILE);
+		return -1;
+	}
+	if(flock(fd, LOCK_EX) < 0) {
+		perror("flock");
+		return -1;
+	}
+	len = snprintf(buf, sizeof(buf), "%i", pid);
+	if(len >= (signed)sizeof(buf)) {
+		fprintf(stderr, "Buf is sized too small in monitor_set_pid\n");
+		return -1;
+	}
+	write(fd, buf, len);
+	ftruncate(fd, len);
+	if(flock(fd, LOCK_UN) < 0) {
+		perror("flock");
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+int monitor_get_pid(void)
+{
+	struct buf b;
+	int fd;
+	int rc = 0;
+
+	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDONLY, 0666);
+	if(fd < 0) {
+		if(errno != ENOENT) {
+			perror(MONITOR_PID_FILE);
+			return -1;
+		}
+		return -1;
+	}
+	if(flock(fd, LOCK_EX) < 0) {
+		perror("flock");
+		return -1;
+	}
+	if(fslurp(fd, &b) < 0) {
+		rc = -1;
+		goto out;
+	}
+
+	rc = strtol(b.s, NULL, 0);
+
+	if(rc > 0) {
+		/* Just using getpriority() to see if the monitor process is
+		 * alive.
+		 */
+		errno = 0;
+		if(getpriority(PRIO_PROCESS, rc) == -1 && errno == ESRCH) {
+			printf("Monitor pid %i doesn't exist anymore.\n", rc);
+			monitor_set_pid(-1);
+			rc = -1;
+		}
+	}
+	free(b.s);
+out:
+	if(flock(fd, LOCK_UN) < 0) {
+		perror("flock");
+		return -1;
+	}
+	close(fd);
 	return rc;
 }
 
@@ -308,33 +390,24 @@ static int monitor_loop(void)
 	return 0;
 }
 
-int stop_monitor(int argc, char **argv)
+int stop_monitor(void)
 {
-	int mon_lock;
 	int pid;
 
-	if(argc) {}
-	if(argv) {}
+	if(find_tup_dir() < 0)
+		return -1;
 
-	pid = tup_db_config_get_int(MONITOR_PID_CFG);
+	pid = monitor_get_pid();
 	if(pid < 0) {
 		printf("No monitor process to kill (pid < 0)\n");
 		return 0;
 	}
-	/* Just using getpriority() to see if the monitor process is alive. */
-	errno = 0;
-	if(getpriority(PRIO_PROCESS, pid) == -1 && errno == ESRCH) {
-		printf("Monitor pid %i doesn't exist anymore.\n", pid);
-	} else {
-		printf("Shutting down monitor.\n");
-	}
-	mon_lock = open(TUP_MONITOR_LOCK, O_RDONLY);
-	if(mon_lock < 0) {
-		perror(TUP_MONITOR_LOCK);
+	printf("Shutting down monitor.\n");
+	if(kill(pid, SIGKILL) < 0) {
+		perror("kill");
 		return -1;
 	}
-	close(mon_lock);
-	tup_db_config_set_int(MONITOR_PID_CFG, -1);
+	monitor_set_pid(-1);
 
 	return 0;
 }
@@ -709,7 +782,7 @@ static void handle_event(struct monitor_event *m)
 static void sighandler(int sig)
 {
 	if(sig) {}
-	tup_db_config_set_int(MONITOR_PID_CFG, -1);
+	monitor_set_pid(-1);
 	/* TODO: gracefully close, or something? */
 	exit(0);
 }

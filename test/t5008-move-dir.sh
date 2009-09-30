@@ -16,7 +16,8 @@ sym_check a/prog main
 mv a b
 tup rm a
 tup touch b b/foo.c b/Tupfile
-update
+# TODO: instead of --no-scan, use --overwrite-outputs or some such
+update --no-scan
 tup_object_exist . b
 tup_object_exist b foo.c foo.o prog
 tup_object_no_exist . a

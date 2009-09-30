@@ -5,7 +5,9 @@
 #include "path.h"
 #include "flist.h"
 #include "fileio.h"
+#include "monitor.h"
 #include "db.h"
+#include "config.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -89,4 +91,15 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 			file);
 		return -1;
 	}
+}
+
+int tup_scan(void)
+{
+	if(tup_db_scan_begin() < 0)
+		return -1;
+	if(watch_path(0, tup_top_fd(), ".", 1, NULL) < 0)
+		return -1;
+	if(tup_db_scan_end() < 0)
+		return -1;
+	return 0;
 }

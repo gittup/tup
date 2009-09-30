@@ -11,6 +11,8 @@
 #include "fslurp.h"
 #include "array_size.h"
 #include "config.h"
+#include "monitor.h"
+#include "path.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,6 +90,7 @@ struct work_rc {
 int updater(int argc, char **argv, int phase)
 {
 	int x;
+	int do_scan = 1;
 
 	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
@@ -105,6 +108,8 @@ int updater(int argc, char **argv, int phase)
 			do_keep_going = 1;
 		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
 			do_keep_going = 0;
+		} else if(strcmp(argv[x], "--no-scan") == 0) {
+			do_scan = 0;
 		} else if(strncmp(argv[x], "-j", 2) == 0) {
 			num_jobs = strtol(argv[x]+2, NULL, 0);
 		}
@@ -115,6 +120,13 @@ int updater(int argc, char **argv, int phase)
 		num_jobs = 1;
 	}
 
+	if(do_scan) {
+		if(monitor_get_pid() < 0) {
+			printf("Scanning filesystem...\n");
+			if(tup_scan() < 0)
+				return -1;
+		}
+	}
 	if(server_init() < 0)
 		return -1;
 	if(update_tup_config() < 0)

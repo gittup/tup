@@ -15,7 +15,7 @@ if tup scan 2>&1 | grep 'tup warning'; then
 	exit 1
 fi
 
-tup upd
+update
 rm -f foo.o
 
 if tup scan 2>&1 | grep 'tup warning'; then

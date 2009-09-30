@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %F.o
 HERE
 tup touch Tupfile
-tup upd
+update
 sym_check foo.o foo
 sym_check bar.o bar
 

@@ -18,7 +18,8 @@ sym_check a/a2/prog main
 mv a b
 tup rm a
 tup touch b b/a2 b/a2/foo.c b/a2/Tupfile
-update
+# TODO: replace with --overwrite-outputs
+update --no-scan
 tup_object_exist . b
 tup_object_exist b a2
 tup_object_exist b/a2 foo.c foo.o prog 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog'

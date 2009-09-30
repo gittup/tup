@@ -31,5 +31,5 @@ tup_dep_no_exist . ghost . './ok.sh > output.txt'
 echo 'hey' > ghost
 tup touch ghost
 rm -f output.txt
-update
+update --no-scan
 check_not_exist output.txt

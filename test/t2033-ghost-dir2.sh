@@ -24,14 +24,14 @@ rm -f output.txt
 # Create 'secret' as a file - ghost should still be reachable
 echo 'foo' > secret
 tup touch secret
-update
+update --no-scan
 tup_object_exist secret ghost
 check_not_exist output.txt
 
 # Delete the file - ghost should still be reachable
 rm -f secret
 tup rm secret
-update
+update --no-scan
 tup_object_exist secret ghost
 check_not_exist output.txt
 

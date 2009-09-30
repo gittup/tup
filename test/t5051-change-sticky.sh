@@ -28,7 +28,7 @@ cat > headers/Tupfile << HERE
 : |> echo '#define BAR 3' > %o |> bar.h
 HERE
 tup touch headers/Tupfile
-update
+update --no-scan
 
 check_not_exist foo.o
 tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
@@ -39,7 +39,7 @@ cat > headers/Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h
 HERE
 tup touch headers/Tupfile
-update
+update --no-scan
 
 check_not_exist foo.o
 tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
@@ -54,6 +54,6 @@ update_fail_msg "headers/foo.h: No such file or directory"
 # Fix the C file and re-build
 echo '' > foo.c
 tup touch foo.c
-update
+update --no-scan
 tup_dep_no_exist headers foo.h . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist headers bar.h . 'gcc -c foo.c -o foo.o'

@@ -24,7 +24,8 @@ tup touch b b/a2 b/a2/foo.c b/a2/Tupfile
 mv b a
 tup rm b
 tup touch a a/a2 a/a2/foo.c a/a2/Tupfile
-update
+# TODO: Replace with --overwrite-outputs
+update --no-scan
 tup_object_exist . a
 tup_object_exist a a2
 tup_object_exist a/a2 foo.c foo.o prog 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog'

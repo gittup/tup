@@ -24,7 +24,6 @@ static int file_exists(const char *s);
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct db_node *dbn, int style);
 static int graph(int argc, char **argv);
-static int scan(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
 static int node_exists(int argc, char **argv);
@@ -60,6 +59,8 @@ int main(int argc, char **argv)
 		  strcmp(argv[1], "-v") == 0) {
 		printf("tup %s\n", tup_version());
 		return 0;
+	} else if(strcmp(argv[1], "stop") == 0) {
+		return stop_monitor();
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {
@@ -86,12 +87,16 @@ int main(int argc, char **argv)
 	argv++;
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
-	} else if(strcmp(cmd, "stop") == 0) {
-		rc = stop_monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
-		rc = scan(argc, argv);
+		int pid;
+		pid = monitor_get_pid();
+		if(pid > 0) {
+			fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
+			return -1;
+		}
+		rc = tup_scan();
 	} else if(strcmp(cmd, "link") == 0) {
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "read") == 0) {
@@ -362,28 +367,6 @@ static int graph(int argc, char **argv)
 	}
 	printf("}\n");
 	destroy_graph(&g);
-	return 0;
-}
-
-static int scan(int argc, char **argv)
-{
-	int pid;
-
-	if(argc) {/* unused */}
-	if(argv) {/* unused */}
-
-	pid = tup_db_config_get_int(MONITOR_PID_CFG);
-	if(pid > 0) {
-		fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
-		return -1;
-	}
-
-	if(tup_db_scan_begin() < 0)
-		return -1;
-	if(watch_path(0, tup_top_fd(), ".", 1, NULL) < 0)
-		return -1;
-	if(tup_db_scan_end() < 0)
-		return -1;
 	return 0;
 }
 

@@ -24,7 +24,7 @@ sym_check bar.o bar1 ~x
 rm foo.o
 ln bar.o oldbar.o
 tup touch foo.h
-update
+update --no-scan
 check_same_link bar.o oldbar.o
 rm oldbar.o
 sym_check foo.o main x
