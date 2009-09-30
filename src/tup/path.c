@@ -57,8 +57,10 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 				return -1;
 		}
 
-		if(callback)
-			callback(newdt, dfd, file);
+		if(callback) {
+			if(callback(newdt, dfd, file) < 0)
+				return -1;
+		}
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {

@@ -70,6 +70,7 @@ static int ephemeral_event(struct inotify_event *e);
 static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void handle_event(struct monitor_event *m);
+static void pinotify(void);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -122,7 +123,7 @@ int monitor(int argc, char **argv)
 
 	tup_wd = inotify_add_watch(inot_fd, TUP_DIR, IN_DELETE);
 	if(tup_wd < 0) {
-		perror("inotify_add_watch");
+		pinotify();
 		rc = -1;
 		goto close_inot;
 	}
@@ -134,14 +135,14 @@ int monitor(int argc, char **argv)
 	 */
 	obj_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
 	if(obj_wd < 0) {
-		perror("inotify_add_watch");
+		pinotify();
 		rc = -1;
 		goto close_inot;
 	}
 
 	mon_wd = inotify_add_watch(inot_fd, TUP_MONITOR_LOCK, IN_OPEN);
 	if(mon_wd < 0) {
-		perror("inotify_add_watch");
+		pinotify();
 		rc = -1;
 		goto close_inot;
 	}
@@ -192,6 +193,7 @@ int monitor(int argc, char **argv)
 			}
 		}
 	} while(rc == MONITOR_LOOP_RETRY);
+	monitor_set_pid(-1);
 
 close_inot:
 	close(inot_fd);
@@ -234,7 +236,7 @@ int monitor_get_pid(void)
 {
 	struct buf b;
 	int fd;
-	int rc = 0;
+	int rc = -1;
 
 	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDONLY, 0666);
 	if(fd < 0) {
@@ -249,11 +251,19 @@ int monitor_get_pid(void)
 		return -1;
 	}
 	if(fslurp(fd, &b) < 0) {
-		rc = -1;
 		goto out;
 	}
 
-	rc = strtol(b.s, NULL, 0);
+	if(b.len > 0) {
+		rc = strtol(b.s, NULL, 0);
+	}
+	free(b.s);
+out:
+	if(flock(fd, LOCK_UN) < 0) {
+		perror("flock");
+		return -1;
+	}
+	close(fd);
 
 	if(rc > 0) {
 		/* Just using getpriority() to see if the monitor process is
@@ -266,13 +276,6 @@ int monitor_get_pid(void)
 			rc = -1;
 		}
 	}
-	free(b.s);
-out:
-	if(flock(fd, LOCK_UN) < 0) {
-		perror("flock");
-		return -1;
-	}
-	close(fd);
 	return rc;
 }
 
@@ -423,7 +426,7 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
-		perror("inotify_add_watch");
+		pinotify();
 		return -1;
 	}
 
@@ -776,6 +779,14 @@ static void handle_event(struct monitor_event *m)
 
 		/* An IN_MOVED_FROM event points to itself */
 		list_del(&m->from_event->list);
+	}
+}
+
+static void pinotify(void)
+{
+	perror("inotify_add_watch");
+	if(errno == ENOSPC) {
+		fprintf(stderr, "tup: try to increase /proc/sys/fs/inotify/max_user_watches ?\n");
 	}
 }
 
