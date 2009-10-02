@@ -1491,7 +1491,9 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 
 	if(tup_db_select_dirname(tupid, &old_name) < 0)
 		return -1;
-	if(strcmp(old_name, new_name) == 0) {
+	rc = strcmp(old_name, new_name);
+	free(old_name);
+	if(rc == 0) {
 		return 0;
 	}
 
