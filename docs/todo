@@ -44,8 +44,6 @@ file: 'tcc' [150 in dir 3] - use dirtree?
 kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try to hit ctrl-c twice)
  - might have to worry about a file being written, but the notification of it doesn't reach tup
 
-monitor rbtree instead of tmplist?
-
 print directories of Tupfiles when parsing fails
 
 ifneq

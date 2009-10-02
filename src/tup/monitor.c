@@ -285,20 +285,16 @@ static int monitor_loop(void)
 	int rc;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
+	struct rb_root scan_tree = RB_ROOT;
 	int locked = 1;
 
-	/* Use tmp_list to store all file objects in a list. We then start to
-	 * watch the filesystem, and remove all existing objects from the tmp
-	 * list. Anything leftover in tmp must have been deleted while the
-	 * monitor wasn't looking.
-	 */
 	gettimeofday(&t1, NULL);
 
-	if(tup_db_scan_begin() < 0)
+	if(tup_db_scan_begin(&scan_tree) < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", 1, wp_callback) < 0)
+	if(watch_path(0, tup_top_fd(), ".", &scan_tree, wp_callback) < 0)
 		return -1;
-	if(tup_db_scan_end() < 0)
+	if(tup_db_scan_end(&scan_tree) < 0)
 		return -1;
 
 	gettimeofday(&t2, NULL);
@@ -738,7 +734,7 @@ static void handle_event(struct monitor_event *m)
 			fd = tup_db_open_tupid(dc->dt);
 			if(fd < 0)
 				return;
-			watch_path(dc->dt, fd, m->e.name, 0, wp_callback);
+			watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
 			close(fd);
 		} else {
 			tup_file_mod(dc->dt, m->e.name);
@@ -757,7 +753,7 @@ static void handle_event(struct monitor_event *m)
 		fd = tup_db_open_tupid(dc->dt);
 		if(fd < 0)
 			return;
-		watch_path(dc->dt, fd, m->e.name, 0, wp_callback);
+		watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
 		close(fd);
 		return;
 	}

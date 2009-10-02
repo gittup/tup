@@ -42,11 +42,6 @@ struct half_entry {
 	int type;
 };
 
-struct tree_entry {
-	struct tupid_tree tnode;
-	int type;
-};
-
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
 	TUP_NODE_CMD,
@@ -167,12 +162,9 @@ int tup_db_request_tmp_list(void);
 int tup_db_release_tmp_list(void);
 int tup_db_clear_tmp_list(void);
 
-/* monitor tmp operations */
-int tup_db_scan_begin(void);
-int tup_db_scan_end(void);
-int tup_db_files_to_tmp(void);
-int tup_db_unflag_tmp(tupid_t tupid);
-int tup_db_get_all_in_tmp(struct list_head *list);
+/* scanner operations */
+int tup_db_scan_begin(struct rb_root *tree);
+int tup_db_scan_end(struct rb_root *tree);
 
 /* updater tmp operations */
 int tup_db_add_write_list(tupid_t tupid);

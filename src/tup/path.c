@@ -8,12 +8,13 @@
 #include "monitor.h"
 #include "db.h"
 #include "config.h"
+#include "tupid_tree.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
-int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
+int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 	       int (*callback)(tupid_t newdt, int dfd, const char *file))
 {
 	struct flist f = {0, 0, 0};
@@ -31,9 +32,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 		tupid = tup_file_mod_mtime(dt, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
-		if(tmp_list) {
-			if(tup_db_unflag_tmp(tupid) < 0)
-				return -1;
+		if(tree) {
+			tree_entry_remove(tree, tupid, NULL);
 		}
 		return 0;
 	} else if(S_ISLNK(buf.st_mode)) {
@@ -42,9 +42,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 		tupid = update_symlink_fileat(dt, dfd, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
-		if(tmp_list) {
-			if(tup_db_unflag_tmp(tupid) < 0)
-				return -1;
+		if(tree) {
+			tree_entry_remove(tree, tupid, NULL);
 		}
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
@@ -52,9 +51,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 		int flistfd;
 
 		newdt = create_dir_file(dt, file);
-		if(tmp_list) {
-			if(tup_db_unflag_tmp(newdt) < 0)
-				return -1;
+		if(tree) {
+			tree_entry_remove(tree, newdt, NULL);
 		}
 
 		if(callback) {
@@ -82,7 +80,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 		flist_foreachfd(&f, flistfd) {
 			if(f.filename[0] == '.')
 				continue;
-			if(watch_path(newdt, newfd, f.filename, tmp_list,
+			if(watch_path(newdt, newfd, f.filename, tree,
 				      callback) < 0)
 				return -1;
 		}
@@ -97,11 +95,12 @@ int watch_path(tupid_t dt, int dfd, const char *file, int tmp_list,
 
 int tup_scan(void)
 {
-	if(tup_db_scan_begin() < 0)
+	struct rb_root scan_tree = RB_ROOT;
+	if(tup_db_scan_begin(&scan_tree) < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", 1, NULL) < 0)
+	if(watch_path(0, tup_top_fd(), ".", &scan_tree, NULL) < 0)
 		return -1;
-	if(tup_db_scan_end() < 0)
+	if(tup_db_scan_end(&scan_tree) < 0)
 		return -1;
 	return 0;
 }

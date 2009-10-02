@@ -540,21 +540,6 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	return include_name_list(tf, &nl, cwd, clen);
 }
 
-static void tree_entry_remove(struct graph *g, tupid_t tupid)
-{
-	struct tree_entry *te;
-	struct tupid_tree *tt;
-
-	tt = tupid_tree_search(&g->delete_tree, tupid);
-	if(!tt)
-		return;
-	rb_erase(&tt->rbn, &g->delete_tree);
-	te = container_of(tt, struct tree_entry, tnode);
-	if(te->type == TUP_NODE_GENERATED)
-		g->delete_count--;
-	free(te);
-}
-
 static int gitignore(struct tupfile *tf)
 {
 	char *s;
@@ -579,7 +564,8 @@ static int gitignore(struct tupfile *tf)
 			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
 				return -1;
 		} else {
-			tree_entry_remove(tf->g, dbn.tupid);
+			tree_entry_remove(&tf->g->delete_tree, dbn.tupid,
+					  &tf->g->delete_count);
 		}
 
 		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
@@ -1652,7 +1638,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		tup_db_print(stderr, cmdid);
 		return -1;
 	}
-	tree_entry_remove(tf->g, cmdid);
+	tree_entry_remove(&tf->g->delete_tree, cmdid, &tf->g->delete_count);
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
@@ -1666,7 +1652,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 		delete_name_list_entry(&onl, onle);
-		tree_entry_remove(tf->g, onle->tupid);
+		tree_entry_remove(&tf->g->delete_tree, onle->tupid,
+				  &tf->g->delete_count);
 	}
 
 	if(tup_db_write_outputs(cmdid) < 0)

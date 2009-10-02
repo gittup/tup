@@ -91,3 +91,40 @@ void free_tupid_tree(struct rb_root *root)
 		free(tt);
 	}
 }
+
+int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count)
+{
+	struct tree_entry *te;
+
+	te = malloc(sizeof *te);
+	if(!te) {
+		perror("malloc");
+		return -1;
+	}
+	te->tnode.tupid = tupid;
+	te->type = type;
+	if(tupid_tree_insert(tree, &te->tnode) < 0) {
+		fprintf(stderr, "tup internal error: Duplicate tupid %lli in tree_entry_add?\n", tupid);
+		return -1;
+		free(te);
+	} else {
+		if(type == TUP_NODE_GENERATED && count)
+			(*count)++;
+	}
+	return 0;
+}
+
+void tree_entry_remove(struct rb_root *tree, tupid_t tupid, int *count)
+{
+	struct tree_entry *te;
+	struct tupid_tree *tt;
+
+	tt = tupid_tree_search(tree, tupid);
+	if(!tt)
+		return;
+	rb_erase(&tt->rbn, tree);
+	te = container_of(tt, struct tree_entry, tnode);
+	if(te->type == TUP_NODE_GENERATED && count)
+		(*count)--;
+	free(te);
+}
