@@ -126,6 +126,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       int lno);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct list_head *symlist);
+static void del_pl(struct path_list *pl);
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 				    struct graph *g);
 static int get_name_list(struct tupfile *tf, struct list_head *plist,
@@ -315,8 +316,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			if(get_name_list(tf, &plist, &nl) < 0)
 				return -1;
 			list_for_each_entry_safe(pl, tmppl, &plist, list) {
-				list_del(&pl->list);
-				free(pl);
+				del_pl(pl);
 			}
 			/* Can only be freed after plist */
 			free(file);
@@ -1212,8 +1212,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	if(get_name_list(tf, &plist, nl) < 0)
 		return -1;
 	list_for_each_entry_safe(pl, tmp, &plist, list) {
-		list_del(&pl->list);
-		free(pl);
+		del_pl(pl);
 	}
 	return 0;
 }
@@ -1287,6 +1286,13 @@ skip_empty_space:
 	} while(!last_entry);
 
 	return 0;
+}
+
+static void del_pl(struct path_list *pl)
+{
+	list_del(&pl->list);
+	free(pl->pel);
+	free(pl);
 }
 
 static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
@@ -1600,8 +1606,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 
-		list_del(&pl->list);
-		free(pl);
+		del_pl(pl);
 	}
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
