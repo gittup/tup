@@ -1656,9 +1656,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		delete_name_list_entry(&onl, onle);
 		tree_entry_remove(&tf->g->delete_tree, onle->tupid,
 				  &tf->g->delete_count);
+		delete_name_list_entry(&onl, onle);
 	}
 
 	if(tup_db_write_outputs(cmdid) < 0)
