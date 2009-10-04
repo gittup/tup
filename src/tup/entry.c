@@ -343,9 +343,6 @@ int tup_entry_change_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	if(resolve_parent(tent) < 0)
 		return -1;
 
-	if(tup_entry_find_dir(new_dt, new_name, -1, &tent) < 0)
-		return -1;
-
 	return 0;
 }
 
