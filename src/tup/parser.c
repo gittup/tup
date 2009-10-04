@@ -10,7 +10,7 @@
 #include "graph.h"
 #include "config.h"
 #include "bin.h"
-#include "dirtree.h"
+#include "entry.h"
 #include "string_tree.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -189,7 +189,8 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_delete_gitignore(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
 
-	tf.dfd = dirtree_open(tf.tupid);
+	/* TODO: Store tent in tf, call do_open() in entry.c? */
+	tf.dfd = tup_entry_open(tf.tupid);
 	if(tf.dfd < 0) {
 		fprintf(stderr, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;
@@ -451,7 +452,7 @@ syntax_error:
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen)
 {
-	tupid_t parent;
+	struct tup_entry *tent;
 	int num_dotdots;
 	int x;
 	char *p;
@@ -462,18 +463,12 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	struct name_list nl;
 	struct build_name_list_args args;
 
-	parent = curdir;
 	num_dotdots = 0;
-	while(parent != DOT_DT) {
-		struct dirtree *dirt;
-
-		if(dirtree_add(parent, &dirt) < 0)
-			return -1;
-		if(!dirt || !dirt->parent) {
-			fprintf(stderr, "Error finding parent node of ID %lli. Database might be hosed.\n", parent);
-			return -1;
-		}
-		parent = dirt->parent->tnode.tupid;
+	tent = tup_entry_get(curdir);
+	if(!tent)
+		return -1;
+	while(tent->tnode.tupid != DOT_DT) {
+		tent = tent->parent;
 		num_dotdots++;
 	}
 	path = malloc(num_dotdots * 3 + trlen + 1);
