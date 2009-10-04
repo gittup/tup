@@ -8,7 +8,7 @@
 #include "monitor.h"
 #include "db.h"
 #include "config.h"
-#include "tupid_tree.h"
+#include "entry.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -33,7 +33,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		if(tupid < 0)
 			return -1;
 		if(tree) {
-			tree_entry_remove(tree, tupid, NULL);
+			tup_tree_entry_remove(tree, tupid);
 		}
 		return 0;
 	} else if(S_ISLNK(buf.st_mode)) {
@@ -43,7 +43,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		if(tupid < 0)
 			return -1;
 		if(tree) {
-			tree_entry_remove(tree, tupid, NULL);
+			tup_tree_entry_remove(tree, tupid);
 		}
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
@@ -52,7 +52,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 
 		newdt = create_dir_file(dt, file);
 		if(tree) {
-			tree_entry_remove(tree, newdt, NULL);
+			tup_tree_entry_remove(tree, newdt);
 		}
 
 		if(callback) {

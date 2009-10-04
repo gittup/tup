@@ -18,6 +18,10 @@ struct tupid_tree *tupid_tree_search(struct rb_root *root, tupid_t tupid);
 int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data);
 int tupid_tree_add(struct rb_root *root, tupid_t tupid, tupid_t cmdid);
 int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid);
+static inline void tupid_tree_rm(struct tupid_tree *tt, struct rb_root *root)
+{
+	rb_erase(&tt->rbn, root);
+}
 void free_tupid_tree(struct rb_root *root);
 int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count);
 void tree_entry_remove(struct rb_root *tree, tupid_t tupid, int *count);

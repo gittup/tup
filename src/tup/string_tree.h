@@ -14,5 +14,9 @@ struct string_tree *string_tree_search(struct rb_root *root, const char *s,
 struct string_tree *string_tree_search2(struct rb_root *root, const char *s1,
 					int s1len, const char *s2);
 int string_tree_insert(struct rb_root *root, struct string_tree *data);
+static inline void string_tree_rm(struct string_tree *st, struct rb_root *root)
+{
+	rb_erase(&st->rbn, root);
+}
 
 #endif

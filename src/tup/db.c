@@ -9,6 +9,7 @@
 #include "config.h"
 #include "vardb.h"
 #include "fslurp.h"
+#include "entry.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@ enum {
 	DB_DEBUG_ADD_ALL_GHOSTS,
 	DB_CHECK_DUP_LINKS,
 	DB_SELECT_DBN_BY_ID,
+	DB_FILL_TUP_ENTRY,
 	DB_SELECT_DIRNAME,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
@@ -837,6 +839,63 @@ out_reset:
 	return rc;
 }
 
+int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_FILL_TUP_ENTRY];
+	static char s[] = "select dir, type, sym, mtime, name from node where id=?";
+	const char *name;
+	int len;
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Unable to find node entry for tupid: %lli\n", tupid);
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		goto out_reset;
+	}
+
+	tent->dt = sqlite3_column_int64(*stmt, 0);
+	tent->type = sqlite3_column_int(*stmt, 1);
+	tent->sym_tupid = sqlite3_column_int64(*stmt, 2);
+	tent->mtime = sqlite3_column_int(*stmt, 3);
+	name = (const char*)sqlite3_column_text(*stmt, 4);
+	len = strlen(name);
+	tent->name.s = malloc(len + 1);
+	if(!tent->name.s) {
+		perror("malloc");
+		goto out_reset;
+	}
+	strcpy(tent->name.s, name);
+	tent->name.len = len;
+	rc = 0;
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+
+	return rc;
+}
+
 tupid_t tup_db_select_dirname(tupid_t tupid, char **name)
 {
 	tupid_t dt = -1;
@@ -1141,6 +1200,13 @@ int delete_node(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_DELETE_NODE];
 	static char s[] = "delete from node where id=?";
+
+	if(tup_entry_rm(tupid) < 0) {
+		/* TODO: This should return an error, once all nodes are
+		 * properly loaded into tup_tree
+		 * return -1;
+		 */
+	}
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -1455,6 +1521,9 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 
+	if(tup_entry_change_name(tupid, new_name, new_dt) < 0)
+		return -1;
+
 	rc = sqlite3_step(*stmt);
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
@@ -1535,6 +1604,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 int tup_db_set_type(tupid_t tupid, int type)
 {
 	int rc;
+	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_TYPE];
 	static char s[] = "update node set type=? where id=?";
 
@@ -1566,12 +1636,18 @@ int tup_db_set_type(tupid_t tupid, int type)
 		return -1;
 	}
 
+	tent = tup_entry_get(tupid);
+	if(!tent)
+		return -1;
+	tent->type = type;
+
 	return 0;
 }
 
 int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 {
 	int rc;
+	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_SYM];
 	static char s[] = "update node set sym=? where id=?";
 
@@ -1602,6 +1678,13 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	tent = tup_entry_get(tupid);
+	if(!tent)
+		return -1;
+	tent->sym_tupid = sym;
+	if(tup_entry_resolve_sym(tent) < 0)
+		return -1;
 
 	return 0;
 }
@@ -3608,8 +3691,7 @@ int tup_db_scan_begin(struct rb_root *tree)
 		return -1;
 	if(files_to_tree(tree) < 0)
 		return -1;
-	tree_entry_remove(tree, DOT_DT, NULL);
-	tree_entry_remove(tree, VAR_DT, NULL);
+	tup_tree_entry_remove(tree, VAR_DT);
 	return 0;
 }
 
@@ -3619,12 +3701,13 @@ int tup_db_scan_end(struct rb_root *tree)
 
 	while((rbn = rb_first(tree)) != NULL) {
 		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
-		struct tree_entry *te = container_of(tt, struct tree_entry,
-						     tnode);
-		if(tup_del_id(te->tnode.tupid, te->type) < 0)
+		struct tup_tree_entry *tte = container_of(tt,
+							  struct tup_tree_entry,
+							  tnode);
+		if(tup_file_missing(tte->tnode.tupid, tte->tent->type) < 0)
 			return -1;
 		rb_erase(rbn, tree);
-		free(te);
+		free(tte);
 	}
 
 	if(tup_db_commit() < 0)
@@ -3664,9 +3747,10 @@ static int check_tmp_requested(void)
 
 static int files_to_tree(struct rb_root *tree)
 {
-	int rc;
+	int rc = -1;
+	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TREE];
-	static char s[] = "select id, type from node where type=? or type=? or type=? and name <> '.gitignore'";
+	static char s[] = "select id, dir, type, sym, mtime, name from node where type=? or type=? or type=? and name <> '.gitignore'";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%i, %i, %i][0m\n", s, TUP_NODE_FILE, TUP_NODE_DIR, TUP_NODE_GENERATED);
 	if(!*stmt) {
@@ -3690,12 +3774,45 @@ static int files_to_tree(struct rb_root *tree)
 		return -1;
 	}
 
-	rc = tree_add_tupids(tree, *stmt, NULL);
+	while(1) {
+		tupid_t tupid;
+		tupid_t dt;
+		int type;
+		tupid_t sym;
+		time_t mtime;
+		const char *name;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			break;
+		}
+
+		tupid = sqlite3_column_int64(*stmt, 0);
+		dt = sqlite3_column_int64(*stmt, 1);
+		type = sqlite3_column_int(*stmt, 2);
+		sym = sqlite3_column_int64(*stmt, 3);
+		mtime = sqlite3_column_int64(*stmt, 4);
+		name = (const char*)sqlite3_column_text(*stmt, 5);
+
+		if(tup_entry_add_all(tupid, dt, type, sym, mtime, name, tree) < 0)
+			break;
+	}
 
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	/* This uses our temporary tree for the scanner since it may add new
+	 * nodes to tup_tree (for example, ghost nodes pointed to by symlinks).
+	 */
+	if(tup_entry_resolve_dirsym(tree) < 0)
+		return -1;
 
 	return 0;
 }
@@ -4093,15 +4210,16 @@ tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 	}
 
 	tupid = sqlite3_last_insert_rowid(tup_db);
-	switch(type) {
+	if(type == TUP_NODE_CMD) {
 		/* New commands go in the modify list so they are executed at
 		 * least once.
 		 */
-		case TUP_NODE_CMD:
-			if(tup_db_add_modify_list(tupid) < 0)
-				return -1;
-			break;
+		if(tup_db_add_modify_list(tupid) < 0)
+			return -1;
 	}
+
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime) < 0)
+		return -1;
 
 	return tupid;
 }
@@ -4113,6 +4231,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
 	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
+	struct tup_entry *tent;
 
 	dbn->tupid = -1;
 	dbn->dt = -1;
@@ -4120,6 +4239,17 @@ static int node_select(tupid_t dt, const char *name, int len,
 	dbn->type = 0;
 	dbn->sym = -1;
 	dbn->mtime = -1;
+
+	if(tup_entry_find_dir(dt, name, len, &tent) < 0)
+		return -1;
+	if(tent) {
+		dbn->tupid = tent->tnode.tupid;
+		dbn->dt = tent->dt;
+		dbn->type = tent->type;
+		dbn->sym = tent->sym_tupid;
+		dbn->mtime = tent->mtime;
+		return 0;
+	}
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, '%.*s'][0m\n", s, dt, len, name);
 	if(!*stmt) {
@@ -4155,6 +4285,9 @@ static int node_select(tupid_t dt, const char *name, int len,
 	dbn->type = sqlite3_column_int64(*stmt, 1);
 	dbn->sym = sqlite3_column_int64(*stmt, 2);
 	dbn->mtime = sqlite3_column_int64(*stmt, 3);
+
+	if(tup_entry_add_to_dir(dt, dbn->tupid, name, len, dbn->type, dbn->sym, dbn->mtime) < 0)
+		return -1;
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -4641,11 +4774,17 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 
 	while(!list_empty(&del_list)) {
 		int dfd;
+		struct tup_entry *tent;
 		de = list_entry(del_list.next, struct del_entry, list);
 
 		dfd = dirtree_open(de->dt);
 		if(dfd < 0)
 			return -1;
+		tent = tup_entry_get(de->tupid);
+		if(!tent)
+			return -1;
+		tent->sym = NULL;
+		tent->sym_tupid = -1;
 		if(update_symlink_fileat(de->dt, dfd, de->name, de->mtime, 0) < 0)
 			return -1;
 		list_del(&de->list);
@@ -4783,6 +4922,8 @@ static int get_db_var_tree(struct vardb *vdb)
 		value = (const char*)sqlite3_column_text(*stmt, 2);
 		type = sqlite3_column_int(*stmt, 3);
 		if(vardb_set(vdb, var, value, type, tupid) < 0)
+			return -1;
+		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1) <0)
 			return -1;
 	} while(1);
 

@@ -217,7 +217,7 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 	return tup_del_id_type(dbn.tupid, dbn.type, 0);
 }
 
-int tup_del_id(tupid_t tupid, int type)
+int tup_file_missing(tupid_t tupid, int type)
 {
 	return tup_del_id_type(tupid, type, 0);
 }
