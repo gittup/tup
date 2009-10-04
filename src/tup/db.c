@@ -4237,7 +4237,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	dbn->sym = -1;
 	dbn->mtime = -1;
 
-	if(tup_entry_find_dir(dt, name, len, &tent) < 0)
+	if(tup_entry_find_name_in_dir(dt, name, len, &tent) < 0)
 		return -1;
 	if(tent) {
 		dbn->tupid = tent->tnode.tupid;

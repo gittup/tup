@@ -67,8 +67,8 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	return 0;
 }
 
-int tup_entry_find_dir(tupid_t dt, const char *name, int len,
-		       struct tup_entry **dest)
+int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
+			       struct tup_entry **dest)
 {
 	struct tup_entry *parent;
 	struct string_tree *st;

@@ -4,7 +4,7 @@
 #include "db.h"
 #include "compat.h"
 #include "config.h"
-#include "dirtree.h"
+#include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -374,7 +374,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct list_head *symlist, int sotgv)
 {
 	struct path_element *pel;
-	struct dirtree *dirt;
+	struct tup_entry *tent;
 
 	/* Ignore if the file is hidden or outside of the tup hierarchy */
 	if((pg->pg_flags & PG_HIDDEN) || (pg->pg_flags & PG_OUTSIDE_TUP))
@@ -398,7 +398,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 
 	if(pg->pg_flags & PG_ROOT)
 		dt = 1;
-	if(dirtree_add(dt, &dirt) < 0)
+	if(tup_entry_add(dt, &tent) < 0)
 		return -1;
 
 	while(!list_empty(&pg->path_list)) {
@@ -406,7 +406,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 
 		pel = list_entry(pg->path_list.next, struct path_element, list);
 		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
-			if(dirt->parent == NULL) {
+			if(tent->parent == NULL) {
 				/* If we're at the top of the tup hierarchy and
 				 * trying to go up a level, bail out and return
 				 * success since we don't keep track of files
@@ -414,29 +414,29 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				 */
 				return 0;
 			}
-			dirt = dirt->parent;
+			tent = tent->parent;
 		} else {
-			if(tup_db_select_dbn_part(dirt->tnode.tupid, pel->path, pel->len, &dbn) < 0)
+			if(tup_db_select_dbn_part(tent->tnode.tupid, pel->path, pel->len, &dbn) < 0)
 				return -1;
 			if(dbn.tupid < 0) {
 				/* Secret of the ghost valley! */
 				if(sotgv == 0)
 					return -1;
-				dbn.tupid = tup_db_node_insert(dirt->tnode.tupid, pel->path, pel->len, TUP_NODE_GHOST, -1);
+				dbn.tupid = tup_db_node_insert(tent->tnode.tupid, pel->path, pel->len, TUP_NODE_GHOST, -1);
 				if(dbn.tupid < 0)
 					return -1;
 				dbn.sym = -1;
 			}
 			if(sym_follow(&dbn, symlist) < 0)
 				return -1;
-			if(dirtree_add(dbn.tupid, &dirt) < 0)
+			if(tup_entry_add(dbn.tupid, &tent) < 0)
 				return -1;
 		}
 
 		del_pel(pel);
 	}
 
-	return dirt->tnode.tupid;
+	return tent->tnode.tupid;
 }
 
 int get_path_elements(const char *dir, struct pel_group *pg)
