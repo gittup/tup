@@ -1202,10 +1202,7 @@ int delete_node(tupid_t tupid)
 	static char s[] = "delete from node where id=?";
 
 	if(tup_entry_rm(tupid) < 0) {
-		/* TODO: This should return an error, once all nodes are
-		 * properly loaded into tup_tree
-		 * return -1;
-		 */
+		return -1;
 	}
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
@@ -1280,8 +1277,6 @@ static int recurse_delete_ghost_tree(tupid_t tupid, struct list_head *list)
 		return -1;
 	if(tup_db_delete_links(tupid) < 0)
 		return -1;
-	if(delete_node(tupid) < 0)
-		return -1;
 
 	list_for_each_entry(he, &subdir_list, list) {
 		if(he->type != TUP_NODE_GHOST) {
@@ -1292,6 +1287,8 @@ static int recurse_delete_ghost_tree(tupid_t tupid, struct list_head *list)
 		if(recurse_delete_ghost_tree(he->tupid, list) < 0)
 			return -1;
 	}
+	if(delete_node(tupid) < 0)
+		return -1;
 	list_splice(&subdir_list, list);
 	return 0;
 }

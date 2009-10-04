@@ -109,12 +109,20 @@ int tup_entry_rm(tupid_t tupid)
 
 	tent = tup_entry_find(tupid);
 	if(!tent) {
-		fprintf(stderr, "tup error: Unable to find tup entry %lli for removal\n", tupid);
-		return -1;
+		/* Some nodes may be removed from the database without ever
+		 * being cached - for example, when a command is no longer
+		 * created by a Tupfile we don't need to read in the entry (it
+		 * is all handled by tupid).
+		 */
+		return 0;
 	}
 	tupid_tree_rm(&tent->tnode, &tup_tree);
 	if(tent->parent) {
 		string_tree_rm(&tent->name, &tent->parent->entries);
+	}
+	if(tent->entries.rb_node != NULL) {
+		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which still has entries\n", tupid);
+		return -1;
 	}
 	free(tent->name.s);
 	free(tent);
