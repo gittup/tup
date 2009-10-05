@@ -9,6 +9,7 @@
 
 static void dump_node(FILE *f, struct node *n);
 static struct tup_entry root_entry;
+static char root_name[] = "root";
 
 struct node *find_node(struct graph *g, tupid_t tupid)
 {
@@ -94,12 +95,8 @@ int create_graph(struct graph *g, int count_flags)
 	root_entry.sym = NULL;
 	root_entry.type = TUP_NODE_ROOT;
 	root_entry.mtime = -1;
-	root_entry.name.len = 4;
-	root_entry.name.s = strdup("root");
-	if(!root_entry.name.s) {
-		perror("strdup");
-		return -1;
-	}
+	root_entry.name.len = strlen(root_name);
+	root_entry.name.s = root_name;
 	root_entry.entries.rb_node = NULL;
 
 	INIT_LIST_HEAD(&g->node_list);
