@@ -226,6 +226,15 @@ int tup_entry_resolve_dirsym(struct rb_root *tree)
 	return 0;
 }
 
+int tup_entry_open_tupid(tupid_t tupid)
+{
+	struct tup_entry *tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	return tup_entry_open(tent);
+}
+
 int tup_entry_open(struct tup_entry *tent)
 {
 	int dfd;

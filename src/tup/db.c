@@ -5,7 +5,6 @@
 #include "linux/list.h"
 #include "tupid_tree.h"
 #include "fileio.h"
-#include "dirtree.h"
 #include "config.h"
 #include "vardb.h"
 #include "fslurp.h"
@@ -4762,14 +4761,15 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 		struct tup_entry *tent;
 		de = list_entry(del_list.next, struct del_entry, list);
 
-		dfd = dirtree_open(de->dt);
-		if(dfd < 0)
-			return -1;
 		tent = tup_entry_get(de->tupid);
 		if(!tent)
 			return -1;
 		tent->sym = NULL;
 		tent->sym_tupid = -1;
+
+		dfd = tup_entry_open(tent->parent);
+		if(dfd < 0)
+			return -1;
 		if(update_symlink_fileat(de->dt, dfd, de->name, de->mtime, 0) < 0)
 			return -1;
 		list_del(&de->list);

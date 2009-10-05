@@ -6,7 +6,7 @@
 #include "linux/list.h"
 #include "db.h"
 #include "fileio.h"
-#include "dirtree.h"
+#include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -165,7 +165,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
-			dirfd = dirtree_open(dt);
+			dirfd = tup_entry_open_tupid(dt);
 			if(dirfd < 0) {
 				fprintf(stderr, "Unable to automatically unlink file.\n");
 			} else {
@@ -198,7 +198,7 @@ out_skip:
 			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym->to, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", sym->to);
-			dirfd = dirtree_open(dt);
+			dirfd = tup_entry_open_tupid(dt);
 			if(dirfd < 0) {
 				fprintf(stderr, "Unable to automatically unlink file.\n");
 			} else {
