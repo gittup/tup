@@ -91,6 +91,8 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 			return -1;
 		}
 	}
+	free(pel);
+
 	if(dbn.sym != link_dbn.tupid) {
 		if(tup_db_set_sym(dbn.tupid, link_dbn.tupid) < 0)
 			return -1;
