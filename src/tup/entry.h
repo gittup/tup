@@ -32,7 +32,8 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
 		      time_t mtime, const char *name, struct rb_root *root);
 int tup_entry_resolve_dirsym(struct rb_root *tree);
 int tup_entry_resolve_sym(struct tup_entry *tent);
-int tup_entry_change_name(tupid_t tupid, const char *new_name, tupid_t dt);
+int tup_entry_change_name(tupid_t tupid, const char *new_name);
+int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_open_tupid(tupid_t tupid);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);

@@ -16,6 +16,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest);
 static int resolve_parent(struct tup_entry *tent);
+static int change_name(struct tup_entry *tent, const char *new_name);
 static struct tup_entry *tup_entry_find(tupid_t tupid);
 
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
@@ -345,7 +346,18 @@ int tup_entry_resolve_sym(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_entry_change_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
+int tup_entry_change_name(tupid_t tupid, const char *new_name)
+{
+	struct tup_entry *tent;
+
+	tent = tup_entry_get(tupid);
+	if(!tent)
+		return -1;
+	return change_name(tent, new_name);
+}
+
+int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
+			     tupid_t new_dt)
 {
 	struct tup_entry *tent;
 
@@ -353,6 +365,13 @@ int tup_entry_change_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	if(!tent)
 		return -1;
 
+	tent->dt = new_dt;
+
+	return change_name(tent, new_name);
+}
+
+static int change_name(struct tup_entry *tent, const char *new_name)
+{
 	if(tent->parent) {
 		string_tree_rm(&tent->name, &tent->parent->entries);
 	}
@@ -365,11 +384,8 @@ int tup_entry_change_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 	strcpy(tent->name.s, new_name);
-
-	tent->dt = new_dt;
 	if(resolve_parent(tent) < 0)
 		return -1;
-
 	return 0;
 }
 

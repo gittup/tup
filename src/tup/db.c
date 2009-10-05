@@ -28,7 +28,6 @@ enum {
 	DB_CHECK_DUP_LINKS,
 	DB_SELECT_DBN_BY_ID,
 	DB_FILL_TUP_ENTRY,
-	DB_SELECT_DIRNAME,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
 	DB_SELECT_NODE_BY_FLAGS_3,
@@ -895,52 +894,6 @@ out_reset:
 	return rc;
 }
 
-tupid_t tup_db_select_dirname(tupid_t tupid, char **name)
-{
-	tupid_t dt = -1;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_SELECT_DIRNAME];
-	static char s[] = "select dir, name from node where id=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		goto out_reset;
-	}
-
-	*name = strdup((const char *)sqlite3_column_text(*stmt, 1));
-	if(!*name) {
-		perror("strdup");
-		goto out_reset;
-	}
-	dt = sqlite3_column_int64(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return dt;
-}
-
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 {
 	if(node_select(dt, name, -1, dbn) < 0)
@@ -1509,9 +1462,6 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 
-	if(tup_entry_change_name(tupid, new_name, new_dt) < 0)
-		return -1;
-
 	rc = sqlite3_step(*stmt);
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
@@ -1521,6 +1471,9 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	if(tup_entry_change_name_dt(tupid, new_name, new_dt) < 0)
+		return -1;
 
 	while(!list_empty(&ghost_list)) {
 		struct half_entry *he = list_entry(ghost_list.next,
@@ -1542,14 +1495,13 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 int tup_db_set_name(tupid_t tupid, const char *new_name)
 {
 	int rc;
+	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_NAME];
 	static char s[] = "update node set name=? where id=?";
-	char *old_name;
 
-	if(tup_db_select_dirname(tupid, &old_name) < 0)
+	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	rc = strcmp(old_name, new_name);
-	free(old_name);
+	rc = strcmp(tent->name.s, new_name);
 	if(rc == 0) {
 		return 0;
 	}
@@ -1581,6 +1533,9 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	if(tup_entry_change_name(tupid, new_name) < 0)
+		return -1;
 
 	/* Since we changed the name, we have to run the command again. */
 	if(tup_db_add_modify_list(tupid) < 0)
