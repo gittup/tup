@@ -11,7 +11,7 @@ struct edge {
 	int style;
 };
 
-struct dirtree;
+struct tup_entry;
 
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
@@ -20,15 +20,11 @@ struct dirtree;
 struct node {
 	struct list_head list;
 	struct edge *edges;
-	tupid_t dt;
-	tupid_t sym;
-	char *name;
 	int incoming_count;
 	struct tupid_tree tnode;
-	struct dirtree *dirtree;
+	struct tup_entry *tent;
 
 	char state;
-	char type; /* One of TUP_NODE_* */
 	char already_used;
 	char expanded;
 	char parsing;
@@ -47,7 +43,7 @@ struct graph {
 };
 
 struct node *find_node(struct graph *g, tupid_t tupid);
-struct node *create_node(struct graph *g, struct db_node *dbn);
+struct node *create_node(struct graph *g, struct tup_entry *tent);
 void remove_node(struct graph *g, struct node *n);
 
 int create_edge(struct node *n1, struct node *n2, int style);

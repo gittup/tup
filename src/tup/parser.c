@@ -158,7 +158,7 @@ int parse(struct node *n, struct graph *g)
 	struct buf b;
 
 	if(n->parsing) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->name);
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->tent->name.s);
 		return -1;
 	}
 	n->parsing = 1;
@@ -189,8 +189,7 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_delete_gitignore(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
 
-	/* TODO: Store tent in tf, call do_open() in entry.c? */
-	tf.dfd = tup_entry_open(tf.tupid);
+	tf.dfd = tup_entry_open(n->tent);
 	if(tf.dfd < 0) {
 		fprintf(stderr, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;

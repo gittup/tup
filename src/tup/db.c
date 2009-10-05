@@ -965,15 +965,15 @@ int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 	return 0;
 }
 
-int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
+int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
 						int style),
 				void *arg, int flags)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt;
-	static char s1[] = "select id, dir, name, type, sym, mtime from node where id in (select * from create_list)";
-	static char s2[] = "select id, dir, name, type, sym, mtime from node where id in (select * from modify_list)";
+	static char s1[] = "select * from create_list";
+	static char s2[] = "select * from modify_list";
 	char *sql;
 	int sqlsize;
 
@@ -1000,7 +1000,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 	}
 
 	while(1) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -1013,18 +1013,14 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct db_node *,
 			goto out_reset;
 		}
 
-		dbn.tupid = sqlite3_column_int64(*stmt, 0);
-		dbn.dt = sqlite3_column_int64(*stmt, 1);
-		dbn.name = (const char *)sqlite3_column_text(*stmt, 2);
-		dbn.type = sqlite3_column_int(*stmt, 3);
-		dbn.sym = sqlite3_column_int64(*stmt, 4);
-		dbn.mtime = sqlite3_column_int64(*stmt, 5);
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
+			return -1;
 
 		/* Since this is used to build the initial part of the DAG,
 		 * we use TUP_LINK_NORMAL so the nodes that are returned will
 		 * be expanded.
 		 */
-		if((rc = callback(arg, &dbn, TUP_LINK_NORMAL)) < 0) {
+		if((rc = callback(arg, tent, TUP_LINK_NORMAL)) < 0) {
 			goto out_reset;
 		}
 	}
@@ -1038,13 +1034,13 @@ out_reset:
 	return rc;
 }
 
-int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
+int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style),
 			   void *arg, tupid_t dt)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR];
-	static char s[] = "select id, name, type, sym, mtime from node where dir=?";
+	static char s[] = "select id from node where dir=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, dt);
 	if(!*stmt) {
@@ -1061,7 +1057,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
 	}
 
 	while(1) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -1074,18 +1070,14 @@ int tup_db_select_node_dir(int (*callback)(void *, struct db_node *, int style),
 			goto out_reset;
 		}
 
-		dbn.tupid = sqlite3_column_int64(*stmt, 0);
-		dbn.dt = dt;
-		dbn.name = (const char *)sqlite3_column_text(*stmt, 1);
-		dbn.type = sqlite3_column_int(*stmt, 2);
-		dbn.sym = sqlite3_column_int64(*stmt, 3);
-		dbn.mtime = sqlite3_column_int64(*stmt, 4);
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
+			return -1;
 
 		/* This is used by the 'tup g' function if the user wants to
 		 * graph a directory. Since we want to expand all nodes in the
 		 * directory, we use TUP_LINK_NORMAL.
 		 */
-		if(callback(arg, &dbn, TUP_LINK_NORMAL) < 0) {
+		if(callback(arg, tent, TUP_LINK_NORMAL) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -2792,14 +2784,14 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
+int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 					       int style),
 			       void *arg, tupid_t tupid)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_LINK];
-	static char s[] = "select id, dir, name, type, sym, mtime, style from node, link where from_id=? and id=to_id";
+	static char s[] = "select to_id, style from link where from_id=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -2816,7 +2808,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 	}
 
 	while(1) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 		int style;
 
 		dbrc = sqlite3_step(*stmt);
@@ -2830,15 +2822,11 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct db_node *,
 			goto out_reset;
 		}
 
-		dbn.tupid = sqlite3_column_int64(*stmt, 0);
-		dbn.dt = sqlite3_column_int64(*stmt, 1);
-		dbn.name = (const char *)sqlite3_column_text(*stmt, 2);
-		dbn.type = sqlite3_column_int(*stmt, 3);
-		dbn.sym = sqlite3_column_int64(*stmt, 4);
-		dbn.mtime = sqlite3_column_int64(*stmt, 5);
-		style = sqlite3_column_int(*stmt, 6);
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
+			return -1;
+		style = sqlite3_column_int(*stmt, 1);
 
-		if(callback(arg, &dbn, style) < 0) {
+		if(callback(arg, tent, style) < 0) {
 			rc = -1;
 			goto out_reset;
 		}

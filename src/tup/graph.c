@@ -1,5 +1,6 @@
 #define _GNU_SOURCE /* TODO: For asprintf */
 #include "graph.h"
+#include "entry.h"
 #include "debug.h"
 #include "db.h"
 #include <stdio.h>
@@ -7,6 +8,7 @@
 #include <string.h>
 
 static void dump_node(FILE *f, struct node *n);
+static struct tup_entry root_entry;
 
 struct node *find_node(struct graph *g, tupid_t tupid)
 {
@@ -17,7 +19,7 @@ struct node *find_node(struct graph *g, tupid_t tupid)
 	return container_of(tnode, struct node, tnode);
 }
 
-struct node *create_node(struct graph *g, struct db_node *dbn)
+struct node *create_node(struct graph *g, struct tup_entry *tent)
 {
 	struct node *n;
 
@@ -27,18 +29,10 @@ struct node *create_node(struct graph *g, struct db_node *dbn)
 		return NULL;
 	}
 	n->edges = NULL;
-	n->tnode.tupid = dbn->tupid;
-	n->dt = dbn->dt;
-	n->sym = dbn->sym;
 	n->incoming_count = 0;
-	n->dirtree = NULL;
-	n->name = strdup(dbn->name);
-	if(!n->name) {
-		perror("strdup");
-		return NULL;
-	}
+	n->tnode.tupid = tent->tnode.tupid;
+	n->tent = tent;
 	n->state = STATE_INITIALIZED;
-	n->type = dbn->type;
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
@@ -56,7 +50,6 @@ void remove_node(struct graph *g, struct node *n)
 	}
 	rb_erase(&n->tnode.rbn, &g->tree);
 	/* TODO: block pool */
-	free(n->name);
 	free(n);
 }
 
@@ -94,7 +87,20 @@ struct edge *remove_edge(struct edge *e)
 
 int create_graph(struct graph *g, int count_flags)
 {
-	struct db_node dbn_root = {0, 0, "root", TUP_NODE_ROOT, -1, -1};
+	root_entry.tnode.tupid = 0;
+	root_entry.dt = 0;
+	root_entry.sym_tupid = -1;
+	root_entry.parent = NULL;
+	root_entry.sym = NULL;
+	root_entry.type = TUP_NODE_ROOT;
+	root_entry.mtime = -1;
+	root_entry.name.len = 4;
+	root_entry.name.s = strdup("root");
+	if(!root_entry.name.s) {
+		perror("strdup");
+		return -1;
+	}
+	root_entry.entries.rb_node = NULL;
 
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
@@ -103,7 +109,7 @@ int create_graph(struct graph *g, int count_flags)
 
 	g->tree.rb_node = NULL;
 
-	g->cur = g->root = create_node(g, &dbn_root);
+	g->cur = g->root = create_node(g, &root_entry);
 	if(!g->root)
 		return -1;
 	g->num_nodes = 0;
@@ -158,7 +164,7 @@ static void dump_node(FILE *f, struct node *n)
 	if(flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
-		n, n->name, n->tnode.tupid, n->incoming_count, n->expanded, color);
+		n, n->tent->name.s, n->tnode.tupid, n->incoming_count, n->expanded, color);
 	/* TODO: slist_for_each? */
 	for(e=n->edges; e; e=e->next) {
 		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);

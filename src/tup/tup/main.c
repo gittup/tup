@@ -18,11 +18,12 @@
 #include "tup/compat.h"
 #include "tup/version.h"
 #include "tup/path.h"
+#include "tup/entry.h"
 
 static int file_exists(const char *s);
 
 static int init(int argc, char **argv);
-static int graph_cb(void *arg, struct db_node *dbn, int style);
+static int graph_cb(void *arg, struct tup_entry *tent, int style);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
@@ -201,15 +202,15 @@ static int init(int argc, char **argv)
 	return 0;
 }
 
-static int graph_cb(void *arg, struct db_node *dbn, int style)
+static int graph_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
 
-	n = find_node(g, dbn->tupid);
+	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
 		goto edge_create;
-	n = create_node(g, dbn);
+	n = create_node(g, tent);
 	if(!n)
 		return -1;
 
@@ -248,6 +249,7 @@ static int graph(int argc, char **argv)
 	for(x=1; x<argc; x++) {
 		struct db_node dbn;
 
+		/* TODO: Only use tent here rather than dbn? */
 		tupid = get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL);
 		if(tupid < 0) {
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
@@ -257,7 +259,11 @@ static int graph(int argc, char **argv)
 
 		n = find_node(&g, dbn.tupid);
 		if(n == NULL) {
-			n = create_node(&g, &dbn);
+			struct tup_entry *tent;
+
+			if(tup_entry_add(dbn.tupid, &tent) < 0)
+				return -1;
+			n = create_node(&g, tent);
 			if(!n)
 				return -1;
 			n->expanded = 1;
@@ -293,7 +299,7 @@ static int graph(int argc, char **argv)
 		style = "solid";
 		color = 0;
 		fontcolor = 0;
-		switch(n->type) {
+		switch(n->tent->type) {
 			case TUP_NODE_FILE:
 			case TUP_NODE_GENERATED:
 				shape = "oval";
@@ -340,7 +346,7 @@ static int graph(int argc, char **argv)
 			}
 		}
 		printf("\tnode_%lli [label=\"", n->tnode.tupid);
-		s = n->name;
+		s = n->tent->name.s;
 		if(s[0] == '^') {
 			s++;
 			while(*s && *s != ' ') {
@@ -352,14 +358,14 @@ static int graph(int argc, char **argv)
 			print_name(s, 0);
 		}
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
-		if(n->dt) {
+		if(n->tent->dt) {
 			struct node *tmp;
-			tmp = find_node(&g, n->dt);
+			tmp = find_node(&g, n->tent->dt);
 			if(tmp)
-				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->dt);
+				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
 		}
-		if(n->sym != -1)
-			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->sym, n->tnode.tupid);
+		if(n->tent->sym_tupid != -1)
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->tent->sym_tupid, n->tnode.tupid);
 
 		e = n->edges;
 		while(e) {

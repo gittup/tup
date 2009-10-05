@@ -17,7 +17,6 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest);
 static int resolve_parent(struct tup_entry *tent);
 static struct tup_entry *tup_entry_find(tupid_t tupid);
-static int do_open(struct tup_entry *tent);
 
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 {
@@ -141,6 +140,15 @@ struct tup_entry *tup_entry_get(tupid_t tupid)
 	return tent;
 }
 
+void print_tup_entry(struct tup_entry *tent)
+{
+	/* Skip empty entries, and skip '.' here (dirt->parent == NULL) */
+	if(!tent || !tent->parent)
+		return;
+	print_tup_entry(tent->parent);
+	printf("%s/", tent->name.s);
+}
+
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 {
 	if(tupid == 0) {
@@ -218,17 +226,27 @@ int tup_entry_resolve_dirsym(struct rb_root *tree)
 	return 0;
 }
 
-int tup_entry_open(tupid_t tupid)
+int tup_entry_open(struct tup_entry *tent)
 {
-	struct tup_entry *tent;
+	int dfd;
+	int newdfd;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
-	if(!tent) {
-		fprintf(stderr, "tup error: tup_entry(%lli) is NULL\n", tupid);
+	if(tent->parent == NULL)
+		return dup(tup_top_fd());
+
+	dfd = tup_entry_open(tent->parent);
+	if(dfd < 0)
+		return dfd;
+
+	newdfd = openat(dfd, tent->name.s, O_RDONLY);
+	close(dfd);
+	if(newdfd < 0) {
+		if(errno == ENOENT)
+			return -ENOENT;
+		perror(tent->name.s);
 		return -1;
 	}
-	return do_open(tent);
+	return newdfd;
 }
 
 void tup_tree_entry_remove(struct rb_root *tree, tupid_t tupid)
@@ -353,27 +371,4 @@ static struct tup_entry *tup_entry_find(tupid_t tupid)
 	if(!tnode)
 		return NULL;
 	return container_of(tnode, struct tup_entry, tnode);
-}
-
-static int do_open(struct tup_entry *tent)
-{
-	int dfd;
-	int newdfd;
-
-	if(tent->parent == NULL)
-		return dup(tup_top_fd());
-
-	dfd = do_open(tent->parent);
-	if(dfd < 0)
-		return dfd;
-
-	newdfd = openat(dfd, tent->name.s, O_RDONLY);
-	close(dfd);
-	if(newdfd < 0) {
-		if(errno == ENOENT)
-			return -ENOENT;
-		perror(tent->name.s);
-		return -1;
-	}
-	return newdfd;
 }

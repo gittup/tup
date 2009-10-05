@@ -3,7 +3,7 @@
 #include "fileio.h"
 #include "debug.h"
 #include "db.h"
-#include "dirtree.h"
+#include "entry.h"
 #include "parser.h"
 #include "server.h"
 #include "file.h"
@@ -30,7 +30,7 @@ static int process_update_nodes(void);
 static int check_create_todo(void);
 static int check_update_todo(void);
 static int build_graph(struct graph *g);
-static int add_file_cb(void *arg, struct db_node *dbn, int style);
+static int add_file_cb(void *arg, struct tup_entry *tent, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 
@@ -41,7 +41,6 @@ static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static void sighandler(int sig);
 static void show_progress(int sum, int tot, struct node *n);
-static void print_dirtree(struct dirtree *dirt);
 
 static int do_show_progress;
 static int do_keep_going;
@@ -191,12 +190,8 @@ static int delete_files(struct graph *g)
 			struct node tmpn;
 			int rc;
 
-			tmpn.dt = tup_db_select_dirname(tt->tupid, &tmpn.name);
-			if(tmpn.dt < 0)
+			if(tup_entry_add(tt->tupid, &tmpn.tent) < 0)
 				return -1;
-			if(dirtree_add(tmpn.dt, &tmpn.dirtree) < 0)
-				return -1;
-			tmpn.type = te->type;
 
 			rc = tup_db_in_modify_list(tt->tupid);
 			if(rc < 0)
@@ -204,7 +199,6 @@ static int delete_files(struct graph *g)
 			if(rc == 1) {
 				if(tup_db_set_type(tt->tupid, TUP_NODE_FILE) < 0)
 					return -1;
-				tmpn.type = TUP_NODE_FILE;
 				do_delete = 0;
 			}
 
@@ -213,10 +207,9 @@ static int delete_files(struct graph *g)
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				if(delete_file(tmpn.dt, tmpn.name) < 0)
+				if(delete_file(tmpn.tent->dt, tmpn.tent->name.s) < 0)
 					return -1;
 			}
-			free(tmpn.name);
 		}
 		if(do_delete) {
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
@@ -429,27 +422,17 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
-static int add_file_cb(void *arg, struct db_node *dbn, int style)
+static int add_file_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
 
-	n = find_node(g, dbn->tupid);
+	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
 		goto edge_create;
-	n = create_node(g, dbn);
+	n = create_node(g, tent);
 	if(!n)
 		return -1;
-	if(dirtree_add(n->dt, &n->dirtree) < 0)
-		return -1;
-	/* For directories, put the futh path in the dirtree since the parser
-	 * may need them.
-	 */
-	if(n->type == TUP_NODE_DIR) {
-		if(dirtree_add(n->tnode.tupid, NULL) < 0)
-			return -1;
-	}
-	DEBUGP("create node: %lli (0x%x)\n", dbn->tupid, dbn->type);
 
 edge_create:
 	if(n->state == STATE_PROCESSING) {
@@ -458,11 +441,11 @@ edge_create:
 		 */
 		fprintf(stderr, "Error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
-			g->cur->tnode.tupid, dbn->tupid);
+			g->cur->tnode.tupid, tent->tnode.tupid);
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->type == g->count_flags)
+		if(n->tent->type == g->count_flags)
 			g->num_nodes++;
 		n->expanded = 1;
 		list_move(&n->list, &g->plist);
@@ -551,7 +534,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			goto check_empties;
 		}
 
-		if(n->type == g->count_flags) {
+		if(n->tent->type == g->count_flags) {
 			show_progress(num_processed, g->num_nodes, n);
 			num_processed++;
 		}
@@ -608,11 +591,11 @@ keep_going:
 				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
 				fprintf(stderr, "Node list:\n");
 				list_for_each_entry(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->name);
+					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 				}
 				fprintf(stderr, "plist:\n");
 				list_for_each_entry(n, &g->plist, list) {
-					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->name);
+					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 				}
 			}
 		}
@@ -647,20 +630,20 @@ static void *create_work(void *arg)
 		if(n == NULL)
 			break;
 
-		if(n->type == TUP_NODE_DIR) {
+		if(n->tent->type == TUP_NODE_DIR) {
 			if(n->already_used) {
-				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->name);
+				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
 				rc = 0;
 			} else {
 				rc = parse(n, g);
 			}
-		} else if(n->type == TUP_NODE_VAR ||
-			  n->type == TUP_NODE_FILE ||
-			  n->type == TUP_NODE_GENERATED ||
-			  n->type == TUP_NODE_CMD) {
+		} else if(n->tent->type == TUP_NODE_VAR ||
+			  n->tent->type == TUP_NODE_FILE ||
+			  n->tent->type == TUP_NODE_GENERATED ||
+			  n->tent->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
-			fprintf(stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->type, n->tnode.tupid, n->name);
+			fprintf(stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
 			rc = -1;
 		}
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)
@@ -696,7 +679,7 @@ static void *update_work(void *arg)
 		if(n == NULL)
 			break;
 
-		if(n->type == TUP_NODE_CMD) {
+		if(n->tent->type == TUP_NODE_CMD) {
 			rc = update(n, s);
 
 			/* If the command succeeds, mark any next commands (ie:
@@ -762,7 +745,7 @@ static void *todo_work(void *arg)
 		if(n == NULL)
 			break;
 
-		if(n->type == g->count_flags)
+		if(n->tent->type == g->count_flags)
 			tup_db_print(stdout, n->tnode.tupid);
 
 		wrc.rc = 0;
@@ -781,7 +764,7 @@ static int update(struct node *n, struct server *s)
 	int pid;
 	int dfd = -1;
 	int exit_status = -1;
-	const char *name = n->name;
+	const char *name = n->tent->name.s;
 	int rc;
 
 	/* Commands that begin with a ',' are special var/sed commands */
@@ -804,14 +787,14 @@ static int update(struct node *n, struct server *s)
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
-			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->name);
+			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			return -1;
 		}
 		name++;
 		while(isspace(*name)) name++;
 	}
 
-	dfd = dirtree_open(n->dt);
+	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		goto err_out;
 	}
@@ -852,7 +835,7 @@ static int update(struct node *n, struct server *s)
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
 			pthread_mutex_lock(&db_mutex);
-			rc = write_files(n->tnode.tupid, n->dt, dfd, name, &s->finfo, &warnings);
+			rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
@@ -901,15 +884,15 @@ static int var_replace(struct node *n)
 	struct db_node dbn;
 	struct db_node odbn;
 
-	if(n->name[0] != ',') {
+	if(n->tent->name.s[0] != ',') {
 		fprintf(stderr, "Error: var_replace command must begin with ','\n");
 		return -1;
 	}
-	input = n->name + 1;
+	input = n->tent->name.s + 1;
 	while(isspace(*input))
 		input++;
 
-	dfd = dirtree_open(n->dt);
+	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0)
 		return -1;
 	fchdir(dfd);
@@ -933,7 +916,7 @@ static int var_replace(struct node *n)
 	 * input file changes in the future we'll continue to process the
 	 * required parts of the DAG. See t3009.
 	 */
-	if(tup_db_select_dbn(n->dt, input, &dbn) < 0)
+	if(tup_db_select_dbn(n->tent->dt, input, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0)
 		return -1;
@@ -994,7 +977,7 @@ static int var_replace(struct node *n)
 		
 	} while(p < e);
 
-	if(tup_db_select_dbn(n->dt, output, &odbn) < 0)
+	if(tup_db_select_dbn(n->tent->dt, output, &odbn) < 0)
 		return -1;
 	if(odbn.tupid < 0)
 		return -1;
@@ -1063,8 +1046,8 @@ static void show_progress(int sum, int tot, struct node *n)
 		memcpy(buf+fill, "[00m", 5);
 
 		if(n) {
-			name = n->name;
-			name_sz = strlen(n->name);
+			name = n->tent->name.s;
+			name_sz = strlen(n->tent->name.s);
 			if(name[0] == '^') {
 				name++;
 				while(*name && *name != ' ') name++;
@@ -1073,34 +1056,25 @@ static void show_progress(int sum, int tot, struct node *n)
 				while(name[name_sz] && name[name_sz] != '^')
 					name_sz++;
 			}
-			if(n->type == TUP_NODE_DIR) {
+			if(n->tent->type == TUP_NODE_DIR) {
 				color = "[33";
-			} else if(n->type == TUP_NODE_CMD) {
+			} else if(n->tent->type == TUP_NODE_CMD) {
 				color = "[34";
-			} else if(n->type == TUP_NODE_GENERATED) {
+			} else if(n->tent->type == TUP_NODE_GENERATED) {
 				color = "[35";
-			} else if(n->type == TUP_NODE_FILE) {
+			} else if(n->tent->type == TUP_NODE_FILE) {
 				/* If a generated node becomes a normal file
 				 * (t6031)
 				 */
 				color = "[37";
 			}
 			printf("[%s;07m%.*s[0m] ", color, sizeof(buf), buf);
-			if(n->dirtree && n->dirtree->parent) {
-				print_dirtree(n->dirtree);
+			if(n->tent && n->tent->parent) {
+				print_tup_entry(n->tent->parent);
 			}
 			printf("%sm%.*s[0m\n", color, name_sz, name);
 		} else {
 			printf("[[07;32m%.*s[0m]\n", sizeof(buf), buf);
 		}
 	}
-}
-
-static void print_dirtree(struct dirtree *dirt)
-{
-	/* Skip empty dirtrees, and skip '.' here (dirt->parent == NULL) */
-	if(!dirt || !dirt->parent)
-		return;
-	print_dirtree(dirt->parent);
-	printf("%s/", dirt->name);
 }
