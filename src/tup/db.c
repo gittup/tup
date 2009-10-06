@@ -1635,6 +1635,7 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 int tup_db_set_mtime(tupid_t tupid, time_t mtime)
 {
 	int rc;
+	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_MTIME];
 	static char s[] = "update node set mtime=? where id=?";
 
@@ -1665,6 +1666,11 @@ int tup_db_set_mtime(tupid_t tupid, time_t mtime)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	tent = tup_entry_get(tupid);
+	if(!tent)
+		return -1;
+	tent->mtime = mtime;
 
 	return 0;
 }
