@@ -47,7 +47,25 @@ int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data)
 	return 0;
 }
 
-int tupid_tree_add(struct rb_root *root, tupid_t tupid, tupid_t cmdid)
+int tupid_tree_add(struct rb_root *root, tupid_t tupid)
+{
+	struct tupid_tree *tt;
+
+	tt = malloc(sizeof *tt);
+	if(!tt) {
+		perror("malloc");
+		return -1;
+	}
+	tt->tupid = tupid;
+	if(tupid_tree_insert(root, tt) < 0) {
+		fprintf(stderr, "Error: Unable to insert duplicate tupid %lli\n", tupid);
+		tup_db_print(stderr, tupid);
+		return -1;
+	}
+	return 0;
+}
+
+int tupid_tree_add_cmdid(struct rb_root *root, tupid_t tupid, tupid_t cmdid)
 {
 	struct tupid_tree *tt;
 
@@ -79,6 +97,18 @@ int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid)
 	if(tupid_tree_insert(root, tt) < 0)
 		free(tt);
 	return 0;
+}
+
+void tupid_tree_remove(struct rb_root *root, tupid_t tupid)
+{
+	struct tupid_tree *tt;
+
+	tt = tupid_tree_search(root, tupid);
+	if(!tt) {
+		return;
+	}
+	tupid_tree_rm(root, tt);
+	free(tt);
 }
 
 void free_tupid_tree(struct rb_root *root)

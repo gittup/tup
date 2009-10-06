@@ -1661,15 +1661,15 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
-		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
-		if(tupid_tree_add(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
 			return -1;
 	}
 	if(tup_db_write_inputs(cmdid, &tree) < 0)

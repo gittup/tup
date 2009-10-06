@@ -33,7 +33,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		if(tupid < 0)
 			return -1;
 		if(tree) {
-			tup_tree_entry_remove(tree, tupid);
+			tupid_tree_remove(tree, tupid);
 		}
 		return 0;
 	} else if(S_ISLNK(buf.st_mode)) {
@@ -43,7 +43,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		if(tupid < 0)
 			return -1;
 		if(tree) {
-			tup_tree_entry_remove(tree, tupid);
+			tupid_tree_remove(tree, tupid);
 		}
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
@@ -52,7 +52,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 
 		newdt = create_dir_file(dt, file);
 		if(tree) {
-			tup_tree_entry_remove(tree, newdt);
+			tupid_tree_remove(tree, newdt);
 		}
 
 		if(callback) {

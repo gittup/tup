@@ -17,7 +17,6 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
-static struct tup_entry *tup_entry_find(tupid_t tupid);
 
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 {
@@ -116,9 +115,9 @@ int tup_entry_rm(tupid_t tupid)
 		 */
 		return 0;
 	}
-	tupid_tree_rm(&tent->tnode, &tup_tree);
+	tupid_tree_rm(&tup_tree, &tent->tnode);
 	if(tent->parent) {
-		string_tree_rm(&tent->name, &tent->parent->entries);
+		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
 	if(tent->entries.rb_node != NULL) {
 		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which still has entries\n", tupid);
@@ -139,6 +138,15 @@ struct tup_entry *tup_entry_get(tupid_t tupid)
 		return NULL;
 	}
 	return tent;
+}
+
+struct tup_entry *tup_entry_find(tupid_t tupid)
+{
+	struct tupid_tree *tnode;
+	tnode = tupid_tree_search(&tup_tree, tupid);
+	if(!tnode)
+		return NULL;
+	return container_of(tnode, struct tup_entry, tnode);
 }
 
 void print_tup_entry(struct tup_entry *tent)
@@ -191,36 +199,36 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
 		      time_t mtime, const char *name, struct rb_root *tree)
 {
 	struct tup_entry *tent;
-	struct tup_tree_entry *tte;
 
 	tent = new_entry(tupid, dt, sym, name, strlen(name), type, mtime);
 	if(!tent)
 		return -1;
 
-	tte = malloc(sizeof *tte);
-	if(!tte) {
-		perror("malloc");
+	if(tupid_tree_add(tree, tupid) < 0)
 		return -1;
-	}
-	tte->tnode.tupid = tupid;
-	tte->tent = tent;
-	if(tupid_tree_insert(tree, &tte->tnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert node %lli into the spare tree\n", tte->tnode.tupid);
-		return -1;
-	}
 	return 0;
 }
 
-int tup_entry_resolve_dirsym(struct rb_root *tree)
+int tup_entry_resolve_dirsym(void)
 {
 	struct rb_node *rbn;
-	for(rbn = rb_first(tree); rbn; rbn = rb_next(rbn)) {
+
+	/* Resolve parents first, since those will all already be loaded into
+	 * the tree. Then resolve symlinks, since that may require loading
+	 * additional nodes (for example, a node may point to a ghost node).
+	 * In that case we'll need an already stable tup_tree before calling
+	 * tup_entry_add().
+	 */
+	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
 		struct tupid_tree *tnode = rb_entry(rbn, struct tupid_tree, rbn);
-		struct tup_tree_entry *tte = container_of(tnode, struct tup_tree_entry, tnode);
-		struct tup_entry *tent = tte->tent;
+		struct tup_entry *tent = container_of(tnode, struct tup_entry, tnode);
 
 		if(resolve_parent(tent) < 0)
 			return -1;
+	}
+	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
+		struct tupid_tree *tnode = rb_entry(rbn, struct tupid_tree, rbn);
+		struct tup_entry *tent = container_of(tnode, struct tup_entry, tnode);
 		if(tup_entry_resolve_sym(tent) < 0)
 			return -1;
 	}
@@ -257,20 +265,6 @@ int tup_entry_open(struct tup_entry *tent)
 		return -1;
 	}
 	return newdfd;
-}
-
-void tup_tree_entry_remove(struct rb_root *tree, tupid_t tupid)
-{
-	struct tup_tree_entry *tte;
-	struct tupid_tree *tt;
-
-	tt = tupid_tree_search(tree, tupid);
-	if(!tt) {
-		return;
-	}
-	rb_erase(&tt->rbn, tree);
-	tte = container_of(tt, struct tup_tree_entry, tnode);
-	free(tte);
 }
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
@@ -373,7 +367,7 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {
-		string_tree_rm(&tent->name, &tent->parent->entries);
+		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
 	free(tent->name.s);
 
@@ -387,13 +381,4 @@ static int change_name(struct tup_entry *tent, const char *new_name)
 	if(resolve_parent(tent) < 0)
 		return -1;
 	return 0;
-}
-
-static struct tup_entry *tup_entry_find(tupid_t tupid)
-{
-	struct tupid_tree *tnode;
-	tnode = tupid_tree_search(&tup_tree, tupid);
-	if(!tnode)
-		return NULL;
-	return container_of(tnode, struct tup_entry, tnode);
 }

@@ -148,11 +148,6 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
 
-	/* Need to check variables if tup.config changed. */
-	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
-		return create_reparse_file();
-	}
-
 	if(dbn.tupid < 0) {
 		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
@@ -197,6 +192,13 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 					return -1;
 		}
 	}
+
+	/* Need to check variables if tup.config changed. */
+	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+		if(create_reparse_file() < 0)
+			return -1;
+	}
+
 	return dbn.tupid;
 }
 

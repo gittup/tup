@@ -3636,7 +3636,7 @@ int tup_db_scan_begin(struct rb_root *tree)
 		return -1;
 	if(files_to_tree(tree) < 0)
 		return -1;
-	tup_tree_entry_remove(tree, VAR_DT);
+	tupid_tree_remove(tree, VAR_DT);
 	return 0;
 }
 
@@ -3646,13 +3646,20 @@ int tup_db_scan_end(struct rb_root *tree)
 
 	while((rbn = rb_first(tree)) != NULL) {
 		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
-		struct tup_tree_entry *tte = container_of(tt,
-							  struct tup_tree_entry,
-							  tnode);
-		if(tup_file_missing(tte->tnode.tupid, tte->tent->type) < 0)
-			return -1;
-		rb_erase(rbn, tree);
-		free(tte);
+		struct tup_entry *tent;
+
+		/* It is possible that the node has already been removed. For
+		 * example, we may have previously called tup_file_missing on
+		 * the directory that owns a file before calling it on the
+		 * file. In this case, the tent will no longer exist.
+		 */
+		tent = tup_entry_find(tt->tupid);
+		if(tent) {
+			if(tup_file_missing(tt->tupid, tent->type) < 0)
+				return -1;
+		}
+		tupid_tree_rm(tree, tt);
+		free(tt);
 	}
 
 	if(tup_db_commit() < 0)
@@ -3753,10 +3760,7 @@ static int files_to_tree(struct rb_root *tree)
 		return -1;
 	}
 
-	/* This uses our temporary tree for the scanner since it may add new
-	 * nodes to tup_tree (for example, ghost nodes pointed to by symlinks).
-	 */
-	if(tup_entry_resolve_dirsym(tree) < 0)
+	if(tup_entry_resolve_dirsym() < 0)
 		return -1;
 
 	return 0;
@@ -3895,10 +3899,10 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 		tupid = sqlite3_column_int64(*stmt, 0);
 		style = sqlite3_column_int(*stmt, 1);
 		if(style & TUP_LINK_STICKY) {
-			rc = tupid_tree_add(sticky_tree, tupid, cmdid);
+			rc = tupid_tree_add_cmdid(sticky_tree, tupid, cmdid);
 		}
 		if(style & TUP_LINK_NORMAL) {
-			rc = tupid_tree_add(normal_tree, tupid, cmdid);
+			rc = tupid_tree_add_cmdid(normal_tree, tupid, cmdid);
 		}
 
 		if(rc < 0) {

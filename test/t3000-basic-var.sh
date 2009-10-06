@@ -24,6 +24,3 @@ tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
 vardict_exist BAR=y
-
-varsetall BAR=y
-check_empty_tupdirs
