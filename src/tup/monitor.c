@@ -250,7 +250,7 @@ int monitor_get_pid(void)
 		perror("flock");
 		return -1;
 	}
-	if(fslurp(fd, &b) < 0) {
+	if(fslurp_null(fd, &b) < 0) {
 		goto out;
 	}
 

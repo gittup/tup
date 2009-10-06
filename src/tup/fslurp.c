@@ -4,7 +4,24 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+static int do_slurp(int fd, struct buf *b, int extra);
+
 int fslurp(int fd, struct buf *b)
+{
+	return do_slurp(fd, b, 0);
+}
+
+int fslurp_null(int fd, struct buf *b)
+{
+	int rc;
+
+	rc = do_slurp(fd, b, 1);
+	if(rc == 0)
+		b->s[b->len] = 0;
+	return rc;
+}
+
+static int do_slurp(int fd, struct buf *b, int extra)
 {
 	struct stat st;
 	char *tmp;
@@ -14,7 +31,7 @@ int fslurp(int fd, struct buf *b)
 		return -1;
 	}
 
-	tmp = malloc(st.st_size);
+	tmp = malloc(st.st_size + extra);
 	if(!tmp) {
 		return -1;
 	}
