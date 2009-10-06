@@ -414,6 +414,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				 * success since we don't keep track of files
 				 * in the great beyond.
 				 */
+				free(*last);
+				*last = NULL;
+				del_pel_list(&pg->path_list);
 				return 0;
 			}
 			tent = tent->parent;
