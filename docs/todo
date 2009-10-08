@@ -21,6 +21,8 @@ don't continue down re-parse tree unless outputs of the dir have changed.
 
 give user an option to kill an autoupdate updater
 
+change use of 'tup stop' in test cases to 'tup flush/tup stop', since tup stop won't flush the monitor anymore
+
 if monitor restarts, it never detects a waiting 'tup upd' process.
 
 check inputs and outputs even if command fails
@@ -36,6 +38,10 @@ generated symlink becomes generated file - sym field still points somewhere whic
 .gitignore should be re-generated if removed by user?
 
 'tup todo': check for config update
+
+print scan time in tup upd?
+
+remove tup scan?
 
 syntax: color %flags in output
 
