@@ -419,7 +419,7 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 	DEBUGP("add watch: '%s'\n", file);
 
 	fchdir(dfd);
-	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
+	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE | IN_MOVE_SELF | IN_DELETE_SELF;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
 		pinotify();
@@ -707,6 +707,10 @@ static void handle_event(struct monitor_event *m)
 
 	if(m->e.mask & IN_IGNORED) {
 		dircache_del(&tree, dc);
+		return;
+	}
+	if((m->e.mask & IN_MOVE_SELF) || (m->e.mask & IN_DELETE_SELF)) {
+		inotify_rm_watch(inot_fd, dc->tnode.tupid);
 		return;
 	}
 
