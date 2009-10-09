@@ -39,6 +39,7 @@
 #include "lock.h"
 #include "updater.h"
 #include "path.h"
+#include "entry.h"
 #include "fslurp.h"
 #include "linux/rbtree.h"
 
@@ -458,8 +459,8 @@ static int queue_event(struct inotify_event *e)
 		 * is just a single file-creation event.
 		 */
 	}
-	DEBUGP("Queue[%li]: '%s' %08x\n",
-	       (long)sizeof(*e) + e->len, e->len ? e->name : "", e->mask);
+	DEBUGP("[33mQueue[%li]: %i, '%s' %08x[0m\n",
+	       (long)sizeof(*e)+e->len, e->wd, e->len ? e->name : "", e->mask);
 
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
@@ -710,7 +711,14 @@ static void handle_event(struct monitor_event *m)
 		return;
 	}
 	if((m->e.mask & IN_MOVE_SELF) || (m->e.mask & IN_DELETE_SELF)) {
-		inotify_rm_watch(inot_fd, dc->tnode.tupid);
+		struct tup_entry *tent;
+		tent = tup_entry_find(dc->dt);
+		if(!tent) {
+			/* t7032 - Only remove the watch if the node is
+			 * actually gone from tup.
+			 */
+			inotify_rm_watch(inot_fd, dc->tnode.tupid);
+		}
 		return;
 	}
 
