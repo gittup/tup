@@ -9,7 +9,7 @@ cat > Tupfile << HERE
 : |> echo hey |>
 HERE
 update
-tup stop
+stop_monitor
 tup_object_exist . 'echo hey'
 
 cat > Tupfile << HERE
@@ -19,7 +19,7 @@ HERE
 touch -t 202005080000 Tupfile
 tup monitor
 update
-tup stop
+stop_monitor
 
 tup_object_exist . 'echo yo'
 tup_object_no_exist . 'echo hey'

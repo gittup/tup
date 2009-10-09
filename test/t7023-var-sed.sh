@@ -22,7 +22,7 @@ update
 (echo "a sup b") | diff out.txt -
 (echo "a sup b") | diff new.txt -
 
-tup stop
+stop_monitor
 tup monitor
-tup stop
+stop_monitor
 check_empty_tupdirs

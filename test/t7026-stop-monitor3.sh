@@ -9,7 +9,7 @@ tup monitor
 mkdir .git
 echo ".gitignore" > Tupfile
 update
-tup stop
+stop_monitor
 tup_object_exist . .gitignore Tupfile
 
 # If we just stop and then start the monitor after an update, no flags should

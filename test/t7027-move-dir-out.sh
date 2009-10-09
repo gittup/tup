@@ -16,6 +16,6 @@ cd ..
 update
 
 mv foo ..
-tup stop
+stop_monitor
 update
 tup_object_no_exist . foo

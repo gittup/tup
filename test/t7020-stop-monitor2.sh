@@ -9,7 +9,7 @@ tup monitor
 touch foo
 echo "include foo" > Tupfile
 update
-tup stop
+stop_monitor
 tup_object_exist . foo Tupfile
 tup_dep_exist . foo 0 .
 

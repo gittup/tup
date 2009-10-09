@@ -11,14 +11,14 @@ update
 
 # Now fake the mtime to be old, and update again to clear the flags (since the
 # mtime is different, it will get put into modify)
-tup stop
+stop_monitor
 tup fake_mtime foo 5
 tup monitor
-tup stop
+stop_monitor
 update
 
 # Now the mtime should match the symlink. Start and stop the monitor again to
 # see that no flags are set.
 tup monitor
-tup stop
+stop_monitor
 check_empty_tupdirs

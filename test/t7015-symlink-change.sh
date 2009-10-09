@@ -25,7 +25,7 @@ tup_dep_exist foo-x86 processor.h . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist foo-ppc processor.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . 'gcc -c foo.c -o foo.o' . foo.o
 
-tup stop
+stop_monitor
 rm foo
 ln -s foo-ppc foo
 tup monitor

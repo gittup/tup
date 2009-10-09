@@ -8,7 +8,7 @@ mkdir foo-x86
 ln -s foo-x86 foo
 
 update
-tup stop
+stop_monitor
 
 tup monitor
 check_empty_tupdirs

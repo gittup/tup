@@ -8,7 +8,7 @@ tup monitor
 
 echo "int main(void) {return 0;}" > foo.c
 cp ../testTupfile.tup Tupfile
-tup stop
+stop_monitor
 tup monitor
 update
 tup_object_exist . foo.c foo.o prog
@@ -19,7 +19,7 @@ sym_check prog main
 # back (so we can see it gets re-created). When the monitor starts again, it
 # shouldn't clear foo.c's flags.
 touch foo.c
-tup stop
+stop_monitor
 rm foo.o
 tup monitor
 update
@@ -29,6 +29,6 @@ sym_check prog main
 
 # If we just stop and then start the monitor after an update, no flags should
 # be set.
-tup stop
+stop_monitor
 tup monitor
 check_empty_tupdirs

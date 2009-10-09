@@ -7,7 +7,7 @@ tup monitor
 cp ../testTupfile.tup Tupfile
 echo "int main(void) {return 0;}" > foo.c
 update
-tup stop
+stop_monitor
 
 # Now we make a change outside of the monitor's control (create a new file)
 echo "void bar(void) {}" > bar.c
@@ -15,7 +15,7 @@ tup monitor
 update
 tup_object_exist . bar.c bar.o
 sym_check prog bar
-tup stop
+stop_monitor
 
 # Now we make another change outside of the monitor's control (modify a file).
 # We have to fudge the timestamp to be in the future because we just stopped
@@ -39,11 +39,11 @@ touch -t 202005080000 bar.c
 tup monitor
 update
 sym_check prog bar bar2
-tup stop
+stop_monitor
 
 # Finally, delete a file outside of the monitor's control
 rm bar.c
 tup monitor
 update
 sym_check prog ~bar ~bar2
-tup stop
+stop_monitor

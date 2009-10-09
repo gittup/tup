@@ -280,3 +280,9 @@ varsetall()
 	done
 	tup touch tup.config
 }
+
+stop_monitor()
+{
+	tup flush
+	tup stop
+}
