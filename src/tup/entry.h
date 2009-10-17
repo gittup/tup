@@ -34,6 +34,7 @@ int tup_entry_open(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);
 struct tup_entry *tup_entry_get(tupid_t tupid);
 struct tup_entry *tup_entry_find(tupid_t tupid);
+int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree);
 void print_tup_entry(struct tup_entry *tent);
 
 #endif

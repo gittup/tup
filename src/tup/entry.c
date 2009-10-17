@@ -364,6 +364,20 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	return change_name(tent, new_name);
 }
 
+int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
+{
+	struct tup_entry *tent;
+
+	tent = *entry;
+	while(tent->sym != NULL) {
+		if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
+			return -1;
+		tent = tent->sym;
+	}
+	*entry = tent;
+	return 0;
+}
+
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {

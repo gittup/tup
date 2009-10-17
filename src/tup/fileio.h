@@ -3,6 +3,7 @@
 
 #include "tupid.h"
 #include "linux/list.h"
+#include "linux/rbtree.h"
 #include <time.h>
 
 #define TUP_CONFIG "tup.config"
@@ -47,8 +48,11 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last,
 			     struct list_head *symlist, int sotgv);
+int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
+				struct rb_root *symtree,
+				struct tup_entry **entry);
 int gimme_node_or_make_ghost(tupid_t dt, const char *name,
-			     struct list_head *symlist,
+			     struct rb_root *symtree,
 			     struct tup_entry **entry);
 
 int delete_file(tupid_t dt, const char *name);

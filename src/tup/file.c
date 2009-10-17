@@ -309,43 +309,17 @@ skip_read:
 	}
 
 	while(!list_empty(&info->ghost_list)) {
-		struct path_element *pel;
-		tupid_t newdt;
+		struct tup_entry *tent;
 
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
-		newdt = find_dir_tupid_dt_pg(dt, &g->pg, &pel, &symlist, 1);
-		if(newdt < 0) {
-			fprintf(stderr, "Error finding dir for '%s' relative to dir %lli\n", g->filename, dt);
-			return 0;
-		}
-		if(newdt == 0)
+		if(gimme_node_or_make_ghost_pg(dt, &g->pg, &read_tree, &tent) < 0)
+			return -1;
+		if(!tent)
 			goto skip_ghost;
 
-		if(!pel) {
-			fprintf(stderr, "[31mtup internal error: processing the ghost list didn't get a final pel pointer in find_dir_tupid_dt_pg()[0m\n");
+		if(tup_entry_sym_follow(&tent, &read_tree) < 0)
 			return -1;
-		}
-
-		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
-			return -1;
-		if(dbn.tupid < 0) {
-			dbn.tupid = tup_db_node_insert(newdt, pel->path, pel->len, TUP_NODE_GHOST, -1);
-			if(dbn.tupid < 0)
-				return -1;
-		} else {
-			if(sym_follow(&dbn, &symlist) < 0)
-				return -1;
-		}
-		free(pel);
-
-		while(!list_empty(&symlist)) {
-			he = list_entry(symlist.next, struct half_entry, list);
-			if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
-				return -1;
-			list_del(&he->list);
-			free(he);
-		}
-		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
+		if(tupid_tree_add_dup(&read_tree, tent->tnode.tupid) < 0)
 			return -1;
 
 skip_ghost:

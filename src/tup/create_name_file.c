@@ -437,17 +437,30 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int gimme_node_or_make_ghost(tupid_t dt, const char *name,
-			     struct list_head *symlist,
-			     struct tup_entry **entry)
+int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
+				struct rb_root *symtree,
+				struct tup_entry **entry)
 {
 	tupid_t new_dt;
+	LIST_HEAD(symlist);
 	struct path_element *pel = NULL;
 	struct db_node dbn;
 
-	new_dt = find_dir_tupid_dt(dt, name, &pel, symlist, 1);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, 1);
 	if(new_dt < 0)
 		return -1;
+
+	/* TODO: Just use the tree directly in find_dir_tupid_dt_pg or whatever
+	 * its replacement is.
+	 */
+	while(!list_empty(&symlist)) {
+		struct half_entry *he = list_entry(symlist.next, struct half_entry, list);
+		if(tupid_tree_add_dup(symtree, he->tupid) < 0)
+			return -1;
+		list_del(&he->list);
+		free(he);
+	}
+
 	if(new_dt == 0) {
 		*entry = NULL;
 		return 0;
@@ -470,6 +483,18 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 
 	*entry = tup_entry_get(dbn.tupid);
 	return 0;
+}
+
+int gimme_node_or_make_ghost(tupid_t dt, const char *name,
+			     struct rb_root *symtree,
+			     struct tup_entry **entry)
+{
+	struct pel_group pg;
+
+	if(get_path_elements(name, &pg) < 0)
+		return -1;
+
+	return gimme_node_or_make_ghost_pg(dt, &pg, symtree, entry);
 }
 
 int get_path_elements(const char *dir, struct pel_group *pg)
