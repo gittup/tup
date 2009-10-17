@@ -264,33 +264,10 @@ skip_sym:
 		return -1;
 
 	while(!list_empty(&info->read_list)) {
-		tupid_t dbn_tupid;
-
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
-		if(r->pg.pg_flags & PG_HIDDEN) {
-			goto skip_read;
-		}
-
-		dbn_tupid = get_dbn_dt_pg(dt, &r->pg, &dbn, &symlist);
-		if(dbn_tupid < 0) {
-			fprintf(stderr, "tup error: File '%s' was read from, but is not in .tup/db. It was read from command '%s' - not sure why it isn't there.\n", r->filename, debug_name);
+		if(add_node_to_tree(dt, &r->pg, &read_tree) < 0)
 			return -1;
-		}
-		/* Skip files outside of .tup */
-		if(dbn_tupid == 0)
-			goto skip_read;
-		while(!list_empty(&symlist)) {
-			he = list_entry(symlist.next, struct half_entry, list);
-			if(tupid_tree_add_dup(&read_tree, he->tupid) < 0)
-				return -1;
-			list_del(&he->list);
-			free(he);
-		}
-		if(tupid_tree_add_dup(&read_tree, dbn.tupid) < 0)
-			return -1;
-
-skip_read:
 		del_entry(r);
 	}
 
@@ -314,6 +291,8 @@ skip_read:
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
 		if(gimme_node_or_make_ghost_pg(dt, &g->pg, &read_tree, &tent) < 0)
 			return -1;
+
+		/* Skip files outside of .tup */
 		if(!tent)
 			goto skip_ghost;
 

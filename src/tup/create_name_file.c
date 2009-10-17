@@ -437,6 +437,61 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
+int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree)
+{
+	tupid_t new_dt;
+	LIST_HEAD(symlist);
+	struct path_element *pel = NULL;
+	struct db_node dbn;
+	struct tup_entry *tent;
+
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, 1);
+	if(new_dt < 0)
+		return -1;
+
+	/* TODO: Just use the tree directly in find_dir_tupid_dt_pg or whatever
+	 * its replacement is.
+	 */
+	while(!list_empty(&symlist)) {
+		struct half_entry *he = list_entry(symlist.next, struct half_entry, list);
+		if(tupid_tree_add_dup(tree, he->tupid) < 0)
+			return -1;
+		list_del(&he->list);
+		free(he);
+	}
+
+	if(new_dt == 0) {
+		return 0;
+	}
+	if(pel == NULL) {
+		tent = tup_entry_get(new_dt);
+		if(!tent)
+			return -1;
+		if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
+			return -1;
+		return 0;
+	}
+
+	if(tup_db_select_dbn_part(new_dt, pel->path, pel->len, &dbn) < 0)
+		return -1;
+	if(dbn.tupid < 0) {
+		fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
+		tup_db_print(stderr, new_dt);
+		return -1;
+	}
+	free(pel);
+
+	tent = tup_entry_get(dbn.tupid);
+	if(!tent)
+		return -1;
+	if(tup_entry_sym_follow(&tent, tree) < 0)
+		return -1;
+	if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
+		return -1;
+
+	return 0;
+}
+
 int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
 				struct rb_root *symtree,
 				struct tup_entry **entry)

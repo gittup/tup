@@ -369,7 +369,11 @@ int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
 	struct tup_entry *tent;
 
 	tent = *entry;
-	while(tent->sym != NULL) {
+	while(tent->sym_tupid != -1) {
+		if(tent->sym == NULL) {
+			if(tup_entry_resolve_sym(tent) < 0)
+				return -1;
+		}
 		if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
 			return -1;
 		tent = tent->sym;
