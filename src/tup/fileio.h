@@ -39,8 +39,6 @@ int tup_file_missing(tupid_t tupid, int type);
 int tup_del_id_force(tupid_t tupid, int type);
 tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		   struct list_head *symlist);
-tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
-		      struct list_head *symlist);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, struct list_head *symlist,

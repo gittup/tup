@@ -317,32 +317,6 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 	}
 }
 
-tupid_t get_dbn_dt_pg(tupid_t dt, struct pel_group *pg, struct db_node *dbn,
-		      struct list_head *symlist)
-{
-	struct path_element *pel = NULL;
-
-	dbn->tupid = -1;
-	dt = find_dir_tupid_dt_pg(dt, pg, &pel, symlist, 0);
-	if(dt < 0)
-		return -1;
-	/* File hidden from tup */
-	if(dt == 0)
-		return 0;
-
-	if(pel) {
-		if(tup_db_select_dbn_part(dt, pel->path, pel->len, dbn) < 0)
-			return -1;
-		free(pel);
-		if(sym_follow(dbn, symlist) < 0)
-			return -1;
-		return dbn->tupid;
-	} else {
-		fprintf(stderr, "[31mtup internal error: get_dbn_dt_pg() didn't get a final pel pointer in find_dir_tupid_dt_pg()[0m\n");
-		return -1;
-	}
-}
-
 tupid_t find_dir_tupid(const char *dir)
 {
 	struct db_node dbn;
