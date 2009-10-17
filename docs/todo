@@ -23,8 +23,6 @@ give user an option to kill an autoupdate updater
 
 if monitor restarts, it never detects a waiting 'tup upd' process.
 
-symlink points to file not in tup db?
-
 check inputs and outputs even if command fails
  - make sure failed output doesn't become white if the command is removed
  - ie: compile foo.c because FOO is y, but it fails, then set FOO to n - foo.o should be removed

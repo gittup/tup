@@ -9,6 +9,7 @@
 #define TUP_CONFIG_REPARSE ".tup/db-parse-config-needed"
 
 struct db_node;
+struct tup_entry;
 
 struct path_element {
 	struct list_head list;
@@ -46,6 +47,9 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last,
 			     struct list_head *symlist, int sotgv);
+int gimme_node_or_make_ghost(tupid_t dt, const char *name,
+			     struct list_head *symlist,
+			     struct tup_entry **entry);
 
 int delete_file(tupid_t dt, const char *name);
 int delete_name_file(tupid_t tupid);
