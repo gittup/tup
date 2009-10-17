@@ -190,7 +190,10 @@ int monitor(int argc, char **argv)
 				}
 				if(ret == 0)
 					break;
-				read(inot_fd, buf, sizeof(buf));
+				if(read(inot_fd, buf, sizeof(buf)) < 0) {
+					perror("read");
+					return -1;
+				}
 			}
 		}
 	} while(rc == MONITOR_LOOP_RETRY);
@@ -223,8 +226,14 @@ static int monitor_set_pid(int pid)
 		fprintf(stderr, "Buf is sized too small in monitor_set_pid\n");
 		return -1;
 	}
-	write(fd, buf, len);
-	ftruncate(fd, len);
+	if(write(fd, buf, len) < 0) {
+		perror("write");
+		return -1;
+	}
+	if(ftruncate(fd, len) < 0) {
+		perror("ftruncate");
+		return -1;
+	}
 	if(flock(fd, LOCK_UN) < 0) {
 		perror("flock");
 		return -1;
@@ -419,7 +428,10 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 
 	DEBUGP("add watch: '%s'\n", file);
 
-	fchdir(dfd);
+	if(fchdir(dfd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE | IN_MOVE_SELF | IN_DELETE_SELF;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {

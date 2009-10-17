@@ -818,7 +818,10 @@ static int update(struct node *n, struct server *s)
 		sigemptyset(&sa.sa_mask);
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGTERM, &sa, NULL);
-		fchdir(dfd);
+		if(fchdir(dfd) < 0) {
+			perror("fchdir");
+			exit(1);
+		}
 		server_setenv(s, vardict_fd);
 		execl("/bin/sh", "/bin/sh", "-e", "-c", name, NULL);
 		perror("execl");
@@ -895,7 +898,10 @@ static int var_replace(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0)
 		return -1;
-	fchdir(dfd);
+	if(fchdir(dfd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
 
 	rbracket = strchr(input, '>');
 	if(rbracket == NULL) {
@@ -990,7 +996,10 @@ err_free_buf:
 err_close_ifd:
 	close(ifd);
 err_close_dfd:
-	fchdir(tup_top_fd());
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
 	close(dfd);
 	return rc;
 }

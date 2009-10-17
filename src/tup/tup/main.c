@@ -513,7 +513,10 @@ static int touch(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	chdir(get_sub_dir());
+	if(chdir(get_sub_dir()) < 0) {
+		perror("chdir");
+		return -1;
+	}
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;

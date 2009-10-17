@@ -37,7 +37,10 @@ int find_tup_dir(void)
 			tup_wd[tup_top_len] = 0;
 			break;
 		}
-		chdir("..");
+		if(chdir("..") < 0) {
+			perror("chdir");
+			return -1;
+		}
 		while(tup_top_len > 0) {
 			tup_top_len--;
 			tup_sub_len++;

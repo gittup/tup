@@ -568,14 +568,26 @@ static int gitignore(struct tupfile *tf)
 			return -1;
 		}
 		if(tf->tupid == 1) {
-			write(fd, ".tup\n", 5);
+			if(write(fd, ".tup\n", 5) < 0) {
+				perror("write");
+				return -1;
+			}
 		}
 		if(git_root == 1) {
-			write(fd, ".*.swp\n", 7);
-			write(fd, ".gitignore\n", 11);
+			if(write(fd, ".*.swp\n", 7) < 0) {
+				perror("write");
+				return -1;
+			}
+			if(write(fd, ".gitignore\n", 11) < 0) {
+				perror("write");
+				return -1;
+			}
 		}
 		if(s && len) {
-			write(fd, s, len);
+			if(write(fd, s, len) < 0) {
+				perror("write");
+				return -1;
+			}
 		}
 		close(fd);
 	}
