@@ -266,7 +266,7 @@ skip_sym:
 	while(!list_empty(&info->read_list)) {
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
-		if(add_node_to_tree(dt, &r->pg, &read_tree) < 0)
+		if(add_node_to_tree(dt, &r->pg, &read_tree, 0) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -286,22 +286,10 @@ skip_sym:
 	}
 
 	while(!list_empty(&info->ghost_list)) {
-		struct tup_entry *tent;
-
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
-		if(gimme_node_or_make_ghost_pg(dt, &g->pg, &read_tree, &tent) < 0)
-			return -1;
 
-		/* Skip files outside of .tup */
-		if(!tent)
-			goto skip_ghost;
-
-		if(tup_entry_sym_follow(&tent, &read_tree) < 0)
+		if(add_node_to_tree(dt, &g->pg, &read_tree, 1) < 0)
 			return -1;
-		if(tupid_tree_add_dup(&read_tree, tent->tnode.tupid) < 0)
-			return -1;
-
-skip_ghost:
 		del_entry(g);
 	}
 	if(tup_db_check_actual_inputs(cmdid, &read_tree) < 0)

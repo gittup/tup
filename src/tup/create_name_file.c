@@ -411,7 +411,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree)
+int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree,
+		     int sotgv)
 {
 	tupid_t new_dt;
 	LIST_HEAD(symlist);
@@ -419,7 +420,7 @@ int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree)
 	struct db_node dbn;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, 1);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, sotgv);
 	if(new_dt < 0)
 		return -1;
 
@@ -449,9 +450,17 @@ int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree)
 	if(tup_db_select_dbn_part(new_dt, pel->path, pel->len, &dbn) < 0)
 		return -1;
 	if(dbn.tupid < 0) {
-		fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
-		tup_db_print(stderr, new_dt);
-		return -1;
+		if(sotgv) {
+			dbn.tupid = tup_db_node_insert(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
+			if(dbn.tupid < 0) {
+				fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+				return -1;
+			}
+		} else {
+			fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
+			tup_db_print(stderr, new_dt);
+			return -1;
+		}
 	}
 	free(pel);
 
@@ -466,16 +475,16 @@ int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree)
 	return 0;
 }
 
-int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
-				struct rb_root *symtree,
-				struct tup_entry **entry)
+int gimme_node_or_make_ghost(tupid_t dt, const char *name,
+			     struct rb_root *symtree,
+			     struct tup_entry **entry)
 {
 	tupid_t new_dt;
 	LIST_HEAD(symlist);
 	struct path_element *pel = NULL;
 	struct db_node dbn;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, 1);
+	new_dt = find_dir_tupid_dt(dt, name, &pel, &symlist, 1);
 	if(new_dt < 0)
 		return -1;
 
@@ -514,18 +523,6 @@ int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
 
 	*entry = tup_entry_get(dbn.tupid);
 	return 0;
-}
-
-int gimme_node_or_make_ghost(tupid_t dt, const char *name,
-			     struct rb_root *symtree,
-			     struct tup_entry **entry)
-{
-	struct pel_group pg;
-
-	if(get_path_elements(name, &pg) < 0)
-		return -1;
-
-	return gimme_node_or_make_ghost_pg(dt, &pg, symtree, entry);
 }
 
 int get_path_elements(const char *dir, struct pel_group *pg)

@@ -46,10 +46,8 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last,
 			     struct list_head *symlist, int sotgv);
-int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree);
-int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
-				struct rb_root *symtree,
-				struct tup_entry **entry);
+int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree,
+		     int sotgv);
 int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 			     struct rb_root *symtree,
 			     struct tup_entry **entry);
