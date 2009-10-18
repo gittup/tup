@@ -3223,9 +3223,8 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	}
 	if(dbn.type == TUP_NODE_GHOST)
 		return dbn.tupid;
-	if(dest)
-		if(get_var_id(dbn.tupid, dest) < 0)
-			return -1;
+	if(get_var_id(dbn.tupid, dest) < 0)
+		return -1;
 	return dbn.tupid;
 }
 

@@ -272,15 +272,9 @@ skip_sym:
 	}
 
 	while(!list_empty(&info->var_list)) {
-		tupid_t tupid;
-
 		r = list_entry(info->var_list.next, struct file_entry, list);
-		tupid = tup_db_get_var(r->filename, -1, NULL);
-		if(tupid < 0) {
-			fprintf(stderr, "Error: Unable to find tupid for variable named '%s'\n", r->filename);
-			return -1;
-		}
-		if(tupid_tree_add_dup(&read_tree, tupid) < 0)
+
+		if(add_node_to_tree(VAR_DT, &r->pg, &read_tree, 1) < 0)
 			return -1;
 		del_entry(r);
 	}
