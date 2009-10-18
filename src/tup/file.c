@@ -186,9 +186,8 @@ out_skip:
 
 	while(!list_empty(&info->sym_list)) {
 		struct sym_entry *sym;
-		struct db_node dbn_link;
-		struct path_element *pel = NULL;
-		tupid_t link_dt;
+		struct tup_entry *link_tent;
+		tupid_t sym_tupid;
 
 		sym = list_entry(info->sym_list.next, struct sym_entry, list);
 
@@ -224,28 +223,20 @@ out_skip:
 				del_entry(g);
 		}
 
-		/* TODO: Don't need symlist? */
-		link_dt = find_dir_tupid_dt(dt, sym->from, &pel, NULL, 1);
-		if(link_dt < 0)
+		/* Don't pass in read_tree for the tree parameter - we don't
+		 * actually need to track symlinks referenced by the path of
+		 * the symlink file. These would get picked up by any command
+		 * that reads our symlink.
+		 */
+		if(gimme_node_or_make_ghost(dt, sym->from, NULL, &link_tent) < 0)
 			return -1;
-		/* Skip files outside of .tup */
-		if(link_dt == 0)
-			goto skip_sym;
-
-		if(!pel) {
-			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
-			return -1;
+		if(link_tent) {
+			sym_tupid = link_tent->tnode.tupid;
+		} else {
+			sym_tupid = -1;
 		}
-		if(tup_db_select_dbn_part(link_dt, pel->path, pel->len, &dbn_link) < 0)
-			return -1;
-		if(dbn_link.tupid < 0) {
-			dbn_link.tupid = tup_db_node_insert(link_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
-			if(dbn_link.tupid < 0)
-				return -1;
-		}
-		free(pel);
 
-		if(tup_db_set_sym(dbn.tupid, dbn_link.tupid) < 0)
+		if(tup_db_set_sym(dbn.tupid, sym_tupid) < 0)
 			return -1;
 
 skip_sym:
