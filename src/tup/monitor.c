@@ -178,6 +178,14 @@ int monitor(int argc, char **argv)
 				free(dc);
 			}
 
+			if(tup_entry_clear() < 0)
+				return -1;
+			if(monitor_set_pid(-1) < 0)
+				return -1;
+			tup_lock_close();
+			if(tup_lock_init() < 0)
+				return -1;
+
 			/* Flush the inotify queue */
 			while(1) {
 				char buf[1024];
@@ -195,6 +203,13 @@ int monitor(int argc, char **argv)
 					return -1;
 				}
 			}
+
+			if(flock(tup_sh_lock(), LOCK_UN) < 0) {
+				perror("flock");
+				return -1;
+			}
+			if(monitor_set_pid(getpid()) < 0)
+				return -1;
 		}
 	} while(rc == MONITOR_LOOP_RETRY);
 	monitor_set_pid(-1);

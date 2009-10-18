@@ -15,6 +15,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 				   time_t mtime);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest);
+static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
 
@@ -104,6 +105,11 @@ int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 
 int tup_entry_rm(tupid_t tupid)
 {
+	return rm_entry(tupid, 0);
+}
+
+static int rm_entry(tupid_t tupid, int safe)
+{
 	struct tup_entry *tent;
 
 	tent = tup_entry_find(tupid);
@@ -115,13 +121,18 @@ int tup_entry_rm(tupid_t tupid)
 		 */
 		return 0;
 	}
+	if(tent->entries.rb_node != NULL) {
+		if(safe) {
+			return 0;
+		} else {
+			fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which still has entries\n", tupid);
+			return -1;
+		}
+	}
+
 	tupid_tree_rm(&tup_tree, &tent->tnode);
 	if(tent->parent) {
 		string_tree_rm(&tent->parent->entries, &tent->name);
-	}
-	if(tent->entries.rb_node != NULL) {
-		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which still has entries\n", tupid);
-		return -1;
 	}
 	free(tent->name.s);
 	free(tent);
@@ -379,6 +390,24 @@ int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
 		tent = tent->sym;
 	}
 	*entry = tent;
+	return 0;
+}
+
+int tup_entry_clear(void)
+{
+	struct rb_node *rbn;
+	while((rbn = rb_first(&tup_tree)) != NULL) {
+		struct rb_node *next;
+		struct tupid_tree *tt;
+
+		while(rbn != NULL) {
+			next = rb_next(rbn);
+			tt = rb_entry(rbn, struct tupid_tree, rbn);
+			if(rm_entry(tt->tupid, 1) < 0)
+				return -1;
+			rbn = next;
+		}
+	}
 	return 0;
 }
 
