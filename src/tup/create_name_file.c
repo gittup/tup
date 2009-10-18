@@ -484,8 +484,10 @@ int gimme_node_or_make_ghost_pg(tupid_t dt, struct pel_group *pg,
 	 */
 	while(!list_empty(&symlist)) {
 		struct half_entry *he = list_entry(symlist.next, struct half_entry, list);
-		if(tupid_tree_add_dup(symtree, he->tupid) < 0)
-			return -1;
+		if(symtree) {
+			if(tupid_tree_add_dup(symtree, he->tupid) < 0)
+				return -1;
+		}
 		list_del(&he->list);
 		free(he);
 	}
