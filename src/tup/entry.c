@@ -396,6 +396,16 @@ int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
 int tup_entry_clear(void)
 {
 	struct rb_node *rbn;
+
+	/* The rm_entry with safe=1 will only remove the node if all of the
+	 * children nodes are gone. Rather than try to smartly remove things
+	 * in the correct order, the outer loop will just keep going until
+	 * all the nodes are gone, and the inner loop does a single pass over
+	 * the whole tree. Eventually everything will be gone.
+	 *
+	 * I don't really care about performance here, since this only happens
+	 * when the monitor needs to restart.
+	 */
 	while((rbn = rb_first(&tup_tree)) != NULL) {
 		struct rb_node *next;
 		struct tupid_tree *tt;

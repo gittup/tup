@@ -170,6 +170,13 @@ int monitor(int argc, char **argv)
 			int ret;
 			fd_set rfds;
 
+			/* Need to clear out all saved structures (the dircache
+			 * and tup_entries), then shut the monitor off before
+			 * turning it back on. If there is a waiting 'tup upd'
+			 * it will get the lock and update in scan mode before
+			 * we return from tup_lock_init(). Then we should be
+			 * good to go.
+			 */
 			while((rbn = rb_first(&tree)) != NULL) {
 				struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
 				struct dircache *dc = container_of(tt, struct dircache, tnode);
