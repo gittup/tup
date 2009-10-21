@@ -147,11 +147,6 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
-		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
-			return -1;
-		free(pel);
-		if(sym_follow(&dbn, &symlist) < 0)
-			return -1;
 		if(!list_empty(&symlist)) {
 			fprintf(stderr, "tup error: Attempt to write to a file using a symlink. The command should only  use the full non-symlinked path, or just write to the current directory.\n");
 			fprintf(stderr, " -- Command: '%s'\n", debug_name);
@@ -161,6 +156,14 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			}
 			return -1;
 		}
+		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
+			return -1;
+		/* Don't need to sym_follow dbn here, since the output file
+		 * was removed by the updater. So our database representation
+		 * may not match the filesystem, untilwe reset the sym field
+		 * to -1 later.
+		 */
+		free(pel);
 		if(dbn.tupid < 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
@@ -170,6 +173,8 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			if(tup_db_add_write_list(dbn.tupid) < 0)
 				return -1;
 			if(file_set_mtime(dbn.tupid, dfd, w->filename) < 0)
+				return -1;
+			if(tup_db_set_sym(dbn.tupid, -1) < 0)
 				return -1;
 		}
 

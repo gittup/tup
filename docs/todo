@@ -87,9 +87,6 @@ sqlite style graphs for parser
 
 indent dependent dirs while parsing?
 
-symlink becomes normal file retains sym field?
- - ie: foo -> bar; command does: rm foo; touch foo
-
 html:
   proof: no clean target
   graphs
