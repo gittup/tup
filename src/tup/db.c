@@ -114,6 +114,19 @@ struct del_entry {
 	char *name;
 };
 
+struct id_entry {
+	struct list_head list;
+	tupid_t tupid;
+};
+
+struct half_entry {
+	struct list_head list;
+	tupid_t tupid;
+	tupid_t dt;
+	tupid_t sym;
+	int type;
+};
+
 static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
 static int tup_db_var_changed = 0;

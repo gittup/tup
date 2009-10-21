@@ -2,7 +2,6 @@
 #define tup_db_h
 
 #include "tupid.h"
-#include "tupid_tree.h"
 #include "linux/list.h"
 #include "linux/rbtree.h"
 #include <stdio.h>
@@ -15,25 +14,6 @@
 #define VAR_DT 2
 
 struct tup_entry;
-
-struct id_entry {
-	struct list_head list;
-	tupid_t tupid;
-};
-
-/* This is kinda like a combination of db_node and id_entry, except we don't
- * have 'name'. This is used in symlists, as well as to get a list of nodes to
- * delete back to the monitor so it can handle all the deletions that happened
- * while we were out fishing (or whatever it is programs do when they're not
- * working).
- */
-struct half_entry {
-	struct list_head list;
-	tupid_t tupid;
-	tupid_t dt;
-	tupid_t sym;
-	int type;
-};
 
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
