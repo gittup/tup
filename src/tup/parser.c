@@ -134,7 +134,7 @@ static int get_name_list(struct tupfile *tf, struct list_head *plist,
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl);
 static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
-static int build_name_list_cb(void *arg, struct db_node *dbn);
+static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *cwd, int clen, const char *ext, int extlen);
@@ -488,7 +488,6 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p+=3, plen-=3) {
-		struct db_node dbn;
 		tupid_t dt;
 		struct path_element *pel = NULL;
 
@@ -501,30 +500,27 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 			fprintf(stderr, "[31mtup internal error: didn't get a final pel pointer in include_rules()[0m\n");
 			return -1;
 		}
-		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
+		if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {
 			return -1;
 		}
 		free(pel);
-		if(dbn.tupid < 0) {
+		if(!tent) {
 			/* Tuprules.tup doesn't exist here, go to the next
 			 * dir.
 			 */
-			dbn.tupid = tup_db_node_insert(dt, tuprules, -1, TUP_NODE_GHOST, -1);
-			if(dbn.tupid < 0)
+			if(tup_db_node_insert_tent(dt, tuprules, -1, TUP_NODE_GHOST, -1, &tent) < 0)
 				return -1;
-			dbn.type = TUP_NODE_GHOST;
-
 			/* Fall through to next if */
 		}
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(tup_db_create_link(dbn.tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
+		if(tent->type == TUP_NODE_GHOST) {
+			if(tup_db_create_link(tent->tnode.tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			continue;
 		}
 
 		args.dir = p;
 		args.dirlen = plen;
-		if(build_name_list_cb(&args, &dbn) < 0)
+		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	}
 	free(path);
@@ -547,15 +543,16 @@ static int gitignore(struct tupfile *tf)
 	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_tree) < 0)
 		return -1;
 	if((s && len) || git_root == 1 || tf->tupid == 1) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 
-		if(tup_db_select_dbn(tf->tupid, ".gitignore", &dbn) < 0)
+		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 			return -1;
-		if(dbn.tupid < 0) {
+		if(!tent) {
 			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
 				return -1;
 		} else {
-			tree_entry_remove(&tf->g->delete_tree, dbn.tupid,
+			tree_entry_remove(&tf->g->delete_tree,
+					  tent->tnode.tupid,
 					  &tf->g->delete_count);
 		}
 
@@ -1371,27 +1368,27 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.nl = nl;
 	args.tf = tf;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 
-		if(tup_db_select_dbn_part(pl->dt, pl->pel->path, pl->pel->len, &dbn) < 0) {
+		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
 			return -1;
 		}
-		if(dbn.tupid < 0) {
+		if(!tent) {
 			fprintf(stderr, "Error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
-		if(dbn.type == TUP_NODE_GHOST) {
+		if(tent->type == TUP_NODE_GHOST) {
 			fprintf(stderr, "Error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
-			tup_db_print(stderr, dbn.tupid);
+			tup_db_print(stderr, tent->tnode.tupid);
 			return -1;
 		}
-		if(tupid_tree_search(&tf->g->delete_tree, dbn.tupid) != NULL) {
+		if(tupid_tree_search(&tf->g->delete_tree, tent->tnode.tupid) != NULL) {
 			fprintf(stderr, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
-		if(build_name_list_cb(&args, &dbn) < 0)
+		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	} else {
 		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len) < 0)
@@ -1437,24 +1434,22 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl)
 	return 0;
 }
 
-static int build_name_list_cb(void *arg, struct db_node *dbn)
+static int build_name_list_cb(void *arg, struct tup_entry *tent)
 {
 	struct build_name_list_args *args = arg;
 	int extlesslen;
 	int len;
-	int namelen;
 	struct name_list_entry *nle;
 
-	if(tupid_tree_search(&args->tf->g->delete_tree, dbn->tupid) != NULL)
+	if(tupid_tree_search(&args->tf->g->delete_tree, tent->tnode.tupid) != NULL)
 		return 0;
 
-	namelen = strlen(dbn->name);
-	len = namelen + args->dirlen;
-	extlesslen = namelen - 1;
-	while(extlesslen > 0 && dbn->name[extlesslen] != '.')
+	len = tent->name.len + args->dirlen;
+	extlesslen = tent->name.len - 1;
+	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
 		extlesslen--;
 	if(extlesslen == 0)
-		extlesslen = namelen;
+		extlesslen = tent->name.len;
 	extlesslen += args->dirlen;
 
 	nle = malloc(sizeof *nle);
@@ -1463,15 +1458,15 @@ static int build_name_list_cb(void *arg, struct db_node *dbn)
 		return -1;
 	}
 
-	nle->path = set_path(dbn->name, args->dir, args->dirlen);
+	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
 	if(!nle->path)
 		return -1;
 
 	nle->len = len;
 	nle->extlesslen = extlesslen;
-	nle->tupid = dbn->tupid;
-	nle->dt = dbn->dt;
-	nle->type = dbn->type;
+	nle->tupid = tent->tnode.tupid;
+	nle->dt = tent->dt;
+	nle->type = tent->type;
 	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
 

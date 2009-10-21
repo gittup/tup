@@ -1054,7 +1054,7 @@ out_reset:
 	return rc;
 }
 
-int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
+int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
 				int len)
 {
@@ -1090,7 +1090,12 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 	}
 
 	while(1) {
-		struct db_node dbn;
+		struct tup_entry *tent;
+		tupid_t tupid;
+		const char *name;
+		int type;
+		tupid_t sym;
+		time_t mtime;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -1103,14 +1108,21 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
 			goto out_reset;
 		}
 
-		dbn.tupid = sqlite3_column_int64(*stmt, 0);
-		dbn.dt = dt;
-		dbn.name = (const char *)sqlite3_column_text(*stmt, 1);
-		dbn.type = sqlite3_column_int(*stmt, 2);
-		dbn.sym = sqlite3_column_int64(*stmt, 3);
-		dbn.mtime = sqlite3_column_int64(*stmt, 4);
+		tupid = sqlite3_column_int64(*stmt, 0);
+		tent = tup_entry_find(tupid);
+		if(!tent) {
+			name = (const char *)sqlite3_column_text(*stmt, 1);
+			type = sqlite3_column_int(*stmt, 2);
+			sym = sqlite3_column_int64(*stmt, 3);
+			mtime = sqlite3_column_int64(*stmt, 4);
 
-		if(callback(arg, &dbn) < 0) {
+			if(tup_entry_add_to_dir(dt, tupid, name, -1, type, sym, mtime, &tent) < 0) {
+				rc = -1;
+				goto out_reset;
+			}
+		}
+
+		if(callback(arg, tent) < 0) {
 			rc = -1;
 			goto out_reset;
 		}

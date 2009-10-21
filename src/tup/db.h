@@ -97,7 +97,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
 				void *arg, int flags);
 int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style),
 			   void *arg, tupid_t dt);
-int tup_db_select_node_dir_glob(int (*callback)(void *, struct db_node *),
+int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
 				int len);
 int tup_db_delete_node(tupid_t tupid);
