@@ -766,16 +766,16 @@ static void handle_event(struct monitor_event *m)
 			return;
 		}
 		if(m->e.mask & IN_ISDIR) {
-			struct db_node dbn;
+			struct tup_entry *tent;
 			int fd;
 
-			if(tup_db_select_dbn(from_dc->dt, mfe->m->e.name, &dbn) < 0)
+			if(tup_db_select_tent(from_dc->dt, mfe->m->e.name, &tent) < 0)
 				return;
-			if(dbn.tupid < 0)
+			if(!tent)
 				return;
-			if(tup_db_change_node(dbn.tupid, m->e.name, dc->dt) < 0)
+			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt) < 0)
 				return;
-			if(tup_db_modify_dir(dbn.tupid) < 0)
+			if(tup_db_modify_dir(tent->tnode.tupid) < 0)
 				return;
 			fd = tup_db_open_tupid(dc->dt);
 			if(fd < 0)
