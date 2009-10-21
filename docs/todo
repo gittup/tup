@@ -27,17 +27,9 @@ check inputs and outputs even if command fails
  - make sure failed output doesn't become white if the command is removed
  - ie: compile foo.c because FOO is y, but it fails, then set FOO to n - foo.o should be removed
 
-new node gets stuck in modify (probably due to mtime)
- - not a big deal, just unnecessary
- - maybe big deal for ghost that becomes normal file
-
-generated symlink becomes generated file - sym field still points somewhere which screws things up? or the actual symlink does?
-
 .gitignore should be re-generated if removed by user?
 
 'tup todo': check for config update
-
-print scan time in tup upd?
 
 remove tup scan?
 
@@ -47,8 +39,6 @@ file: 'tcc' [150 in dir 3] - use dirtree?
 
 kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try to hit ctrl-c twice)
  - might have to worry about a file being written, but the notification of it doesn't reach tup
-
-print directories of Tupfiles when parsing fails
 
 ifneq
 
@@ -67,14 +57,6 @@ read in +/- in order to add/remove worker threads?
 rule without a : should be an error?
 
 reverse of tup g: give it a file, print the dir/command to create it?
-
-non-existent nodes in create_list ?
-
-tup-gcc:
-if CONFIG_NON_EXISTENT is used, add it to .tup/db as ~UNSET~?
- - make sure it's culled
- - work if user code does '#define CONFIG_BLAH blah'?
- - namespace CONFIG under @/default, @/newconfig, etc?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
