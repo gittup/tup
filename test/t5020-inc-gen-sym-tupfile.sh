@@ -11,7 +11,7 @@
 tmkdir foo
 echo 'var = 3' > foo/x86.tup
 cat > foo/Tupfile << HERE
-: x86.tup |> rm -f %o; ln -s %f %o |> arch.tup
+: x86.tup |> ln -s %f %o |> arch.tup
 HERE
 tup touch foo/x86.tup foo/Tupfile
 update

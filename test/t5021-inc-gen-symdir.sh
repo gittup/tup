@@ -10,7 +10,7 @@ tmkdir foo
 tmkdir foo/arch-x86
 echo 'var = 3' > foo/arch-x86/rules.tup
 cat > foo/Tupfile << HERE
-: arch-x86 |> rm -f %o; ln -s %f %o |> arch
+: arch-x86 |> ln -s %f %o |> arch
 HERE
 tup touch foo/arch-x86/rules.tup foo/Tupfile
 update

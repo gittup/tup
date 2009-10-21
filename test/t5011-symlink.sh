@@ -3,7 +3,7 @@
 . ../tup.sh
 echo 'this is a file' > file1
 cat > Tupfile << HERE
-: file1 |> rm -f %o; ln -s %f %o |> file1.sym
+: file1 |> ln -s %f %o |> file1.sym
 HERE
 tup touch file1 Tupfile
 update

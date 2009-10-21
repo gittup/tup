@@ -8,7 +8,7 @@ echo "#define FOO 4" > foo-ppc.h
 echo '#include "foo.h"' > foo.c
 cat > Tupfile << HERE
 ARCH = x86
-: foo-\$(ARCH).h |> rm -f %o; ln -s %f %o |> foo.h
+: foo-\$(ARCH).h |> ln -s %f %o |> foo.h
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch foo.c foo-x86.h foo-ppc.h
@@ -21,7 +21,7 @@ check_no_updates foo-ppc.h foo.o
 
 cat > Tupfile << HERE
 ARCH = ppc
-: foo-\$(ARCH).h |> rm -f %o; ln -s %f %o |> foo.h
+: foo-\$(ARCH).h |> ln -s %f %o |> foo.h
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile

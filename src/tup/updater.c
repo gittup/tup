@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #include "updater.h"
 #include "graph.h"
 #include "fileio.h"
@@ -18,6 +19,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <sys/file.h>
 #include <sys/wait.h>
@@ -764,6 +766,23 @@ static void *todo_work(void *arg)
 	return NULL;
 }
 
+static int unlink_outputs(int dfd, struct node *n)
+{
+	struct edge *e;
+	struct node *output;
+	for(e = n->edges; e; e = e->next) {
+		output = e->dest;
+		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
+			if(errno != ENOENT) {
+				perror("unlinkat");
+				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
 static int update(struct node *n, struct server *s)
 {
 	int status;
@@ -804,6 +823,9 @@ static int update(struct node *n, struct server *s)
 	if(dfd < 0) {
 		goto err_out;
 	}
+
+	if(unlink_outputs(dfd, n) < 0)
+		goto err_close_dfd;
 
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");

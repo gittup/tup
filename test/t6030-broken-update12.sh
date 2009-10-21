@@ -15,7 +15,7 @@ cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 cat > Tupfile << HERE
-: sub/*.o |> rm -f %o; ar rcs %o %f |> libfoo.a
+: sub/*.o |> ar rcs %o %f |> libfoo.a
 HERE
 tup touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
 update

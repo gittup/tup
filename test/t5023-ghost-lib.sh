@@ -24,7 +24,7 @@ void foo(void) {printf("libB\n");}
 HERE
 cat > b/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> rm -f %o; ar cr %o %f |> libfoo.a
+: *.o |> ar cr %o %f |> libfoo.a
 HERE
 tup touch main.c b/foo.c Tupfile b/Tupfile
 update
@@ -43,7 +43,7 @@ void foo(void) {printf("libA\n");}
 HERE
 cat > a/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> rm -f %o; ar cr %o %f |> libfoo.a
+: *.o |> ar cr %o %f |> libfoo.a
 HERE
 tup touch a/foo.c a/Tupfile
 update_fail

@@ -37,7 +37,7 @@ files-@(BAR) += bar.c
 HERE
 
 cat > Tupfile << HERE
-: sub sub/*.o |> rm -f %o; (for i in %f; do echo \$i; done) > %o |> output
+: sub sub/*.o |> (for i in %f; do echo \$i; done) > %o |> output
 HERE
 echo "int main(void) {return 0;}" > sub/foo.c
 echo "void bar(void) {}" > sub/bar.c

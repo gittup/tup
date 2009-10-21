@@ -17,7 +17,7 @@ echo 'int main(void) {return 0;}' > foo.c
 tmkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> rm -f %o; ar cr %o %f |> libsub.a
+: *.o |> ar cr %o %f |> libsub.a
 include_rules
 HERE
 

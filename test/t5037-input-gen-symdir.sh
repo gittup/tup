@@ -9,13 +9,13 @@
 
 tmkdir arch-x86
 cat > Tupfile << HERE
-: |> rm -f %o; ln -s arch-x86 %o |> arch
+: |> ln -s arch-x86 %o |> arch
 HERE
 tup touch Tupfile arch-x86/foo.c
 update
 
 cat > Tupfile << HERE
-: |> rm -f %o; ln -s arch-x86 %o |> arch
+: |> ln -s arch-x86 %o |> arch
 : arch/*.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile

@@ -8,7 +8,7 @@
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: lib.o |> rm -f %o; ar cr %o %f |> lib.a
+: lib.o |> ar cr %o %f |> lib.a
 : foo.o lib.a |> gcc %f -o %o |> prog
 HERE
 
