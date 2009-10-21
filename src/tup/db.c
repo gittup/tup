@@ -125,7 +125,7 @@ static int reclaim_ghost_debug = 0;
 static int version_check(void);
 static void fill_dbn(struct db_node *dbn, struct tup_entry *tent);
 static int node_select(tupid_t dt, const char *name, int len,
-		       struct tup_entry **tent);
+		       struct tup_entry **entry);
 
 static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
@@ -913,6 +913,14 @@ int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 		return -1;
 
 	fill_dbn(dbn, tent);
+	return 0;
+}
+
+int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
+			    struct tup_entry **entry)
+{
+	if(node_select(dt, name, len, entry) < 0)
+		return -1;
 	return 0;
 }
 
@@ -4149,6 +4157,12 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			   time_t mtime)
 {
+	return tup_db_node_insert_tent(dt, name, len, type, mtime, NULL);
+}
+
+int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
+			    time_t mtime, struct tup_entry **entry)
+{
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_NODE_INSERT];
 	static char s[] = "insert into node(dir, type, name, sym, mtime) values(?, ?, ?, -1, ?)";
@@ -4200,7 +4214,7 @@ tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			return -1;
 	}
 
-	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime, NULL) < 0)
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime, entry) < 0)
 		return -1;
 
 	return tupid;
@@ -4226,7 +4240,7 @@ static void fill_dbn(struct db_node *dbn, struct tup_entry *tent)
 }
 
 static int node_select(tupid_t dt, const char *name, int len,
-		       struct tup_entry **tent)
+		       struct tup_entry **entry)
 {
 	int rc;
 	int dbrc;
@@ -4237,9 +4251,9 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int mtime;
 	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
 
-	if(tup_entry_find_name_in_dir(dt, name, len, tent) < 0)
+	if(tup_entry_find_name_in_dir(dt, name, len, entry) < 0)
 		return -1;
-	if(*tent)
+	if(*entry)
 		return 0;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, '%.*s'][0m\n", s, dt, len, name);
@@ -4277,7 +4291,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	sym = sqlite3_column_int64(*stmt, 2);
 	mtime = sqlite3_column_int(*stmt, 3);
 
-	if(tup_entry_add_to_dir(dt, tupid, name, len, type, sym, mtime, tent) < 0)
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, sym, mtime, entry) < 0)
 		return -1;
 
 out_reset:

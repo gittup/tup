@@ -367,8 +367,6 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 		return -1;
 
 	while(!list_empty(&pg->path_list)) {
-		struct db_node dbn;
-
 		pel = list_entry(pg->path_list.next, struct path_element, list);
 		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
 			if(tent->parent == NULL) {
@@ -384,19 +382,18 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			}
 			tent = tent->parent;
 		} else {
-			if(tup_db_select_dbn_part(tent->tnode.tupid, pel->path, pel->len, &dbn) < 0)
+			tupid_t curdt;
+
+			curdt = tent->tnode.tupid;
+			if(tup_db_select_tent_part(curdt, pel->path, pel->len, &tent) < 0)
 				return -1;
-			if(dbn.tupid < 0) {
+			if(!tent) {
 				/* Secret of the ghost valley! */
 				if(sotgv == 0)
 					return -1;
-				dbn.tupid = tup_db_node_insert(tent->tnode.tupid, pel->path, pel->len, TUP_NODE_GHOST, -1);
-				if(dbn.tupid < 0)
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
 					return -1;
-				dbn.sym = -1;
 			}
-			if(tup_entry_add(dbn.tupid, &tent) < 0)
-				return -1;
 			if(tup_entry_sym_follow(&tent, symlist) < 0)
 				return -1;
 		}
