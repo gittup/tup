@@ -294,6 +294,8 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
 			return NULL;
 		free(pel);
+		if(dbn.tupid < 0)
+			return NULL;
 		if(sym_follow(&dbn) < 0)
 			return NULL;
 		return tup_entry_get(dbn.tupid);
@@ -386,10 +388,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				return -1;
 			if(dbn.tupid < 0) {
 				/* Secret of the ghost valley! */
-				if(sotgv == 0) {
-					fprintf(stderr, "tup error: Unable to find node '%.*s' in dir %lli in find_dir_tupid_dt_pg\n", pel->len, pel->path, tent->tnode.tupid);
+				if(sotgv == 0)
 					return -1;
-				}
 				dbn.tupid = tup_db_node_insert(tent->tnode.tupid, pel->path, pel->len, TUP_NODE_GHOST, -1);
 				if(dbn.tupid < 0)
 					return -1;
