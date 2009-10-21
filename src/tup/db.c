@@ -3918,6 +3918,36 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 	return rc;
 }
 
+static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
+			     int (*extra_a)(tupid_t tupid, void *data),
+			     int (*extra_b)(tupid_t tupid, void *data))
+{
+	struct tup_entry *tent;
+	struct rb_node *nb;
+	struct tupid_tree *ttb;
+
+	nb = rb_first(b);
+
+	list_for_each_entry(tent, a, list) {
+		ttb = tupid_tree_search(b, tent->tnode.tupid);
+		if(!ttb) {
+			if(extra_a && extra_a(tent->tnode.tupid, data) < 0)
+				return -1;
+		} else {
+			tupid_tree_rm(b, ttb);
+			free(ttb);
+		}
+	}
+
+	for(nb = rb_first(b); nb; nb = rb_next(nb)) {
+		ttb = rb_entry(nb, struct tupid_tree, rbn);
+		if(extra_b && extra_b(ttb->tupid, data) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
 static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 			 int (*extra_a)(struct tupid_tree *tt, void *data),
 			 int (*extra_b)(struct tupid_tree *tt, void *data))
@@ -4027,19 +4057,19 @@ struct actual_input_data {
 	struct rb_root sticky_tree;
 };
 
-static int new_input(struct tupid_tree *tt, void *data)
+static int new_input(tupid_t tupid, void *data)
 {
 	struct db_node dbn;
 	struct actual_input_data *aid = data;
 
-	if(tup_db_select_dbn_by_id(tt->tupid, &dbn) < 0)
+	if(tup_db_select_dbn_by_id(tupid, &dbn) < 0)
 		return -1;
 	if(dbn.type == TUP_NODE_GENERATED) {
 		if(!aid->input_error) {
 			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not         specified as an input link for the command. This is an issue because the file   was created from another command, and without the input link the commands may   execute out of order. You should add this file as an input, since it is         possible this could randomly break in the future.\n");
 			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);
 		}
-		tup_db_print(stderr, tt->tupid);
+		tup_db_print(stderr, tupid);
 		aid->input_error = 1;
 		/* Return success here so we can display all errant inputs.
 		 * Actual check is in tup_db_check_actual_inputs().
@@ -4049,44 +4079,45 @@ static int new_input(struct tupid_tree *tt, void *data)
 	return 0;
 }
 
-static int new_normal_link(struct tupid_tree *tt, void *data)
+static int new_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
 	int rc;
 
-	if(tupid_tree_search(&aid->sticky_tree, tt->tupid) == NULL) {
+	if(tupid_tree_search(&aid->sticky_tree, tupid) == NULL) {
 		/* Not a sticky link, insert it */
-		rc = link_insert(tt->tupid, aid->cmdid, TUP_LINK_NORMAL);
+		rc = link_insert(tupid, aid->cmdid, TUP_LINK_NORMAL);
 	} else {
 		/* Currently just a sticky link, update it */
-		rc = link_update(tt->tupid, aid->cmdid, TUP_LINK_NORMAL | TUP_LINK_STICKY);
+		rc = link_update(tupid, aid->cmdid, TUP_LINK_NORMAL | TUP_LINK_STICKY);
 	}
 	return rc;
 }
 
-static int del_normal_link(struct tupid_tree *tt, void *data)
+static int del_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
 
-	if(tupid_tree_search(&aid->sticky_tree, tt->tupid) == NULL) {
+	if(tupid_tree_search(&aid->sticky_tree, tupid) == NULL) {
 		/* Not a sticky link, kill it. Also check if it was a ghost
 		 * (t5054).
 		 */
-		if(link_remove(tt->tupid, aid->cmdid) < 0)
+		if(link_remove(tupid, aid->cmdid) < 0)
 			return -1;
-		if(add_ghost(tt->tupid) < 0)
+		if(add_ghost(tupid) < 0)
 			return -1;
 	} else {
 		/* Demote to a sticky link */
-		if(link_update(tt->tupid, aid->cmdid, TUP_LINK_STICKY) < 0)
+		if(link_update(tupid, aid->cmdid, TUP_LINK_STICKY) < 0)
 			return -1;
 	}
 	return 0;
 }
 
-int tup_db_check_actual_inputs(tupid_t cmdid, struct rb_root *read_tree)
+int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 {
 	struct rb_root normal_tree = {NULL};
+	struct rb_root sticky_copy = {NULL};
 	struct actual_input_data aid = {
 		.cmdid = cmdid,
 		.input_error = 0,
@@ -4095,20 +4126,23 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct rb_root *read_tree)
 
 	if(get_links(cmdid, &aid.sticky_tree, &normal_tree) < 0)
 		return -1;
+	if(tupid_tree_copy(&sticky_copy, &aid.sticky_tree) < 0)
+		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
 	 */
-	if(compare_trees(read_tree, &aid.sticky_tree, &aid,
-			 new_input, NULL) < 0)
+	if(compare_list_tree(readlist, &sticky_copy, &aid,
+			     new_input, NULL) < 0)
 		return -1;
 	if(aid.input_error)
 		return -1;
 
-	if(compare_trees(read_tree, &normal_tree, &aid,
-			 new_normal_link, del_normal_link) < 0)
+	if(compare_list_tree(readlist, &normal_tree, &aid,
+			     new_normal_link, del_normal_link) < 0)
 		return -1;
 	free_tupid_tree(&aid.sticky_tree);
 	free_tupid_tree(&normal_tree);
+	free_tupid_tree(&sticky_copy);
 	return 0;
 }
 

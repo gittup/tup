@@ -9,6 +9,8 @@
 #include <errno.h>
 
 static struct rb_root tup_tree = RB_ROOT;
+static int list_out = 0;
+static struct list_head entry_list;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 				   const char *name, int len, int type,
@@ -42,6 +44,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return -1;
 	}
 	tent->tnode.tupid = tupid;
+	tent->list.next = NULL;
 	tent->entries.rb_node = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
@@ -294,6 +297,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 		len = strlen(name);
 
 	tent->tnode.tupid = tupid;
+	tent->list.next = NULL;
 	tent->dt = dt;
 	tent->sym_tupid = sym;
 	tent->parent = NULL;
@@ -375,7 +379,7 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	return change_name(tent, new_name);
 }
 
-int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
+int tup_entry_sym_follow(struct tup_entry **entry, struct list_head *list)
 {
 	struct tup_entry *tent;
 
@@ -385,8 +389,8 @@ int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree)
 			if(tup_entry_resolve_sym(tent) < 0)
 				return -1;
 		}
-		if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
-			return -1;
+		if(list)
+			tup_entry_list_add(tent, list);
 		tent = tent->sym;
 	}
 	*entry = tent;
@@ -419,6 +423,52 @@ int tup_entry_clear(void)
 		}
 	}
 	return 0;
+}
+
+struct list_head *tup_entry_get_list(void)
+{
+	if(list_out) {
+		fprintf(stderr, "tup internal error: entry list is already out\n");
+		exit(1);
+	}
+	list_out = 1;
+	INIT_LIST_HEAD(&entry_list);
+	return &entry_list;
+}
+
+void tup_entry_release_list(void)
+{
+	if(!list_out) {
+		fprintf(stderr, "tup internal error: entry list isn't out\n");
+		exit(1);
+	}
+	while(!list_empty(&entry_list)) {
+		struct tup_entry *tent;
+		tent = list_entry(entry_list.next, struct tup_entry, list);
+		tup_entry_list_del(tent);
+	}
+	list_out = 0;
+}
+
+void tup_entry_list_add(struct tup_entry *tent, struct list_head *list)
+{
+	if(!list_out) {
+		fprintf(stderr, "tup internal error: tup_entry_list_add called without the list\n");
+		exit(1);
+	}
+	if(tent->list.next == NULL) {
+		list_add(&tent->list, list);
+	}
+}
+
+void tup_entry_list_del(struct tup_entry *tent)
+{
+	if(!list_out) {
+		fprintf(stderr, "tup internal error: tup_entry_list_del called without the list\n");
+		exit(1);
+	}
+	list_del(&tent->list);
+	tent->list.next = NULL;
 }
 
 static int change_name(struct tup_entry *tent, const char *new_name)

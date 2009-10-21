@@ -19,6 +19,7 @@ struct id_flags {
 
 static int tup_del_id_type(tupid_t tupid, int type, int force);
 static int ghost_to_file(struct db_node *dbn);
+static int sym_follow(struct db_node *dbn);
 
 tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime)
 {
@@ -280,14 +281,13 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 	return 0;
 }
 
-tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
-		   struct list_head *symlist)
+tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn)
 {
 	struct path_element *pel = NULL;
 
 	dbn->tupid = -1;
 
-	dt = find_dir_tupid_dt(dt, path, &pel, symlist, 0);
+	dt = find_dir_tupid_dt(dt, path, &pel, NULL, 0);
 	if(dt < 0)
 		return -1;
 
@@ -295,7 +295,7 @@ tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn,
 		if(tup_db_select_dbn_part(dt, pel->path, pel->len, dbn) < 0)
 			return -1;
 		free(pel);
-		if(sym_follow(dbn, symlist) < 0)
+		if(sym_follow(dbn) < 0)
 			return -1;
 		return dbn->tupid;
 	} else {
@@ -313,7 +313,7 @@ tupid_t find_dir_tupid(const char *dir)
 {
 	struct db_node dbn;
 
-	return get_dbn_dt(DOT_DT, dir, &dbn, NULL);
+	return get_dbn_dt(DOT_DT, dir, &dbn);
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
@@ -391,9 +391,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					return -1;
 				dbn.sym = -1;
 			}
-			if(sym_follow(&dbn, symlist) < 0)
-				return -1;
 			if(tup_entry_add(dbn.tupid, &tent) < 0)
+				return -1;
+			if(tup_entry_sym_follow(&tent, symlist) < 0)
 				return -1;
 		}
 
@@ -403,30 +403,17 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree,
+int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 		     int sotgv)
 {
 	tupid_t new_dt;
-	LIST_HEAD(symlist);
 	struct path_element *pel = NULL;
 	struct db_node dbn;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, &symlist, sotgv);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, sotgv);
 	if(new_dt < 0)
 		return -1;
-
-	/* TODO: Just use the tree directly in find_dir_tupid_dt_pg or whatever
-	 * its replacement is.
-	 */
-	while(!list_empty(&symlist)) {
-		struct half_entry *he = list_entry(symlist.next, struct half_entry, list);
-		if(tupid_tree_add_dup(tree, he->tupid) < 0)
-			return -1;
-		list_del(&he->list);
-		free(he);
-	}
-
 	if(new_dt == 0) {
 		return 0;
 	}
@@ -434,8 +421,7 @@ int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree,
 		tent = tup_entry_get(new_dt);
 		if(!tent)
 			return -1;
-		if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
-			return -1;
+		tup_entry_list_add(tent, list);
 		return 0;
 	}
 
@@ -459,39 +445,24 @@ int add_node_to_tree(tupid_t dt, struct pel_group *pg, struct rb_root *tree,
 	tent = tup_entry_get(dbn.tupid);
 	if(!tent)
 		return -1;
-	if(tup_entry_sym_follow(&tent, tree) < 0)
+	if(tup_entry_sym_follow(&tent, list) < 0)
 		return -1;
-	if(tupid_tree_add_dup(tree, tent->tnode.tupid) < 0)
-		return -1;
+	tup_entry_list_add(tent, list);
 
 	return 0;
 }
 
 int gimme_node_or_make_ghost(tupid_t dt, const char *name,
-			     struct rb_root *symtree,
+			     struct list_head *symlist,
 			     struct tup_entry **entry)
 {
 	tupid_t new_dt;
-	LIST_HEAD(symlist);
 	struct path_element *pel = NULL;
 	struct db_node dbn;
 
-	new_dt = find_dir_tupid_dt(dt, name, &pel, &symlist, 1);
+	new_dt = find_dir_tupid_dt(dt, name, &pel, symlist, 1);
 	if(new_dt < 0)
 		return -1;
-
-	/* TODO: Just use the tree directly in find_dir_tupid_dt_pg or whatever
-	 * its replacement is.
-	 */
-	while(!list_empty(&symlist)) {
-		struct half_entry *he = list_entry(symlist.next, struct half_entry, list);
-		if(symtree) {
-			if(tupid_tree_add_dup(symtree, he->tupid) < 0)
-				return -1;
-		}
-		list_del(&he->list);
-		free(he);
-	}
 
 	if(new_dt == 0) {
 		*entry = NULL;
@@ -650,23 +621,9 @@ void del_pel_list(struct list_head *list)
 	}
 }
 
-int sym_follow(struct db_node *dbn, struct list_head *symlist)
+static int sym_follow(struct db_node *dbn)
 {
 	while(dbn->sym != -1) {
-		if(symlist) {
-			struct half_entry *he;
-			he = malloc(sizeof *he);
-			if(!he) {
-				perror("malloc");
-				return -1;
-			}
-			he->tupid = dbn->tupid;
-			he->dt = dbn->dt;
-			he->sym = dbn->sym;
-			he->type = dbn->type;
-			list_add(&he->list, symlist);
-		}
-
 		if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
 			return -1;
 	}

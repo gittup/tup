@@ -99,6 +99,18 @@ int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid)
 	return 0;
 }
 
+int tupid_tree_copy(struct rb_root *dest, struct rb_root *src)
+{
+	struct rb_node *rbn;
+	for(rbn = rb_first(src); rbn; rbn = rb_next(rbn)) {
+		struct tupid_tree *tt;
+		tt = rb_entry(rbn, struct tupid_tree, rbn);
+		if(tupid_tree_add(dest, tt->tupid) < 0)
+			return -1;
+	}
+	return 0;
+}
+
 void tupid_tree_remove(struct rb_root *root, tupid_t tupid)
 {
 	struct tupid_tree *tt;

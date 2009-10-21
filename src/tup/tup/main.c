@@ -250,7 +250,7 @@ static int graph(int argc, char **argv)
 		struct db_node dbn;
 
 		/* TODO: Only use tent here rather than dbn? */
-		tupid = get_dbn_dt(sub_dir_dt, argv[x], &dbn, NULL);
+		tupid = get_dbn_dt(sub_dir_dt, argv[x], &dbn);
 		if(tupid < 0) {
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
 			return -1;

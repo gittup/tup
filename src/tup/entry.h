@@ -3,6 +3,7 @@
 
 #include "tupid_tree.h"
 #include "string_tree.h"
+#include "linux/list.h"
 #include <time.h>
 
 /* Local cache of the entries in the 'node' database table */
@@ -16,6 +17,11 @@ struct tup_entry {
 	time_t mtime;
 	struct string_tree name;
 	struct rb_root entries;
+	/* Only valid inside of get/release list. The next pointer is used to
+	 * determine whether or not it is in the list (next==NULL means it
+	 * isn't in the list).
+	 */
+	struct list_head list;
 };
 
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
@@ -34,8 +40,12 @@ int tup_entry_open(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);
 struct tup_entry *tup_entry_get(tupid_t tupid);
 struct tup_entry *tup_entry_find(tupid_t tupid);
-int tup_entry_sym_follow(struct tup_entry **entry, struct rb_root *tree);
+int tup_entry_sym_follow(struct tup_entry **entry, struct list_head *list);
 void print_tup_entry(struct tup_entry *tent);
 int tup_entry_clear(void);
+struct list_head *tup_entry_get_list(void);
+void tup_entry_release_list(void);
+void tup_entry_list_add(struct tup_entry *tent, struct list_head *list);
+void tup_entry_list_del(struct tup_entry *tent);
 
 #endif

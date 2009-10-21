@@ -99,10 +99,10 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	struct file_entry *g;
 	struct file_entry *tmp;
 	struct db_node dbn;
-	struct half_entry *he;
+	struct tup_entry *tent;
 	int write_bork = 0;
-	struct rb_root read_tree = {NULL};
-	LIST_HEAD(symlist);
+	struct list_head *readlist;
+	struct list_head *symlist;
 
 	handle_unlink(info);
 
@@ -138,7 +138,8 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, &symlist, 0);
+		symlist = tup_entry_get_list();
+		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, symlist, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
@@ -147,21 +148,23 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
-		if(!list_empty(&symlist)) {
+		if(!list_empty(symlist)) {
 			fprintf(stderr, "tup error: Attempt to write to a file using a symlink. The command should only  use the full non-symlinked path, or just write to the current directory.\n");
 			fprintf(stderr, " -- Command: '%s'\n", debug_name);
 			fprintf(stderr, " -- Filename: '%s'\n", w->filename);
-			list_for_each_entry(he, &symlist, list) {
-				fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", he->tupid, he->sym, he->dt);
+			list_for_each_entry(tent, symlist, list) {
+				fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym_tupid, tent->dt);
 			}
 			return -1;
 		}
+		tup_entry_release_list();
+
 		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
 			return -1;
-		/* Don't need to sym_follow dbn here, since the output file
-		 * was removed by the updater. So our database representation
-		 * may not match the filesystem, untilwe reset the sym field
-		 * to -1 later.
+		/* Don't need to follow the syms of  dbn here, since the output
+		 * file was removed by the updater. So our database
+		 * representation may not match the filesystem, untilwe reset
+		 * the sym field to -1 later.
 		 */
 		free(pel);
 		if(dbn.tupid < 0) {
@@ -221,7 +224,7 @@ out_skip:
 				del_entry(g);
 		}
 
-		/* Don't pass in read_tree for the tree parameter - we don't
+		/* Don't pass in readlist for the list parameter - we don't
 		 * actually need to track symlinks referenced by the path of
 		 * the symlink file. These would get picked up by any command
 		 * that reads our symlink.
@@ -252,10 +255,11 @@ skip_sym:
 	if(tup_db_clear_tmp_list() < 0)
 		return -1;
 
+	readlist = tup_entry_get_list();
 	while(!list_empty(&info->read_list)) {
 		r = list_entry(info->read_list.next, struct file_entry, list);
 
-		if(add_node_to_tree(dt, &r->pg, &read_tree, 0) < 0)
+		if(add_node_to_list(dt, &r->pg, readlist, 0) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -263,7 +267,7 @@ skip_sym:
 	while(!list_empty(&info->var_list)) {
 		r = list_entry(info->var_list.next, struct file_entry, list);
 
-		if(add_node_to_tree(VAR_DT, &r->pg, &read_tree, 1) < 0)
+		if(add_node_to_list(VAR_DT, &r->pg, readlist, 1) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -271,13 +275,14 @@ skip_sym:
 	while(!list_empty(&info->ghost_list)) {
 		g = list_entry(info->ghost_list.next, struct file_entry, list);
 
-		if(add_node_to_tree(dt, &g->pg, &read_tree, 1) < 0)
+		if(add_node_to_list(dt, &g->pg, readlist, 1) < 0)
 			return -1;
 		del_entry(g);
 	}
-	if(tup_db_check_actual_inputs(cmdid, &read_tree) < 0)
+	if(tup_db_check_actual_inputs(cmdid, readlist) < 0)
 		return -1;
-	free_tupid_tree(&read_tree);
+	tup_entry_release_list();
+
 	return 0;
 }
 
