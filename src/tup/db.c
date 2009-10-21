@@ -26,7 +26,6 @@ enum {
 	DB_ROLLBACK,
 	DB_DEBUG_ADD_ALL_GHOSTS,
 	DB_CHECK_DUP_LINKS,
-	DB_SELECT_DBN_BY_ID,
 	DB_FILL_TUP_ENTRY,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
@@ -782,59 +781,6 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 	if(tupid < 0)
 		return -1;
 	return tupid;
-}
-
-int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn)
-{
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_SELECT_DBN_BY_ID];
-	static char s[] = "select dir, type, sym from node where id=?";
-
-	dbn->tupid = -1;
-	dbn->dt = -1;
-	dbn->name = NULL;
-	dbn->type = 0;
-	dbn->sym = -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		rc = 0;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	rc = 0;
-	dbn->tupid = tupid;
-	dbn->dt = sqlite3_column_int64(*stmt, 0);
-	dbn->type = sqlite3_column_int64(*stmt, 1);
-	dbn->sym = sqlite3_column_int64(*stmt, 2);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return rc;
 }
 
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
@@ -4060,12 +4006,12 @@ struct actual_input_data {
 
 static int new_input(tupid_t tupid, void *data)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 	struct actual_input_data *aid = data;
 
-	if(tup_db_select_dbn_by_id(tupid, &dbn) < 0)
+	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	if(dbn.type == TUP_NODE_GENERATED) {
+	if(tent->type == TUP_NODE_GENERATED) {
 		if(!aid->input_error) {
 			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not         specified as an input link for the command. This is an issue because the file   was created from another command, and without the input link the commands may   execute out of order. You should add this file as an input, since it is         possible this could randomly break in the future.\n");
 			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);

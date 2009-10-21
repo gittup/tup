@@ -7,7 +7,6 @@
 
 #define TUP_CONFIG "tup.config"
 
-struct db_node;
 struct tup_entry;
 
 struct path_element {
