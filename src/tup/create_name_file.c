@@ -281,39 +281,38 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 	return 0;
 }
 
-tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn)
+struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 {
 	struct path_element *pel = NULL;
-
-	dbn->tupid = -1;
+	struct db_node dbn;
 
 	dt = find_dir_tupid_dt(dt, path, &pel, NULL, 0);
 	if(dt < 0)
-		return -1;
+		return NULL;
 
 	if(pel) {
-		if(tup_db_select_dbn_part(dt, pel->path, pel->len, dbn) < 0)
-			return -1;
+		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
+			return NULL;
 		free(pel);
-		if(sym_follow(dbn) < 0)
-			return -1;
-		return dbn->tupid;
+		if(sym_follow(&dbn) < 0)
+			return NULL;
+		return tup_entry_get(dbn.tupid);
 	} else {
 		/* We get here if the path list ends up being empty (for
 		 * example, if the path is ".")
 		 */
-		if(tup_db_select_dbn_by_id(dt, dbn) < 0)
-			return -1;
-		dbn->name = path;
-		return dt;
+		return tup_entry_get(dt);
 	}
 }
 
 tupid_t find_dir_tupid(const char *dir)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 
-	return get_dbn_dt(DOT_DT, dir, &dbn);
+	tent = get_tent_dt(DOT_DT, dir);
+	if(!tent)
+		return -1;
+	return tent->tnode.tupid;
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
@@ -344,8 +343,11 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	/* The list can be empty if dir is "." or something like "foo/..". In
 	 * this case just return dt (the start dir).
 	 */
-	if(list_empty(&pg->path_list))
+	if(list_empty(&pg->path_list)) {
+		if(tup_entry_add(dt, &tent) < 0)
+			return -1;
 		return dt;
+	}
 
 	if(last) {
 		pel = list_entry(pg->path_list.prev, struct path_element, list);
@@ -384,8 +386,10 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				return -1;
 			if(dbn.tupid < 0) {
 				/* Secret of the ghost valley! */
-				if(sotgv == 0)
+				if(sotgv == 0) {
+					fprintf(stderr, "tup error: Unable to find node '%.*s' in dir %lli in find_dir_tupid_dt_pg\n", pel->len, pel->path, tent->tnode.tupid);
 					return -1;
+				}
 				dbn.tupid = tup_db_node_insert(tent->tnode.tupid, pel->path, pel->len, TUP_NODE_GHOST, -1);
 				if(dbn.tupid < 0)
 					return -1;

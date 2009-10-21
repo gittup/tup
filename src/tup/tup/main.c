@@ -247,22 +247,16 @@ static int graph(int argc, char **argv)
 			return -1;
 	}
 	for(x=1; x<argc; x++) {
-		struct db_node dbn;
+		struct tup_entry *tent;
 
-		/* TODO: Only use tent here rather than dbn? */
-		tupid = get_dbn_dt(sub_dir_dt, argv[x], &dbn);
-		if(tupid < 0) {
+		tent = get_tent_dt(sub_dir_dt, argv[x]);
+		if(!tent) {
 			fprintf(stderr, "Unable to find tupid for: '%s'\n", argv[x]);
 			return -1;
 		}
-		dbn.name = argv[x];
 
-		n = find_node(&g, dbn.tupid);
+		n = find_node(&g, tent->tnode.tupid);
 		if(n == NULL) {
-			struct tup_entry *tent;
-
-			if(tup_entry_add(dbn.tupid, &tent) < 0)
-				return -1;
 			n = create_node(&g, tent);
 			if(!n)
 				return -1;

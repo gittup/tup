@@ -35,7 +35,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 int tup_file_del(tupid_t dt, const char *file, int len);
 int tup_file_missing(tupid_t tupid, int type);
 int tup_del_id_force(tupid_t tupid, int type);
-tupid_t get_dbn_dt(tupid_t dt, const char *path, struct db_node *dbn);
+struct tup_entry *get_tent_dt(tupid_t dt, const char *path);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, struct list_head *symlist,
