@@ -23,6 +23,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 static int update_tup_config(void);
 static int process_create_nodes(void);
@@ -121,9 +122,15 @@ int updater(int argc, char **argv, int phase)
 
 	if(do_scan) {
 		if(monitor_get_pid() < 0) {
-			printf("Scanning filesystem...\n");
+			struct timeval t1, t2;
+			printf("Scanning filesystem... ");
+			fflush(stdout);
+			gettimeofday(&t1, NULL);
 			if(tup_scan() < 0)
 				return -1;
+			gettimeofday(&t2, NULL);
+			printf("%.3fs\n", (double)(t2.tv_sec - t1.tv_sec) +
+			       (double)(t2.tv_usec - t1.tv_usec)/1e6);
 		}
 	}
 	if(server_init() < 0)
