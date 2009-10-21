@@ -162,16 +162,9 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			return -1;
 		}
 		if(dbn.tupid < 0) {
-			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
-			dirfd = tup_entry_open_tupid(dt);
-			if(dirfd < 0) {
-				fprintf(stderr, "Unable to automatically unlink file.\n");
-			} else {
-				unlinkat(dirfd, w->filename, 0);
-				close(dirfd);
-			}
+			unlinkat(dfd, w->filename, 0);
 			write_bork = 1;
 		} else {
 			if(tup_db_add_write_list(dbn.tupid) < 0)
