@@ -459,7 +459,6 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
-	struct db_node dbn;
 
 	new_dt = find_dir_tupid_dt(dt, name, &pel, symlist, 1);
 	if(new_dt < 0)
@@ -474,18 +473,16 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 		return 0;
 	}
 
-	if(tup_db_select_dbn_part(new_dt, pel->path, pel->len, &dbn) < 0)
+	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, entry) < 0)
 		return -1;
-	if(dbn.tupid < 0) {
-		dbn.tupid = tup_db_node_insert(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
-		if(dbn.tupid < 0) {
+	if(!*entry) {
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, entry) < 0) {
 			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
 	}
 	free(pel);
 
-	*entry = tup_entry_get(dbn.tupid);
 	return 0;
 }
 
