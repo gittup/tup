@@ -98,7 +98,6 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	struct file_entry *r;
 	struct file_entry *g;
 	struct file_entry *tmp;
-	struct db_node dbn;
 	struct tup_entry *tent;
 	int write_bork = 0;
 	struct list_head *readlist;
@@ -159,25 +158,25 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 		}
 		tup_entry_release_list();
 
-		if(tup_db_select_dbn_part(newdt, pel->path, pel->len, &dbn) < 0)
+		if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
 			return -1;
-		/* Don't need to follow the syms of  dbn here, since the output
+		/* Don't need to follow the syms of tent here, since the output
 		 * file was removed by the updater. So our database
 		 * representation may not match the filesystem, untilwe reset
 		 * the sym field to -1 later.
 		 */
 		free(pel);
-		if(dbn.tupid < 0) {
+		if(!tent) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
 			unlinkat(dfd, w->filename, 0);
 			write_bork = 1;
 		} else {
-			if(tup_db_add_write_list(dbn.tupid) < 0)
+			if(tup_db_add_write_list(tent->tnode.tupid) < 0)
 				return -1;
-			if(file_set_mtime(dbn.tupid, dfd, w->filename) < 0)
+			if(file_set_mtime(tent->tnode.tupid, dfd, w->filename) < 0)
 				return -1;
-			if(tup_db_set_sym(dbn.tupid, -1) < 0)
+			if(tup_db_set_sym(tent->tnode.tupid, -1) < 0)
 				return -1;
 		}
 
@@ -192,9 +191,9 @@ out_skip:
 
 		sym_entry = list_entry(info->sym_list.next, struct sym_entry, list);
 
-		if(tup_db_select_dbn(dt, sym_entry->to, &dbn) < 0)
+		if(tup_db_select_tent(dt, sym_entry->to, &tent) < 0)
 			return -1;
-		if(dbn.tupid < 0) {
+		if(!tent) {
 			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", sym_entry->to);
@@ -209,9 +208,9 @@ out_skip:
 			goto skip_sym;
 		}
 
-		if(tup_db_add_write_list(dbn.tupid) < 0)
+		if(tup_db_add_write_list(tent->tnode.tupid) < 0)
 			return -1;
-		if(file_set_mtime(dbn.tupid, dfd, sym_entry->to) < 0)
+		if(file_set_mtime(tent->tnode.tupid, dfd, sym_entry->to) < 0)
 			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
@@ -237,7 +236,7 @@ out_skip:
 			sym = -1;
 		}
 
-		if(tup_db_set_sym(dbn.tupid, sym) < 0)
+		if(tup_db_set_sym(tent->tnode.tupid, sym) < 0)
 			return -1;
 
 skip_sym:
