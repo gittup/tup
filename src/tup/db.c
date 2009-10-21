@@ -1843,15 +1843,15 @@ out_reset:
 
 int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree, int *count)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 
-	if(tup_db_select_dbn(dt, ".gitignore", &dbn) < 0)
+	if(tup_db_select_tent(dt, ".gitignore", &tent) < 0)
 		return -1;
 	/* Fine if the .gitignore file isn't present. */
-	if(dbn.tupid < 0)
+	if(!tent)
 		return 0;
 
-	if(tree_entry_add(tree, dbn.tupid, dbn.type, count) < 0)
+	if(tree_entry_add(tree, tent->tnode.tupid, tent->type, count) < 0)
 		return -1;
 
 	return 0;

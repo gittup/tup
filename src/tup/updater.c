@@ -912,8 +912,7 @@ static int var_replace(struct node *n)
 	char *output;
 	char *p, *e;
 	int rc = -1;
-	struct db_node dbn;
-	struct db_node odbn;
+	struct tup_entry *tent;
 
 	if(n->tent->name.s[0] != ',') {
 		fprintf(stderr, "Error: var_replace command must begin with ','\n");
@@ -950,11 +949,11 @@ static int var_replace(struct node *n)
 	 * input file changes in the future we'll continue to process the
 	 * required parts of the DAG. See t3009.
 	 */
-	if(tup_db_select_dbn(n->tent->dt, input, &dbn) < 0)
+	if(tup_db_select_tent(n->tent->dt, input, &tent) < 0)
 		return -1;
-	if(dbn.tupid < 0)
+	if(!tent)
 		return -1;
-	if(tup_db_create_link(dbn.tupid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
+	if(tup_db_create_link(tent->tnode.tupid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 
 	ifd = open(input, O_RDONLY);
@@ -1011,11 +1010,11 @@ static int var_replace(struct node *n)
 		
 	} while(p < e);
 
-	if(tup_db_select_dbn(n->tent->dt, output, &odbn) < 0)
+	if(tup_db_select_tent(n->tent->dt, output, &tent) < 0)
 		return -1;
-	if(odbn.tupid < 0)
+	if(!tent)
 		return -1;
-	rc = file_set_mtime(odbn.tupid, dfd, output);
+	rc = file_set_mtime(tent->tnode.tupid, dfd, output);
 
 err_close_ofd:
 	close(ofd);
