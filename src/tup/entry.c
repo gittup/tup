@@ -193,7 +193,8 @@ static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest)
 }
 
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, tupid_t sym, time_t mtime)
+			 int type, tupid_t sym, time_t mtime,
+			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
@@ -206,6 +207,8 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 
 	if(resolve_parent(tent) < 0)
 		return -1;
+	if(dest)
+		*dest = tent;
 	return 0;
 }
 

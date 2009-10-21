@@ -123,8 +123,9 @@ static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
 
 static int version_check(void);
+static void fill_dbn(struct db_node *dbn, struct tup_entry *tent);
 static int node_select(tupid_t dt, const char *name, int len,
-		       struct db_node *dbn);
+		       struct tup_entry **tent);
 
 static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
@@ -750,32 +751,32 @@ tupid_t tup_db_create_node(tupid_t dt, const char *name, int type)
 
 tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 	tupid_t tupid;
 
-	if(node_select(dt, name, len, &dbn) < 0) {
+	if(node_select(dt, name, len, &tent) < 0) {
 		return -1;
 	}
 
-	if(dbn.tupid != -1) {
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(tup_db_set_type(dbn.tupid, type) < 0)
+	if(tent) {
+		if(tent->type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(tent->tnode.tupid, type) < 0)
 				return -1;
-			return dbn.tupid;
+			return tent->tnode.tupid;
 		}
-		if(dbn.type != type) {
+		if(tent->type != type) {
 			/* Try to provide a more sane error message in this
 			 * case, since a user might come across it just by
 			 * screwing up the Tupfile.
 			 */
-			if(dbn.type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
+			if(tent->type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
 				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\nThis error message is brought to you by the Defenders of the Truth to prevent   you from doing stupid things like delete your source code.\n", name);
 				return -1;
 			}
-			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, dbn.type);
+			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, tent->type);
 			return -1;
 		}
-		return dbn.tupid;
+		return tent->tnode.tupid;
 	}
 
 	tupid = tup_db_node_insert(dt, name, len, type, -1);
@@ -896,24 +897,22 @@ out_reset:
 
 int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
 {
-	if(node_select(dt, name, -1, dbn) < 0)
+	struct tup_entry *tent;
+	if(node_select(dt, name, -1, &tent) < 0)
 		return -1;
 
-	dbn->dt = dt;
-	dbn->name = name;
-
+	fill_dbn(dbn, tent);
 	return 0;
 }
 
 int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 			   struct db_node *dbn)
 {
-	if(node_select(dt, name, len, dbn) < 0)
+	struct tup_entry *tent;
+	if(node_select(dt, name, len, &tent) < 0)
 		return -1;
 
-	dbn->dt = dt;
-	dbn->name = name;
-
+	fill_dbn(dbn, tent);
 	return 0;
 }
 
@@ -1421,17 +1420,17 @@ out_reset:
 int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 {
 	int rc;
-	struct db_node dbn;
+	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
 	static char s[] = "update node set name=?, dir=? where id=?";
 	LIST_HEAD(ghost_list);
 
-	if(node_select(new_dt, new_name, -1, &dbn) < 0) {
+	if(node_select(new_dt, new_name, -1, &tent) < 0) {
 		return -1;
 	}
-	if(dbn.tupid != -1) {
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(recurse_delete_ghost_tree(dbn.tupid, &ghost_list) < 0)
+	if(tent) {
+		if(tent->type == TUP_NODE_GHOST) {
+			if(recurse_delete_ghost_tree(tent->tnode.tupid, &ghost_list) < 0)
 				return -1;
 		} else {
 			fprintf(stderr, "Error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
@@ -3206,26 +3205,27 @@ out_reset:
 
 tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 
-	if(node_select(VAR_DT, var, varlen, &dbn) < 0)
+	if(node_select(VAR_DT, var, varlen, &tent) < 0)
 		return -1;
-	if(dbn.tupid < 0) {
-		dbn.tupid = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
-		if(dbn.tupid < 0)
+	if(!tent) {
+		tupid_t tupid;
+		tupid = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
+		if(tupid < 0)
 			return -1;
 		/* I was gonna put "BOO" here, but then I realized that would
 		 * waste space and cure hiccups.
 		 */
-		if(tup_db_set_var(dbn.tupid, "") < 0)
+		if(tup_db_set_var(tupid, "") < 0)
 			return -1;
-		return dbn.tupid;
+		return tupid;
 	}
-	if(dbn.type == TUP_NODE_GHOST)
-		return dbn.tupid;
-	if(get_var_id(dbn.tupid, dest) < 0)
+	if(tent->type == TUP_NODE_GHOST)
+		return tent->tnode.tupid;
+	if(get_var_id(tent->tnode.tupid, dest) < 0)
 		return -1;
-	return dbn.tupid;
+	return tent->tnode.tupid;
 }
 
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
@@ -4200,38 +4200,47 @@ tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			return -1;
 	}
 
-	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime) < 0)
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime, NULL) < 0)
 		return -1;
 
 	return tupid;
 }
 
-static int node_select(tupid_t dt, const char *name, int len,
-		       struct db_node *dbn)
+static void fill_dbn(struct db_node *dbn, struct tup_entry *tent)
 {
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
-	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
-	struct tup_entry *tent;
-
-	dbn->tupid = -1;
-	dbn->dt = -1;
-	dbn->name = NULL;
-	dbn->type = 0;
-	dbn->sym = -1;
-	dbn->mtime = -1;
-
-	if(tup_entry_find_name_in_dir(dt, name, len, &tent) < 0)
-		return -1;
 	if(tent) {
 		dbn->tupid = tent->tnode.tupid;
 		dbn->dt = tent->dt;
 		dbn->type = tent->type;
 		dbn->sym = tent->sym;
 		dbn->mtime = tent->mtime;
-		return 0;
+		dbn->name = tent->name.s;
+	} else {
+		dbn->tupid = -1;
+		dbn->dt = -1;
+		dbn->name = NULL;
+		dbn->type = 0;
+		dbn->sym = -1;
+		dbn->mtime = -1;
 	}
+}
+
+static int node_select(tupid_t dt, const char *name, int len,
+		       struct tup_entry **tent)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
+	tupid_t tupid;
+	tupid_t sym;
+	int type;
+	int mtime;
+	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
+
+	if(tup_entry_find_name_in_dir(dt, name, len, tent) < 0)
+		return -1;
+	if(*tent)
+		return 0;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, '%.*s'][0m\n", s, dt, len, name);
 	if(!*stmt) {
@@ -4263,12 +4272,12 @@ static int node_select(tupid_t dt, const char *name, int len,
 	}
 
 	rc = 0;
-	dbn->tupid = sqlite3_column_int64(*stmt, 0);
-	dbn->type = sqlite3_column_int64(*stmt, 1);
-	dbn->sym = sqlite3_column_int64(*stmt, 2);
-	dbn->mtime = sqlite3_column_int64(*stmt, 3);
+	tupid = sqlite3_column_int64(*stmt, 0);
+	type = sqlite3_column_int(*stmt, 1);
+	sym = sqlite3_column_int64(*stmt, 2);
+	mtime = sqlite3_column_int(*stmt, 3);
 
-	if(tup_entry_add_to_dir(dt, dbn->tupid, name, len, dbn->type, dbn->sym, dbn->mtime) < 0)
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, sym, mtime, tent) < 0)
 		return -1;
 
 out_reset:
@@ -4906,7 +4915,7 @@ static int get_db_var_tree(struct vardb *vdb)
 		type = sqlite3_column_int(*stmt, 3);
 		if(vardb_set(vdb, var, value, type, tupid) < 0)
 			return -1;
-		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1) <0)
+		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1, NULL) <0)
 			return -1;
 	} while(1);
 

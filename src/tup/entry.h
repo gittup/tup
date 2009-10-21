@@ -28,7 +28,8 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 			       struct tup_entry **dest);
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, tupid_t sym, time_t mtime);
+			 int type, tupid_t sym, time_t mtime,
+			 struct tup_entry **dest);
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
 		      time_t mtime, const char *name, struct rb_root *root);
 int tup_entry_resolve_dirsym(void);
