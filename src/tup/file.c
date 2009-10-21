@@ -153,7 +153,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			fprintf(stderr, " -- Command: '%s'\n", debug_name);
 			fprintf(stderr, " -- Filename: '%s'\n", w->filename);
 			list_for_each_entry(tent, symlist, list) {
-				fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym_tupid, tent->dt);
+				fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym, tent->dt);
 			}
 			return -1;
 		}
@@ -186,23 +186,23 @@ out_skip:
 	}
 
 	while(!list_empty(&info->sym_list)) {
-		struct sym_entry *sym;
+		struct sym_entry *sym_entry;
 		struct tup_entry *link_tent;
-		tupid_t sym_tupid;
+		tupid_t sym;
 
-		sym = list_entry(info->sym_list.next, struct sym_entry, list);
+		sym_entry = list_entry(info->sym_list.next, struct sym_entry, list);
 
-		if(tup_db_select_dbn(dt, sym->to, &dbn) < 0)
+		if(tup_db_select_dbn(dt, sym_entry->to, &dbn) < 0)
 			return -1;
 		if(dbn.tupid < 0) {
 			int dirfd;
-			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym->to, debug_name);
-			fprintf(stderr, " Unlink: [35m%s[0m\n", sym->to);
+			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);
+			fprintf(stderr, " Unlink: [35m%s[0m\n", sym_entry->to);
 			dirfd = tup_entry_open_tupid(dt);
 			if(dirfd < 0) {
 				fprintf(stderr, "Unable to automatically unlink file.\n");
 			} else {
-				unlinkat(dirfd, sym->to, 0);
+				unlinkat(dirfd, sym_entry->to, 0);
 				close(dirfd);
 			}
 			write_bork = 1;
@@ -211,7 +211,7 @@ out_skip:
 
 		if(tup_db_add_write_list(dbn.tupid) < 0)
 			return -1;
-		if(file_set_mtime(dbn.tupid, dfd, sym->to) < 0)
+		if(file_set_mtime(dbn.tupid, dfd, sym_entry->to) < 0)
 			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
@@ -220,7 +220,7 @@ out_skip:
 			 * happen when 'ln' does a stat() before it does a
 			 * symlink().
 			 */
-			if(strcmp(sym->to, g->filename) == 0)
+			if(strcmp(sym_entry->to, g->filename) == 0)
 				del_entry(g);
 		}
 
@@ -229,22 +229,22 @@ out_skip:
 		 * the symlink file. These would get picked up by any command
 		 * that reads our symlink.
 		 */
-		if(gimme_node_or_make_ghost(dt, sym->from, NULL, &link_tent) < 0)
+		if(gimme_node_or_make_ghost(dt, sym_entry->from, NULL, &link_tent) < 0)
 			return -1;
 		if(link_tent) {
-			sym_tupid = link_tent->tnode.tupid;
+			sym = link_tent->tnode.tupid;
 		} else {
-			sym_tupid = -1;
+			sym = -1;
 		}
 
-		if(tup_db_set_sym(dbn.tupid, sym_tupid) < 0)
+		if(tup_db_set_sym(dbn.tupid, sym) < 0)
 			return -1;
 
 skip_sym:
-		list_del(&sym->list);
-		free(sym->from);
-		free(sym->to);
-		free(sym);
+		list_del(&sym_entry->list);
+		free(sym_entry->from);
+		free(sym_entry->to);
+		free(sym_entry);
 	}
 
 	if(write_bork)

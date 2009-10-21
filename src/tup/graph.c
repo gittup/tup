@@ -90,9 +90,9 @@ int create_graph(struct graph *g, int count_flags)
 {
 	root_entry.tnode.tupid = 0;
 	root_entry.dt = 0;
-	root_entry.sym_tupid = -1;
+	root_entry.sym = -1;
 	root_entry.parent = NULL;
-	root_entry.sym = NULL;
+	root_entry.symlink = NULL;
 	root_entry.type = TUP_NODE_ROOT;
 	root_entry.mtime = -1;
 	root_entry.name.len = strlen(root_name);

@@ -872,7 +872,7 @@ int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
 
 	tent->dt = sqlite3_column_int64(*stmt, 0);
 	tent->type = sqlite3_column_int(*stmt, 1);
-	tent->sym_tupid = sqlite3_column_int64(*stmt, 2);
+	tent->sym = sqlite3_column_int64(*stmt, 2);
 	tent->mtime = sqlite3_column_int(*stmt, 3);
 	name = (const char*)sqlite3_column_text(*stmt, 4);
 	len = strlen(name);
@@ -1625,7 +1625,7 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 	tent = tup_entry_get(tupid);
 	if(!tent)
 		return -1;
-	tent->sym_tupid = sym;
+	tent->sym = sym;
 	if(tup_entry_resolve_sym(tent) < 0)
 		return -1;
 
@@ -4228,7 +4228,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 		dbn->tupid = tent->tnode.tupid;
 		dbn->dt = tent->dt;
 		dbn->type = tent->type;
-		dbn->sym = tent->sym_tupid;
+		dbn->sym = tent->sym;
 		dbn->mtime = tent->mtime;
 		return 0;
 	}
@@ -4762,8 +4762,8 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 		tent = tup_entry_get(de->tupid);
 		if(!tent)
 			return -1;
-		tent->sym = NULL;
-		tent->sym_tupid = -1;
+		tent->symlink = NULL;
+		tent->sym = -1;
 
 		dfd = tup_entry_open(tent->parent);
 		if(dfd < 0)

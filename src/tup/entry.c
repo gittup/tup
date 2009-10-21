@@ -52,7 +52,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 
 	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
 		return -1;
-	if(tup_entry_add_m1(tent->sym_tupid, &tent->sym) < 0)
+	if(tup_entry_add_m1(tent->sym, &tent->symlink) < 0)
 		return -1;
 
 	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
@@ -299,9 +299,9 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 	tent->tnode.tupid = tupid;
 	tent->list.next = NULL;
 	tent->dt = dt;
-	tent->sym_tupid = sym;
+	tent->sym = sym;
 	tent->parent = NULL;
-	tent->sym = NULL;
+	tent->symlink = NULL;
 	tent->type = type;
 	tent->mtime = mtime;
 	tent->name.s = malloc(len+1);
@@ -342,13 +342,13 @@ static int resolve_parent(struct tup_entry *tent)
 
 int tup_entry_resolve_sym(struct tup_entry *tent)
 {
-	if(tent->sym_tupid < 0) {
-		tent->sym = NULL;
+	if(tent->sym < 0) {
+		tent->symlink = NULL;
 	} else {
-		if(tup_entry_add(tent->sym_tupid, &tent->sym) < 0)
+		if(tup_entry_add(tent->sym, &tent->symlink) < 0)
 			return -1;
-		if(!tent->sym) {
-			fprintf(stderr, "tup error: Unable to find sym entry [%lli] for node %lli\n", tent->sym_tupid, tent->tnode.tupid);
+		if(!tent->symlink) {
+			fprintf(stderr, "tup error: Unable to find sym entry [%lli] for node %lli\n", tent->sym, tent->tnode.tupid);
 			return -1;
 		}
 	}
@@ -384,14 +384,14 @@ int tup_entry_sym_follow(struct tup_entry **entry, struct list_head *list)
 	struct tup_entry *tent;
 
 	tent = *entry;
-	while(tent->sym_tupid != -1) {
-		if(tent->sym == NULL) {
+	while(tent->sym != -1) {
+		if(tent->symlink == NULL) {
 			if(tup_entry_resolve_sym(tent) < 0)
 				return -1;
 		}
 		if(list)
 			tup_entry_list_add(tent, list);
-		tent = tent->sym;
+		tent = tent->symlink;
 	}
 	*entry = tent;
 	return 0;

@@ -10,9 +10,9 @@
 struct tup_entry {
 	struct tupid_tree tnode;
 	tupid_t dt;
-	tupid_t sym_tupid;
+	tupid_t sym;
 	struct tup_entry *parent;
-	struct tup_entry *sym;
+	struct tup_entry *symlink;
 	int type;
 	time_t mtime;
 	struct string_tree name;

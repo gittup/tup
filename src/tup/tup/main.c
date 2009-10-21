@@ -358,8 +358,8 @@ static int graph(int argc, char **argv)
 			if(tmp)
 				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
 		}
-		if(n->tent->sym_tupid != -1)
-			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->tent->sym_tupid, n->tnode.tupid);
+		if(n->tent->sym != -1)
+			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->tent->sym, n->tnode.tupid);
 
 		e = n->edges;
 		while(e) {
