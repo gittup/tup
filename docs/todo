@@ -35,6 +35,8 @@ remove tup scan?
 
 name_list_entry - pointer to tup_entry?
 
+tup_db_set_mtime and friends take a tup_entry* instead of tupid?
+
 syntax: color %flags in output
 
 file: 'tcc' [150 in dir 3] - use dirtree?

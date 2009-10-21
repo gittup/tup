@@ -123,7 +123,6 @@ static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
 
 static int version_check(void);
-static void fill_dbn(struct db_node *dbn, struct tup_entry *tent);
 static int node_select(tupid_t dt, const char *name, int len,
 		       struct tup_entry **entry);
 
@@ -893,27 +892,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn)
-{
-	struct tup_entry *tent;
-	if(node_select(dt, name, -1, &tent) < 0)
-		return -1;
-
-	fill_dbn(dbn, tent);
-	return 0;
-}
-
-int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
-			   struct db_node *dbn)
-{
-	struct tup_entry *tent;
-	if(node_select(dt, name, len, &tent) < 0)
-		return -1;
-
-	fill_dbn(dbn, tent);
-	return 0;
 }
 
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry)
@@ -4236,25 +4214,6 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 		return -1;
 
 	return 0;
-}
-
-static void fill_dbn(struct db_node *dbn, struct tup_entry *tent)
-{
-	if(tent) {
-		dbn->tupid = tent->tnode.tupid;
-		dbn->dt = tent->dt;
-		dbn->type = tent->type;
-		dbn->sym = tent->sym;
-		dbn->mtime = tent->mtime;
-		dbn->name = tent->name.s;
-	} else {
-		dbn->tupid = -1;
-		dbn->dt = -1;
-		dbn->name = NULL;
-		dbn->type = 0;
-		dbn->sym = -1;
-		dbn->mtime = -1;
-	}
 }
 
 static int node_select(tupid_t dt, const char *name, int len,

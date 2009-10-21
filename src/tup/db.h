@@ -86,9 +86,6 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 			    time_t mtime, struct tup_entry **entry);
 int tup_db_select_dbn_by_id(tupid_t tupid, struct db_node *dbn);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
-int tup_db_select_dbn(tupid_t dt, const char *name, struct db_node *dbn);
-int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
-			   struct db_node *dbn);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
 			    struct tup_entry **entry);

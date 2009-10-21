@@ -381,7 +381,7 @@ static int mlink(int argc, char **argv)
 	int type;
 	int x;
 	tupid_t cmdid;
-	struct db_node dbn;
+	struct tup_entry *tent;
 
 	if(argc < 4) {
 		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
@@ -413,16 +413,16 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		if(tup_db_select_dbn(DOT_DT, name+2, &dbn) < 0)
+		if(tup_db_select_tent(DOT_DT, name+2, &tent) < 0)
 			return -1;
-		if(dbn.tupid < 0)
+		if(!tent)
 			return 1;
 
 		if(type == 0) {
-			if(tup_db_create_link(dbn.tupid, cmdid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(tent->tnode.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		} else {
-			if(tup_db_create_link(cmdid, dbn.tupid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(cmdid, tent->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}
@@ -435,7 +435,7 @@ static int mlink(int argc, char **argv)
 static int node_exists(int argc, char **argv)
 {
 	int x;
-	struct db_node dbn;
+	struct tup_entry *tent;
 	tupid_t dt;
 
 	if(argc < 3) {
@@ -448,9 +448,9 @@ static int node_exists(int argc, char **argv)
 	argv++;
 	argc--;
 	for(x=1; x<argc; x++) {
-		if(tup_db_select_dbn(dt, argv[x], &dbn) < 0)
+		if(tup_db_select_tent(dt, argv[x], &tent) < 0)
 			return -1;
-		if(dbn.tupid < 0)
+		if(!tent)
 			return -1;
 	}
 	return 0;
@@ -458,7 +458,8 @@ static int node_exists(int argc, char **argv)
 
 static int link_exists(int argc, char **argv)
 {
-	struct db_node dbna, dbnb;
+	struct tup_entry *tenta;
+	struct tup_entry *tentb;
 	tupid_t dta, dtb;
 
 	if(argc != 5) {
@@ -474,9 +475,9 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	if(tup_db_select_dbn(dta, argv[2], &dbna) < 0)
+	if(tup_db_select_tent(dta, argv[2], &tenta) < 0)
 		return -1;
-	if(dbna.tupid < 0) {
+	if(!tenta) {
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[2]);
 		return -1;
 	}
@@ -490,13 +491,13 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	if(tup_db_select_dbn(dtb, argv[4], &dbnb) < 0)
+	if(tup_db_select_tent(dtb, argv[4], &tentb) < 0)
 		return -1;
-	if(dbnb.tupid < 0) {
+	if(!tentb) {
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
 		return -1;
 	}
-	return tup_db_link_exists(dbna.tupid, dbnb.tupid);
+	return tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid);
 }
 
 static int touch(int argc, char **argv)
@@ -683,24 +684,24 @@ static int varshow(int argc, char **argv)
 			return -1;
 	} else {
 		int x;
-		struct db_node dbn;
+		struct tup_entry *tent;
 		for(x=1; x<argc; x++) {
 			char *value;
-			if(tup_db_select_dbn(VAR_DT, argv[x], &dbn) < 0)
+			if(tup_db_select_tent(VAR_DT, argv[x], &tent) < 0)
 				return -1;
-			if(dbn.tupid < 0) {
+			if(!tent) {
 				fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
 				continue;
 			}
-			if(dbn.type == TUP_NODE_VAR) {
-				if(tup_db_get_var_id_alloc(dbn.tupid, &value) < 0)
+			if(tent->type == TUP_NODE_VAR) {
+				if(tup_db_get_var_id_alloc(tent->tnode.tupid, &value) < 0)
 					return -1;
 				printf(" - Var[%s] = '%s'\n", argv[x], value);
 				free(value);
-			} else if(dbn.type == TUP_NODE_GHOST) {
+			} else if(tent->type == TUP_NODE_GHOST) {
 				printf(" - Var[[47;30m%s[0m] is a ghost\n", argv[x]);
 			} else {
-				fprintf(stderr, "Variable '%s' has unknown type %i\n", argv[x], dbn.type);
+				fprintf(stderr, "Variable '%s' has unknown type %i\n", argv[x], tent->type);
 			}
 		}
 	}
@@ -724,7 +725,7 @@ static int config(int argc, char **argv)
 
 static int fake_mtime(int argc, char **argv)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 	time_t mtime;
 	tupid_t dt;
 	tupid_t sub_dir_dt;
@@ -742,12 +743,12 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "Error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
-	if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0) {
+	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
 	mtime = strtol(argv[2], NULL, 0);
-	if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+	if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
 		return -1;
 	free(pel);
 	return 0;
