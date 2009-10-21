@@ -624,7 +624,7 @@ static int node(int argc, char **argv)
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(create_name_file(dt, pel->path, -1) < 0) {
+		if(create_name_file(dt, pel->path, -1, NULL) < 0) {
 			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", pel->path, dt);
 			return -1;
 		}

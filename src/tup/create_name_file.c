@@ -18,19 +18,16 @@ struct id_flags {
 };
 
 static int tup_del_id_type(tupid_t tupid, int type, int force);
-static int ghost_to_file(struct db_node *dbn);
-static int sym_follow(struct db_node *dbn);
+static int ghost_to_file(struct tup_entry *tent);
 
-tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime)
+int create_name_file(tupid_t dt, const char *file, time_t mtime,
+		     struct tup_entry **entry)
 {
-	tupid_t tupid;
-
-	tupid = tup_db_node_insert(dt, file, -1, TUP_NODE_FILE, mtime);
-	if(tupid < 0)
+	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
-	return tupid;
+	return 0;
 }
 
 tupid_t create_command_file(tupid_t dt, const char *cmd)
@@ -47,20 +44,19 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 			      time_t mtime, int force)
 {
 	int rc;
-	struct db_node dbn;
+	struct tup_entry *tent;
 	struct tup_entry *link_entry;
 	tupid_t newsym;
 	static char linkname[PATH_MAX];
 
-	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+	if(tup_db_select_tent(dt, file, &tent) < 0)
 		return -1;
-	if(dbn.tupid < 0) {
-		dbn.tupid = create_name_file(dt, file, mtime);
-		if(dbn.tupid < 0)
+	if(!tent) {
+		if(create_name_file(dt, file, mtime, &tent) < 0)
 			return -1;
 	} else {
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(ghost_to_file(&dbn) < 0)
+		if(tent->type == TUP_NODE_GHOST) {
+			if(ghost_to_file(tent) < 0)
 				return -1;
 		}
 	}
@@ -85,18 +81,18 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 		newsym = -1;
 	}
 
-	if(dbn.sym != newsym) {
-		if(tup_db_set_sym(dbn.tupid, newsym) < 0)
+	if(tent->sym != newsym || tent->mtime != mtime || force) {
+		if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 			return -1;
 	}
-	if(dbn.sym != newsym || dbn.mtime != mtime || force) {
-		if(tup_db_add_modify_list(dbn.tupid) < 0)
+	if(tent->sym != newsym) {
+		if(tup_db_set_sym(tent->tnode.tupid, newsym) < 0)
 			return -1;
 	}
-	if(dbn.mtime != mtime)
-		if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+	if(tent->mtime != mtime)
+		if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
 			return -1;
-	return dbn.tupid;
+	return tent->tnode.tupid;
 }
 
 tupid_t tup_file_mod(tupid_t dt, const char *file)
@@ -119,43 +115,42 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 	int new = 0;
 	int modified = 0;
 
-	if(tup_db_select_dbn(dt, file, &dbn) < 0)
+	if(tup_db_select_tent(dt, file, &tent) < 0)
 		return -1;
 
-	if(dbn.tupid < 0) {
-		dbn.tupid = create_name_file(dt, file, mtime);
-		if(dbn.tupid < 0)
+	if(!tent) {
+		if(create_name_file(dt, file, mtime, &tent) < 0)
 			return -1;
 		new = 1;
 	} else {
-		if(dbn.mtime != mtime || force)
+		if(tent->mtime != mtime || force)
 			modified = 1;
 
-		if(dbn.type == TUP_NODE_GHOST) {
-			if(ghost_to_file(&dbn) < 0)
+		if(tent->type == TUP_NODE_GHOST) {
+			if(ghost_to_file(tent) < 0)
 				return -1;
-		} else if(dbn.type != TUP_NODE_FILE &&
-			  dbn.type != TUP_NODE_GENERATED) {
-			fprintf(stderr, "tup error: tup_file_mod(%lli, %s) expecting to move a file to the modify_list, but got type: %i\n", dt, file, dbn.type);
+		} else if(tent->type != TUP_NODE_FILE &&
+			  tent->type != TUP_NODE_GENERATED) {
+			fprintf(stderr, "tup error: tup_file_mod(%lli, %s) expecting to move a file to the modify_list, but got type: %i\n", dt, file, tent->type);
 			return -1;
 		}
 		if(modified) {
-			if(dbn.type == TUP_NODE_GENERATED) {
+			if(tent->type == TUP_NODE_GENERATED) {
 				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
-				if(tup_db_modify_cmds_by_output(dbn.tupid, NULL) < 0)
+				if(tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL) < 0)
 					return -1;
 			}
-			if(tup_db_add_modify_list(dbn.tupid) < 0)
+			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 				return -1;
 
 			/* It's possible this is a file that was included by a
 			 * Tupfile.  Try to set any dependent directory flags.
 			 */
-			if(tup_db_set_dependent_dir_flags(dbn.tupid) < 0)
+			if(tup_db_set_dependent_dir_flags(tent->tnode.tupid) < 0)
 				return -1;
 
 			/* Need to re-parse the Tupfile if it was changed. */
@@ -164,8 +159,8 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 					return -1;
 			}
 
-			if(dbn.mtime != mtime)
-				if(tup_db_set_mtime(dbn.tupid, mtime) < 0)
+			if(tent->mtime != mtime)
+				if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
 					return -1;
 		}
 	}
@@ -181,12 +176,12 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		}
 	}
 
-	return dbn.tupid;
+	return tent->tnode.tupid;
 }
 
 int tup_file_del(tupid_t dt, const char *file, int len)
 {
-	struct db_node dbn;
+	struct tup_entry *tent;
 
 	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
 		/* If tup.config was removed, also add the @-directory to the
@@ -196,13 +191,13 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 			return -1;
 	}
 
-	if(tup_db_select_dbn_part(dt, file, len, &dbn) < 0)
+	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
 		return -1;
-	if(dbn.tupid < 0) {
+	if(!tent) {
 		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 		return -1;
 	}
-	return tup_del_id_type(dbn.tupid, dbn.type, 0);
+	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
 }
 
 int tup_file_missing(tupid_t tupid, int type)
@@ -284,21 +279,21 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 {
 	struct path_element *pel = NULL;
-	struct db_node dbn;
+	struct tup_entry *tent;
 
 	dt = find_dir_tupid_dt(dt, path, &pel, NULL, 0);
 	if(dt < 0)
 		return NULL;
 
 	if(pel) {
-		if(tup_db_select_dbn_part(dt, pel->path, pel->len, &dbn) < 0)
+		if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
 			return NULL;
 		free(pel);
-		if(dbn.tupid < 0)
+		if(!tent)
 			return NULL;
-		if(sym_follow(&dbn) < 0)
+		if(tup_entry_sym_follow(&tent, NULL) < 0)
 			return NULL;
-		return tup_entry_get(dbn.tupid);
+		return tent;
 	} else {
 		/* We get here if the path list ends up being empty (for
 		 * example, if the path is ".")
@@ -409,7 +404,6 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
-	struct db_node dbn;
 	struct tup_entry *tent;
 
 	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, sotgv);
@@ -426,12 +420,11 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 		return 0;
 	}
 
-	if(tup_db_select_dbn_part(new_dt, pel->path, pel->len, &dbn) < 0)
+	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, &tent) < 0)
 		return -1;
-	if(dbn.tupid < 0) {
+	if(!tent) {
 		if(sotgv) {
-			dbn.tupid = tup_db_node_insert(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1);
-			if(dbn.tupid < 0) {
+			if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
 				fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 				return -1;
 			}
@@ -443,9 +436,6 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	}
 	free(pel);
 
-	tent = tup_entry_get(dbn.tupid);
-	if(!tent)
-		return -1;
 	if(tup_entry_sym_follow(&tent, list) < 0)
 		return -1;
 	tup_entry_list_add(tent, list);
@@ -619,23 +609,14 @@ void del_pel_list(struct list_head *list)
 	}
 }
 
-static int sym_follow(struct db_node *dbn)
+static int ghost_to_file(struct tup_entry *tent)
 {
-	while(dbn->sym != -1) {
-		if(tup_db_select_dbn_by_id(dbn->sym, dbn) < 0)
-			return -1;
-	}
-	return 0;
-}
-
-static int ghost_to_file(struct db_node *dbn)
-{
-	if(tup_db_set_type(dbn->tupid, TUP_NODE_FILE) < 0)
+	if(tup_db_set_type(tent->tnode.tupid, TUP_NODE_FILE) < 0)
 		return -1;
-	if(tup_db_add_create_list(dbn->dt) < 0)
+	if(tup_db_add_create_list(tent->dt) < 0)
 		return -1;
-	if(tup_db_add_modify_list(dbn->tupid) < 0)
+	if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 		return -1;
-	dbn->type = TUP_NODE_FILE;
+	tent->type = TUP_NODE_FILE;
 	return 0;
 }

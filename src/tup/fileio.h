@@ -24,7 +24,8 @@ struct pel_group {
 	int pg_flags;
 };
 
-tupid_t create_name_file(tupid_t dt, const char *file, time_t mtime);
+int create_name_file(tupid_t dt, const char *file, time_t mtime,
+		     struct tup_entry **entry);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
 tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,

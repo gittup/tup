@@ -916,12 +916,15 @@ int tup_db_select_dbn_part(tupid_t dt, const char *name, int len,
 	return 0;
 }
 
+int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry)
+{
+	return node_select(dt, name, -1, entry);
+}
+
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
 			    struct tup_entry **entry)
 {
-	if(node_select(dt, name, len, entry) < 0)
-		return -1;
-	return 0;
+	return node_select(dt, name, len, entry);
 }
 
 int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
@@ -4157,7 +4160,10 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
 			   time_t mtime)
 {
-	return tup_db_node_insert_tent(dt, name, len, type, mtime, NULL);
+	struct tup_entry *tent;
+	if(tup_db_node_insert_tent(dt, name, len, type, mtime, &tent) < 0)
+		return -1;
+	return tent->tnode.tupid;
 }
 
 int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
@@ -4217,7 +4223,7 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 	if(tup_entry_add_to_dir(dt, tupid, name, len, type, -1, mtime, entry) < 0)
 		return -1;
 
-	return tupid;
+	return 0;
 }
 
 static void fill_dbn(struct db_node *dbn, struct tup_entry *tent)
@@ -4250,6 +4256,8 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int type;
 	int mtime;
 	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
+
+	*entry = NULL;
 
 	if(tup_entry_find_name_in_dir(dt, name, len, entry) < 0)
 		return -1;
