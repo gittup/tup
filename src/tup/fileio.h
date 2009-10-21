@@ -7,7 +7,6 @@
 #include <time.h>
 
 #define TUP_CONFIG "tup.config"
-#define TUP_CONFIG_REPARSE ".tup/db-parse-config-needed"
 
 struct db_node;
 struct tup_entry;

@@ -115,26 +115,12 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 	return tup_file_mod_mtime(dt, file, buf.st_mtime, 1);
 }
 
-static int create_reparse_file(void)
-{
-	int dfd;
-	int fd;
-	dfd = tup_db_open_tupid(DOT_DT);
-	if(dfd < 0)
-		return -1;
-	fd = openat(dfd, TUP_CONFIG_REPARSE, O_CREAT|O_WRONLY|O_TRUNC,
-		    0666);
-	if(fd < 0)
-		return -1;
-	close(fd);
-	close(dfd);
-	return 0;
-}
-
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force)
 {
 	struct db_node dbn;
+	int new = 0;
+	int modified = 0;
 
 	if(tup_db_select_dbn(dt, file, &dbn) < 0)
 		return -1;
@@ -143,9 +129,8 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		dbn.tupid = create_name_file(dt, file, mtime);
 		if(dbn.tupid < 0)
 			return -1;
+		new = 1;
 	} else {
-		int modified = 0;
-
 		if(dbn.mtime != mtime || force)
 			modified = 1;
 
@@ -184,10 +169,15 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		}
 	}
 
-	/* Need to check variables if tup.config changed. */
-	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
-		if(create_reparse_file() < 0)
-			return -1;
+	if(new || modified) {
+		if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+			/* If tup.config was modified changed, put the
+			 * @-directory in the create list so we can import any
+			 * variables that have changed.
+			 */
+			if(tup_db_add_create_list(VAR_DT) < 0)
+				return -1;
+		}
 	}
 
 	return dbn.tupid;
@@ -198,9 +188,11 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 	struct db_node dbn;
 
 	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
-		if(create_reparse_file() < 0)
+		/* If tup.config was removed, also add the @-directory to the
+		 * create list.
+		 */
+		if(tup_db_add_create_list(VAR_DT) < 0)
 			return -1;
-		return 0;
 	}
 
 	if(tup_db_select_dbn_part(dt, file, len, &dbn) < 0)

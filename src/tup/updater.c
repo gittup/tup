@@ -233,27 +233,26 @@ static int delete_files(struct graph *g)
 
 static int update_tup_config(void)
 {
-	struct stat buf;
 	int rc;
 
-	if(stat(TUP_CONFIG_REPARSE, &buf) < 0) {
-		if(errno == ENOENT) {
-			return 0;
+	rc = tup_db_in_create_list(VAR_DT);
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		if(tup_db_begin() < 0)
+			return -1;
+		if(tup_db_unflag_create(VAR_DT) < 0)
+			return -1;
+		printf("Reading in new configuration variables...\n");
+		rc = tup_db_read_vars(DOT_DT, TUP_CONFIG);
+		if(rc == 0) {
+			tup_db_commit();
+		} else {
+			tup_db_rollback();
+			return -1;
 		}
-		perror(TUP_CONFIG_REPARSE);
-		return -1;
-	}
-	if(tup_db_begin() < 0)
-		return -1;
-	rc = tup_db_read_vars(DOT_DT, TUP_CONFIG);
-	if(rc == 0) {
-		tup_db_commit();
-	} else {
-		tup_db_rollback();
-		return -1;
 	}
 
-	unlink(TUP_CONFIG_REPARSE);
 	return 0;
 }
 
