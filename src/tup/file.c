@@ -176,7 +176,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 				return -1;
 			if(file_set_mtime(tent, dfd, w->filename) < 0)
 				return -1;
-			if(tup_db_set_sym(tent->tnode.tupid, -1) < 0)
+			if(tup_db_set_sym(tent, -1) < 0)
 				return -1;
 		}
 
@@ -236,7 +236,7 @@ out_skip:
 			sym = -1;
 		}
 
-		if(tup_db_set_sym(tent->tnode.tupid, sym) < 0)
+		if(tup_db_set_sym(tent, sym) < 0)
 			return -1;
 
 skip_sym:

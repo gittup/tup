@@ -86,7 +86,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 			return -1;
 	}
 	if(tent->sym != newsym) {
-		if(tup_db_set_sym(tent->tnode.tupid, newsym) < 0)
+		if(tup_db_set_sym(tent, newsym) < 0)
 			return -1;
 	}
 	if(tent->mtime != mtime)

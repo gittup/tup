@@ -1080,9 +1080,13 @@ int tup_db_delete_node(tupid_t tupid)
 		/* We're but a ghost now... make sure we don't point at
 		 * anybody (t5033). Ghosts don't have fingers, you know.
 		 */
+		struct tup_entry *tent;
+
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
 		if(tup_db_set_type(tupid, TUP_NODE_GHOST) < 0)
 			return -1;
-		if(tup_db_set_sym(tupid, -1) < 0)
+		if(tup_db_set_sym(tent, -1) < 0)
 			return -1;
 		return 0;
 	}
@@ -1538,14 +1542,13 @@ int tup_db_set_type(tupid_t tupid, int type)
 	return 0;
 }
 
-int tup_db_set_sym(tupid_t tupid, tupid_t sym)
+int tup_db_set_sym(struct tup_entry *tent, tupid_t sym)
 {
 	int rc;
-	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_SYM];
 	static char s[] = "update node set sym=? where id=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %lli][0m\n", s, sym, tupid);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %lli][0m\n", s, sym, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -1558,7 +1561,7 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, tent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -1573,9 +1576,6 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 		return -1;
 	}
 
-	tent = tup_entry_get(tupid);
-	if(!tent)
-		return -1;
 	tent->sym = sym;
 	if(tup_entry_resolve_sym(tent) < 0)
 		return -1;
@@ -5159,7 +5159,7 @@ static int check_actual_outputs(tupid_t cmdid)
 			/* Clear the sym field in case we wrote a bad symlink
 			 * (t5032)
 			 */
-			tup_db_set_sym(tent->tnode.tupid, -1);
+			tup_db_set_sym(tent, -1);
 
 			/* Re-run whatever command was supposed to create this
 			 * file (if any), and remove the bad output. This is
