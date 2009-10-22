@@ -174,7 +174,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 		} else {
 			if(tup_db_add_write_list(tent->tnode.tupid) < 0)
 				return -1;
-			if(file_set_mtime(tent->tnode.tupid, dfd, w->filename) < 0)
+			if(file_set_mtime(tent, dfd, w->filename) < 0)
 				return -1;
 			if(tup_db_set_sym(tent->tnode.tupid, -1) < 0)
 				return -1;
@@ -210,7 +210,7 @@ out_skip:
 
 		if(tup_db_add_write_list(tent->tnode.tupid) < 0)
 			return -1;
-		if(file_set_mtime(tent->tnode.tupid, dfd, sym_entry->to) < 0)
+		if(file_set_mtime(tent, dfd, sym_entry->to) < 0)
 			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
@@ -285,7 +285,7 @@ skip_sym:
 	return 0;
 }
 
-int file_set_mtime(tupid_t tupid, int dfd, const char *file)
+int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 {
 	struct stat buf;
 	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
@@ -293,7 +293,7 @@ int file_set_mtime(tupid_t tupid, int dfd, const char *file)
 		perror(file);
 		return -1;
 	}
-	if(tup_db_set_mtime(tupid, buf.st_mtime) < 0)
+	if(tup_db_set_mtime(tent, buf.st_mtime) < 0)
 		return -1;
 	return 0;
 }

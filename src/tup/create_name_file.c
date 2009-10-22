@@ -90,7 +90,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 			return -1;
 	}
 	if(tent->mtime != mtime)
-		if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
+		if(tup_db_set_mtime(tent, mtime) < 0)
 			return -1;
 	return tent->tnode.tupid;
 }
@@ -160,7 +160,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			}
 
 			if(tent->mtime != mtime)
-				if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
+				if(tup_db_set_mtime(tent, mtime) < 0)
 					return -1;
 		}
 	}

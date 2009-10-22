@@ -1014,7 +1014,7 @@ static int var_replace(struct node *n)
 		return -1;
 	if(!tent)
 		return -1;
-	rc = file_set_mtime(tent->tnode.tupid, dfd, output);
+	rc = file_set_mtime(tent, dfd, output);
 
 err_close_ofd:
 	close(ofd);

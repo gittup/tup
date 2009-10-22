@@ -748,7 +748,7 @@ static int fake_mtime(int argc, char **argv)
 		return -1;
 	}
 	mtime = strtol(argv[2], NULL, 0);
-	if(tup_db_set_mtime(tent->tnode.tupid, mtime) < 0)
+	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
 	free(pel);
 	return 0;

@@ -1583,14 +1583,13 @@ int tup_db_set_sym(tupid_t tupid, tupid_t sym)
 	return 0;
 }
 
-int tup_db_set_mtime(tupid_t tupid, time_t mtime)
+int tup_db_set_mtime(struct tup_entry *tent, time_t mtime)
 {
 	int rc;
-	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_MTIME];
 	static char s[] = "update node set mtime=? where id=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%li, %lli][0m\n", s, mtime, tupid);
+	if(sql_debug) fprintf(stderr, "%s [37m[%li, %lli][0m\n", s, mtime, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -1603,7 +1602,7 @@ int tup_db_set_mtime(tupid_t tupid, time_t mtime)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, tent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -1618,11 +1617,7 @@ int tup_db_set_mtime(tupid_t tupid, time_t mtime)
 		return -1;
 	}
 
-	tent = tup_entry_get(tupid);
-	if(!tent)
-		return -1;
 	tent->mtime = mtime;
-
 	return 0;
 }
 
