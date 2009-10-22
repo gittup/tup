@@ -206,7 +206,7 @@ static int delete_files(struct graph *g)
 			if(rc < 0)
 				return -1;
 			if(rc == 1) {
-				if(tup_db_set_type(tt->tupid, TUP_NODE_FILE) < 0)
+				if(tup_db_set_type(tmpn.tent, TUP_NODE_FILE) < 0)
 					return -1;
 				do_delete = 0;
 			}

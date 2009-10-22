@@ -763,7 +763,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST) {
-			if(tup_db_set_type(tent->tnode.tupid, type) < 0)
+			if(tup_db_set_type(tent, type) < 0)
 				return -1;
 			return tent->tnode.tupid;
 		}
@@ -1084,7 +1084,7 @@ int tup_db_delete_node(tupid_t tupid)
 
 		if(tup_entry_add(tupid, &tent) < 0)
 			return -1;
-		if(tup_db_set_type(tupid, TUP_NODE_GHOST) < 0)
+		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
 		if(tup_db_set_sym(tent, -1) < 0)
 			return -1;
@@ -1499,14 +1499,13 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 	return 0;
 }
 
-int tup_db_set_type(tupid_t tupid, int type)
+int tup_db_set_type(struct tup_entry *tent, int type)
 {
 	int rc;
-	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_TYPE];
 	static char s[] = "update node set type=? where id=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i, %lli][0m\n", s, type, tupid);
+	if(sql_debug) fprintf(stderr, "%s [37m[%i, %lli][0m\n", s, type, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -1519,7 +1518,7 @@ int tup_db_set_type(tupid_t tupid, int type)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, tent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -1534,11 +1533,7 @@ int tup_db_set_type(tupid_t tupid, int type)
 		return -1;
 	}
 
-	tent = tup_entry_get(tupid);
-	if(!tent)
-		return -1;
 	tent->type = type;
-
 	return 0;
 }
 
@@ -3514,13 +3509,17 @@ static int add_var(struct var_entry *ve)
 
 static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 {
+	struct tup_entry *tent;
+
 	if(vea->type == TUP_NODE_VAR && vea->vallen == veb->vallen &&
 	   strcmp(vea->value, veb->value) == 0) {
 		return 0;
 	}
 	tup_db_var_changed++;
+	if(tup_entry_add(vea->tupid, &tent) < 0)
+		return -1;
 	if(vea->type == TUP_NODE_GHOST) {
-		if(tup_db_set_type(vea->tupid, TUP_NODE_VAR) < 0)
+		if(tup_db_set_type(tent, TUP_NODE_VAR) < 0)
 			return -1;
 	}
 	if(tup_db_add_create_list(vea->tupid) < 0)

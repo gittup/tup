@@ -74,7 +74,7 @@ int tup_db_open_tupid(tupid_t dt);
 int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name);
-int tup_db_set_type(tupid_t tupid, int type);
+int tup_db_set_type(struct tup_entry *tent, int type);
 int tup_db_set_sym(struct tup_entry *tent, tupid_t sym);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);

@@ -611,7 +611,7 @@ void del_pel_list(struct list_head *list)
 
 static int ghost_to_file(struct tup_entry *tent)
 {
-	if(tup_db_set_type(tent->tnode.tupid, TUP_NODE_FILE) < 0)
+	if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 		return -1;
 	if(tup_db_add_create_list(tent->dt) < 0)
 		return -1;
