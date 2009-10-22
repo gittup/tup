@@ -106,14 +106,6 @@ enum {
 	DB_NUM_STATEMENTS
 };
 
-struct del_entry {
-	struct list_head list;
-	tupid_t tupid;
-	tupid_t dt;
-	time_t mtime;
-	char *name;
-};
-
 struct id_entry {
 	struct list_head list;
 	tupid_t tupid;
@@ -4663,8 +4655,8 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADJUST_GHOST_SYMLINKS];
-	static char s[] = "select id, dir, name, mtime from node where sym=?";
-	struct del_entry *de;
+	static char s[] = "select id from node where sym=?";
+	struct id_entry *ide;
 	LIST_HEAD(del_list);
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
@@ -4691,23 +4683,15 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 			return -1;
 		}
 
-		de = malloc(sizeof *de);
-		if(!de) {
+		ide = malloc(sizeof *ide);
+		if(!ide) {
 			perror("malloc");
-			fprintf(stderr, "Unable to adjust symlinks for file '%s'.\n", sqlite3_column_text(*stmt, 2));
+			fprintf(stderr, "Unable to adjust symlinks for file '%lli'.\n", tupid);
 			return -1;
 		}
-		de->tupid = sqlite3_column_int64(*stmt, 0);
-		de->dt = sqlite3_column_int64(*stmt, 1);
-		de->name = strdup((const char *)sqlite3_column_text(*stmt, 2));
-		de->mtime = sqlite3_column_int(*stmt, 3);
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(!de->name) {
-			perror("strdup");
-			fprintf(stderr, "Unable to adjust symlinks for file '%s'.\n", sqlite3_column_text(*stmt, 2));
-			return -1;
-		}
-		list_add(&de->list, &del_list);
+		list_add(&ide->list, &del_list);
 	} while(1);
 
 	if(sqlite3_reset(*stmt) != 0) {
@@ -4718,9 +4702,9 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 	while(!list_empty(&del_list)) {
 		int dfd;
 		struct tup_entry *tent;
-		de = list_entry(del_list.next, struct del_entry, list);
+		ide = list_entry(del_list.next, struct id_entry, list);
 
-		tent = tup_entry_get(de->tupid);
+		tent = tup_entry_get(ide->tupid);
 		if(!tent)
 			return -1;
 		tent->symlink = NULL;
@@ -4729,11 +4713,10 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 		dfd = tup_entry_open(tent->parent);
 		if(dfd < 0)
 			return -1;
-		if(update_symlink_fileat(de->dt, dfd, de->name, de->mtime, 0) < 0)
+		if(update_symlink_fileat(tent->dt, dfd, tent->name.s, tent->mtime, 0) < 0)
 			return -1;
-		list_del(&de->list);
-		free(de->name);
-		free(de);
+		list_del(&ide->list);
+		free(ide);
 	}
 
 	return rc;
@@ -5112,8 +5095,8 @@ static int check_actual_outputs(tupid_t cmdid)
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_CHECK_ACTUAL_OUTPUTS];
-	static char s[] = "select tmpid, dir, name from tmp_list, node where tmpid not in (select to_id from link where from_id=?) and tmpid=id";
-	struct del_entry *de;
+	static char s[] = "select tmpid from tmp_list where tmpid not in (select to_id from link where from_id=?)";
+	struct id_entry *ide;
 	LIST_HEAD(del_list);
 
 	if(check_tmp_requested() < 0)
@@ -5143,22 +5126,15 @@ static int check_actual_outputs(tupid_t cmdid)
 			return -1;
 		}
 
-		de = malloc(sizeof *de);
-		if(!de) {
+		ide = malloc(sizeof *ide);
+		if(!ide) {
 			perror("malloc");
-			fprintf(stderr, "Unable to properly remove file '%s' from the filesystem.\n", sqlite3_column_text(*stmt, 2));
+			fprintf(stderr, "Unable to properly remove file %lli from the filesystem.\n", sqlite3_column_int64(*stmt, 0));
 			return -1;
 		}
-		de->tupid = sqlite3_column_int64(*stmt, 0);
-		de->dt = sqlite3_column_int64(*stmt, 1);
-		de->name = strdup((const char *)sqlite3_column_text(*stmt, 2));
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(!de->name) {
-			perror("strdup");
-			fprintf(stderr, "Unable to properly remove file '%s' from the filesystem.\n", sqlite3_column_text(*stmt, 2));
-			return -1;
-		}
-		list_add(&de->list, &del_list);
+		list_add(&ide->list, &del_list);
 
 		if(rc != -1) {
 			/* rc test used to only print this once */
@@ -5166,7 +5142,6 @@ static int check_actual_outputs(tupid_t cmdid)
 			fprintf(stderr, " -- Command ID: %lli\n", cmdid);
 		}
 
-		fprintf(stderr, " -- File: '%s' [%lli in dir %lli]\n", de->name, de->tupid, de->dt);
 		rc = -1;
 	} while(1);
 
@@ -5176,25 +5151,33 @@ static int check_actual_outputs(tupid_t cmdid)
 	}
 
 	while(!list_empty(&del_list)) {
+		struct tup_entry *tent;
+
 		/* TODO: replace tup_db_modify_cmds_by_output with a single
 		 * sql call to modify all cmds generated incorrect nodes?
 		 */
-		de = list_entry(del_list.next, struct del_entry, list);
+		ide = list_entry(del_list.next, struct id_entry, list);
 
-		/* Clear the sym field in case we wrote a bad symlink (t5032) */
-		tup_db_set_sym(de->tupid, -1);
+		if(tup_entry_add(ide->tupid, &tent) < 0) {
+			fprintf(stderr, "Unable to remove bad file %lli from the system for cmdid %lli\n", ide->tupid, cmdid);
+		} else {
+			/* Clear the sym field in case we wrote a bad symlink
+			 * (t5032)
+			 */
+			tup_db_set_sym(tent->tnode.tupid, -1);
 
-		/* Re-run whatever command was supposed to create this file (if
-		 * any), and remove the bad output. This is particularly
-		 * helpful if a symlink was created in the wrong spot.
-		 */
-		tup_db_modify_cmds_by_output(de->tupid, NULL);
-		fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
-			de->name, de->dt);
-		delete_file(de->dt, de->name);
-		list_del(&de->list);
-		free(de->name);
-		free(de);
+			/* Re-run whatever command was supposed to create this
+			 * file (if any), and remove the bad output. This is
+			 * particularly helpful if a symlink was created in the
+			 * wrong spot.
+			 */
+			tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+			fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
+				tent->name.s, tent->dt);
+			delete_file(tent->dt, tent->name.s);
+		}
+		list_del(&ide->list);
+		free(ide);
 	}
 
 	return rc;
