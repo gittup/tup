@@ -1,7 +1,9 @@
 #! /bin/sh -e
 rm -rf build
+echo "  mkdir build"
 mkdir -p build
 mkdir -p build/ldpreload
+echo "  cd build"
 cd build
 for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c; do
 	echo "  bootstrap CC $i"
@@ -24,3 +26,4 @@ gcc *.o -o tup -lpthread
 cd ..
 ./build/tup init
 ./build/tup upd
+echo "Build complete. If ./tup works, you can remove the 'build' directory."
