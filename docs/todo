@@ -31,8 +31,6 @@ check inputs and outputs even if command fails
 
 'tup todo': check for config update
 
-remove tup scan?
-
 name_list_entry - pointer to tup_entry?
 
 syntax: color %flags in output

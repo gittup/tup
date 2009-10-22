@@ -23,5 +23,4 @@ gcc *.o -o tup -lpthread
 
 cd ..
 ./build/tup init
-./build/tup scan
 ./build/tup upd
