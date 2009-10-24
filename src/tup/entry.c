@@ -88,10 +88,6 @@ int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 		return -1;
 	}
 
-	/* TODO: This should be unnecessary */
-	if(tup_entry_add(dt, NULL) < 0)
-		return -1;
-
 	parent = tup_entry_find(dt);
 	if(!parent) {
 		fprintf(stderr, "tup error: Unable to find parent entry [%lli] for node '%.*s'\n", dt, len, name);
@@ -201,10 +197,6 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 	tent = new_entry(tupid, dt, sym, name, len, type, mtime);
 	if(!tent)
 		return -1;
-	/* TODO: This should be unnecessary */
-	if(tup_entry_add(dt, NULL) < 0)
-		return -1;
-
 	if(resolve_parent(tent) < 0)
 		return -1;
 	if(dest)
