@@ -488,32 +488,11 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p+=3, plen-=3) {
-		tupid_t dt;
-		struct path_element *pel = NULL;
-
-		dt = find_dir_tupid_dt(curdir, p, &pel, NULL, 0);
-		if(dt < 0) {
-			fprintf(stderr, "Error: Unable to find directory for '%s' relative to dir %lli\n", p, curdir);
+		if(gimme_node_or_make_ghost(curdir, p, NULL, &tent) < 0)
 			return -1;
-		}
-		if(!pel) {
-			fprintf(stderr, "[31mtup internal error: didn't get a final pel pointer in include_rules()[0m\n");
-			return -1;
-		}
-		if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {
-			return -1;
-		}
-		free(pel);
-		if(!tent) {
-			/* Tuprules.tup doesn't exist here, go to the next
-			 * dir.
-			 */
-			if(tup_db_node_insert_tent(dt, tuprules, -1, TUP_NODE_GHOST, -1, &tent) < 0)
-				return -1;
-			/* Fall through to next if */
-		}
 		if(tent->type == TUP_NODE_GHOST) {
-			if(tup_db_create_link(tent->tnode.tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
+			if(tup_db_create_link(tent->tnode.tupid, tf->tupid,
+					      TUP_LINK_NORMAL) < 0)
 				return -1;
 			continue;
 		}
