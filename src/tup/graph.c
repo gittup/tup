@@ -50,7 +50,6 @@ void remove_node(struct graph *g, struct node *n)
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tnode.tupid);
 	}
 	rb_erase(&n->tnode.rbn, &g->tree);
-	/* TODO: block pool */
 	free(n);
 }
 
@@ -58,7 +57,6 @@ int create_edge(struct node *n1, struct node *n2, int style)
 {
 	struct edge *e;
 
-	/* TODO: block pool */
 	e = malloc(sizeof *e);
 	if(!e) {
 		perror("malloc");
@@ -68,7 +66,6 @@ int create_edge(struct node *n1, struct node *n2, int style)
 	e->dest = n2;
 	e->style = style;
 
-	/* TODO: slist add? */
 	e->next = n1->edges;
 	n1->edges = e;
 
@@ -81,7 +78,6 @@ struct edge *remove_edge(struct edge *e)
 	struct edge *tmp;
 	tmp = e->next;
 	e->dest->incoming_count--;
-	/* TODO: block pool */
 	free(e);
 	return tmp;
 }
@@ -162,7 +158,6 @@ static void dump_node(FILE *f, struct node *n)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
 		n, n->tent->name.s, n->tnode.tupid, n->incoming_count, n->expanded, color);
-	/* TODO: slist_for_each? */
 	for(e=n->edges; e; e=e->next) {
 		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
 	}
