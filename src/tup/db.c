@@ -985,7 +985,7 @@ out_reset:
 
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
-				int len)
+				int len, struct rb_root *delete_tree)
 {
 	int rc;
 	int dbrc;
@@ -1038,22 +1038,24 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		tent = tup_entry_find(tupid);
-		if(!tent) {
-			name = (const char *)sqlite3_column_text(*stmt, 1);
-			type = sqlite3_column_int(*stmt, 2);
-			sym = sqlite3_column_int64(*stmt, 3);
-			mtime = sqlite3_column_int64(*stmt, 4);
+		if(tupid_tree_search(delete_tree, tupid) == NULL) {
+			tent = tup_entry_find(tupid);
+			if(!tent) {
+				name = (const char *)sqlite3_column_text(*stmt, 1);
+				type = sqlite3_column_int(*stmt, 2);
+				sym = sqlite3_column_int64(*stmt, 3);
+				mtime = sqlite3_column_int64(*stmt, 4);
 
-			if(tup_entry_add_to_dir(dt, tupid, name, -1, type, sym, mtime, &tent) < 0) {
+				if(tup_entry_add_to_dir(dt, tupid, name, -1, type, sym, mtime, &tent) < 0) {
+					rc = -1;
+					goto out_reset;
+				}
+			}
+
+			if(callback(arg, tent) < 0) {
 				rc = -1;
 				goto out_reset;
 			}
-		}
-
-		if(callback(arg, tent) < 0) {
-			rc = -1;
-			goto out_reset;
 		}
 	}
 

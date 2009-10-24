@@ -78,7 +78,6 @@ struct bang_rule {
 };
 
 struct build_name_list_args {
-	struct tupfile *tf;
 	struct name_list *nl;
 	const char *dir;
 	int dirlen;
@@ -483,7 +482,6 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	plen = num_dotdots*3;
 
 	init_name_list(&nl);
-	args.tf = tf;
 	args.nl = &nl;
 
 	p = path;
@@ -1345,7 +1343,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		args.dirlen = 0;
 	}
 	args.nl = nl;
-	args.tf = tf;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 
@@ -1370,7 +1367,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	} else {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->delete_tree) < 0)
 			return -1;
 	}
 	return 0;
@@ -1419,9 +1416,6 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	int extlesslen;
 	int len;
 	struct name_list_entry *nle;
-
-	if(tupid_tree_search(&args->tf->g->delete_tree, tent->tnode.tupid) != NULL)
-		return 0;
 
 	len = tent->name.len + args->dirlen;
 	extlesslen = tent->name.len - 1;
