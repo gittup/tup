@@ -43,6 +43,7 @@ static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
 static void sighandler(int sig);
+static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
 
 static int do_show_progress;
@@ -125,14 +126,17 @@ int updater(int argc, char **argv, int phase)
 	if(do_scan) {
 		if(monitor_get_pid() < 0) {
 			struct timeval t1, t2;
-			printf("Scanning filesystem... ");
+			tup_main_progress("Scanning filesystem...");
 			fflush(stdout);
 			gettimeofday(&t1, NULL);
 			if(tup_scan() < 0)
 				return -1;
 			gettimeofday(&t2, NULL);
-			printf("%.3fs\n", (double)(t2.tv_sec - t1.tv_sec) +
+			printf("%.3fs\n",
+			       (double)(t2.tv_sec - t1.tv_sec) +
 			       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+		} else {
+			tup_main_progress("No filesystem scan - monitor is running.\n");
 		}
 	}
 	if(server_init() < 0)
@@ -151,6 +155,7 @@ int updater(int argc, char **argv, int phase)
 		return -1;
 	if(tup_db_release_tmp_list() < 0)
 		return -1;
+	tup_main_progress("Updated.\n");
 	return 0; /* Profit! */
 }
 
@@ -186,8 +191,9 @@ static int delete_files(struct graph *g)
 	int num_deleted = 0;
 
 	if(g->delete_count) {
-		printf("Deleting %i file%s\n", g->delete_count,
-		       g->delete_count == 1 ? "" : "s");
+		tup_main_progress("Deleting files...\n");
+	} else {
+		tup_main_progress("No files to delete.\n");
 	}
 	while((rbn = rb_first(&g->delete_tree)) != NULL) {
 		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
@@ -245,7 +251,7 @@ static int update_tup_config(void)
 			return -1;
 		if(tup_db_unflag_create(VAR_DT) < 0)
 			return -1;
-		printf("Reading in new configuration variables...\n");
+		tup_main_progress("Reading in new configuration variables...\n");
 		rc = tup_db_read_vars(DOT_DT, TUP_CONFIG);
 		if(rc == 0) {
 			tup_db_commit();
@@ -253,6 +259,8 @@ static int update_tup_config(void)
 			tup_db_rollback();
 			return -1;
 		}
+	} else {
+		tup_main_progress("No tup.config changes.\n");
 	}
 
 	return 0;
@@ -269,8 +277,11 @@ static int process_create_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(g.num_nodes)
-		printf("Parsing Tupfiles\n");
+	if(g.num_nodes) {
+		tup_main_progress("Parsing Tupfiles...\n");
+	} else {
+		tup_main_progress("No Tupfiles to parse.\n");
+	}
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
@@ -301,8 +312,11 @@ static int process_update_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(g.num_nodes)
-		printf("Executing Commands\n");
+	if(g.num_nodes) {
+		tup_main_progress("Executing Commands...\n");
+	} else {
+		tup_main_progress("No commands to execute.\n");
+	}
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
@@ -1051,6 +1065,24 @@ static void sighandler(int sig)
 		 * be returned to the lifestream, and from them another program
 		 * will be born anew...
 		 */
+	}
+}
+
+static void tup_main_progress(const char *s)
+{
+	static int cur_phase = 0;
+	const int NUM_PHASES = 5;
+	if(do_show_progress) {
+		const char *tup[NUM_PHASES+1] = {
+			" tup ",
+			"[07m [0mtup ",
+			"[07m t[0mup ",
+			"[07m tu[0mp ",
+			"[07m tup[0m ",
+			"[07m tup [0m",
+		};
+		printf("[%s] %s", tup[cur_phase], s);
+		cur_phase++;
 	}
 }
 
