@@ -5,7 +5,7 @@
 . ../tup.sh
 mkdir tuptest
 cd tuptest
-tup init --no-sync
+re_init
 tup monitor
 
 mkdir foo

@@ -22,7 +22,7 @@ int find_tup_dir(void)
 
 	if(getcwd(tup_wd, sizeof(tup_wd)) == NULL) {
 		perror("getcwd");
-		return -1;
+		exit(1);
 	}
 
 	tup_top_len = strlen(tup_wd);
@@ -39,7 +39,7 @@ int find_tup_dir(void)
 		}
 		if(chdir("..") < 0) {
 			perror("chdir");
-			return -1;
+			exit(1);
 		}
 		while(tup_top_len > 0) {
 			tup_top_len--;
@@ -49,15 +49,13 @@ int find_tup_dir(void)
 			}
 		}
 		if(!tup_top_len) {
-			fprintf(stderr, "No .tup directory found. Run 'tup "
-				"init' to create the dependency filesystem.\n");
 			return -1;
 		}
 	}
 	top_fd = open(".", O_RDONLY);
 	if(top_fd < 0) {
 		perror(".");
-		return -1;
+		exit(1);
 	}
 	return 0;
 }

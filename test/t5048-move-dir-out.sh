@@ -6,7 +6,7 @@
 . ../tup.sh
 mkdir real
 cd real
-tup init
+re_init
 tmkdir sub
 echo "#define FOO 3" > sub/foo.h
 echo '#include "foo.h"' > foo.c

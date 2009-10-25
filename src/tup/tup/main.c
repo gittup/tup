@@ -155,14 +155,25 @@ static int init(int argc, char **argv)
 {
 	int x;
 	int db_sync = 1;
+	int force_init = 0;
 
 	for(x=0; x<argc; x++) {
-		if(strcmp(argv[x], "--no-sync") == 0)
+		if(strcmp(argv[x], "--no-sync") == 0) {
 			db_sync = 0;
+		} else if(strcmp(argv[x], "--force") == 0) {
+			/* force should only be used for tup/test */
+			force_init = 1;
+		}
 	}
 
-	if(file_exists(TUP_DB_FILE)) {
-		printf("TODO: DB file already exists. abort\n");
+	if(!force_init && find_tup_dir() == 0) {
+		char wd[PATH_MAX];
+		if(getcwd(wd, sizeof(wd)) == NULL) {
+			perror("getcwd");
+			fprintf(stderr, "Error: tup database already exists somewhere up the tree.\n");
+		} else {
+			fprintf(stderr, "Error: tup database already exists in directory: %s\n", wd);
+		}
 		return -1;
 	}
 

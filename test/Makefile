@@ -21,7 +21,7 @@ $T:
 	mkdir tuptesttmp-$$n; \
 	if [ -d "$n" ]; then cp -Rdp $$n/* tuptesttmp-$$n/; fi; \
 	cd tuptesttmp-$$n; \
-	tup init --no-sync; \
+	tup init --no-sync --force; \
 	../$@;\
 	rc=$$?;\
 	tup stop;\

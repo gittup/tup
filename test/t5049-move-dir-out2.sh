@@ -6,7 +6,7 @@
 . ../tup.sh
 mkdir real
 cd real
-tup init
+re_init
 tmkdir sub
 echo ': |> echo blah |>' > sub/Test.tup
 echo 'include sub/Test.tup' > Tupfile

@@ -26,8 +26,7 @@ update
 sym_check foo.o main
 sym_check built-in.o main
 
-rm -rf .tup
-tup init
+re_init
 tup touch foo.c foo.o built-in.o Tupfile
 update_fail
 
@@ -37,8 +36,7 @@ tup rm foo.o built-in.o
 update
 
 # Go back to our error scenario
-rm -rf .tup
-tup init
+re_init
 tup touch foo.c foo.o built-in.o Tupfile
 update_fail
 

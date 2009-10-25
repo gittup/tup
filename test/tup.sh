@@ -273,3 +273,9 @@ stop_monitor()
 	tup flush
 	tup stop
 }
+
+re_init()
+{
+	rm -rf .tup
+	tup init --no-sync --force
+}
