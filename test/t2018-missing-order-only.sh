@@ -4,7 +4,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c | foo.h |> echo gcc -c %f -o %o |> %F.o
+: foreach *.c | foo.h |> echo gcc -c %f -o %o |> %B.o
 HERE
 
 tup touch Tupfile foo.c bar.c

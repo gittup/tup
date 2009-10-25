@@ -5,7 +5,7 @@
 # database.
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 
 touch foo.c

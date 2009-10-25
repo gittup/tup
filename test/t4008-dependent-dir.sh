@@ -13,7 +13,7 @@ HERE
 
 tmkdir fs/input
 cat > fs/input/Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 
 echo "void ext3fs(void) {}" > fs/input/ext3.c

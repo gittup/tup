@@ -16,7 +16,7 @@
 tmkdir tmp
 cat > tmp/Tupfile << HERE
 include Tupfile.vars
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o prog %f |> prog
 HERE
 
@@ -35,7 +35,7 @@ tup_object_exist tmp "gcc -o prog bar.o foo.o"
 tup_dep_exist tmp Tupfile.vars . tmp
 
 cat > tmp/Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o prog %f |> prog
 HERE
 tup touch tmp/Tupfile

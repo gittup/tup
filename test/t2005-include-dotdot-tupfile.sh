@@ -8,7 +8,7 @@
 tmkdir a
 cat > a/Tupfile << HERE
 include ../Tupfile.vars
-: foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %F.o
+: foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %B.o
 : *.o |> \$(CC) -o prog %f |> prog
 HERE
 

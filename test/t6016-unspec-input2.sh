@@ -7,7 +7,7 @@
 tup config num_jobs 1
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
-: foreach *.c | foo.h |> gcc -c %f -o %o |> %F.o
+: foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 
 echo "#define FOO 3" > foo.h.in
@@ -20,7 +20,7 @@ update
 
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile
 update_fail_msg "Missing input dependency"

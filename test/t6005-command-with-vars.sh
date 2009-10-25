@@ -9,7 +9,7 @@ CFILES = *.c
 OFILES = *.o
 EXE = prog
 
-: foreach \$(CFILES) |> \$(CC) -c %f -o %o |> %F.o
+: foreach \$(CFILES) |> \$(CC) -c %f -o %o |> %B.o
 : \$(OFILES) |> \$(CC) %f -o \$(EXE) |> \$(EXE)
 HERE
 

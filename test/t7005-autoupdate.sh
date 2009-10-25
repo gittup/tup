@@ -4,7 +4,7 @@
 tup monitor
 tup config autoupdate 1
 cat > Tupfile << HERE
-: foreach *.txt |> (echo '<html>'; cat %f; echo '</html>') > %o |> %F.html
+: foreach *.txt |> (echo '<html>'; cat %f; echo '</html>') > %o |> %B.html
 HERE
 
 echo "This is the index" > index.txt

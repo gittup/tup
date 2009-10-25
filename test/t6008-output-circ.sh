@@ -16,7 +16,7 @@
 # both cases here.
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %F.o |> %F.o
+: foreach *.c |> gcc -c %f -o %B.o |> %B.o
 : *.o |> ld -r %f -o built-in.o |> built-in.o
 HERE
 
@@ -51,7 +51,7 @@ update_fail
 # doesn't whine about multiple main definitions (from foo.o and the old
 # built-in.o).
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %F.o |> %F.o
+: foreach *.c |> gcc -c %f -o %B.o |> %B.o
 : *.o |> ld -r %f -o new-built-in.o |> new-built-in.o
 HERE
 echo "int foo(void) {return 0;}" > foo.c

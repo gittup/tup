@@ -33,7 +33,7 @@ tup_object_exist . 'gcc -c foo.c -o foo.o'
 tup_object_exist . 'gcc -c bar.c -o bar.o'
 
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o -Iinclude |> %F.o
+: foreach *.c |> gcc -c %f -o %o -Iinclude |> %B.o
 : *.o |> gcc %f -o %o |> prog
 HERE
 tup touch Tupfile

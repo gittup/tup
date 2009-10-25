@@ -8,7 +8,7 @@ touch bar.c
 touch asm.S
 cat > Tupfile << HERE
 CFLAGS_S += -DASM
-: foreach *.c *.S |> gcc \$(CFLAGS_%e) -c %f -o %o |> %F.o
+: foreach *.c *.S |> gcc \$(CFLAGS_%e) -c %f -o %o |> %B.o
 HERE
 tup touch foo.c bar.c asm.S Tupfile
 update

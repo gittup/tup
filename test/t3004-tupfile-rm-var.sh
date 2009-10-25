@@ -8,7 +8,7 @@ tmkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
-: foreach \$(file-y) |> cat %f > %o |> %F.o
+: foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
 echo hey > tmp/foo.c
 echo yo > tmp/bar.c
@@ -22,7 +22,7 @@ tup_dep_exist @ BAR . tmp
 
 cat > tmp/Tupfile << HERE
 file-y = foo.c
-: foreach \$(file-y) |> cat %f > %o |> %F.o
+: foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
 tup touch tmp/Tupfile
 update

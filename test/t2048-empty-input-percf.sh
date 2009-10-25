@@ -10,12 +10,6 @@ tup touch Tupfile
 parse_fail "Shouldn't be able to use %f without input files"
 
 cat > Tupfile << HERE
-: |> cat %F > %o |> bar
-HERE
-tup touch Tupfile
-parse_fail "Shouldn't be able to use %F without input files"
-
-cat > Tupfile << HERE
 : |> cat %b > %o |> bar
 HERE
 tup touch Tupfile

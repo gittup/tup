@@ -7,7 +7,7 @@ cat > Tupfile << HERE
 VAR = 0
 ifeq (\$(VAR),1)
 CC = gcc
-: foreach *.c |> \$(CC) -c %f -o %o |> %F.o
+: foreach *.c |> \$(CC) -c %f -o %o |> %B.o
 endif
 HERE
 

@@ -9,7 +9,7 @@
 tup config num_jobs 1
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
-: foreach *.c | foo.h |> gcc -c %f -o %o |> %F.o
+: foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 
 echo "#define FOO 3" > foo.h.in
@@ -21,7 +21,7 @@ tup touch foo.c foo.h.in Tupfile
 update
 
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 cat > foo.c << HERE
 int main(void) {return 7;}

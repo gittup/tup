@@ -1763,12 +1763,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				return NULL;
 			}
 			clen += nl->totlen + space_chars;
-		} else if(*next == 'F') {
-			if(nl->num_entries == 0) {
-				fprintf(stderr, "Error: %%F used in rule pattern and no input files were specified.\n");
-				return NULL;
-			}
-			clen += nl->extlesstotlen + space_chars;
 		} else if(*next == 'b') {
 			if(nl->num_entries == 0) {
 				fprintf(stderr, "Error: %%b used in rule pattern and no input files were specified.\n");
@@ -1823,17 +1817,6 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				}
 				memcpy(&s[x], nle->path, nle->len);
 				x += nle->len;
-				first = 0;
-			}
-		} else if(*next == 'F') {
-			int first = 1;
-			list_for_each_entry(nle, &nl->entries, list) {
-				if(!first) {
-					s[x] = ' ';
-					x++;
-				}
-				memcpy(&s[x], nle->path, nle->extlesslen);
-				x += nle->extlesslen;
 				first = 0;
 			}
 		} else if(*next == 'b') {

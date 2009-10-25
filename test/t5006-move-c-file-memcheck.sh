@@ -7,7 +7,7 @@ echo "[33mTODO: use valgrind? mtrace doesn't work with threads[0m"
 exit 0
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cru %o %f |> libfoo.a
 HERE
 

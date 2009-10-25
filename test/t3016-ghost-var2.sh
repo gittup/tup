@@ -6,7 +6,7 @@
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(GHOST) += bar.c
-: foreach \$(file-y) |> cat %f > %o |> %F.o
+: foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
 echo hey > foo.c
 echo yo > bar.c

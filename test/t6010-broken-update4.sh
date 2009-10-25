@@ -7,7 +7,7 @@
 # They should still be deleted.
 . ../tup.sh
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o -Dbork=<Bork> |> %F.o
+: foreach *.c |> gcc -c %f -o %o -Dbork=<Bork> |> %B.o
 HERE
 
 echo "void foo(void) {}" > foo.c
@@ -20,7 +20,7 @@ tup_object_exist . 'gcc -c foo.c -o foo.o -Dbork=<Bork>'
 tup_object_exist . 'gcc -c bar.c -o bar.o -Dbork=<Bork>'
 
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile
 update

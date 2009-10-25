@@ -7,7 +7,7 @@
 
 . ../tup.sh
 cat > Tupfile << HERE
-: foo.c |> gcc -c %f -o %o|> %F.o
+: foo.c |> gcc -c %f -o %o|> %B.o
 : foo.o |> gcc %f -o prog |> prog
 HERE
 

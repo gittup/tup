@@ -6,7 +6,7 @@
 srcs = foo.c
 srcs += bar.c ok.c
 cc = gcc
-: foreach $(srcs) |&gt; $(cc) -c %f -o %o |&gt; %F.o
+: foreach $(srcs) |&gt; $(cc) -c %f -o %o |&gt; %B.o
 </pre>
 <p>Don't try to do anything crazy like:</p>
 <ul>
@@ -21,9 +21,8 @@ cc = gcc
 <table border=1>
  <tr><td><b>Flag</b></td><td>What it be</td></tr>
  <tr><td>%f</b></td><td>The filename</td></tr>
- <tr><td>%F</b></td><td>The filename without the extension (the last '.' and everything after it are removed)</td></tr>
  <tr><td>%b</b></td><td>The basename (only includes everything after the last '/')</td></tr>
- <tr><td>%B</b></td><td>The basename without the extension (err...yeah)</td></tr>
+ <tr><td>%B</b></td><td>The basename without the extension</td></tr>
  <tr><td>%o</b></td><td>Copies whatever is in the output field. This is just for convenience in the command string.</td></tr>
 </table>
 <p>Let's play pretend! Say I want to compile two C files from a src/ directory and then link them. Here's how the % things would work out:</p>
@@ -39,21 +38,18 @@ foo.c      bar.c
 <p>The first rule (the foreach one) would be parsed twice. The first time the flags would be set like so:</p>
 <table border=1>
  <tr><td>%f</b></td><td>src/foo.c</td></tr>
- <tr><td>%F</b></td><td>src/foo</td></tr>
  <tr><td>%b</b></td><td>foo.c</td></tr>
  <tr><td>%B</b></td><td>foo</td></tr>
 </table>
 <p>Then it would be parsed again for bar.c:</p>
 <table border=1>
  <tr><td>%f</b></td><td>src/bar.c</td></tr>
- <tr><td>%F</b></td><td>src/bar</td></tr>
  <tr><td>%b</b></td><td>bar.c</td></tr>
  <tr><td>%B</b></td><td>bar</td></tr>
 </table>
 <p>Then we can parse the second rule. Since it is not a foreach rule, the % variables contain the entire input list:</p>
 <table border=1>
  <tr><td>%f</b></td><td>src/foo.c src/bar.c</td></tr>
- <tr><td>%F</b></td><td>src/bar src/bar</td></tr>
  <tr><td>%b</b></td><td>foo.c bar.c</td></tr>
  <tr><td>%B</b></td><td>foo bar</td></tr>
 </table>

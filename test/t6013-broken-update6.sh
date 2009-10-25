@@ -11,7 +11,7 @@
 . ../tup.sh
 tup config num_jobs 1
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 
 echo '#include "foo.h"' > afoo.c

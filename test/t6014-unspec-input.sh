@@ -21,7 +21,7 @@ int main(void) {return FOO;}
 HERE
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
-: foreach *.c |> gcc -c %f -o %o |> %F.o
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch foo.c Tupfile
 update_fail

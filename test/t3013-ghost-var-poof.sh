@@ -6,7 +6,7 @@
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
-: foreach \$(file-y) |> cat %f > %o |> %F.o
+: foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
 echo hey > foo.c
 echo yo > bar.c
@@ -18,7 +18,7 @@ tup_object_exist @ BAR
 
 cat > Tupfile << HERE
 file-y = foo.c
-: foreach \$(file-y) |> cat %f > %o |> %F.o
+: foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
 tup touch Tupfile
 update
