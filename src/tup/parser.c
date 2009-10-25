@@ -1559,6 +1559,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
 			return -1;
 		}
+		if(strcmp(onle->path, "Tupfile") == 0 ||
+		   strcmp(onle->path, "Tuprules.tup") == 0 ||
+		   strcmp(onle->path, "tup.config") == 0) {
+			fprintf(stderr, "Error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
+			return -1;
+		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
