@@ -440,7 +440,7 @@ found_paren:
 	return 0;
 
 syntax_error:
-	fprintf(stderr, "Syntax error parsing Tupfile [%lli] line %i\n  Line was: '%s'\n", tf->tupid, lno, line);
+	fprintf(stderr, "Error parsing Tupfile [%lli] line %i\n  Line was: '%s'\n", tf->tupid, lno, line);
 	tup_db_print(stderr, tf->tupid);
 	return -1;
 }

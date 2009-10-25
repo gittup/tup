@@ -773,7 +773,7 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 			 * screwing up the Tupfile.
 			 */
 			if(tent->type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\nThis error message is brought to you by the Defenders of the Truth to prevent   you from doing stupid things like delete your source code.\n", name);
+				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
 				return -1;
 			}
 			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, tent->type);
