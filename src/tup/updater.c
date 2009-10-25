@@ -136,6 +136,15 @@ int updater(int argc, char **argv, int phase)
 			       (double)(t2.tv_sec - t1.tv_sec) +
 			       (double)(t2.tv_usec - t1.tv_usec)/1e6);
 		} else {
+			/* tup_scan would normally add the @-directory to the
+			 * entry tree, so if that doesn't run we add it here.
+			 * When we query variables, I pass in VAR_DT directly,
+			 * since it is always the same, which means the db
+			 * isn't queried and therefore the entry wouldn't
+			 * necessarily get cached normally (t6039).
+			 */
+			if(tup_entry_add(VAR_DT, NULL) < 0)
+				return -1;
 			tup_main_progress("No filesystem scan - monitor is running.\n");
 		}
 	}

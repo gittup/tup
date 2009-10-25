@@ -3498,9 +3498,6 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 	int fd;
 	int rc;
 
-	if(tup_entry_add(VAR_DT, NULL) < 0)
-		return -1;
-
 	vardb_init(&db_tree);
 	vardb_init(&file_tree);
 	if(get_db_var_tree(&db_tree) < 0)
