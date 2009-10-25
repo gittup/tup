@@ -15,16 +15,6 @@ check_empty_tupdirs()
 	fi
 }
 
-check_dup_links()
-{
-	if tup check_dup_links; then
-		:
-	else
-		echo "*** Duplicate link check failed." 1>&2
-		exit 1
-	fi
-}
-
 sym_check()
 {
 	f=$1
@@ -148,7 +138,6 @@ update()
 		exit 1
 	fi
 	check_empty_tupdirs
-	check_dup_links
 }
 
 update_fail()
@@ -159,7 +148,6 @@ update_fail()
 	else
 		echo "Update expected to fail, and did"
 	fi
-	check_dup_links
 }
 
 update_fail_msg()
@@ -187,7 +175,6 @@ parse_fail()
 	else
 		echo "Hooray, parsing correctly failed."
 	fi
-	check_dup_links
 }
 
 check_same_link()

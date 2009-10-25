@@ -31,9 +31,13 @@ check inputs and outputs even if command fails
 
 'tup todo': check for config update
 
+tup 'next_dirs' - print out other directories that use files in the current dir?
+
 name_list_entry - pointer to tup_entry?
 
 syntax: color %flags in output
+
+limit variable names: eg: 0-9a-zA-Z_-
 
 file: 'tcc' [150 in dir 3] - use dirtree?
 

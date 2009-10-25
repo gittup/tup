@@ -25,7 +25,6 @@ enum {
 	DB_COMMIT,
 	DB_ROLLBACK,
 	DB_DEBUG_ADD_ALL_GHOSTS,
-	DB_CHECK_DUP_LINKS,
 	DB_FILL_TUP_ENTRY,
 	DB_SELECT_NODE_BY_FLAGS_1,
 	DB_SELECT_NODE_BY_FLAGS_2,
@@ -663,46 +662,6 @@ int tup_db_check_flags(int flags)
 			return -1;
 		}
 	}
-	return rc;
-}
-
-int tup_db_check_dup_links(void)
-{
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_CHECK_DUP_LINKS];
-	static char s[] = "select from_id, to_id, count(from_id) from link group by from_id, to_id having count(from_id) > 1";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	while(1) {
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			goto out_reset;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			rc = -1;
-			goto out_reset;
-		}
-
-		fprintf(stderr, "tup error: Duplicate link %lli -> %lli exists %i times\n", sqlite3_column_int64(*stmt, 0), sqlite3_column_int64(*stmt, 1), sqlite3_column_int(*stmt, 2));
-		rc = -1;
-	}
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
 	return rc;
 }
 

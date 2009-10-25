@@ -26,7 +26,7 @@ $T:
 	rc=$$?;\
 	tup stop;\
 	if [ $$rc -eq 0 ]; then \
-	if tup check_dup_links; then cd $$dir; rm -rf tuptesttmp-$$n; exit 0; else echo "*** Test failed: check_dup_links returned false."; exit 1; fi; \
+	cd $$dir; rm -rf tuptesttmp-$$n; exit 0; \
 	else exit 1; fi
 
 $B: clearmarks

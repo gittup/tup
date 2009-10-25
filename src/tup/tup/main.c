@@ -130,8 +130,6 @@ int main(int argc, char **argv)
 		rc = fake_mtime(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
 		rc = flush();
-	} else if(strcmp(cmd, "check_dup_links") == 0) {
-		rc = tup_db_check_dup_links();
 	} else if(strcmp(cmd, "ghost_check") == 0) {
 		rc = ghost_check();
 	} else {
