@@ -86,4 +86,5 @@ html:
   how files are deleted
   how dependencies are described/discovered
   man pages: tup command line, tup_api
+   - move config options to man page
   error messages (eg: you get this error message if...)

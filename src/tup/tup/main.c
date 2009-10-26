@@ -810,9 +810,6 @@ static void usage(void)
 	printf("tup %s usage: tup command [args]\n", tup_version());
 	printf("Where command is:\n");
 	printf("  init		Initialize the tup database in .tup/\n");
-	printf("  monitor 	Start the file monitor\n");
-	printf("  stop		Stop the file monitor\n");
-	printf("  g		Print a graphviz .dot graph of the .tup repository to stdout\n");
-	printf("  upd		Run the updater. (Actually build stuff).\n");
-	printf("  config        Display or set configuration options.\n");
+	printf("  upd		Update everything according to the Tupfiles\n");
+	printf("For information on Tupfiles and other commands, see the tup(1) man page.\n");
 }
