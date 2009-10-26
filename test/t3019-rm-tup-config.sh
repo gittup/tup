@@ -12,7 +12,6 @@ vardict_exist FOO
 vardict_exist BAR
 
 rm tup.config
-tup rm tup.config
 tup read
 
 tup_object_no_exist @ BAR

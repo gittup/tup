@@ -3561,7 +3561,7 @@ int tup_db_scan_end(struct rb_root *tree)
 		 */
 		tent = tup_entry_find(tt->tupid);
 		if(tent) {
-			if(tup_file_missing(tt->tupid, tent->type) < 0)
+			if(tup_file_missing(tent) < 0)
 				return -1;
 		}
 		tupid_tree_rm(tree, tt);

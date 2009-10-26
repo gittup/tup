@@ -167,9 +167,9 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 
 	if(new || modified) {
 		if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
-			/* If tup.config was modified changed, put the
-			 * @-directory in the create list so we can import any
-			 * variables that have changed.
+			/* If tup.config was modified, put the @-directory in
+			 * the create list so we can import any variables that
+			 * have changed.
 			 */
 			if(tup_db_add_create_list(VAR_DT) < 0)
 				return -1;
@@ -179,17 +179,21 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	return tent->tnode.tupid;
 }
 
-int tup_file_del(tupid_t dt, const char *file, int len)
+static int check_rm_tup_config(struct tup_entry *tent)
 {
-	struct tup_entry *tent;
-
-	if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+	if(tent->dt == DOT_DT && strcmp(tent->name.s, TUP_CONFIG) == 0) {
 		/* If tup.config was removed, also add the @-directory to the
 		 * create list.
 		 */
 		if(tup_db_add_create_list(VAR_DT) < 0)
 			return -1;
 	}
+	return 0;
+}
+
+int tup_file_del(tupid_t dt, const char *file, int len)
+{
+	struct tup_entry *tent;
 
 	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
 		return -1;
@@ -197,12 +201,16 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
 		return -1;
 	}
+	if(check_rm_tup_config(tent) < 0)
+		return -1;
 	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
 }
 
-int tup_file_missing(tupid_t tupid, int type)
+int tup_file_missing(struct tup_entry *tent)
 {
-	return tup_del_id_type(tupid, type, 0);
+	if(check_rm_tup_config(tent) < 0)
+		return -1;
+	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
 }
 
 int tup_del_id_force(tupid_t tupid, int type)

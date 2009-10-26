@@ -33,7 +33,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force);
 int tup_file_del(tupid_t dt, const char *file, int len);
-int tup_file_missing(tupid_t tupid, int type);
+int tup_file_missing(struct tup_entry *tent);
 int tup_del_id_force(tupid_t tupid, int type);
 struct tup_entry *get_tent_dt(tupid_t dt, const char *path);
 tupid_t find_dir_tupid(const char *dir);
