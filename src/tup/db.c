@@ -100,8 +100,7 @@ enum {
 	_DB_DELETE_VAR_ENTRY,
 	_DB_CHECK_EXPECTED_OUTPUTS,
 	_DB_CHECK_ACTUAL_OUTPUTS,
-	_DB_ADD_OUTPUTS,
-	_DB_REMOVE_OUTPUTS,
+	_DB_GET_OUTPUTS,
 	DB_NUM_STATEMENTS
 };
 
@@ -151,8 +150,6 @@ static int var_flag_cmds(tupid_t tupid);
 static int delete_var_entry(tupid_t tupid);
 static int check_expected_outputs(tupid_t cmdid);
 static int check_actual_outputs(tupid_t cmdid);
-static int add_outputs(tupid_t cmdid, int *outputs_differ);
-static int remove_outputs(tupid_t cmdid, int *outputs_differ);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int generated_nodelist_len(tupid_t dt);
@@ -161,6 +158,7 @@ static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree,
 static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 static int get_dir_entries(tupid_t dt, struct list_head *list);
+static int get_outputs(tupid_t cmdid, struct list_head *list);
 
 int tup_db_open(void)
 {
@@ -2234,7 +2232,8 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree)
+int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *deltree,
+			      struct rb_root *tree)
 {
 	int rc;
 	tupid_t incoming;
@@ -2243,7 +2242,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree)
 	if(rc < 0)
 		return -1;
 	if(incoming != -1) {
-		if(tupid_tree_search(tree, incoming) != NULL) {
+		if(tupid_tree_search(deltree, incoming) != NULL) {
 			/* Delete any old links (t6029) */
 			if(link_remove(incoming, b) < 0)
 				return -1;
@@ -2252,7 +2251,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *tree)
 	}
 	/* See if we already own the link, or if the link doesn't exist yet */
 	if(a == incoming || incoming == -1) {
-		if(tup_db_add_write_list(b) < 0)
+		if(tupid_tree_add(tree, b) < 0)
 			return -1;
 		return 0;
 	}
@@ -3751,21 +3750,6 @@ int tup_db_check_write_list(tupid_t cmdid)
 	return rc;
 }
 
-int tup_db_write_outputs(tupid_t cmdid)
-{
-	int outputs_differ = 0;
-
-	if(add_outputs(cmdid, &outputs_differ) < 0)
-		return -1;
-	if(remove_outputs(cmdid, &outputs_differ) < 0)
-		return -1;
-	if(outputs_differ == 1) {
-		if(tup_db_add_modify_list(cmdid) < 0)
-			return -1;
-	}
-	return 0;
-}
-
 static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 		     struct rb_root *normal_tree)
 {
@@ -3823,6 +3807,36 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 	}
 
 	return rc;
+}
+
+static int compare_ide_tree(struct list_head *a, struct rb_root *b, void *data,
+			    int (*extra_a)(tupid_t tupid, void *data),
+			    int (*extra_b)(tupid_t tupid, void *data))
+{
+	struct id_entry *ide;
+	struct rb_node *nb;
+	struct tupid_tree *ttb;
+
+	nb = rb_first(b);
+
+	list_for_each_entry(ide, a, list) {
+		ttb = tupid_tree_search(b, ide->tupid);
+		if(!ttb) {
+			if(extra_a && extra_a(ide->tupid, data) < 0)
+				return -1;
+		} else {
+			tupid_tree_rm(b, ttb);
+			free(ttb);
+		}
+	}
+
+	for(nb = rb_first(b); nb; nb = rb_next(nb)) {
+		ttb = rb_entry(nb, struct tupid_tree, rbn);
+		if(extra_b && extra_b(ttb->tupid, data) < 0)
+			return -1;
+	}
+
+	return 0;
 }
 
 static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
@@ -4050,6 +4064,48 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 	free_tupid_tree(&aid.sticky_tree);
 	free_tupid_tree(&normal_tree);
 	free_tupid_tree(&sticky_copy);
+	return 0;
+}
+
+struct parse_output_data {
+	tupid_t cmdid;
+	int outputs_differ;
+};
+
+static int add_output(tupid_t tupid, void *data)
+{
+	struct parse_output_data *pod = data;
+	pod->outputs_differ = 1;
+	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
+		return -1;
+	return 0;
+}
+
+static int rm_output(tupid_t tupid, void *data)
+{
+	struct parse_output_data *pod = data;
+	pod->outputs_differ = 1;
+	if(link_remove(pod->cmdid, tupid) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree)
+{
+	LIST_HEAD(outputs);
+	struct parse_output_data pod = {
+		.cmdid = cmdid,
+		.outputs_differ = 0,
+	};
+
+	if(get_outputs(cmdid, &outputs) < 0)
+		return -1;
+	if(compare_ide_tree(&outputs, tree, &pod, rm_output, add_output) < 0)
+		return -1;
+	if(pod.outputs_differ == 1) {
+		if(tup_db_add_modify_list(cmdid) < 0)
+			return -1;
+	}
 	return 0;
 }
 
@@ -5138,54 +5194,11 @@ static int check_actual_outputs(tupid_t cmdid)
 	return rc;
 }
 
-static int add_outputs(tupid_t cmdid, int *outputs_differ)
+static int get_outputs(tupid_t cmdid, struct list_head *list)
 {
 	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_ADD_OUTPUTS];
-	static char s[] = "insert or ignore into link select ?, tmpid, ? from tmp_list";
-
-	if(check_tmp_requested() < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, cmdid, TUP_LINK_NORMAL);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_LINK_NORMAL) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(sqlite3_changes(tup_db))
-		*outputs_differ = 1;
-
-	return 0;
-}
-
-static int remove_outputs(tupid_t cmdid, int *outputs_differ)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_REMOVE_OUTPUTS];
-	static char s[] = "delete from link where from_id=? and to_id not in (select tmpid from tmp_list)";
+	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUTS];
+	static char s[] = "select to_id from link where from_id=?";
 
 	if(check_tmp_requested() < 0)
 		return -1;
@@ -5204,20 +5217,38 @@ static int remove_outputs(tupid_t cmdid, int *outputs_differ)
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
+	while(1) {
+		struct id_entry *ide;
+		int dbrc;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			goto out_reset;
+		}
+
+		ide = malloc(sizeof *ide);
+		if(!ide) {
+			perror("malloc");
+			rc = -1;
+			goto out_reset;
+		}
+		ide->tupid = sqlite3_column_int64(*stmt, 0);
+		list_add(&ide->list, list);
+	}
+
+out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
 
-	if(sqlite3_changes(tup_db))
-		*outputs_differ = 1;
-
-	return 0;
+	return rc;
 }
 
 static int no_sync(void)

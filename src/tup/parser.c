@@ -1628,7 +1628,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * commands still work (since they don't go through the normal
 		 * server process to create links).
 		 */
-		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->g->delete_tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->g->delete_tree, &tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -1637,10 +1637,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		delete_name_list_entry(&onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid) < 0)
+	if(tup_db_write_outputs(cmdid, &tree) < 0)
 		return -1;
-	if(tup_db_clear_tmp_list() < 0)
-		return -1;
+	free_tupid_tree(&tree);
 
 	list_for_each_entry(nle, &nl->entries, list) {
 		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)

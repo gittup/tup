@@ -21,6 +21,8 @@ don't continue down re-parse tree unless outputs of the dir have changed.
 
 give user an option to kill an autoupdate updater
 
+check duplicate outputs  eg: |> touch %o |> bar bar
+
 t5057 - make 'boo' dependency change update file?
 
 check inputs and outputs even if command fails
