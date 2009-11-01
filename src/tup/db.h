@@ -99,6 +99,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b);
 int tup_db_link_style(tupid_t a, tupid_t b, int *style);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
+int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree);
+int tup_db_write_dir_inputs(tupid_t dt, struct rb_root *tree);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -107,7 +109,6 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 					       int style),
 			       void *arg, tupid_t tupid);
-int tup_db_delete_dependent_dir_links(tupid_t tupid);
 
 /* Config operations */
 int tup_db_show_config(void);
@@ -144,7 +145,6 @@ int tup_db_scan_end(struct rb_root *tree);
 int tup_db_add_write_list(tupid_t tupid);
 int tup_db_check_write_list(tupid_t cmdid);
 int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist);
-int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree);
 int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree);
 
 #endif

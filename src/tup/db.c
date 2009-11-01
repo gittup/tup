@@ -62,7 +62,6 @@ enum {
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
-	DB_DELETE_DEPENDENT_DIR_LINKS,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
 	DB_CONFIG_SET_INT64,
@@ -2702,42 +2701,6 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_dependent_dir_links(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_DELETE_DEPENDENT_DIR_LINKS];
-	static char s[] = "delete from link where to_id=?";
-
-	if(add_ghost_links(tupid) < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
 static int config_cb(void *arg, int argc, char **argv, char **col)
 {
 	int x;
@@ -3870,8 +3833,8 @@ static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
 }
 
 static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
-			 int (*extra_a)(struct tupid_tree *tt, void *data),
-			 int (*extra_b)(struct tupid_tree *tt, void *data))
+			 int (*extra_a)(tupid_t tupid, void *data),
+			 int (*extra_b)(tupid_t tupid, void *data))
 {
 	struct rb_node *na;
 	struct rb_node *nb;
@@ -3884,12 +3847,12 @@ static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 	while(na || nb) {
 		if(!na) {
 			ttb = container_of(nb, struct tupid_tree, rbn);
-			if(extra_b && extra_b(ttb, data) < 0)
+			if(extra_b && extra_b(ttb->tupid, data) < 0)
 				return -1;
 			nb = rb_next(nb);
 		} else if(!nb) {
 			tta = container_of(na, struct tupid_tree, rbn);
-			if(extra_a && extra_a(tta, data) < 0)
+			if(extra_a && extra_a(tta->tupid, data) < 0)
 				return -1;
 			na = rb_next(na);
 		} else {
@@ -3900,11 +3863,11 @@ static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 				na = rb_next(na);
 				nb = rb_next(nb);
 			} else if(tta->tupid < ttb->tupid) {
-				if(extra_a && extra_a(tta, data) < 0)
+				if(extra_a && extra_a(tta->tupid, data) < 0)
 					return -1;
 				na = rb_next(na);
 			} else {
-				if(extra_b && extra_b(ttb, data) < 0)
+				if(extra_b && extra_b(ttb->tupid, data) < 0)
 					return -1;
 				nb = rb_next(nb);
 			}
@@ -3918,34 +3881,34 @@ struct write_input_data {
 	struct rb_root *normal_tree;
 };
 
-static int new_sticky(struct tupid_tree *tt, void *data)
+static int add_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
 	int rc;
 
-	if(tupid_tree_search(wid->normal_tree, tt->tupid) == NULL) {
+	if(tupid_tree_search(wid->normal_tree, tupid) == NULL) {
 		/* Not a normal link, insert it */
-		rc = link_insert(tt->tupid, wid->cmdid, TUP_LINK_STICKY);
+		rc = link_insert(tupid, wid->cmdid, TUP_LINK_STICKY);
 	} else {
 		/* Currently just a normal link, update it */
-		rc = link_update(tt->tupid, wid->cmdid, TUP_LINK_NORMAL | TUP_LINK_STICKY);
+		rc = link_update(tupid, wid->cmdid, TUP_LINK_NORMAL | TUP_LINK_STICKY);
 	}
 	return rc;
 }
 
-static int del_sticky(struct tupid_tree *tt, void *data)
+static int rm_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
 
-	if(tupid_tree_search(wid->normal_tree, tt->tupid) == NULL) {
+	if(tupid_tree_search(wid->normal_tree, tupid) == NULL) {
 		/* Not a normal link, kill it */
-		if(link_remove(tt->tupid, wid->cmdid) < 0)
+		if(link_remove(tupid, wid->cmdid) < 0)
 			return -1;
 	} else {
 		/* Demote to a normal link - make sure we run the command again
 		 * to check for required inputs.
 		 */
-		if(link_update(tt->tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+		if(link_update(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
 		if(tup_db_add_modify_list(wid->cmdid) < 0)
 			return -1;
@@ -3965,7 +3928,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree)
 	if(get_links(cmdid, &sticky_tree, &normal_tree) < 0)
 		return -1;
 	if(compare_trees(input_tree, &sticky_tree, &wid,
-			 new_sticky, del_sticky) < 0)
+			 add_sticky, rm_sticky) < 0)
 		return -1;
 	free_tupid_tree(&sticky_tree);
 	free_tupid_tree(&normal_tree);
@@ -4075,6 +4038,7 @@ struct parse_output_data {
 static int add_output(tupid_t tupid, void *data)
 {
 	struct parse_output_data *pod = data;
+
 	pod->outputs_differ = 1;
 	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
@@ -4084,6 +4048,7 @@ static int add_output(tupid_t tupid, void *data)
 static int rm_output(tupid_t tupid, void *data)
 {
 	struct parse_output_data *pod = data;
+
 	pod->outputs_differ = 1;
 	if(link_remove(pod->cmdid, tupid) < 0)
 		return -1;
@@ -4106,6 +4071,53 @@ int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree)
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
 	}
+	return 0;
+}
+
+struct write_dir_input_data {
+	tupid_t dt;
+};
+
+static int add_dir_link(tupid_t tupid, void *data)
+{
+	struct write_dir_input_data *wdid = data;
+
+	if(link_insert(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
+		return -1;
+	return 0;
+}
+
+static int rm_dir_link(tupid_t tupid, void *data)
+{
+	struct write_dir_input_data *wdid = data;
+
+	if(add_ghost(tupid) < 0)
+		return -1;
+	if(link_remove(tupid, wdid->dt) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_write_dir_inputs(tupid_t dt, struct rb_root *tree)
+{
+	struct rb_root sticky_tree = {NULL};
+	struct rb_root normal_tree = {NULL};
+	struct write_dir_input_data wdid = {
+		.dt = dt,
+	};
+
+	if(get_links(dt, &sticky_tree, &normal_tree) < 0)
+		return -1;
+	if(sticky_tree.rb_node != NULL) {
+		/* All links to directories should be TUP_LINK_NORMAL */
+		fprintf(stderr, "tup internal error: sticky link found to dir %lli\n", dt);
+		return -1;
+	}
+	if(compare_trees(tree, &normal_tree, &wdid,
+			 add_dir_link, rm_dir_link) < 0)
+		return -1;
+	free_tupid_tree(&sticky_tree);
+	free_tupid_tree(&normal_tree);
 	return 0;
 }
 

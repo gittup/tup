@@ -90,6 +90,7 @@ struct tupfile {
 	struct vardb vdb;
 	struct rb_root cmd_tree;
 	struct rb_root bang_tree;
+	struct rb_root input_tree;
 	int ign;
 };
 
@@ -126,7 +127,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct list_head *symlist);
 static void del_pl(struct path_list *pl);
-static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
+static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 				    struct graph *g);
 static int get_name_list(struct tupfile *tf, struct list_head *plist,
 			 struct name_list *nl);
@@ -166,6 +167,7 @@ int parse(struct node *n, struct graph *g)
 	tf.g = g;
 	tf.cmd_tree.rb_node = NULL;
 	tf.bang_tree.rb_node = NULL;
+	tf.input_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
@@ -182,8 +184,6 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_cmds_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
 	if(tup_db_cmd_outputs_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
-		return -1;
-	if(tup_db_delete_dependent_dir_links(tf.tupid) < 0)
 		return -1;
 	if(tup_db_delete_gitignore(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
 		return -1;
@@ -210,6 +210,8 @@ int parse(struct node *n, struct graph *g)
 		if(gitignore(&tf) < 0)
 			rc = -1;
 	}
+	if(tup_db_write_dir_inputs(tf.tupid, &tf.input_tree) < 0)
+		return -1;
 out_close_file:
 	close(fd);
 out_close_dfd:
@@ -219,6 +221,7 @@ out_close_vdb:
 		rc = -1;
 	free_tupid_tree(&tf.cmd_tree);
 	free_bang_tree(&tf.bang_tree);
+	free_tupid_tree(&tf.input_tree);
 
 	return rc;
 }
@@ -489,8 +492,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 		if(gimme_node_or_make_ghost(curdir, p, NULL, &tent) < 0)
 			return -1;
 		if(tent->type == TUP_NODE_GHOST) {
-			if(tup_db_create_link(tent->tnode.tupid, tf->tupid,
-					      TUP_LINK_NORMAL) < 0)
+			if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
 				return -1;
 			continue;
 		}
@@ -654,7 +656,7 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			return -1;
 		}
 
-		if(tup_db_create_link(nle->tupid, tf->tupid, TUP_LINK_NORMAL) < 0)
+		if(tupid_tree_add_dup(&tf->input_tree, nle->tupid) < 0)
 			return -1;
 		delete_name_list_entry(nl, nle);
 	}
@@ -1183,7 +1185,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 		return -1;
 	tup_entry_release_list();
 
-	if(parse_dependent_tupfiles(&plist, tf->tupid, tf->g) < 0)
+	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
 		return -1;
 	if(get_name_list(tf, &plist, nl) < 0)
 		return -1;
@@ -1271,7 +1273,7 @@ static void del_pl(struct path_list *pl)
 	free(pl);
 }
 
-static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
+static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 				    struct graph *g)
 {
 	struct path_list *pl;
@@ -1280,7 +1282,7 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 		/* Only care about non-bins, and directories that are not our
 		 * own.
 		 */
-		if(!pl->bin && pl->dt != dt) {
+		if(!pl->bin && pl->dt != tf->tupid) {
 			struct node *n;
 
 			n = find_node(g, pl->dt);
@@ -1289,7 +1291,7 @@ static int parse_dependent_tupfiles(struct list_head *plist, tupid_t dt,
 				if(parse(n, g) < 0)
 					return -1;
 			}
-			if(tup_db_create_link(pl->dt, dt, TUP_LINK_NORMAL) < 0)
+			if(tupid_tree_add_dup(&tf->input_tree, pl->dt) < 0)
 				return -1;
 		}
 	}
@@ -2006,7 +2008,7 @@ static char *eval(struct tupfile *tf, const char *string,
 				vt = tup_db_get_var(var, rparen-var, &p);
 				if(vt < 0)
 					return NULL;
-				if(tup_db_create_link(vt, tf->tupid, TUP_LINK_NORMAL) < 0)
+				if(tupid_tree_add_dup(&tf->input_tree, vt) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {
