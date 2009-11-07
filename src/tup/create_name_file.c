@@ -32,12 +32,20 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 
 tupid_t create_command_file(tupid_t dt, const char *cmd)
 {
-	return tup_db_create_node(dt, cmd, TUP_NODE_CMD);
+	struct tup_entry *tent;
+	tent = tup_db_create_node(dt, cmd, TUP_NODE_CMD);
+	if(tent)
+		return tent->tnode.tupid;
+	return -1;
 }
 
 tupid_t create_dir_file(tupid_t dt, const char *path)
 {
-	return tup_db_create_node(dt, path, TUP_NODE_DIR);
+	struct tup_entry *tent;
+	tent = tup_db_create_node(dt, path, TUP_NODE_DIR);
+	if(tent)
+		return tent->tnode.tupid;
+	return -1;
 }
 
 tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,

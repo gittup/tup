@@ -703,25 +703,25 @@ int tup_db_debug_add_all_ghosts(void)
 	return 0;
 }
 
-tupid_t tup_db_create_node(tupid_t dt, const char *name, int type)
+struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
 {
 	return tup_db_create_node_part(dt, name, -1, type);
 }
 
-tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
+struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
+					  int type)
 {
 	struct tup_entry *tent;
-	tupid_t tupid;
 
 	if(node_select(dt, name, len, &tent) < 0) {
-		return -1;
+		return NULL;
 	}
 
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST) {
 			if(tup_db_set_type(tent, type) < 0)
-				return -1;
-			return tent->tnode.tupid;
+				return NULL;
+			return tent;
 		}
 		if(tent->type != type) {
 			/* Try to provide a more sane error message in this
@@ -730,18 +730,16 @@ tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type)
 			 */
 			if(tent->type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
 				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
-				return -1;
+				return NULL;
 			}
 			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, tent->type);
-			return -1;
+			return NULL;
 		}
-		return tent->tnode.tupid;
+		return tent;
 	}
 
-	tupid = tup_db_node_insert(dt, name, len, type, -1);
-	if(tupid < 0)
-		return -1;
-	return tupid;
+	tent = tup_db_node_insert(dt, name, len, type, -1);
+	return tent;
 }
 
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
@@ -3075,16 +3073,15 @@ tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
 	if(node_select(VAR_DT, var, varlen, &tent) < 0)
 		return -1;
 	if(!tent) {
-		tupid_t tupid;
-		tupid = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
-		if(tupid < 0)
+		tent = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
+		if(!tent)
 			return -1;
 		/* I was gonna put "BOO" here, but then I realized that would
 		 * waste space and cure hiccups.
 		 */
-		if(tup_db_set_var(tupid, "") < 0)
+		if(tup_db_set_var(tent->tnode.tupid, "") < 0)
 			return -1;
-		return tupid;
+		return tent->tnode.tupid;
 	}
 	if(tent->type == TUP_NODE_GHOST)
 		return tent->tnode.tupid;
@@ -3420,14 +3417,14 @@ static int remove_var(struct var_entry *ve)
 
 static int add_var(struct var_entry *ve)
 {
-	tupid_t tupid;
+	struct tup_entry *tent;
 
 	tup_db_var_changed++;
 
-	tupid = tup_db_create_node(VAR_DT, ve->var.s, TUP_NODE_VAR);
-	if(tupid < 0)
+	tent = tup_db_create_node(VAR_DT, ve->var.s, TUP_NODE_VAR);
+	if(!tent)
 		return -1;
-	return tup_db_set_var(tupid, ve->value);
+	return tup_db_set_var(tent->tnode.tupid, ve->value);
 }
 
 static int compare_vars(struct var_entry *vea, struct var_entry *veb)
@@ -4121,13 +4118,13 @@ int tup_db_write_dir_inputs(tupid_t dt, struct rb_root *tree)
 	return 0;
 }
 
-tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
-			   time_t mtime)
+struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
+				     int type, time_t mtime)
 {
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent(dt, name, len, type, mtime, &tent) < 0)
-		return -1;
-	return tent->tnode.tupid;
+		return NULL;
+	return tent;
 }
 
 int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,

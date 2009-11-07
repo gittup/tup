@@ -19,7 +19,7 @@ void bin_list_del(struct bin_list *bl)
 			struct bin_entry *be;
 			be = list_entry(b->entries.next, struct bin_entry, list);
 			list_del(&be->list);
-			free(be->name);
+			free(be->path);
 			free(be);
 		}
 		list_del(&b->list);
@@ -58,7 +58,8 @@ struct bin *bin_find(const char *name, struct bin_list *bl)
 	return NULL;
 }
 
-int bin_add_entry(struct bin *b, const char *name, int len, tupid_t tupid)
+int bin_add_entry(struct bin *b, const char *path, int len,
+		  struct tup_entry *tent)
 {
 	struct bin_entry *be;
 
@@ -67,30 +68,16 @@ int bin_add_entry(struct bin *b, const char *name, int len, tupid_t tupid)
 		perror("malloc");
 		return -1;
 	}
-	be->name = malloc(len + 1);
-	if(!be->name) {
+	be->path = malloc(len + 1);
+	if(!be->path) {
 		perror("malloc");
 		return -1;
 	}
-	memcpy(be->name, name, len);
-	be->name[len] = 0;
+	memcpy(be->path, path, len);
+	be->path[len] = 0;
 	be->len = len;
-	be->tupid = tupid;
+
+	be->tent = tent;
 	list_add_tail(&be->list, &b->entries);
 	return 0;
-}
-
-void dump_bins(struct bin_list *bl)
-{
-	struct bin *b;
-	printf("Bin list:\n");
-
-	list_for_each_entry(b, &bl->bins, list) {
-		struct bin_entry *be;
-
-		printf(" --[%s]--\n", b->name);
-		list_for_each_entry(be, &b->entries, list) {
-			printf("  - %lli: '%s'\n", be->tupid, be->name);
-		}
-	}
 }

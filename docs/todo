@@ -75,6 +75,8 @@ sqlite style graphs for parser
 
 indent dependent dirs while parsing?
 
+implement */*.c or maybe **/*.c as a recursive input?
+
 html:
   proof: no clean target
   graphs

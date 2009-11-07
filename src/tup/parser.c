@@ -39,9 +39,7 @@ struct name_list_entry {
 	int baselen;
 	int extlessbaselen;
 	int dirlen;
-	tupid_t tupid;
-	tupid_t dt;
-	int type;
+	struct tup_entry *tent;
 };
 
 struct path_list {
@@ -133,7 +131,7 @@ static int get_name_list(struct tupfile *tf, struct list_head *plist,
 			 struct name_list *nl);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl);
-static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl);
+static int nl_add_bin(struct bin *b, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
@@ -530,7 +528,7 @@ static int gitignore(struct tupfile *tf)
 		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 			return -1;
 		if(!tent) {
-			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) < 0)
+			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) == NULL)
 				return -1;
 		} else {
 			tree_entry_remove(&tf->g->delete_tree,
@@ -586,12 +584,12 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 		char *newcwd = NULL;
 		int newclen;
 
-		if(nle->type != TUP_NODE_FILE) {
-			if(nle->type == TUP_NODE_GENERATED) {
+		if(nle->tent->type != TUP_NODE_FILE) {
+			if(nle->tent->type == TUP_NODE_GENERATED) {
 				fprintf(stderr, "Error: Unable to include generated file '%s'. Your build configuration must be comprised of files you wrote yourself.\n", nle->path);
 				return -1;
 			} else {
-				fprintf(stderr, "tup error: Attempt to include node (ID %lli, name='%s') of type %i?\n", nle->tupid, nle->path, nle->type);
+				fprintf(stderr, "tup error: Attempt to include node (ID %lli, name='%s') of type %i?\n", nle->tent->tnode.tupid, nle->path, nle->tent->type);
 				return -1;
 			}
 		}
@@ -632,7 +630,7 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			newclen = clen;
 		}
 
-		fd = tup_db_open_tupid(nle->tupid);
+		fd = tup_entry_open(nle->tent);
 		if(fd < 0) {
 			fprintf(stderr, "Error including '%s': %s\n", nle->path, strerror(errno));
 			return -1;
@@ -644,13 +642,12 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			return -1;
 		}
 
-		/* When parsing the included Tupfile, any files
-		 * it includes will be relative to it
-		 * (nle->dt), not to the parent dir (tupid).
-		 * However, we want all links to be made to the
+		/* When parsing the included Tupfile, any files it includes
+		 * will be relative to it (nle->tent->dt), not to the parent
+		 * dir (tupid).  However, we want all links to be made to the
 		 * parent tupid.
 		 */
-		rc = parse_tupfile(tf, &incb, nle->dt, cnc, newclen);
+		rc = parse_tupfile(tf, &incb, nle->tent->dt, cnc, newclen);
 		free(incb.s);
 		if(newcwd)
 			free(newcwd);
@@ -659,7 +656,7 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			return -1;
 		}
 
-		if(tupid_tree_add_dup(&tf->input_tree, nle->tupid) < 0)
+		if(tupid_tree_add_dup(&tf->input_tree, nle->tent->tnode.tupid) < 0)
 			return -1;
 		delete_name_list_entry(nl, nle);
 	}
@@ -1310,7 +1307,7 @@ static int get_name_list(struct tupfile *tf, struct list_head *plist,
 
 	list_for_each_entry(pl, plist, list) {
 		if(pl->bin) {
-			if(nl_add_bin(pl->bin, pl->dt, nl) < 0)
+			if(nl_add_bin(pl->bin, nl) < 0)
 				return -1;
 		} else {
 			if(nl_add_path(tf, pl, nl) < 0)
@@ -1380,7 +1377,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	return 0;
 }
 
-static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl)
+static int nl_add_bin(struct bin *b, struct name_list *nl)
 {
 	struct bin_entry *be;
 	struct name_list_entry *nle;
@@ -1388,7 +1385,7 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl)
 
 	list_for_each_entry(be, &b->entries, list) {
 		extlesslen = be->len - 1;
-		while(extlesslen > 0 && be->name[extlesslen] != '.')
+		while(extlesslen > 0 && be->path[extlesslen] != '.')
 			extlesslen--;
 		if(extlesslen == 0)
 			extlesslen = be->len;
@@ -1402,14 +1399,11 @@ static int nl_add_bin(struct bin *b, tupid_t dt, struct name_list *nl)
 		nle->path = malloc(be->len + 1);
 		if(!nle->path)
 			return -1;
-		memcpy(nle->path, be->name, be->len+1);
+		memcpy(nle->path, be->path, be->len+1);
 
-		/* All binned nodes are generated from commands */
 		nle->len = be->len;
 		nle->extlesslen = extlesslen;
-		nle->tupid = be->tupid;
-		nle->dt = dt;
-		nle->type = TUP_NODE_GENERATED;
+		nle->tent = be->tent;
 		set_nle_base(nle);
 
 		add_name_list_entry(nl, nle);
@@ -1444,9 +1438,7 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 
 	nle->len = len;
 	nle->extlesslen = extlesslen;
-	nle->tupid = tent->tnode.tupid;
-	nle->dt = tent->dt;
-	nle->type = tent->type;
+	nle->tent = tent;
 	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
 
@@ -1491,7 +1483,7 @@ static int find_existing_command(const struct name_list *onl,
 		int rc;
 		tupid_t incoming;
 
-		rc = tup_db_get_incoming_link(onle->tupid, &incoming);
+		rc = tup_db_get_incoming_link(onle->tent->tnode.tupid, &incoming);
 		if(rc < 0)
 			return -1;
 		/* Only want commands that are still in the del_tree. Any
@@ -1530,7 +1522,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(r->command_len == 0) {
 		if(r->bin) {
 			list_for_each_entry(nle, &nl->entries, list) {
-				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tupid) < 0)
+				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
 					return -1;
 			}
 		}
@@ -1577,15 +1569,15 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
 
-		onle->tupid = tup_db_create_node_part(tf->tupid, onle->path, -1,
-						      TUP_NODE_GENERATED);
-		if(onle->tupid < 0)
+		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
+						     TUP_NODE_GENERATED);
+		if(!onle->tent)
 			return -1;
 
 		add_name_list_entry(&onl, onle);
 
 		if(r->bin) {
-			if(bin_add_entry(r->bin, onle->path, onle->len, onle->tupid) < 0)
+			if(bin_add_entry(r->bin, onle->path, onle->len, onle->tent) < 0)
 				return -1;
 		}
 
@@ -1635,11 +1627,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * commands still work (since they don't go through the normal
 		 * server process to create links).
 		 */
-		if(tup_db_create_unique_link(cmdid, onle->tupid, &tf->g->delete_tree, &tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_tree, &tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		tree_entry_remove(&tf->g->delete_tree, onle->tupid,
+		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
 				  &tf->g->delete_count);
 		delete_name_list_entry(&onl, onle);
 	}
@@ -1649,15 +1641,15 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	free_tupid_tree(&tree);
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tupid, cmdid) < 0)
+		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
 			return -1;
 	}
 	if(tup_db_write_inputs(cmdid, &tree) < 0)

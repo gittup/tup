@@ -48,10 +48,11 @@ void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);
 
 /* Node operations */
-tupid_t tup_db_create_node(tupid_t dt, const char *name, int type);
-tupid_t tup_db_create_node_part(tupid_t dt, const char *name, int len, int type);
-tupid_t tup_db_node_insert(tupid_t dt, const char *name, int len, int type,
-			   time_t mtime);
+struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);
+struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
+					  int type);
+struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
+				     int len, int type, time_t mtime);
 int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 			    time_t mtime, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
