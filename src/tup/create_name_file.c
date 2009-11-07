@@ -73,7 +73,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 	}
 	linkname[rc] = 0;
 
-	if(gimme_node_or_make_ghost(dt, linkname, NULL, &link_entry) < 0)
+	if(gimme_node_or_make_ghost(dt, linkname, &link_entry) < 0)
 		return -1;
 	if(link_entry) {
 		newsym = link_entry->tnode.tupid;
@@ -299,8 +299,11 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 		free(pel);
 		if(!tent)
 			return NULL;
-		if(tup_entry_sym_follow(&tent, NULL) < 0)
+		if(tup_entry_sym_follow(tent) < 0)
 			return NULL;
+		while(tent->sym != -1) {
+			tent = tent->symlink;
+		}
 		return tent;
 	} else {
 		/* We get here if the path list ends up being empty (for
@@ -321,7 +324,7 @@ tupid_t find_dir_tupid(const char *dir)
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
-			  struct path_element **last, struct list_head *symlist,
+			  struct path_element **last, struct rb_root *symtree,
 			  int sotgv)
 {
 	struct pel_group pg;
@@ -330,13 +333,14 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, symlist, sotgv);
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, NULL, symtree, sotgv);
 	return tupid;
 }
 
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last,
-			     struct list_head *symlist, int sotgv)
+			     struct list_head *symlist,
+			     struct rb_root *symtree, int sotgv)
 {
 	struct path_element *pel;
 	struct tup_entry *tent;
@@ -397,8 +401,18 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
 					return -1;
 			}
-			if(tup_entry_sym_follow(&tent, symlist) < 0)
+			if(tup_entry_sym_follow(tent) < 0)
 				return -1;
+
+			for(; tent->sym != -1; tent = tent->symlink) {
+				if(symlist)  {
+					tup_entry_list_add(tent, symlist);
+				}
+				if(symtree) {
+					if(tupid_tree_add(symtree, tent->tnode.tupid) < 0)
+						return -1;
+				}
+			}
 		}
 
 		del_pel(pel);
@@ -414,7 +428,7 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, sotgv);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, NULL, sotgv);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
@@ -444,21 +458,23 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	}
 	free(pel);
 
-	if(tup_entry_sym_follow(&tent, list) < 0)
+	if(tup_entry_sym_follow(tent) < 0)
 		return -1;
+	for(; tent->sym != -1; tent = tent->symlink) {
+		tup_entry_list_add(tent, list);
+	}
 	tup_entry_list_add(tent, list);
 
 	return 0;
 }
 
 int gimme_node_or_make_ghost(tupid_t dt, const char *name,
-			     struct list_head *symlist,
 			     struct tup_entry **entry)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
 
-	new_dt = find_dir_tupid_dt(dt, name, &pel, symlist, 1);
+	new_dt = find_dir_tupid_dt(dt, name, &pel, NULL, 1);
 	if(new_dt < 0)
 		return -1;
 

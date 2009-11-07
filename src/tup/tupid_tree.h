@@ -28,5 +28,9 @@ static inline void tupid_tree_rm(struct rb_root *root, struct tupid_tree *tt)
 void free_tupid_tree(struct rb_root *root);
 int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count);
 void tree_entry_remove(struct rb_root *tree, tupid_t tupid, int *count);
+#define tupid_tree_for_each(_tupid, rbn, tree) \
+	for(rbn = rb_first(tree), _tupid = rbn ? rb_entry(rbn, struct tupid_tree, rbn)->tupid : -1; \
+	    rbn; \
+	    rbn = rb_next(rbn), _tupid = rbn ? rb_entry(rbn, struct tupid_tree, rbn)->tupid : -1)
 
 #endif

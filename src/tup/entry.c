@@ -144,8 +144,8 @@ struct tup_entry *tup_entry_get(tupid_t tupid)
 
 	tent = tup_entry_find(tupid);
 	if(!tent) {
-		fprintf(stderr, "tup error: Unable to find tup entry %lli in tup_entry_get()\n", tupid);
-		return NULL;
+		fprintf(stderr, "tup internal error: Unable to find tup entry %lli in tup_entry_get()\n", tupid);
+		exit(1);
 	}
 	return tent;
 }
@@ -374,21 +374,15 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	return change_name(tent, new_name);
 }
 
-int tup_entry_sym_follow(struct tup_entry **entry, struct list_head *list)
+int tup_entry_sym_follow(struct tup_entry *tent)
 {
-	struct tup_entry *tent;
-
-	tent = *entry;
 	while(tent->sym != -1) {
 		if(tent->symlink == NULL) {
 			if(tup_entry_resolve_sym(tent) < 0)
 				return -1;
 		}
-		if(list)
-			tup_entry_list_add(tent, list);
 		tent = tent->symlink;
 	}
-	*entry = tent;
 	return 0;
 }
 

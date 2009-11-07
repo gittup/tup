@@ -101,7 +101,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	struct tup_entry *tent;
 	int write_bork = 0;
 	struct list_head *readlist;
-	struct list_head *symlist;
+	struct rb_root symtree = RB_ROOT;
 
 	handle_unlink(info);
 
@@ -137,8 +137,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			goto out_skip;
 		}
 
-		symlist = tup_entry_get_list();
-		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, symlist, 0);
+		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, NULL, &symtree, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
@@ -147,22 +146,28 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
-		if(!list_empty(symlist)) {
+		if(!RB_EMPTY_ROOT(&symtree)) {
+			struct rb_node *rbn;
+			tupid_t tupid;
 			fprintf(stderr, "tup error: Attempt to write to a file using a symlink. The command should only  use the full non-symlinked path, or just write to the current directory.\n");
 			fprintf(stderr, " -- Command: '%s'\n", debug_name);
 			fprintf(stderr, " -- Filename: '%s'\n", w->filename);
-			list_for_each_entry(tent, symlist, list) {
-				fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym, tent->dt);
+			tupid_tree_for_each(tupid, rbn, &symtree) {
+				tent = tup_entry_find(tupid);
+				if(tent) {
+					fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym, tent->dt);
+				} else {
+					fprintf(stderr, " -- Unknown symlink %lli\n", tupid);
+				}
 			}
 			return -1;
 		}
-		tup_entry_release_list();
 
 		if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
 			return -1;
 		/* Don't need to follow the syms of tent here, since the output
 		 * file was removed by the updater. So our database
-		 * representation may not match the filesystem, untilwe reset
+		 * representation may not match the filesystem, until we reset
 		 * the sym field to -1 later.
 		 */
 		free(pel);
@@ -228,7 +233,7 @@ out_skip:
 		 * the symlink file. These would get picked up by any command
 		 * that reads our symlink.
 		 */
-		if(gimme_node_or_make_ghost(dt, sym_entry->from, NULL, &link_tent) < 0)
+		if(gimme_node_or_make_ghost(dt, sym_entry->from, &link_tent) < 0)
 			return -1;
 		if(link_tent) {
 			sym = link_tent->tnode.tupid;
