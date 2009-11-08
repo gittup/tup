@@ -460,6 +460,11 @@ void tup_entry_list_del(struct tup_entry *tent)
 	tent->list.next = NULL;
 }
 
+int tup_entry_in_list(struct tup_entry *tent)
+{
+	return !(tent->list.next == NULL);
+}
+
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {

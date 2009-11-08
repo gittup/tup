@@ -48,5 +48,6 @@ struct list_head *tup_entry_get_list(void);
 void tup_entry_release_list(void);
 void tup_entry_list_add(struct tup_entry *tent, struct list_head *list);
 void tup_entry_list_del(struct tup_entry *tent);
+int tup_entry_in_list(struct tup_entry *tent);
 
 #endif

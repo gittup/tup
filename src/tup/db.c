@@ -3749,14 +3749,14 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 		tupid = sqlite3_column_int64(*stmt, 0);
 		style = sqlite3_column_int(*stmt, 1);
 		if(style & TUP_LINK_STICKY) {
-			rc = tupid_tree_add_cmdid(sticky_tree, tupid, cmdid);
+			rc = tupid_tree_add(sticky_tree, tupid);
 		}
 		if(style & TUP_LINK_NORMAL) {
-			rc = tupid_tree_add_cmdid(normal_tree, tupid, cmdid);
+			rc = tupid_tree_add(normal_tree, tupid);
 		}
 
 		if(rc < 0) {
-			fprintf(stderr, "Error inserting tupid %lli into tree\n", tupid);
+			fprintf(stderr, "tup error: get_links() unable to insert tupid %lli into tree - duplicate link in the database?\n", tupid);
 			break;
 		}
 	}

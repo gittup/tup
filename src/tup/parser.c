@@ -25,7 +25,6 @@ struct name_list {
 	struct list_head entries;
 	int num_entries;
 	int totlen;
-	int extlesstotlen;
 	int basetotlen;
 	int extlessbasetotlen;
 };
@@ -55,6 +54,7 @@ struct path_list {
 struct rule {
 	struct list_head list;
 	int foreach;
+	char *input_pattern;
 	char *output_pattern;
 	struct bin *bin;
 	char *command;
@@ -117,7 +117,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *order_only_inputs,
 			       struct bin_list *bl, int lno,
 			       const char *cwd, int clen);
-static int execute_rule(struct tupfile *tf, struct rule *r,
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
@@ -691,18 +691,13 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	} else {
 		r.empty_input = 1;
 	}
+	r.input_pattern = input;
 	r.output_pattern = output;
 	r.command = cmd;
 	r.command_len = cmd_len;
 	r.line_number = lno;
-	init_name_list(&r.inputs);
-	init_name_list(&r.order_only_inputs);
-	init_name_list(&r.bang_oo_inputs);
 
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
-		return -1;
-
-	rc = execute_rule(tf, &r, cwd, clen);
+	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
@@ -738,19 +733,14 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	/* Don't rely on p now, since parse_bin fiddles with things */
 
 	r.foreach = 1;
+	r.input_pattern = input;
 	r.output_pattern = output;
 	r.command = command;
 	r.command_len = sizeof(command) - 1;
 	r.line_number = lno;
 	r.empty_input = 0;
-	init_name_list(&r.inputs);
-	init_name_list(&r.order_only_inputs);
-	init_name_list(&r.bang_oo_inputs);
 
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, r.line_number, cwd, clen) < 0)
-		return -1;
-
-	rc = execute_rule(tf, &r, cwd, clen);
+	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
@@ -1047,10 +1037,42 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r,
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen)
 {
 	struct name_list_entry *nle;
+	struct name_list_entry *tmp;
+	struct list_head *input_list;
+
+	init_name_list(&r->inputs);
+	init_name_list(&r->order_only_inputs);
+	init_name_list(&r->bang_oo_inputs);
+	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
+			       &r->order_only_inputs, bl, r->line_number,
+			       cwd, clen) < 0)
+		return -1;
+
+	/* Use the tup entry list as an easy cheat to remove duplicates. Only
+	 * care about dups in the inputs namelist, since the others are just
+	 * added to the tupid_tree and aren't used in %-flags.
+	 *
+	 * The trick here is that we need to prune duplicate inputs, but still
+	 * maintain the order. So we can't stick the input tupids in a tree and
+	 * use that, since that would kill the order. Also, just going through
+	 * the linked list twice would be O(n^2), which would suck. Since the
+	 * tup_entry's are already unique, we can use the entry list to
+	 * determine if the nle is already present or not. If it is already
+	 * present, the second and further duplicates will be removed.
+	 */
+	input_list = tup_entry_get_list();
+	list_for_each_entry_safe(nle, tmp, &r->inputs.entries, list) {
+		if(tup_entry_in_list(nle->tent)) {
+			delete_name_list_entry(&r->inputs, nle);
+		} else {
+			tup_entry_list_add(nle->tent, input_list);
+		}
+	}
+	tup_entry_release_list();
 
 	if(r->foreach) {
 		struct name_list tmp_nl;
@@ -1641,15 +1663,15 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	free_tupid_tree(&tree);
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
+		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
+		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
-		if(tupid_tree_add_cmdid(&tree, nle->tent->tnode.tupid, cmdid) < 0)
+		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	if(tup_db_write_inputs(cmdid, &tree) < 0)
@@ -1663,7 +1685,6 @@ static void init_name_list(struct name_list *nl)
 	INIT_LIST_HEAD(&nl->entries);
 	nl->num_entries = 0;
 	nl->totlen = 0;
-	nl->extlesstotlen = 0;
 	nl->basetotlen = 0;
 	nl->extlessbasetotlen = 0;
 }
@@ -1693,7 +1714,6 @@ static void add_name_list_entry(struct name_list *nl,
 	list_add_tail(&nle->list, &nl->entries);
 	nl->num_entries++;
 	nl->totlen += nle->len;
-	nl->extlesstotlen += nle->extlesslen;
 	nl->basetotlen += nle->baselen;
 	nl->extlessbasetotlen += nle->extlessbaselen;
 }
@@ -1713,7 +1733,6 @@ static void delete_name_list_entry(struct name_list *nl,
 {
 	nl->num_entries--;
 	nl->totlen -= nle->len;
-	nl->extlesstotlen -= nle->extlesslen;
 	nl->basetotlen -= nle->baselen;
 	nl->extlessbasetotlen -= nle->extlessbaselen;
 
