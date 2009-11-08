@@ -688,6 +688,8 @@ static int varshow_cb(void *arg, const char *var, const char *value, int type)
 
 static int varshow(int argc, char **argv)
 {
+	if(tup_entry_add(VAR_DT, NULL) < 0)
+		return -1;
 	if(argc == 1) {
 		if(tup_db_var_foreach(varshow_cb, NULL) < 0)
 			return -1;
