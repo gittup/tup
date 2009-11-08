@@ -4069,6 +4069,12 @@ int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree)
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
 	}
+	while(!list_empty(&outputs)) {
+		struct id_entry *ide = list_entry(outputs.next,
+						  struct id_entry, list);
+		list_del(&ide->list);
+		free(ide);
+	}
 	return 0;
 }
 
