@@ -94,6 +94,7 @@ struct tupfile {
 
 static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			 const char *cwd, int clen);
+static int var_ifdef(struct tupfile *tf, const char *var);
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen);
 static int gitignore(struct tupfile *tf);
@@ -370,6 +371,18 @@ found_paren:
 			}
 			free(lval);
 			free(rval);
+		} else if(strncmp(line, "ifdef ", 6) == 0) {
+			int rc;
+			rc = var_ifdef(tf, line+6);
+			if(rc < 0)
+				return -1;
+			if_true = rc;
+		} else if(strncmp(line, "ifndef ", 7) == 0) {
+			int rc;
+			rc = var_ifdef(tf, line+7);
+			if(rc < 0)
+				return -1;
+			if_true = !rc;
 		} else if(line[0] == ':') {
 			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
@@ -447,6 +460,24 @@ syntax_error:
 	fprintf(stderr, "Error parsing Tupfile [%lli] line %i\n  Line was: '%s'\n", tf->tupid, lno, line);
 	tup_db_print(stderr, tf->tupid);
 	return -1;
+}
+
+static int var_ifdef(struct tupfile *tf, const char *var)
+{
+	struct tup_entry *tent;
+	int rc;
+
+	tent = tup_db_get_var(var, -1, NULL);
+	if(!tent)
+		return -1;
+	if(tent->type == TUP_NODE_VAR) {
+		rc = 1;
+	} else {
+		rc = 0;
+	}
+	if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
+		return -1;
+	return rc;
 }
 
 static int include_rules(struct tupfile *tf, tupid_t curdir,
@@ -2011,7 +2042,7 @@ static char *eval(struct tupfile *tf, const char *string,
 			}
 		} else if(*s == '@') {
 			const char *rparen;
-			tupid_t vt;
+			struct tup_entry *tent;
 
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
@@ -2021,10 +2052,10 @@ static char *eval(struct tupfile *tf, const char *string,
 				}
 
 				var = s + 2;
-				vt = tup_db_get_var(var, rparen-var, &p);
-				if(vt < 0)
+				tent = tup_db_get_var(var, rparen-var, &p);
+				if(!tent)
 					return NULL;
-				if(tupid_tree_add_dup(&tf->input_tree, vt) < 0)
+				if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {

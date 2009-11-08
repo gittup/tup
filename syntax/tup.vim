@@ -22,6 +22,7 @@ syntax match atvar /@([^)]*)/
 syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\)"
 syntax match backslash /\\$/
 syntax keyword keys foreach
+syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
 syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,bang
 
@@ -35,4 +36,5 @@ highlight link variable Special
 highlight link control Include
 highlight link bang Type
 highlight def atvar ctermfg=red cterm=bold
+highlight def ifdef ctermfg=red cterm=bold
 highlight def backslash ctermfg=red cterm=bold

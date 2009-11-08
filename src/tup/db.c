@@ -3066,28 +3066,29 @@ out_reset:
 	return rc;
 }
 
-tupid_t tup_db_get_var(const char *var, int varlen, char **dest)
+struct tup_entry *tup_db_get_var(const char *var, int varlen, char **dest)
 {
 	struct tup_entry *tent;
 
 	if(node_select(VAR_DT, var, varlen, &tent) < 0)
-		return -1;
+		return NULL;
 	if(!tent) {
 		tent = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
 		if(!tent)
-			return -1;
+			return NULL;
 		/* I was gonna put "BOO" here, but then I realized that would
 		 * waste space and cure hiccups.
 		 */
 		if(tup_db_set_var(tent->tnode.tupid, "") < 0)
-			return -1;
-		return tent->tnode.tupid;
+			return NULL;
+		return tent;
 	}
 	if(tent->type == TUP_NODE_GHOST)
-		return tent->tnode.tupid;
-	if(get_var_id(tent->tnode.tupid, dest) < 0)
-		return -1;
-	return tent->tnode.tupid;
+		return tent;
+	if(dest)
+		if(get_var_id(tent->tnode.tupid, dest) < 0)
+			return NULL;
+	return tent;
 }
 
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
