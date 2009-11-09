@@ -719,6 +719,12 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST) {
+			if(type == TUP_NODE_VAR) {
+				if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+					return NULL;
+			}
+			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+				return NULL;
 			if(tup_db_set_type(tent, type) < 0)
 				return NULL;
 			return tent;
@@ -3076,11 +3082,6 @@ struct tup_entry *tup_db_get_var(const char *var, int varlen, char **dest)
 		tent = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
 		if(!tent)
 			return NULL;
-		/* I was gonna put "BOO" here, but then I realized that would
-		 * waste space and cure hiccups.
-		 */
-		if(tup_db_set_var(tent->tnode.tupid, "") < 0)
-			return NULL;
 		return tent;
 	}
 	if(tent->type == TUP_NODE_GHOST)
@@ -3397,12 +3398,6 @@ out_err:
 
 static int remove_var(struct var_entry *ve)
 {
-	/* Skip ghosts (t3016) - they won't exist in the config (obviously),
-	 * but we want to keep them around in case they point somewhere. They
-	 * will be cleaned up naturally as part of ghost reclaimation.
-	 */
-	if(ve->type == TUP_NODE_GHOST)
-		return 0;
 	tup_db_var_changed++;
 
 	if(var_flag_dirs(ve->tupid) < 0)
@@ -3439,10 +3434,6 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	tup_db_var_changed++;
 	if(tup_entry_add(vea->tupid, &tent) < 0)
 		return -1;
-	if(vea->type == TUP_NODE_GHOST) {
-		if(tup_db_set_type(tent, TUP_NODE_VAR) < 0)
-			return -1;
-	}
 	if(tup_db_add_create_list(vea->tupid) < 0)
 		return -1;
 	if(tup_db_add_modify_list(vea->tupid) < 0)
