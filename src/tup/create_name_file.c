@@ -649,6 +649,5 @@ static int ghost_to_file(struct tup_entry *tent)
 		return -1;
 	if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 		return -1;
-	tent->type = TUP_NODE_FILE;
 	return 0;
 }
