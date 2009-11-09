@@ -1826,6 +1826,14 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 		} else if(*next == 'e') {
 			if(!ext) {
 				fprintf(stderr, "Error: %%e is only valid with a foreach rule for files that have extensions.\n");
+				if(nl->num_entries == 1) {
+					nle = list_entry(nl->entries.next,
+							 struct name_list_entry,
+							 list);
+					fprintf(stderr, " -- Path: '%s'\n", nle->path);
+				} else {
+					fprintf(stderr, " -- This does not appear to be a foreach rule\n");
+				}
 				return NULL;
 			}
 			clen += extlen;
