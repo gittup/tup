@@ -577,6 +577,10 @@ static int flush_queue(void)
 			return -1;
 		}
 		if(pid == 0) {
+			if(fchdir(tup_top_fd()) < 0) {
+				perror("fchdir tup_top");
+				exit(1);
+			}
 			if(tup_lock_init() < 0)
 				exit(1);
 			updater(1, NULL, 0);
