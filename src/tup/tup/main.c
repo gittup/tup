@@ -20,8 +20,6 @@
 #include "tup/path.h"
 #include "tup/entry.h"
 
-static int file_exists(const char *s);
-
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent, int style);
 static int graph(int argc, char **argv);
@@ -141,21 +139,12 @@ int main(int argc, char **argv)
 	return rc;
 }
 
-static int file_exists(const char *s)
-{
-	struct stat buf;
-
-	if(stat(s, &buf) == 0) {
-		return 1;
-	}
-	return 0;
-}
-
 static int init(int argc, char **argv)
 {
 	int x;
 	int db_sync = 1;
 	int force_init = 0;
+	int fd;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "--no-sync") == 0) {
@@ -164,6 +153,12 @@ static int init(int argc, char **argv)
 			/* force should only be used for tup/test */
 			force_init = 1;
 		}
+	}
+
+	fd = open(".", O_RDONLY);
+	if(fd < 0) {
+		perror(".");
+		return -1;
 	}
 
 	if(!force_init && find_tup_dir() == 0) {
@@ -176,12 +171,15 @@ static int init(int argc, char **argv)
 		}
 		return -1;
 	}
+	if(fchdir(fd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	close(fd);
 
-	if(!file_exists(TUP_DIR)) {
-		if(mkdir(TUP_DIR, 0777) != 0) {
-			perror(TUP_DIR);
-			return -1;
-		}
+	if(mkdir(TUP_DIR, 0777) != 0) {
+		perror(TUP_DIR);
+		return -1;
 	}
 
 	if(tup_db_create(db_sync) != 0) {
