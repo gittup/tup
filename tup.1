@@ -67,7 +67,7 @@ This is either the actual string "foreach", or it is empty. The distinction is i
 Additionally, using "foreach" allows the use of the "%e" flag (see below).
 .TP
 .B inputs
-The input files for the command. The inputs are files that will be used by the command. An input file can be anywhere in the tup hierarchy, and is specified relative to the current directory. Input files affect the %-flags (see below). Wildcarding is supported within a directory by using the SQLite glob function. The special glob characters are '*', '?', and '[]'. For example, "*.c" would match any .c file, "fo?.c" would match any 3-character .c file that has 'f' and 'o' as the first two characters, and "fo[xyz].c" would match fox.c, foy.c, and foz.c. Globbing does not match directories, so "src/*.c" will work, but "*/*.c" will not.
+The input files for the command. An input file can be anywhere in the tup hierarchy, and is specified relative to the current directory. Input files affect the %-flags (see below). Wildcarding is supported within a directory by using the SQLite glob function. The special glob characters are '*', '?', and '[]'. For example, "*.c" would match any .c file, "fo?.c" would match any 3-character .c file that has 'f' and 'o' as the first two characters, and "fo[xyz].c" would match fox.c, foy.c, and foz.c. Globbing does not match directories, so "src/*.c" will work, but "*/*.c" will not.
 .TP
 .B order-only inputs
 These are also used as inputs for the command, but will not appear in any of the %-flags. They are separated from regular inputs by use of the '|' character. In effect, these can be used to specify additional inputs to a command that shouldn't appear on the command line. Globbing is supported as in the inputs section. For example, one use for them is to specify auto-generated header dependencies:
@@ -77,7 +77,7 @@ These are also used as inputs for the command, but will not appear in any of the
 : foreach foo.c bar.c | foo.h |> gcc -c %f -o %o |> %B.o
 
 .fi
-This will add the foo.h dependency to the gcc commands, so tup will know to generate the header before trying to compile. If you forget to add such a dependency, tup will report an error when the command is executed. Note that the foo.h dependency is only listed here because it is created by another command -- normal headers do not need to be specified.
+This will add the foo.h dependency to the gcc commands for foo.c and bar.c, so tup will know to generate the header before trying to compile. The foreach command will iterate over the regular inputs (here, foo.c and bar.c), not the order-only inputs (foo.h). If you forget to add such a dependency, tup will report an error when the command is executed. Note that the foo.h dependency is only listed here because it is created by another command -- normal headers do not need to be specified.
 .TP
 .B command
 The command string that will be passed to the system(3) call by tup. This command is allowed to read from any file specified as an input or order-only input, as well as any other file in the tup hierarchy that is not the output of another command. In other words, a command cannot read from another command's output unless it is specified as an input. This restriction is what allows tup to be parallel safe. Additionally, the command must write to all of the output files specified by the "outputs" section, if any. All of the output files must be in the current directory.
@@ -89,7 +89,7 @@ A command string can begin with the special sequence ^\ TEXT^, which will tell t
 
 .fi
 .IP
-A command string can also begin with the special character '!', in which case the !-macro specified will be substituted in for the actual command. See the !macro definition later.
+A command string can also begin with the special character '!', in which case the !-macro specified will be substituted in for the actual command. See the !-macro definition later.
 .TP
 .B outputs
 The outputs section specifies the files that will be written to by the command. Only one command can write to a specific file, but a single command can output multiple files (such as how a bison command will output both a .c and .h file). The output can use any %-flags except %o. Once a file is specified in an output section, it is put into the tup database. Any following rules can use that file as an input, even if it doesn't exist in the filesystem yet.
@@ -103,7 +103,7 @@ Outputs can be grouped into a bin using the "{bin}" syntax. A later rule can use
 
 .fi
 .IP
-In this case one could use *.o as the input instead, but sometimes it is useful to separate outputs into groups even though they have the same extension (such as if one directory creates multiple binaries, using *.o wouldn't be correct).
+In this case one could use *.o as the input instead, but sometimes it is useful to separate outputs into groups even though they have the same extension (such as if one directory creates multiple binaries, using *.o wouldn't be correct). If a {bin} is specified in the output section of multiple rules, the bin will be the union of all the outputs. You can't remove things from a bin, and the bin disappears after the current Tupfile is parsed.
 .RE
 .TP
 .B %-flags
@@ -162,10 +162,10 @@ include_rules
 You will only want to specify the output parameter in either the !-macro or the :-rule that uses it, but not both. If you specify any inputs in the !-macro, they would usually be order-only inputs. For example, if you have a !cc rule where you are using a compiler that has been generated by tup, you can list the compiler file in the order-only list of the !-macro. The compiler file will then become an input dependency for any :-rule that uses the macro.
 .TP
 .B include file
-Reads the specified file and continues parsing almost as if that file was pasted inline in the current Tupfile. Only regular files can be read. No file that is generated by tup is allowed. Any include statements that occur in the included file will be parsed relative to the included file's directory.
+Reads the specified file and continues parsing almost as if that file was pasted inline in the current Tupfile. Only regular files are allowed to be included -- attempting to include a generated file is an error. Any include statements that occur in the included file will be parsed relative to the included file's directory.
 .TP
 .B include_rules
-Reads in Tuprules.tup files up the directory chain. The first Tuprules.tup file is read at the top of the tup hierarchy, followed by the next subdirectory, and so on through to the Tuprules.tup file in the current directory. In this way, the top-level Tuprules.tup file can specify general variable settings, and subsequent subdirectories can override them with more specific settings. You would generally specify include_rules as the first line in the Tupfile.
+Reads in Tuprules.tup files up the directory chain. The first Tuprules.tup file is read at the top of the tup hierarchy, followed by the next subdirectory, and so on through to the Tuprules.tup file in the current directory. In this way, the top-level Tuprules.tup file can specify general variable settings, and subsequent subdirectories can override them with more specific settings. You would generally specify include_rules as the first line in the Tupfile. The name is a bit of a misnomer, since you would typically use Tuprules.tup to define variables rather than :-rules.
 .TP
 .B .gitignore
 Tells tup to automatically generate a .gitignore file in the current directory which contains a list of the output files that are generated by tup. This can be useful if you are using git, since the set of files generated by tup matches exactly the set of files that you want git to ignore. If you are using Tuprules.tup files, you may just want to specify .gitignore in the top-level Tuprules.tup, and then have every other Tupfile use include_rules to pick up the .gitignore definition. In this way you never have to maintain the .gitignore files manually.
@@ -173,7 +173,7 @@ Tells tup to automatically generate a .gitignore file in the current directory w
 .SH "TUPFILE NOTES"
 Variable expansion in tup is immediate in every case except for !-macros. That is, if you see a :-rule or variable declaration, you can substitute the current values for the variables. The !-macros are only parsed when they used in a :-rule. In that case, the actual :-rule is a sort of a union between the :-rule as written and the current value of the !-macro.
 .P
-When tup parses a Tupfile, it makes a single pass through the file, parsing a line at a time. At the end of the Tupfile, all variable, !-macro, and {bin} definitions are discarded. The only lingering effects of parsing a Tupfile are the command nodes and dependencies that now exist in the tup database. Additionally, a .gitignore file may have been created.
+When tup parses a Tupfile, it makes a single pass through the file, parsing a line at a time. At the end of the Tupfile, all variable, !-macro, and {bin} definitions are discarded. The only lingering effects of parsing a Tupfile are the command nodes and dependencies that now exist in the tup database. Additionally, a .gitignore file may have been created if requested by the Tupfile.
 
 .SH "@-VARIABLES"
 @-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used in ,-rules. Special programs may be able to read them too, but they have to have direct knowledge of them. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
@@ -192,11 +192,11 @@ srcs-y += bar.c
 .fi
 In this example, if CONFIG_FOO is set to 'y', then the foo.c file will be included in the input list and therefore compiled. If CONFIG_FOO is unspecified or set to some other value, foo.c will not be included.
 .P
-The @-variables can be used similar to $-variables, with the following distinctions: 1) @-variables are read-only in Tupfiles, and 2) @-variables are in the DAG, and reading from them creates a dependency from the @-variable to the Tupfile. This means that any Tupfile that reads @(FOO) like the above example will be reparsed if the value of CONFIG_FOO in tup.config changes.
+The @-variables can be used similar to $-variables, with the following distinctions: 1) @-variables are read-only in Tupfiles, and 2) @-variables are in the DAG, which means reading from them creates a dependency from the @-variable to the Tupfile. Therefore any Tupfile that reads @(FOO) like the above example will be reparsed if the value of CONFIG_FOO in tup.config changes.
 .P
 The reason for prefixing with "CONFIG_" in the tup.config file is to maintain compatibility with kconfig, which can be used to generate this file.
 .SH "EXAMPLE"
-Parsing a :-rule may be a little confusing. As an example, consider this Tupfile:
+Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf
 
 WARNINGS += -W
@@ -208,7 +208,7 @@ CFLAGS_foo.c = -DFOO
 : *.o |> gcc %f -o %o |> program
 
 .fi
-Tup begins parsing this Tupfile with an empty $-variable set. The first "WARNINGS += -W" line will set the WARNINGS variable to "-W". The second line will append, so WARNINGS will be set to "-W -Wall". The third line references this value, so CFLAGS will now equal "-W -Wall -O2". The fourth line sets a new variable, called CFLAGS_foo.c, and set it to -DFOO". The first rule will create a new node "foo.h" in the database. Note this file won't exist in the filesystem until the command is actually executed after all Tupfiles are parsed.
+Tup begins parsing this Tupfile with an empty $-variable set. The first "WARNINGS += -W" line will set the WARNINGS variable to "-W". The second line will append, so WARNINGS will be set to "-W -Wall". The third line references this value, so CFLAGS will now equal "-W -Wall -O2". The fourth line sets a new variable, called CFLAGS_foo.c, and set it to -DFOO". The first rule will create a new node "foo.h" in the database, along with the corresponding command to create it. Note this file won't exist in the filesystem until the command is actually executed after all Tupfiles are parsed.
 .P
 The foreach :-rule will generate a command to compile each file. First tup will parse the input section, and use the glob operation on the database since a '*' is present. This glob matches foo.c and bar.c. Since it is a foreach rule, tup will run through the rule first using the input "foo.c", and again using the input "bar.c". The output pattern is parsed on each pass, followed by the command string.
 .P
@@ -220,9 +220,9 @@ For more examples with corresponding DAGs, see http://gittup.org/tup/examples.ht
 .SH "OTHER BUILD SYSTEMS"
 Tup is a little bit different from other build systems. It uses a well-defined graph structure that is maintained in a separate database. A set of algorithms to operate on this graph were developed in order to handle cases such as modifying an existing file, creating or deleting files, changing command lines, etc. These algorithms are very efficient - in particular, for the case where a project is already built and one or more existing files are modified, tup is optimal among file-based build systems. For other cases, tup is at least very fast, but optimality has not been proved.
 .P
-The primary reason for the graph database is to allow the tup update algorithm to easily access the information it needs. As a very useful side-effect of the well-defined database structure, tup can determine when a generated file is no longer needed. What this means is there is no clean target. Nor is there a need to do a "fresh checkout" and build your software from scratch. Any number of iterations of updates always produces the same output as it would if everything was built anew.
+The primary reason for the graph database is to allow the tup update algorithm to easily access the information it needs. As a very useful side-effect of the well-defined database structure, tup can determine when a generated file is no longer needed. What this means is there is no clean target. Nor is there a need to do a "fresh checkout" and build your software from scratch. Any number of iterations of updates always produces the same output as it would if everything was built anew. Should you find otherwise, you've likely found a bug in tup (not your Tupfiles), in which case you should notify the mailing list (see CONTACT).
 .P
-For more information, see http://gittup.org/tup/build_system_rules_and_algorithms.pdf
+For more information on the theory behind tup, see http://gittup.org/tup/build_system_rules_and_algorithms.pdf
 .SH "SEE ALSO"
 http://gittup.org/tup
 .SH "CONTACT"
