@@ -190,6 +190,11 @@ int monitor(int argc, char **argv)
 			if(monitor_set_pid(-1) < 0)
 				return -1;
 			tup_lock_close();
+
+			if(fchdir(tup_top_fd()) < 0) {
+				perror("fchdir tup_top");
+				return -1;
+			}
 			if(tup_lock_init() < 0)
 				return -1;
 
