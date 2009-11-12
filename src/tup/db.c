@@ -1159,7 +1159,7 @@ int tup_db_modify_dir(tupid_t dt)
 	LIST_HEAD(subdir_list);
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
-	static char s[] = "insert or replace into modify_list select id from node where dir=? and type!=?";
+	static char s[] = "insert or ignore into modify_list select id from node where dir=? and type!=?";
 
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
@@ -1887,7 +1887,7 @@ int tup_db_add_create_list(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_ADD_CREATE_LIST];
-	static char s[] = "insert or replace into create_list values(?)";
+	static char s[] = "insert or ignore into create_list values(?)";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -1921,7 +1921,7 @@ int tup_db_add_modify_list(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_ADD_MODIFY_LIST];
-	static char s[] = "insert or replace into modify_list values(?)";
+	static char s[] = "insert or ignore into modify_list values(?)";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
 	if(!*stmt) {
@@ -2576,7 +2576,7 @@ int tup_db_modify_cmds_by_input(tupid_t input)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_CMDS_BY_INPUT];
-	static char s[] = "insert or replace into modify_list select to_id from link, node where from_id=? and to_id=id and type=?";
+	static char s[] = "insert or ignore into modify_list select to_id from link, node where from_id=? and to_id=id and type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, input, TUP_NODE_CMD);
 	if(!*stmt) {
@@ -2614,7 +2614,7 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_DEPENDENT_DIR_FLAGS];
-	static char s[] = "insert or replace into create_list select to_id from link, node where from_id=? and to_id=id and type=?";
+	static char s[] = "insert or ignore into create_list select to_id from link, node where from_id=? and to_id=id and type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, tupid, TUP_NODE_DIR);
 	if(!*stmt) {
@@ -4591,7 +4591,7 @@ static int add_ghost_links(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_LINKS];
-	static char s[] = "insert or replace into ghost_list select id from node where id in (select from_id from link where to_id=?) and type=?";
+	static char s[] = "insert or ignore into ghost_list select id from node where id in (select from_id from link where to_id=?) and type=?";
 
 	if(tupid < 0)
 		return 0;
