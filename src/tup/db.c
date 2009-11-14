@@ -71,7 +71,6 @@ enum {
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
 	DB_GET_VAR_ID_ALLOC,
-	DB_GET_VARLEN,
 	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
 	DB_FILES_TO_TREE,
@@ -122,6 +121,7 @@ static int tup_db_var_changed = 0;
 static int num_ghosts = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
+static struct vardb atvardb = { {NULL}, 0};
 
 static int version_check(void);
 static int node_select(tupid_t dt, const char *name, int len,
@@ -3018,32 +3018,33 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 	return 0;
 }
 
-static int get_var_id(tupid_t tupid, char **dest)
+static struct var_entry *get_var_id(struct tup_entry *tent,
+				    const char *var, int varlen)
 {
-	int rc = -1;
+	struct var_entry *ve = NULL;
 	int dbrc;
 	int len;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_VAR_ID];
 	static char s[] = "select value, length(value) from var where var.id=?";
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
 				sqlite3_errmsg(tup_db), s);
-			return -1;
+			return NULL;
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, tent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		return NULL;
 	}
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tupid);
+		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tent->tnode.tupid);
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -3059,37 +3060,56 @@ static int get_var_id(tupid_t tupid, char **dest)
 	if(!value) {
 		goto out_reset;
 	}
-	memcpy(*dest, value, len);
-	*dest += len;
-	rc = 0;
+
+	ve = vardb_set2(&atvardb, var, varlen, value, tent);
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		return NULL;
 	}
 
-	return rc;
+	return ve;
+}
+
+static struct var_entry *get_var(const char *var, int varlen)
+{
+	struct var_entry *ve;
+
+	ve = vardb_get(&atvardb, var, varlen);
+	if(!ve) {
+		struct tup_entry *tent;
+
+		if(node_select(VAR_DT, var, varlen, &tent) < 0)
+			return NULL;
+		if(!tent) {
+			tent = tup_db_node_insert(VAR_DT, var, varlen,
+						  TUP_NODE_GHOST, -1);
+			if(!tent)
+				return NULL;
+		}
+		if(tent->type == TUP_NODE_VAR) {
+			ve = get_var_id(tent, var, varlen);
+		} else {
+			ve = vardb_set2(&atvardb, var, varlen, "", tent);
+		}
+	}
+	return ve;
 }
 
 struct tup_entry *tup_db_get_var(const char *var, int varlen, char **dest)
 {
-	struct tup_entry *tent;
+	struct var_entry *ve;
 
-	if(node_select(VAR_DT, var, varlen, &tent) < 0)
+	ve = get_var(var, varlen);
+	if(!ve)
 		return NULL;
-	if(!tent) {
-		tent = tup_db_node_insert(VAR_DT, var, varlen, TUP_NODE_GHOST, -1);
-		if(!tent)
-			return NULL;
-		return tent;
+
+	if(dest) {
+		memcpy(*dest, ve->value, ve->vallen);
+		*dest += ve->vallen;
 	}
-	if(tent->type == TUP_NODE_GHOST)
-		return tent;
-	if(dest)
-		if(get_var_id(tent->tnode.tupid, dest) < 0)
-			return NULL;
-	return tent;
+	return ve->tent;
 }
 
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
@@ -3153,51 +3173,12 @@ out_reset:
 
 int tup_db_get_varlen(const char *var, int varlen)
 {
-	int rc = -1;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_GET_VARLEN];
-	static char s[] = "select length(value) from var, node where node.dir=? and node.name=? and node.id=var.id";
+	struct var_entry *ve;
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i, '%.*s'][0m\n", s, VAR_DT, varlen, var);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+	ve = get_var(var, varlen);
+	if(!ve)
 		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, var, varlen, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		/* Non-existent variable has zero length. This will be made
-		 * into a ghost node.
-		 */
-		rc = 0;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		goto out_reset;
-	}
-
-	rc = sqlite3_column_int(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return rc;
+	return ve->vallen;
 }
 
 tupid_t tup_db_write_var(const char *var, int varlen, int fd)
@@ -3400,13 +3381,13 @@ static int remove_var(struct var_entry *ve)
 {
 	tup_db_var_changed++;
 
-	if(var_flag_dirs(ve->tupid) < 0)
+	if(var_flag_dirs(ve->tent->tnode.tupid) < 0)
 		return -1;
-	if(var_flag_cmds(ve->tupid) < 0)
+	if(var_flag_cmds(ve->tent->tnode.tupid) < 0)
 		return -1;
-	if(delete_var_entry(ve->tupid) < 0)
+	if(delete_var_entry(ve->tent->tnode.tupid) < 0)
 		return -1;
-	if(delete_name_file(ve->tupid) < 0)
+	if(delete_name_file(ve->tent->tnode.tupid) < 0)
 		return -1;
 	return 0;
 }
@@ -3427,18 +3408,18 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 {
 	struct tup_entry *tent;
 
-	if(vea->type == TUP_NODE_VAR && vea->vallen == veb->vallen &&
+	if(vea->tent->type == TUP_NODE_VAR && vea->vallen == veb->vallen &&
 	   strcmp(vea->value, veb->value) == 0) {
 		return 0;
 	}
 	tup_db_var_changed++;
-	if(tup_entry_add(vea->tupid, &tent) < 0)
+	if(tup_entry_add(vea->tent->tnode.tupid, &tent) < 0)
 		return -1;
-	if(tup_db_add_create_list(vea->tupid) < 0)
+	if(tup_db_add_create_list(vea->tent->tnode.tupid) < 0)
 		return -1;
-	if(tup_db_add_modify_list(vea->tupid) < 0)
+	if(tup_db_add_modify_list(vea->tent->tnode.tupid) < 0)
 		return -1;
-	return tup_db_set_var(vea->tupid, veb->value);
+	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
 int tup_db_read_vars(tupid_t dt, const char *file)
@@ -3467,6 +3448,12 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 		/* No tup.config == empty file_tree */
 		rc = 0;
 	} else {
+		/* TODO: Get this straight into atvardb instead? The trick will
+		 * be mapping the atvardb var_entries to tup_entrys, since it
+		 * will map the new variables (from the file) to the old
+		 * tup_entrys (in the database), and will need to updated wrt
+		 * ghost nodes and such.
+		 */
 		rc = get_file_var_tree(&file_tree, fd);
 		close(fd);
 	}
@@ -4851,6 +4838,7 @@ static int get_db_var_tree(struct vardb *vdb)
 		const char *var;
 		const char *value;
 		int type;
+		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -4866,9 +4854,9 @@ static int get_db_var_tree(struct vardb *vdb)
 		var = (const char*)sqlite3_column_text(*stmt, 1);
 		value = (const char*)sqlite3_column_text(*stmt, 2);
 		type = sqlite3_column_int(*stmt, 3);
-		if(vardb_set(vdb, var, value, type, tupid) < 0)
+		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1, &tent) <0)
 			return -1;
-		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1, NULL) <0)
+		if(vardb_set(vdb, var, value, tent) < 0)
 			return -1;
 	} while(1);
 
@@ -4912,7 +4900,7 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 					return -1;
 				}
 				*space = 0;
-				if(vardb_set(vdb, p+9, "n", TUP_NODE_VAR, -1) < 0)
+				if(vardb_set(vdb, p+9, "n", NULL) < 0)
 					return -1;
 			}
 		} else  {
@@ -4940,7 +4928,7 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 				value = eq+1;
 			}
 			*eq = 0;
-			if(vardb_set(vdb, p+7, value, TUP_NODE_VAR, -1) < 0)
+			if(vardb_set(vdb, p+7, value, NULL) < 0)
 				return -1;
 		}
 

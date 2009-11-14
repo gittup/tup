@@ -26,13 +26,21 @@ int vardb_close(struct vardb *v)
 	return 0;
 }
 
-int vardb_set(struct vardb *v, const char *var, const char *value, int type,
-	      tupid_t tupid)
+int vardb_set(struct vardb *v, const char *var, const char *value,
+	      struct tup_entry *tent)
+{
+	if(vardb_set2(v, var, -1, value, tent) == NULL)
+		return -1;
+	return 0;
+}
+
+struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
+			     const char *value, struct tup_entry *tent)
 {
 	struct string_tree *st;
 	struct var_entry *ve;
 
-	st = string_tree_search(&v->tree, var, -1);
+	st = string_tree_search(&v->tree, var, varlen);
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
 		free(ve->value);
@@ -40,42 +48,43 @@ int vardb_set(struct vardb *v, const char *var, const char *value, int type,
 		ve->value = malloc(ve->vallen + 1);
 		if(!ve->value) {
 			perror("malloc");
-			return -1;
+			return NULL;
 		}
 		strcpy(ve->value, value);
-		ve->type = type;
-		ve->tupid = tupid;
-		return 0;
+		ve->tent = tent;
 	} else {
 		ve = malloc(sizeof *ve);
 		if(!ve) {
 			perror("malloc");
-			return -1;
+			return NULL;
 		}
-		ve->var.len = strlen(var);
+
+		if(varlen == -1)
+			varlen = strlen(var);
+		ve->var.len = varlen;
 		ve->var.s = malloc(ve->var.len + 1);
 		if(!ve->var.s) {
 			perror("malloc");
-			return -1;
+			return NULL;
 		}
-		strcpy(ve->var.s, var);
+		memcpy(ve->var.s, var, varlen);
+		ve->var.s[varlen] = 0;
 		ve->vallen = strlen(value);
 		ve->value = malloc(ve->vallen + 1);
 		if(!ve->value) {
 			perror("malloc");
-			return -1;
+			return NULL;
 		}
 		strcpy(ve->value, value);
 		if(string_tree_insert(&v->tree, &ve->var) < 0) {
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
-			return -1;
+			return NULL;
 		}
-		ve->type = type;
-		ve->tupid = tupid;
+		ve->tent = tent;
 
 		v->count++;
-		return 0;
 	}
+	return ve;
 }
 
 int vardb_append(struct vardb *v, const char *var, const char *value)
@@ -103,7 +112,7 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		ve->vallen += vallen + 1;
 		return 0;
 	} else {
-		return vardb_set(v, var, value, 0, -1);
+		return vardb_set(v, var, value, NULL);
 	}
 }
 
@@ -135,14 +144,14 @@ int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest)
 	return 0;
 }
 
-const char *vardb_get(struct vardb *v, const char *var)
+struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen)
 {
 	struct string_tree *st;
 
-	st = string_tree_search(&v->tree, var, -1);
+	st = string_tree_search(&v->tree, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
-		return ve->value;
+		return ve;
 	}
 	return NULL;
 }

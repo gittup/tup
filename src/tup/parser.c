@@ -442,7 +442,7 @@ found_paren:
 			if(append)
 				rc = vardb_append(&tf->vdb, var, value);
 			else
-				rc = vardb_set(&tf->vdb, var, value, 0, -1);
+				rc = vardb_set(&tf->vdb, var, value, NULL);
 			if(rc < 0) {
 				fprintf(stderr, "Error setting variable '%s'\n", var);
 				return -1;
