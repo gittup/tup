@@ -1,4 +1,9 @@
 FD_CLOEXEC flag on file descriptors?
+ - also close stdin on subprocesses?
+
+fix tup_entry_get list not being released in file.c if tup_db_check_actual_inputs fails
+
+update node set sym=-1 where id=blah executed even when sym is already -1?
 
 can we have the monitor kill the updater if a file modification is detected? or restart it?
 
@@ -79,6 +84,21 @@ sqlite style graphs for parser
 indent dependent dirs while parsing?
 
 implement */*.c or maybe **/*.c as a recursive input?
+
+get rid of tmp_list
+
+add test: tup init in /tmp? fix for 34a61c3e1f
+add test: gcc var in be8bb98e407
+
+add to ghost list from parser, then fail - ghost is still reclaimed?
+
+dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
+
+fix t2058 TODO
+
+cache flags and write out the diff before a commit? eg: no need to add a command to modify (in order to pick up where we left off), then remove it a second later when the command executes.
+
+still need *.o |> cmd |> built-in.o to check for output file being removed from input, when built-in.o already exists? probably shouldn't be necessary with delete list
 
 html:
   proof: no clean target
