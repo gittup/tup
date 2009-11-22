@@ -1,9 +1,18 @@
+<html>
+<head>
+<title>tup: The Updater</title>
+<link rel="stylesheet" type="text/css" href="tup.css" />
+</head>
+<body>
+
 <p>Get tup:</p>
 <pre>
-git clone http://gittup.org/tup.git
+$ git clone http://gittup.org/tup.git
+$ cd tup
+tup$ sh bootstrap.sh
+tup$ man ./tup.1
 </pre>
 
-<a href="command_line.html">Command Line</a><br>
 <a href="building_tup.html">Building tup</a><br>
 <a href="getting_started.html">Getting Started</a><br>
 <a href="examples.html">Examples</a><br>
@@ -33,7 +42,7 @@ git clone http://gittup.org/tup.git
 
 <h2>How is it so awesome?</h2>
 <p>In a typical build system, the dependency arrows go down. Although this is the way they would naturally go due to gravity, it is unfortunately also where the enemy's gate is. This makes it very inefficient and unfriendly. In tup, the arrows go up. This is obviously true because it rhymes. See how the dependencies differ in make and tup:</p>
-<table border=1><tr><td align=center><b>Make</b></td><td align=center><b>tup</b></td></tr>
+<table border=0><tr><td align=center><b>Make</b></td><td align=center><b>tup</b></td></tr>
    <tr>
      <td><img src="make_deps.png"></td>
      <td><img src="tup_deps.png"></td>
@@ -44,3 +53,6 @@ git clone http://gittup.org/tup.git
 
 <h2>How do I (person reading this) give you (marf) millions of dollars ($$$) to buy the awesomeness (tup)?</h2>
 <p>Tup is currently released under the same conditions as <a href="http://www.erestar.net/games/marfitude/">marfitude</a>. So, the source code is free to download and use under the conditions of the GPL. Also, you are encouraged to donate some of your millions or your time to some place worthy, rather than to me, since I am but a pale ghost of my former self, and may be hit by a bus at anytime. Just think of all the time you saved with tup, and how much that is worth to you, and maybe do something about it.</p>
+
+</body>
+</html>
