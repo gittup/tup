@@ -3,6 +3,10 @@ FD_CLOEXEC flag on file descriptors?
 
 fix tup_entry_get list not being released in file.c if tup_db_check_actual_inputs fails
 
+find a way to avoid committing after the parsing/delete stage
+
+let partial parsings commit rather than waiting for all directories to finish successfully
+
 update node set sym=-1 where id=blah executed even when sym is already -1?
 
 can we have the monitor kill the updater if a file modification is detected? or restart it?
