@@ -1,0 +1,70 @@
+make: initial
+real 197.58
+user 107.62
+sys 79.35
+make: 0.c touched
+real 6.27
+user 5.41
+sys 0.86
+real 6.26
+user 5.37
+sys 0.88
+real 6.28
+user 5.39
+sys 0.88
+make: 0.h touched
+real 6.40
+user 5.47
+sys 0.92
+real 6.44
+user 5.51
+sys 0.92
+real 6.44
+user 5.48
+sys 0.95
+make: nothing
+real 6.23
+user 5.35
+sys 0.88
+real 6.26
+user 5.34
+sys 0.92
+real 6.26
+user 5.31
+sys 0.95
+tup: initial
+Initialized in 0.819645 seconds.
+real 253.44
+user 128.52
+sys 106.95
+tup: 0.c touched
+real 0.06
+user 0.03
+sys 0.02
+real 0.06
+user 0.03
+sys 0.02
+real 0.06
+user 0.03
+sys 0.02
+tup: 0.h touched
+real 0.22
+user 0.12
+sys 0.09
+real 0.22
+user 0.12
+sys 0.07
+real 0.22
+user 0.11
+sys 0.09
+tup: nothing
+real 0.00
+user 0.00
+sys 0.00
+real 0.00
+user 0.00
+sys 0.00
+real 0.00
+user 0.00
+sys 0.00
+Shutting down monitor.
