@@ -2,7 +2,7 @@
 rm -rf .run_test
 mkdir .run_test
 cd .run_test
-niter=10
+niter=3
 ../gen-test-case.pl "$@" || exit 1
 sync
 cd tmake
@@ -32,7 +32,7 @@ done
 
 cd ../ttup
 find . -type f | while read i; do cat $i > /dev/null; done
-tup init > /dev/null
+tup init --force > /dev/null
 echo "tup: initial"
 tup monitor
 time -p tup upd > /dev/null

@@ -1,8 +1,14 @@
 #! /usr/bin/perl
-&gen_data("initial", 2, 100, 1);
-&gen_data("c_file", 6, 104, 10);
-&gen_data("h_file", 37, 135, 10);
-&gen_data("nothing", 68, 166, 10);
+$num = 3;
+$cur = 2;
+$tup = 2 + ($num * 3 * 3) + 3 + 3;
+&gen_data("initial", $cur, $cur + $tup, 1);
+$cur += 4;
+&gen_data("c_file", $cur, $cur + $tup, $num);
+$cur += $num * 3 + 1;
+&gen_data("h_file", $cur, $cur + $tup, $num);
+$cur += $num * 3 + 1;
+&gen_data("nothing", $cur, $cur + $tup, $num);
 
 sub gen_data
 {
