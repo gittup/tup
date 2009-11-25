@@ -1,4 +1,5 @@
 .gitignore
 ifeq (@(TUP_GRAPHS),y)
 : foreach *.dat |> ^ PLOT %f^ ../../test/make_v_tup/plot %f > %o |> %B.png
+: foreach *.dot |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |> %B.png
 endif
