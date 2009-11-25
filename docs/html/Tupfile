@@ -1,4 +1,4 @@
 .gitignore
 ifeq (@(TUP_GRAPHS),y)
-: foreach *.dat |> ^ PLOT %f^ ../../test/make_v_tup/plot %f > %o |> make_vs_tup-%B.png
+: foreach *.dat |> ^ PLOT %f^ ../../test/make_v_tup/plot %f > %o |> %B.png
 endif
