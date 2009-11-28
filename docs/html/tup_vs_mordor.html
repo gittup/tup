@@ -8,6 +8,6 @@
     <td><img src="tup_vs_eye-h_file.png"></td>
   </tr>
 </table>
-<p>As you can see, tup is approximately a constant factor increase in time over an impossible to achieve perfect solution. In all cases here, tup adds about 40-50% overhead in order to do dependency management. This number is wildly inaccurate for any real purposes, since normally you will be compiling C files with more than 2 lines in them. In those cases, the compile time will dwarf the amount of time that tup uses to lookup and handle dependencies.</p>
+<p>As you can see, tup is approximately a constant factor increase in time over an impossible to achieve perfect solution. In all cases here, tup adds about 13-22% overhead in order to do dependency management. This number is wildly inaccurate for any real purposes, since normally you will be compiling C files with more than 2 lines in them. In those cases, the compile time will dwarf the amount of time that tup uses to lookup and handle dependencies.</p>
 <p>I suppose I could compare tup to the Eye for an initial build too, but it already took me long enough to setup these two cases. Hobbits have made the journey to Mordor in less time[1] than it takes me to code up a crappy oracle machine.</p>
 <p>[1] Maximum respect to team foosball co-champion Andy B. for that gem.</p>
