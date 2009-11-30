@@ -33,11 +33,23 @@ Starts the inotify-based file monitor. The monitor must scan the filesystem once
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
 .TP
 .B config [option value]
-Displays or sets the current tup options. With no further arguments, all of the options are displayed. The options can be set by specifying the option name and a new value. For example, "tup config db_sync 0" would turn off the database disk synchronization.
+Displays or sets the current tup options. With no further arguments, all of the options are displayed. The options can be set by specifying the option name and a new value. For example, 'tup config db_sync 0' would turn off the database disk synchronization. The configuration options are stored in the database in the 'config' table, so accessing these options cannot be done at the same time as an update.
 .RS
 .TP
 .B db_sync (default '1')
 Set to '1' if the SQLite synchronous feature is enabled. When enabled, the database is properly synchronized to the disk in a way that it is always consistent. When disabled, it will run faster since writes are left in the disk cache for a time before being written out. However, if your computer crashes before everything is written out, the tup database may become corrupted. See http://www.sqlite.org/pragma.html for more information.
+.TP
+.B autoupdate (default '0')
+Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
+.TP
+.B num_jobs (default '1')
+Set to the maximum number of commands tup will run simultaneously. The default is '1', which means commands will be executed serially. If this number is greater than 1, commands will be run in parallel only if they are independent. See also the -j option.
+.TP
+.B keep_going (default '0')
+Set to '1' to keep building as much as possible even if errors are encountered. Anything dependent on a failed command will not be executed, but other independent commands will be. The default is '0', which will cause tup to stop after the first failed command. See also the -k option.
+.TP
+.B db_version (internal use only!)
+This is used internally to update the database in case the schema changes. If a newer version of tup is used on an old database, the schema will be automatically updated and db_version will be set to the new version. If an older version of tup is used with a newer database, you will get an error message.
 .RE
 .TP
 .B g
