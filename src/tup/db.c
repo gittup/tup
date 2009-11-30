@@ -206,7 +206,6 @@ int tup_db_create(int db_sync)
 		"create table modify_list (id integer primary key not null)",
 		"create index node_sym_index on node(sym)",
 		"create index link_index2 on link(to_id)",
-		"insert into config values('show_progress', 1)",
 		"insert into config values('keep_going', 0)",
 		"insert into config values('db_sync', 1)",
 		"insert into config values('db_version', 0)",

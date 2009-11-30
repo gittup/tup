@@ -46,7 +46,6 @@ static void sighandler(int sig);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
 
-static int do_show_progress;
 static int do_keep_going;
 static int num_jobs;
 static int vardict_fd;
@@ -95,17 +94,12 @@ int updater(int argc, char **argv, int phase)
 	int x;
 	int do_scan = 1;
 
-	do_show_progress = tup_db_config_get_int("show_progress");
 	do_keep_going = tup_db_config_get_int("keep_going");
 	num_jobs = tup_db_config_get_int("num_jobs");
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
-		} else if(strcmp(argv[x], "--show-progress") == 0) {
-			do_show_progress = 1;
-		} else if(strcmp(argv[x], "--no-show-progress") == 0) {
-			do_show_progress = 0;
 		} else if(strcmp(argv[x], "--keep-going") == 0 ||
 			  strcmp(argv[x], "-k") == 0) {
 			do_keep_going = 1;
@@ -1081,23 +1075,21 @@ static void tup_main_progress(const char *s)
 {
 	static int cur_phase = 0;
 	const int NUM_PHASES = 5;
-	if(do_show_progress) {
-		const char *tup[NUM_PHASES+1] = {
-			" tup ",
-			"[07m [0mtup ",
-			"[07m t[0mup ",
-			"[07m tu[0mp ",
-			"[07m tup[0m ",
-			"[07m tup [0m",
-		};
-		printf("[%s] %s", tup[cur_phase], s);
-		cur_phase++;
-	}
+	const char *tup[NUM_PHASES+1] = {
+		" tup ",
+		"[07m [0mtup ",
+		"[07m t[0mup ",
+		"[07m tu[0mp ",
+		"[07m tup[0m ",
+		"[07m tup [0m",
+	};
+	printf("[%s] %s", tup[cur_phase], s);
+	cur_phase++;
 }
 
 static void show_progress(int sum, int tot, struct node *n)
 {
-	if(do_show_progress && tot) {
+	if(tot) {
 		const int max = 11;
 		const char *color = "";
 		char *name;
