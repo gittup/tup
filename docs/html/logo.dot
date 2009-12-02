@@ -1,0 +1,8 @@
+digraph g {
+	bgcolor="#efefef";
+	tup [style="filled" fillcolor="#ffffff"];
+	the [shape="rectangle" style="filled" fillcolor="#ffffff"];
+	updater [style="filled" fillcolor="#ffffff"];
+	tup -> the [dir=back];
+	the -> updater [dir=back];
+};

@@ -1,5 +1,12 @@
 .gitignore
-ifeq (@(TUP_GRAPHS),y)
-: foreach *.dat |> ^ PLOT %f^ ../../test/make_v_tup/plot %f > %o |> %B.png
-: foreach *.dot |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |> %B.png
+ifeq (@(TUP_WWW),y)
+
+pages += index.html
+pages += getting_started.html
+pages += examples.html
+pages += make_vs_tup.html
+pages += tup_vs_mordor.html
+: |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
+: foreach $(pages) | menu.inc |> ^ GEN %f^ ./gen_page.sh %f > %o |> %f.gen
+
 endif

@@ -1,0 +1,79 @@
+pre {
+	border-style: dashed;
+	border-width: 1;
+	margin-left: 2em;
+	margin-right: 2em;
+	padding: 0px 10px 0px 10px;
+	background-color: #ffffdd;
+	font-family: Fixed;
+}
+
+div.img {
+	margin:2px;
+	border-style: double;
+	height:auto;
+	width:auto;
+	float:left;
+	text-align:center;
+}
+
+div.img img {
+	display:inline;
+	margin:3px;
+	border:1px solid #ffffff;
+}
+
+div.desc {
+	text-align:center;
+	font-weight:normal;
+	margin:2px;
+}
+
+img {
+	border-style: double;
+}
+em {
+	background-color: #ffffdd;
+}
+sup {
+	color: #0000ff;
+}
+
+/* Thanks http://ago.tanfa.co.uk/css/examples/menu/vs1.html */
+#menu a, #menu h2 {
+	font: bold 11px/16px arial, helvetica, sans-serif;
+	display: block;
+	border-width: 1px;
+	border-style: solid;
+	border-color: #ccc #888 #555 #bbb;
+	margin: 0;
+	padding: 2px 3px;
+	width: 95px;
+}
+
+#menu h2 {
+	color: #fff;
+	background: #000;
+	text-transform: uppercase;
+}
+
+#menu img {
+	border-style: none;
+}
+
+#menu a {
+	color: #000;
+	background: #efefef;
+	text-decoration: none;
+}
+
+#menu a:hover {
+	color: #a00;
+	background: #fff;
+}
+
+#menu ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
