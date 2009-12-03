@@ -9,11 +9,11 @@ pre {
 }
 
 div.img {
-	margin:2px;
+	margin:5px;
 	border-style: double;
 	height:auto;
 	width:auto;
-	float:left;
+	float:right;
 	text-align:center;
 }
 
