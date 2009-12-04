@@ -1,11 +1,39 @@
+/* Used for commands */
 pre {
 	border-style: dashed;
 	border-width: 1;
 	margin-left: 2em;
 	margin-right: 2em;
-	padding: 0px 10px 0px 10px;
+	padding: 5px 10px 5px 10px;
 	background-color: #ffffdd;
+	font-family: 'Lucida Console';
+	font-size: 15px;
+}
+
+span.prompt {
+	color: #00aaaa;
+}
+
+span.filename {
+	border-style: solid;
+	border-width: 1;
+	margin-left: 0em;
+	margin-right: 0em;
+	padding: 0px 10px 0px 10px;
+	background-color: #99ff99;
 	font-family: Fixed;
+}
+
+div.code {
+	white-space: pre;
+	border-style: dashed;
+	border-width: 1;
+	margin-left: 2em;
+	margin-right: 2em;
+	padding: 5px 10px 5px 10px;
+	background-color: #eeffff;
+	font-family: 'Lucida Console';
+	font-size: 15px;
 }
 
 div.img {
@@ -39,16 +67,30 @@ sup {
 	color: #0000ff;
 }
 
+/* Used for filenames */
+i {
+	font-style: normal;
+	background-color: #ddddff;
+}
+
+/* Used for keywords/symbols */
+b {
+	font-style: normal;
+	background-color: #bbbbbb;
+	color: #ffff00;
+	padding: 2px;
+}
+
 /* Thanks http://ago.tanfa.co.uk/css/examples/menu/vs1.html */
 #menu a, #menu h2 {
-	font: bold 11px/16px arial, helvetica, sans-serif;
+	font: bold 12px/16px arial, helvetica, sans-serif;
 	display: block;
 	border-width: 1px;
 	border-style: solid;
 	border-color: #ccc #888 #555 #bbb;
 	margin: 0;
 	padding: 2px 3px;
-	width: 95px;
+	width: 98px;
 }
 
 #menu h2 {
@@ -68,7 +110,7 @@ sup {
 }
 
 #menu a:hover {
-	color: #a00;
+	color: #0aa;
 	background: #fff;
 }
 

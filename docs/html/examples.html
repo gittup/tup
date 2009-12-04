@@ -1,15 +1,78 @@
-<p>Let's say you want to compile a bunch of C files in a directory. Since you would want to issue a separate compiler command for each C file, you would use the foreach directive:</p>
+<h3>A First Tupfile</h3>
+<p>In this example, we'll create a small C program using tup. The program itself will be completely useless, but hopefully you can use your imagination to see how you might use tup in a real project. Let's start with a typical "Hello, world!" in C. Since we're using tup, you'll want to run <em>tup init</em> at the top of the project, which in this example will be the tup_test directory.</p>
 <pre>
-: foreach *.c |&gt; gcc -c %f -o %o |&gt; %B.o
+<span class="prompt">$</span> mkdir tup_test
+<span class="prompt">$</span> cd tup_test
+<span class="prompt">$</span> tup init
+<span class="prompt">$</span> EDITOR hello.c
+</pre>
+<span class="filename">hello.c</span>
+<div class="code">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf("Hello, world!\n");
+	return 0;
+}
+</div>
+
+<p>Here's what we have so far:</p>
+<pre>
+<span class="prompt">$</span> ls -a
+.  ..  .tup  hello.c
+</pre>
+<p>The <i>.tup</i> directory contains the dependency database, and some lock files. You shouldn't mess with files in this directory manually, unless you want to play around. If there was a warranty for tup, you would lose it by doing that.</p>
+
+<p>If you were going to compile <i>hello.c</i> manually, you might run something like <em>gcc hello.c -o hello</em>. Instead of doing that, however, we'll put that exact string in a Tupfile (along with some additional annotations).</p>
+
+<span class="filename">Tupfile</span>
+<div class="code">: hello.c |&gt; gcc hello.c -o hello |&gt; hello
+</div>
+
+<p>This line we typed is known as a ":-rule", since the line begins with a <b>:</b>. You can see the gcc command in between the <b>|&gt;</b> symbols. The file listed on the left side is the input, and the file listed on the outside is the output. Ignore the redundancy for now -- we'll fix that later.</p>
+
+<p>Now that you have a Tupfile to tell tup what to do, you can run <em>tup upd</em> to start the build process. If all goes well, you should see something like the following, only with more colors and cool progress bars:</p>
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/1    ] gcc hello.c -o hello
+[    1/1    ]
+[ tup ] Updated.
+<span class="prompt">$</span> ls
+Tupfile  hello  hello.c
+<span class="prompt">$</span> ./hello
+Hello, world!
 </pre>
 
-<p>Assuming your monitor is running, you could then run 'tup upd' and the object files would be built. If you touch a C file and run 'tup upd', just that C file should be built again. You could also comment out the rule by putting a pound sign '#' in front of the rule, then save the Tupfile and update again. Since the rule is commented out, the object files will be deleted. Un-comment the rule and update, and the files will be re-created.</p>
-
-<p>You can link the object files with another rule. Now the Tupfile should look like this:</p>
+<p>You can try to run <em>tup upd</em> again to verify that the file isn't compiled unnecessarily (since it hasn't been changed). Then you can touch the file and see that it *is* rebuilt:</p>
 <pre>
-: foreach *.c |&gt; gcc -c %f -o %o |&gt; %B.o
-: *.o |&gt; gcc %f -o %o |&gt; hello_world
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.000s
+[ tup ] No tup.config changes.
+[ tup ] No Tupfiles to parse.
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+<span class="prompt">$</span> touch hello.c
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] No Tupfiles to parse.
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/1    ] gcc hello.c -o hello
+[    1/1    ]
+[ tup ] Updated.
 </pre>
+
+<hr>
+<h3>A Program Grows</h3>
+<p></p>
+
 <p>Note that we don't use the foreach keyword for the second rule, because we want all the object files to be listed where the %f is. The %o is replaced with 'hello_world' since that is what we set the output file to. One thing that may be confusing is the *.o doesn't actually do a shell glob on the filesystem. This is because when the file is parsed, the object files don't actually exist yet. Instead, the *.o does a wildcard in the tup database. The first rule will actually create an object file in the tup database (not the filesystem) when the rule is parsed. So, the rules have to go in this order, otherwise *.o won't match anything.</p>
-
-<p>That's pretty much it for now. Just put a Tupfile in a directory where you want files to be created, and write some rules. I'm sure you'll run into lots of problems, so just let me know.</p>
