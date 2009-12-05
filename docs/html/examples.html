@@ -63,13 +63,12 @@ Hello, world!
 <span class="prompt">$</span> EDITOR hello.c
 </pre>
 
-<span class="fileheader">hello.c</span>
+<span class="modfileheader">hello.c</span>
 <code>#include &lt;stdio.h&gt;
 
 int main(void)
 {
-	printf(<span class="removed">"Hello, world!\n"</span>);
-	printf(<span class="added">"Hi, everybody!\n"</span>);
+	printf(<span class="removed">"Hello, world!\n"</span><span class="added">"Hi, everybody!\n"</span>);
 	return 0;
 }
 </code>
@@ -90,7 +89,7 @@ Hi, everybody!
 
 <p>Finally, we will try to change the gcc command string itself. In this case, we won't change the <span class="filename">hello.c</span> file, only the <span class="filename">Tupfile</span>.</p>
 
-<span class="fileheader">Tupfile</span>
+<span class="modfileheader">Tupfile</span>
 <code>: hello.c |&gt; gcc <span class="added">-Wall </span>hello.c -o hello |&gt; hello
 </code>
 
@@ -112,10 +111,249 @@ Hi, everybody!
 
 <p>If you only ever want one C file, you can continue modifying this example as long as you like. Just edit the Tupfile when you want to change how the program is built, and edit the C file when you want to change the program itself.</p>
 
-<p>Read on for other examples to see how to build more than one file, and make the Tupfiles more manageable.</p>
+<p>Read on for other examples to see how to build more than one file, and make the Tupfiles less redundant and more manageable.</p>
 
 <hr>
 <h3>A Program Grows</h3>
-<p>Continuing from the previous example, we will build on the Hello World program to add a new C file.</p>
+<p>Continuing from the previous example, we will build on the Hello World program by adding a new C file. Like any useless program example, this file will provide a function to square a number.</p>
 
-<p>Note that we don't use the foreach keyword for the second rule, because we want all the object files to be listed where the %f is. The %o is replaced with 'hello_world' since that is what we set the output file to. One thing that may be confusing is the *.o doesn't actually do a shell glob on the filesystem. This is because when the file is parsed, the object files don't actually exist yet. Instead, the *.o does a wildcard in the tup database. The first rule will actually create an object file in the tup database (not the filesystem) when the rule is parsed. So, the rules have to go in this order, otherwise *.o won't match anything.</p>
+<span class="fileheader">square.c</span>
+<code>#include "square.h"
+
+int square(int x)
+{
+	return x * x;
+}
+</code>
+
+<span class="fileheader">square.h</span>
+<code>int square(int x);
+</code>
+
+<span class="modfileheader">hello.c</span>
+<code>#include &lt;stdio.h&gt;
+<span class="added">#include "square.h"</span>
+
+int main(void)
+{
+	printf("Hi, everybody!\n");
+	<span class="added">printf("Five squared is: %i\n", square(5));</span>
+	return 0;
+}
+</code>
+
+<p>Now we can try to build the new program:</p>
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/1    ] gcc -Wall hello.c -o hello
+/tmp/ccYlogLJ.o: In function `main':
+hello.c:(.text+0x25): undefined reference to `square'
+collect2: ld returned 1 exit status
+ *** Command 6 failed with return value 1: gcc -Wall hello.c -o hello
+</pre>
+
+<p>Oops, that obviously didn't work, since we forgot to actually compile and link the new C file. Let's do that now.</p>
+<p>Consider how you might build this program with the shell, keeping scalability in mind. As a first step, you would probably compile each C file individually with <span class="cmd">gcc -Wall -c hello.c -o hello.o</span> and <span class="cmd">gcc -Wall -c square.c -o square.o</span>. Similar to before, we will type these compilation commands exactly as is in the Tupfile, and add the input/output annotations. Note that we change the first :-rule to use -c and output to <span class="filename">hello.o</span> instead of <span class="filename">hello</span>. After you've made the changes, run <span class="cmd">tup upd</span>.</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc -Wall <span class="added">-c </span>hello.c -o hello<span class="added">.o</span> |&gt; hello<span class="added">.o</span>
+<span class="added">: square.c |&gt; gcc -Wall -c square.c -o square.o |&gt; square.o</span>
+</code>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] Deleting files...
+[    0/1    ] hello
+[    1/1    ]
+[ tup ] Executing Commands...
+[    0/2    ] gcc -Wall -c hello.c -o hello.o
+[    1/2    ] gcc -Wall -c square.c -o square.o
+[    2/2    ]
+[ tup ] Updated.
+<span class="prompt">$</span> ls
+Tupfile  hello.c  hello.o  square.c  square.h  square.o
+<span class="prompt">$</span> ./hello
+-bash: ./hello: No such file or directory
+</pre>
+
+<p>Since we changed the first rule to compile <span class="filename">hello.o</span> instead of <span class="filename">hello</span>, the main executable is no longer generated. Tup sees this, and removes <span class="filename">hello</span> from the filesystem. In this way, tup always keeps your build as if you had just built everything from scratch. This is why you don't ever have to write or manually invoke a "clean" target, like you do in most other build systems.</p>
+
+<p>To finish the Tupfile, let's go ahead and add the linker rule:</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc -Wall -c hello.c -o hello.o |&gt; hello.o
+: square.c |&gt; gcc -Wall -c square.c -o square.o |&gt; square.o
+<span class="added">: hello.o square.o |&gt; gcc hello.o square.o -o hello |&gt; hello</span>
+</code>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/1    ] gcc hello.o square.o -o hello
+[    1/1    ]
+[ tup ] Updated.
+<span class="prompt">$</span> ./hello
+Hi, everybody!
+Five squared is: 25
+</pre>
+
+<p>One thing you may have noticed is that both C files include the <span class="filename">square.h</span> header, but we haven't specified it as an input to the command. You may be surprised to see that we can still change the header and cause both files to recompile to pick up the change:</p>
+
+<span class="modfileheader">square.h</span>
+<code>int square(int x);
+<span class="added">#define SECRET 42</span>
+</code>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] No Tupfiles to parse.
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/3    ] gcc -Wall -c hello.c -o hello.o
+[    1/3    ] gcc -Wall -c square.c -o square.o
+[    2/3    ] gcc hello.o square.o -o hello
+[    3/3    ]
+[ tup ] Updated.
+</pre>
+
+<p>The trick is that tup instruments all commands that it executes in order to determine what files were actually read from (the inputs) and written to (the outputs). When the C preprocessor opens the header file, tup will notice that and automatically add the dependency. In fact, we don't have to specify the C input file either, but you can leave that in there for now since we'll use it in the next section.</p>
+
+<hr>
+<h3>A Simpler Tupfile</h3>
+<p>Let's take a closer look at the Tupfile from before:</p>
+
+<span class="samefileheader">Tupfile</span>
+<code>: <font style="background-color: #ffbbff">hello.c</font> |&gt; gcc -Wall -c <font style="background-color: #ffbbff">hello.c</font> -o <font style="background-color: #ffffbb">hello.o</font> |&gt; <font style="background-color: #ffffbb">hello.o</font>
+: square.c |&gt; gcc -Wall -c square.c -o square.o |&gt; square.o
+: hello.o square.o |&gt; gcc hello.o square.o -o hello |&gt; hello
+</code>
+
+<p>The first :-rule has been highlighted to show the redundant information. It's pretty annoying anytime you have to type something twice, so we'll get rid of the duplication. To do that, we'll make use of tup's %-flags. The <span class="keyword">%f</span> flag can be used to represent the inputs, while the <span class="keyword">%o</span> flag can be used to represent the outputs. Let's change each of the rules to use these new flags:</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc -Wall -c <span class="removed">hello.c</span><span class="added">%f</span> -o <span class="removed">hello.o</span><span class="added">%o</span> |&gt; hello.o
+: square.c |&gt; gcc -Wall -c <span class="removed">square.c</span><span class="added">%f</span> -o <span class="removed">square.o</span><span class="added">%o</span> |&gt; square.o
+: hello.o square.o |&gt; gcc <span class="removed">hello.o square.o</span><span class="added">%f</span> -o <span class="removed">hello</span><span class="added">%o</span> |&gt; hello
+</code>
+
+<p>You should now have:</p>
+
+<span class="samefileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc -Wall -c %f -o %o |&gt; hello.o
+: square.c |&gt; gcc -Wall -c %f -o %o |&gt; square.o
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>An easy way to see that your Tupfile refactoring didn't cause any functional changes is to run <span class="cmd">tup upd</span>. If you see commands being executed, you either changed the actual command string, or made other changes to input files. If the commands expand to the same string, you will only see the Tupfile being re-parsed, followed by "No files to delete" and "No commands to execute" messages:</p>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+</pre>
+
+<h4>More!</h4>
+<p>There is still some more redundancy we get get rid of:</p>
+<span class="samefileheader">Tupfile</span>
+<code>: <font style="background-color: #ffbbff">hello</font>.c |&gt; gcc -Wall -c %f -o %o |&gt; <font style="background-color: #ffbbff">hello</font>.o
+: <font style="background-color: #ffffbb">square</font>.c |&gt; gcc -Wall -c %f -o %o |&gt; <font style="background-color: #ffffbb">square</font>.o
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>In this case we'll want to make the output file the same name as the input file, only with a different extension. We can use some %-flags in the output file list as well. For example, <span class="keyword">%B</span> (basename, no extension) will be replaced with the input filename, minus any directory and extension information. Let's use it in the output section now:</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc -Wall -c %f -o %o |&gt; <span class="removed">hello.o</span><span class="added">%B.o</span>
+: square.c |&gt; gcc -Wall -c %f -o %o |&gt; <span class="removed">square.o</span><span class="added">%B.o</span>
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>If you run <span class="cmd">tup upd</span> again you should only see any activity during the parsing stage.</p>
+
+<h4>More! More!</h4>
+<p>Continuing our efforts to remove redundancy, let's take another look at the first two rules:</p>
+
+<span class="samefileheader">Tupfile</span>
+<code>: hello.c <font style="background-color: #ffbbff">|&gt; gcc -Wall -c %f -o %o |&gt; %B.o</font>
+: square.c <font style="background-color: #ffbbff">|&gt; gcc -Wall -c %f -o %o |&gt; %B.o</font>
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>Here you can see we have two rules that differ only in their input filename - both the command string and output string are identical (even though they evaluate to different values). We can combine these rules into one using the <span class="keyword">foreach</span> keyword. The foreach keyword iterates over the input list in a loop, and creates a new rule for each one. Since we have two inputs, there are two new rules, which exactly correspond to the two separate rules we had written earlier.</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: <span class="added">foreach </span>hello.c <span class="added">square.c </span>|&gt; gcc -Wall -c %f -o %o |&gt; %B.o
+<span class="removed">: square.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o</span>
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>Once again verify that no functional changes have been made by running <span class="cmd">tup upd</span>.</p>
+
+<h4>MMMMMMMMMore!</h4>
+<p>By now you can see that there isn't a whole lot of redundancy left. One thing that may not be apparent is that the Tupfile is redundant with the directory itself!</p>
+
+<span class="samefileheader">Tupfile</span>
+<code>: foreach <font style="background-color: #ffbbff">hello.c square.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
+: hello.o square.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+<pre>
+<span class="prompt">$</span> ls *.c
+<font style="background-color: #ffbbff">hello.c  square.c</font>
+</pre>
+
+<p>If you like explicitly listing the source files, you are certainly free to do so. However, you might like to just be able to create a new C file in the directory and have it automatically get compiled and linked in. To do so, just use the globbing feature:</p>
+
+<span class="modfileheader">Tupfile</span>
+<code>: foreach <span class="removed">hello.c square.c</span><span class="added">*.c</span> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
+: <span class="removed">hello.o square.o</span><span class="added">*.o</span> |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>One thing to note is that the file globbing does not take place on the filesystem, but rather the tup database itself. Consider if we had used this Tupfile before we ever created <span class="filename">hello.o</span> or <span class="filename">square.o</span> - the <span class="keyword">*.o</span> wouldn't have anything to match! However, when tup parses the <span class="keyword">foreach</span> rule, the new files are added to the tup database before they are created in the filesystem. This way the <span class="keyword">*.o</span> will match the files, and the proper linker rule will be generated.</p>
+
+<h4>A Brief Look Inside Tup</h4>
+
+<p>Let's take one last look at the final Tupfile for this example:</p>
+
+<span class="samefileheader">Tupfile</span>
+<code>: foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
+: *.o |&gt; gcc %f -o %o |&gt; hello
+</code>
+
+<p>It doesn't look too much like a shell script anymore. Fret not, for the script is still in tup! However, it is not a true shell script, but rather a graph of commands connected by their inputs and outputs. If you have <a href="http://www.graphviz.org/">Graphviz</a> installed (which gives you the <span class="cmd">dot</span> program), you can generate a graph like so:</p>
+
+<pre>
+<span class="prompt">$</span> tup g * | dot -Tpng &gt; ~/hello.png
+</pre>
+
+<p>If you take a look at the image, you should see something like this:</p>
+
+<img src="hello.png">
+<p>If you were to make a <a href="http://en.wikipedia.org/wiki/Topological_ordering">topological sort (Wikipedia)</a> of the graph, keeping only the rectangle shaped nodes, you would have your shell script again. When <span class="cmd">tup upd</span> gets to the final stage of its processing and actually goes to execute commands, it will start with the files you changed (like <span class="filename">hello.c</span>) and follow the arrows upward until there are no more arrows to follow. Try starting at each of the three base files and see which commands will be executed. It also works for any combination of inputs. In this way, you can think of the tup database as a collection of <span class="keyword">2^n</span> shell scripts, where <span class="keyword">n</span> is the number of input files (since each file can be either "modified" or "unmodified", you get an exponential number of possible fileset changes). Depending on which files you modified, tup will pick out the smallest shell script that updates everything quickly and correctly. Of course, the shell script is generated on the fly using the graph - storing an exponential number of shell scripts would be crazy.</p>
+
+<p>This is merely scratching the surface of how tup works - there is much more than just picking out the correct rectangles! After all, those dots and lines have to get in the graph in the first place...</p>

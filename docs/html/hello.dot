@@ -1,0 +1,21 @@
+digraph G {
+	node_4 [label="Tupfile\n4" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_20 [label="hello\n20" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_3 [label="hello.c\n3" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_3 [dir=back,style="solid"]
+	node_11 [label="hello.o\n11" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_21 -> node_11 [dir=back,style="solid"]
+	node_9 [label="square.c\n9" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_14 -> node_9 [dir=back,style="solid"]
+	node_12 [label="gcc -Wall -c hello.c -o hello.o\n12" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_11 -> node_12 [dir=back,style="solid"]
+	node_14 [label="gcc -Wall -c square.c -o square.o\n14" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_13 -> node_14 [dir=back,style="solid"]
+	node_10 [label="square.h\n10" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_14 -> node_10 [dir=back,style="solid"]
+	node_12 -> node_10 [dir=back,style="solid"]
+	node_21 [label="gcc hello.o square.o -o hello\n21" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_20 -> node_21 [dir=back,style="solid"]
+	node_13 [label="square.o\n13" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_21 -> node_13 [dir=back,style="solid"]
+}

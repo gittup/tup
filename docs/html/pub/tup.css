@@ -3,7 +3,7 @@ pre {
 	border-style: dashed;
 	border-width: 1;
 	margin-left: 2em;
-	margin-right: 2em;
+	margin-right: 20em;
 	padding: 5px 10px 5px 10px;
 	background-color: #ffffdd;
 }
@@ -20,6 +20,26 @@ span.fileheader {
 	margin-right: 0em;
 	padding: 0px 10px 0px 10px;
 	background-color: #99ff99;
+	font-family: Fixed;
+}
+
+span.modfileheader {
+	border-style: solid;
+	border-width: 1;
+	margin-left: 0em;
+	margin-right: 0em;
+	padding: 0px 10px 0px 10px;
+	background-color: #99ffff;
+	font-family: Fixed;
+}
+
+span.samefileheader {
+	border-style: solid;
+	border-width: 1;
+	margin-left: 0em;
+	margin-right: 0em;
+	padding: 0px 10px 0px 10px;
+	background-color: #bbbbbb;
 	font-family: Fixed;
 }
 
@@ -55,7 +75,7 @@ code {
 	border-style: dashed;
 	border-width: 1;
 	margin-left: 2em;
-	margin-right: 2em;
+	margin-right: 20em;
 	padding: 5px 10px 5px 10px;
 	background-color: #eeeeee;
 }
