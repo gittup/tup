@@ -36,6 +36,14 @@ span.keyword {
 	padding: 2px;
 }
 
+span.removed {
+	color: #ff0000;
+	text-decoration: line-through;
+}
+span.added {
+	background-color:#00ffff;
+}
+
 span.cmd {
 	background-color: #ffffdd;
 	font-family: Fixed;

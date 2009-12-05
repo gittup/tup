@@ -6,6 +6,7 @@
 <span class="prompt">$</span> tup init
 <span class="prompt">$</span> EDITOR hello.c
 </pre>
+
 <span class="fileheader">hello.c</span>
 <code>#include &lt;stdio.h&gt;
 
@@ -29,7 +30,7 @@ int main(void)
 <code>: hello.c |&gt; gcc hello.c -o hello |&gt; hello
 </code>
 
-<p>This line we typed is known as a ":-rule", since the line begins with a <span class="keyword">:</span>. You can see the gcc command in between the <span class="keyword">|&gt;</span> symbols. The file listed on the left side is the input, and the file listed on the outside is the output. Ignore the redundancy for now -- we'll fix that later.</p>
+<p>This line we typed is known as a ":-rule", since the line begins with a <span class="keyword">:</span>. You can see the gcc command in between the <span class="keyword">|&gt;</span> symbols. The file listed on the left side is the input, and the file listed on the right side is the output. Ignore the redundancy for now -- we'll fix that later.</p>
 
 <p>Now that you have a Tupfile to tell tup what to do, you can run <span class="cmd">tup upd</span> to start the build process. If all goes well, you should see something like the following, only with more colors and cool progress bars:</p>
 <pre>
@@ -50,7 +51,7 @@ Tupfile  hello  hello.c
 Hello, world!
 </pre>
 
-<p>You can try to run <span class="cmd">tup upd</span> again to verify that the file isn't compiled unnecessarily (since it hasn't been changed). Then you can touch the file and see that it *is* rebuilt:</p>
+<p>You can try to run <span class="cmd">tup upd</span> again to verify that the file isn't compiled unnecessarily (since it hasn't been changed). Then you can edit the file and see that it *is* rebuilt:</p>
 <pre>
 <span class="prompt">$</span> tup upd
 [ tup ] Scanning filesystem...0.000s
@@ -59,7 +60,21 @@ Hello, world!
 [ tup ] No files to delete.
 [ tup ] No commands to execute.
 [ tup ] Updated.
-<span class="prompt">$</span> touch hello.c
+<span class="prompt">$</span> EDITOR hello.c
+</pre>
+
+<span class="fileheader">hello.c</span>
+<code>#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf(<span class="removed">"Hello, world!\n"</span>);
+	printf(<span class="added">"Hi, everybody!\n"</span>);
+	return 0;
+}
+</code>
+
+<pre>
 <span class="prompt">$</span> tup upd
 [ tup ] Scanning filesystem...0.002s
 [ tup ] No tup.config changes.
@@ -69,10 +84,38 @@ Hello, world!
 [    0/1    ] gcc hello.c -o hello
 [    1/1    ]
 [ tup ] Updated.
+<span class="prompt">$</span> ./hello
+Hi, everybody!
 </pre>
+
+<p>Finally, we will try to change the gcc command string itself. In this case, we won't change the <span class="filename">hello.c</span> file, only the <span class="filename">Tupfile</span>.</p>
+
+<span class="fileheader">Tupfile</span>
+<code>: hello.c |&gt; gcc <span class="added">-Wall </span>hello.c -o hello |&gt; hello
+</code>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.002s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    0/1    ] .
+[    1/1    ]
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    0/1    ] gcc -Wall hello.c -o hello
+[    1/1    ]
+[ tup ] Updated.
+</pre>
+
+<p>Since the <span class="filename">Tupfile</span> changed, you can see that the top-level directory (represented by <span class="filename">.</span>) had to be re-parsed. Tup then saw that the command changed, so the new command was executed, even though <span class="filename">hello.c</span> was unchanged.</p>
+
+<p>If you only ever want one C file, you can continue modifying this example as long as you like. Just edit the Tupfile when you want to change how the program is built, and edit the C file when you want to change the program itself.</p>
+
+<p>Read on for other examples to see how to build more than one file, and make the Tupfiles more manageable.</p>
 
 <hr>
 <h3>A Program Grows</h3>
-<p></p>
+<p>Continuing from the previous example, we will build on the Hello World program to add a new C file.</p>
 
 <p>Note that we don't use the foreach keyword for the second rule, because we want all the object files to be listed where the %f is. The %o is replaced with 'hello_world' since that is what we set the output file to. One thing that may be confusing is the *.o doesn't actually do a shell glob on the filesystem. This is because when the file is parsed, the object files don't actually exist yet. Instead, the *.o does a wildcard in the tup database. The first rule will actually create an object file in the tup database (not the filesystem) when the rule is parsed. So, the rules have to go in this order, otherwise *.o won't match anything.</p>
