@@ -1,7 +1,7 @@
-.gitignore
+include_rules
 ifeq (@(TUP_WWW),y)
 : foreach ../make*.dat |> ^ PLOT %f^ ../../../test/make_v_tup/plot %f > %o |> %B.png
 : foreach ../tup_vs_eye*.dat |> ^ PLOT %f^ ../../../test/make_v_tup/plot %f Eye > %o |> %B.png
-: foreach ../*.dot |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |> %B.png
+: foreach ../*.dot |> !dot |> %B.png
 : foreach ../*.gen |> ^ CP %o^ cp %f %o |> %B
 endif
