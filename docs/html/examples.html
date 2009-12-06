@@ -248,7 +248,7 @@ Five squared is: 25
 : hello.o square.o |&gt; gcc hello.o square.o -o hello |&gt; hello
 </code>
 
-<p>The first :-rule has been highlighted to show the redundant information. It's pretty annoying anytime you have to type something twice, so we'll get rid of the duplication. To do that, we'll make use of tup's %-flags. The <span class="keyword">%f</span> flag can be used to represent the inputs, while the <span class="keyword">%o</span> flag can be used to represent the outputs. Let's change each of the rules to use these new flags:</p>
+<p>The first :-rule has been highlighted to show the redundant information. It's pretty annoying whenever you have to type something twice, so we'll get rid of the duplication. To do that, we'll make use of tup's %-flags. The <span class="keyword">%f</span> flag can be used to represent the inputs, while the <span class="keyword">%o</span> flag can be used to represent the outputs. Let's change each of the rules to use these new flags:</p>
 
 <span class="modfileheader">Tupfile</span>
 <code>: hello.c |&gt; gcc -Wall -c <span class="removed">hello.c</span><span class="added">%f</span> -o <span class="removed">hello.o</span><span class="added">%o</span> |&gt; hello.o
@@ -264,7 +264,7 @@ Five squared is: 25
 : hello.o square.o |&gt; gcc %f -o %o |&gt; hello
 </code>
 
-<p>An easy way to see that your Tupfile refactoring didn't cause any functional changes is to run <span class="cmd">tup upd</span>. If you see commands being executed, you either changed the actual command string, or made other changes to input files. If the commands expand to the same string, you will only see the Tupfile being re-parsed, followed by "No files to delete" and "No commands to execute" messages:</p>
+<p>An easy way to see that your Tupfile refactoring didn't cause any functional changes is to run <span class="cmd">tup upd</span>. If you see commands being executed, that means you either changed the actual command string, or made other changes to input files. If the commands expand to the same string, you will only see the Tupfile being re-parsed, followed by "No files to delete" and "No commands to execute" messages:</p>
 
 <pre>
 <span class="prompt">$</span> tup upd
