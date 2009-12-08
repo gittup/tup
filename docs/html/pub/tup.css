@@ -87,6 +87,7 @@ div.img {
 	width:auto;
 	float:right;
 	text-align:center;
+	clear:right;
 }
 
 div.img img {
