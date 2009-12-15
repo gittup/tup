@@ -2,7 +2,7 @@
 
 # If we have a gcc command like -La -Lb -lfoo, then in theory we depend on both
 # a/libfoo.a and b/libfoo.a. However if only b/libfoo.a exists then we need a
-# ghost dependency on a/libfoo.a so we can build probably if a/libfoo.a is
+# ghost dependency on a/libfoo.a so we can build properly if a/libfoo.a is
 # later created.
 
 . ../tup.sh
