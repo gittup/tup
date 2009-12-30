@@ -271,7 +271,10 @@ varsetall()
 stop_monitor()
 {
 	tup flush
-	tup stop
+	if tup stop; then :; else
+		echo "Error: tup monitor no longer running when it should be" 1>&2
+		exit 1
+	fi
 }
 
 re_init()

@@ -70,7 +70,7 @@ static int same_event(struct inotify_event *e1, struct inotify_event *e2);
 static int ephemeral_event(struct inotify_event *e);
 static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
-static void handle_event(struct monitor_event *m);
+static int handle_event(struct monitor_event *m);
 static void pinotify(void);
 static void sighandler(int sig);
 
@@ -436,7 +436,7 @@ int stop_monitor(void)
 	pid = monitor_get_pid();
 	if(pid < 0) {
 		printf("No monitor process to kill (pid < 0)\n");
-		return 0;
+		return -1;
 	}
 	printf("Shutting down monitor.\n");
 	if(kill(pid, SIGKILL) < 0) {
@@ -547,8 +547,12 @@ static int flush_queue(void)
 		if(e->wd == -1) {
 			overflow = 1;
 		} else {
-			if(e->mask != 0)
-				handle_event(m);
+			if(e->mask != 0) {
+				if(handle_event(m) < 0) {
+					tup_db_rollback();
+					return -1;
+				}
+			}
 		}
 		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
@@ -661,6 +665,14 @@ static int ephemeral_event(struct inotify_event *e)
 	int newflags = IN_CREATE | IN_MOVED_TO;
 	int delflags = IN_DELETE | IN_MOVED_FROM;
 
+	/* Don't want to remove events on directories, since we will need to
+	 * make sure we keep track of the details of all subdirectories and
+	 * such (ie: if a directory is moved out of the way and a new directory
+	 * is moved in its place, we don't want to ignore that). See t7034.
+	 */
+	if(e->mask & IN_ISDIR)
+		return -1;
+
 	if(!(e->mask & (newflags | delflags))) {
 		return -1;
 	}
@@ -738,7 +750,7 @@ static struct moved_from_event *check_from_events(struct inotify_event *e)
 	return NULL;
 }
 
-static void handle_event(struct monitor_event *m)
+static int handle_event(struct monitor_event *m)
 {
 	struct dircache *dc;
 
@@ -746,12 +758,12 @@ static void handle_event(struct monitor_event *m)
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
 			m->e.wd);
-		return;
+		return -1;
 	}
 
 	if(m->e.mask & IN_IGNORED) {
 		dircache_del(&tree, dc);
-		return;
+		return 0;
 	}
 	if((m->e.mask & IN_MOVE_SELF) || (m->e.mask & IN_DELETE_SELF)) {
 		struct tup_entry *tent;
@@ -762,7 +774,7 @@ static void handle_event(struct monitor_event *m)
 			 */
 			inotify_rm_watch(inot_fd, dc->tnode.tupid);
 		}
-		return;
+		return 0;
 	}
 
 	if(m->e.mask & IN_MOVED_TO && m->from_event) {
@@ -772,31 +784,33 @@ static void handle_event(struct monitor_event *m)
 		from_dc = dircache_lookup(&tree, mfe->m->e.wd);
 		if(!from_dc) {
 			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
-			return;
+			return -1;
 		}
 		if(m->e.mask & IN_ISDIR) {
 			struct tup_entry *tent;
 			int fd;
 
 			if(tup_db_select_tent(from_dc->dt, mfe->m->e.name, &tent) < 0)
-				return;
+				return -1;
 			if(!tent)
-				return;
+				return -1;
 			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt) < 0)
-				return;
+				return -1;
 			if(tup_db_modify_dir(tent->tnode.tupid) < 0)
-				return;
+				return -1;
 			fd = tup_db_open_tupid(dc->dt);
 			if(fd < 0)
-				return;
+				return -1;
 			watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
 			close(fd);
 		} else {
-			tup_file_mod(dc->dt, m->e.name);
-			tup_file_del(from_dc->dt, mfe->m->e.name, -1);
+			if(tup_file_mod(dc->dt, m->e.name) < 0)
+				return -1;
+			if(tup_file_del(from_dc->dt, mfe->m->e.name, -1) < 0)
+				return -1;
 		}
 		free(mfe);
-		return;
+		return 0;
 	}
 
 	/* Handle IN_MOVED_TO events without corresponding from events as if
@@ -807,17 +821,19 @@ static void handle_event(struct monitor_event *m)
 
 		fd = tup_db_open_tupid(dc->dt);
 		if(fd < 0)
-			return;
+			return -1;
 		watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
 		close(fd);
-		return;
+		return 0;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
-		tup_file_mod(dc->dt, m->e.name);
+		if(tup_file_mod(dc->dt, m->e.name) < 0)
+			return -1;
 	}
 	if(m->e.mask & IN_DELETE) {
-		tup_file_del(dc->dt, m->e.name, -1);
+		if(tup_file_del(dc->dt, m->e.name, -1) < 0)
+			return -1;
 	}
 	if(m->e.mask & IN_MOVED_FROM) {
 		/* IN_MOVED_FROM only happens here if the event is never
@@ -826,11 +842,13 @@ static void handle_event(struct monitor_event *m)
 		 * jurisdiction, or if the event is simply unloved and dies
 		 * alone.
 		 */
-		tup_file_del(dc->dt, m->e.name, -1);
+		if(tup_file_del(dc->dt, m->e.name, -1) < 0)
+			return -1;
 
 		/* An IN_MOVED_FROM event points to itself */
 		list_del(&m->from_event->list);
 	}
+	return 0;
 }
 
 static void pinotify(void)
