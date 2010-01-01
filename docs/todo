@@ -91,7 +91,6 @@ implement */*.c or maybe **/*.c as a recursive input?
 
 get rid of tmp_list
 
-add test: tup init in /tmp? fix for 34a61c3e1f
 add test: gcc var in be8bb98e407
 
 add to ghost list from parser, then fail - ghost is still reclaimed?
