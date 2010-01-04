@@ -104,6 +104,7 @@ int monitor(int argc, char **argv)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
+	sigaction(SIGUSR1, &sigact, NULL);
 
 	mon_lock = openat(tup_top_fd(), TUP_MONITOR_LOCK, O_WRONLY);
 	if(mon_lock < 0) {
@@ -339,9 +340,19 @@ static int monitor_loop(void)
 		(double)(t2.tv_sec - t1.tv_sec) +
 		(double)(t2.tv_usec - t1.tv_usec)/1e6);
 
-	while((x = read(inot_fd, buf, sizeof(buf))) > 0) {
+	do {
 		struct inotify_event *e;
 		int offset = 0;
+
+		x = read(inot_fd, buf, sizeof(buf));
+		if(x < 0) {
+			if(errno == EINTR) {
+				continue;
+			} else {
+				perror("read");
+				return -1;
+			}
+		}
 
 		for(offset = 0; offset < x; offset += sizeof(*e) + e->len) {
 			e = (void*)((char*)buf + offset);
@@ -422,7 +433,8 @@ static int monitor_loop(void)
 					return rc;
 			}
 		}
-	}
+	} while(1);
+
 	return 0;
 }
 
@@ -861,8 +873,11 @@ static void pinotify(void)
 
 static void sighandler(int sig)
 {
-	if(sig) {}
-	monitor_set_pid(-1);
-	/* TODO: gracefully close, or something? */
-	exit(0);
+	if(sig == SIGUSR1) {
+		dump_dircache(&tree);
+	} else {
+		monitor_set_pid(-1);
+		/* TODO: gracefully close, or something? */
+		exit(0);
+	}
 }
