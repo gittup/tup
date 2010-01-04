@@ -40,17 +40,3 @@ struct dircache *dircache_lookup(struct rb_root *tree, int wd)
 		return NULL;
 	return container_of(tnode, struct dircache, tnode);
 }
-
-void dump_dircache(struct rb_root *tree)
-{
-	struct rb_node *rbn;
-
-	printf("Dircache:\n");
-	for(rbn = rb_first(tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tt;
-		struct dircache *dc;
-		tt = rb_entry(rbn, struct tupid_tree, rbn);
-		dc = container_of(tt, struct dircache, tnode);
-		printf("  Dc[tupid=%lli, wd=%lli]\n", dc->dt, dc->tnode.tupid);
-	}
-}

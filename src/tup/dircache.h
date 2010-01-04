@@ -24,5 +24,4 @@ struct dircache *dircache_lookup(struct rb_root *tree, int wd);
 /** Deletes dc from the dircache. */
 void dircache_del(struct rb_root *tree, struct dircache *dc);
 
-void dump_dircache(struct rb_root *tree);
 #endif

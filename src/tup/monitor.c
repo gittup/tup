@@ -871,10 +871,40 @@ static void pinotify(void)
 	}
 }
 
+static int dump_dircache(void)
+{
+	struct rb_node *rbn;
+	int rc = 0;
+
+	printf("Dircache:\n");
+	for(rbn = rb_first(&tree); rbn; rbn = rb_next(rbn)) {
+		struct tupid_tree *tt;
+		struct dircache *dc;
+		struct tup_entry *tent;
+
+		tt = rb_entry(rbn, struct tupid_tree, rbn);
+		dc = container_of(tt, struct dircache, tnode);
+
+		tent = tup_entry_find(dc->dt);
+		if(!tent) {
+			printf("  [31mwd %lli: [%lli] not found[0m\n", dc->tnode.tupid, dc->dt);
+			rc = -1;
+		} else {
+			printf("  wd %lli: [%lli] ", dc->tnode.tupid, dc->dt);
+			print_tup_entry(tent);
+			printf("\n");
+		}
+	}
+	return rc;
+}
+
 static void sighandler(int sig)
 {
 	if(sig == SIGUSR1) {
-		dump_dircache(&tree);
+		if(dump_dircache() < 0) {
+			monitor_set_pid(-1);
+			exit(-1);
+		}
 	} else {
 		monitor_set_pid(-1);
 		/* TODO: gracefully close, or something? */
