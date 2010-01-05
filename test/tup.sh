@@ -277,6 +277,24 @@ stop_monitor()
 	fi
 }
 
+signal_monitor()
+{
+	if [ -f .tup/monitor.pid ]; then
+		# It's really confusing if you happen to 'kill -USR1 -1', cuz
+		# everything disappears.
+		text=`cat .tup/monitor.pid`
+		if echo "$text" | grep '\-1' > /dev/null; then
+			echo "Error: Monitor is not running - unable to signal" 1>&2
+			exit 1
+		fi
+
+		kill -USR1 $text
+	else
+		echo "Error: No monitor.pid file running - unable to signal" 1>&2
+		exit 1
+	fi
+}
+
 re_init()
 {
 	rm -rf .tup

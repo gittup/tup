@@ -20,6 +20,8 @@ struct id_flags {
 static int tup_del_id_type(tupid_t tupid, int type, int force);
 static int ghost_to_file(struct tup_entry *tent);
 
+static void (*rmdir_callback)(tupid_t tupid);
+
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry)
 {
@@ -226,6 +228,11 @@ int tup_del_id_force(tupid_t tupid, int type)
 	return tup_del_id_type(tupid, type, 1);
 }
 
+void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
+{
+	rmdir_callback = callback;
+}
+
 static int tup_del_id_type(tupid_t tupid, int type, int force)
 {
 	if(type == TUP_NODE_DIR) {
@@ -234,6 +241,8 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 		 */
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
+		if(rmdir_callback)
+			rmdir_callback(tupid);
 	}
 
 	/* If a file was deleted and it was created by a command, set the

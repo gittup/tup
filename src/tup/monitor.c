@@ -70,6 +70,7 @@ static int same_event(struct inotify_event *e1, struct inotify_event *e2);
 static int ephemeral_event(struct inotify_event *e);
 static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
+static void monitor_rmdir_cb(tupid_t dt);
 static int handle_event(struct monitor_event *m);
 static void pinotify(void);
 static void sighandler(int sig);
@@ -78,7 +79,7 @@ static int inot_fd;
 static int tup_wd;
 static int obj_wd;
 static int mon_wd;
-static struct rb_root tree = RB_ROOT;
+static struct dircache_root droot;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
@@ -163,6 +164,9 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
+	dircache_init(&droot);
+	tup_register_rmdir_callback(monitor_rmdir_cb);
+
 	do {
 		rc = monitor_loop();
 		if(rc == MONITOR_LOOP_RETRY) {
@@ -178,12 +182,11 @@ int monitor(int argc, char **argv)
 			 * we return from tup_lock_init(). Then we should be
 			 * good to go.
 			 */
-			while((rbn = rb_first(&tree)) != NULL) {
+			while((rbn = rb_first(&droot.wd_tree)) != NULL) {
 				struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
-				struct dircache *dc = container_of(tt, struct dircache, tnode);
-				inotify_rm_watch(inot_fd, dc->tnode.tupid);
-				rb_erase(rbn, &tree);
-				free(dc);
+				struct dircache *dc = container_of(tt, struct dircache, wd_node);
+				inotify_rm_watch(inot_fd, dc->wd_node.tupid);
+				dircache_del(&droot, dc);
 			}
 
 			if(tup_entry_clear() < 0)
@@ -471,14 +474,14 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 		perror("fchdir");
 		return -1;
 	}
-	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE | IN_MOVE_SELF | IN_DELETE_SELF;
+	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
 		pinotify();
 		return -1;
 	}
 
-	dircache_add(&tree, wd, newdt);
+	dircache_add(&droot, wd, newdt);
 	return 0;
 }
 
@@ -762,38 +765,40 @@ static struct moved_from_event *check_from_events(struct inotify_event *e)
 	return NULL;
 }
 
+static void monitor_rmdir_cb(tupid_t dt)
+{
+	struct dircache *dc;
+
+	dc = dircache_lookup_dt(&droot, dt);
+	if(dc) {
+		inotify_rm_watch(inot_fd, dc->wd_node.tupid);
+		dircache_del(&droot, dc);
+	}
+}
+
 static int handle_event(struct monitor_event *m)
 {
 	struct dircache *dc;
 
-	dc = dircache_lookup(&tree, m->e.wd);
+	if(m->e.mask & IN_IGNORED) {
+		/* Ignore IN_IGNORED events - we'll already have removed the
+		 * wd from the dircache in the callback function.
+		 */
+		return 0;
+	}
+
+	dc = dircache_lookup_wd(&droot, m->e.wd);
 	if(!dc) {
 		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
 			m->e.wd);
 		return -1;
 	}
 
-	if(m->e.mask & IN_IGNORED) {
-		dircache_del(&tree, dc);
-		return 0;
-	}
-	if((m->e.mask & IN_MOVE_SELF) || (m->e.mask & IN_DELETE_SELF)) {
-		struct tup_entry *tent;
-		tent = tup_entry_find(dc->dt);
-		if(!tent) {
-			/* t7032 - Only remove the watch if the node is
-			 * actually gone from tup.
-			 */
-			inotify_rm_watch(inot_fd, dc->tnode.tupid);
-		}
-		return 0;
-	}
-
 	if(m->e.mask & IN_MOVED_TO && m->from_event) {
 		struct moved_from_event *mfe = m->from_event;
 		struct dircache *from_dc;
 
-		from_dc = dircache_lookup(&tree, mfe->m->e.wd);
+		from_dc = dircache_lookup_wd(&droot, mfe->m->e.wd);
 		if(!from_dc) {
 			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
 			return -1;
@@ -802,23 +807,26 @@ static int handle_event(struct monitor_event *m)
 			struct tup_entry *tent;
 			int fd;
 
-			if(tup_db_select_tent(from_dc->dt, mfe->m->e.name, &tent) < 0)
+			if(tup_db_select_tent(from_dc->dt_node.tupid, mfe->m->e.name, &tent) < 0)
 				return -1;
 			if(!tent)
 				return -1;
-			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt) < 0)
+			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt_node.tupid) < 0)
 				return -1;
 			if(tup_db_modify_dir(tent->tnode.tupid) < 0)
 				return -1;
-			fd = tup_db_open_tupid(dc->dt);
+			fd = tup_db_open_tupid(dc->dt_node.tupid);
 			if(fd < 0)
 				return -1;
-			watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
+			/* TODO: What happens to existing wd's? Don't we add
+			 * new ones here?
+			 */
+			watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
 			close(fd);
 		} else {
-			if(tup_file_mod(dc->dt, m->e.name) < 0)
+			if(tup_file_mod(dc->dt_node.tupid, m->e.name) < 0)
 				return -1;
-			if(tup_file_del(from_dc->dt, mfe->m->e.name, -1) < 0)
+			if(tup_file_del(from_dc->dt_node.tupid, mfe->m->e.name, -1) < 0)
 				return -1;
 		}
 		free(mfe);
@@ -831,20 +839,20 @@ static int handle_event(struct monitor_event *m)
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
 		int fd;
 
-		fd = tup_db_open_tupid(dc->dt);
+		fd = tup_db_open_tupid(dc->dt_node.tupid);
 		if(fd < 0)
 			return -1;
-		watch_path(dc->dt, fd, m->e.name, NULL, wp_callback);
+		watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
 		close(fd);
 		return 0;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
-		if(tup_file_mod(dc->dt, m->e.name) < 0)
+		if(tup_file_mod(dc->dt_node.tupid, m->e.name) < 0)
 			return -1;
 	}
 	if(m->e.mask & IN_DELETE) {
-		if(tup_file_del(dc->dt, m->e.name, -1) < 0)
+		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1) < 0)
 			return -1;
 	}
 	if(m->e.mask & IN_MOVED_FROM) {
@@ -854,7 +862,7 @@ static int handle_event(struct monitor_event *m)
 		 * jurisdiction, or if the event is simply unloved and dies
 		 * alone.
 		 */
-		if(tup_file_del(dc->dt, m->e.name, -1) < 0)
+		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1) < 0)
 			return -1;
 
 		/* An IN_MOVED_FROM event points to itself */
@@ -877,20 +885,20 @@ static int dump_dircache(void)
 	int rc = 0;
 
 	printf("Dircache:\n");
-	for(rbn = rb_first(&tree); rbn; rbn = rb_next(rbn)) {
+	for(rbn = rb_first(&droot.wd_tree); rbn; rbn = rb_next(rbn)) {
 		struct tupid_tree *tt;
 		struct dircache *dc;
 		struct tup_entry *tent;
 
 		tt = rb_entry(rbn, struct tupid_tree, rbn);
-		dc = container_of(tt, struct dircache, tnode);
+		dc = container_of(tt, struct dircache, wd_node);
 
-		tent = tup_entry_find(dc->dt);
+		tent = tup_entry_find(dc->dt_node.tupid);
 		if(!tent) {
-			printf("  [31mwd %lli: [%lli] not found[0m\n", dc->tnode.tupid, dc->dt);
+			printf("  [31mwd %lli: [%lli] not found[0m\n", dc->wd_node.tupid, dc->dt_node.tupid);
 			rc = -1;
 		} else {
-			printf("  wd %lli: [%lli] ", dc->tnode.tupid, dc->dt);
+			printf("  wd %lli: [%lli] ", dc->wd_node.tupid, dc->dt_node.tupid);
 			print_tup_entry(tent);
 			printf("\n");
 		}
