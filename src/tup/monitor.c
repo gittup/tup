@@ -818,8 +818,10 @@ static int handle_event(struct monitor_event *m)
 			fd = tup_db_open_tupid(dc->dt_node.tupid);
 			if(fd < 0)
 				return -1;
-			/* TODO: What happens to existing wd's? Don't we add
-			 * new ones here?
+			/* Existing watches will be replaced by the
+			 * inotify_add_watch calls that happen here. No sense
+			 * in removing them all and re-creating them. The
+			 * dircache already handles this case.
 			 */
 			watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
 			close(fd);
