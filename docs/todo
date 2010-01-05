@@ -103,6 +103,30 @@ cache flags and write out the diff before a commit? eg: no need to add a command
 
 still need *.o |> cmd |> built-in.o to check for output file being removed from input, when built-in.o already exists? probably shouldn't be necessary with delete list
 
+replace 'tup monitor' with a tup.sh function and wrap it with valgrind
+
+monitor should move deleted files to use dir=-1 instead of actually doing the full node deletion. The full deletion is done at next tup upd. file should be renamed to avoid unique constraint violation (name=tupid?)
+
+remove "Randomly deleting object files is pretty stupid" comment.
+
+monitor running, move directory away, then create new directory with similarly named files - things get screwed up? End up with files that had a 'dir' field with a tupid that was deleted, had to manually fix things
+ - might be fixed in 0cca75675a?
+
+detect stupid build tools, like yacc
+ - anyway to detect tmp files that didn't use a proper tmp name generator?
+
+get rid of 'Already parsed' messages - indent instead
+
+command creates a file, then command is modified and fails. Output file gets removed and not re-created (since command failed), then tup whines that a generated file was removed next time
+
+rm file, re-create as dir without monitor running
+
+can't tup upd using existing tup if tup-ldpreload.so changes, since tup-ldpreload.so is removed before running the link command. Investigate ptrace?
+
+look at gcov, gperf
+
+highlight += differently from = to make it obvious when a var is overridden
+
 html:
   proof: no clean target
   graphs

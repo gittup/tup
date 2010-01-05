@@ -249,9 +249,6 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 	 * command's flags to modify. For example, if foo.o was deleted, we set
 	 * 'gcc -c foo.c -o foo.o' to modify, so it will be re-executed. This
 	 * only happens if a file was deleted outside of the parser (!force).
-	 *
-	 * This is really just to mimic what people would expect from make.
-	 * Randomly deleting object files is pretty stupid.
 	 */
 	if(type == TUP_NODE_GENERATED && !force) {
 		int modified = 0;
