@@ -4772,7 +4772,7 @@ static int reclaim_ghosts(void)
 			return -1;
 		}
 		changes = sqlite3_changes(tup_db);
-		if(reclaim_ghost_debug) {
+		if(sql_debug || reclaim_ghost_debug) {
 			fprintf(stderr, "Ghosts removed: %i\n", changes);
 		}
 	} while(changes > 0);
