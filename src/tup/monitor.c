@@ -806,6 +806,7 @@ static int handle_event(struct monitor_event *m)
 		if(m->e.mask & IN_ISDIR) {
 			struct tup_entry *tent;
 			int fd;
+			int rc;
 
 			if(tup_db_select_tent(from_dc->dt_node.tupid, mfe->m->e.name, &tent) < 0)
 				return -1;
@@ -823,8 +824,11 @@ static int handle_event(struct monitor_event *m)
 			 * in removing them all and re-creating them. The
 			 * dircache already handles this case.
 			 */
-			watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
 			close(fd);
+			if(rc < 0) {
+				return -1;
+			}
 		} else {
 			if(tup_file_mod(dc->dt_node.tupid, m->e.name) < 0)
 				return -1;
@@ -840,13 +844,14 @@ static int handle_event(struct monitor_event *m)
 	 */
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
 		int fd;
+		int rc;
 
 		fd = tup_db_open_tupid(dc->dt_node.tupid);
 		if(fd < 0)
 			return -1;
-		watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
 		close(fd);
-		return 0;
+		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {

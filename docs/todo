@@ -127,6 +127,8 @@ look at gcov, gperf
 
 highlight += differently from = to make it obvious when a var is overridden
 
+spaces in filenames and/or directories?
+
 html:
   proof: no clean target
   graphs

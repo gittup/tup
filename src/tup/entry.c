@@ -45,6 +45,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	}
 	tent->tnode.tupid = tupid;
 	tent->list.next = NULL;
+	tent->ghost_list.next = NULL;
 	tent->entries.rb_node = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
@@ -129,6 +130,14 @@ static int rm_entry(tupid_t tupid, int safe)
 		}
 	}
 
+	if(tent->list.next != NULL) {
+		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which is in the entry list [%lli:%s]\n", tupid, tent->dt, tent->name.s);
+		return -1;
+	}
+	if(tent->ghost_list.next != NULL) {
+		list_del(&tent->ghost_list);
+	}
+
 	tupid_tree_rm(&tup_tree, &tent->tnode);
 	if(tent->parent) {
 		string_tree_rm(&tent->parent->entries, &tent->name);
@@ -199,6 +208,10 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 		return -1;
 	if(resolve_parent(tent) < 0)
 		return -1;
+	/* TODO: Should symlink always be resolved here? Would simplify
+	 * add_ghost_dt_sym() and remove the need for tup_entry_sym_follow()
+	 * (I think)
+	 */
 	if(dest)
 		*dest = tent;
 	return 0;
@@ -213,8 +226,9 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
 	if(!tent)
 		return -1;
 
-	if(tupid_tree_add(tree, tupid) < 0)
-		return -1;
+	if(tree)
+		if(tupid_tree_add(tree, tupid) < 0)
+			return -1;
 	return 0;
 }
 
@@ -293,6 +307,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 
 	tent->tnode.tupid = tupid;
 	tent->list.next = NULL;
+	tent->ghost_list.next = NULL;
 	tent->dt = dt;
 	tent->sym = sym;
 	tent->parent = NULL;
@@ -310,7 +325,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 	tent->entries.rb_node = NULL;
 
 	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree\n", tent->tnode.tupid);
+		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree in new_entry\n", tent->tnode.tupid);
 		return NULL;
 	}
 
@@ -465,6 +480,52 @@ int tup_entry_in_list(struct tup_entry *tent)
 	return !(tent->list.next == NULL);
 }
 
+void tup_entry_add_ghost_list(struct tup_entry *tent, struct list_head *list)
+{
+	if(tent->type == TUP_NODE_GHOST) {
+		/* It is fine if the ghost is already in the list - just make
+		 * sure we don't try to list_add it twice.
+		 */
+		if(tent->ghost_list.next == NULL) {
+			/* Use list_add_tail so new ghosts go to the back. This
+			 * way if we need to re-check a directory, we will only
+			 * check it again at the end (in case multiple ghosts
+			 * are in a ghost directory, it would be silly to
+			 * check one ghost, then check the dir, then check the
+			 * next ghost, then check the dir again, etc).
+			 */
+			list_add_tail(&tent->ghost_list, list);
+		}
+	}
+}
+
+int tup_entry_del_ghost_list(struct tup_entry *tent)
+{
+	if(tent->ghost_list.next == NULL) {
+		fprintf(stderr, "tup internal error: ghost_list.next is NULL in tup_entry_del_ghost_list %lli [%lli:%s]\n", tent->tnode.tupid, tent->dt, tent->name.s);
+		return -1;
+	}
+	list_del(&tent->ghost_list);
+	tent->ghost_list.next = NULL;
+	return 0;
+}
+
+int tup_entry_debug_add_all_ghosts(struct list_head *list)
+{
+	struct rb_node *rbn;
+
+	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
+		struct tupid_tree *tt;
+		struct tup_entry *tent;
+
+		tt = rb_entry(rbn, struct tupid_tree, rbn);
+		tent = container_of(tt, struct tup_entry, tnode);
+
+		tup_entry_add_ghost_list(tent, list);
+	}
+	return 0;
+}
+
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {
@@ -482,4 +543,19 @@ static int change_name(struct tup_entry *tent, const char *new_name)
 	if(resolve_parent(tent) < 0)
 		return -1;
 	return 0;
+}
+
+void dump_tup_entry(void)
+{
+	struct rb_node *rbn;
+
+	printf("Tup entries:\n");
+	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
+		struct tupid_tree *tt;
+		struct tup_entry *tent;
+
+		tt = rb_entry(rbn, struct tupid_tree, rbn);
+		tent = container_of(tt, struct tup_entry, tnode);
+		printf("  [%lli, dir=%lli, type=%i] name=%s\n", tent->tnode.tupid, tent->dt, tent->type, tent->name.s);
+	}
 }

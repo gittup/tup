@@ -17,6 +17,8 @@ struct tup_entry {
 	time_t mtime;
 	struct string_tree name;
 	struct rb_root entries;
+	struct list_head ghost_list;
+
 	/* Only valid inside of get/release list. The next pointer is used to
 	 * determine whether or not it is in the list (next==NULL means it
 	 * isn't in the list).
@@ -49,5 +51,9 @@ void tup_entry_release_list(void);
 void tup_entry_list_add(struct tup_entry *tent, struct list_head *list);
 void tup_entry_list_del(struct tup_entry *tent);
 int tup_entry_in_list(struct tup_entry *tent);
+void tup_entry_add_ghost_list(struct tup_entry *tent, struct list_head *list);
+int tup_entry_del_ghost_list(struct tup_entry *tent);
+int tup_entry_debug_add_all_ghosts(struct list_head *list);
+void dump_tup_entry(void);
 
 #endif
