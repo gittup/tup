@@ -1,8 +1,6 @@
 FD_CLOEXEC flag on file descriptors?
  - also close stdin on subprocesses?
 
-fix tup_entry_get list not being released in file.c if tup_db_check_actual_inputs fails
-
 find a way to avoid committing after the parsing/delete stage
 
 let partial parsings commit rather than waiting for all directories to finish successfully
@@ -30,8 +28,6 @@ put dirtree in a list for things like tup_db_select_node_by_flags to avoid callb
 don't continue down re-parse tree unless outputs of the dir have changed.
 
 give user an option to kill an autoupdate updater
-
-check duplicate outputs  eg: |> touch %o |> bar bar
 
 t5057 - make 'boo' dependency change update file?
 
