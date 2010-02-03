@@ -148,15 +148,11 @@ int updater(int argc, char **argv, int phase)
 		return -1;
 	if(phase == 1) /* Collect underpants */
 		return 0;
-	if(tup_db_request_tmp_list() < 0)
-		return -1;
 	if(process_create_nodes() < 0)
 		return -1;
 	if(phase == 2) /* ? */
 		return 0;
 	if(process_update_nodes() < 0)
-		return -1;
-	if(tup_db_release_tmp_list() < 0)
 		return -1;
 	tup_main_progress("Updated.\n");
 	return 0; /* Profit! */

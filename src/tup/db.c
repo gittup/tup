@@ -73,16 +73,14 @@ enum {
 	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
 	DB_FILES_TO_TREE,
-	DB_CLEAR_TMP_LIST,
+	_DB_GET_OUTPUT_TREE,
 	_DB_GET_LINKS,
-	DB_ADD_WRITE_LIST,
 	DB_NODE_INSERT,
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT,
 	_DB_LINK_UPDATE,
 	_DB_LINK_REMOVE,
 	_DB_NODE_HAS_GHOSTS,
-	_DB_CREATE_TMP_LIST,
 	_DB_ADD_GHOST_LINKS,
 	_DB_GHOST_RECLAIMABLE,
 	_DB_ADJUST_GHOST_SYMLINKS,
@@ -90,8 +88,6 @@ enum {
 	_DB_VAR_FLAG_DIRS,
 	_DB_VAR_FLAG_CMDS,
 	_DB_DELETE_VAR_ENTRY,
-	_DB_CHECK_EXPECTED_OUTPUTS,
-	_DB_CHECK_ACTUAL_OUTPUTS,
 	_DB_GET_OUTPUTS,
 	DB_NUM_STATEMENTS
 };
@@ -125,8 +121,6 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
 static int link_remove(tupid_t a, tupid_t b);
 static int node_has_ghosts(tupid_t tupid);
-static int create_tmp_list(void);
-static int check_tmp_requested(void);
 static int files_to_tree(struct rb_root *tree);
 static int add_ghost_dt_sym(tupid_t tupid);
 static int add_ghost(tupid_t tupid);
@@ -139,8 +133,6 @@ static int get_file_var_tree(struct vardb *vdb, int fd);
 static int var_flag_dirs(tupid_t tupid);
 static int var_flag_cmds(tupid_t tupid);
 static int delete_var_entry(tupid_t tupid);
-static int check_expected_outputs(tupid_t cmdid);
-static int check_actual_outputs(tupid_t cmdid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int generated_nodelist_len(tupid_t dt);
@@ -170,9 +162,6 @@ int tup_db_open(void)
 			return -1;
 	}
 	if(version_check() < 0)
-		return -1;
-
-	if(create_tmp_list() < 0)
 		return -1;
 
 	return rc;
@@ -3480,36 +3469,6 @@ int tup_db_scan_end(struct rb_root *tree)
 	return 0;
 }
 
-static int tmp_list_out = 0;
-int tup_db_request_tmp_list(void)
-{
-	if(tmp_list_out) {
-		fprintf(stderr, "[31mtup internal error: tmp list already in use.[0m\n");
-		return -1;
-	}
-	tmp_list_out = 1;
-	return 0;
-}
-
-int tup_db_release_tmp_list(void)
-{
-	if(!tmp_list_out) {
-		fprintf(stderr, "[31mtup internal error: tmp list not in use[0m\n");
-		return -1;
-	}
-	tmp_list_out = 0;
-	return 0;
-}
-
-static int check_tmp_requested(void)
-{
-	if(!tmp_list_out) {
-		fprintf(stderr, "[31mtup internal error: tmp list hasn't been requested before use[0m\n");
-		return -1;
-	}
-	return 0;
-}
-
 static int files_to_tree(struct rb_root *tree)
 {
 	int rc = -1;
@@ -3579,16 +3538,14 @@ static int files_to_tree(struct rb_root *tree)
 	return 0;
 }
 
-int tup_db_clear_tmp_list(void)
+static int get_output_tree(tupid_t cmdid, struct rb_root *output_tree)
 {
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CLEAR_TMP_LIST];
-	static char s[] = "delete from tmp_list";
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_TREE];
+	static char s[] = "select to_id from link where from_id=?";
 
-	if(check_tmp_requested() < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, cmdid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -3597,64 +3554,38 @@ int tup_db_clear_tmp_list(void)
 		}
 	}
 
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_add_write_list(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_ADD_WRITE_LIST];
-	static char s[] = "insert or ignore into tmp_list values(?)";
-
-	if(check_tmp_requested() < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
+	while(1) {
+		tupid_t tupid;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			rc = -1;
+			break;
+		}
+
+		tupid = sqlite3_column_int64(*stmt, 0);
+		rc = tupid_tree_add(output_tree, tupid);
+
+		if(rc < 0) {
+			fprintf(stderr, "tup error: get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+			break;
+		}
+	}
+
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-int tup_db_check_write_list(tupid_t cmdid)
-{
-	int rc = 0;
-	if(check_expected_outputs(cmdid) < 0)
-		rc = -1;
-	if(check_actual_outputs(cmdid) < 0)
-		rc = -1;
 	return rc;
 }
 
@@ -3704,7 +3635,7 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 		}
 
 		if(rc < 0) {
-			fprintf(stderr, "tup error: get_links() unable to insert tupid %lli into tree - duplicate link in the database?\n", tupid);
+			fprintf(stderr, "tup error: get_links() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
 			break;
 		}
 	}
@@ -3818,6 +3749,80 @@ static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
 			}
 		}
 	}
+	return 0;
+}
+
+struct actual_output_data {
+	tupid_t cmdid;
+	int output_error;
+};
+
+static int extra_output(tupid_t tupid, void *data)
+{
+	struct tup_entry *tent;
+	struct actual_output_data *aod = data;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	if(!(aod->output_error & 1)) {
+		aod->output_error |= 1;
+		fprintf(stderr, "tup error: Unspecified output files - A command is writing to files that you    didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
+		fprintf(stderr, " -- Command ID: %lli\n", aod->cmdid);
+		/* Return success here so we can display all errant outputs.
+		 * Actual check is in tup_db_check_actual_outputs().
+		 */
+	}
+
+	/* Clear the sym field in case we wrote a bad symlink (t5032) */
+	tup_db_set_sym(tent, -1);
+
+	/* Re-run whatever command was supposed to create this file (if any),
+	 * and remove the bad output. This is particularly helpful if a symlink
+	 * was created in the wrong spot.
+	 */
+	tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+	fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
+		tent->name.s, tent->dt);
+	delete_file(tent->dt, tent->name.s);
+	return 0;
+}
+
+static int missing_output(tupid_t tupid, void *data)
+{
+	struct tup_entry *tent;
+	struct actual_output_data *aod = data;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	fprintf(stderr, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
+
+	if(!(aod->output_error & 2)) {
+		aod->output_error |= 2;
+		/* Return success here so we can display all errant outputs.
+		 * Actual check is in tup_db_check_actual_outputs().
+		 */
+	}
+	return 0;
+}
+
+int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
+{
+	struct rb_root output_tree = {NULL};
+	struct actual_output_data aod = {
+		.cmdid = cmdid,
+		.output_error = 0,
+	};
+
+	if(get_output_tree(cmdid, &output_tree) < 0)
+		return -1;
+	if(compare_list_tree(writelist, &output_tree, &aod,
+			     extra_output, missing_output) < 0)
+		return -1;
+	free_tupid_tree(&output_tree);
+	if(aod.output_error)
+		return -1;
 	return 0;
 }
 
@@ -4393,35 +4398,6 @@ out_reset:
 	return rc;
 }
 
-static int create_tmp_list(void)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_CREATE_TMP_LIST];
-	static char s[] = "create temporary table tmp_list (tmpid integer primary key not null)";
-
-	if(sql_debug) fprintf(stderr, "%s\n", s);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
 static int add_ghost_dt_sym(tupid_t tupid)
 {
 	struct tup_entry *tent;
@@ -4910,153 +4886,11 @@ static int delete_var_entry(tupid_t tupid)
 	return 0;
 }
 
-static int check_expected_outputs(tupid_t cmdid)
-{
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_CHECK_EXPECTED_OUTPUTS];
-	static char s[] = "select to_id, name from link, node left join tmp_list on tmpid=to_id where from_id=? and id=to_id and tmpid is null";
-
-	if(check_tmp_requested() < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, cmdid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	do {
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			break;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
-		}
-
-		fprintf(stderr, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", sqlite3_column_text(*stmt, 1), cmdid);
-		rc = -1;
-	} while(1);
-
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return rc;
-}
-
-static int check_actual_outputs(tupid_t cmdid)
-{
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_CHECK_ACTUAL_OUTPUTS];
-	static char s[] = "select tmpid from tmp_list where tmpid not in (select to_id from link where from_id=?)";
-	struct id_entry *ide;
-	LIST_HEAD(del_list);
-
-	if(check_tmp_requested() < 0)
-		return -1;
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, cmdid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	do {
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			break;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
-		}
-
-		ide = malloc(sizeof *ide);
-		if(!ide) {
-			perror("malloc");
-			fprintf(stderr, "Unable to properly remove file %lli from the filesystem.\n", sqlite3_column_int64(*stmt, 0));
-			return -1;
-		}
-		ide->tupid = sqlite3_column_int64(*stmt, 0);
-
-		list_add(&ide->list, &del_list);
-
-		if(rc != -1) {
-			/* rc test used to only print this once */
-			fprintf(stderr, "tup error: Unspecified output files - A command is writing to files that you    didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
-			fprintf(stderr, " -- Command ID: %lli\n", cmdid);
-		}
-
-		rc = -1;
-	} while(1);
-
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	while(!list_empty(&del_list)) {
-		struct tup_entry *tent;
-
-		/* TODO: replace tup_db_modify_cmds_by_output with a single
-		 * sql call to modify all cmds generated incorrect nodes?
-		 */
-		ide = list_entry(del_list.next, struct id_entry, list);
-
-		if(tup_entry_add(ide->tupid, &tent) < 0) {
-			fprintf(stderr, "Unable to remove bad file %lli from the system for cmdid %lli\n", ide->tupid, cmdid);
-		} else {
-			/* Clear the sym field in case we wrote a bad symlink
-			 * (t5032)
-			 */
-			tup_db_set_sym(tent, -1);
-
-			/* Re-run whatever command was supposed to create this
-			 * file (if any), and remove the bad output. This is
-			 * particularly helpful if a symlink was created in the
-			 * wrong spot.
-			 */
-			tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-			fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
-				tent->name.s, tent->dt);
-			delete_file(tent->dt, tent->name.s);
-		}
-		list_del(&ide->list);
-		free(ide);
-	}
-
-	return rc;
-}
-
 static int get_outputs(tupid_t cmdid, struct list_head *list)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUTS];
 	static char s[] = "select to_id from link where from_id=?";
-
-	if(check_tmp_requested() < 0)
-		return -1;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, cmdid);
 	if(!*stmt) {

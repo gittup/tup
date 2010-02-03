@@ -90,7 +90,7 @@ indent dependent dirs while parsing?
 
 implement */*.c or maybe **/*.c as a recursive input?
 
-get rid of tmp_list
+combine get_outputs and get_output_tree - maybe remove compare_ide_tree()
 
 add to ghost list from parser, then fail - ghost is still reclaimed?
 
@@ -109,10 +109,6 @@ detect stupid build tools, like yacc
  - anyway to detect tmp files that didn't use a proper tmp name generator?
 
 get rid of 'Already parsed' messages - indent instead
-
-command creates a file, then command is modified and fails. Output file gets removed and not re-created (since command failed), then tup whines that a generated file was removed next time
- - this should be fixed if I always check outputs even if command fails
- - may also try using a &modified flag to the tup_db_modify_cmds_by_output() call instead of NULL (like in the other place that calls that function)
 
 rm file, re-create as dir without monitor running
 
