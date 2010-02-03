@@ -90,8 +90,6 @@ indent dependent dirs while parsing?
 
 implement */*.c or maybe **/*.c as a recursive input?
 
-combine get_outputs and get_output_tree - maybe remove compare_ide_tree()
-
 add to ghost list from parser, then fail - ghost is still reclaimed?
 
 dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
