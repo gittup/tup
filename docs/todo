@@ -92,8 +92,6 @@ implement */*.c or maybe **/*.c as a recursive input?
 
 get rid of tmp_list
 
-add test: gcc var in be8bb98e407
-
 add to ghost list from parser, then fail - ghost is still reclaimed?
 
 dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
