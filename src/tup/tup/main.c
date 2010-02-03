@@ -398,6 +398,8 @@ static int mlink(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
+	if(tup_entry_add(DOT_DT, NULL) < 0)
+		return -1;
 	cmdid = create_command_file(DOT_DT, argv[1]);
 	if(cmdid < 0) {
 		return -1;
