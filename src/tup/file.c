@@ -33,6 +33,8 @@ static int handle_symlink(const char *from, const char *to,
 			  struct file_info *info);
 static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
 static void handle_unlink(struct file_info *info);
+static int update_read_info(struct file_info *info, tupid_t dt, tupid_t cmdid,
+			    struct list_head *readlist);
 
 int init_file_info(struct file_info *info)
 {
@@ -102,6 +104,7 @@ int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
 	int write_bork = 0;
 	struct list_head *readlist;
 	struct rb_root symtree = RB_ROOT;
+	int rc;
 
 	handle_unlink(info);
 
@@ -260,34 +263,10 @@ skip_sym:
 		return -1;
 
 	readlist = tup_entry_get_list();
-	while(!list_empty(&info->read_list)) {
-		r = list_entry(info->read_list.next, struct file_entry, list);
-
-		if(add_node_to_list(dt, &r->pg, readlist, 0) < 0)
-			return -1;
-		del_entry(r);
-	}
-
-	while(!list_empty(&info->var_list)) {
-		r = list_entry(info->var_list.next, struct file_entry, list);
-
-		if(add_node_to_list(VAR_DT, &r->pg, readlist, 1) < 0)
-			return -1;
-		del_entry(r);
-	}
-
-	while(!list_empty(&info->ghost_list)) {
-		g = list_entry(info->ghost_list.next, struct file_entry, list);
-
-		if(add_node_to_list(dt, &g->pg, readlist, 1) < 0)
-			return -1;
-		del_entry(g);
-	}
-	if(tup_db_check_actual_inputs(cmdid, readlist) < 0)
-		return -1;
+	rc = update_read_info(info, dt, cmdid, readlist);
 	tup_entry_release_list();
 
-	return 0;
+	return rc;
 }
 
 int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
@@ -439,4 +418,37 @@ static void handle_unlink(struct file_info *info)
 /*		delete_name_file(u->tupid);*/
 		del_entry(u);
 	}
+}
+
+static int update_read_info(struct file_info *info, tupid_t dt, tupid_t cmdid,
+			    struct list_head *readlist)
+{
+	struct file_entry *r;
+
+	while(!list_empty(&info->read_list)) {
+		r = list_entry(info->read_list.next, struct file_entry, list);
+
+		if(add_node_to_list(dt, &r->pg, readlist, 0) < 0)
+			return -1;
+		del_entry(r);
+	}
+
+	while(!list_empty(&info->var_list)) {
+		r = list_entry(info->var_list.next, struct file_entry, list);
+
+		if(add_node_to_list(VAR_DT, &r->pg, readlist, 1) < 0)
+			return -1;
+		del_entry(r);
+	}
+
+	while(!list_empty(&info->ghost_list)) {
+		r = list_entry(info->ghost_list.next, struct file_entry, list);
+
+		if(add_node_to_list(dt, &r->pg, readlist, 1) < 0)
+			return -1;
+		del_entry(r);
+	}
+	if(tup_db_check_actual_inputs(cmdid, readlist) < 0)
+		return -1;
+	return 0;
 }

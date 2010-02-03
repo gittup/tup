@@ -150,9 +150,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		}
 		if(modified) {
 			if(tent->type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
-				if(tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL) < 0)
+				int tmp = 0;
+				if(tup_db_modify_cmds_by_output(tent->tnode.tupid, &tmp) < 0)
 					return -1;
+				if(tmp == 1)
+					fprintf(stderr, "tup warning: generated file '%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
 			}
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 				return -1;
