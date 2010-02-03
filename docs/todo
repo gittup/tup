@@ -37,8 +37,6 @@ check inputs and outputs even if command fails
 
 progress bar looks dumb when you have numbers in the thousands because of the space between the second number and the ']', and then another space before the program
 
-tup should yell if you use a wrong % flag
-
 .gitignore should be re-generated if removed by user?
 
 on rm -rf test-gcc, got a 'tup internal error: directory 123456 still has entries'

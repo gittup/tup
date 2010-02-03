@@ -1802,6 +1802,10 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 		int space_chars;
 
 		clen -= 2;
+		if(next == cmd+cmd_len-1) {
+			fprintf(stderr, "Error: Unfinished %%-flag at the end of the string '%s'\n", cmd);
+			return NULL;
+		}
 		next++;
 		p = next+1;
 		space_chars = nl->num_entries - 1;
@@ -1847,6 +1851,11 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				return NULL;
 			}
 			clen += onl->totlen + (onl->num_entries-1);
+		} else if(*next == '%') {
+			clen++;
+		} else {
+			fprintf(stderr, "Error: Unknown %%-flag: '%c'\n", *next);
+			return NULL;
 		}
 	}
 
@@ -1911,6 +1920,12 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				x += nle->len;
 				first = 0;
 			}
+		} else if(*next == '%') {
+			s[x] = '%';
+			x++;
+		} else {
+			fprintf(stderr, "tup internal error: Unhandled %%-flag '%c'\n", *next);
+			return NULL;
 		}
 	}
 	memcpy(&s[x], p, cmd+cmd_len - p + 1);

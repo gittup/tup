@@ -15,7 +15,8 @@ syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match separator /|>/
-syntax match format display "%\([efoBb]\)" contained
+syntax match format display "%\([%efoBb]\)" contained
+syntax match errfmt display "%\([^%efoBb]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match atvar /@([^)]*)/
@@ -23,8 +24,8 @@ syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.
 syntax match backslash /\\$/
 syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
-syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable
-syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,bang
+syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable,errfmt
+syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,bang,errfmt
 
 highlight link comment Comment
 highlight link command String
@@ -32,6 +33,7 @@ highlight link rule Operator
 highlight link separator Keyword
 highlight link keys Keyword
 highlight link format Special
+highlight link errfmt Error
 highlight link variable Special
 highlight link control Include
 highlight link bang Type
