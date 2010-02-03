@@ -3958,8 +3958,6 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 	if(compare_list_tree(readlist, &sticky_copy, &aid,
 			     new_input, NULL) < 0)
 		return -1;
-	if(aid.input_error)
-		return -1;
 
 	if(compare_list_tree(readlist, &normal_tree, &aid,
 			     new_normal_link, del_normal_link) < 0)
@@ -3967,6 +3965,8 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 	free_tupid_tree(&aid.sticky_tree);
 	free_tupid_tree(&normal_tree);
 	free_tupid_tree(&sticky_copy);
+	if(aid.input_error)
+		return -1;
 	return 0;
 }
 

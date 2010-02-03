@@ -138,9 +138,6 @@ run an old version of tup on a new db version?
 
 if you ctrl-c after files are deleted but before the commit finishes, the files are gone but won't be re-created
 
-run command with missing input dependency - a ghost node is created, but not linked to the command or removed?
- - found while trying t8001
-
 make all error messages and such pretty print on things other than 80 columns
 
 html:
