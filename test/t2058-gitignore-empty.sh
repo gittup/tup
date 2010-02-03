@@ -20,9 +20,6 @@ fi
 gitignore_good .tup .gitignore
 
 mkdir .git
-# TODO: If a .git directory is created, perhaps the Tupfile should be
-# re-parsed.
-tup touch Tupfile
 update
 gitignore_good .*.swp .gitignore
 gitignore_good .gitignore .gitignore

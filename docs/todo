@@ -96,8 +96,6 @@ add to ghost list from parser, then fail - ghost is still reclaimed?
 
 dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
 
-fix t2058 TODO
-
 cache flags and write out the diff before a commit? eg: no need to add a command to modify (in order to pick up where we left off), then remove it a second later when the command executes.
 
 replace 'tup monitor' with a tup.sh function and wrap it with valgrind

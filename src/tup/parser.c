@@ -543,17 +543,10 @@ static int gitignore(struct tupfile *tf)
 	char *s;
 	int len;
 	int fd;
-	struct stat buf;
-	int git_root = 0;
-
-	if(fstatat(tf->dfd, ".git", &buf, 0) == 0) {
-		if(S_ISDIR(buf.st_mode))
-			git_root = 1;
-	}
 
 	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_tree) < 0)
 		return -1;
-	if((s && len) || git_root == 1 || tf->tupid == 1) {
+	if((s && len) || tf->tupid == 1) {
 		struct tup_entry *tent;
 
 		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
@@ -578,15 +571,13 @@ static int gitignore(struct tupfile *tf)
 				return -1;
 			}
 		}
-		if(git_root == 1) {
-			if(write(fd, ".*.swp\n", 7) < 0) {
-				perror("write");
-				return -1;
-			}
-			if(write(fd, ".gitignore\n", 11) < 0) {
-				perror("write");
-				return -1;
-			}
+		if(write(fd, "/.*.swp\n", 8) < 0) {
+			perror("write");
+			return -1;
+		}
+		if(write(fd, "/.gitignore\n", 12) < 0) {
+			perror("write");
+			return -1;
 		}
 		if(s && len) {
 			if(write(fd, s, len) < 0) {
