@@ -20,4 +20,4 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile
-update_fail
+update_fail_msg "Expected to write to file 'foo.o'"
