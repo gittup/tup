@@ -3,6 +3,8 @@ FD_CLOEXEC flag on file descriptors?
 
 find a way to avoid committing after the parsing/delete stage
 
+ldpreload: instead of a static msgbuf and mutex, just allocate msgbuf on the stack?
+
 let partial parsings commit rather than waiting for all directories to finish successfully
 
 update node set sym=-1 where id=blah executed even when sym is already -1?

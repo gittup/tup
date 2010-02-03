@@ -5,6 +5,8 @@ LDFLAGS_tup-ldpreload.so += -shared
 LDFLAGS_tup-ldpreload.so += -ldl
 : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 
+: src/tup/client/*.o |> !ar |> libtup_client.a
+
 srcs = src/tup/*.o
 srcs += src/linux/*.o
 srcs += src/sqlite3/*.o

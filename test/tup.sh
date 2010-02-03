@@ -300,3 +300,27 @@ re_init()
 	rm -rf .tup
 	tup init --no-sync --force
 }
+
+make_tup_client()
+{
+	cat > client.c << HERE
+#include "../../src/tup/client/tup_config_vars.h"
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{
+	const char *value;
+	while(argc > 1) {
+		value = tup_config_var(argv[1], -1);
+		if(value)
+			printf("%s\n", value);
+		argc--;
+		argv++;
+	}
+	return 0;
+}
+HERE
+
+	gcc client.c ../../libtup_client.a -o client
+	tup touch client
+}
