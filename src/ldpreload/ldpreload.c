@@ -57,10 +57,13 @@ int open(const char *pathname, int flags, ...)
 		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
-	/* O_ACCMODE is 0x3, which covers O_WRONLY and O_RDWR */
 	rc = s_open(pathname, flags, mode);
 	if(rc >= 0) {
-		handle_file(pathname, "", flags&O_ACCMODE);
+		int at = ACCESS_READ;
+
+		if(flags&O_WRONLY || flags&O_RDWR)
+			at = ACCESS_WRITE;
+		handle_file(pathname, "", at);
 	} else {
 		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(pathname, "", ACCESS_GHOST);
@@ -82,7 +85,11 @@ int open64(const char *pathname, int flags, ...)
 	}
 	rc = s_open64(pathname, flags, mode);
 	if(rc >= 0) {
-		handle_file(pathname, "", flags&O_ACCMODE);
+		int at = ACCESS_READ;
+
+		if(flags&O_WRONLY || flags&O_RDWR)
+			at = ACCESS_WRITE;
+		handle_file(pathname, "", at);
 	} else {
 		if(errno == ENOENT || errno == ENOTDIR)
 			handle_file(pathname, "", ACCESS_GHOST);
