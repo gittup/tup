@@ -15,7 +15,7 @@ syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match separator /|>/
-syntax match format display "%\([FfoBb]\)" contained
+syntax match format display "%\([efoBb]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match atvar /@([^)]*)/
