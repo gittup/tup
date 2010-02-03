@@ -9,6 +9,7 @@
 #include "vardb.h"
 #include "fslurp.h"
 #include "entry.h"
+#include "version.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -286,6 +287,10 @@ static int version_check(void)
 		return -1;
 	}
 
+	if(version > DB_VERSION) {
+		fprintf(stderr, "Error: tup database is version %i, but this version of tup (%s) can only handle up to %i.\n", version, tup_version(), DB_VERSION);
+		return -1;
+	}
 	if(version != DB_VERSION) {
 		printf("Updating tup database from version %i to %i. This may take a while...\n", version, DB_VERSION);
 		if(tup_db_begin() < 0)
@@ -508,7 +513,7 @@ static int version_check(void)
 		case DB_VERSION:
 			break;
 		default:
-			fprintf(stderr, "Error: Database version %i not compatible with %i\n", version, DB_VERSION);
+			fprintf(stderr, "Error: Unable to convert database version %i to version %i\n", version, DB_VERSION);
 			return -1;
 	}
 

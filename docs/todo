@@ -134,8 +134,6 @@ spaces in filenames and/or directories?
 
 remove test/Makefile, just make tup.sh smarter?
 
-run an old version of tup on a new db version?
-
 if you ctrl-c after files are deleted but before the commit finishes, the files are gone but won't be re-created
 
 make all error messages and such pretty print on things other than 80 columns
