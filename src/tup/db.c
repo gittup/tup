@@ -4944,7 +4944,7 @@ static int check_expected_outputs(tupid_t cmdid)
 			return -1;
 		}
 
-		fprintf(stderr, "Bork: Expected to write to file '%s' from cmd %lli but didn't\n", sqlite3_column_text(*stmt, 1), cmdid);
+		fprintf(stderr, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", sqlite3_column_text(*stmt, 1), cmdid);
 		rc = -1;
 	} while(1);
 
