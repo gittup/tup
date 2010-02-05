@@ -3,7 +3,7 @@
 # Make sure a var/sed command ends up propagating down the DAG. When I made the
 # sticky link change, it looks like this broke.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 : out.txt |> cat %f > %o |> new.txt
@@ -21,3 +21,5 @@ tup touch foo.txt
 update
 (echo "a sup b") | diff out.txt -
 (echo "a sup b") | diff new.txt -
+
+eotup

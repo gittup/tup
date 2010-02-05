@@ -5,7 +5,7 @@
 # However, the command needs to be re-executed in order to see that the output
 # file is no longer necessary (since here, it is).
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo foo > %o |> output
 : output |> cat output |>
@@ -33,3 +33,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update
+
+eotup

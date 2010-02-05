@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # Apparently changing a Tupfile in between monitor invocations doesn't work
 # properly (it doesn't get re-parsed).
@@ -23,3 +23,5 @@ stop_monitor
 
 tup_object_exist . 'echo yo'
 tup_object_no_exist . 'echo hey'
+
+eotup

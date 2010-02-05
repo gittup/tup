@@ -5,7 +5,7 @@
 # a specific bug, namely that when an update fails and the command is still
 # marked MODIFY, changing the Tupfile will re-create the command, and end up
 # setting the command's flags to NONE, so it doesn't get executed. Whoops.
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
@@ -24,3 +24,5 @@ else
 	echo "foo.c should have been compiled again." 1>&2
 	exit 1
 fi
+
+eotup

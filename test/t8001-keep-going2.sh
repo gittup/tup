@@ -7,7 +7,7 @@
 # test reproduces that by using the -k flag to keep going after the first error
 # (it could also happen randomly when parallelized).
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h
@@ -27,3 +27,5 @@ else
 	echo "Error: Only one file should have been compiled." 1>&2
 	exit 1
 fi
+
+eotup

@@ -5,7 +5,7 @@
 # deleted, so we shouldn't have to worry about it in the rule. (Of course if it
 # was still included in the C file the compiler would whine about it since we
 # have to run the command again anyway).
-. ../tup.sh
+. ./tup.sh
 tup config num_jobs 1
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
@@ -28,3 +28,5 @@ int main(void) {return 7;}
 HERE
 tup touch Tupfile foo.c
 update
+
+eotup

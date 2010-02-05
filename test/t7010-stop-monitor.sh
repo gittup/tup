@@ -3,7 +3,7 @@
 # Test to make sure that if the monitor is stopped and re-started, we don't
 # hose up existing flags.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 echo "int main(void) {return 0;}" > foo.c
@@ -32,3 +32,5 @@ sym_check prog main
 stop_monitor
 tup monitor
 check_empty_tupdirs
+
+eotup

@@ -2,7 +2,7 @@
 
 # Try to generate a ghost symlink in a subdir from a rule.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> ln -s secret/ghost %o |> foo
 HERE
@@ -16,3 +16,5 @@ tup rm Tupfile
 update
 tup_object_no_exist secret ghost
 tup_object_no_exist . foo secret
+
+eotup

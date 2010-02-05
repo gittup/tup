@@ -3,7 +3,7 @@
 # See if we can use separate rules to go into the same bin. Note I have no idea
 # if the syntax for 'as' is correct - I'm just checking the parser.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o |> %B.o {objs}
 : bar.S |> as %f -o %o |> %B.o {objs}
@@ -27,3 +27,5 @@ tup_dep_no_exist . 'foo.o' . 'gcc foo.o bar.o -o prog'
 tup_dep_no_exist . 'bar.o' . 'gcc foo.o bar.o -o prog'
 tup_dep_exist . 'foo.o' . 'gcc bar.o foo.o -o prog'
 tup_dep_exist . 'bar.o' . 'gcc bar.o foo.o -o prog'
+
+eotup

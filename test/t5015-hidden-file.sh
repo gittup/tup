@@ -4,7 +4,7 @@
 # in commands. The commands should still work to allow things like git describe
 # to function, but in general reading from hidden files is discouraged.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> cat .hidden |>
 HERE
@@ -29,3 +29,5 @@ fi
 tup touch Tupfile
 update
 tup_dep_no_exist . .hidden . 'cat .hidden'
+
+eotup

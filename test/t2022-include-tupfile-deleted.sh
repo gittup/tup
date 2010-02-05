@@ -2,7 +2,7 @@
 
 # See if we delete an included Tupfile that we get re-parsed.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 include yo/Install.tup
 : |> echo foo |>
@@ -33,3 +33,5 @@ HERE
 update
 tup_object_exist . 'echo foo'
 tup_object_no_exist . 'echo bar'
+
+eotup

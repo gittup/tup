@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> sh ok.sh |> a b
 HERE
@@ -29,3 +29,5 @@ update
 
 check_exist a c
 check_not_exist b
+
+eotup

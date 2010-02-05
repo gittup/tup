@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Make sure we can use a symlink from the monitor
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 mkdir foo-x86
@@ -21,3 +21,5 @@ update
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
 tup_dep_exist foo-x86 processor.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . 'gcc -c foo.c -o foo.o' . foo.o
+
+eotup

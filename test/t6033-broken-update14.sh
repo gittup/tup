@@ -11,7 +11,7 @@
 #
 # The result instead was a fatal tup error since the graph isn't empty.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 !cc = | \$(generated_headers) |> gcc -c %f -o %o |>
 : foreach errors.c |> !cc |> errors.o
@@ -24,3 +24,5 @@ HERE
 echo 'int main(void) {return 0;}' > errors.c
 tup touch errors.c Tupfile
 update_fail_msg "Attempted to add duplicate command ID"
+
+eotup

@@ -2,7 +2,7 @@
 
 # Make sure we can remove the tup.config file to clear all the variables.
 
-. ../tup.sh
+. ./tup.sh
 varsetall FOO=n BAR=n
 tup read
 tup_object_exist @ FOO
@@ -19,3 +19,5 @@ tup_object_no_exist @ FOO
 
 vardict_no_exist BAR
 vardict_no_exist FOO
+
+eotup

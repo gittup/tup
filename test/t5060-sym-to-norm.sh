@@ -3,7 +3,7 @@
 # Make sure we can have a command that creates a symlink get changed into a
 # command that creates a regular file.
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> ln -s foo bar |> bar
@@ -22,3 +22,5 @@ update
 # Make sure the sym field in bar no longer points to foo
 check_updates bar output
 check_no_updates foo output
+
+eotup

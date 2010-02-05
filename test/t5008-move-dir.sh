@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 tmkdir a
 cp ../testTupfile.tup a/Tupfile
 
@@ -22,3 +22,5 @@ tup_object_exist . b
 tup_object_exist b foo.c foo.o prog
 tup_object_no_exist . a
 tup_object_no_exist a foo.c foo.o prog
+
+eotup

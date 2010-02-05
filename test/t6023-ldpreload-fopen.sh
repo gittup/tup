@@ -6,7 +6,7 @@
 # of utilities like cp and mv. This breaks because apparently my constructor
 # in ldpreload isn't called until after all shared libraries are loaded.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : lib.c |> gcc -fPIC -shared %f -o %o |> lib.so
 : prog.c lib.so |> gcc %f -o %o |> prog
@@ -23,3 +23,5 @@ int main(void) {return 0;}
 HERE
 tup touch Tupfile foo.txt lib.c prog.c
 update
+
+eotup

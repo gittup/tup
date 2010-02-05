@@ -3,7 +3,7 @@
 # Make sure a ghost variable and a regular variable don't compare as equal if
 # the values are equal (ie: both blank).
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
@@ -22,3 +22,5 @@ if tup flags_exists 2> /dev/null; then
 	echo "*** BAR variable doesn't have flags set" 1>&2
 	exit 1
 fi
+
+eotup

@@ -2,7 +2,7 @@
 
 # Make sure include_rules makes ghost Tuprules.tup files.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir fs
 tmkdir fs/sub
 cat > fs/sub/Tupfile << HERE
@@ -39,3 +39,5 @@ tup parse
 
 tup_dep_exist fs/sub helper.c fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'
 tup_dep_exist fs/sub helper.o fs/sub 'gcc -lm -lfoo helper.o -o prog'
+
+eotup

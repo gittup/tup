@@ -2,7 +2,7 @@
 
 # Test the basename flags (%B and %b)
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : superlongtest/ok |> cp %f %o |> %B.o
 : foreach subdir/*.txt |> cp %f %o |> %b
@@ -16,3 +16,5 @@ tup_object_exist . foo.o readme.txt
 tup_object_exist . "cp subdir/readme.txt readme.txt"
 tup_object_exist . "gcc -c subdir/foo.c -o foo.o"
 tup_object_exist . "cp superlongtest/ok ok.o"
+
+eotup

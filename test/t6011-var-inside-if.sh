@@ -2,7 +2,7 @@
 
 # Make sure if a variable is set inside an if statement (and used within that
 # if statement), we don't care that it is unset.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 VAR = 0
 ifeq (\$(VAR),1)
@@ -13,3 +13,5 @@ HERE
 
 tup touch foo.c Tupfile
 update
+
+eotup

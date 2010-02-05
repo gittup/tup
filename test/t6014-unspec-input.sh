@@ -6,7 +6,7 @@
 # However, if the header isn't specified as a dependency for the compilation
 # command then things could break during a parallel build or if things get
 # re-ordered later. So, that should be detected and return a failure.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 HERE
@@ -25,3 +25,5 @@ cat > Tupfile << HERE
 HERE
 tup touch foo.c Tupfile
 update_fail
+
+eotup

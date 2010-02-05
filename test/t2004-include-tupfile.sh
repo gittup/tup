@@ -2,7 +2,7 @@
 
 # Now try to include the variables from another Tupfile
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 include Tupfile.vars
 : foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %B.o
@@ -41,3 +41,5 @@ tup_object_no_exist . "gcc -o prog bar.o foo.o"
 tup_object_exist . "cc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_exist . "cc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
 tup_object_exist . "cc -o prog bar.o foo.o"
+
+eotup

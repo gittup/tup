@@ -14,7 +14,7 @@
 # Note this test won't always fail since it relies on the scheduling of -j2,
 # but it is pretty consistent when the bug exists.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 obj-@(OK) += foo.c
 obj-@(OK) += bar.c
@@ -36,3 +36,5 @@ check_not_exist bar.o
 
 tup_object_no_exist . foo.o
 tup_object_no_exist . bar.o
+
+eotup

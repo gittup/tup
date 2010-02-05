@@ -2,7 +2,7 @@
 
 # Make sure a command that segfaults actually fails (and doesn't hose the DAG).
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : segfault.c |> gcc %f -o %o |> tup_t5014_segfault
 : tup_t5014_segfault |> ./tup_t5014_segfault |>
@@ -24,3 +24,5 @@ tup_dep_exist . tup_t5014_segfault . './tup_t5014_segfault'
 
 # Make sure the command runs and fails again.
 update_fail
+
+eotup

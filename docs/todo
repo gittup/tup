@@ -118,8 +118,6 @@ highlight += differently from = to make it obvious when a var is overridden
 
 spaces in filenames and/or directories?
 
-remove test/Makefile, just make tup.sh smarter?
-
 if you ctrl-c after files are deleted but before the commit finishes, the files are gone but won't be re-created
 
 make all error messages and such pretty print on things other than 80 columns

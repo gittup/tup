@@ -2,7 +2,7 @@
 
 # Duplicate outputs should result in an error.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> touch %o |> bar bar
 HERE
@@ -15,3 +15,5 @@ HERE
 tup touch Tupfile
 
 update
+
+eotup

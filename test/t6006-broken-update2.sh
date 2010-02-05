@@ -4,7 +4,7 @@
 # we run update again it should start at that command again (or really any
 # other available command). What it shouldn't do is assume everything is up-to-
 # date.
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
@@ -18,3 +18,5 @@ update_fail
 
 # Update again should fail again
 update_fail
+
+eotup

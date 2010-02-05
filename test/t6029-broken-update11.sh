@@ -4,7 +4,7 @@
 # command gets marked for deletion because we're reparsing the Tupfile, and
 # some other command comes in and snipes the output file.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo foo > %o |> output
 HERE
@@ -17,3 +17,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update_fail_msg "Unable to create a unique link"
+
+eotup

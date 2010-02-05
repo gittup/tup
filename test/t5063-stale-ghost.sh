@@ -5,7 +5,7 @@
 # dependency), then the ghost nodes are never connected. If the command changes
 # such that it no longer reads from the ghost, then the ghost will persist.
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h
@@ -26,3 +26,5 @@ tup touch ok.sh
 
 update
 tup_object_no_exist . ghost
+
+eotup

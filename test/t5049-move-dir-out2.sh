@@ -3,7 +3,7 @@
 # Try to move a directory out of tup, and make sure dependent Tupfiles are
 # parsed.
 
-. ../tup.sh
+. ./tup.sh
 mkdir real
 cd real
 re_init
@@ -16,3 +16,5 @@ update
 mv sub ..
 tup rm sub
 update_fail
+
+eotup

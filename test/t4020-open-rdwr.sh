@@ -2,7 +2,7 @@
 
 # Make sure open with O_RDWR works properly
 
-. ../tup.sh
+. ./tup.sh
 
 cat > prog.c << HERE
 #include <stdio.h>
@@ -23,3 +23,5 @@ tup touch prog Tupfile
 update
 
 tup_dep_exist . './prog' . output
+
+eotup

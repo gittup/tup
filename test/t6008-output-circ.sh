@@ -14,7 +14,7 @@
 # Actually, I've now changed the behavior to yell at you. So the user has the
 # option of either removing the offending file, or fixing the Tupfile. We test
 # both cases here.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %B.o |> %B.o
 : *.o |> ld -r %f -o built-in.o |> built-in.o
@@ -59,3 +59,5 @@ tup touch Tupfile foo.c
 update
 
 check_exist foo.o built-in.o new-built-in.o
+
+eotup

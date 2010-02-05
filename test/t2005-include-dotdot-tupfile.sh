@@ -4,7 +4,7 @@
 # another file relative to it (Tupfile.vars and Tupfile.ccargs are in the same
 # directory).
 
-. ../tup.sh
+. ./tup.sh
 tmkdir a
 cat > a/Tupfile << HERE
 include ../Tupfile.vars
@@ -28,3 +28,5 @@ tup_object_exist a foo.c bar.c
 tup_object_exist a "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_exist a "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
 tup_object_exist a "gcc -o prog bar.o foo.o"
+
+eotup

@@ -2,7 +2,7 @@
 
 # Make sure we can move a directory outside of tup and have it be deleted.
 
-. ../tup.sh
+. ./tup.sh
 mkdir tuptest
 cd tuptest
 re_init
@@ -19,3 +19,5 @@ mv foo ..
 stop_monitor
 update
 tup_object_no_exist . foo
+
+eotup

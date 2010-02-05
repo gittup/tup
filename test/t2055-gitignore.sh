@@ -2,7 +2,7 @@
 
 # Try to use the .gitignore directive
 
-. ../tup.sh
+. ./tup.sh
 cat > Tuprules.tup << HERE
 .gitignore
 HERE
@@ -55,3 +55,5 @@ if [ -f sub/.gitignore ]; then
 	echo "Error: sub/.gitignore exists when it shouldn't" 1>&2
 	exit 1
 fi
+
+eotup

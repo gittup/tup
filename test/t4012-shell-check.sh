@@ -4,7 +4,7 @@
 # file accesses in a shell script, we end up with a file that has its modify
 # flag set after a successful update. That's annoying.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo hey > %o && ./foo.sh %o |> out.txt
 HERE
@@ -18,3 +18,5 @@ HERE
 chmod +x foo.sh
 tup touch Tupfile foo.sh
 update
+
+eotup

@@ -13,7 +13,7 @@
 # I had to add a fake dependency from bar.o to the foo command because a random
 # re-ordering of commands could make this test fail (ie: if foo happens to
 # compile first).
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : bar.c |> gcc -c bar.c -o bar.o |> bar.o
 : foo.c bar.o |> gcc -c foo.c -o foo.o |> foo.o
@@ -51,3 +51,5 @@ tup_object_exist . 'gcc -c foo.c -o foo.o -Iinclude'
 tup_object_exist . 'gcc -c bar.c -o bar.o -Iinclude'
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_object_no_exist . 'gcc -c bar.c -o bar.o'
+
+eotup

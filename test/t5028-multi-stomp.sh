@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Stomp on multiple other files.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
@@ -31,3 +31,5 @@ update
 echo 'foo' | diff - file1
 echo 'foo2' | diff - file2
 echo 'bar' | diff - file3
+
+eotup

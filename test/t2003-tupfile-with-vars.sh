@@ -2,7 +2,7 @@
 
 # Same as the previous test, only we try some variable assignments.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 CC = gcc
 CCARGS := -DFOO=1
@@ -17,3 +17,5 @@ tup_object_exist . foo.c bar.c
 tup_object_exist . "echo gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_exist . "echo gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
 tup_object_exist . "echo gcc -o prog bar.o foo.o"
+
+eotup

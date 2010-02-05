@@ -3,7 +3,7 @@
 # Test to make sure that if the monitor is stopped and re-started, we don't
 # hose up existing flags. Now with an included Tupfile
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 touch foo
@@ -17,3 +17,5 @@ tup_dep_exist . foo 0 .
 # be set.
 tup monitor
 check_empty_tupdirs
+
+eotup

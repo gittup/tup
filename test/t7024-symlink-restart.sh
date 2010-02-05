@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Make sure a symlink doesn't do anything funky when the monitor is restarted
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 # First set everything up and clear all flags
@@ -22,3 +22,5 @@ update
 tup monitor
 stop_monitor
 check_empty_tupdirs
+
+eotup

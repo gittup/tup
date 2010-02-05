@@ -2,7 +2,7 @@
 
 # Seems I broke re-parsing a Tupfile with a var/sed command
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 HERE
@@ -15,3 +15,5 @@ echo "hey sup yo" | diff out.txt -
 
 tup touch Tupfile
 update
+
+eotup

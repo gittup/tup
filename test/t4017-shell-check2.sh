@@ -4,7 +4,7 @@
 # './bar.sh', then unlink it. This apparently worked before when I was
 # canonicalizing everything, but now it doesn't.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> ./foo.sh |>
 HERE
@@ -18,3 +18,5 @@ HERE
 chmod +x foo.sh
 tup touch Tupfile foo.sh
 update
+
+eotup

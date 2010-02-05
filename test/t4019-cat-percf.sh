@@ -6,7 +6,7 @@
 # object files in the DAG (ie: this was a long time ago). I don't think it's
 # necessary anymore and is confusing.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.txt bar.txt |> cat %f; echo yay |>
 HERE
@@ -14,3 +14,5 @@ echo "foo" > foo.txt
 echo "bar" > bar.txt
 tup touch Tupfile foo.txt bar.txt
 update
+
+eotup

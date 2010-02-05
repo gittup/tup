@@ -10,7 +10,7 @@
 # Which matches how we would write it on the command line (the '\$' in the sed
 # command is supposed to match the literal '$' in 'foo$').
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo 'foo\$' | sed 's/o\\\$/3/' > %o |> out.txt
 HERE
@@ -18,3 +18,5 @@ cat Tupfile
 tup touch Tupfile
 update
 echo 'fo3' | diff - out.txt
+
+eotup

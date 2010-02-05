@@ -8,7 +8,7 @@
 # Note: I use 'afoo' here because it used to be foo, then I changed how
 # foreach works (it now processes files in order, instead of in reverse), and
 # it needs to go first.
-. ../tup.sh
+. ./tup.sh
 tup config num_jobs 1
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -30,3 +30,5 @@ echo '#include "foo.h"' > afoo.c
 tup touch afoo.c
 update
 check_exist afoo.o bar.o
+
+eotup

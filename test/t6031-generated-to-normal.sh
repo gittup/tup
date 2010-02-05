@@ -6,7 +6,7 @@
 # (which would include the rule removal and file addition), they should be able
 # to build in one step.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.txt |> cp %f %o |> bar.txt
 HERE
@@ -35,3 +35,5 @@ check_exist foo.txt bar.txt
 echo 'new file' | diff - bar.txt
 
 tup_object_exist . bar.txt
+
+eotup

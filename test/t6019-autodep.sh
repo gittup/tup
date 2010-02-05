@@ -3,7 +3,7 @@
 # Make sure that when we use order-only dependencies for an auto-generated
 # header, that only the C files that actually include the header are
 # re-compiled after the first build.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
@@ -45,3 +45,5 @@ rm foo.o bar.o
 tup touch foo.h.in
 update --no-scan
 check_exist foo.o bar.o
+
+eotup

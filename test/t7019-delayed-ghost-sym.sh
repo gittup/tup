@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # Check to see if we can create a ghost node, then shutdown the monitor and
 # turn the ghost into a symlink, then shutdown the monitor and change the
@@ -28,3 +28,5 @@ tup monitor
 update
 stop_monitor
 echo newfoo | diff - output.txt
+
+eotup

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # sym-cycle: a game about a wheel?
-. ../tup.sh
+. ./tup.sh
 
 ln -s a b
 ln -s b a
@@ -23,3 +23,5 @@ tup rm a b
 update
 echo yoi | diff - output.txt
 tup_object_no_exist . a b
+
+eotup

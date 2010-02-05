@@ -3,7 +3,7 @@
 # Try to include a header that was auto-generated from another command. Assume
 # we correctly have the dependency specified in the rule the first time, and
 # then later remove it. We should get yelled at.
-. ../tup.sh
+. ./tup.sh
 tup config num_jobs 1
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
@@ -24,3 +24,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update_fail_msg "Missing input dependency"
+
+eotup

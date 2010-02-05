@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # Verify that 'tup scan' works as a one-shot monitor. Now 'tup scan' is called
 # automatically by 'tup upd' when necessary.
@@ -38,3 +38,5 @@ HERE
 touch -t 202005080000 Tupfile
 tup upd
 check_not_exist prog
+
+eotup

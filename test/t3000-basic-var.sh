@@ -2,7 +2,7 @@
 
 # Test vars that are in the db.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
@@ -24,3 +24,5 @@ tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
 vardict_exist BAR=y
+
+eotup

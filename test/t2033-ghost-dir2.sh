@@ -5,7 +5,7 @@
 # then we remove secret and make it a directory, and then create ghost in it.
 # Make sure that we don't lose ghost dependencies and that all works somehow.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 cat secret/ghost 2>/dev/null || echo nofile
 HERE
@@ -41,3 +41,5 @@ echo 'alive' > secret/ghost
 tup touch secret/ghost
 update
 echo alive | diff output.txt -
+
+eotup

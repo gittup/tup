@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 (echo "#include \"foo.h\""; echo "int main(void) {}") > foo.c
@@ -36,3 +36,5 @@ tup touch foo.h
 update
 tup_dep_exist . foo.h . "gcc -c foo.c -o foo.o"
 tup_dep_exist . "gcc -c foo.c -o foo.o" . foo.o
+
+eotup

@@ -3,7 +3,7 @@
 # Try to move a directory out of tup, and make sure dependent files are still
 # compiled.
 
-. ../tup.sh
+. ./tup.sh
 mkdir real
 cd real
 re_init
@@ -20,3 +20,5 @@ update_fail
 
 tup touch foo.h
 update
+
+eotup

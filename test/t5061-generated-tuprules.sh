@@ -2,7 +2,7 @@
 
 # Make sure we can't sneak in a generated Tuprules.tup file by making it a
 # ghost node first and then generating it later.
-. ../tup.sh
+. ./tup.sh
 tmkdir sub
 cat > sub/Tupfile << HERE
 include_rules
@@ -18,3 +18,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update_fail
+
+eotup

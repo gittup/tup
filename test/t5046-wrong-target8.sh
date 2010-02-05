@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Like t5045, but with a symlink.
-. ../tup.sh
+. ./tup.sh
 
 tmkdir sub
 cat > sub/Tupfile << HERE
@@ -20,3 +20,5 @@ update
 
 check_exist sub/foo
 check_not_exist sub/bar
+
+eotup

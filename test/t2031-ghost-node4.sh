@@ -3,7 +3,7 @@
 # Make sure a ghost node from a previous command doesn't affect a new command
 # that doesn't rely on its ghostly past.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE
@@ -33,3 +33,5 @@ tup touch ghost
 rm -f output.txt
 update --no-scan
 check_not_exist output.txt
+
+eotup

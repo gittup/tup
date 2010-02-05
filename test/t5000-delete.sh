@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 # Verify all files are compiled
@@ -30,3 +30,5 @@ tup rm foo.c bar.c
 update
 check_not_exist foo.o bar.o prog
 tup_object_no_exist . foo.c foo.o bar.c bar.o prog
+
+eotup

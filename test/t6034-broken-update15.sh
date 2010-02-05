@@ -9,7 +9,7 @@
 # load the entire partial DAG (even nodes that won't be executed, because the
 # only incoming links are sticky). Not sure if that would be worthwhile.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach foo.c | foo.h |> gcc -c %f -o %o |> foo.o
 HERE
@@ -18,3 +18,5 @@ update
 
 tup touch foo.h foo.c
 update
+
+eotup

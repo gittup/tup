@@ -2,7 +2,7 @@
 
 # Test the %e extension variable, which is only valid in a foreach command.
 
-. ../tup.sh
+. ./tup.sh
 touch foo.c
 touch bar.c
 touch asm.S
@@ -15,3 +15,5 @@ update
 tup_dep_exist . foo.c . 'gcc  -c foo.c -o foo.o'
 tup_dep_exist . bar.c . 'gcc  -c bar.c -o bar.o'
 tup_dep_exist . asm.S . 'gcc -DASM -c asm.S -o asm.o'
+
+eotup

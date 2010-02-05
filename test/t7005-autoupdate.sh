@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 tup config autoupdate 1
 cat > Tupfile << HERE
@@ -40,3 +40,5 @@ HERE
 rm page.txt
 tup flush
 check_not_exist page.html
+
+eotup

@@ -3,7 +3,7 @@
 # Apparently I have a bug where I run the updater in a subdirectory and it
 # gets confused and thinks it's writing to the wrong file.
 
-. ../tup.sh
+. ./tup.sh
 
 tmkdir a
 tmkdir a/b
@@ -17,3 +17,5 @@ sym_check a/b/prog main
 tup touch a/b/foo.c
 cd a
 update
+
+eotup

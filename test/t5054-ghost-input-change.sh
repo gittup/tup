@@ -3,7 +3,7 @@
 # See what happens if the command string doesn't change, but the input
 # dependencies of the command do. The ghost node should still be removed.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : ok.sh |> sh %f > %o |> output
 HERE
@@ -26,3 +26,5 @@ update
 echo 'heyo' | diff - output
 tup_dep_no_exist . ghost . 'sh ok.sh > output'
 tup_object_no_exist . ghost
+
+eotup

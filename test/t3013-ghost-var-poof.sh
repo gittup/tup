@@ -2,7 +2,7 @@
 
 # Make sure a ghost variable gets removed when necessary.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
@@ -26,3 +26,5 @@ update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
 tup_object_no_exist @ BAR
+
+eotup

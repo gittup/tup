@@ -2,7 +2,7 @@
 
 # See that using %[fFbB] when there is no input gets an error.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> cat %f > %o |> bar
 HERE
@@ -20,3 +20,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 parse_fail "Shouldn't be able to use %B without input files"
+
+eotup

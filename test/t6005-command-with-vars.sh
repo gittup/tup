@@ -2,7 +2,7 @@
 
 # Test that a rule in a Tupfile can use variables
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 CC = gcc
 CFILES = *.c
@@ -21,3 +21,5 @@ sym_check prog foo
 tup_object_exist . "gcc foo.o -o prog"
 tup_object_exist . "gcc -c foo.c -o foo.o"
 tup_object_exist . prog foo.o
+
+eotup

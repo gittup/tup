@@ -2,7 +2,7 @@
 
 # Make sure changing a ghost node to a generated node works.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> (cat secret/ghost || echo nofile) > %o |> output.txt
 HERE
@@ -15,3 +15,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update
+
+eotup

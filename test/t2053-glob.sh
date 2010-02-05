@@ -2,7 +2,7 @@
 
 # Make sure all forms of sqlite globbing work.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c [123].d ?.e |> test %f |>
 HERE
@@ -17,3 +17,5 @@ for i in boo.cc 4.d 52.e; do
 	check_exist $i
 	tup_dep_no_exist . $i . "test $i"
 done
+
+eotup

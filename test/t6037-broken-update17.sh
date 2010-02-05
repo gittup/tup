@@ -7,7 +7,7 @@
 # there is a dependency from a directory to a command (as is the case with
 # cpio - most normal commands don't have this).
 
-. ../tup.sh
+. ./tup.sh
 
 grep_yes()
 {
@@ -55,3 +55,5 @@ update
 grep_yes '^sub$'
 grep_yes '^sub/foo.o$'
 grep_no '^sub/bar.o$'
+
+eotup

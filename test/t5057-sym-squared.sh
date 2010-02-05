@@ -3,7 +3,7 @@
 # Make sure we can make a symlink to a file with a path that also includes
 # a symlink.
 
-. ../tup.sh
+. ./tup.sh
 
 mkdir foo
 ln -s foo boo
@@ -17,3 +17,5 @@ tup_dep_exist . sym . 'cat sym'
 tup_dep_exist foo ok.txt . 'cat sym'
 # TODO: How do we make sure the symlinked directory causes an update?
 #tup_dep_exist . boo . 'cat sym'
+
+eotup

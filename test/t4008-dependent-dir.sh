@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : fs/*.o |> ld -r %f -o built-in.o |> built-in.o
@@ -28,3 +28,5 @@ echo "void ext5fs(void) {}" > fs/input/ext5.c
 tup touch fs/input/ext5.c
 update
 sym_check built-in.o ext3fs ext4fs ext5fs
+
+eotup

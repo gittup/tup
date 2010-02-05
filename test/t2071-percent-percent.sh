@@ -2,7 +2,7 @@
 
 # Make %% end up doing a single % in the command string
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> printf "hey %%i yo\n" 3  |>
 HERE
@@ -13,3 +13,5 @@ else
 	echo "Error: %% not properly expanded" 1>&2
 	exit 1
 fi
+
+eotup

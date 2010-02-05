@@ -2,7 +2,7 @@
 
 # See what happens if we use a variable that doesn't exist.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
@@ -19,3 +19,5 @@ varsetall BAR=y
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
+
+eotup

@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # First create a foo.c program, then stop the monitor
 tup monitor
@@ -47,3 +47,5 @@ tup monitor
 update
 sym_check prog ~bar ~bar2
 stop_monitor
+
+eotup

@@ -3,7 +3,7 @@
 # Verify that removing a variable from the database will cause a dependent
 # Tupfile to be re-parsed.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 src-y:=
 src-@(BLAH) = foo.c
@@ -21,3 +21,5 @@ varsetall
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o"
 check_not_exist foo.o
+
+eotup

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Same as t5027, only the file we stomp is in a different directory.
-. ../tup.sh
+. ./tup.sh
 
 tmkdir sub
 cat > sub/Tupfile << HERE
@@ -25,3 +25,5 @@ tup touch Tupfile
 update
 echo 'foo' | diff - sub/file1
 echo 'bar' | diff - file2
+
+eotup

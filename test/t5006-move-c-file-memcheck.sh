@@ -5,7 +5,7 @@
 
 echo "[33mTODO: use valgrind? mtrace doesn't work with threads[0m"
 exit 0
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cru %o %f |> libfoo.a
@@ -29,3 +29,5 @@ MALLOC_TRACE=mout tup upd
 # Still seem to be some leaks in sqlite, even though I'm finalizing the
 # statements and doing an sqlite3_close(). Maybe I'm missing something.
 cat mout | grep -v libsqlite3.so | mtrace `which tup` -
+
+eotup

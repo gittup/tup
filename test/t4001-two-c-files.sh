@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 # Verify both files are compiled
@@ -34,3 +34,5 @@ fi
 check_empty_tupdirs
 sym_check foo.o main foo2
 sym_check bar.o bar1
+
+eotup

@@ -2,7 +2,7 @@
 
 # Like t5013, but now with execvp.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach exec_test.c exe.c |> gcc %f -o %o |> %B
 : exec_test exe |> ./exec_test && touch %o |> test_passed
@@ -24,3 +24,5 @@ tup touch Tupfile exec_test.c exe.c
 update
 
 check_updates exe.c test_passed
+
+eotup

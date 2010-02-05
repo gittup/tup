@@ -2,7 +2,7 @@
 
 # We have a ghost Tuprules.tup node, and then move a file over it. The
 # necessary directories should be re-parsed.
-. ../tup.sh
+. ./tup.sh
 tup monitor
 mkdir a
 mkdir a/a2
@@ -22,3 +22,5 @@ update
 
 tup_dep_exist a Tuprules.tup a a2
 tup_object_exist a/a2 'echo 4'
+
+eotup

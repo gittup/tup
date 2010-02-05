@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 tmkdir bar
@@ -13,3 +13,5 @@ update
 sym_check bar/foo.o main
 tup_dep_exist . foo.h bar "gcc -c foo.c -o foo.o"
 tup_dep_exist bar "gcc -c foo.c -o foo.o" bar foo.o
+
+eotup

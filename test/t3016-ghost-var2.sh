@@ -2,7 +2,7 @@
 
 # Make sure ghost variables stay when setting all normal variables.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c
 file-@(GHOST) += bar.c
@@ -23,3 +23,5 @@ tup_dep_exist @ GHOST 0 .
 varsetall FOO=4
 tup_object_exist @ GHOST
 tup_dep_exist @ GHOST 0 .
+
+eotup

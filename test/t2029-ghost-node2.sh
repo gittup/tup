@@ -2,7 +2,7 @@
 
 # Similar to t2028, only the ghost file is now created by a new rule.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE
@@ -22,3 +22,5 @@ HERE
 tup touch Tupfile
 update
 echo alive | diff output.txt -
+
+eotup

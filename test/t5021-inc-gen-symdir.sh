@@ -4,7 +4,7 @@
 # else in the path. Here we'll make a directory symlink in a rule, and then
 # later try to include a Tupfile by using that directory link.
 
-. ../tup.sh
+. ./tup.sh
 
 tmkdir foo
 tmkdir foo/arch-x86
@@ -20,3 +20,5 @@ include foo/arch/rules.tup
 HERE
 tup touch Tupfile
 update_fail
+
+eotup

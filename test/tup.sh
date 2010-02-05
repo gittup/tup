@@ -1,4 +1,11 @@
-tupdir=$PWD
+tupcurdir=$PWD
+testname=`echo $0 | sed 's/\.\///' | sed 's/\.sh//'`
+tuptestdir="tuptesttmp-$testname"
+rm -rf $tuptestdir
+mkdir $tuptestdir
+cd $tuptestdir
+tup init --no-sync --force
+
 tmkdir()
 {
 	mkdir $1
@@ -323,4 +330,12 @@ HERE
 
 	gcc client.c ../../libtup_client.a -o client
 	tup touch client
+}
+
+eotup()
+{
+	tup stop || true
+	cd $tupcurdir
+	rm -rf $tuptestdir
+	exit 0
 }

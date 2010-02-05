@@ -3,7 +3,7 @@
 # After creating a ghost dir and ghost node, remove the rule and see that both
 # ghosts are poofed.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 cat secret/ghost 2>/dev/null || echo nofile
 HERE
@@ -22,3 +22,5 @@ update
 
 tup_object_no_exist . secret
 tup_object_no_exist secret ghost
+
+eotup

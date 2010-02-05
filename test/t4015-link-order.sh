@@ -4,7 +4,7 @@
 # %f list. We check this by making an archive, which has to come after the
 # object file in the command line.
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -19,3 +19,5 @@ int main(void) {return foo();}
 HERE
 tup touch foo.c lib.c Tupfile
 update
+
+eotup

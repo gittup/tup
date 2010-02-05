@@ -2,7 +2,7 @@
 
 # Test ifdef
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 ifdef FOO
 objs-y += foo.c
@@ -36,3 +36,5 @@ tup touch Tupfile
 tup parse
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist @ FOO 0 .
+
+eotup

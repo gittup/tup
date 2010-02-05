@@ -4,7 +4,7 @@
 # Tupfile has errors. This could be an issue based on the way I plan to delete
 # links before parsing for 4009. I think the rollback in the updater will make
 # this all magically work though.
-. ../tup.sh
+. ./tup.sh
 
 tmkdir bar
 cat > bar/Tupfile << HERE
@@ -31,3 +31,5 @@ HERE
 tup touch bar/Tupfile
 update_fail
 tup_dep_exist . fs . bar
+
+eotup

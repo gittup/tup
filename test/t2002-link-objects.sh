@@ -3,7 +3,7 @@
 # Since *.o isn't 'tup touched', we have to get them from the output of the
 # first rule.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o prog %f |> prog
@@ -14,3 +14,5 @@ tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o"
 tup_object_exist . "gcc -c bar.c -o bar.o"
 tup_object_exist . "gcc -o prog bar.o foo.o"
+
+eotup

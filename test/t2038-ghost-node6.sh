@@ -4,7 +4,7 @@
 # to it, then delete the symlink. The ghost should hang around because of its
 # use in a rule.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE
@@ -25,3 +25,5 @@ echo 'alive' > ghost
 tup touch ghost
 update
 echo alive | diff output.txt -
+
+eotup

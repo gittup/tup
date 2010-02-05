@@ -6,7 +6,7 @@
 # created C and added a file to A at the same time, then C may be parsed first
 # and not try to parse B because it is already parsed, and I'm just checking
 # create flags at the moment, instead of its presence in the DAG.
-. ../tup.sh
+. ./tup.sh
 
 # Need to make sure C runs first when it comes up (seems to go in order of ID)
 tmkdir C
@@ -39,3 +39,5 @@ tup touch C/Tupfile
 tup touch A/Tupfile
 update
 check_exist A/foo.txt A/bar.txt B/foo.txt B/bar.txt C/foo.txt C/bar.txt
+
+eotup

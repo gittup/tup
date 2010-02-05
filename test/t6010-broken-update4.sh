@@ -5,7 +5,7 @@
 # first one fails, so we change the Tupfile to create all new commands, the old
 # ones are marked delete *and* modify, and they don't actually get removed.
 # They should still be deleted.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o -Dbork=<Bork> |> %B.o
 HERE
@@ -31,3 +31,5 @@ tup_object_exist . 'gcc -c foo.c -o foo.o'
 tup_object_exist . 'gcc -c bar.c -o bar.o'
 tup_object_no_exist . 'gcc -c foo.c -o foo.o -Dbork=<Bork>'
 tup_object_no_exist . 'gcc -c bar.c -o bar.o -Dbork=<Bork>'
+
+eotup

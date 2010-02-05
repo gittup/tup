@@ -3,7 +3,7 @@
 # Make sure a lone ghost in a directory doesn't end up killing the directory
 # that it's in.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir foo
 cat > Tupfile << HERE
 : |> (cat foo/ghost || echo nofile) > %o |> output.txt
@@ -18,3 +18,5 @@ tup touch Tupfile
 update
 
 tup_object_exist . foo
+
+eotup

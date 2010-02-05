@@ -4,7 +4,7 @@
 # then later a command is created that writes to that node. We should get
 # yelled at that the input was unspecified.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> (cat ghost || echo nofile) > %o |> output.txt
 HERE
@@ -26,3 +26,5 @@ HERE
 tup touch Tupfile
 update
 echo yo | diff - output.txt
+
+eotup

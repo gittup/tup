@@ -2,7 +2,7 @@
 
 # Test backslash for line-continuation.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 file-y = foo.c \\
 	 bar.c
@@ -15,3 +15,5 @@ update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_exist . "cat bar.c > bar.o"
+
+eotup

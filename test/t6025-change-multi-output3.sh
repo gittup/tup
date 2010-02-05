@@ -3,7 +3,7 @@
 # Similar to t6003, only we forget to update the shell script. Try to remove an
 # existing target and see that the shell script runs again.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> sh ok.sh |> a b
 HERE
@@ -32,3 +32,5 @@ update
 
 check_exist a
 check_not_exist b
+
+eotup

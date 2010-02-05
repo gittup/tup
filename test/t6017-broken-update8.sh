@@ -11,7 +11,7 @@
 # 4.3.2 from 4.1.something, gcj became slow as crap. The 'ls | grep' part is
 # to mimic the getdents() syscall that javac and gcj appear to use.
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : B.java |> cat %f > %o |> B.class
@@ -35,3 +35,5 @@ check_not_exist A.class B.class
 check_exist A.o B.o
 echo 'B' | diff - B.o
 (echo 'Using B.java'; echo 'B'; echo 'A') | diff - A.o
+
+eotup

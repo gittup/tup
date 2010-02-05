@@ -6,7 +6,7 @@
 # two scripts dependent on the same ghost node, then creating the ghost. Both
 # scripts should update.
 
-. ../tup.sh
+. ./tup.sh
 
 tmkdir include
 cat > ok.sh << HERE
@@ -28,3 +28,5 @@ tup touch include/ghost
 update
 echo alive | diff output.txt -
 echo alive | diff foo-output.txt -
+
+eotup

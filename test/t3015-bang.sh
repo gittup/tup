@@ -2,7 +2,7 @@
 
 # Test bang macros.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 headers = foo.h
 !cc = | foo.h |> gcc -c %f -o %o |>
@@ -20,3 +20,5 @@ tup_dep_exist . foo.h . 'gcc -c bar.c -o bar.o'
 
 check_updates foo.h.in foo.o
 check_no_updates foo.h.in bar.o
+
+eotup

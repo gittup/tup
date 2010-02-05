@@ -4,7 +4,7 @@
 # 'foo' that uses files from '.' that we get yelled at. This is what we in the
 # biz call a "circular dependency".
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo/*.o |> gcc %f -o %o |> prog
 HERE
@@ -20,3 +20,5 @@ HERE
 
 tup touch Tupfile foo/Tupfile foo/ok.c
 update_fail
+
+eotup

@@ -3,7 +3,7 @@
 # Same as t7008, only we move the dir back to its original spot before doing
 # the update.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 mkdir a
 mkdir a/a2
@@ -31,3 +31,5 @@ sym_check a/foo.o main
 tup_object_no_exist . b
 tup_object_no_exist b a2 foo.o 'gcc -c a2/foo.c -o foo.o'
 tup_object_no_exist b/a2 foo.c
+
+eotup

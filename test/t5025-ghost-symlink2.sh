@@ -3,7 +3,7 @@
 # See what happens if we have a valid symlink, then remove the destination
 # node, and then re-create the destination.
 
-. ../tup.sh
+. ./tup.sh
 echo "#define FOO 3" > foo-x86.h
 ln -s foo-x86.h foo.h
 cat > Tupfile << HERE
@@ -28,3 +28,5 @@ update
 echo '#define FOO new' | diff - output.txt
 check_updates foo.h output.txt
 check_updates foo-x86.h output.txt
+
+eotup

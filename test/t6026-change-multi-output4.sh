@@ -4,7 +4,7 @@
 # should still try to run again, so that we can find out that it is writing to
 # the wrong files.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> sh ok.sh |> a b
 HERE
@@ -35,3 +35,5 @@ update
 
 check_exist a c
 check_not_exist b
+
+eotup

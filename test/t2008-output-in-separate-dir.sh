@@ -5,7 +5,7 @@
 # which seems to be more useful, it would be weird to also output files in a
 # different directory.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir bar
 cat > Tupfile << HERE
 : |> echo hey %o |> bar/foo.o
@@ -14,3 +14,5 @@ tup touch Tupfile
 update_fail
 tup_object_no_exist . "echo hey bar/foo.o"
 tup_object_no_exist bar "foo.o"
+
+eotup

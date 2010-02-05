@@ -3,7 +3,7 @@
 # Test to make sure if a Tupfile is dependent on another that the link between
 # directories exists, and then when the dependency between Tupfiles is removed,
 # the link is removed.
-. ../tup.sh
+. ./tup.sh
 
 tmkdir bar
 cat > bar/Tupfile << HERE
@@ -30,3 +30,5 @@ tup touch bar/Tupfile
 update
 tup_dep_no_exist . fs . bar
 check_not_exist bar/built-in.o
+
+eotup

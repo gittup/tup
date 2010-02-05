@@ -3,7 +3,7 @@
 # Make sure that if we remove a header so the compilation falls through to the
 # next header, the first one becomes a ghost (the dependency should still be
 # there).
-. ../tup.sh
+. ./tup.sh
 
 tmkdir foo
 tmkdir bar
@@ -26,3 +26,5 @@ update
 
 tup_dep_exist foo me.h . 'gcc -c ok.c -o ok.o -Ifoo -Ibar'
 tup_dep_exist bar me.h . 'gcc -c ok.c -o ok.o -Ifoo -Ibar'
+
+eotup

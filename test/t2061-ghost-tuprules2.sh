@@ -3,7 +3,7 @@
 # Now make sure a ghost Tuprules.tup already exists before creating a new
 # Tupfile to try to include it.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir fs
 tmkdir fs/sub
 cat > fs/Tupfile << HERE
@@ -26,3 +26,5 @@ tup touch fs/sub/Tupfile
 tup parse
 
 tup_dep_exist fs/sub helper.c fs/sub 'gcc  -c helper.c -o helper.o'
+
+eotup

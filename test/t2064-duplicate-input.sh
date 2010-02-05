@@ -2,7 +2,7 @@
 
 # Duplicate inputs should be pruned.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o {objs}
 : {objs} foo.o |> gcc %f -o %o |> prog
@@ -12,3 +12,5 @@ tup touch foo.c Tupfile
 update
 
 tup_object_exist . 'gcc foo.o -o prog'
+
+eotup

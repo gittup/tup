@@ -4,7 +4,7 @@
 # tup_entry_add's a commit or two ago. Only happens when the monitor is
 # running.
 
-. ../tup.sh
+. ./tup.sh
 
 tup monitor
 cat > Tuprules.tup << HERE
@@ -19,3 +19,5 @@ update
 
 tup touch Tupfile
 update
+
+eotup

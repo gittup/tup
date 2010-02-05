@@ -6,9 +6,11 @@
 # would need to fiddle with the db directly, or add more debugging
 # functionality to tup.
 
-. ../tup.sh
+. ./tup.sh
 tup touch foo
 tup_object_exist . foo
 
 tup ghost_check
 tup_object_exist . foo
+
+eotup

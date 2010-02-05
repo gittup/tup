@@ -2,7 +2,7 @@
 
 # Kinda like t7009, only we don't mess with the directory that has the Tupfile.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 mkdir a
 mkdir output
@@ -29,3 +29,5 @@ sym_check output/foo.o main
 
 tup_object_no_exist . b
 tup_object_no_exist b foo.c
+
+eotup

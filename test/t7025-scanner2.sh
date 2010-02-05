@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # Make sure we don't get a warning for deleting a file if it was never created
 # in the first place.
@@ -24,3 +24,5 @@ else
 	echo "Did not receive warning from tup scan" 1>&2
 	exit 1
 fi
+
+eotup

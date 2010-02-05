@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 # Verify both files are compiled
@@ -21,3 +21,5 @@ check_not_exist bar.o
 tup_object_no_exist bar.c bar.o
 sym_check realbar.o bar1
 sym_check prog main bar1
+
+eotup

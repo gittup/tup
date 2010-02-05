@@ -2,7 +2,7 @@
 
 # Make sure .gitignore works anywhere in the Tupfile
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 .gitignore
@@ -25,3 +25,5 @@ gitignore_bad Tupfile .gitignore
 gitignore_good foo.o .gitignore
 gitignore_good bar.o .gitignore
 gitignore_good prog .gitignore
+
+eotup

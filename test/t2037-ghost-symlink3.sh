@@ -3,7 +3,7 @@
 # Make sure that if we have two symlinks pointing to the same ghost, deleting
 # one symlink doesn't kill the ghost.
 
-. ../tup.sh
+. ./tup.sh
 ln -s ghost foo
 ln -s ghost bar
 tup touch foo bar
@@ -17,3 +17,5 @@ tup_object_exist . ghost bar
 rm -f bar
 tup rm bar
 tup_object_no_exist . ghost foo bar
+
+eotup

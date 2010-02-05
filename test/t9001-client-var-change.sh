@@ -2,7 +2,7 @@
 
 # Now try changing a variable and see the client re-execute
 
-. ../tup.sh
+. ./tup.sh
 
 make_tup_client
 
@@ -20,3 +20,5 @@ varsetall defg=hey
 update
 
 echo 'hey' | diff - ok.txt
+
+eotup

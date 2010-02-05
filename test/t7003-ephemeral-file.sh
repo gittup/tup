@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 cp ../testTupfile.tup Tupfile
 
@@ -23,3 +23,5 @@ touch bar.c
 mv bar.c newbar.c
 rm newbar.c
 check_empty_tupdirs
+
+eotup

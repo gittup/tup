@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # See what happens if we change where a symlink points while the monitor is away
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 mkdir foo-x86
@@ -35,3 +35,5 @@ tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist foo-x86 processor.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist foo-ppc processor.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . 'gcc -c foo.c -o foo.o' . foo.o
+
+eotup

@@ -3,7 +3,7 @@
 # Make sure .gitignore generates the standard list if a .git directory is
 # present.
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 .gitignore
@@ -23,3 +23,5 @@ mkdir .git
 update
 gitignore_good .*.swp .gitignore
 gitignore_good .gitignore .gitignore
+
+eotup

@@ -5,10 +5,12 @@
 # making the seemingly innocuous change of removing 'echo bar' would cause the
 # command to now break if we didn't do this.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo foo; false; echo bar |>
 HERE
 
 tup touch Tupfile
 update_fail
+
+eotup

@@ -3,7 +3,7 @@
 # If we have two commands, they obviously have to write to different files.
 # However, if one of them behaves poorly and overwrites the other guy's output,
 # we should automatically re-run the first command.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
@@ -28,3 +28,5 @@ tup touch Tupfile
 update
 echo 'foo' | diff - file1
 echo 'bar' | diff - file2
+
+eotup

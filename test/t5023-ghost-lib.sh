@@ -5,7 +5,7 @@
 # ghost dependency on a/libfoo.a so we can build properly if a/libfoo.a is
 # later created.
 
-. ../tup.sh
+. ./tup.sh
 
 tmkdir a
 tmkdir b
@@ -58,3 +58,5 @@ HERE
 tup touch Tupfile
 update
 echo libA | diff - output.txt
+
+eotup

@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
@@ -20,3 +20,5 @@ else
 	echo "foo.c should have been compiled and linked again." 1>&2
 	exit 1
 fi
+
+eotup

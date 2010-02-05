@@ -3,7 +3,7 @@
 # If we create a symlink to somewhere that doesn't exist, we should get a ghost
 # node there, and properly update things if the file is later created.
 
-. ../tup.sh
+. ./tup.sh
 echo "#define FOO 3" > foo-x86.h
 ln -s foo-x86.h foo.h
 cat > Tupfile << HERE
@@ -33,3 +33,5 @@ echo '#define FOO 4' | diff - output.txt
 check_updates foo.h output.txt
 check_no_updates foo-x86.h output.txt
 check_updates foo-ppc.h output.txt
+
+eotup

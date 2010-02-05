@@ -2,7 +2,7 @@
 
 # Try to move a directory, then move it back to the original directory.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 mkdir a
 mkdir a/a2
@@ -30,3 +30,5 @@ sym_check a/a2/prog main
 tup_object_no_exist . b
 tup_object_no_exist b a2
 tup_object_no_exist b/a2 foo.c foo.o prog 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog'
+
+eotup

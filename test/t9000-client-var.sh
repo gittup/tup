@@ -3,7 +3,7 @@
 # Simple test to verify that a client program can try to access variables,
 # causing those variables to become ghosts.
 
-. ../tup.sh
+. ./tup.sh
 
 make_tup_client
 
@@ -23,3 +23,5 @@ update
 
 tup_object_no_exist @ abcd
 tup_object_exist @ defg
+
+eotup

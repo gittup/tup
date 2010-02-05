@@ -3,7 +3,7 @@
 # Make sure if we have a ghost node that it doesn't get used in wildcarding or
 # explicit inputs.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE
@@ -33,3 +33,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 parse_fail "Shouldn't be able to parse the Tupfile with a ghost node as input."
+
+eotup

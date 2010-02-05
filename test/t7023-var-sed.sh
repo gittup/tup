@@ -3,7 +3,7 @@
 # Make sure a var/sed command doesn't get re-invoked when the monitor is
 # stopped and restarted.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 cat > Tupfile << HERE
@@ -26,3 +26,5 @@ stop_monitor
 tup monitor
 stop_monitor
 check_empty_tupdirs
+
+eotup

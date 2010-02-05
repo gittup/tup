@@ -2,7 +2,7 @@
 
 # See if we can include multiple Tupfiles
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 include foo/Install.tup
 include bar/Install.tup
@@ -22,3 +22,5 @@ HERE
 tup touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
 tup parse
 tup_object_exist . sball.o tab.o
+
+eotup

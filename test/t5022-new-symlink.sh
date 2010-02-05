@@ -2,7 +2,7 @@
 
 # Make sure when a symlink is created, the directory gets re-parsed.
 
-. ../tup.sh
+. ./tup.sh
 
 echo 'int foo(void) {return 0;}' > foo.c
 cat > Tupfile << HERE
@@ -16,3 +16,5 @@ ln -s foo.c bar.c
 tup touch bar.c
 update
 check_exist bar.o
+
+eotup

@@ -5,7 +5,7 @@
 # C file to include the header (without changing the Tupfile), we get yelled at
 # even though the dependency is specified in the Tupfile. This dependency
 # should stick around somehow.
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
@@ -25,3 +25,5 @@ int main(void) {return FOO;}
 HERE
 tup touch foo.c
 update
+
+eotup

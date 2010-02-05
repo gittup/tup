@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Like t5038, but with multiple wrong files.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> touch foo; touch bar; touch baz |> foo
@@ -17,3 +17,5 @@ update
 
 check_exist foo
 check_not_exist bar baz
+
+eotup

@@ -11,7 +11,7 @@
 # some ghost nodes in a directory that gets moved away, then new nodes are
 # created to have the same tupids.
 
-. ../tup.sh
+. ./tup.sh
 mkdir tuptest
 cd tuptest
 re_init
@@ -40,3 +40,5 @@ cd ../../..
 update
 
 stop_monitor
+
+eotup

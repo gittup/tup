@@ -3,7 +3,7 @@
 # Some checks to make sure sticky link changes will only cause a command to be
 # re-executed when necessary (specifically, when a sticky link is removed that
 # is also a normal link).
-. ../tup.sh
+. ./tup.sh
 tmkdir headers
 cat > headers/Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h
@@ -57,3 +57,5 @@ tup touch foo.c
 update --no-scan
 tup_dep_no_exist headers foo.h . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist headers bar.h . 'gcc -c foo.c -o foo.o'
+
+eotup

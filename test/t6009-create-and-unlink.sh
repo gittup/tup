@@ -7,7 +7,7 @@
 # up getting moved over to delete. Either way, those temporary files shouldn't
 # show up in the tup db (basically, these are ephemeral files, only instead of
 # the monitor they come in from the ldpreload/wrapper).
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> ./foo.sh |> foo.h
 HERE
@@ -27,3 +27,5 @@ check_exist foo.h
 check_not_exist foo.tmp
 tup_object_exist . foo.h
 tup_object_no_exist . foo.tmp
+
+eotup

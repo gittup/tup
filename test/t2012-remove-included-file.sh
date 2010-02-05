@@ -12,7 +12,7 @@
 # it doesn't impact users with 0 files), but I'm leaving this test the way it
 # is because the faces are silly.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir tmp
 cat > tmp/Tupfile << HERE
 include Tupfile.vars
@@ -41,3 +41,5 @@ HERE
 tup touch tmp/Tupfile
 update
 tup_dep_no_exist tmp Tupfile.vars . tmp
+
+eotup

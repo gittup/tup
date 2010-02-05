@@ -2,7 +2,7 @@
 
 # If a generated file hasn't been created yet, doing a scan shouldn't cause the
 # directory to get put into the create list.
-. ../tup.sh
+. ./tup.sh
 
 check_empty_create()
 {
@@ -23,3 +23,5 @@ check_empty_create
 
 tup scan
 check_empty_create
+
+eotup

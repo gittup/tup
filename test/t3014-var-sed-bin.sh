@@ -2,7 +2,7 @@
 
 # Check that static binning with a varsed rule works.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt {txt}
 : foreach {txt} |> cp %f %o |> %B.copied
@@ -14,3 +14,5 @@ update
 
 echo "hey sup yo" | diff out.copied -
 check_not_exist foo.copied
+
+eotup

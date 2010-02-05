@@ -3,7 +3,7 @@
 echo "[33mSkip t5005 - not needed?[0m"
 exit 0
 
-. ../tup.sh
+. ./tup.sh
 echo 'this is a file' > file1
 ln file1 file2
 cat > Makefile << HERE
@@ -22,3 +22,5 @@ tup touch file1
 
 update
 check_exist new-file1 new-file2
+
+eotup

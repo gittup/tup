@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 # Since the 'foreach *.c' in the Tupfile will process the files in alphabetical
@@ -20,3 +20,5 @@ check_not_exist foo.o zap.o prog
 update_fail -k
 check_exist bar.o zap.o
 check_not_exist foo.o prog
+
+eotup

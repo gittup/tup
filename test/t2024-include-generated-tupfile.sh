@@ -9,7 +9,7 @@
 # parsed, so that would get an error anyway. This test is to specifically check
 # that it should error on the fact that it was a generated file.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir foo
 cat > foo/Tupfile << HERE
 : |> echo "var=foo" > %o |> inc
@@ -24,3 +24,5 @@ include foo/inc
 HERE
 tup touch Tupfile
 update_fail
+
+eotup

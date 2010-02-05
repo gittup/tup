@@ -3,7 +3,7 @@
 # See what happens if we try to read from a non-existent file in a non-existent
 # directory.
 
-. ../tup.sh
+. ./tup.sh
 cat > ok.sh << HERE
 cat secret/ghost 2>/dev/null || echo nofile
 HERE
@@ -20,3 +20,5 @@ echo 'alive' > secret/ghost
 tup touch secret/ghost
 update
 echo alive | diff output.txt -
+
+eotup

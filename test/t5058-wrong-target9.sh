@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Like t5038, but the file is written in a different directory
-. ../tup.sh
+. ./tup.sh
 
 tmkdir sub
 cat > Tupfile << HERE
@@ -21,3 +21,5 @@ update
 
 check_exist foo bar
 check_not_exist sub/bar
+
+eotup

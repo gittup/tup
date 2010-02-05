@@ -2,7 +2,7 @@
 
 # Test the include_rules directive.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir fs
 tmkdir fs/sub
 cat > fs/Tupfile << HERE
@@ -42,3 +42,5 @@ tup_dep_exist fs Tuprules.tup . fs
 tup_dep_exist fs Tuprules.tup fs sub
 tup_dep_no_exist fs/sub Tuprules.tup . fs
 tup_dep_exist fs/sub Tuprules.tup fs sub
+
+eotup

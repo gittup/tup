@@ -3,7 +3,7 @@
 # Check that if a Tupfile stops using a variable, that var no longer has a
 # dependency on the directory.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
@@ -30,3 +30,5 @@ tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"
 tup_object_no_exist tmp "cat bar.c > bar.o"
 tup_dep_no_exist @ BAR . tmp
+
+eotup

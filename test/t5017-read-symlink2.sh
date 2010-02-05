@@ -2,7 +2,7 @@
 
 # Same as t5016, only the link points to a file in a subdirectory.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir arch
 echo "#define FOO 3" > arch/foo-x86.h
 echo "#define FOO 4" > arch/foo-ppc.h
@@ -25,3 +25,5 @@ update
 check_updates foo.h foo.o
 check_no_updates arch/foo-x86.h foo.o
 check_updates arch/foo-ppc.h foo.o
+
+eotup

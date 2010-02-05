@@ -2,7 +2,7 @@
 
 # Make sure that files that go outside of tup are properly ignored.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir foo
 tmkdir include
 cat > foo/Tupfile << HERE
@@ -10,3 +10,5 @@ cat > foo/Tupfile << HERE
 HERE
 tup touch foo/Tupfile
 update
+
+eotup

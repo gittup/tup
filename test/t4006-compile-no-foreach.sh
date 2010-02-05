@@ -5,7 +5,7 @@
 # output has done a select on it. This addresses a specific bug discovered
 # while tupifying sysvinit.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o|> %B.o
 : foo.o |> gcc %f -o prog |> prog
@@ -24,3 +24,5 @@ tup touch foo.c Tupfile
 update
 sym_check foo.o main
 tup_object_exist . foo.o prog
+
+eotup

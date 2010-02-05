@@ -2,7 +2,7 @@
 
 # Make sure writing to a file that tup doesn't know about at all is removed
 # from the filesystem.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> touch foo; touch bar |> foo
@@ -18,3 +18,5 @@ update
 
 check_exist foo
 check_not_exist bar
+
+eotup

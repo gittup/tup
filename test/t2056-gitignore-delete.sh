@@ -2,7 +2,7 @@
 
 # .gitignore with deleted files
 
-. ../tup.sh
+. ./tup.sh
 cat > Tuprules.tup << HERE
 .gitignore
 HERE
@@ -39,3 +39,5 @@ gitignore_bad Tupfile .gitignore
 gitignore_good foo.o .gitignore
 gitignore_bad bar.o .gitignore
 gitignore_good prog .gitignore
+
+eotup

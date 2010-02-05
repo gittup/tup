@@ -2,7 +2,7 @@
 
 # Test using a var to sed a file
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 HERE
@@ -22,3 +22,5 @@ update
 
 tup_object_no_exist . out.txt
 tup_object_no_exist . ", foo.txt > out.txt"
+
+eotup

@@ -2,7 +2,7 @@
 
 # See if we can include a Tupfile using a variable de-reference.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 var = foo
 include \$(var).tup
@@ -31,3 +31,5 @@ tup parse
 tup_object_exist . 'echo bar > file'
 tup_dep_no_exist . foo.tup 0 .
 tup_dep_exist . bar.tup 0 .
+
+eotup

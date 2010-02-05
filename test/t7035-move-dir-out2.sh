@@ -4,7 +4,7 @@
 # all the subdirectories. Use the USR1 signal to have the monitor quit if it
 # has a watch on any invalid tupid.
 
-. ../tup.sh
+. ./tup.sh
 mkdir tuptest
 cd tuptest
 re_init
@@ -25,3 +25,5 @@ signal_monitor
 stop_monitor
 update
 tup_object_no_exist . foo
+
+eotup

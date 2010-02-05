@@ -2,7 +2,7 @@
 
 # Make sure ../.. doesn't get condensed to nothing.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir foo
 cd foo
 tmkdir baz
@@ -12,3 +12,5 @@ tup touch ../baz/../../foo.c
 cd ../..
 tup_object_exist . bar.c
 tup_object_exist . foo.c
+
+eotup

@@ -2,7 +2,7 @@
 
 # Make sure a dependent Tupfile that fails still gets re-parsed.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir foo
 tmkdir bar
 cat > foo/Tupfile << HERE
@@ -25,3 +25,5 @@ update_fail
 
 # An update should again try to parse bar and fail again.
 update_fail
+
+eotup

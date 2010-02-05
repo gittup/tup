@@ -3,7 +3,7 @@
 # Make sure changing a ghost dir to a real file works. Basically the same as
 # t5044, only we're checking to see that a file can still have ghost children.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> (cat secret/ghost || echo nofile) > %o |> output.txt
 HERE
@@ -24,3 +24,5 @@ tup touch secret/ghost
 update
 
 echo boo | diff - output.txt
+
+eotup

@@ -2,7 +2,7 @@
 
 # Same as t5017, only the symlink points to a directory instead of a file.
 
-. ../tup.sh
+. ./tup.sh
 mkdir arch-x86
 mkdir arch-ppc
 tup touch arch-x86 arch-ppc
@@ -28,3 +28,5 @@ update
 check_updates arch/foo.h foo.o
 check_no_updates arch-x86/foo.h foo.o
 check_updates arch-ppc/foo.h foo.o
+
+eotup

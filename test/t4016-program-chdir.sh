@@ -11,7 +11,7 @@ exit 0
 # then touch a file back in the original directory. Obviously it doesn't make
 # sense to touch a file in the new directory since that would be illegal.
 
-. ../tup.sh
+. ./tup.sh
 
 mkdir tmp
 cat > ok.sh << HERE
@@ -29,3 +29,5 @@ echo "yo" > tmp/bar
 
 tup touch tmp/bar Tupfile ok.sh
 update
+
+eotup

@@ -3,7 +3,7 @@
 # Similar to t5027, only this time we write a symlink in the wrong spot. This
 # is necessary in addition to t5027 because symlinks are handled differently
 # than normal output files.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
@@ -29,3 +29,5 @@ HERE
 tup touch Tupfile
 update
 echo 'foo' | diff - file1
+
+eotup

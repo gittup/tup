@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 # Check to see if we can create a ghost node, then shutdown the monitor and
 # turn the ghost into a file.
@@ -18,3 +18,5 @@ tup monitor
 update
 stop_monitor
 echo foo | diff - output.txt
+
+eotup

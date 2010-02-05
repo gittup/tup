@@ -6,10 +6,12 @@
 #
 # I don't care about the lib, so I just use ls instead of a linking command.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o {objs}
 : {objs} lib |> ls %f |>
 HERE
 tup touch Tupfile foo.c bar.c lib
 update
+
+eotup

@@ -3,7 +3,7 @@
 # Stop monitor test, now with .gitignore, which is handled kinda differently
 # from other files.
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 mkdir .git
@@ -17,3 +17,5 @@ tup_object_exist . .gitignore Tupfile
 tup monitor
 check_empty_tupdirs
 tup_object_exist . .gitignore Tupfile
+
+eotup

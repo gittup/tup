@@ -2,7 +2,7 @@
 
 # We have a ghost node that is pointed to by another node, then move a
 # directory over the parent ghost. The symlink's tupid should be updated.
-. ../tup.sh
+. ./tup.sh
 tup monitor
 
 ln -s secret/ghost a
@@ -24,3 +24,5 @@ if ! tup g | grep 'node_7 -> node_3'; then
 	echo "Error: Symlink was not updated" 1>&2
 	exit 1
 fi
+
+eotup

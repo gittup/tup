@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -21,3 +21,5 @@ tup touch Tupfile main.c fs/ext3.c fs/ext4.c fs/Tupfile
 update
 
 sym_check prog main ext3fs ext4fs
+
+eotup

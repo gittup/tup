@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 # Like t5039, but with symlinks
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : |> touch foo; ln -s foo bar; ln -s foo baz |> foo
@@ -17,3 +17,5 @@ update
 
 check_exist foo
 check_not_exist bar baz
+
+eotup

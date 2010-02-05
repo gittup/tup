@@ -2,7 +2,7 @@
 
 # See if we can escape an at-sign
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo "\@hey" |>
 : |> echo "\@(hey" |>
@@ -12,3 +12,5 @@ update
 
 tup_object_exist . 'echo "\@hey"'
 tup_object_exist . 'echo "@(hey"'
+
+eotup

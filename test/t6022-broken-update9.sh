@@ -5,7 +5,7 @@
 # command would be re-created and also succeed. The end result is two commands
 # trying to write to the same output file, with no error report from tup.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : |> echo hey > %o |> foo
 HERE
@@ -34,3 +34,5 @@ tup touch Tupfile
 update
 tup_object_no_exist . 'echo hey > foo'
 tup_dep_exist . 'echo yo > foo' . foo
+
+eotup

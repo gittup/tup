@@ -9,7 +9,7 @@
 #
 # This test just mimics how it was discovered.
 
-. ../tup.sh
+. ./tup.sh
 tmkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -23,3 +23,5 @@ update
 rm sub/bar.c
 tup rm sub/bar.c
 update
+
+eotup

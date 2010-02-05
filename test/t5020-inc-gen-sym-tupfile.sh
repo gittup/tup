@@ -4,7 +4,7 @@
 # could, we'd have to go from the update phase back to the create phase, which
 # would be silly. Let's *not* do the time warp again.
 
-. ../tup.sh
+. ./tup.sh
 
 # Make the symlink first, in a separate directory. That way it will exist
 # and not be marked delete when we create a new Tupfile in the top-level
@@ -21,3 +21,5 @@ include foo/arch.tup
 HERE
 tup touch Tupfile
 update_fail
+
+eotup

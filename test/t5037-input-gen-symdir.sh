@@ -5,7 +5,7 @@
 # will necessarily be a symlink to a directory, so we can't figure out which
 # files to use as input.
 
-. ../tup.sh
+. ./tup.sh
 
 tmkdir arch-x86
 cat > Tupfile << HERE
@@ -20,3 +20,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 parse_fail "Shouldn't be able to use a generated symlink in input specification."
+
+eotup

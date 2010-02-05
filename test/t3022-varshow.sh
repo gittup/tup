@@ -2,7 +2,7 @@
 
 # Make sure 'varshow' works
 
-. ../tup.sh
+. ./tup.sh
 varsetall FOO=sup
 tup read
 tup varshow FOO
@@ -12,3 +12,5 @@ else
 	echo "Variable not displayed in 'varshow'" 1>&2
 	exit 1
 fi
+
+eotup

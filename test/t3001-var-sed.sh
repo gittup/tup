@@ -2,7 +2,7 @@
 
 # Test using a var to sed a file
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 HERE
@@ -17,3 +17,5 @@ tup_object_exist . foo.txt out.txt
 varsetall FOO=blah
 update
 (echo "hey blah yo"; echo "This is an email@address.com") | diff out.txt -
+
+eotup

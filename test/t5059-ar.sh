@@ -3,7 +3,7 @@
 # Make sure just running a regular ar command will include the proper objects.
 # I used to make my ar rules 'rm -f %o; ar ...', but now tup should unlink the
 # output file automatically before running the command.
-. ../tup.sh
+. ./tup.sh
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -19,3 +19,5 @@ rm foo.c
 tup rm foo.c
 update
 sym_check lib.a ~foo bar
+
+eotup

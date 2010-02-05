@@ -2,7 +2,7 @@
 
 # Test the TUP_CWD variable
 
-. ../tup.sh
+. ./tup.sh
 tmkdir fs
 cat > fs/Tupfile << HERE
 include ../bar/Install.tup
@@ -26,3 +26,5 @@ tup touch fs/Tupfile bar/Install.tup tab/Install.tup bar/foo.so tab/blah.so
 update
 tup_object_exist fs foo.so blah.so
 check_exist fs/foo.so fs/blah.so
+
+eotup

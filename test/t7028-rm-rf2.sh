@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 tup monitor
 mkdir a
 echo ': |> echo "#define FOO 3" > %o |> foo.h' > a/Tupfile
@@ -15,3 +15,5 @@ update_fail_msg "Failed to find directory ID for dir"
 
 echo ': foreach *.c |> gcc -c %f -o %o |> %B.o' > b/Tupfile
 update
+
+eotup

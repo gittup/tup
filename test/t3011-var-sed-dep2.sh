@@ -3,7 +3,7 @@
 # Similar to t3009, only make sure that if the variable is deleted the command
 # is still executed.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 , foo.txt |> out.txt
 : out.txt |> cat %f > %o |> new.txt
@@ -23,3 +23,5 @@ varsetall FOO=diggity
 update
 (echo "hey diggity yo") | diff out.txt -
 (echo "hey diggity yo") | diff new.txt -
+
+eotup

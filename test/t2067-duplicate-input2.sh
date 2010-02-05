@@ -2,7 +2,7 @@
 
 # More duplicate input tests.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foreach foo.c foo.c | foo.c foo.h foo.h |> gcc -c %f -o %o |> %B.o {objs}
 : {objs} foo.o |> gcc %f -o %o |> prog
@@ -19,3 +19,5 @@ tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . foo.h . 'gcc -c foo.c -o foo.o'
 tup_object_exist . 'echo blah1 foo.c bar.c'
 tup_object_exist . 'echo blah2 bar.c foo.c'
+
+eotup

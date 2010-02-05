@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
@@ -18,3 +18,5 @@ sym_check newprog foo
 check_not_exist prog
 tup_object_no_exist . "gcc foo.o -o prog"
 tup_object_no_exist . prog
+
+eotup

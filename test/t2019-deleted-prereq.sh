@@ -2,7 +2,7 @@
 
 # Like t2011 and t2018, but this time the prerequisite gets deleted later.
 
-. ../tup.sh
+. ./tup.sh
 cat > Tupfile << HERE
 : foo.txt |> cat %f > %o |> bar.txt
 : bar.txt |> cat %f |>
@@ -17,3 +17,5 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 update_fail
+
+eotup

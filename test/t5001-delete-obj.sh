@@ -1,6 +1,6 @@
 #! /bin/sh -e
 
-. ../tup.sh
+. ./tup.sh
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {return 0;}" > foo.c
@@ -22,3 +22,5 @@ rm prog
 tup rm prog
 update
 sym_check prog main bar1
+
+eotup

@@ -2,7 +2,7 @@
 
 # Make sure we can't write to a file in the wrong directory using %f
 
-. ../tup.sh
+. ./tup.sh
 tmkdir sub
 touch sub/foo.c
 cat > Tupfile << HERE
@@ -11,3 +11,5 @@ HERE
 tup touch sub/foo.c Tupfile
 update_fail
 check_not_exist foo.o sub/foo.o
+
+eotup
