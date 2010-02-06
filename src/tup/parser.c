@@ -791,6 +791,44 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		eq--;
 	eq[1] = 0;
 
+	if(value[0] == '!') {
+		/* Alias one macro as another */
+		struct bang_rule *br;
+		struct bang_rule *cur_br;
+
+		st = string_tree_search(&tf->bang_tree, value, -1);
+		if(!st) {
+			fprintf(stderr, "Error: Unable to find !-macro '%s'\n", value);
+			return -1;
+		}
+		cur_br = container_of(st, struct bang_rule, st);
+
+		br = malloc(sizeof *br);
+		if(!br) {
+			perror("malloc");
+			return -1;
+		}
+		/* The value field is only used for freeing, but we don't need
+		 * to allocate it for aliasing.
+		 */
+		br->value = NULL;
+		br->input = cur_br->input;
+		br->command = cur_br->command;
+		br->command_len = cur_br->command_len;
+		br->output_pattern = cur_br->output_pattern;
+		br->st.s = strdup(p);
+		if(!br->st.s) {
+			perror("strdup");
+			return -1;
+		}
+		br->st.len = eq - p + 1;
+		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
+			fprintf(stderr, "Error inserting bang rule into tree\n");
+			return -1;
+		}
+		return 0;
+	}
+
 	alloc_value = strdup(value);
 	if(!alloc_value) {
 		perror("strdup");
@@ -807,6 +845,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 	st = string_tree_search(&tf->bang_tree, p, -1);
 	if(st) {
+		/* Replace existing !-macro */
 		struct bang_rule *cur_br;
 
 		cur_br = container_of(st, struct bang_rule, st);
@@ -817,6 +856,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		cur_br->command_len = command_len;
 		cur_br->output_pattern = output;
 	} else {
+		/* Create new !-macro */
 		struct bang_rule *br;
 
 		br = malloc(sizeof *br);
@@ -910,7 +950,8 @@ static void free_bang_tree(struct rb_root *root)
 		struct bang_rule *br = container_of(st, struct bang_rule, st);
 		rb_erase(rbn, root);
 		free(st->s);
-		free(br->value);
+		if(br->value)
+			free(br->value);
 		free(br);
 	}
 }
