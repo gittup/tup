@@ -885,12 +885,18 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 {
 	struct string_tree *st;
 
-	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
-				 ext);
+	/* First try to find the extension-specific rule, and if not then use
+	 * the general one. Eg: if the input is foo.c, then the extension is ".c",
+	 * so try "!cc.c" first, then "!cc" second.
+	 */
+	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, ext);
 	if(!st) {
-		fprintf(stderr, "Error finding bang variable: '%s'\n",
-			r->command);
-		return -1;
+		st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, NULL);
+		if(!st) {
+			fprintf(stderr, "Error finding bang variable: '%s'\n",
+				r->command);
+			return -1;
+		}
 	}
 	return __parse_bang_rule(tf, r, st, cwd, clen);
 }
@@ -1102,18 +1108,10 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		char *old_command = NULL;
 		char *old_output_pattern = NULL;
 		int old_command_len = 0;
-		int per_bang = 0;
+		int is_bang = 0;
 
 		if(r->command[0] == '!') {
-			if(r->command[r->command_len-1] == '.') {
-				per_bang = 1;
-				old_command = r->command;
-				old_command_len = r->command_len;
-				old_output_pattern = r->output_pattern;
-			} else {
-				if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
-					return -1;
-			}
+			is_bang = 1;
 		}
 
 		/* For a foreach loop, iterate over each entry in the rule's
@@ -1122,6 +1120,9 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		 * allocating a separate nle, which is why we don't have to do
 		 * a delete_name_list_entry for the temporary list and can just
 		 * reinitialize the pointers using init_name_list.
+		 *
+		 * TODO: Compare ext to previous ext to re-use the bang parsing?
+		 * or would that be a confusing premature optimization?
 		 */
 		while(!list_empty(&r->inputs.entries)) {
 			nle = list_entry(r->inputs.entries.next,
@@ -1134,17 +1135,27 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			add_name_list_entry(&tmp_nl, &tmp_nle);
 			if(tmp_nle.base &&
 			   tmp_nle.extlessbaselen != tmp_nle.baselen) {
-				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
-				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
+				ext = tmp_nle.base + tmp_nle.extlessbaselen;
+				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen;
 			}
-			if(per_bang) {
+			if(is_bang) {
+				/* parse_bang_rule overwrites the command and
+				 * output pattern, so save the old pointers to
+				 * be restored after do_rule().
+				 */
+				old_command = r->command;
+				old_command_len = r->command_len;
+				old_output_pattern = r->output_pattern;
 				if(parse_bang_rule(tf, r, ext, cwd, clen) < 0)
 					return -1;
 			}
-			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext, extlen) < 0)
+			/* The extension in do_rule() does not include the
+			 * leading '.'
+			 */
+			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext+1, extlen-1) < 0)
 				return -1;
 
-			if(per_bang) {
+			if(is_bang) {
 				r->command = old_command;
 				r->command_len = old_command_len;
 				r->output_pattern = old_output_pattern;
