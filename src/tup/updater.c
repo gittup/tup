@@ -1070,8 +1070,7 @@ static void sighandler(int sig)
 static void tup_main_progress(const char *s)
 {
 	static int cur_phase = 0;
-	const int NUM_PHASES = 5;
-	const char *tup[NUM_PHASES+1] = {
+	const char *tup[] = {
 		" tup ",
 		"[07m [0mtup ",
 		"[07m t[0mup ",
