@@ -181,11 +181,9 @@ int parse(struct node *n, struct graph *g)
 	 * on. These will be re-generated when the file is parsed, or when
 	 * the database is rolled back in case of error.
 	 */
-	if(tup_db_cmds_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_cmd_outputs_to_tree(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
-		return -1;
-	if(tup_db_delete_gitignore(tf.tupid, &g->delete_tree, &g->delete_count) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_GENERATED) < 0)
 		return -1;
 
 	tf.dfd = tup_entry_open(n->tent);

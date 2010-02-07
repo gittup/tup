@@ -55,8 +55,7 @@ enum {
 	DB_LINK_STYLE,
 	DB_GET_INCOMING_LINK,
 	DB_DELETE_LINKS,
-	DB_CMDS_TO_TREE,
-	DB_CMD_OUTPUTS_TO_TREE,
+	DB_DIRTYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -1678,22 +1677,6 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree, int *count)
-{
-	struct tup_entry *tent;
-
-	if(tup_db_select_tent(dt, ".gitignore", &tent) < 0)
-		return -1;
-	/* Fine if the .gitignore file isn't present. */
-	if(!tent)
-		return 0;
-
-	if(tree_entry_add(tree, tent->tnode.tupid, tent->type, count) < 0)
-		return -1;
-
-	return 0;
-}
-
 static int db_print(FILE *stream, tupid_t tupid)
 {
 	int rc;
@@ -2398,90 +2381,51 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-static int tree_add_tupids(struct rb_root *tree, sqlite3_stmt *stmt, int *count)
+int tup_db_dirtype_to_tree(tupid_t dt, struct rb_root *tree, int *count, int type)
 {
+	int rc = 0;
 	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE_TO_TREE];
+	static char s[] = "select id from node where dir=? and type=?";
+
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, type);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
+				sqlite3_errmsg(tup_db), s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, type) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		return -1;
+	}
 
 	while(1) {
 		tupid_t tupid;
-		int type;
 
-		dbrc = sqlite3_step(stmt);
+		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
-			return 0;
+			break;
 		}
 		if(dbrc != SQLITE_ROW) {
 			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
+			rc = -1;
+			break;
 		}
 
-		tupid = sqlite3_column_int64(stmt, 0);
-		type = sqlite3_column_int(stmt, 1);
+		tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(tree_entry_add(tree, tupid, type, count) < 0)
-			return -1;
-	}
-}
-
-int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree, int *count)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CMDS_TO_TREE];
-	static char s[] = "select id, type from node where dir=? and type=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_CMD);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
+		if(tree_entry_add(tree, tupid, type, count) < 0) {
+			rc = -1;
+			break;
 		}
 	}
-
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = tree_add_tupids(tree, *stmt, count);
-
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return rc;
-}
-
-int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree, int *count)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CMD_OUTPUTS_TO_TREE];
-	static char s[] = "select to_id, type from link, node where from_id in (select id from node where dir=? and type=?) and to_id=id";
-
-	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i][0m\n", s, dt, TUP_NODE_CMD);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = tree_add_tupids(tree, *stmt, count);
 
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));

@@ -80,7 +80,6 @@ int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 				    struct rb_root *tree);
-int tup_db_delete_gitignore(tupid_t dt, struct rb_root *tree, int *count);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
@@ -131,8 +130,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 int tup_db_read_vars(tupid_t dt, const char *file);
 
 /* Tree operations */
-int tup_db_cmds_to_tree(tupid_t dt, struct rb_root *tree, int *count);
-int tup_db_cmd_outputs_to_tree(tupid_t dt, struct rb_root *tree, int *count);
+int tup_db_dirtype_to_tree(tupid_t dt, struct rb_root *tree, int *count, int type);
 
 /* scanner operations */
 int tup_db_scan_begin(struct rb_root *tree);
