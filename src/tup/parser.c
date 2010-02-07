@@ -172,14 +172,9 @@ int parse(struct node *n, struct graph *g)
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
 
-	/* Move all existing commands over to delete - then the ones that are
-	 * re-created will be moved back out to modify or none when parsing the
-	 * Tupfile. All those that are no longer generated remain in delete for
-	 * cleanup.
-	 *
-	 * Also delete links to our directory from directories that we depend
-	 * on. These will be re-generated when the file is parsed, or when
-	 * the database is rolled back in case of error.
+	/* Keep track of the commands and generated files that we had created
+	 * previously. We'll check these against the new ones in order to see
+	 * if any should be removed.
 	 */
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_CMD) < 0)
 		return -1;
