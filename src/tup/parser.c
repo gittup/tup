@@ -924,11 +924,9 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 	r->command = br->command;
 	r->command_len = br->command_len;
 
-	/* Output only makes sense if one of them specifies it */
-	if(r->output_pattern[0] && br->output_pattern[0]) {
-		fprintf(stderr, "Error: Both the bang macro and rule specify output patterns.\n");
-		return -1;
-	}
+	/* If the rule didn't specify any output pattern, use the one from the
+	 * !-macro.
+	 */
 	if(!r->output_pattern[0])
 		r->output_pattern = br->output_pattern;
 	return 0;
