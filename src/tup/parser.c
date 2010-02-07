@@ -68,6 +68,7 @@ struct rule {
 
 struct bang_rule {
 	struct string_tree st;
+	int foreach;
 	char *value;
 	char *input;
 	char *command;
@@ -772,6 +773,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *input;
 	char *command;
 	int command_len;
+	int foreach = 0;
 	char *output;
 	char *eq;
 	char *value;
@@ -808,14 +810,28 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("malloc");
 			return -1;
 		}
-		/* The value field is only used for freeing, but we don't need
-		 * to allocate it for aliasing.
-		 */
+		br->foreach = cur_br->foreach;
 		br->value = NULL;
-		br->input = cur_br->input;
-		br->command = cur_br->command;
+		if(cur_br->input) {
+			br->input = strdup(cur_br->input);
+			if(!br->input) {
+				perror("strdup");
+				return -1;
+			}
+		} else {
+			br->input = NULL;
+		}
+		br->command = strdup(cur_br->command);
+		if(!br->command) {
+			perror("strdup");
+			return -1;
+		}
+		br->output_pattern = strdup(cur_br->output_pattern);
+		if(!br->output_pattern) {
+			perror("strdup");
+			return -1;
+		}
 		br->command_len = cur_br->command_len;
-		br->output_pattern = cur_br->output_pattern;
 		br->st.s = strdup(p);
 		if(!br->st.s) {
 			perror("strdup");
@@ -843,6 +859,14 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		return -1;
 	}
 
+	if(input) {
+		if(strncmp(input, "foreach", 7) == 0) {
+			foreach = 1;
+			input += 7;
+			while(*input == ' ') input++;
+		}
+	}
+
 	st = string_tree_search(&tf->bang_tree, p, -1);
 	if(st) {
 		/* Replace existing !-macro */
@@ -850,6 +874,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 		cur_br = container_of(st, struct bang_rule, st);
 		free(cur_br->value);
+		cur_br->foreach = foreach;
 		cur_br->value = alloc_value;
 		cur_br->input = input;
 		cur_br->command = command;
@@ -864,6 +889,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("malloc");
 			return -1;
 		}
+		br->foreach = foreach;
 		br->input = input;
 		br->command = command;
 		br->command_len = command_len;
@@ -950,8 +976,15 @@ static void free_bang_tree(struct rb_root *root)
 		struct bang_rule *br = container_of(st, struct bang_rule, st);
 		rb_erase(rbn, root);
 		free(st->s);
-		if(br->value)
+		if(br->value) {
+			/* For regular macros */
 			free(br->value);
+		} else {
+			/* For aliased macros */
+			free(br->input);
+			free(br->command);
+			free(br->output_pattern);
+		}
 		free(br);
 	}
 }
@@ -1112,6 +1145,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	struct name_list_entry *nle;
 	struct name_list_entry *tmp;
 	struct list_head *input_list;
+	int is_bang = 0;
+	int foreach = 0;
 
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
@@ -1143,17 +1178,34 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	}
 	tup_entry_release_list();
 
-	if(r->foreach) {
+	if(r->command[0] == '!') {
+		struct string_tree *st;
+		struct bang_rule *br;
+
+		is_bang = 1;
+
+		/* If we can't find the actual !-macro, it may be that there
+		 * are only extension-specific macros, in which case the rule
+		 * itself determines the foreach-ness.
+		 */
+		st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, NULL);
+		if(st) {
+			br = container_of(st, struct bang_rule, st);
+			foreach = br->foreach;
+		}
+	}
+	/* Either the !-macro or the rule itself can list 'foreach'. There is no
+	 * way to cancel a foreach in a !-macro.
+	 */
+	if(r->foreach)
+		foreach = r->foreach;
+
+	if(foreach) {
 		struct name_list tmp_nl;
 		struct name_list_entry tmp_nle;
 		char *old_command = NULL;
 		char *old_output_pattern = NULL;
 		int old_command_len = 0;
-		int is_bang = 0;
-
-		if(r->command[0] == '!') {
-			is_bang = 1;
-		}
 
 		/* For a foreach loop, iterate over each entry in the rule's
 		 * namelist and do a shallow copy over into a single-entry
@@ -1205,24 +1257,23 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 
 			delete_name_list_entry(&r->inputs, nle);
 		}
-	}
-
-	/* Only parse non-foreach rules if the namelist has some entries, or if
-	 * there is no input listed. We don't want to generate a command if
-	 * there is an input pattern but no entries match (for example, *.o
-	 * inputs to ld %f with no object files). However, if you have no input
-	 * but just a command (eg: you want to run a shell script), then we
-	 * still want to do the rule for that case.
-	 *
-	 * Also note that we check that the original user string is empty
-	 * (r->empty_input), not the eval'd string. This way if the user
-	 * specifies the input as $(foo) and it evaluates to empty, we won't
-	 * try to execute do_rule(). But an empty user string implies that no
-	 * input is required.
-	 */
-	if(!r->foreach) {
+	} else {
+		/* Only parse non-foreach rules if the namelist has some
+		 * entries, or if there is no input listed. We don't want to
+		 * generate a command if there is an input pattern but no
+		 * entries match (for example, *.o inputs to ld %f with no
+		 * object files). However, if you have no input but just a
+		 * command (eg: you want to run a shell script), then we still
+		 * want to do the rule for that case.
+		 *
+		 * Also note that we check that the original user string is
+		 * empty (r->empty_input), not the eval'd string. This way if
+		 * the user specifies the input as $(foo) and it evaluates to
+		 * empty, we won't try to execute do_rule(). But an empty user
+		 * string implies that no input is required.
+		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
-			if(r->command[0] == '!') {
+			if(is_bang) {
 				if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
 					return -1;
 			}
@@ -1237,7 +1288,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			 * .EMPTY rule if one was specified. If no empty rule
 			 * is specified, then no command is generated.
 			 */
-			if(r->command[0] == '!') {
+			if(is_bang) {
 				int rc;
 
 				rc = parse_empty_bang_rule(tf, r, cwd, clen);
