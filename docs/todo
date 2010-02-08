@@ -69,6 +69,8 @@ access(2) support in ldpreload?
 
 command that reads from stdin?
 
+move kconfig into tup?
+
 tup show to list the Tupfile as read in the current dir?
 
 read in +/- in order to add/remove worker threads?

@@ -15,6 +15,7 @@ syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match separator /|>/
+syntax match reverseseparator /<|/
 syntax match format display "%\([%efoBb]\)" contained
 syntax match errfmt display "%\([^%efoBb]\)" contained
 syntax match variable /$([^)]*)/
@@ -26,11 +27,14 @@ syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
 syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable,errfmt
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,bang,errfmt
+syntax region reversecommand matchgroup=reverseseparator start=/<|/ end=/<|/ end=/$/ contains=format,variable,bang,errfmt
 
 highlight link comment Comment
 highlight link command String
+highlight link reversecommand String
 highlight link rule Operator
 highlight link separator Keyword
+highlight link reverseseparator Keyword
 highlight link keys Keyword
 highlight link format Special
 highlight link errfmt Error

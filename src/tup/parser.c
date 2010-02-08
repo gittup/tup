@@ -52,7 +52,6 @@ struct path_list {
 };
 
 struct rule {
-	struct list_head list;
 	int foreach;
 	char *input_pattern;
 	char *output_pattern;
@@ -113,7 +112,8 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 static void free_bang_tree(struct rb_root *root);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
-			       int *o_cmdlen, char **o_output, char **o_bin);
+			       int *o_cmdlen, char **o_output, char **o_bin,
+			       int *swapio);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
@@ -121,6 +121,8 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       const char *cwd, int clen);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen);
+static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
+				struct bin_list *bl, const char *cwd, int clen);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
 			       int lno);
@@ -686,8 +688,9 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	int cmd_len;
 	struct rule r;
 	int rc;
+	int swapio;
 
-	if(split_input_pattern(p, &input, &cmd, &cmd_len, &output, &bin) < 0)
+	if(split_input_pattern(p, &input, &cmd, &cmd_len, &output, &bin, &swapio) < 0)
 		return -1;
 	if(bin) {
 		if((r.bin = bin_add(bin, bl)) == NULL)
@@ -713,7 +716,10 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	r.command_len = cmd_len;
 	r.line_number = lno;
 
-	rc = execute_rule(tf, &r, bl, cwd, clen);
+	if(swapio)
+		rc = execute_reverse_rule(tf, &r, bl, cwd, clen);
+	else
+		rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
@@ -772,6 +778,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *value;
 	char *alloc_value;
 	char *bin;
+	int swapio = 0;
 
 	eq = strchr(p, '=');
 	if(!eq) {
@@ -845,10 +852,14 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	}
 
 	if(split_input_pattern(alloc_value, &input, &command, &command_len, &output,
-			       &bin) < 0)
+			       &bin, &swapio) < 0)
 		return -1;
 	if(bin != NULL) {
-		fprintf(stderr, "Error: bins aren't allowed in bang rules. Rule was: %s = %s\n", p, alloc_value);
+		fprintf(stderr, "Error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
+		return -1;
+	}
+	if(swapio) {
+		fprintf(stderr, "Error: !-macro must use '|>' separators\n");
 		return -1;
 	}
 
@@ -1019,7 +1030,8 @@ static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
 }
 
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
-			       int *o_cmdlen, char **o_output, char **o_bin)
+			       int *o_cmdlen, char **o_output, char **o_bin,
+			       int *swapio)
 {
 	char *input;
 	char *cmd;
@@ -1027,13 +1039,21 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	char *bin = NULL;
 	char *brace;
 	char *ie, *ce, *oe;
+	char *tmp;
 
 	input = p;
 	while(isspace(*input))
 		input++;
-	p = strstr(p, "|>");
-	if(!p)
-		return -1;
+	tmp = strstr(p, "|>");
+	if(tmp) {
+		*swapio = 0;
+		p = tmp;
+	} else {
+		*swapio = 1;
+		p = strstr(p, "<|");
+		if(!p)
+			return -1;
+	}
 	if(input < p) {
 		ie = p - 1;
 		while(isspace(*ie) && ie > input)
@@ -1046,7 +1066,11 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	cmd = p;
 	while(isspace(*cmd))
 		cmd++;
-	p = strstr(p, "|>");
+	if(*swapio) {
+		p = strstr(p, "<|");
+	} else {
+		p = strstr(p, "|>");
+	}
 	if(!p)
 		return -1;
 	ce = p - 1;
@@ -1296,6 +1320,91 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 
 	delete_name_list(&r->order_only_inputs);
 	delete_name_list(&r->bang_oo_inputs);
+
+	return 0;
+}
+
+static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
+				struct bin_list *bl, const char *cwd, int clen)
+{
+	LIST_HEAD(oplist);
+	struct path_list *pl;
+	char *eval_pattern;
+	struct name_list tmp_nl;
+	struct name_list_entry tmp_nle;
+
+	if(!r->foreach) {
+		fprintf(stderr, "Error: reverse rule must use 'foreach'\n");
+		return -1;
+	}
+	if(!r->input_pattern) {
+		fprintf(stderr, "Error: reverse rule must have input list\n");
+		return -1;
+	}
+	eval_pattern = eval(tf, r->input_pattern, cwd, clen);
+	if(!eval_pattern)
+		return -1;
+
+	if(get_path_list(eval_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
+		return -1;
+	while(!list_empty(&oplist)) {
+		struct rule tmpr;
+		char *tinput;
+		char *input_pattern;
+
+		pl = list_entry(oplist.next, struct path_list, list);
+
+		if(pl->path) {
+			/* TODO: re-use error message */
+			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
+			return -1;
+		}
+
+		init_name_list(&tmp_nl);
+		tmp_nle.path = malloc(pl->pel->len + 1);
+		if(!tmp_nle.path) {
+			perror("malloc");
+			return -1;
+		}
+		memcpy(tmp_nle.path, pl->pel->path, pl->pel->len);
+		tmp_nle.path[pl->pel->len] = 0;
+		tmp_nle.len = pl->pel->len;
+		tmp_nle.extlesslen = tmp_nle.len - 1;
+		while(tmp_nle.extlesslen > 0 && tmp_nle.path[tmp_nle.extlesslen] != '.')
+			tmp_nle.extlesslen--;
+
+		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
+						       TUP_NODE_GENERATED);
+		if(!tmp_nle.tent)
+			return -1;
+		set_nle_base(&tmp_nle);
+		add_name_list_entry(&tmp_nl, &tmp_nle);
+
+		tinput = tup_printf(r->output_pattern, -1, &tmp_nl, NULL, NULL, 0);
+		if(!tinput)
+			return -1;
+		input_pattern = eval(tf, tinput, cwd, clen);
+		free(tinput);
+		if(!input_pattern)
+			return -1;
+
+		tmpr.foreach = 0;
+		tmpr.input_pattern = input_pattern;
+		tmpr.output_pattern = tmp_nle.path;
+		tmpr.bin = NULL;
+		tmpr.command = r->command;
+		tmpr.command_len = r->command_len;
+		tmpr.empty_input = 0;
+		tmpr.line_number = r->line_number;
+
+		if(execute_rule(tf, &tmpr, bl, cwd, clen) < 0)
+			return -1;
+		free(input_pattern);
+		free(tmp_nle.path);
+
+		del_pl(pl);
+	}
+	free(eval_pattern);
 
 	return 0;
 }
