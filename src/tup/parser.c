@@ -121,6 +121,8 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       const char *cwd, int clen);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen);
+static int __execute_rule(struct tupfile *tf, struct rule *r,
+			  struct name_list *output_nl, const char *cwd, int clen);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 				struct bin_list *bl, const char *cwd, int clen);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
@@ -139,7 +141,8 @@ static int nl_add_bin(struct bin *b, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *cwd, int clen, const char *ext, int extlen);
+		   const char *cwd, int clen, const char *ext, int extlen,
+		   struct name_list *output_nl);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
@@ -147,6 +150,9 @@ static void add_name_list_entry(struct name_list *nl,
 static void delete_name_list(struct name_list *nl);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
+static void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
+				 struct name_list_entry *nle);
+static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			struct name_list *onl, const char *ext, int extlen);
 static char *eval(struct tupfile *tf, const char *string,
@@ -1040,17 +1046,19 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	char *brace;
 	char *ie, *ce, *oe;
 	char *tmp;
+	const char *marker = "|>";
 
 	input = p;
 	while(isspace(*input))
 		input++;
-	tmp = strstr(p, "|>");
+	tmp = strstr(p, marker);
 	if(tmp) {
 		*swapio = 0;
 		p = tmp;
 	} else {
 		*swapio = 1;
-		p = strstr(p, "<|");
+		marker = "<|";
+		p = strstr(p, marker);
 		if(!p)
 			return -1;
 	}
@@ -1066,13 +1074,13 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	cmd = p;
 	while(isspace(*cmd))
 		cmd++;
-	if(*swapio) {
-		p = strstr(p, "<|");
-	} else {
-		p = strstr(p, "|>");
-	}
+
+	p = strstr(p, marker);
 	if(!p)
 		return -1;
+	while((tmp = strstr(p+2, marker)) != NULL) {
+		p = tmp;
+	}
 	ce = p - 1;
 	while(isspace(*ce) && ce > cmd)
 		ce--;
@@ -1157,11 +1165,13 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen)
 {
+	struct name_list output_nl;
+	struct list_head *input_list;
 	struct name_list_entry *nle;
 	struct name_list_entry *tmp;
-	struct list_head *input_list;
-	int is_bang = 0;
-	int foreach = 0;
+	char *p;
+	char *last_output_pattern;
+	char empty_pattern[] = "";
 
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
@@ -1192,6 +1202,45 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		}
 	}
 	tup_entry_release_list();
+
+	last_output_pattern = r->output_pattern;
+	r->output_pattern = empty_pattern;
+	init_name_list(&output_nl);
+
+	do {
+		char *ce;
+		p = strstr(r->command, "|>");
+		if(p) {
+			ce = p-1;
+			while(isspace(*ce) && ce > r->command)
+				ce--;
+			ce[1] = 0;
+			r->command_len = strlen(r->command);
+			p += 2;
+			while(*p && isspace(*p))
+				p++;
+		} else {
+			r->output_pattern = last_output_pattern;
+		}
+
+		if(__execute_rule(tf, r, &output_nl, cwd, clen) < 0)
+			return -1;
+		delete_name_list(&r->inputs);
+		move_name_list(&r->inputs, &output_nl);
+
+		r->command = p;
+	} while(p != NULL);
+	delete_name_list(&r->inputs);
+
+	return 0;
+}
+
+static int __execute_rule(struct tupfile *tf, struct rule *r,
+			  struct name_list *output_nl, const char *cwd, int clen)
+{
+	struct name_list_entry *nle;
+	int is_bang = 0;
+	int foreach = 0;
 
 	if(r->command[0] == '!') {
 		struct string_tree *st;
@@ -1260,7 +1309,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			/* The extension in do_rule() does not include the
 			 * leading '.'
 			 */
-			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext+1, extlen-1) < 0)
+			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext+1, extlen-1, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
@@ -1293,7 +1342,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 					return -1;
 			}
 
-			if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0) < 0)
+			if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0, output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -1311,7 +1360,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 					return -1;
 				if(rc == 0) {
 					if(do_rule(tf, r, &r->inputs, cwd, clen,
-						   NULL, 0) < 0)
+						   NULL, 0, output_nl) < 0)
 						return -1;
 				}
 			}
@@ -1750,7 +1799,8 @@ static int find_existing_command(const struct name_list *onl,
 }
 
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *cwd, int clen, const char *ext, int extlen)
+		   const char *cwd, int clen, const char *ext, int extlen,
+		   struct name_list *output_nl)
 {
 	struct name_list onl;
 	struct name_list_entry *nle, *onle;
@@ -1821,6 +1871,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(!onle->tent)
 			return -1;
 
+		set_nle_base(onle);
 		add_name_list_entry(&onl, onle);
 
 		if(r->bin) {
@@ -1880,7 +1931,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
 				  &tf->g->delete_count);
-		delete_name_list_entry(&onl, onle);
+		move_name_list_entry(output_nl, &onl, onle);
 	}
 
 	if(tup_db_write_outputs(cmdid, &tree) < 0)
@@ -1964,6 +2015,33 @@ static void delete_name_list_entry(struct name_list *nl,
 	list_del(&nle->list);
 	free(nle->path);
 	free(nle);
+}
+
+static void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
+				 struct name_list_entry *nle)
+{
+	oldnl->num_entries--;
+	oldnl->totlen -= nle->len;
+	oldnl->basetotlen -= nle->baselen;
+	oldnl->extlessbasetotlen -= nle->extlessbaselen;
+
+	list_del(&nle->list);
+
+	newnl->num_entries++;
+	newnl->totlen += nle->len;
+	newnl->basetotlen += nle->baselen;
+	newnl->extlessbasetotlen += nle->extlessbaselen;
+	list_add_tail(&nle->list, &newnl->entries);
+}
+
+static void move_name_list(struct name_list *newnl, struct name_list *oldnl)
+{
+	struct name_list_entry *nle;
+
+	while(!list_empty(&oldnl->entries)) {
+		nle = list_entry(oldnl->entries.next, struct name_list_entry, list);
+		move_name_list_entry(newnl, oldnl, nle);
+	}
 }
 
 static const char *find_char(const char *s, int len, char c)
