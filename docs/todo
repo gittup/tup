@@ -1,6 +1,8 @@
 FD_CLOEXEC flag on file descriptors?
  - also close stdin on subprocesses?
 
+ try chain with a !a |> !b, but !a doesn't specify outputs
+
 find a way to avoid committing after the parsing/delete stage
 
 ldpreload: instead of a static msgbuf and mutex, just allocate msgbuf on the stack?

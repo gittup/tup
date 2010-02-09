@@ -75,6 +75,16 @@ struct bang_rule {
 	char *output_pattern;
 };
 
+struct bang_list {
+	struct list_head list;
+	struct bang_rule *br;
+};
+
+struct chain {
+	struct string_tree st;
+	struct list_head banglist;
+};
+
 struct build_name_list_args {
 	struct name_list *nl;
 	const char *dir;
@@ -89,6 +99,7 @@ struct tupfile {
 	struct rb_root cmd_tree;
 	struct rb_root bang_tree;
 	struct rb_root input_tree;
+	struct rb_root chain_tree;
 	int ign;
 };
 
@@ -105,11 +116,14 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 static int parse_varsed(struct tupfile *tf, char *p, int lno,
 			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
+static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
 				 const char *cwd, int clen);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 			   const char *cwd, int clen);
 static void free_bang_tree(struct rb_root *root);
+static void free_chain_tree(struct rb_root *root);
+static void free_banglist(struct list_head *list);
 static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 			       int *o_cmdlen, char **o_output, char **o_bin,
@@ -176,6 +190,7 @@ int parse(struct node *n, struct graph *g)
 	tf.cmd_tree.rb_node = NULL;
 	tf.bang_tree.rb_node = NULL;
 	tf.input_tree.rb_node = NULL;
+	tf.chain_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		return -1;
@@ -220,6 +235,7 @@ out_close_dfd:
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
+	free_chain_tree(&tf.chain_tree);
 	free_tupid_tree(&tf.cmd_tree);
 	free_bang_tree(&tf.bang_tree);
 	free_tupid_tree(&tf.input_tree);
@@ -393,6 +409,9 @@ found_paren:
 				goto syntax_error;
 		} else if(line[0] == '!') {
 			if(parse_bang_definition(tf, line, lno) < 0)
+				goto syntax_error;
+		} else if(line[0] == '*') {
+			if(parse_chain_definition(tf, line, lno) < 0)
 				goto syntax_error;
 		} else {
 			char *eq;
@@ -772,24 +791,13 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	return rc;
 }
 
-static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
+static char *split_eq(char *p)
 {
-	struct string_tree *st;
-	char *input;
-	char *command;
-	int command_len;
-	int foreach = 0;
-	char *output;
 	char *eq;
 	char *value;
-	char *alloc_value;
-	char *bin;
-	int swapio = 0;
 
 	eq = strchr(p, '=');
 	if(!eq) {
-		fprintf(stderr, "Parse error line %i: Expecting '=' to set the bang rule.\n", lno);
-		return -1;
 	}
 	value = eq + 1;
 	while(*value && isspace(*value))
@@ -798,6 +806,27 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	while(isspace(*eq))
 		eq--;
 	eq[1] = 0;
+	return value;
+}
+
+static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
+{
+	struct string_tree *st;
+	char *input;
+	char *command;
+	int command_len;
+	int foreach = 0;
+	char *output;
+	char *value;
+	char *alloc_value;
+	char *bin;
+	int swapio = 0;
+
+	value = split_eq(p);
+	if(!value) {
+		fprintf(stderr, "Parse error line %i: Expecting '=' to set the bang rule.\n", lno);
+		return -1;
+	}
 
 	if(value[0] == '!') {
 		/* Alias one macro as another */
@@ -843,7 +872,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("strdup");
 			return -1;
 		}
-		br->st.len = eq - p + 1;
+		br->st.len = strlen(br->st.s);
 		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			return -1;
@@ -910,12 +939,88 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("strdup");
 			return -1;
 		}
-		br->st.len = eq - p + 1;
+		br->st.len = strlen(br->st.s);
 		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			return -1;
 		}
 	}
+	return 0;
+}
+
+static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
+{
+	struct string_tree *st;
+	char *value;
+	struct chain *ch;
+
+	value = split_eq(p);
+	if(!value) {
+		fprintf(stderr, "Parse error line %i: Expecting '=' to set the *-chain.\n", lno);
+		return -1;
+	}
+	st = string_tree_search(&tf->chain_tree, p, -1);
+	if(st) {
+		/* Replace existing *-chain */
+		ch = container_of(st, struct chain, st);
+		free_banglist(&ch->banglist);
+	} else {
+		/* Create new *-chain */
+		ch = malloc(sizeof *ch);
+		if(!ch) {
+			perror("malloc");
+			return -1;
+		}
+		INIT_LIST_HEAD(&ch->banglist);
+		ch->st.s = strdup(p);
+		if(!ch->st.s) {
+			perror("strdup");
+			return -1;
+		}
+		ch->st.len = strlen(ch->st.s);
+		if(string_tree_insert(&tf->chain_tree, &ch->st) < 0) {
+			fprintf(stderr, "Error inserting *-chain into tree\n");
+			return -1;
+		}
+	}
+
+	do {
+		struct string_tree *bst;
+		struct bang_rule *br;
+		struct bang_list *bal;
+		char *ce;
+		p = strstr(value, "|>");
+		if(p) {
+			ce = p-1;
+			while(isspace(*ce) && ce > value)
+				ce--;
+			ce[1] = 0;
+			p += 2;
+			while(*p && isspace(*p))
+				p++;
+		}
+		if(value[0] != '!') {
+			fprintf(stderr, "Error: *-chain must be composed of !-macros, not '%s'\n", value);
+			return -1;
+		}
+		bst = string_tree_search(&tf->bang_tree, value, -1);
+		if(!bst) {
+			fprintf(stderr, "Error: Unable to find !-macro: '%s'\n", value);
+			return -1;
+		}
+		br = container_of(bst, struct bang_rule, st);
+
+		bal = malloc(sizeof *bal);
+		if(!bal) {
+			perror("malloc");
+			return -1;
+		}
+		bal->br = br;
+		list_add_tail(&bal->list, &ch->banglist);
+
+		value = p;
+	} while(p != NULL);
+
 	return 0;
 }
 
@@ -994,6 +1099,32 @@ static void free_bang_tree(struct rb_root *root)
 			free(br->output_pattern);
 		}
 		free(br);
+	}
+}
+
+static void free_chain_tree(struct rb_root *root)
+{
+	struct rb_node *rbn;
+
+	while((rbn = rb_first(root)) != NULL) {
+		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+		struct chain *ch = container_of(st, struct chain, st);
+
+		rb_erase(rbn, root);
+		free(st->s);
+
+		free_banglist(&ch->banglist);
+		free(ch);
+	}
+}
+
+static void free_banglist(struct list_head *list)
+{
+	struct bang_list *bal;
+	while(!list_empty(list)) {
+		bal = list_entry(list->next, struct bang_list, list);
+		list_del(&bal->list);
+		free(bal);
 	}
 }
 
@@ -1078,9 +1209,6 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 	p = strstr(p, marker);
 	if(!p)
 		return -1;
-	while((tmp = strstr(p+2, marker)) != NULL) {
-		p = tmp;
-	}
 	ce = p - 1;
 	while(isspace(*ce) && ce > cmd)
 		ce--;
@@ -1169,7 +1297,6 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	struct list_head *input_list;
 	struct name_list_entry *nle;
 	struct name_list_entry *tmp;
-	char *p;
 	char *last_output_pattern;
 	char empty_pattern[] = "";
 
@@ -1203,34 +1330,45 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	}
 	tup_entry_release_list();
 
-	last_output_pattern = r->output_pattern;
-	r->output_pattern = empty_pattern;
 	init_name_list(&output_nl);
 
-	do {
-		char *ce;
-		p = strstr(r->command, "|>");
-		if(p) {
-			ce = p-1;
-			while(isspace(*ce) && ce > r->command)
-				ce--;
-			ce[1] = 0;
-			r->command_len = strlen(r->command);
-			p += 2;
-			while(*p && isspace(*p))
-				p++;
-		} else {
-			r->output_pattern = last_output_pattern;
-		}
+	if(r->command[0] == '*') {
+		struct string_tree *st;
+		struct chain *ch;
+		struct bang_list *bal;
 
+		last_output_pattern = r->output_pattern;
+		r->output_pattern = empty_pattern;
+
+		st = string_tree_search(&tf->chain_tree, r->command, r->command_len);
+		if(!st) {
+			fprintf(stderr, "Error: Unable to find *-chain: '%s'\n", r->command);
+			return -1;
+		}
+		ch = container_of(st, struct chain, st);
+
+		list_for_each_entry(bal, &ch->banglist, list) {
+			if(bal->list.next == &ch->banglist) {
+				/* Apply the output pattern specified in the rule
+				 * to the last !-macro in the *-chain.
+				 */
+				r->output_pattern = last_output_pattern;
+			}
+			r->command = bal->br->st.s;
+			r->command_len = bal->br->st.len;
+
+			if(__execute_rule(tf, r, &output_nl, cwd, clen) < 0)
+				return -1;
+
+			delete_name_list(&r->inputs);
+			move_name_list(&r->inputs, &output_nl);
+		}
+		delete_name_list(&r->inputs);
+	} else {
 		if(__execute_rule(tf, r, &output_nl, cwd, clen) < 0)
 			return -1;
-		delete_name_list(&r->inputs);
-		move_name_list(&r->inputs, &output_nl);
-
-		r->command = p;
-	} while(p != NULL);
-	delete_name_list(&r->inputs);
+		delete_name_list(&output_nl);
+	}
 
 	return 0;
 }
