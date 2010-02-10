@@ -63,6 +63,7 @@ struct rule {
 	struct name_list bang_oo_inputs;
 	int empty_input;
 	int line_number;
+	struct name_list *output_nl;
 };
 
 struct bang_rule {
@@ -80,8 +81,15 @@ struct bang_list {
 	struct bang_rule *br;
 };
 
+struct src_chain {
+	struct list_head list;
+	char *input_pattern;
+	struct list_head banglist;
+};
+
 struct chain {
 	struct string_tree st;
+	struct list_head src_chain_list;
 	struct list_head banglist;
 };
 
@@ -740,6 +748,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	r.command = cmd;
 	r.command_len = cmd_len;
 	r.line_number = lno;
+	r.output_nl = NULL;
 
 	if(swapio)
 		rc = execute_reverse_rule(tf, &r, bl, cwd, clen);
@@ -786,6 +795,7 @@ static int parse_varsed(struct tupfile *tf, char *p, int lno,
 	r.command_len = sizeof(command) - 1;
 	r.line_number = lno;
 	r.empty_input = 0;
+	r.output_nl = NULL;
 
 	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
@@ -953,17 +963,35 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 	struct string_tree *st;
 	char *value;
 	struct chain *ch;
+	char *lbracket;
+	char *input_pattern = NULL;
+	struct list_head *destlist;
 
 	value = split_eq(p);
 	if(!value) {
 		fprintf(stderr, "Parse error line %i: Expecting '=' to set the *-chain.\n", lno);
 		return -1;
 	}
+
+	lbracket = strchr(p, '[');
+	if(lbracket) {
+		char *rbracket;
+		*lbracket = 0;
+		input_pattern = lbracket+1;
+		rbracket = strchr(input_pattern, ']');
+		if(!rbracket) {
+			fprintf(stderr, "Parse error line %i: Expecting ']' character in *-chain definition\n", lno);
+			return -1;
+		}
+		*rbracket = 0;
+	}
 	st = string_tree_search(&tf->chain_tree, p, -1);
 	if(st) {
 		/* Replace existing *-chain */
 		ch = container_of(st, struct chain, st);
-		free_banglist(&ch->banglist);
+		if(!input_pattern) {
+			free_banglist(&ch->banglist);
+		}
 	} else {
 		/* Create new *-chain */
 		ch = malloc(sizeof *ch);
@@ -971,6 +999,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			perror("malloc");
 			return -1;
 		}
+		INIT_LIST_HEAD(&ch->src_chain_list);
 		INIT_LIST_HEAD(&ch->banglist);
 		ch->st.s = strdup(p);
 		if(!ch->st.s) {
@@ -982,6 +1011,20 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			fprintf(stderr, "Error inserting *-chain into tree\n");
 			return -1;
 		}
+	}
+
+	destlist = &ch->banglist;
+	if(input_pattern) {
+		struct src_chain *sc;
+		sc = malloc(sizeof *sc);
+		if(!sc) {
+			perror("malloc");
+			return -1;
+		}
+		sc->input_pattern = input_pattern;
+		INIT_LIST_HEAD(&sc->banglist);
+		list_add_tail(&sc->list, &ch->src_chain_list);
+		destlist = &sc->banglist;
 	}
 
 	do {
@@ -1016,7 +1059,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			return -1;
 		}
 		bal->br = br;
-		list_add_tail(&bal->list, &ch->banglist);
+		list_add_tail(&bal->list, destlist);
 
 		value = p;
 	} while(p != NULL);
@@ -1109,9 +1152,17 @@ static void free_chain_tree(struct rb_root *root)
 	while((rbn = rb_first(root)) != NULL) {
 		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
 		struct chain *ch = container_of(st, struct chain, st);
+		struct src_chain *sc;
 
 		rb_erase(rbn, root);
 		free(st->s);
+
+		while(!list_empty(&ch->src_chain_list)) {
+			sc = list_entry(ch->src_chain_list.next, struct src_chain, list);
+			free_banglist(&sc->banglist);
+			list_del(&sc->list);
+			free(sc);
+		}
 
 		free_banglist(&ch->banglist);
 		free(ch);
@@ -1336,6 +1387,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		struct string_tree *st;
 		struct chain *ch;
 		struct bang_list *bal;
+		struct list_head *banglist;
 
 		last_output_pattern = r->output_pattern;
 		r->output_pattern = empty_pattern;
@@ -1347,8 +1399,39 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		}
 		ch = container_of(st, struct chain, st);
 
-		list_for_each_entry(bal, &ch->banglist, list) {
-			if(bal->list.next == &ch->banglist) {
+		banglist = &ch->banglist;
+		if(!r->inputs.num_entries && r->output_nl) {
+			struct src_chain *sc;
+			list_for_each_entry(sc, &ch->src_chain_list, list) {
+				char *tinput;
+				char *input_pattern;
+
+				banglist = &sc->banglist;
+
+				tinput = tup_printf(sc->input_pattern, -1, r->output_nl, NULL, NULL, 0);
+				if(!tinput)
+					return -1;
+				input_pattern = eval(tf, tinput, cwd, clen);
+				free(tinput);
+				if(!input_pattern)
+					return -1;
+				delete_name_list(&r->order_only_inputs);
+				if(parse_input_pattern(tf, input_pattern, &r->inputs,
+						       &r->order_only_inputs, bl, r->line_number,
+						       cwd, clen) < 0)
+					return -1;
+				free(input_pattern);
+				if(r->inputs.num_entries)
+					break;
+			}
+			if(!r->inputs.num_entries) {
+				fprintf(stderr, "Error: Unable to find any inputs for the *-chain for output '%s' in rule at line %i\n", last_output_pattern, r->line_number);
+				return -1;
+			}
+		}
+
+		list_for_each_entry(bal, banglist, list) {
+			if(bal->list.next == banglist) {
 				/* Apply the output pattern specified in the rule
 				 * to the last !-macro in the *-chain.
 				 */
@@ -1542,9 +1625,10 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		pl = list_entry(oplist.next, struct path_list, list);
 
 		if(pl->path) {
-			/* TODO: re-use error message */
-			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
-			return -1;
+			/* Things with paths (eg: foo/built-in.o) get skipped.
+			 * This is pretty much hacked to get linux to work.
+			 */
+			goto out_skip;
 		}
 
 		init_name_list(&tmp_nl);
@@ -1583,12 +1667,14 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.command_len = r->command_len;
 		tmpr.empty_input = 0;
 		tmpr.line_number = r->line_number;
+		tmpr.output_nl = &tmp_nl;
 
 		if(execute_rule(tf, &tmpr, bl, cwd, clen) < 0)
 			return -1;
 		free(input_pattern);
 		free(tmp_nle.path);
 
+out_skip:
 		del_pl(pl);
 	}
 	free(eval_pattern);
@@ -2201,6 +2287,11 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 	const char *p;
 	const char *next;
 	int clen = strlen(cmd);
+
+	if(!nl) {
+		fprintf(stderr, "tup internal error: tup_printf called with NULL name_list\n");
+		return NULL;
+	}
 
 	if(cmd_len == -1) {
 		cmd_len = strlen(cmd);
