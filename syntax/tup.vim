@@ -14,8 +14,8 @@ syntax case match
 syntax match comment ,^#.*$,
 syntax match rule ,^[:,],
 syntax match bang ,![a-zA-Z0-9_.-]*,
-syntax match chain ,^*[a-zA-Z0-9_.-]*,
-syntax match chain ,[^a-zA-Z0-9_.-]\*[a-zA-Z0-9_.-]*,
+syntax match chain ,^*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
+syntax match chain ,[^a-zA-Z0-9_-]\*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match separator /|>/
 syntax match reverseseparator /<|/
 syntax match format display "%\([%efoBb]\)" contained
