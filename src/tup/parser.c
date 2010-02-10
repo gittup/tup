@@ -496,6 +496,8 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	struct tup_entry *tent;
 	int rc;
 
+	if(strncmp(var, "CONFIG_", 7) == 0)
+		var += 7;
 	tent = tup_db_get_var(var, -1, NULL);
 	if(!tent)
 		return -1;
@@ -2478,6 +2480,15 @@ static char *eval(struct tupfile *tf, const char *string,
 						return NULL;
 					}
 					len += clen;
+				} else if(rparen - var > 7 &&
+					  strncmp(var, "CONFIG_", 7) == 0) {
+					const char *atvar;
+					atvar = var+7;
+					vlen = tup_db_get_varlen(atvar, rparen-atvar);
+					if(vlen < 0)
+						return NULL;
+					len += vlen;
+					s = rparen + 1;
 				} else {
 					vlen = vardb_len(&tf->vdb, var, rparen-var);
 					if(vlen < 0)
@@ -2554,6 +2565,18 @@ static char *eval(struct tupfile *tf, const char *string,
 					}
 					memcpy(p, cwd, clen);
 					p += clen;
+				} else if(rparen - var > 7 &&
+					  strncmp(var, "CONFIG_", 7) == 0) {
+					const char *atvar;
+					struct tup_entry *tent;
+					atvar = var+7;
+
+					tent = tup_db_get_var(atvar, rparen-atvar, &p);
+					if(!tent)
+						return NULL;
+					if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
+						return NULL;
+					s = rparen + 1;
 				} else {
 					if(vardb_copy(&tf->vdb, var, rparen-var, &p) < 0)
 						return NULL;
