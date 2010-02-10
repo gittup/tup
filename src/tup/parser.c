@@ -1023,7 +1023,11 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			perror("malloc");
 			return -1;
 		}
-		sc->input_pattern = input_pattern;
+		sc->input_pattern = strdup(input_pattern);
+		if(!sc->input_pattern) {
+			perror("strdup");
+			return -1;
+		}
 		INIT_LIST_HEAD(&sc->banglist);
 		list_add_tail(&sc->list, &ch->src_chain_list);
 		destlist = &sc->banglist;
@@ -1161,8 +1165,9 @@ static void free_chain_tree(struct rb_root *root)
 
 		while(!list_empty(&ch->src_chain_list)) {
 			sc = list_entry(ch->src_chain_list.next, struct src_chain, list);
-			free_banglist(&sc->banglist);
 			list_del(&sc->list);
+			free_banglist(&sc->banglist);
+			free(sc->input_pattern);
 			free(sc);
 		}
 
