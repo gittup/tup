@@ -127,7 +127,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
 				 const char *cwd, int clen);
-static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
+static int parse_bang_rule(struct tupfile *tf, struct rule *r,
+			   struct name_list *nl,const char *ext,
 			   const char *cwd, int clen);
 static void free_bang_tree(struct rb_root *root);
 static void free_chain_tree(struct rb_root *root);
@@ -1074,15 +1075,27 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 }
 
 static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
-			     struct string_tree *st, const char *cwd, int clen)
+			     struct string_tree *st, struct name_list *nl,
+			     const char *cwd, int clen)
 {
 	struct bang_rule *br;
+	char *tinput;
 	br = container_of(st, struct bang_rule, st);
 
 	/* Add any order only inputs to the list */
-	if(parse_input_pattern(tf, br->input, NULL, &r->bang_oo_inputs, NULL,
+	if(nl && br->input) {
+		tinput = tup_printf(br->input, -1, nl, NULL, NULL, 0);
+		if(!tinput)
+			return -1;
+	} else {
+		tinput = br->input;
+	}
+	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL,
 			       r->line_number, cwd, clen) < 0)
 		return -1;
+	if(nl) {
+		free(tinput);
+	}
 
 	/* The command gets replaced whole-sale */
 	r->command = br->command;
@@ -1105,10 +1118,11 @@ static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
 				 ".EMPTY");
 	if(!st)
 		return 1;
-	return __parse_bang_rule(tf, r, st, cwd, clen);
+	return __parse_bang_rule(tf, r, st, NULL, cwd, clen);
 }
 
-static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
+static int parse_bang_rule(struct tupfile *tf, struct rule *r,
+			   struct name_list *nl, const char *ext,
 			   const char *cwd, int clen)
 {
 	struct string_tree *st;
@@ -1126,7 +1140,7 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r, const char *ext,
 			return -1;
 		}
 	}
-	return __parse_bang_rule(tf, r, st, cwd, clen);
+	return __parse_bang_rule(tf, r, st, nl, cwd, clen);
 }
 
 static void free_bang_tree(struct rb_root *root)
@@ -1531,7 +1545,7 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
-				if(parse_bang_rule(tf, r, ext, cwd, clen) < 0)
+				if(parse_bang_rule(tf, r, &tmp_nl, ext, cwd, clen) < 0)
 					return -1;
 			}
 			/* The extension in do_rule() does not include the
@@ -1566,7 +1580,7 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
-				if(parse_bang_rule(tf, r, NULL, cwd, clen) < 0)
+				if(parse_bang_rule(tf, r, NULL, NULL, cwd, clen) < 0)
 					return -1;
 			}
 
