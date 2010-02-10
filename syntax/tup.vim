@@ -29,8 +29,8 @@ syntax match backslash /\\$/
 syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
 syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable,errfmt
-syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,bang,errfmt,chain
-syntax region reversecommand matchgroup=reverseseparator start=/<|/ end=/<|/ end=/$/ contains=format,variable,bang,errfmt,chain
+syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
+syntax region reversecommand matchgroup=reverseseparator start=/<|/ end=/<|/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
 
 highlight link comment Comment
 highlight link command String
