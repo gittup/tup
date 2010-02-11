@@ -1683,7 +1683,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.foreach = 0;
 		tmpr.input_pattern = input_pattern;
 		tmpr.output_pattern = tmp_nle.path;
-		tmpr.bin = NULL;
+		tmpr.bin = r->bin;
 		tmpr.command = r->command;
 		tmpr.command_len = r->command_len;
 		tmpr.empty_input = 0;
