@@ -1457,6 +1457,11 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 				 * to the last !-macro in the *-chain.
 				 */
 				r->output_pattern = last_output_pattern;
+			} else {
+				if(strcmp(bal->br->output_pattern, "") == 0) {
+					fprintf(stderr, "Error: Intermediate !-macro '%s' in *-chain '%s' does not specify an output pattern.\n", bal->br->st.s, ch->st.s);
+					return -1;
+				}
 			}
 			r->command = bal->br->st.s;
 			r->command_len = bal->br->st.len;
