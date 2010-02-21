@@ -148,6 +148,10 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 			  struct name_list *output_nl, const char *cwd, int clen);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 				struct bin_list *bl, const char *cwd, int clen);
+static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
+				 struct bin_list *bl,
+				 struct rule *r, const char *ext,
+				 const char *cwd, int clen);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
 			       int lno);
@@ -1423,6 +1427,15 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		banglist = &ch->banglist;
 		if(!r->inputs.num_entries && r->output_nl) {
 			struct src_chain *sc;
+			const char *ext = NULL;
+
+			if(r->output_nl->num_entries > 0) {
+				nle = list_entry(r->output_nl->entries.next, struct name_list_entry, list);
+				if(nle->base &&
+				   nle->extlessbaselen != nle->baselen) {
+					ext = nle->base + nle->extlessbaselen;
+				}
+			}
 			list_for_each_entry(sc, &ch->src_chain_list, list) {
 				char *tinput;
 				char *input_pattern;
@@ -1435,6 +1448,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 				input_pattern = eval(tf, tinput, cwd, clen);
 				free(tinput);
 				if(!input_pattern)
+					return -1;
+				if(check_recursive_chain(tf, input_pattern, bl, r, ext, cwd, clen) < 0)
 					return -1;
 				delete_name_list(&r->order_only_inputs);
 				if(parse_input_pattern(tf, input_pattern, &r->inputs,
@@ -1705,6 +1720,62 @@ out_skip:
 	}
 	free(eval_pattern);
 
+	return 0;
+}
+
+static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
+				 struct bin_list *bl,
+				 struct rule *r, const char *ext,
+				 const char *cwd, int clen)
+{
+	LIST_HEAD(inp_list);
+	char *inp;
+	struct path_list *pl;
+	int extlen = strlen(ext);;
+
+	inp = strdup(input_pattern);
+	if(!inp) {
+		perror("strdup");
+		return -1;
+	}
+
+	if(get_path_list(inp, &inp_list, tf->tupid, NULL, NULL) < 0)
+		return -1;
+	while(!list_empty(&inp_list)) {
+		pl = list_entry(inp_list.next, struct path_list, list);
+
+		if(pl->pel->len > extlen) {
+			if(strcmp(pl->pel->path + pl->pel->len - extlen, ext) == 0) {
+				struct rule tmpr;
+				char output_pattern[] = "";
+				char *tinput;
+
+				tinput = malloc(pl->pel->len + 1);
+				if(!tinput) {
+					perror("malloc");
+					return -1;
+				}
+				memcpy(tinput, pl->pel->path, pl->pel->len);
+				tinput[pl->pel->len] = 0;
+
+				tmpr.foreach = 1;
+				tmpr.input_pattern = tinput;
+				tmpr.output_pattern = output_pattern;
+				tmpr.bin = NULL;
+				tmpr.command = r->command;
+				tmpr.command_len = r->command_len;
+				tmpr.empty_input = 0;
+				tmpr.line_number = r->line_number;
+				tmpr.output_nl = NULL;
+				if(execute_reverse_rule(tf, &tmpr, bl, cwd, clen) < 0)
+					return -1;
+				free(tinput);
+			}
+		}
+
+		del_pl(pl);
+	}
+	free(inp);
 	return 0;
 }
 

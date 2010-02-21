@@ -8,12 +8,12 @@ cat > Tupfile << HERE
 !ld = |> ld -r %f -o %o |>
 
 *chain[%B.c*] = !cc
-*chain[\$(%B-y)] = !cc |> !ld
+*chain[\$(%B-y)] = !ld
 
 obj-y += foo.o
 obj-y += bar.o
-bar-y += bar1.c
-bar-y += bar2.c
+bar-y += bar1.o
+bar-y += bar2.o
 : foreach \$(obj-y) <| *chain <|
 : \$(obj-y) |> !ld |> built-in.o
 HERE
