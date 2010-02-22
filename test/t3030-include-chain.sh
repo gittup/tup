@@ -7,7 +7,7 @@ cat > whee.tup << HERE
 !cc = foreach |> gcc -c %f -o %o |> %B.o
 !ld = |> ld -r %f -o %o |>
 
-*chain[%B.c*] = !cc
+*chain[%B.c] = !cc
 *chain[\$(%B-y)] = !ld
 HERE
 cat > Tupfile << HERE

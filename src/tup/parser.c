@@ -141,7 +141,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_list *bl, int lno,
-			       const char *cwd, int clen);
+			       const char *cwd, int clen, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen);
 static int __execute_rule(struct tupfile *tf, struct rule *r,
@@ -154,7 +154,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				 const char *cwd, int clen);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
-			       int lno);
+			       int lno, int required);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct rb_root *symtree);
 static void make_path_list_unique(struct list_head *plist);
@@ -163,9 +163,9 @@ static void make_name_list_unique(struct name_list *nl);
 static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 				    struct graph *g);
 static int get_name_list(struct tupfile *tf, struct list_head *plist,
-			 struct name_list *nl);
+			 struct name_list *nl, int required);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl);
+		       struct name_list *nl, int required);
 static int nl_add_bin(struct bin *b, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
@@ -348,7 +348,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 				return -1;
 			free_tupid_tree(&symtree);
 
-			if(get_name_list(tf, &plist, &nl) < 0)
+			if(get_name_list(tf, &plist, &nl, 1) < 0)
 				return -1;
 			list_for_each_entry_safe(pl, tmppl, &plist, list) {
 				del_pl(pl);
@@ -1097,7 +1097,7 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 		tinput = br->input;
 	}
 	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL,
-			       r->line_number, cwd, clen) < 0)
+			       r->line_number, cwd, clen, 1) < 0)
 		return -1;
 	if(nl) {
 		free(tinput);
@@ -1328,7 +1328,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_list *bl, int lno,
-			       const char *cwd, int clen)
+			       const char *cwd, int clen, int required)
 {
 	char *eval_pattern;
 	char *oosep;
@@ -1352,11 +1352,11 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			*oosep = 0;
 			oosep++;
 		}
-		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, lno) < 0)
+		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, lno, required) < 0)
 			return -1;
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, lno) < 0)
+		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, lno, required) < 0)
 			return -1;
 	} else {
 		if(eval_pattern[0]) {
@@ -1381,7 +1381,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	init_name_list(&r->bang_oo_inputs);
 	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
 			       &r->order_only_inputs, bl, r->line_number,
-			       cwd, clen) < 0)
+			       cwd, clen, 1) < 0)
 		return -1;
 
 	make_name_list_unique(&r->inputs);
@@ -1434,7 +1434,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 				delete_name_list(&r->order_only_inputs);
 				if(parse_input_pattern(tf, input_pattern, &r->inputs,
 						       &r->order_only_inputs, bl, r->line_number,
-						       cwd, clen) < 0)
+						       cwd, clen, 0) < 0)
 					return -1;
 				make_name_list_unique(&r->inputs);
 				free(input_pattern);
@@ -1766,7 +1766,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
-			       int lno)
+			       int lno, int required)
 {
 	LIST_HEAD(plist);
 	struct rb_root symtree = RB_ROOT;
@@ -1791,7 +1791,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 
 	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
 		return -1;
-	if(get_name_list(tf, &plist, nl) < 0)
+	if(get_name_list(tf, &plist, nl, required) < 0)
 		return -1;
 	list_for_each_entry_safe(pl, tmp, &plist, list) {
 		del_pl(pl);
@@ -1957,7 +1957,7 @@ static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 }
 
 static int get_name_list(struct tupfile *tf, struct list_head *plist,
-			 struct name_list *nl)
+			 struct name_list *nl, int required)
 {
 	struct path_list *pl;
 
@@ -1966,7 +1966,7 @@ static int get_name_list(struct tupfile *tf, struct list_head *plist,
 			if(nl_add_bin(pl->bin, nl) < 0)
 				return -1;
 		} else {
-			if(nl_add_path(tf, pl, nl) < 0)
+			if(nl_add_path(tf, pl, nl, required) < 0)
 				return -1;
 		}
 	}
@@ -1987,7 +1987,7 @@ static int char_find(const char *s, int len, const char *list)
 }
 
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl)
+		       struct name_list *nl, int required)
 {
 	struct build_name_list_args args;
 
@@ -2010,16 +2010,22 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(!tent) {
+			if(!required)
+				return 0;
 			fprintf(stderr, "Error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {
+			if(!required)
+				return 0;
 			fprintf(stderr, "Error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			tup_db_print(stderr, tent->tnode.tupid);
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->delete_tree, tent->tnode.tupid) != NULL) {
+			if(!required)
+				return 0;
 			fprintf(stderr, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(stderr, pl->dt);
 			return -1;
