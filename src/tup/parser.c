@@ -157,7 +157,9 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       int lno);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 			 struct bin_list *bl, struct rb_root *symtree);
+static void make_path_list_unique(struct list_head *plist);
 static void del_pl(struct path_list *pl);
+static void make_name_list_unique(struct name_list *nl);
 static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 				    struct graph *g);
 static int get_name_list(struct tupfile *tf, struct list_head *plist,
@@ -1370,9 +1372,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			const char *cwd, int clen)
 {
 	struct name_list output_nl;
-	struct list_head *input_list;
 	struct name_list_entry *nle;
-	struct name_list_entry *tmp;
 	char *last_output_pattern;
 	char empty_pattern[] = "";
 
@@ -1384,27 +1384,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			       cwd, clen) < 0)
 		return -1;
 
-	/* Use the tup entry list as an easy cheat to remove duplicates. Only
-	 * care about dups in the inputs namelist, since the others are just
-	 * added to the tupid_tree and aren't used in %-flags.
-	 *
-	 * The trick here is that we need to prune duplicate inputs, but still
-	 * maintain the order. So we can't stick the input tupids in a tree and
-	 * use that, since that would kill the order. Also, just going through
-	 * the linked list twice would be O(n^2), which would suck. Since the
-	 * tup_entry's are already unique, we can use the entry list to
-	 * determine if the nle is already present or not. If it is already
-	 * present, the second and further duplicates will be removed.
-	 */
-	input_list = tup_entry_get_list();
-	list_for_each_entry_safe(nle, tmp, &r->inputs.entries, list) {
-		if(tup_entry_in_list(nle->tent)) {
-			delete_name_list_entry(&r->inputs, nle);
-		} else {
-			tup_entry_list_add(nle->tent, input_list);
-		}
-	}
-	tup_entry_release_list();
+	make_name_list_unique(&r->inputs);
 
 	init_name_list(&output_nl);
 
@@ -1456,6 +1436,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 						       &r->order_only_inputs, bl, r->line_number,
 						       cwd, clen) < 0)
 					return -1;
+				make_name_list_unique(&r->inputs);
 				free(input_pattern);
 				if(r->inputs.num_entries)
 					break;
@@ -1658,6 +1639,8 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 
 	if(get_path_list(eval_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
 		return -1;
+	make_path_list_unique(&oplist);
+
 	while(!list_empty(&oplist)) {
 		struct rule tmpr;
 		char *tinput;
@@ -1741,6 +1724,8 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 
 	if(get_path_list(inp, &inp_list, tf->tupid, NULL, NULL) < 0)
 		return -1;
+	make_path_list_unique(&inp_list);
+
 	while(!list_empty(&inp_list)) {
 		pl = list_entry(inp_list.next, struct path_list, list);
 
@@ -1885,11 +1870,65 @@ skip_empty_space:
 	return 0;
 }
 
+static void make_path_list_unique(struct list_head *plist)
+{
+	/* When make_name_list_unique can't be used, this can make a path_list
+	 * unique in O(n^2) time.
+	 */
+	struct path_list *pl;
+	struct path_list *tmp;
+
+	list_for_each_entry_safe(pl, tmp, plist, list) {
+		struct path_list *pl2;
+		struct list_head *tlist;
+
+		tlist = pl->list.next;
+		while(tlist != plist) {
+			pl2 = list_entry(tlist, struct path_list, list);
+			if(pl->pel->len == pl2->pel->len &&
+			   memcmp(pl->pel->path, pl2->pel->path, pl->pel->len) == 0) {
+				del_pl(pl);
+				break;
+			}
+			tlist = pl2->list.next;
+		}
+	}
+}
+
 static void del_pl(struct path_list *pl)
 {
 	list_del(&pl->list);
 	free(pl->pel);
 	free(pl);
+}
+
+static void make_name_list_unique(struct name_list *nl)
+{
+	struct name_list_entry *tmp;
+	struct list_head *input_list;
+	struct name_list_entry *nle;
+
+	/* Use the tup entry list as an easy cheat to remove duplicates. Only
+	 * care about dups in the inputs namelist, since the others are just
+	 * added to the tupid_tree and aren't used in %-flags.
+	 *
+	 * The trick here is that we need to prune duplicate inputs, but still
+	 * maintain the order. So we can't stick the input tupids in a tree and
+	 * use that, since that would kill the order. Also, just going through
+	 * the linked list twice would be O(n^2), which would suck. Since the
+	 * tup_entry's are already unique, we can use the entry list to
+	 * determine if the nle is already present or not. If it is already
+	 * present, the second and further duplicates will be removed.
+	 */
+	input_list = tup_entry_get_list();
+	list_for_each_entry_safe(nle, tmp, &nl->entries, list) {
+		if(tup_entry_in_list(nle->tent)) {
+			delete_name_list_entry(nl, nle);
+		} else {
+			tup_entry_list_add(nle->tent, input_list);
+		}
+	}
+	tup_entry_release_list();
 }
 
 static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,

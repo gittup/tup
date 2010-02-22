@@ -2199,6 +2199,8 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *deltree,
 	}
 	/* Otherwise, someone else got the girl. Err, output file. */
 	fprintf(stderr, "Error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
+	tup_db_print(stderr, a);
+	tup_db_print(stderr, b);
 	return -1;
 }
 
