@@ -4599,10 +4599,17 @@ static int get_db_var_tree(struct vardb *vdb)
 		var = (const char*)sqlite3_column_text(*stmt, 1);
 		value = (const char*)sqlite3_column_text(*stmt, 2);
 		type = sqlite3_column_int(*stmt, 3);
-		if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1, &tent) <0)
-			return -1;
+		/* Only add the entry if we don't have it already. It is
+		 * possible that variables have been added if a file was
+		 * removed, causing incoming links to be added to the
+		 * by add_ghost_links.
+		 */
+		tent = tup_entry_find(tupid);
+		if(!tent)
+			if(tup_entry_add_to_dir(VAR_DT, tupid, var, -1, type, -1, -1, &tent) <0)
+				goto out_reset;
 		if(vardb_set(vdb, var, value, tent) < 0)
-			return -1;
+			goto out_reset;
 	} while(1);
 
 out_reset:

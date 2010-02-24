@@ -326,6 +326,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 
 	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree in new_entry\n", tent->tnode.tupid);
+		tup_db_print(stderr, tent->tnode.tupid);
 		return NULL;
 	}
 
