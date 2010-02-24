@@ -819,8 +819,10 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
 			goto out_reset;
 		}
 
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
-			return -1;
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
 
 		/* Since this is used to build the initial part of the DAG,
 		 * we use TUP_LINK_NORMAL so the nodes that are returned will
@@ -876,8 +878,10 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style
 			goto out_reset;
 		}
 
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
-			return -1;
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
 
 		/* This is used by the 'tup g' function if the user wants to
 		 * graph a directory. Since we want to expand all nodes in the
@@ -2086,7 +2090,8 @@ static int get_recurse_dirs(tupid_t dt, struct list_head *list)
 		ide = malloc(sizeof *ide);
 		if(ide == NULL) {
 			perror("malloc");
-			return -1;
+			rc = -1;
+			goto out_reset;
 		}
 		ide->tupid = sqlite3_column_int64(*stmt, 0);
 		list_add(&ide->list, list);
@@ -2139,7 +2144,8 @@ static int get_dir_entries(tupid_t dt, struct list_head *list)
 		he = malloc(sizeof *he);
 		if(he == NULL) {
 			perror("malloc");
-			return -1;
+			rc = -1;
+			goto out_reset;
 		}
 		he->tupid = sqlite3_column_int64(*stmt, 0);
 		he->dt = dt;
@@ -2246,7 +2252,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 
 int tup_db_link_style(tupid_t a, tupid_t b, int *style)
 {
-	int rc;
+	int rc = -1;
 	sqlite3_stmt **stmt = &stmts[DB_LINK_STYLE];
 	static char s[] = "select style from link where from_id=? and to_id=?";
 
@@ -2272,13 +2278,15 @@ int tup_db_link_style(tupid_t a, tupid_t b, int *style)
 
 	rc = sqlite3_step(*stmt);
 	if(rc == SQLITE_DONE) {
+		rc = 0;
 		goto out_reset;
 	}
 	if(rc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		goto out_reset;
 	}
 	*style = sqlite3_column_int(*stmt, 0);
+	rc = 0;
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -2286,7 +2294,7 @@ out_reset:
 		return -1;
 	}
 
-	return 0;
+	return rc;
 }
 
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
@@ -2318,7 +2326,8 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 	}
 	if(dbrc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		rc = -1;
+		goto out_reset;
 	}
 	*incoming = sqlite3_column_int64(*stmt, 0);
 
@@ -2588,8 +2597,10 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 			goto out_reset;
 		}
 
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0)
-			return -1;
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
 		style = sqlite3_column_int(*stmt, 1);
 
 		if(callback(arg, tent, style) < 0) {
@@ -4109,8 +4120,10 @@ static int node_select(tupid_t dt, const char *name, int len,
 	sym = sqlite3_column_int64(*stmt, 2);
 	mtime = sqlite3_column_int(*stmt, 3);
 
-	if(tup_entry_add_to_dir(dt, tupid, name, len, type, sym, mtime, entry) < 0)
-		return -1;
+	if(tup_entry_add_to_dir(dt, tupid, name, len, type, sym, mtime, entry) < 0) {
+		rc = -1;
+		goto out_reset;
+	}
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
@@ -4341,6 +4354,7 @@ static int add_ghost(tupid_t tupid)
 
 static int add_ghost_links(tupid_t tupid)
 {
+	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_LINKS];
 	static char s[] = "select from_id from link where to_id=?";
@@ -4369,22 +4383,26 @@ static int add_ghost_links(tupid_t tupid)
 		}
 		if(dbrc != SQLITE_ROW) {
 			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
+			rc = -1;
+			goto out_reset;
 		}
 
 		link_tupid = sqlite3_column_int64(*stmt, 0);
-		if(tup_entry_add(link_tupid, &tent) < 0)
-			return -1;
+		if(tup_entry_add(link_tupid, &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
 
 		tup_entry_add_ghost_list(tent, &ghost_list);
 	} while(1);
 
+out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
 
-	return 0;
+	return rc;
 }
 
 static int adjust_ghost_symlinks(tupid_t tupid)
@@ -4417,24 +4435,29 @@ static int adjust_ghost_symlinks(tupid_t tupid)
 		}
 		if(dbrc != SQLITE_ROW) {
 			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			return -1;
+			rc = -1;
+			goto out_reset;
 		}
 
 		ide = malloc(sizeof *ide);
 		if(!ide) {
 			perror("malloc");
 			fprintf(stderr, "Unable to adjust symlinks for file '%lli'.\n", tupid);
-			return -1;
+			rc = -1;
+			goto out_reset;
 		}
 		ide->tupid = sqlite3_column_int64(*stmt, 0);
 
 		list_add(&ide->list, &del_list);
 	} while(1);
 
+out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+	if(rc < 0)
+		return -1;
 
 	while(!list_empty(&del_list)) {
 		int dfd;
