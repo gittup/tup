@@ -1,2 +1,7 @@
 include_rules
+
+ifeq (@(NO_COLORS),y)
+CFLAGS_updater.c = -DTUP_NO_COLORS
+endif
+
 : foreach *.c |> !cc |> %B.o

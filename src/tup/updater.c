@@ -1086,7 +1086,9 @@ static void show_progress(int sum, int tot, struct node *n)
 {
 	if(tot) {
 		const int max = 11;
+#ifndef TUP_NO_COLORS
 		const char *color = "";
+#endif
 		char *name;
 		int name_sz = 0;
 		int fill;
@@ -1120,6 +1122,7 @@ static void show_progress(int sum, int tot, struct node *n)
 				while(name[name_sz] && name[name_sz] != '^')
 					name_sz++;
 			}
+#ifndef TUP_NO_COLORS
 			if(n->tent->type == TUP_NODE_DIR) {
 				color = "[33";
 			} else if(n->tent->type == TUP_NODE_CMD) {
@@ -1133,12 +1136,23 @@ static void show_progress(int sum, int tot, struct node *n)
 				color = "[37";
 			}
 			printf("[%s;07m%.*s[0m] ", color, (int)sizeof(buf), buf);
+#else
+			printf("[%.*s] ", (int)sizeof(buf), buf);
+#endif
 			if(n->tent && n->tent->parent) {
 				print_tup_entry(n->tent->parent);
 			}
+#ifndef TUP_NO_COLORS
 			printf("%sm%.*s[0m\n", color, name_sz, name);
+#else
+			printf("%.*s\n", name_sz, name);
+#endif
 		} else {
+#ifndef TUP_NO_COLORS
 			printf("[[07;32m%.*s[0m]\n", (int)sizeof(buf), buf);
+#else
+			printf("[%.*s]\n", (int)sizeof(buf), buf);
+#endif
 		}
 	}
 }
