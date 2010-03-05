@@ -128,6 +128,11 @@ if you ctrl-c after files are deleted but before the commit finishes, the files 
 
 make all error messages and such pretty print on things other than 80 columns
 
+make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
+ - I was trying to do 'find . -type f | xargs tup g' to just show files
+
+make 'Werror' optional (tup.config option?)
+
 html:
   proof: no clean target
   graphs

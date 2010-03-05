@@ -25,6 +25,8 @@ static FILE *(*s_freopen)(const char *, const char *, FILE *);
 static int (*s_creat)(const char *, mode_t);
 static int (*s_symlink)(const char *, const char *);
 static int (*s_rename)(const char*, const char*);
+static int (*s_mkstemp)(char *template);
+static int (*s_mkostemp)(char *template, int flags);
 static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
@@ -173,6 +175,30 @@ int rename(const char *old, const char *new)
 		if(!ignore_file(old) && !ignore_file(new)) {
 			handle_file(old, new, ACCESS_RENAME);
 		}
+	}
+	return rc;
+}
+
+int mkstemp(char *template)
+{
+	int rc;
+
+	WRAP(s_mkstemp, "mkstemp");
+	rc = s_mkstemp(template);
+	if(rc != -1) {
+		handle_file(template, "", ACCESS_WRITE);
+	}
+	return rc;
+}
+
+int mkostemp(char *template, int flags)
+{
+	int rc;
+
+	WRAP(s_mkostemp, "mkostemp");
+	rc = s_mkostemp(template, flags);
+	if(rc != -1) {
+		handle_file(template, "", ACCESS_WRITE);
 	}
 	return rc;
 }
