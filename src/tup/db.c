@@ -3814,12 +3814,17 @@ struct actual_input_data {
 	tupid_t cmdid;
 	int input_error;
 	struct rb_root sticky_tree;
+	struct rb_root output_tree;
 };
 
 static int new_input(tupid_t tupid, void *data)
 {
 	struct tup_entry *tent;
 	struct actual_input_data *aid = data;
+
+	/* Skip any files that are supposed to be used as outputs */
+	if(tupid_tree_search(&aid->output_tree, tupid) != NULL)
+		return 0;
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
@@ -3842,6 +3847,10 @@ static int new_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
 	int rc;
+
+	/* Skip any files that are supposed to be used as outputs */
+	if(tupid_tree_search(&aid->output_tree, tupid) != NULL)
+		return 0;
 
 	if(tupid_tree_search(&aid->sticky_tree, tupid) == NULL) {
 		/* Not a sticky link, insert it */
@@ -3881,8 +3890,11 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 		.cmdid = cmdid,
 		.input_error = 0,
 		.sticky_tree = {NULL},
+		.output_tree = {NULL},
 	};
 
+	if(get_output_tree(cmdid, &aid.output_tree) < 0)
+		return -1;
 	if(get_links(cmdid, &aid.sticky_tree, &normal_tree) < 0)
 		return -1;
 	if(tupid_tree_copy(&sticky_copy, &aid.sticky_tree) < 0)
@@ -3900,6 +3912,7 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 	free_tupid_tree(&aid.sticky_tree);
 	free_tupid_tree(&normal_tree);
 	free_tupid_tree(&sticky_copy);
+	free_tupid_tree(&aid.output_tree);
 	if(aid.input_error)
 		return -1;
 	return 0;

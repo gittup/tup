@@ -286,19 +286,6 @@ static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
 
 		w = list_entry(info->write_list.next, struct file_entry, list);
 
-		/* Some programs read from a file before writing over it. In
-		 * this case we don't want to have a link both to and from the
-		 * command, and writing takes precedence.
-		 */
-		list_for_each_entry_safe(r, tmp, &info->read_list, list) {
-			if(pg_eq(&w->pg, &r->pg))
-				del_entry(r);
-		}
-		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
-			if(pg_eq(&w->pg, &g->pg))
-				del_entry(g);
-		}
-
 		/* Remove duplicate write entries */
 		list_for_each_entry_safe(r, tmp, &info->write_list, list) {
 			if(r != w && pg_eq(&w->pg, &r->pg)) {
