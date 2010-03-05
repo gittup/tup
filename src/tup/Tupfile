@@ -1,6 +1,6 @@
 include_rules
 
-ifeq (@(NO_COLORS),y)
+ifeq (@(TUP_NO_COLORS),y)
 CFLAGS_updater.c = -DTUP_NO_COLORS
 endif
 
