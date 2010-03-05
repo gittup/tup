@@ -607,9 +607,16 @@ static int flush_queue(void)
 			tup_lock_exit();
 			exit(0);
 		} else {
+			int *newpid;
 			pthread_t tid;
 
-			if(pthread_create(&tid, NULL, wait_thread, (void*)pid) < 0) {
+			newpid = malloc(sizeof(int));
+			if(!newpid) {
+				perror("malloc");
+				return -1;
+			}
+			*newpid = pid;
+			if(pthread_create(&tid, NULL, wait_thread, (void*)newpid) < 0) {
 				perror("pthread_create");
 				return -1;
 			}
@@ -628,11 +635,12 @@ static void *wait_thread(void *arg)
 	/* Apparently setting SIGCHLD to SIG_IGN isn't particularly portable,
 	 * so I use this stupid thread instead. Maybe there's a better way.
 	 */
-	int pid = (int)arg;
+	int *pid = (int*)arg;
 
-	if(waitpid(pid, NULL, 0) < 0) {
+	if(waitpid(*pid, NULL, 0) < 0) {
 		perror("waitpid");
 	}
+	free(pid);
 	return NULL;
 }
 

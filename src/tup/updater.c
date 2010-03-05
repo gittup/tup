@@ -1132,13 +1132,13 @@ static void show_progress(int sum, int tot, struct node *n)
 				 */
 				color = "[37";
 			}
-			printf("[%s;07m%.*s[0m] ", color, sizeof(buf), buf);
+			printf("[%s;07m%.*s[0m] ", color, (int)sizeof(buf), buf);
 			if(n->tent && n->tent->parent) {
 				print_tup_entry(n->tent->parent);
 			}
 			printf("%sm%.*s[0m\n", color, name_sz, name);
 		} else {
-			printf("[[07;32m%.*s[0m]\n", sizeof(buf), buf);
+			printf("[[07;32m%.*s[0m]\n", (int)sizeof(buf), buf);
 		}
 	}
 }
