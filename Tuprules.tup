@@ -5,7 +5,9 @@ CC = gcc
 CFLAGS += -Os
 CFLAGS += -W
 CFLAGS += -Wall
+ifeq (@(TUP_WERROR),y)
 CFLAGS += -Werror
+endif
 CFLAGS += -Wbad-function-cast
 CFLAGS += -Wcast-align
 CFLAGS += -Wcast-qual
