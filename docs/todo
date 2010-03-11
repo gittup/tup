@@ -131,9 +131,7 @@ make all error messages and such pretty print on things other than 80 columns
 make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
  - I was trying to do 'find . -type f | xargs tup g' to just show files
 
-|> cmd |> output
- - but command reads from 'output' instead of writing to it
- - causes circular dependency?
+touch ok.o; rm -f ok.o ok.c; tup upd shouldn't keep ok.o in the dag
 
 html:
   proof: no clean target
