@@ -10,6 +10,7 @@
 #include "fslurp.h"
 #include "entry.h"
 #include "version.h"
+#include "platform.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -3004,7 +3005,12 @@ static struct var_entry *get_var(const char *var, int varlen)
 		if(tent->type == TUP_NODE_VAR) {
 			ve = get_var_id(tent, var, varlen);
 		} else {
-			ve = vardb_set2(&atvardb, var, varlen, "", tent);
+			if(varlen == 12 &&
+			   strncmp(var, "TUP_PLATFORM", varlen) == 0) {
+				ve = vardb_set2(&atvardb, var, varlen, tup_platform, tent);
+			} else {
+				ve = vardb_set2(&atvardb, var, varlen, "", tent);
+			}
 		}
 	}
 	return ve;
