@@ -5,7 +5,7 @@ mkdir -p build
 mkdir -p build/ldpreload
 echo "  cd build"
 cd build
-for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c; do
+for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/colors/colors.c; do
 	echo "  bootstrap CC $i"
 	gcc -Os -c $i -I../src
 done
@@ -24,6 +24,7 @@ echo "const char *tup_version(void) {return \"bootstrap\";}" | gcc -x c -c - -o 
 gcc *.o -o tup -lpthread
 
 cd ..
-./build/tup init
+# We may be bootstrapping over an already-inited area.
+./build/tup init || true
 ./build/tup upd
 echo "Build complete. If ./tup works, you can remove the 'build' directory."
