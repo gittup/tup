@@ -1,0 +1,9 @@
+include_rules
+
+ifeq (@(TUP_NO_COLORS),y)
+	srcs += no_colors.c
+else
+	srcs += colors.c
+endif
+
+: $(srcs) |> !cc |> %B.o

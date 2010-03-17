@@ -14,6 +14,7 @@
 #include "config.h"
 #include "monitor.h"
 #include "path.h"
+#include "colors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1070,15 +1071,8 @@ static void sighandler(int sig)
 static void tup_main_progress(const char *s)
 {
 	static int cur_phase = 0;
-	const char *tup[] = {
-		" tup ",
-		"[07m [0mtup ",
-		"[07m t[0mup ",
-		"[07m tu[0mp ",
-		"[07m tup[0m ",
-		"[07m tup [0m",
-	};
-	printf("[%s] %s", tup[cur_phase], s);
+	const char *tup = " tup ";
+	printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
 	cur_phase++;
 }
 
@@ -1086,13 +1080,11 @@ static void show_progress(int sum, int tot, struct node *n)
 {
 	if(tot) {
 		const int max = 11;
-#ifndef TUP_NO_COLORS
 		const char *color = "";
-#endif
 		char *name;
 		int name_sz = 0;
 		int fill;
-		char buf[16];
+		char buf[12];
 
 		/* If it's a good enough limit for Final Fantasy VII, it's good
 		 * enough for me.
@@ -1102,14 +1094,7 @@ static void show_progress(int sum, int tot, struct node *n)
 		} else {
 			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, tot);
 		}
-		/* Now that we know how the text in between the []'s should
-		 * look, stick an extra five bytes in the middle somewhere
-		 * (based on the current % complete) to cancel the color
-		 * inversion.
-		 */
 		fill = max * sum / tot;
-		memmove(buf+fill+5, buf+fill, 11-fill);
-		memcpy(buf+fill, "[00m", 5);
 
 		if(n) {
 			name = n->tent->name.s;
@@ -1122,37 +1107,15 @@ static void show_progress(int sum, int tot, struct node *n)
 				while(name[name_sz] && name[name_sz] != '^')
 					name_sz++;
 			}
-#ifndef TUP_NO_COLORS
-			if(n->tent->type == TUP_NODE_DIR) {
-				color = "[33";
-			} else if(n->tent->type == TUP_NODE_CMD) {
-				color = "[34";
-			} else if(n->tent->type == TUP_NODE_GENERATED) {
-				color = "[35";
-			} else if(n->tent->type == TUP_NODE_FILE) {
-				/* If a generated node becomes a normal file
-				 * (t6031)
-				 */
-				color = "[37";
-			}
-			printf("[%s;07m%.*s[0m] ", color, (int)sizeof(buf), buf);
-#else
-			printf("[%.*s] ", (int)sizeof(buf), buf);
-#endif
+
+			color = color_type(n->tent->type);
+			printf("[%s%s%.*s%s%.*s] ", color, color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 			if(n->tent && n->tent->parent) {
 				print_tup_entry(n->tent->parent);
 			}
-#ifndef TUP_NO_COLORS
-			printf("%sm%.*s[0m\n", color, name_sz, name);
-#else
-			printf("%.*s\n", name_sz, name);
-#endif
+			printf("%s%s%.*s%s\n", color, color_append_normal(), name_sz, name, color_end());
 		} else {
-#ifndef TUP_NO_COLORS
-			printf("[[07;32m%.*s[0m]\n", (int)sizeof(buf), buf);
-#else
-			printf("[%.*s]\n", (int)sizeof(buf), buf);
-#endif
+			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
 		}
 	}
 }
