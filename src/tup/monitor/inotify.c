@@ -19,7 +19,7 @@
  */
 
 #define _ATFILE_SOURCE
-#include "monitor.h"
+#include "tup/monitor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,16 +31,16 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <pthread.h>
-#include "dircache.h"
-#include "debug.h"
-#include "fileio.h"
-#include "config.h"
-#include "db.h"
-#include "lock.h"
-#include "updater.h"
-#include "path.h"
-#include "entry.h"
-#include "fslurp.h"
+#include "tup/dircache.h"
+#include "tup/debug.h"
+#include "tup/fileio.h"
+#include "tup/config.h"
+#include "tup/db.h"
+#include "tup/lock.h"
+#include "tup/updater.h"
+#include "tup/path.h"
+#include "tup/entry.h"
+#include "tup/fslurp.h"
 #include "linux/rbtree.h"
 
 #define MONITOR_LOOP_RETRY -2
