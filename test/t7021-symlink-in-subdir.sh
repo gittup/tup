@@ -5,6 +5,7 @@
 # around I found out I was relying on the cwd to be set for readlink() to work
 # in update_symlink_file). This makes sure I don't break that again.
 . ./tup.sh
+check_monitor_supported
 
 mkdir a
 cd a

@@ -3,6 +3,7 @@
 # Kinda like t7009, only we don't mess with the directory that has the Tupfile.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir output

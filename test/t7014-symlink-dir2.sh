@@ -2,6 +2,7 @@
 
 # Make sure a symlink doesn't go into the modify list when the monitor starts.
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 mkdir foo-x86

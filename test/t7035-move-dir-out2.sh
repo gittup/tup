@@ -5,6 +5,7 @@
 # has a watch on any invalid tupid.
 
 . ./tup.sh
+check_monitor_supported
 mkdir tuptest
 cd tuptest
 re_init

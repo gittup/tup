@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 cp ../testTupfile.tup a/Tupfile

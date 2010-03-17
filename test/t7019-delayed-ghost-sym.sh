@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 
 # Check to see if we can create a ghost node, then shutdown the monitor and
 # turn the ghost into a symlink, then shutdown the monitor and change the

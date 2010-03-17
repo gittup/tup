@@ -4,6 +4,7 @@
 # directory in its place. The monitor should still be running afterward, which
 # is checked by stop_monitor.
 . ./tup.sh
+check_monitor_supported
 mkdir tuptest
 cd tuptest
 re_init

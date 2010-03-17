@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 
 # First create a foo.c program, then stop the monitor
 tup monitor

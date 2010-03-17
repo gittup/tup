@@ -4,6 +4,7 @@
 # the update.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

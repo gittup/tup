@@ -4,6 +4,7 @@
 # directory node just gets renamed, we have to make sure the ghost becomes a
 # normal node.
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

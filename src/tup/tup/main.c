@@ -130,6 +130,8 @@ int main(int argc, char **argv)
 		rc = flush();
 	} else if(strcmp(cmd, "ghost_check") == 0) {
 		rc = ghost_check();
+	} else if(strcmp(cmd, "monitor_supported") == 0) {
+		rc = monitor_supported();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", cmd);
 		rc = 1;

@@ -3,6 +3,7 @@
 # We have a ghost Tuprules.tup node, and then move a file over it. The
 # necessary directories should be re-parsed.
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

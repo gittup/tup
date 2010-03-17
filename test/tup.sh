@@ -332,6 +332,16 @@ HERE
 	tup touch client
 }
 
+check_monitor_supported()
+{
+	if tup monitor_supported; then
+		:
+	else
+		echo "Monitor is not supported. Skipping test."
+		exit 0
+	fi
+}
+
 eotup()
 {
 	tup stop || true

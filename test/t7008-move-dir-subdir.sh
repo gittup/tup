@@ -3,6 +3,7 @@
 # Check if we move a dir that depends on its subdir, that things work.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

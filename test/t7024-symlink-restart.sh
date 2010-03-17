@@ -2,6 +2,7 @@
 
 # Make sure a symlink doesn't do anything funky when the monitor is restarted
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 # First set everything up and clear all flags

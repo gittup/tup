@@ -8,6 +8,7 @@ LDFLAGS_tup-ldpreload.so += -ldl
 : src/tup/client/*.o |> !ar |> libtup_client.a
 
 srcs = src/tup/*.o
+srcs += src/tup/monitor/*.o
 srcs += src/linux/*.o
 srcs += src/sqlite3/*.o
 : $(srcs) |> !ar |> libtup.a

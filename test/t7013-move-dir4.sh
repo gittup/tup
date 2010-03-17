@@ -3,6 +3,7 @@
 # Make sure we can move a directory to a different place in the hierarchy. This
 # means we have to update the node's dir field when it is renamed.
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

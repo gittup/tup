@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 
 # Apparently changing a Tupfile in between monitor invocations doesn't work
 # properly (it doesn't get re-parsed).

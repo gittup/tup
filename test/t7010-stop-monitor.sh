@@ -4,6 +4,7 @@
 # hose up existing flags.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 echo "int main(void) {return 0;}" > foo.c

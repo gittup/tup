@@ -4,6 +4,7 @@
 # was relying on the watch to move when a directory moves.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 touch a/foo.c

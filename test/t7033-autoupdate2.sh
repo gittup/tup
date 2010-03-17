@@ -4,6 +4,7 @@
 # directories.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 tup config autoupdate 1
 cat > foo.c << HERE

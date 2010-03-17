@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 
 # Make sure we don't get a warning for deleting a file if it was never created
 # in the first place.

@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
 . ./tup.sh
+check_monitor_supported
 
 # Verify that 'tup scan' works as a one-shot monitor. Now 'tup scan' is called
 # automatically by 'tup upd' when necessary.

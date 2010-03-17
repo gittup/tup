@@ -7,6 +7,7 @@
 # create), then move it to another directory (so it goes in delete).
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

@@ -4,6 +4,7 @@
 # stopped and restarted.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 cat > Tupfile << HERE

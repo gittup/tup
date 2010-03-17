@@ -90,6 +90,11 @@ static int queue_end = 0;
 static struct monitor_event *queue_last_e = NULL;
 static LIST_HEAD(moved_from_list);
 
+int monitor_supported(void)
+{
+	return 0;
+}
+
 int monitor(int argc, char **argv)
 {
 	int x;

@@ -12,6 +12,7 @@
 # created to have the same tupids.
 
 . ./tup.sh
+check_monitor_supported
 mkdir tuptest
 cd tuptest
 re_init

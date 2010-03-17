@@ -3,6 +3,7 @@
 # Make sure we can move a directory outside of tup and have it be deleted.
 
 . ./tup.sh
+check_monitor_supported
 mkdir tuptest
 cd tuptest
 re_init

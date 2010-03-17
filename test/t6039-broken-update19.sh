@@ -6,6 +6,7 @@
 
 . ./tup.sh
 
+check_monitor_supported
 tup monitor
 cat > Tuprules.tup << HERE
 files-@(ARCH) = foo.c

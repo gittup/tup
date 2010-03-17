@@ -4,6 +4,7 @@
 # hose up existing flags. Now with an included Tupfile
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 touch foo

@@ -3,6 +3,7 @@
 # Try to move a directory, then move it back to the original directory.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 mkdir a
 mkdir a/a2

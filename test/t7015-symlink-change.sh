@@ -2,6 +2,7 @@
 
 # See what happens if we change where a symlink points while the monitor is away
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 mkdir foo-x86

@@ -4,6 +4,7 @@
 # from other files.
 
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 mkdir .git

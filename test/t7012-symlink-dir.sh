@@ -2,6 +2,7 @@
 
 # Make sure we can use a symlink from the monitor
 . ./tup.sh
+check_monitor_supported
 tup monitor
 
 mkdir foo-x86
