@@ -9,10 +9,10 @@ make_tup_client
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-tup touch Tupfile
+tup touch Tupfile empty.txt
 update
 
-echo -n '' | diff - ok.txt
+diff empty.txt ok.txt
 
 tup_object_exist @ defg
 
