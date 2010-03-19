@@ -23,9 +23,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/inotify.h>
 #include <sys/time.h>
-#include <sys/file.h>
 #include <errno.h>
 #include <signal.h>
 #include <sys/resource.h>
@@ -99,7 +99,7 @@ int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
-	int mon_lock;
+	int mon_fd;
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -112,15 +112,10 @@ int monitor(int argc, char **argv)
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 
-	mon_lock = openat(tup_top_fd(), TUP_MONITOR_LOCK, O_WRONLY);
-	if(mon_lock < 0) {
+	mon_fd = openat(tup_top_fd(), TUP_MONITOR_LOCK, O_RDWR);
+	if(mon_fd < 0) {
 		perror(TUP_MONITOR_LOCK);
 		return -1;
-	}
-	if(flock(mon_lock, LOCK_EX) < 0) {
-		perror("flock");
-		rc = -1;
-		goto close_monlock;
 	}
 
 	inot_fd = inotify_init();
@@ -155,14 +150,23 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	if(flock(tup_sh_lock(), LOCK_UN) < 0) {
-		perror("flock");
+	if(fork() > 0) {
+		/* Remove our object lock, then wait for the child process to get
+		 * it.
+		 */
+		tup_unflock(tup_obj_lock());
+		if(tup_wait_flock(tup_obj_lock()) < 0)
+			exit(1);
+		exit(0);
+	}
+
+	/* Child must re-acquire the object lock, since we lost it at the
+	 * fork
+	 */
+	if(tup_flock(tup_obj_lock()) < 0) {
 		rc = -1;
 		goto close_inot;
 	}
-
-	if(fork() > 0)
-		exit(0);
 
 	if(monitor_set_pid(getpid()) < 0) {
 		rc = -1;
@@ -225,8 +229,7 @@ int monitor(int argc, char **argv)
 				}
 			}
 
-			if(flock(tup_sh_lock(), LOCK_UN) < 0) {
-				perror("flock");
+			if(tup_unflock(tup_sh_lock()) < 0) {
 				return -1;
 			}
 			if(monitor_set_pid(getpid()) < 0)
@@ -237,8 +240,7 @@ int monitor(int argc, char **argv)
 
 close_inot:
 	close(inot_fd);
-close_monlock:
-	close(mon_lock);
+	close(mon_fd);
 	return rc;
 }
 
@@ -253,8 +255,7 @@ static int monitor_set_pid(int pid)
 		perror(MONITOR_PID_FILE);
 		return -1;
 	}
-	if(flock(fd, LOCK_EX) < 0) {
-		perror("flock");
+	if(tup_flock(fd) < 0) {
 		return -1;
 	}
 	len = snprintf(buf, sizeof(buf), "%i", pid);
@@ -270,8 +271,7 @@ static int monitor_set_pid(int pid)
 		perror("ftruncate");
 		return -1;
 	}
-	if(flock(fd, LOCK_UN) < 0) {
-		perror("flock");
+	if(tup_unflock(fd) < 0) {
 		return -1;
 	}
 	close(fd);
@@ -284,7 +284,7 @@ int monitor_get_pid(void)
 	int fd;
 	int rc = -1;
 
-	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDONLY, 0666);
+	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDWR, 0666);
 	if(fd < 0) {
 		if(errno != ENOENT) {
 			perror(MONITOR_PID_FILE);
@@ -292,8 +292,7 @@ int monitor_get_pid(void)
 		}
 		return -1;
 	}
-	if(flock(fd, LOCK_EX) < 0) {
-		perror("flock");
+	if(tup_flock(fd) < 0) {
 		return -1;
 	}
 	if(fslurp_null(fd, &b) < 0) {
@@ -305,8 +304,7 @@ int monitor_get_pid(void)
 	}
 	free(b.s);
 out:
-	if(flock(fd, LOCK_UN) < 0) {
-		perror("flock");
+	if(tup_unflock(fd) < 0) {
 		return -1;
 	}
 	close(fd);
@@ -393,23 +391,19 @@ static int monitor_loop(void)
 					if(rc < 0)
 						return rc;
 					locked = 0;
-					if(flock(tup_tri_lock(), LOCK_EX) < 0) {
-						perror("flock");
+					if(tup_flock(tup_tri_lock()) < 0) {
 						return -1;
 					}
-					if(flock(tup_obj_lock(), LOCK_UN) < 0) {
-						perror("flock");
+					if(tup_unflock(tup_obj_lock()) < 0) {
 						return -1;
 					}
 					DEBUGP("monitor off\n");
 				}
 				if((e->mask & IN_CLOSE) && !locked) {
-					if(flock(tup_obj_lock(), LOCK_EX) < 0) {
-						perror("flock");
+					if(tup_flock(tup_obj_lock()) < 0) {
 						return -1;
 					}
-					if(flock(tup_tri_lock(), LOCK_UN) < 0) {
-						perror("flock");
+					if(tup_unflock(tup_tri_lock()) < 0) {
 						return -1;
 					}
 					locked = 1;

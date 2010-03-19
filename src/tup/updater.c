@@ -22,7 +22,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <sys/file.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>

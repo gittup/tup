@@ -1,7 +1,8 @@
 #include "lock.h"
 #include <stdio.h>
+#include <fcntl.h>
 #include <unistd.h>
-#include <sys/file.h>
+#include <time.h>
 
 /* So...the tri-lock business. There are three locks. They lock one thing - the
  * database. It also lets the monitor ignore the file accesses while an update
@@ -58,27 +59,25 @@ static int tri_lock;
 
 int tup_lock_init(void)
 {
-	sh_lock = open(TUP_SHARED_LOCK, O_RDONLY);
+	sh_lock = open(TUP_SHARED_LOCK, O_RDWR);
 	if(sh_lock < 0) {
 		perror(TUP_SHARED_LOCK);
 		return -1;
 	}
-	if(flock(sh_lock, LOCK_EX) < 0) {
-		perror("flock");
+	if(tup_flock(sh_lock) < 0) {
 		return -1;
 	}
 
-	obj_lock = open(TUP_OBJECT_LOCK, O_RDONLY);
+	obj_lock = open(TUP_OBJECT_LOCK, O_RDWR);
 	if(obj_lock < 0) {
 		perror(TUP_OBJECT_LOCK);
 		return -1;
 	}
-	if(flock(obj_lock, LOCK_EX) < 0) {
-		perror("flock");
+	if(tup_flock(obj_lock) < 0) {
 		return -1;
 	}
 
-	tri_lock = open(TUP_TRI_LOCK, O_RDONLY);
+	tri_lock = open(TUP_TRI_LOCK, O_RDWR);
 	if(tri_lock < 0) {
 		perror(TUP_TRI_LOCK);
 		return -1;
@@ -88,13 +87,13 @@ int tup_lock_init(void)
 
 void tup_lock_exit(void)
 {
-	flock(obj_lock, LOCK_UN);
+	tup_unflock(obj_lock);
 	close(obj_lock);
 	/* Wait for the monitor to pick up the object lock */
-	flock(tri_lock, LOCK_EX);
-	flock(tri_lock, LOCK_UN);
+	tup_flock(tri_lock);
+	tup_unflock(tri_lock);
 	close(tri_lock);
-	flock(sh_lock, LOCK_UN);
+	tup_unflock(sh_lock);
 	close(sh_lock);
 }
 
@@ -118,4 +117,60 @@ int tup_obj_lock(void)
 int tup_tri_lock(void)
 {
 	return tri_lock;
+}
+
+int tup_flock(int fd)
+{
+	struct flock fl = {
+		.l_type = F_WRLCK,
+		.l_whence = SEEK_SET,
+		.l_start = 0,
+		.l_len = 0,
+	};
+
+	if(fcntl(fd, F_SETLKW, &fl) < 0) {
+		perror("fcntl F_WRLCK");
+		return -1;
+	}
+	return 0;
+}
+
+int tup_unflock(int fd)
+{
+	struct flock fl = {
+		.l_type = F_UNLCK,
+		.l_whence = SEEK_SET,
+		.l_start = 0,
+		.l_len = 0,
+	};
+
+	if(fcntl(fd, F_SETLKW, &fl) < 0) {
+		perror("fcntl F_UNLCK");
+		return -1;
+	}
+	return 0;
+}
+
+int tup_wait_flock(int fd)
+{
+	struct flock fl;
+
+	while(1) {
+		struct timespec ts = {0, 10000000};
+
+		fl.l_type = F_WRLCK;
+		fl.l_whence = SEEK_SET;
+		fl.l_start = 0;
+		fl.l_len = 0;
+
+		if(fcntl(fd, F_GETLK, &fl) < 0) {
+			perror("fcntl F_GETLK");
+			return -1;
+		}
+
+		if(fl.l_type == F_WRLCK)
+			break;
+		nanosleep(&ts, NULL);
+	}
+	return 0;
 }
