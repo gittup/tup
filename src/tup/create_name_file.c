@@ -1,3 +1,5 @@
+/* _ATFILE_SOURCE for AT_SYMLINK_NOFOLLOW */
+#define _ATFILE_SOURCE
 #include "fileio.h"
 #include "db.h"
 #include "compat.h"
