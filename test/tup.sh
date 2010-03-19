@@ -330,7 +330,11 @@ int main(int argc, char **argv)
 }
 HERE
 
-	gcc client.c ../../libtup_client.a -o client
+	plat_ldflags=""
+	if [ "$tupos" = "SunOS" ]; then
+		plat_ldflags="$plat_ldflags -lsocket"
+	fi
+	gcc client.c ../../libtup_client.a -o client $plat_ldflags
 	tup touch client
 }
 
