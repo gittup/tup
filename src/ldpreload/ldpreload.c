@@ -34,6 +34,7 @@ static int (*s_execve)(const char *filename, char *const argv[],
 static int (*s_execv)(const char *path, char *const argv[]);
 static int (*s_execvp)(const char *file, char *const argv[]);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
+static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
 
@@ -314,6 +315,19 @@ int __xstat(int vers, const char *name, struct stat *buf)
 	if(rc < 0) {
 		if(errno == ENOENT || errno == ENOTDIR) {
 			handle_file(name, "", ACCESS_GHOST);
+		}
+	}
+	return rc;
+}
+
+int stat64(const char *filename, struct stat64 *buf)
+{
+	int rc;
+	WRAP(s_stat64, "stat64");
+	rc = s_stat64(filename, buf);
+	if(rc < 0) {
+		if(errno == ENOENT || errno == ENOTDIR) {
+			handle_file(filename, "", ACCESS_GHOST);
 		}
 	}
 	return rc;
