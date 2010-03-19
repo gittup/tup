@@ -25,7 +25,7 @@ echo "  bootstrap CC ../src/ldpreload/ldpreload.c"
 gcc -Os -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o -fpic -I../src
 
 echo "  bootstrap LD.so tup-ldpreload.so"
-gcc -fpic -shared -o tup-ldpreload.so ldpreload/ldpreload.o -ldl
+gcc -fpic -shared -o tup-ldpreload.so ldpreload/ldpreload.o -ldl $plat_ldflags
 
 echo "  bootstrap LD tup"
 echo "const char *tup_version(void) {return \"bootstrap\";}" | gcc -x c -c - -o tup_version.o
