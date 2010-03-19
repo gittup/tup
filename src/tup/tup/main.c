@@ -6,7 +6,6 @@
 #include <time.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/time.h>
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/getexecwd.h"
@@ -514,7 +513,6 @@ static int link_exists(int argc, char **argv)
 static int touch(int argc, char **argv)
 {
 	int x;
-	static char linkname[PATH_MAX];
 	tupid_t sub_dir_dt;
 
 	if(tup_db_begin() < 0)
@@ -534,53 +532,6 @@ static int touch(int argc, char **argv)
 
 		if(lstat(argv[x], &buf) < 0) {
 			close(open(argv[x], O_WRONLY | O_CREAT, 0666));
-			if(lstat(argv[x], &buf) < 0) {
-				fprintf(stderr, "lstat: ");
-				perror(argv[x]);
-				return -1;
-			}
-		} else {
-			int rc;
-
-			if(S_ISLNK(buf.st_mode)) {
-				rc = readlink(argv[x], linkname, sizeof(linkname));
-				if(rc < 0) {
-					fprintf(stderr, "readlink: ");
-					perror(argv[x]);
-					return -1;
-				}
-				if(rc >= (signed)sizeof(linkname)) {
-					fprintf(stderr, "tup error: linkname buffer too small for symlink of '%s'\n", argv[x]);
-					return -1;
-				}
-				linkname[rc] = 0;
-
-				unlink(argv[x]);
-				if(symlink(linkname, argv[x]) < 0) {
-					fprintf(stderr, "symlink: ");
-					perror(argv[x]);
-					return -1;
-				}
-			} else {
-				struct timeval tv[2];
-				int fd;
-
-				tv[0].tv_sec = buf.st_atime;
-				tv[0].tv_usec = 0;
-				tv[1].tv_sec = time(NULL);
-				tv[1].tv_usec = 0;
-				fd = open(argv[x], O_RDONLY);
-				if(fd < 0) {
-					fprintf(stderr, "open: ");
-					perror(argv[x]);
-					return -1;
-				}
-				if(futimes(fd, tv) < 0) {
-					fprintf(stderr, "futimes: ");
-					perror(argv[x]);
-					return -1;
-				}
-			}
 			if(lstat(argv[x], &buf) < 0) {
 				fprintf(stderr, "lstat: ");
 				perror(argv[x]);
