@@ -1,6 +1,7 @@
 tupcurdir=$PWD
 testname=`echo $0 | sed 's/\.\///' | sed 's/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
+tupos=`uname -s`
 rm -rf $tuptestdir
 mkdir $tuptestdir
 cd $tuptestdir

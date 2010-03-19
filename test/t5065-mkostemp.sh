@@ -3,6 +3,10 @@
 # Check support for mkostemp
 
 . ./tup.sh
+if [ ! "$tupos" = "Linux" ]; then
+	echo "mkostemp only checked under linux. Skipping test."
+	exit 0
+fi
 cat > ok.c << HERE
 #include <stdlib.h>
 #include <fcntl.h>
