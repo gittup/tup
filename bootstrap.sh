@@ -1,4 +1,12 @@
 #! /bin/sh -e
+os=`uname -s`
+plat_ldflags=""
+case "$os" in
+	SunOS)
+	plat_ldflags="$plat_ldflags -lsocket"
+	;;
+esac
+
 rm -rf build
 echo "  mkdir build"
 mkdir -p build
@@ -21,7 +29,7 @@ gcc -fpic -shared -o tup-ldpreload.so ldpreload/ldpreload.o -ldl
 
 echo "  bootstrap LD tup"
 echo "const char *tup_version(void) {return \"bootstrap\";}" | gcc -x c -c - -o tup_version.o
-gcc *.o -o tup -lpthread
+gcc *.o -o tup -lpthread $plat_ldflags
 
 cd ..
 # We may be bootstrapping over an already-inited area.
