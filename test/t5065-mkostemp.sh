@@ -5,7 +5,7 @@
 . ./tup.sh
 if [ ! "$tupos" = "Linux" ]; then
 	echo "mkostemp only checked under linux. Skipping test."
-	exit 0
+	eotup
 fi
 cat > ok.c << HERE
 #include <stdlib.h>

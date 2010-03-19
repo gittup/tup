@@ -340,7 +340,7 @@ check_monitor_supported()
 		:
 	else
 		echo "Monitor is not supported. Skipping test."
-		exit 0
+		eotup
 	fi
 }
 
