@@ -4,12 +4,14 @@
 # for these test cases.
 
 tmpdir="/tmp/tup-t0001"
-function cleanup()
+cleanup()
 {
+	cd /tmp
 	rm -rf $tmpdir
 }
 
 trap cleanup INT TERM
+cleanup
 mkdir $tmpdir
 cd $tmpdir
 tup init
