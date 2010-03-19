@@ -1,1 +1,2 @@
 TUP_MONITOR = null
+LDFLAGS += -lsocket

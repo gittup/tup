@@ -14,4 +14,4 @@ srcs += src/linux/*.o
 srcs += src/sqlite3/*.o
 : $(srcs) |> !ar |> libtup.a
 
-: src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread |> tup tup-version.o
+: src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o
