@@ -1,5 +1,3 @@
-/* _ATFILE_SOURCE for readlinkat */
-#define _ATFILE_SOURCE
 #include "fileio.h"
 #include "db.h"
 #include "compat.h"
@@ -71,10 +69,19 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 		}
 	}
 
-	rc = readlinkat(dfd, file, linkname, sizeof(linkname));
+	/* readlinkat not supported on all platforms :( */
+	if(fchdir(dfd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	rc = readlink(file, linkname, sizeof(linkname));
 	if(rc < 0) {
-		fprintf(stderr, "readlinkat: ");
+		fprintf(stderr, "readlink: ");
 		perror(file);
+		return -1;
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
 		return -1;
 	}
 	if(rc >= (signed)sizeof(linkname)) {
