@@ -2,6 +2,7 @@
 #define file_h
 
 #include "tupid.h"
+#include "access_event.h"
 #include "linux/list.h"
 
 struct file_info {
@@ -13,7 +14,6 @@ struct file_info {
 	struct list_head ghost_list;
 };
 
-enum access_type;
 struct tup_entry;
 
 int init_file_info(struct file_info *info);
