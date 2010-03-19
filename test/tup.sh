@@ -266,7 +266,8 @@ varsetall()
 	rm -f tup.config
 	while [ $# -gt 0 ]; do
 		if echo "$1" | grep "=n$" > /dev/null; then
-			(echo -n "# CONFIG_"; echo -n "$1" | sed 's/=.*//'; echo " is not set") >> tup.config
+			var=`echo "$1" | sed 's/=.*//'`
+			echo "# CONFIG_$var is not set" >> tup.config
 		else
 			echo CONFIG_$1 >> tup.config
 		fi
