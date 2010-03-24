@@ -1216,6 +1216,7 @@ int tup_db_open_tupid(tupid_t tupid)
 	}
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		free(path);
 		return -1;
 	}
 
@@ -1734,11 +1735,14 @@ static int db_print(FILE *stream, tupid_t tupid)
 	}
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		free(path);
 		return -1;
 	}
 
-	if(db_print(stream, parent) < 0)
+	if(db_print(stream, parent) < 0) {
+		free(path);
 		return -1;
+	}
 
 	if(parent != 1) {
 		fprintf(stream, "/");

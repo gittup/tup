@@ -71,6 +71,7 @@ int bin_add_entry(struct bin *b, const char *path, int len,
 	be->path = malloc(len + 1);
 	if(!be->path) {
 		perror("malloc");
+		free(be);
 		return -1;
 	}
 	memcpy(be->path, path, len);

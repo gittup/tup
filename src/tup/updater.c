@@ -747,7 +747,7 @@ static void *update_work(void *arg)
 		wrc.n = n;
 		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
 			perror("write");
-			return NULL;
+			break;
 		}
 	}
 	free(s);

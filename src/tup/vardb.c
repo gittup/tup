@@ -65,6 +65,7 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 		ve->var.s = malloc(ve->var.len + 1);
 		if(!ve->var.s) {
 			perror("malloc");
+			free(ve);
 			return NULL;
 		}
 		memcpy(ve->var.s, var, varlen);
@@ -73,11 +74,16 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 		ve->value = malloc(ve->vallen + 1);
 		if(!ve->value) {
 			perror("malloc");
+			free(ve->var.s);
+			free(ve);
 			return NULL;
 		}
 		strcpy(ve->value, value);
 		if(string_tree_insert(&v->tree, &ve->var) < 0) {
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
+			free(ve->value);
+			free(ve->var.s);
+			free(ve);
 			return NULL;
 		}
 		ve->tent = tent;

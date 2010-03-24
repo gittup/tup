@@ -606,21 +606,21 @@ static int gitignore(struct tupfile *tf)
 		if(tf->tupid == 1) {
 			if(write(fd, ".tup\n", 5) < 0) {
 				perror("write");
-				return -1;
+				goto err_close;
 			}
 		}
 		if(write(fd, "/.*.swp\n", 8) < 0) {
 			perror("write");
-			return -1;
+			goto err_close;
 		}
 		if(write(fd, "/.gitignore\n", 12) < 0) {
 			perror("write");
-			return -1;
+			goto err_close;
 		}
 		if(s && len) {
 			if(write(fd, s, len) < 0) {
 				perror("write");
-				return -1;
+				goto err_close;
 			}
 		}
 		close(fd);
@@ -629,6 +629,10 @@ static int gitignore(struct tupfile *tf)
 		free(s); /* Freeze gopher! */
 	}
 	return 0;
+
+err_close:
+	close(fd);
+	return -1;
 }
 
 static int include_name_list(struct tupfile *tf, struct name_list *nl,
@@ -828,6 +832,21 @@ static char *split_eq(char *p)
 	return value;
 }
 
+static struct bang_rule *alloc_br(void)
+{
+	struct bang_rule *br;
+	br = malloc(sizeof *br);
+	if(!br) {
+		perror("malloc");
+		return NULL;
+	}
+	br->value = NULL;
+	br->input = NULL;
+	br->command = NULL;
+	br->output_pattern = NULL;
+	return br;
+}
+
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 {
 	struct string_tree *st;
@@ -840,6 +859,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *alloc_value;
 	char *bin;
 	int swapio = 0;
+	struct bang_rule *br;
 
 	value = split_eq(p);
 	if(!value) {
@@ -849,7 +869,6 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 	if(value[0] == '!') {
 		/* Alias one macro as another */
-		struct bang_rule *br;
 		struct bang_rule *cur_br;
 
 		st = string_tree_search(&tf->bang_tree, value, -1);
@@ -859,9 +878,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		}
 		cur_br = container_of(st, struct bang_rule, st);
 
-		br = malloc(sizeof *br);
+		br = alloc_br();
 		if(!br) {
-			perror("malloc");
 			return -1;
 		}
 		br->foreach = cur_br->foreach;
@@ -870,7 +888,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			br->input = strdup(cur_br->input);
 			if(!br->input) {
 				perror("strdup");
-				return -1;
+				goto err_cleanup_br;
 			}
 		} else {
 			br->input = NULL;
@@ -878,23 +896,23 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->command = strdup(cur_br->command);
 		if(!br->command) {
 			perror("strdup");
-			return -1;
+			goto err_cleanup_br;
 		}
 		br->output_pattern = strdup(cur_br->output_pattern);
 		if(!br->output_pattern) {
 			perror("strdup");
-			return -1;
+			goto err_cleanup_br;
 		}
 		br->command_len = cur_br->command_len;
 		br->st.s = strdup(p);
 		if(!br->st.s) {
 			perror("strdup");
-			return -1;
+			goto err_cleanup_br;
 		}
 		br->st.len = strlen(br->st.s);
 		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
-			return -1;
+			goto err_cleanup_br;
 		}
 		return 0;
 	}
@@ -940,11 +958,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		cur_br->output_pattern = output;
 	} else {
 		/* Create new !-macro */
-		struct bang_rule *br;
-
-		br = malloc(sizeof *br);
+		br = alloc_br();
 		if(!br) {
-			perror("malloc");
 			return -1;
 		}
 		br->foreach = foreach;
@@ -956,15 +971,23 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->st.s = strdup(p);
 		if(!br->st.s) {
 			perror("strdup");
-			return -1;
+			goto err_cleanup_br;
 		}
 		br->st.len = strlen(br->st.s);
 		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
-			return -1;
+			goto err_cleanup_br;
 		}
 	}
 	return 0;
+
+err_cleanup_br:
+	free(br->output_pattern);
+	free(br->command);
+	free(br->input);
+	free(br->value);
+	free(br);
+	return -1;
 }
 
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
@@ -1033,6 +1056,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		sc->input_pattern = strdup(input_pattern);
 		if(!sc->input_pattern) {
 			perror("strdup");
+			free(sc);
 			return -1;
 		}
 		INIT_LIST_HEAD(&sc->banglist);
@@ -2059,8 +2083,10 @@ static int nl_add_bin(struct bin *b, struct name_list *nl)
 		}
 
 		nle->path = malloc(be->len + 1);
-		if(!nle->path)
+		if(!nle->path) {
+			free(nle);
 			return -1;
+		}
 		memcpy(nle->path, be->path, be->len+1);
 
 		nle->len = be->len;
@@ -2095,8 +2121,10 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	}
 
 	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
-	if(!nle->path)
+	if(!nle->path) {
+		free(nle);
 		return -1;
+	}
 
 	nle->len = len;
 	nle->extlesslen = extlesslen;
@@ -2212,19 +2240,25 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 		onle->path = tup_printf(pl->pel->path, pl->pel->len, nl, NULL, NULL, 0);
-		if(!onle->path)
+		if(!onle->path) {
+			free(onle);
 			return -1;
+		}
 		if(strchr(onle->path, '/')) {
 			/* Same error as above...uhh, I guess I should rework
 			 * this.
 			 */
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
+			free(onle->path);
+			free(onle);
 			return -1;
 		}
 		if(strcmp(onle->path, "Tupfile") == 0 ||
 		   strcmp(onle->path, "Tuprules.tup") == 0 ||
 		   strcmp(onle->path, "tup.config") == 0) {
 			fprintf(stderr, "Error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
+			free(onle->path);
+			free(onle);
 			return -1;
 		}
 		onle->len = strlen(onle->path);
@@ -2234,8 +2268,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
 						     TUP_NODE_GENERATED);
-		if(!onle->tent)
+		if(!onle->tent) {
+			free(onle->path);
+			free(onle);
 			return -1;
+		}
 
 		set_nle_base(onle);
 		add_name_list_entry(&onl, onle);

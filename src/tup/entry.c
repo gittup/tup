@@ -317,6 +317,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 	tent->name.s = malloc(len+1);
 	if(!tent->name.s) {
 		perror("malloc");
+		free(tent);
 		return NULL;
 	}
 	strncpy(tent->name.s, name, len);

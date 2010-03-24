@@ -143,10 +143,13 @@ static struct file_entry *new_entry(const char *filename)
 	fent->filename = strdup(filename);
 	if(!fent->filename) {
 		perror("strdup");
+		free(fent);
 		return NULL;
 	}
 
 	if(get_path_elements(fent->filename, &fent->pg) < 0) {
+		free(fent->filename);
+		free(fent);
 		return NULL;
 	}
 	return fent;
@@ -220,11 +223,14 @@ static int handle_symlink(const char *from, const char *to,
 	sym->from = strdup(from);
 	if(!sym->from) {
 		perror("strdup");
+		free(sym);
 		return -1;
 	}
 	sym->to = strdup(to);
 	if(!sym->to) {
 		perror("strdup");
+		free(sym->from);
+		free(sym);
 		return -1;
 	}
 	list_add(&sym->list, &info->sym_list);

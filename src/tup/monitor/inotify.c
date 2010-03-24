@@ -121,7 +121,7 @@ int monitor(int argc, char **argv)
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
 		perror("inotify_init");
-		return -1;
+		goto close_mon;
 	}
 
 	tup_wd = inotify_add_watch(inot_fd, TUP_DIR, IN_DELETE);
@@ -240,6 +240,7 @@ int monitor(int argc, char **argv)
 
 close_inot:
 	close(inot_fd);
+close_mon:
 	close(mon_fd);
 	return rc;
 }

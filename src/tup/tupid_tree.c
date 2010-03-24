@@ -128,8 +128,8 @@ int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count)
 	te->type = type;
 	if(tupid_tree_insert(tree, &te->tnode) < 0) {
 		fprintf(stderr, "tup internal error: Duplicate tupid %lli in tree_entry_add?\n", tupid);
-		return -1;
 		free(te);
+		return -1;
 	} else {
 		if(type == TUP_NODE_GENERATED && count)
 			(*count)++;

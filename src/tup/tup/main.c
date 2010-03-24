@@ -170,11 +170,11 @@ static int init(int argc, char **argv)
 		} else {
 			fprintf(stderr, "Error: tup database already exists in directory: %s\n", wd);
 		}
-		return -1;
+		goto err_close;
 	}
 	if(fchdir(fd) < 0) {
 		perror("fchdir");
-		return -1;
+		goto err_close;
 	}
 	close(fd);
 
@@ -208,6 +208,10 @@ static int init(int argc, char **argv)
 		return -1;
 	}
 	return 0;
+
+err_close:
+	close(fd);
+	return -1;
 }
 
 static int graph_cb(void *arg, struct tup_entry *tent, int style)
