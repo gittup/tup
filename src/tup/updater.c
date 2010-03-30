@@ -320,7 +320,7 @@ static int process_update_nodes(void)
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
 	tup_db_begin();
-	vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
+	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
 		/* Create vardict if it doesn't exist, since I forgot to add
 		 * that to the database update part whenever I added this file.
@@ -328,7 +328,7 @@ static int process_update_nodes(void)
 		 * prevents a useless error message from coming up.
 		 */
 		if(errno == ENOENT) {
-			vardict_fd = open(TUP_VARDICT_FILE, O_CREAT|O_RDONLY, 0666);
+			vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_CREAT|O_RDONLY, 0666);
 			if(vardict_fd < 0) {
 				perror(TUP_VARDICT_FILE);
 				return -1;
@@ -1038,10 +1038,6 @@ err_free_buf:
 err_close_ifd:
 	close(ifd);
 err_close_dfd:
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		return -1;
-	}
 	close(dfd);
 	return rc;
 }

@@ -1,4 +1,5 @@
 #include "lock.h"
+#include "config.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -59,7 +60,7 @@ static int tri_lock;
 
 int tup_lock_init(void)
 {
-	sh_lock = open(TUP_SHARED_LOCK, O_RDWR);
+	sh_lock = openat(tup_top_fd(), TUP_SHARED_LOCK, O_RDWR);
 	if(sh_lock < 0) {
 		perror(TUP_SHARED_LOCK);
 		return -1;
@@ -68,7 +69,7 @@ int tup_lock_init(void)
 		return -1;
 	}
 
-	obj_lock = open(TUP_OBJECT_LOCK, O_RDWR);
+	obj_lock = openat(tup_top_fd(), TUP_OBJECT_LOCK, O_RDWR);
 	if(obj_lock < 0) {
 		perror(TUP_OBJECT_LOCK);
 		return -1;
@@ -77,7 +78,7 @@ int tup_lock_init(void)
 		return -1;
 	}
 
-	tri_lock = open(TUP_TRI_LOCK, O_RDWR);
+	tri_lock = openat(tup_top_fd(), TUP_TRI_LOCK, O_RDWR);
 	if(tri_lock < 0) {
 		perror(TUP_TRI_LOCK);
 		return -1;

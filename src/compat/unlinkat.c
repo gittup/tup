@@ -23,10 +23,6 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 		goto err_unlock;
 	}
 	rc = unlink(pathname);
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		goto err_unlock;
-	}
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 

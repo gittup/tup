@@ -23,10 +23,6 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 	} else {
 		rc = stat(pathname, buf);
 	}
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		goto err_unlock;
-	}
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 

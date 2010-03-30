@@ -25,11 +25,6 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 	fd = open(pathname, flags, mode);
-	if(fchdir(tup_top_fd()) < 0) {
-		close(fd);
-		perror("fchdir");
-		goto err_unlock;
-	}
 	pthread_mutex_unlock(&dir_mutex);
 	return fd;
 
