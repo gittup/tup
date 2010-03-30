@@ -34,7 +34,12 @@ void server_setenv(struct server *s, int vardict_fd)
 	snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
 	fd_name[31] = 0;
 	setenv(TUP_VARDICT_NAME, fd_name, 1);
+#ifdef __APPLE__
+	setenv("DYLD_FORCE_FLAT_NAMESPACE", "", 1);
+	setenv("DYLD_INSERT_LIBRARIES", ldpreload_path, 1);
+#else
 	setenv("LD_PRELOAD", ldpreload_path, 1);
+#endif
 }
 
 int start_server(struct server *s)

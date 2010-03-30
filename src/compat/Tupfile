@@ -1,0 +1,10 @@
+include_rules
+
+ifeq (@(TUP_PLATFORM),macosx)
+srcs += dir_mutex.c
+srcs += fdopendir.c
+srcs += fstatat.c
+srcs += openat.c
+srcs += unlinkat.c
+endif
+: foreach $(srcs) |> !cc |> %B.o

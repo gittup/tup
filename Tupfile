@@ -1,7 +1,7 @@
 include_rules
 
-LDFLAGS_tup-ldpreload.so += -fpic
-LDFLAGS_tup-ldpreload.so += -shared
+LDFLAGS_tup-ldpreload.so += $(FPIC)
+LDFLAGS_tup-ldpreload.so += $(SHARED)
 LDFLAGS_tup-ldpreload.so += -ldl
 : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 
@@ -12,6 +12,7 @@ srcs += src/tup/monitor/*.o
 srcs += src/tup/colors/*.o
 srcs += src/linux/*.o
 srcs += src/sqlite3/*.o
+srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
 : src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o

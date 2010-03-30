@@ -27,4 +27,6 @@ CFLAGS += -I$(TUP_CWD)/src
 !ar = |> ^ AR %o^ ar crs %o %f |>
 !dot = |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
 
+FPIC = -fpic
+SHARED = -shared
 include @(TUP_PLATFORM).tup

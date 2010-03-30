@@ -510,7 +510,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int x;
 	int active = 0;
 
-	if(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, socks) < 0) {
+	if(socketpair(AF_UNIX, SOCK_DGRAM, 0, socks) < 0) {
 		perror("socketpair");
 		return -2;
 	}
@@ -834,6 +834,8 @@ static int update(struct node *n, struct server *s)
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
+		fprintf(stderr, "Error: Unable to open directory for update work.\n");
+		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		goto err_out;
 	}
 
