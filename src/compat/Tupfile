@@ -1,10 +1,17 @@
 include_rules
 
+# Changes here need to be reflected in the bootstrap.sh file
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += dir_mutex.c
 srcs += fdopendir.c
 srcs += fstatat.c
 srcs += openat.c
+srcs += readlinkat.c
 srcs += unlinkat.c
+endif
+
+ifeq (@(TUP_PLATFORM),solaris)
+srcs += dir_mutex.c
+srcs += readlinkat.c
 endif
 : foreach $(srcs) |> !cc |> %B.o

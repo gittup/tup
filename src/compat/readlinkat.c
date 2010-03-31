@@ -3,14 +3,9 @@
 #include <unistd.h>
 #include "dir_mutex.h"
 
-int unlinkat(int dirfd, const char *pathname, int flags)
+int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
 	int rc;
-
-	if(flags != 0) {
-		fprintf(stderr, "tup compat unlinkat error: flags=%i not supported\n", flags);
-		return -1;
-	}
 
 	if(pthread_mutex_lock(&dir_mutex) < 0) {
 		perror("pthread_mutex_lock");
@@ -21,7 +16,7 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 		perror("fchdir");
 		goto err_unlock;
 	}
-	rc = unlink(pathname);
+	rc = readlink(pathname, buf, bufsiz);
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 

@@ -8,9 +8,16 @@ plat_preloadldflags="-shared"
 case "$os" in
 	SunOS)
 	plat_ldflags="$plat_ldflags -lsocket"
+	plat_files="$plat_files ../src/compat/dir_mutex.c"
+	plat_files="$plat_files ../src/compat/readlinkat.c"
 	;;
 	Darwin)
-	plat_files="../src/compat/fdopendir.c ../src/compat/fstatat.c ../src/compat/openat.c ../src/compat/unlinkat.c"
+	plat_files="$plat_files ../src/compat/dir_mutex.c "
+	plat_files="$plat_files ../src/compat/fdopendir.c"
+	plat_files="$plat_files ../src/compat/fstatat.c"
+	plat_files="$plat_files ../src/compat/openat.c"
+	plat_files="$plat_files ../src/compat/readlinkat.c"
+	plat_files="$plat_files ../src/compat/unlinkat.c"
 	plat_cflags="-DAT_SYMLINK_NOFOLLOW=0x100"
 	plat_preloadcflags="-DAT_FDCWD=-100 -fPIC"
 	plat_preloadldflags="-dynamiclib"

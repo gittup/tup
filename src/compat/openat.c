@@ -1,8 +1,8 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include "dir_mutex.h"
-#include "tup/config.h"
 
 int openat(int dirfd, const char *pathname, int flags, ...)
 {

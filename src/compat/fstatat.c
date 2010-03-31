@@ -3,7 +3,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "dir_mutex.h"
-#include "tup/config.h"
 
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 {
