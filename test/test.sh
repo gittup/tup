@@ -10,7 +10,7 @@
 # for that test will remain for manual inspection.
 
 files=$@
-if [ "$files" == "" ]; then
+if [ "$files" = "" ]; then
 	files="t[0-9]*.sh"
 fi
 
