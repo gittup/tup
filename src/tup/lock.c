@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #include "lock.h"
 #include "config.h"
 #include <stdio.h>
