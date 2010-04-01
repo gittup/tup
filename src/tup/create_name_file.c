@@ -145,8 +145,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				return -1;
 		} else if(tent->type != TUP_NODE_FILE &&
 			  tent->type != TUP_NODE_GENERATED) {
-			fprintf(stderr, "tup error: tup_file_mod(%lli, %s) expecting to move a file to the modify_list, but got type: %i\n", dt, file, tent->type);
-			return -1;
+			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1) < 0)
+				return -1;
+			if(create_name_file(dt, file, mtime, &tent) < 0)
+				return -1;
+			new = 1;
 		}
 		if(modified) {
 			if(tent->type == TUP_NODE_GENERATED) {

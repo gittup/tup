@@ -690,16 +690,23 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			 * case, since a user might come across it just by
 			 * screwing up the Tupfile.
 			 */
-			if(tent->type == TUP_NODE_FILE && type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a user file. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
+			if(type == TUP_NODE_GENERATED) {
+				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a different type. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
 				return NULL;
 			}
-			fprintf(stderr, "tup error: Attempting to insert node '%s' with type %i, which already exists as type %i\n", name, type, tent->type);
-			return NULL;
+
+			/* If we changed from one type to another (eg: a file
+			 * became a directory), then delete the old one and
+			 * create a new one.
+			 */
+			if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
+				return NULL;
+			goto out_create;
 		}
 		return tent;
 	}
 
+out_create:
 	tent = tup_db_node_insert(dt, name, len, type, -1);
 	return tent;
 }
