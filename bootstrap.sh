@@ -31,15 +31,15 @@ mkdir -p build/ldpreload
 echo "  cd build"
 cd build
 for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/colors/colors.c $plat_files; do
-	echo "  bootstrap CC $i"
-	gcc -Os -c $i -I../src $plat_cflags
+	echo "  bootstrap CC (unoptimized) $i"
+	gcc -c $i -I../src $plat_cflags
 done
 
-echo "  bootstrap CC ../src/sqlite3/sqlite3.c"
-gcc -Os -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION
+echo "  bootstrap CC (unoptimized) ../src/sqlite3/sqlite3.c"
+gcc -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION
 
-echo "  bootstrap CC ../src/ldpreload/ldpreload.c"
-gcc -Os -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o $plat_preloadcflags -I../src
+echo "  bootstrap CC (unoptimized) ../src/ldpreload/ldpreload.c"
+gcc -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o $plat_preloadcflags -I../src
 
 echo "  bootstrap LD.so tup-ldpreload.so"
 gcc $plat_preloadcflags $plat_preloadldflags -o tup-ldpreload.so ldpreload/ldpreload.o -ldl $plat_ldflags
