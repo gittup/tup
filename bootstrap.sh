@@ -7,10 +7,11 @@ plat_preloadcflags="-fpic"
 plat_preloadldflags="-shared"
 case "$os" in
 	SunOS)
-	plat_ldflags="$plat_ldflags -lsocket"
 	plat_files="$plat_files ../src/compat/dir_mutex.c"
 	plat_files="$plat_files ../src/compat/mkdirat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
+	plat_ldflags="$plat_ldflags -lsocket"
+	plat_cflags="-D_REENTRANT"
 	;;
 	Darwin)
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
@@ -37,10 +38,10 @@ for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monito
 done
 
 echo "  bootstrap CC (unoptimized) ../src/sqlite3/sqlite3.c"
-gcc -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION
+gcc -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags
 
 echo "  bootstrap CC (unoptimized) ../src/ldpreload/ldpreload.c"
-gcc -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o $plat_preloadcflags -I../src
+gcc -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o $plat_preloadcflags $plat_cflags -I../src
 
 echo "  bootstrap LD.so tup-ldpreload.so"
 gcc $plat_preloadcflags $plat_preloadldflags -o tup-ldpreload.so ldpreload/ldpreload.o -ldl $plat_ldflags
