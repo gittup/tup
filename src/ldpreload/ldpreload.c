@@ -425,7 +425,7 @@ static void handle_file(const char *file, const char *file2, int at)
 static int sendall(int sd, const void *buf, size_t len)
 {
 	size_t sent = 0;
-	char *cur = buf;
+	const char *cur = buf;
 
 	while(sent < len) {
 		int rc;
