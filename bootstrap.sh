@@ -9,11 +9,13 @@ case "$os" in
 	SunOS)
 	plat_ldflags="$plat_ldflags -lsocket"
 	plat_files="$plat_files ../src/compat/dir_mutex.c"
+	plat_files="$plat_files ../src/compat/mkdirat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
 	;;
 	Darwin)
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
 	plat_files="$plat_files ../src/compat/fstatat.c"
+	plat_files="$plat_files ../src/compat/mkdirat.c"
 	plat_files="$plat_files ../src/compat/openat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
 	plat_files="$plat_files ../src/compat/unlinkat.c"

@@ -9,6 +9,9 @@
 /** The file descriptor for the variable dictionary. */
 #define TUP_VARDICT_NAME "tup_vardict"
 
+/** Lock to ensure synchronization with the ldpreload socket. */
+#define TUP_LOCK_NAME "tup_lock"
+
 enum access_type {
 	ACCESS_READ,
 	ACCESS_WRITE,

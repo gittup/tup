@@ -27,6 +27,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#define MAX_JOBS 65535
+
 static int update_tup_config(void);
 static int process_create_nodes(void);
 static int process_update_nodes(void);
@@ -81,6 +83,7 @@ static const char *signal_err[] = {
 struct worker_thread {
 	pthread_t pid;
 	int sock;        /* 1 sock and no shoes? What a life... */
+	int lockfd;      /* lock fd for .tup/jobXXXX/.tuplock */
 	struct graph *g; /* This should only be used in create_work() and todo_work */
 };
 
@@ -115,6 +118,10 @@ int updater(int argc, char **argv, int phase)
 	if(num_jobs < 1) {
 		fprintf(stderr, "Warning: Setting the number of jobs to 1\n");
 		num_jobs = 1;
+	}
+	if(num_jobs > MAX_JOBS) {
+		fprintf(stderr, "Warning: Setting the number of jobs to MAX_JOBS\n");
+		num_jobs = MAX_JOBS;
 	}
 
 	if(do_scan) {
@@ -509,9 +516,16 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int rc = -1;
 	int x;
 	int active = 0;
+	int tupfd;
 
 	if(socketpair(AF_UNIX, SOCK_DGRAM, 0, socks) < 0) {
 		perror("socketpair");
+		return -2;
+	}
+
+	tupfd = openat(tup_top_fd(), TUP_DIR, O_RDONLY);
+	if(tupfd < 0) {
+		perror(TUP_DIR);
 		return -2;
 	}
 
@@ -521,13 +535,29 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		return -2;
 	}
 	for(x=0; x<jobs; x++) {
+		char lockname[] = "jobXXXX/.tuplock";
 		workers[x].g = g;
 		workers[x].sock = socks[1];
+		snprintf(lockname+3, 5, "%04x", x);
+		lockname[7] = 0;
+		if(mkdirat(tupfd, lockname, 0777) < 0) {
+			if(errno != EEXIST) {
+				perror("mkdirat");
+				return -2;
+			}
+		}
+		lockname[7] = '/';
+		workers[x].lockfd = openat(tupfd, lockname, O_RDWR|O_CREAT, 0644);
+		if(workers[x].lockfd < 0) {
+			perror(lockname);
+			return -2;
+		}
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
 			perror("pthread_create");
 			return -2;
 		}
 	}
+	close(tupfd);
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tnode.tupid);
@@ -631,6 +661,7 @@ out:
 	}
 	for(x=0; x<jobs; x++) {
 		pthread_join(workers[x].pid, NULL);
+		close(workers[x].lockfd);
 	}
 	free(workers); /* Viva la revolucion! */
 	close(socks[0]);
@@ -691,6 +722,7 @@ static void *update_work(void *arg)
 		perror("malloc");
 		return NULL;
 	}
+	s->lockfd = wt->lockfd;
 
 	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
 		struct edge *e;

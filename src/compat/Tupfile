@@ -4,6 +4,7 @@ include_rules
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += dir_mutex.c
 srcs += fstatat.c
+srcs += mkdirat.c
 srcs += openat.c
 srcs += readlinkat.c
 srcs += unlinkat.c
@@ -11,6 +12,7 @@ endif
 
 ifeq (@(TUP_PLATFORM),solaris)
 srcs += dir_mutex.c
+srcs += mkdirat.c
 srcs += readlinkat.c
 endif
 : foreach $(srcs) |> !cc |> %B.o

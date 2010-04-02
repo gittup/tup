@@ -9,9 +9,11 @@
 
 struct server {
 	int sd[2];
+	int lockfd;
 	pthread_t tid;
 	struct file_info finfo;
-	char msgbuf[sizeof(struct access_event) + PATH_MAX*2];
+	char file1[PATH_MAX];
+	char file2[PATH_MAX];
 };
 
 int server_init(void);
