@@ -13,7 +13,6 @@ case "$os" in
 	;;
 	Darwin)
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
-	plat_files="$plat_files ../src/compat/fdopendir.c"
 	plat_files="$plat_files ../src/compat/fstatat.c"
 	plat_files="$plat_files ../src/compat/openat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"

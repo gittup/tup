@@ -1,7 +1,5 @@
 /* _ATFILE_SOURCE for fstatat() */
 #define _ATFILE_SOURCE
-/* _GNU_SOURCE for fdopendir */
-#define _GNU_SOURCE
 #include "path.h"
 #include "flist.h"
 #include "fileio.h"
@@ -48,7 +46,6 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
 		int newfd;
-		int flistfd;
 
 		newdt = create_dir_file(dt, file);
 		if(tree) {
@@ -62,22 +59,16 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {
-			fprintf(stderr, "tup monitor error: Unable to openat() file.\n");
+			fprintf(stderr, "tup monitor error: Unable to openat() directory.\n");
 			perror(file);
 			return -1;
 		}
-		flistfd = dup(newfd);
-		if(flistfd < 0) {
-			fprintf(stderr, "tup monitor error: Unable to dup file descriptor.\n");
-			perror("dup");
+		if(fchdir(newfd) < 0) {
+			perror("fchdir");
 			return -1;
 		}
 
-		/* flist_foreachfd uses fdopendir, which takes ownership of
-		 * flistfd and closes it for us. That's why it's dup'd and only
-		 * newfd is closed explicitly.
-		 */
-		flist_foreachfd(&f, flistfd) {
+		flist_foreach(&f, ".") {
 			if(f.filename[0] == '.')
 				continue;
 			if(watch_path(newdt, newfd, f.filename, tree,
