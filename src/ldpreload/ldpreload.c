@@ -18,7 +18,7 @@ static int sendall(int sd, const void *buf, size_t len);
 static int ignore_file(const char *file);
 static int tup_flock(int fd);
 static int tup_unflock(int fd);
-static int sd;
+static int tupsd;
 static int lockfd;
 
 static int (*s_open)(const char *, int, ...);
@@ -368,7 +368,6 @@ static void handle_file(const char *file, const char *file2, int at)
 {
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct access_event event;
-	int rc;
 
 	if(ignore_file(file))
 		return;
@@ -390,7 +389,7 @@ static void handle_file(const char *file, const char *file2, int at)
 		}
 	}
 
-	if(!sd) {
+	if(!tupsd) {
 		char *path;
 
 		path = getenv(TUP_SERVER_NAME);
@@ -399,8 +398,8 @@ static void handle_file(const char *file, const char *file2, int at)
 				"path from the environment.\n", TUP_SERVER_NAME);
 			exit(1);
 		}
-		sd = strtol(path, NULL, 0);
-		if(sd <= 0) {
+		tupsd = strtol(path, NULL, 0);
+		if(tupsd <= 0) {
 			fprintf(stderr, "tup.ldpreload: Unable to get valid socket descriptor.\n");
 			exit(1);
 		}
@@ -412,11 +411,11 @@ static void handle_file(const char *file, const char *file2, int at)
 	event.at = at;
 	event.len = strlen(file) + 1;
 	event.len2 = strlen(file2) + 1;
-	if(sendall(sd, &event, sizeof(event)) < 0)
+	if(sendall(tupsd, &event, sizeof(event)) < 0)
 		exit(1);
-	if(sendall(sd, file, event.len) < 0)
+	if(sendall(tupsd, file, event.len) < 0)
 		exit(1);
-	if(sendall(sd, file2, event.len2) < 0)
+	if(sendall(tupsd, file2, event.len2) < 0)
 		exit(1);
 	if(tup_unflock(lockfd) < 0)
 		exit(1);
@@ -426,10 +425,11 @@ static void handle_file(const char *file, const char *file2, int at)
 static int sendall(int sd, const void *buf, size_t len)
 {
 	size_t sent = 0;
+	char *cur = buf;
 
 	while(sent < len) {
 		int rc;
-		rc = send(sd, buf + sent, len - sent, 0);
+		rc = send(sd, cur + sent, len - sent, 0);
 		if(rc < 0) {
 			perror("send");
 			return -1;
