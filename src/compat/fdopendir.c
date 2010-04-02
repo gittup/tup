@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <dirent.h>
 
@@ -9,13 +10,13 @@ DIR *fdopendir(int fd)
 
 	if(!dir) {
 		return NULL;
-	} else if(close(dir->dd_fd)) {
+	} else if(close(dir->__dd_fd)) {
 		fprintf(stderr, "tup error: Unable to close fd in DIR\n");
 		perror("close");
 		return NULL;
 	}
 
-	dir->dd_fd = fd;
+	dir->__dd_fd = fd;
 	rewinddir(dir);
 	return dir;
 }

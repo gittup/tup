@@ -2,6 +2,9 @@
 #define tup_container_h
 
 /* Macros pulled out of list.h for re-use with rbtree */
+#ifdef offsetof
+#undef offsetof
+#endif
 
 #ifdef __compiler_offsetof
 #define offsetof(TYPE,MEMBER) __compiler_offsetof(TYPE,MEMBER)
