@@ -1,2 +1,5 @@
 TUP_MONITOR = null
+# _REENTRANT makes errno threadsafe. Otherwise things explode in an otherwise
+# not-so-informative fashion.
+CFLAGS += -D_REENTRANT
 LDFLAGS += -lsocket
