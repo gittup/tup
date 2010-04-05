@@ -100,11 +100,11 @@ static void *message_thread(void *arg)
 		if(!event.len)
 			continue;
 
-		if(event.len >= (signed)sizeof(s->file1)) {
+		if(event.len >= (signed)sizeof(s->file1) - 1) {
 			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len);
 			return (void*)-1;
 		}
-		if(event.len2 >= (signed)sizeof(s->file2)) {
+		if(event.len2 >= (signed)sizeof(s->file2) - 1) {
 			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len2);
 			return (void*)-1;
 		}
@@ -118,14 +118,8 @@ static void *message_thread(void *arg)
 			return (void*)-1;
 		}
 
-		if(s->file1[event.len-1] != 0) {
-			fprintf(stderr, "tup internal error: file1 event '%.*s' not nul-terminated.\n", event.len, s->file1);
-			return (void*)-1;
-		}
-		if(s->file2[event.len2-1] != 0) {
-			fprintf(stderr, "tup internal error: file2 event '%.*s' not nul-terminated.\n", event.len2, s->file2);
-			return (void*)-1;
-		}
+		s->file1[event.len] = 0;
+		s->file2[event.len2] = 0;
 
 		if(handle_file(event.at, s->file1, s->file2, &s->finfo) < 0) {
 			return (void*)-1;
