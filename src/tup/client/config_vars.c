@@ -104,7 +104,7 @@ const char *tup_config_var(const char *key, int keylen)
 	if(keylen == -1)
 		keylen = strlen(key);
 
-	tup_send_event_f(key, keylen + 1, "", 0, ACCESS_VAR);
+	tup_send_event_f(key, keylen + 1, "", 1, ACCESS_VAR);
 	while(1) {
 		cur = (right - left) >> 1;
 		if(cur <= 0)
