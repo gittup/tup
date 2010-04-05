@@ -1,12 +1,13 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include "tup_config_vars.h"
 #include "tup/access_event.h"
-#include "tup/compat.h"
 
 struct vardict {
 	unsigned int len;
@@ -16,25 +17,19 @@ struct vardict {
 	void *map;
 };
 static void tup_var_init(void) __attribute__((constructor));
+static void (*tup_send_event_f)(const char *file, int len, const char *file2, int len2, int at);
 static int init_vardict(int fd);
-static int tup_send_event(const char *var, int len);
 
 static struct vardict tup_vars;
-static int tup_sd;
 
 static void tup_var_init(void)
 {
 	char *path;
 	int vardict_fd;
 
-	path = getenv(TUP_SERVER_NAME);
-	if(!path) {
-		fprintf(stderr, "tup client error: TUP_SERVER_NAME not defined in libcpp/tupvar.c - abort\n");
-		abort();
-	}
-	tup_sd = strtol(path, NULL, 0);
-	if(tup_sd <= 0) {
-		fprintf(stderr, "tup client error: Unable to find tup_sd - abort\n");
+	tup_send_event_f = dlsym(RTLD_DEFAULT, "tup_send_event");
+	if(!tup_send_event_f) {
+		fprintf(stderr, "tup client error: Unable to resolve tup_send_event symbol (is tup-ldpreload.so preloaded?)\n");
 		abort();
 	}
 
@@ -109,7 +104,7 @@ const char *tup_config_var(const char *key, int keylen)
 	if(keylen == -1)
 		keylen = strlen(key);
 
-	tup_send_event(key, keylen);
+	tup_send_event_f(key, keylen + 1, "", 0, ACCESS_VAR);
 	while(1) {
 		cur = (right - left) >> 1;
 		if(cur <= 0)
@@ -152,31 +147,4 @@ out_next:
 		;
 	}
 	return NULL;
-}
-
-static int tup_send_event(const char *var, int len)
-{
-	struct access_event *event;
-	char msgbuf[sizeof(*event) + PATH_MAX];
-	int rc = -1;
-
-	if(!tup_sd)
-		return -1;
-
-	event = (struct access_event*)msgbuf;
-	event->at = ACCESS_VAR;
-	event->len = len + 1;
-	event->len2 = 0;
-	if(event->len >= PATH_MAX) {
-		fprintf(stderr, "tup.ldpreload error: Path too long (%i bytes)\n", event->len);
-		return -1;
-	}
-	memcpy(msgbuf + sizeof(*event), var, len);
-	msgbuf[sizeof(*event) + len] = 0;
-	rc = send(tup_sd, msgbuf, sizeof(*event) + event->len, 0);
-	if(rc < 0) {
-		perror("tup send");
-		return -1;
-	}
-	return 0;
 }

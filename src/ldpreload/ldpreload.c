@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include "tup/access_event.h"
-#include "tup/compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,9 +12,11 @@
 #include <errno.h>
 #include <sys/socket.h>
 
+void tup_send_event(const char *file, int len, const char *file2, int len2, int at);
+
 static void handle_file(const char *file, const char *file2, int at);
-static int sendall(int sd, const void *buf, size_t len);
 static int ignore_file(const char *file);
+static int sendall(int sd, const void *buf, size_t len);
 static int tup_flock(int fd);
 static int tup_unflock(int fd);
 static int tupsd;
@@ -366,13 +367,34 @@ int __lxstat64(int vers, const char *path, struct stat64 *buf)
 
 static void handle_file(const char *file, const char *file2, int at)
 {
+	if(ignore_file(file))
+		return;
+	tup_send_event(file, strlen(file) + 1, file2, strlen(file2) + 1, at);
+}
+
+static int ignore_file(const char *file)
+{
+	if(strncmp(file, "/tmp/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/dev/", 5) == 0)
+		return 1;
+	return 0;
+}
+
+void tup_send_event(const char *file, int len, const char *file2, int len2, int at)
+{
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct access_event event;
 
-	if(ignore_file(file))
-		return;
-
 	pthread_mutex_lock(&mutex);
+	if(!file) {
+		fprintf(stderr, "tup.ldpreload internal error: file can't be NUL\n");
+		exit(1);
+	}
+	if(!file2) {
+		fprintf(stderr, "tup.ldpreload internal error: file2 can't be NUL\n");
+		exit(1);
+	}
 	if(!lockfd) {
 		char *path;
 
@@ -409,8 +431,8 @@ static void handle_file(const char *file, const char *file2, int at)
 		exit(1);
 	}
 	event.at = at;
-	event.len = strlen(file) + 1;
-	event.len2 = strlen(file2) + 1;
+	event.len = len;
+	event.len2 = len2;
 	if(sendall(tupsd, &event, sizeof(event)) < 0)
 		exit(1);
 	if(sendall(tupsd, file, event.len) < 0)
@@ -436,15 +458,6 @@ static int sendall(int sd, const void *buf, size_t len)
 		}
 		sent += rc;
 	}
-	return 0;
-}
-
-static int ignore_file(const char *file)
-{
-	if(strncmp(file, "/tmp/", 5) == 0)
-		return 1;
-	if(strncmp(file, "/dev/", 5) == 0)
-		return 1;
 	return 0;
 }
 

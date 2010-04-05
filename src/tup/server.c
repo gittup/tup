@@ -117,6 +117,15 @@ static void *message_thread(void *arg)
 			return (void*)-1;
 		}
 
+		if(s->file1[event.len-1] != 0) {
+			fprintf(stderr, "tup internal error: file1 event '%.*s' not nul-terminated.\n", event.len, s->file1);
+			return (void*)-1;
+		}
+		if(s->file2[event.len2-1] != 0) {
+			fprintf(stderr, "tup internal error: file2 event '%.*s' not nul-terminated.\n", event.len2, s->file2);
+			return (void*)-1;
+		}
+
 		if(handle_file(event.at, s->file1, s->file2, &s->finfo) < 0) {
 			return (void*)-1;
 		}

@@ -334,7 +334,7 @@ HERE
 	if [ "$tupos" = "SunOS" ]; then
 		plat_ldflags="$plat_ldflags -lsocket"
 	fi
-	gcc client.c ../../libtup_client.a -o client $plat_ldflags
+	gcc client.c ../../libtup_client.a -o client $plat_ldflags -ldl
 	tup touch client
 }
 
