@@ -4,8 +4,7 @@
 #include "access_event.h"
 #include "compat.h"
 #include "file.h"
-#include <signal.h>
-#include <sys/un.h>
+#include <pthread.h>
 
 struct server {
 	int sd[2];
