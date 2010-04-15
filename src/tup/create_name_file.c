@@ -320,9 +320,6 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 			return NULL;
 		if(tup_entry_sym_follow(tent) < 0)
 			return NULL;
-		while(tent->sym != -1) {
-			tent = tent->symlink;
-		}
 		return tent;
 	} else {
 		/* We get here if the path list ends up being empty (for

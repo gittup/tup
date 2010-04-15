@@ -47,19 +47,22 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	tent->list.next = NULL;
 	tent->ghost_list.next = NULL;
 	tent->entries.rb_node = NULL;
+	tent->parent = NULL;
+	tent->symlink = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
-		return -1;
-
-	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
-		return -1;
-	if(tup_entry_add_m1(tent->sym, &tent->symlink) < 0)
 		return -1;
 
 	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree\n", tent->tnode.tupid);
 		return -1;
 	}
+
+	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
+		return -1;
+	if(tup_entry_add_m1(tent->sym, &tent->symlink) < 0)
+		return -1;
+
 	if(tent->parent) {
 		if(string_tree_insert(&tent->parent->entries, &tent->name) < 0) {
 			fprintf(stderr, "tup error: Unable to insert node named '%s' into parent's (id=%lli) string tree.\n", tent->name.s, tent->parent->tnode.tupid);
