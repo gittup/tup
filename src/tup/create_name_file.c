@@ -437,8 +437,10 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				return -1;
 			if(!tent) {
 				/* Secret of the ghost valley! */
-				if(sotgv == 0)
+				if(sotgv == 0) {
+					fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
 					return -1;
+				}
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
 					return -1;
 			}
