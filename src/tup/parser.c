@@ -293,7 +293,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 		if(!newline)
 			goto syntax_error;
 		lno++;
-		while(newline[-1] == '\\') {
+		while(newline[-1] == '\\' || (newline[-2] == '\\' && newline[-1] == '\r')) {
+			if (newline[-1] == '\r') {
+				newline[-2] = ' ';
+			}
 			newline[-1] = ' ';
 			newline[0] = ' ';
 			newline = strchr(p, '\n');
@@ -302,8 +305,13 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			lno++;
 		}
 
-		*newline = 0;
 		p = newline + 1;
+
+		/* Remove trailing whitespace */
+		while(newline > line && isspace(newline[-1])) {
+			newline--;
+		}
+		*newline = 0;
 
 		linelen = newline - line;
 
