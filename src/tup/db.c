@@ -4787,6 +4787,10 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 			fprintf(stderr, "Error: No newline found in tup config file\n");
 			return -1;
 		}
+
+		while (nl > p && isspace(nl[-1]))
+			nl--;
+
 		*nl = 0;
 
 		if(nl == p)
