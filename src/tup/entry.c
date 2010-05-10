@@ -2,6 +2,7 @@
 #include "entry.h"
 #include "config.h"
 #include "db.h"
+#include "compat.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -177,7 +178,7 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	if(!tent || !tent->parent)
 		return;
 	print_tup_entry(f, tent->parent);
-	fprintf(f, "%s/", tent->name.s);
+	fprintf(f, "%s" path_sep_str, tent->name.s);
 }
 
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)

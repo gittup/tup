@@ -30,7 +30,7 @@ int find_tup_dir(void)
 	for(;;) {
 		if(stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
 			tup_wd_offset = tup_top_len;
-			while(tup_wd[tup_wd_offset] == '/') {
+			while(is_path_sep(&tup_wd[tup_wd_offset])) {
 				tup_wd_offset++;
 				tup_sub_len--;
 			}
@@ -44,7 +44,7 @@ int find_tup_dir(void)
 		while(tup_top_len > 0) {
 			tup_top_len--;
 			tup_sub_len++;
-			if(tup_wd[tup_top_len] == '/') {
+			if(is_path_sep(&tup_wd[tup_top_len])) {
 				break;
 			}
 		}

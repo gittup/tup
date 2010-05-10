@@ -10,6 +10,7 @@
 #include "bin.h"
 #include "entry.h"
 #include "string_tree.h"
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -558,7 +559,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	}
 	p = path;
 	for(x=0; x<num_dotdots; x++) {
-		strcpy(p, "../");
+		strcpy(p, ".." path_sep_str);
 		p += 3;
 	}
 	strcpy(path + num_dotdots*3, tuprules);
@@ -695,7 +696,7 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 					return -1;
 				}
 				memcpy(newcwd, cwd, clen);
-				newcwd[clen] = '/';
+				newcwd[clen] = path_sep;
 				memcpy(newcwd+clen+1, nle->path, nle->dirlen-1);
 				newcwd[newclen] = 0;
 			}
@@ -2200,7 +2201,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 		}
 
 		memcpy(path, dir, dirlen-1);
-		path[dirlen-1] = '/';
+		path[dirlen-1] = path_sep;
 		strcpy(path + dirlen, name);
 	} else {
 		path = strdup(name);
@@ -2468,7 +2469,7 @@ static void set_nle_base(struct name_list_entry *nle)
 	nle->baselen = 0;
 	while(nle->base > nle->path) {
 		nle->base--;
-		if(nle->base[0] == '/') {
+		if(nle->base[0] == path_sep) {
 			nle->base++;
 			goto out;
 		}

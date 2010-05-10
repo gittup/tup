@@ -550,19 +550,19 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 	pg->pg_flags = 0;
 	INIT_LIST_HEAD(&pg->path_list);
 
-	if(dir[0] == '/')
+	if(is_path_abs(dir))
 		pg->pg_flags |= PG_ROOT;
 
 	while(1) {
 		const char *path;
 		int len;
-		while(*p && *p == '/') {
+		while(*p && is_path_sep(p)) {
 			p++;
 		}
 		if(!*p)
 			break;
 		path = p;
-		while(*p && *p != '/') {
+		while(*p && !is_path_sep(p)) {
 			p++;
 		}
 		len = p - path;
@@ -613,11 +613,13 @@ skip_num_elements:
 			/* Returns are 0 here to indicate file is outside of
 			 * .tup
 			 */
-			if(list_empty(&pg->path_list) || top[0] != '/') {
+			if(list_empty(&pg->path_list) || !is_path_abs(top)) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
 				return 0;
 			}
-			top++;
+			while (*top && is_path_sep(top)) {
+				top++;
+			}
 			pel = list_entry(pg->path_list.next, struct path_element, list);
 			if(strncmp(top, pel->path, pel->len) != 0) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
