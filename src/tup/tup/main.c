@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		printf("tup %s\n", tup_version());
 		return 0;
 	} else if(strcmp(argv[1], "stop") == 0) {
-		return stop_monitor();
+		return stop_monitor(0);
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {
@@ -197,10 +197,6 @@ static int init(int argc, char **argv)
 	}
 	if(creat(TUP_TRI_LOCK, 0666) < 0) {
 		perror(TUP_TRI_LOCK);
-		return -1;
-	}
-	if(creat(TUP_MONITOR_LOCK, 0666) < 0) {
-		perror(TUP_MONITOR_LOCK);
 		return -1;
 	}
 	if(creat(TUP_VARDICT_FILE, 0666) < 0) {

@@ -78,7 +78,6 @@ static void sighandler(int sig);
 static int inot_fd;
 static int tup_wd;
 static int obj_wd;
-static int mon_wd;
 static struct dircache_root droot;
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
@@ -99,7 +98,6 @@ int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
-	int mon_fd;
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
@@ -112,16 +110,15 @@ int monitor(int argc, char **argv)
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 
-	mon_fd = openat(tup_top_fd(), TUP_MONITOR_LOCK, O_RDWR);
-	if(mon_fd < 0) {
-		perror(TUP_MONITOR_LOCK);
+	if(stop_monitor(1) < 0) {
+		fprintf(stderr, "Error: Unable to stop the current monitor process.\n");
 		return -1;
 	}
 
 	inot_fd = inotify_init();
 	if(inot_fd < 0) {
 		perror("inotify_init");
-		goto close_mon;
+		return -1;
 	}
 
 	tup_wd = inotify_add_watch(inot_fd, TUP_DIR, IN_DELETE);
@@ -138,13 +135,6 @@ int monitor(int argc, char **argv)
 	 */
 	obj_wd = inotify_add_watch(inot_fd, TUP_OBJECT_LOCK, IN_OPEN|IN_CLOSE);
 	if(obj_wd < 0) {
-		pinotify();
-		rc = -1;
-		goto close_inot;
-	}
-
-	mon_wd = inotify_add_watch(inot_fd, TUP_MONITOR_LOCK, IN_OPEN);
-	if(mon_wd < 0) {
 		pinotify();
 		rc = -1;
 		goto close_inot;
@@ -240,8 +230,6 @@ int monitor(int argc, char **argv)
 
 close_inot:
 	close(inot_fd);
-close_mon:
-	close(mon_fd);
 	return rc;
 }
 
@@ -410,8 +398,6 @@ static int monitor_loop(void)
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
-			} else if(e->wd == mon_wd) {
-				return 0;
 			} else {
 				if(locked) {
 					rc = queue_event(e);
@@ -441,7 +427,7 @@ static int monitor_loop(void)
 	return 0;
 }
 
-int stop_monitor(void)
+int stop_monitor(int restarting)
 {
 	int pid;
 
@@ -450,10 +436,15 @@ int stop_monitor(void)
 
 	pid = monitor_get_pid();
 	if(pid < 0) {
+		if(restarting)
+			return 0;
 		printf("No monitor process to kill (pid < 0)\n");
 		return -1;
 	}
-	printf("Shutting down monitor.\n");
+	if(restarting)
+		printf("Restarting the monitor.\n");
+	else
+		printf("Shutting down the monitor.\n");
 	if(kill(pid, SIGKILL) < 0) {
 		perror("kill");
 		return -1;

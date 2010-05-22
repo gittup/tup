@@ -15,7 +15,7 @@ cleanup
 mkdir $tmpdir
 cd $tmpdir
 tup init
-for i in db object shared tri monitor vardict; do
+for i in db object shared tri vardict; do
 	if [ ! -f ".tup/$i" ]; then
 		echo ".tup/$i not created!" 1>&2
 		cleanup

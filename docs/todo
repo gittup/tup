@@ -18,9 +18,6 @@ can we have the monitor kill the updater if a file modification is detected? or 
 
 unlinkat(AT_FDCWD) to do the same thing as unlink() (eg: rm -f foo.o in a badly behaving command should cause foo.o to be re-generated)?
 
-recursive grep kills monitor
- - print message when monitor exits?
-
 kill monitor if you ctrl-c twice? (maybe SIGHUP?) that way user has to restart it, which should catch any out of place files
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.

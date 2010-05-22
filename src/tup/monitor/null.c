@@ -12,8 +12,9 @@ int monitor(int argc, char **argv)
 	return -1;
 }
 
-int stop_monitor(void)
+int stop_monitor(int restarting)
 {
+	if(restarting) {}
 	return -1;
 }
 
