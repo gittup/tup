@@ -851,17 +851,22 @@ static struct bang_rule *alloc_br(void)
 	return br;
 }
 
-static void set_br_extra_outputs(struct bang_rule *br)
+static int set_br_extra_outputs(struct bang_rule *br)
 {
 	char *sep;
 
 	sep = strchr(br->output_pattern, '|');
 	if(sep != NULL) {
 		*sep = 0;
-		br->extra_outputs = sep + 1;
+		br->extra_outputs = strdup(sep + 1);
+		if(!br->extra_outputs) {
+			perror("strdup");
+			return -1;
+		}
 	} else {
 		br->extra_outputs = NULL;
 	}
+	return 0;
 }
 
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
@@ -920,7 +925,15 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("strdup");
 			goto err_cleanup_br;
 		}
-		set_br_extra_outputs(br);
+		if(cur_br->extra_outputs) {
+			br->extra_outputs = strdup(cur_br->extra_outputs);
+			if(!br->extra_outputs) {
+				perror("strdup");
+				goto err_cleanup_br;
+			}
+		} else {
+			br->extra_outputs = NULL;
+		}
 
 		br->command_len = cur_br->command_len;
 		br->st.s = strdup(p);
@@ -975,6 +988,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		cur_br->command = command;
 		cur_br->command_len = command_len;
 		cur_br->output_pattern = output;
+		if(set_br_extra_outputs(cur_br) < 0)
+			goto err_cleanup_br;
 	} else {
 		/* Create new !-macro */
 		br = alloc_br();
@@ -986,6 +1001,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->command = command;
 		br->command_len = command_len;
 		br->output_pattern = output;
+		if(set_br_extra_outputs(br) < 0)
+			goto err_cleanup_br;
 		br->value = alloc_value;
 		br->st.s = strdup(p);
 		if(!br->st.s) {
@@ -998,10 +1015,10 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			goto err_cleanup_br;
 		}
 	}
-	set_br_extra_outputs(br);
 	return 0;
 
 err_cleanup_br:
+	free(br->extra_outputs);
 	free(br->output_pattern);
 	free(br->command);
 	free(br->input);
@@ -1217,6 +1234,7 @@ static void free_bang_tree(struct rb_root *root)
 			free(br->command);
 			free(br->output_pattern);
 		}
+		free(br->extra_outputs);
 		free(br);
 	}
 }
