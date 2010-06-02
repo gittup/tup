@@ -61,6 +61,7 @@ struct rule {
 	struct name_list inputs;
 	struct name_list order_only_inputs;
 	struct name_list bang_oo_inputs;
+	char *bang_extra_outputs;
 	int empty_input;
 	int line_number;
 	struct name_list *output_nl;
@@ -74,6 +75,7 @@ struct bang_rule {
 	char *command;
 	int command_len;
 	char *output_pattern;
+	char *extra_outputs;
 };
 
 struct bang_list {
@@ -183,7 +185,8 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 				 struct name_list_entry *nle);
 static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
-			struct name_list *onl, const char *ext, int extlen);
+			struct name_list *onl, const char *ext, int extlen,
+			int is_command);
 static char *eval(struct tupfile *tf, const char *string,
 		  const char *cwd, int clen);
 
@@ -844,7 +847,21 @@ static struct bang_rule *alloc_br(void)
 	br->input = NULL;
 	br->command = NULL;
 	br->output_pattern = NULL;
+	br->extra_outputs = NULL;
 	return br;
+}
+
+static void set_br_extra_outputs(struct bang_rule *br)
+{
+	char *sep;
+
+	sep = strchr(br->output_pattern, '|');
+	if(sep != NULL) {
+		*sep = 0;
+		br->extra_outputs = sep + 1;
+	} else {
+		br->extra_outputs = NULL;
+	}
 }
 
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
@@ -903,6 +920,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			perror("strdup");
 			goto err_cleanup_br;
 		}
+		set_br_extra_outputs(br);
+
 		br->command_len = cur_br->command_len;
 		br->st.s = strdup(p);
 		if(!br->st.s) {
@@ -979,6 +998,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			goto err_cleanup_br;
 		}
 	}
+	set_br_extra_outputs(br);
 	return 0;
 
 err_cleanup_br:
@@ -1114,7 +1134,7 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 
 	/* Add any order only inputs to the list */
 	if(nl && br->input) {
-		tinput = tup_printf(br->input, -1, nl, NULL, NULL, 0);
+		tinput = tup_printf(br->input, -1, nl, NULL, NULL, 0, 0);
 		if(!tinput)
 			return -1;
 	} else {
@@ -1136,6 +1156,12 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 	 */
 	if(!r->output_pattern[0])
 		r->output_pattern = br->output_pattern;
+
+	/* Also include any extra outputs from the !-macro. These may specify
+	 * additional outputs that the user of the !-macro doesn't know about
+	 * (such as command side-effects).
+	 */
+	r->bang_extra_outputs = br->extra_outputs;
 	return 0;
 }
 
@@ -1403,6 +1429,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
 	init_name_list(&r->bang_oo_inputs);
+	r->bang_extra_outputs = NULL;
 	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
 			       &r->order_only_inputs, bl, r->line_number,
 			       cwd, clen, 1) < 0)
@@ -1446,7 +1473,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 
 				banglist = &sc->banglist;
 
-				tinput = tup_printf(sc->input_pattern, -1, r->output_nl, NULL, NULL, 0);
+				tinput = tup_printf(sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, 0);
 				if(!tinput)
 					return -1;
 				input_pattern = eval(tf, tinput, cwd, clen);
@@ -1583,6 +1610,7 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 				r->command = old_command;
 				r->command_len = old_command_len;
 				r->output_pattern = old_output_pattern;
+				r->bang_extra_outputs = NULL;
 				delete_name_list(&r->bang_oo_inputs);
 			}
 
@@ -1699,7 +1727,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		set_nle_base(&tmp_nle);
 		add_name_list_entry(&tmp_nl, &tmp_nle);
 
-		tinput = tup_printf(r->output_pattern, -1, &tmp_nl, NULL, NULL, 0);
+		tinput = tup_printf(r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, 0);
 		if(!tinput)
 			return -1;
 		input_pattern = eval(tf, tinput, cwd, clen);
@@ -2197,8 +2225,10 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   struct name_list *output_nl)
 {
 	struct name_list onl;
+	struct name_list extra_onl;
 	struct name_list_entry *nle, *onle;
 	char *output_pattern;
+	char *extra_pattern = NULL;
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
@@ -2206,6 +2236,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	tupid_t cmdid = -1;
 	LIST_HEAD(oplist);
 	struct rb_root tree = {NULL};
+	int extra_outputs = 0;
+	char sep[] = "|";
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -2221,25 +2253,49 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 
 	init_name_list(&onl);
+	init_name_list(&extra_onl);
 
 	output_pattern = eval(tf, r->output_pattern, cwd, clen);
 	if(!output_pattern)
 		return -1;
 	if(get_path_list(output_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
 		return -1;
+	if(r->bang_extra_outputs) {
+		/* Insert a fake separator in case the rule doesn't have one */
+		if(get_path_list(sep, &oplist, tf->tupid, NULL, NULL) < 0)
+			return -1;
+		extra_pattern = eval(tf, r->bang_extra_outputs, cwd, clen);
+		if(!extra_pattern)
+			return -1;
+		if(get_path_list(extra_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
+			return -1;
+	}
 	while(!list_empty(&oplist)) {
+		struct name_list *use_onl;
 		pl = list_entry(oplist.next, struct path_list, list);
 
 		if(pl->path) {
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
 			return -1;
 		}
+		if(pl->pel->len == 1 && pl->pel->path[0] == '|') {
+			extra_outputs = 1;
+			goto out_pl;
+		}
+
 		onle = malloc(sizeof *onle);
 		if(!onle) {
 			perror("malloc");
 			return -1;
 		}
-		onle->path = tup_printf(pl->pel->path, pl->pel->len, nl, NULL, NULL, 0);
+
+		/* tup_printf allows %O if we have an onl and are not a command */
+		if(extra_outputs) {
+			use_onl = &onl;
+		} else {
+			use_onl = NULL;
+		}
+		onle->path = tup_printf(pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, 0);
 		if(!onle->path) {
 			free(onle);
 			return -1;
@@ -2275,19 +2331,25 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 
 		set_nle_base(onle);
-		add_name_list_entry(&onl, onle);
+		if(extra_outputs) {
+			add_name_list_entry(&extra_onl, onle);
+		} else {
+			add_name_list_entry(&onl, onle);
 
-		if(r->bin) {
-			if(bin_add_entry(r->bin, onle->path, onle->len, onle->tent) < 0)
-				return -1;
+			if(r->bin) {
+				if(bin_add_entry(r->bin, onle->path, onle->len, onle->tent) < 0)
+					return -1;
+			}
 		}
 
+out_pl:
 		del_pl(pl);
 	}
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
+	free(extra_pattern);
 
-	tcmd = tup_printf(r->command, -1, nl, &onl, ext, extlen);
+	tcmd = tup_printf(r->command, -1, nl, &onl, ext, extlen, 1);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, cwd, clen);
@@ -2335,6 +2397,18 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
 				  &tf->g->delete_count);
 		move_name_list_entry(output_nl, &onl, onle);
+	}
+
+	while(!list_empty(&extra_onl.entries)) {
+		onle = list_entry(extra_onl.entries.next, struct name_list_entry,
+				  list);
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_tree, &tree) < 0) {
+			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
+			return -1;
+		}
+		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
+				  &tf->g->delete_count);
+		delete_name_list_entry(&extra_onl, onle);
 	}
 
 	if(tup_db_write_outputs(cmdid, &tree) < 0)
@@ -2458,7 +2532,8 @@ static const char *find_char(const char *s, int len, char c)
 }
 
 static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
-			struct name_list *onl, const char *ext, int extlen)
+			struct name_list *onl, const char *ext, int extlen,
+			int is_command)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -2522,7 +2597,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			}
 			clen += extlen;
 		} else if(*next == 'o') {
-			if(!onl) {
+			if(!is_command) {
 				fprintf(stderr, "Error: %%o can only be used in a command.\n");
 				return NULL;
 			}
@@ -2531,6 +2606,16 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				return NULL;
 			}
 			clen += onl->totlen + (onl->num_entries-1);
+		} else if(*next == 'O') {
+			if(!onl) {
+				fprintf(stderr, "Error: %%O can only be used in the extra outputs section.\n");
+				return NULL;
+			}
+			if(onl->num_entries != 1) {
+				fprintf(stderr, "Error: %%O can only be used if there is exactly one output specified.\n");
+				return NULL;
+			}
+			clen += onl->extlessbasetotlen;
 		} else if(*next == '%') {
 			clen++;
 		} else {
@@ -2600,6 +2685,10 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				x += nle->len;
 				first = 0;
 			}
+		} else if(*next == 'O') {
+			nle = list_entry(onl->entries.next, struct name_list_entry, list);
+			memcpy(&s[x], nle->path, nle->extlessbaselen);
+			x += nle->extlessbaselen;
 		} else if(*next == '%') {
 			s[x] = '%';
 			x++;

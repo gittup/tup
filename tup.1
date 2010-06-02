@@ -60,7 +60,7 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .SH "TUPFILES"
 You must create a file called "Tupfile" anywhere in the tup hierarchy that you want to create an output file based on the input files. The input files can be anywhere else in the tup hierarchy, but the output file(s) must be written in the same directory as the Tupfile.
 .TP
-.B : [foreach] [inputs] [ | order-only inputs] |> command |> [outputs]
+.B : [foreach] [inputs] [ | order-only inputs] |> command |> [outputs] [ | extra outputs] [{bin}]
 The :-rules are the primary means of creating commands, and are denoted by the fact that the ':' character appears in the first column of the Tupfile. The syntax is supposed to look somewhat like a pipeline, in that the input files on the left go into the command in the middle, and the output files come out on the right.
 .RS
 .TP
@@ -105,8 +105,11 @@ A command string can also begin with the special character '!', in which case th
 .TP
 .B outputs
 The outputs section specifies the files that will be written to by the command. Only one command can write to a specific file, but a single command can output multiple files (such as how a bison command will output both a .c and .h file). The output can use any %-flags except %o. Once a file is specified in an output section, it is put into the tup database. Any following rules can use that file as an input, even if it doesn't exist in the filesystem yet.
-.RS
-.IP {bin}
+.TP
+.B extra-outputs
+The extra-outputs section is similar to the order-only inputs section. It is separated from the regular outputs by the '|' character. The extra-outputs behave exactly as regular outputs, except they do not appear in the %o flag. These can be used if a command generates files whose names do not actually appear in the command line. If there is exactly one output specified by the rule, the extra-outputs section can use the %O flag to represent the basename of the output. This can be useful in extra-outputs for !-macros.
+.TP
+.B {bin}
 Outputs can be grouped into a bin using the "{bin}" syntax. A later rule can use "{bin}" as an input to use all of the files in that bin. For example, the foreach rule will put each .o file in the objs bin, which is used as an input in the linker rule:
 .nf
 
@@ -136,6 +139,15 @@ The file extension of the current file when used in a foreach rule. This can be 
 .TP
 .B %o
 The name of the output file(s). It is useful in a command so that the filename passed to a command will always match what tup thinks the output is. This only works in the "command" section, not in the "outputs" section.
+.TP
+.B %O
+The name of the output file without the extension. This only works in the extra-outputs section if there is exactly one output file specified. A use-case for this is if you have a !-macro that generates files not specified on the command line, but are based off of the output that is named. For example, if a linker creates a map file by taking the specified output "foo.so", removing the ".so" and adding ".map", then you may want a !-macro like so:
+.nf
+
+!ldmap = |> ld ... -o %o |> | %O.map
+: foo1.o foo2.o |> !ldmap |> foo.so
+
+.fi
 .RE
 .RE
 .TP
