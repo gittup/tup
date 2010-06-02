@@ -988,8 +988,9 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		cur_br->command = command;
 		cur_br->command_len = command_len;
 		cur_br->output_pattern = output;
+		free(cur_br->extra_outputs);
 		if(set_br_extra_outputs(cur_br) < 0)
-			goto err_cleanup_br;
+			return -1;
 	} else {
 		/* Create new !-macro */
 		br = alloc_br();
