@@ -140,6 +140,15 @@ check for transitive dependencies (eg: prog links foo.so, and foo.so links to ba
   'b' does read from foo.so - if you remove foo.so from the |> a |> rule, will 'b'
   re-execute to find that it's missing?
 
+better error message if you try to do: |> blah |> .foo
+
+merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
+
+prohibit read from stdin
+
+set errno instead of returning -ENOSYS in chdir() wrapper
+ - or actually support chdir/fchdir
+
 html:
   proof: no clean target
   graphs
