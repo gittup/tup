@@ -5,7 +5,7 @@
 . ./tup.sh
 cat > Tupfile << HERE
 : segfault.c |> gcc %f -o %o |> tup_t5014_segfault
-: tup_t5014_segfault |> ./tup_t5014_segfault |>
+: tup_t5014_segfault |> ./%f |>
 HERE
 
 cat > segfault.c << HERE
@@ -17,12 +17,12 @@ int main(void)
 }
 HERE
 tup touch segfault.c Tupfile
-update_fail
+update_fail_msg "signal 11 (Segmentation fault)"
 tup_dep_exist . segfault.c . 'gcc segfault.c -o tup_t5014_segfault'
 tup_dep_exist . 'gcc segfault.c -o tup_t5014_segfault' . tup_t5014_segfault
 tup_dep_exist . tup_t5014_segfault . './tup_t5014_segfault'
 
 # Make sure the command runs and fails again.
-update_fail
+update_fail_msg "signal 11 (Segmentation fault)"
 
 eotup
