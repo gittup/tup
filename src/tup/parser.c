@@ -1916,9 +1916,17 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 				return -1;
 			}
 		} else {
+			struct pel_group pg;
 			/* Path */
 			pl->path = p;
-			pl->dt = find_dir_tupid_dt(dt, p, &pl->pel, symtree, 0);
+
+			if(get_path_elements(p, &pg) < 0)
+				return -1;
+			if(pg.pg_flags & PG_HIDDEN) {
+				fprintf(stderr, "Error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
+				return -1;
+			}
+			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, NULL, symtree, 0);
 			if(pl->dt <= 0) {
 				fprintf(stderr, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
