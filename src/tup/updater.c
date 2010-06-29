@@ -910,11 +910,11 @@ static int update(struct node *n, struct server *s)
 		goto err_cmd_failed;
 	}
 
+	pthread_mutex_lock(&db_mutex);
+	rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
+	pthread_mutex_unlock(&db_mutex);
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {
-			pthread_mutex_lock(&db_mutex);
-			rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
-			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0)
 				goto err_cmd_failed;
 		} else {
@@ -935,7 +935,7 @@ static int update(struct node *n, struct server *s)
 	}
 
 	close(dfd);
-	return rc;
+	return 0;
 
 err_cmd_failed:
 	if(exit_status == -1)
