@@ -898,6 +898,12 @@ static int update(struct node *n, struct server *s)
 			exit(1);
 		}
 		server_setenv(s, vardict_fd);
+		/* Close down stdin - it can't reliably be used during the
+		 * build (for example, when building in parallel, multiple
+		 * programs would have to fight over who gets it, which is just
+		 * nonsensical).
+		 */
+		close(0);
 		execl("/bin/sh", "/bin/sh", "-e", "-c", name, NULL);
 		perror("execl");
 		exit(1);

@@ -140,8 +140,6 @@ better error message if you try to do: |> blah |> .foo
 
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
 
-prohibit read from stdin
-
 set errno instead of returning -ENOSYS in chdir() wrapper
  - or actually support chdir/fchdir
 
