@@ -138,8 +138,7 @@ check for transitive dependencies (eg: prog links foo.so, and foo.so links to ba
 
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
 
-set errno instead of returning -ENOSYS in chdir() wrapper
- - or actually support chdir/fchdir
+actually support chdir/fchdir?
 
 html:
   proof: no clean target
