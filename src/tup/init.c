@@ -2,6 +2,8 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
+#include "entry.h"
+#include <stdlib.h>
 #include <unistd.h>
 
 int tup_init(void)
@@ -22,6 +24,16 @@ int tup_init(void)
 
 void tup_cleanup(void)
 {
+	/* The tup_entry structures are a cache of the database, so they aren't
+	 * normally freed during execution. There's also no need to go through
+	 * the whole thing and clean them up manually since we can let the OS
+	 * do it (we're quitting soon anyway). However, when valgrind is
+	 * running it looks like there's a bunch of memory leaks, so this is
+	 * done conditionally.
+	 */
+	if(getenv("TUP_VALGRIND")) {
+		tup_entry_clear();
+	}
 	tup_db_close();
 	tup_lock_exit();
 	close(tup_top_fd());
