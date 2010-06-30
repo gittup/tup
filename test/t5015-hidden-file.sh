@@ -12,17 +12,17 @@ HERE
 echo 'foo' > .hidden
 tmkdir yo
 mkdir yo/.hidden_dir
-if tup touch yo/.hidden_dir; then
+if tup touch yo/.hidden_dir 2>/dev/null; then
 	echo 'Error: tup-touching .hidden_dir should be an error' 1>&2
 	exit 1
 fi
 echo 'bar' > yo/.hidden_dir/foo
 
-if tup touch .hidden; then
+if tup touch .hidden 2>/dev/null; then
 	echo 'Error: tup-touching .hidden should be an error' 1>&2
 	exit 1
 fi
-if tup touch yo/.hidden_dir/foo; then
+if tup touch yo/.hidden_dir/foo 2>/dev/null; then
 	echo 'Error: tup-touching yo/.hidden_dir/foo should be an error' 1>&2
 	exit 1
 fi

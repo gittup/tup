@@ -175,13 +175,20 @@ update_fail_msg()
 	fi
 }
 
-parse_fail()
+parse_fail_msg()
 {
-	if tup parse; then
-		echo "Error: $1" 1>&2
+	if tup parse 2>.tupoutput; then
+		echo "*** Expected parsing to fail, but didn't" 1>&2
 		exit 1
 	else
-		echo "Hooray, parsing correctly failed."
+		if grep "$1" .tupoutput > /dev/null; then
+			echo "Parsing expected to fail, and failed for the right reason."
+		else
+			echo "*** Parsing expected to fail because of: $1" 1>&2
+			echo "*** But failed because of:" 1>&2
+			cat .tupoutput 1>&2
+			exit 1
+		fi
 	fi
 }
 

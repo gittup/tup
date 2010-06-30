@@ -8,6 +8,6 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile foo.c bar.c
-parse_fail "Shouldn't be able to parse a non-existent order-only prereq."
+parse_fail_msg "Explicitly named file 'foo.h' not found"
 
 eotup

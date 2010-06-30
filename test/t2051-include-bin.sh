@@ -10,6 +10,6 @@ cat > Tupfile << HERE
 include {includes}
 HERE
 tup touch Tupfile
-parse_fail "Shouldn't be able to include files specified in a bin"
+parse_fail_msg "Bins are only usable in an input or output list"
 
 eotup

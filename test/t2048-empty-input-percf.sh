@@ -1,24 +1,24 @@
 #! /bin/sh -e
 
-# See that using %[fFbB] when there is no input gets an error.
+# See that using %[fbB] when there is no input gets an error.
 
 . ./tup.sh
 cat > Tupfile << HERE
 : |> cat %f > %o |> bar
 HERE
 tup touch Tupfile
-parse_fail "Shouldn't be able to use %f without input files"
+parse_fail_msg "%f used in rule pattern and no input files were specified"
 
 cat > Tupfile << HERE
 : |> cat %b > %o |> bar
 HERE
 tup touch Tupfile
-parse_fail "Shouldn't be able to use %b without input files"
+parse_fail_msg "%b used in rule pattern and no input files were specified"
 
 cat > Tupfile << HERE
 : |> cat %B > %o |> bar
 HERE
 tup touch Tupfile
-parse_fail "Shouldn't be able to use %B without input files"
+parse_fail_msg "%B used in rule pattern and no input files were specified"
 
 eotup

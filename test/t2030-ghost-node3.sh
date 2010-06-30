@@ -32,6 +32,6 @@ cat > Tupfile << HERE
 : ghost |> cat %f |>
 HERE
 tup touch Tupfile
-parse_fail "Shouldn't be able to parse the Tupfile with a ghost node as input."
+parse_fail_msg "Explicitly named file 'ghost' is a ghost file, so it can't be used as an input"
 
 eotup
