@@ -563,10 +563,8 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 				 */
 				goto skip_num_elements;
 			} else {
-				/* Ignore hidden paths */
-				del_pel_list(&pg->path_list);
+				/* Hidden paths have special treatment in tup */
 				pg->pg_flags |= PG_HIDDEN;
-				return 0;
 			}
 		}
 
@@ -613,10 +611,6 @@ int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
 {
 	const struct list_head *la, *lb;
 	struct path_element *pela, *pelb;
-
-	if((pga->pg_flags & PG_HIDDEN) ||
-	   (pgb->pg_flags & PG_HIDDEN))
-		return 0;
 
 	la = &pga->path_list;
 	lb = &pgb->path_list;
