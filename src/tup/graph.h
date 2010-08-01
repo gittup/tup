@@ -51,6 +51,8 @@ struct edge *remove_edge(struct edge *e);
 
 int create_graph(struct graph *g, int count_flags);
 int destroy_graph(struct graph *g);
+int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
+			int *connected);
 void dump_graph(const struct graph *g, const char *filename);
 
 #endif

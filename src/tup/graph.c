@@ -116,6 +116,106 @@ int destroy_graph(struct graph *g)
 	return 0;
 }
 
+static int add_file_cb(void *arg, struct tup_entry *tent, int style)
+{
+	struct graph *g = arg;
+	struct node *n;
+	int strongly_connected;
+
+	n = find_node(g, tent->tnode.tupid);
+	if(n != NULL)
+		goto edge_create;
+	n = create_node(g, tent);
+	if(!n)
+		return -1;
+
+edge_create:
+	if(n->state == STATE_PROCESSING) {
+		/* A circular dependency is not guaranteed to trigger this,
+		 * but it is easy to check before going through the graph.
+		 */
+		fprintf(stderr, "Error: Circular dependency detected! "
+			"Last edge was: %lli -> %lli\n",
+			g->cur->tnode.tupid, tent->tnode.tupid);
+		return -1;
+	}
+	strongly_connected = 0;
+	/* Commands are always strongly connected to their outputs, since we
+	 * restrict commands to make sure that they always write all of their
+	 * outputs.
+	 */
+	if(g->cur->tent->type == TUP_NODE_CMD) {
+		strongly_connected = 1;
+	} else {
+		if(style == (TUP_LINK_NORMAL | TUP_LINK_STICKY))
+			strongly_connected = 1;
+	}
+	if(strongly_connected && n->expanded == 0) {
+		if(n->tent->type == g->count_flags)
+			g->num_nodes++;
+		n->expanded = 1;
+		list_move(&n->list, &g->plist);
+	}
+
+	if(create_edge(g->cur, n, style) < 0)
+		return -1;
+	return 0;
+}
+
+int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
+			int *connected)
+{
+	struct graph g;
+	struct node *n;
+
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
+		return -1;
+	n = create_node(&g, src);
+	if(!n)
+		return -1;
+	if(create_edge(g.cur, n, TUP_LINK_NORMAL) < 0)
+		return -1;
+	n->expanded = 1;
+	list_move(&n->list, &g.plist);
+
+	*connected = 0;
+	while(!list_empty(&g.plist)) {
+		struct tup_entry *tent;
+		n = list_entry(g.plist.next, struct node, list);
+
+		list_for_each_entry(tent, dest_list, list) {
+			if(tent == src)
+				continue;
+			if(tent == n->tent) {
+				*connected = 1;
+				goto out_cleanup;
+			}
+		}
+
+		if(n->state == STATE_INITIALIZED) {
+			DEBUGP("find deps for node: %lli\n", n->tnode.tupid);
+			g.cur = n;
+			if(tup_db_select_node_by_link(add_file_cb, &g, n->tnode.tupid) < 0)
+				return -1;
+			n->state = STATE_PROCESSING;
+		} else if(n->state == STATE_PROCESSING) {
+			DEBUGP("remove node from stack: %lli\n", n->tnode.tupid);
+			list_del(&n->list);
+			list_add_tail(&n->list, &g.node_list);
+			n->state = STATE_FINISHED;
+		} else if(n->state == STATE_FINISHED) {
+			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", n->tnode.tupid);
+			tup_db_print(stderr, n->tnode.tupid);
+			return -1;
+		}
+	}
+
+out_cleanup:
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return 0;
+}
+
 void dump_graph(const struct graph *g, const char *filename)
 {
 	static int count = 0;

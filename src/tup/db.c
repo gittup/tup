@@ -9,6 +9,7 @@
 #include "vardb.h"
 #include "fslurp.h"
 #include "entry.h"
+#include "graph.h"
 #include "version.h"
 #include "platform.h"
 #include <stdio.h>
@@ -3832,6 +3833,7 @@ struct actual_input_data {
 	int input_error;
 	struct rb_root sticky_tree;
 	struct rb_root output_tree;
+	struct list_head *readlist;
 };
 
 static int new_input(tupid_t tupid, void *data)
@@ -3846,6 +3848,15 @@ static int new_input(tupid_t tupid, void *data)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
+		int connected;
+
+		if(nodes_are_connected(tent, aid->readlist, &connected) < 0)
+			return -1;
+
+		if(connected) {
+			return 0;
+		}
+
 		if(!aid->input_error) {
 			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not         specified as an input link for the command. This is an issue because the file   was created from another command, and without the input link the commands may   execute out of order. You should add this file as an input, since it is         possible this could randomly break in the future.\n");
 			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);
@@ -3908,6 +3919,7 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 		.input_error = 0,
 		.sticky_tree = {NULL},
 		.output_tree = {NULL},
+		.readlist = readlist,
 	};
 
 	if(get_output_tree(cmdid, &aid.output_tree) < 0)
