@@ -1,6 +1,7 @@
 #! /bin/sh -e
 
-# TODO
+# Make sure hidden files are still tracked internally during command
+# execution, even though they won't make it into the final DAG.
 . ./tup.sh
 
 cat > Tupfile << HERE
