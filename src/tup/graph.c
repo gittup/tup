@@ -44,6 +44,18 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	return n;
 }
 
+static void __remove_node(struct graph *g, struct node *n)
+{
+	list_del(&n->list);
+	while(n->edges) {
+		struct edge *tmp;
+		tmp = n->edges->next;
+		free(n->edges);
+		n->edges = tmp;
+	}
+	remove_node(g, n);
+}
+
 void remove_node(struct graph *g, struct node *n)
 {
 	if(n->edges) {
@@ -112,7 +124,12 @@ int create_graph(struct graph *g, int count_flags)
 
 int destroy_graph(struct graph *g)
 {
-	if(g) {/* TODO */}
+	while(!list_empty(&g->plist)) {
+		__remove_node(g, list_entry(g->plist.next, struct node, list));
+	}
+	while(!list_empty(&g->node_list)) {
+		__remove_node(g, list_entry(g->node_list.next, struct node, list));
+	}
 	return 0;
 }
 
