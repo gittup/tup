@@ -478,6 +478,11 @@ found_paren:
 			if(!value)
 				return -1;
 
+			if(strncmp(var, "CONFIG_", 7) == 0) {
+				fprintf(stderr, "Error: Unable to override setting of variable '%s' because it begins with 'CONFIG_'. These variables can only be set in the tup.config file.\n", var);
+				return -1;
+			}
+
 			if(append)
 				rc = vardb_append(&tf->vdb, var, value);
 			else
