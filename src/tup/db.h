@@ -100,7 +100,8 @@ int tup_db_link_style(tupid_t a, tupid_t b, int *style);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree);
-int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree);
+int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
+			struct rb_root *delete_tree);
 int tup_db_write_dir_inputs(tupid_t dt, struct rb_root *tree);
 
 /* Combo operations */

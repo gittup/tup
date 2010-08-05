@@ -2459,7 +2459,7 @@ out_pl:
 		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &tree) < 0)
+	if(tup_db_write_inputs(cmdid, &tree, &tf->g->delete_tree) < 0)
 		return -1;
 	free_tupid_tree(&tree);
 	return 0;

@@ -3772,6 +3772,7 @@ int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
 struct write_input_data {
 	tupid_t cmdid;
 	struct rb_root *normal_tree;
+	struct rb_root *delete_tree;
 };
 
 static int add_sticky(tupid_t tupid, void *data)
@@ -3798,24 +3799,37 @@ static int rm_sticky(tupid_t tupid, void *data)
 		if(link_remove(tupid, wid->cmdid) < 0)
 			return -1;
 	} else {
-		/* Demote to a normal link - make sure we run the command again
-		 * to check for required inputs.
+		if(tupid_tree_search(wid->delete_tree, tupid) == NULL) {
+			/* Demote to a normal link */
+			if(link_update(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+				return -1;
+		} else {
+			/* The node is in the delete list and we are no longer
+			 * claiming it as a dependency. Make sure the normal
+			 * link is removed as well to avoid a circular
+			 * dependency (t6045).
+			 */
+			if(link_remove(tupid, wid->cmdid) < 0)
+				return -1;
+		}
+		/* Make sure we re-run the command to check for required
+		 * inputs.
 		 */
-		if(link_update(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
-			return -1;
 		if(tup_db_add_modify_list(wid->cmdid) < 0)
 			return -1;
 	}
 	return 0;
 }
 
-int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree)
+int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
+			struct rb_root *delete_tree)
 {
 	struct rb_root sticky_tree = {NULL};
 	struct rb_root normal_tree = {NULL};
 	struct write_input_data wid = {
 		.cmdid = cmdid,
 		.normal_tree = &normal_tree,
+		.delete_tree = delete_tree,
 	};
 
 	if(get_links(cmdid, &sticky_tree, &normal_tree) < 0)
