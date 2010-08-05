@@ -5,7 +5,6 @@
 # eg: a -> b -> c and a -> c
 # then we remove a -> b, so the a -> c link should get an error
 
-
 . ./tup.sh
 
 cat > ok1.sh << HERE
