@@ -371,7 +371,7 @@ static int graph(int argc, char **argv)
 
 		e = n->edges;
 		while(e) {
-			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid");
+			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
 			e = e->next;
 		}
 	}
