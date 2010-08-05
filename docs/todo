@@ -87,8 +87,6 @@ sqlite style graphs for parser
 
 indent dependent dirs while parsing?
 
-implement */*.c or maybe **/*.c as a recursive input?
-
 add to ghost list from parser, then fail - ghost is still reclaimed?
 
 dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
@@ -127,14 +125,6 @@ make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
 touch ok.o; rm -f ok.o ok.c; tup upd shouldn't keep ok.o in the dag
 
 allow 'tup upd foo.o' to construct a partial DAG only for things that eventually point to foo.o (and maybe print out the number of commands that were skipped)
-
-check for transitive dependencies (eg: prog links foo.so, and foo.so links to bar.so - need to specify both foo.so and bar.so as deps to prog, which is annoying)
- - will this work if you say:
-  foo.so |> a |> blah
-  blah |> b |>
-  and 'a' doesn't actually read from foo.so (so it's only a sticky link), and then
-  'b' does read from foo.so - if you remove foo.so from the |> a |> rule, will 'b'
-  re-execute to find that it's missing?
 
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
 
