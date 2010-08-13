@@ -122,8 +122,6 @@ make all error messages and such pretty print on things other than 80 columns
 make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
  - I was trying to do 'find . -type f | xargs tup g' to just show files
 
-touch ok.o; rm -f ok.o ok.c; tup upd shouldn't keep ok.o in the dag
-
 allow 'tup upd foo.o' to construct a partial DAG only for things that eventually point to foo.o (and maybe print out the number of commands that were skipped)
 
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port

@@ -260,6 +260,13 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 
 		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
 			return -1;
+
+		/* Since the file has been removed, make sure it is no longer
+		 * in the modify list (t5071)
+		 */
+		if(tup_db_unflag_modify(tupid) < 0)
+			return -1;
+
 		/* Only display a warning if the command isn't already in the
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.
