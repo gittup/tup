@@ -431,8 +431,10 @@ int stop_monitor(int restarting)
 {
 	int pid;
 
-	if(find_tup_dir() < 0)
+	if(find_tup_dir() < 0) {
+		fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
 		return -1;
+	}
 
 	pid = monitor_get_pid();
 	if(pid < 0) {
