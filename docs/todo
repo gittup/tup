@@ -1,7 +1,4 @@
 FD_CLOEXEC flag on file descriptors?
- - also close stdin on subprocesses?
-
-automatically backup db before updating to new version
 
 remove var/sed commands in favor of an external client?
 

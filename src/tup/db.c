@@ -225,6 +225,50 @@ int tup_db_create(int db_sync)
 	return 0;
 }
 
+static int db_backup(void)
+{
+	char backup[sizeof(TUP_DB_BACKUP_FILE)];
+	int fd;
+	int ifd;
+	int rc;
+	char buf[1024];
+
+	memcpy(backup, TUP_DB_BACKUP_FILE, sizeof(backup));
+	fd = mkstemp(backup);
+	if(fd < 0) {
+		perror(backup);
+		return -1;
+	}
+	ifd = open(TUP_DB_FILE, O_RDONLY);
+	if(ifd < 0) {
+		perror(TUP_DB_FILE);
+		goto err_open;
+	}
+	while(1) {
+		rc = read(ifd, buf, sizeof(buf));
+		if(rc < 0) {
+			perror("read");
+			goto err_fail;
+		}
+		if(rc == 0)
+			break;
+		if(write(fd, buf, rc) != rc) {
+			perror("write");
+			goto err_fail;
+		}
+	}
+	close(ifd);
+	close(fd);
+	printf("Old tup database backed up as '%s'\n", backup);
+	return 0;
+
+err_fail:
+	close(ifd);
+err_open:
+	close(fd);
+	return -1;
+}
+
 static int version_check(void)
 {
 	int version;
@@ -281,6 +325,10 @@ static int version_check(void)
 	}
 	if(version != DB_VERSION) {
 		printf("Updating tup database from version %i to %i. This may take a while...\n", version, DB_VERSION);
+		if(db_backup() < 0) {
+			fprintf(stderr, "tup error: Unable to backup the current database during the db version upgrade.\n");
+			return -1;
+		}
 		if(tup_db_begin() < 0)
 			return -1;
 	}
@@ -303,7 +351,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 2) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
+			printf("WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
 
 			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
 		case 2:
@@ -329,7 +377,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 3) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 3.\nThe style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.\n");
+			printf("WARNING: Tup database updated to version 3.\nThe style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.\n");
 		case 3:
 			if(sqlite3_exec(tup_db, sql_3a, NULL, NULL, &errmsg) != 0) {
 				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
@@ -338,7 +386,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 4) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
+			printf("WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
 		case 4:
 			if(sqlite3_exec(tup_db, sql_4a, NULL, NULL, &errmsg) != 0) {
 				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
@@ -352,7 +400,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 5) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
+			printf("NOTE: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
 
 		case 5:
 			if(sqlite3_exec(tup_db, sql_5a, NULL, NULL, &errmsg) != 0) {
@@ -362,7 +410,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 6) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 6.\nAnother minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.\n");
+			printf("NOTE: Tup database updated to version 6.\nAnother minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.\n");
 
 		case 6:
 			if(sqlite3_exec(tup_db, sql_6a, NULL, NULL, &errmsg) != 0) {
@@ -372,7 +420,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 7) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 7.\nThis includes a ghost_list for storing ghost ids so they can later be raptured.\n");
+			printf("NOTE: Tup database updated to version 7.\nThis includes a ghost_list for storing ghost ids so they can later be raptured.\n");
 
 		case 7:
 			if(sqlite3_exec(tup_db, sql_7a, NULL, NULL, &errmsg) != 0) {
@@ -382,7 +430,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 8) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
+			printf("NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
 
 		case 8:
 			if(sqlite3_exec(tup_db, sql_8a, NULL, NULL, &errmsg) != 0) {
@@ -392,7 +440,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 9) < 0)
 				return -1;
-			fprintf(stderr, "WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
+			printf("WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
 
 		case 9:
 			if(sqlite3_exec(tup_db, sql_9a, NULL, NULL, &errmsg) != 0) {
@@ -432,7 +480,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 10) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
+			printf("NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
 
 		case 10:
 			if(sqlite3_exec(tup_db, sql_10, NULL, NULL, &errmsg) != 0) {
@@ -442,7 +490,7 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 11) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
+			printf("NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
 
 		case 11:
 			/* First clear out any ghosts that shouldn't be there.
@@ -492,12 +540,13 @@ static int version_check(void)
 			}
 			if(tup_db_config_set_int("db_version", 12) < 0)
 				return -1;
-			fprintf(stderr, "NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
+			printf("NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
 
 			/***************************************/
 			/* Last case must fall through to here */
 			if(tup_db_commit() < 0)
 				return -1;
+			printf("Database update successful. You can remove the backup database file in the .tup/ directory if everything appears to be working.\n");
 		case DB_VERSION:
 			break;
 		default:
