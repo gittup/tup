@@ -417,7 +417,8 @@ int tup_entry_clear(void)
 	 * the whole tree. Eventually everything will be gone.
 	 *
 	 * I don't really care about performance here, since this only happens
-	 * when the monitor needs to restart.
+	 * when the monitor needs to restart or during certain database
+	 * upgrades.
 	 */
 	while((rbn = rb_first(&tup_tree)) != NULL) {
 		struct rb_node *next;

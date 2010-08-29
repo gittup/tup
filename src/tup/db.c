@@ -501,6 +501,8 @@ static int version_check(void)
 				return -1;
 			if(tup_db_commit() < 0)
 				return -1;
+			if(tup_entry_clear() < 0)
+				return -1;
 			if(tup_db_begin() < 0)
 				return -1;
 			if(sqlite3_exec(tup_db, sql_11a, NULL, NULL, &errmsg) != 0) {
