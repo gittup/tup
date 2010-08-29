@@ -13,8 +13,6 @@ update node set sym=-1 where id=blah executed even when sym is already -1?
 can we have the monitor kill the updater if a file modification is detected? or restart it?
  - also what happens if there is no monitor? will the next update work properly?
 
-unlinkat(AT_FDCWD) to do the same thing as unlink() (eg: rm -f foo.o in a badly behaving command should cause foo.o to be re-generated)?
-
 kill monitor if you ctrl-c twice? (maybe SIGHUP?) that way user has to restart it, which should catch any out of place files
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
@@ -47,8 +45,6 @@ name_list_entry - pointer to tup_entry?
 syntax: color %flags in output
 
 limit variable names: eg: 0-9a-zA-Z_-
-
-file: 'tcc' [150 in dir 3] - use dirtree?
 
 kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try to hit ctrl-c twice)
  - might have to worry about a file being written, but the notification of it doesn't reach tup
@@ -138,5 +134,4 @@ html:
   how files are deleted
   how dependencies are described/discovered
   man pages: tup command line, tup_api
-   - move config options to man page
   error messages (eg: you get this error message if...)
