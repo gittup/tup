@@ -364,9 +364,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			if(include_rules(tf, curdir, cwd, clen) < 0)
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
-			if(tf->ign) {
-				fprintf(stderr, "Warning: .gitignore already specified earlier in the Tupfile (line %i is redundant).\n", lno);
-			}
 			tf->ign = 1;
 		} else if(strncmp(line, "ifeq ", 5) == 0) {
 			char *paren;
