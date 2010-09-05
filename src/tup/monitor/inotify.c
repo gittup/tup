@@ -438,8 +438,10 @@ int stop_monitor(int restarting)
 
 	pid = monitor_get_pid();
 	if(pid < 0) {
-		if(restarting)
+		if(restarting) {
+			printf("Restarting the monitor.\n");
 			return 0;
+		}
 		printf("No monitor process to kill (pid < 0)\n");
 		return -1;
 	}
