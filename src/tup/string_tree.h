@@ -19,4 +19,10 @@ static inline void string_tree_rm(struct rb_root *root, struct string_tree *st)
 	rb_erase(&st->rbn, root);
 }
 
+/* _add is like _insert, but also malloc()s and copies 's' into 'st->s'. _free
+ * just free()s st->s and calls _rm.
+ */
+int string_tree_add(struct rb_root *root, struct string_tree *st, const char *s);
+void string_tree_free(struct rb_root *root, struct string_tree *st);
+
 #endif

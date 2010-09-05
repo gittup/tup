@@ -1,5 +1,6 @@
 #include "string_tree.h"
 #include <string.h>
+#include <stdlib.h>
 
 struct string_tree *string_tree_search(struct rb_root *root, const char *s,
 				       int n)
@@ -78,4 +79,29 @@ int string_tree_insert(struct rb_root *root, struct string_tree *data)
 	rb_insert_color(&data->rbn, root);
 
 	return 0;
+}
+
+int string_tree_add(struct rb_root *root, struct string_tree *st, const char *s)
+{
+	st->len = strlen(s);
+	st->s = malloc(st->len + 1);
+	if(!st->s) {
+		perror("malloc");
+		return -1;
+	}
+
+	memcpy(st->s, s, st->len);
+	st->s[st->len] = 0;
+
+	if(string_tree_insert(root, st) < 0) {
+		free(st->s);
+		return -1;
+	}
+	return 0;
+}
+
+void string_tree_free(struct rb_root *root, struct string_tree *st)
+{
+	string_tree_rm(root, st);
+	free(st->s);
 }

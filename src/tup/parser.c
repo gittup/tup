@@ -938,13 +938,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		}
 
 		br->command_len = cur_br->command_len;
-		br->st.s = strdup(p);
-		if(!br->st.s) {
-			perror("strdup");
-			goto err_cleanup_br;
-		}
-		br->st.len = strlen(br->st.s);
-		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
+
+		if(string_tree_add(&tf->bang_tree, &br->st, p) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
@@ -1007,13 +1002,8 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		if(set_br_extra_outputs(br) < 0)
 			goto err_cleanup_br;
 		br->value = alloc_value;
-		br->st.s = strdup(p);
-		if(!br->st.s) {
-			perror("strdup");
-			goto err_cleanup_br;
-		}
-		br->st.len = strlen(br->st.s);
-		if(string_tree_insert(&tf->bang_tree, &br->st) < 0) {
+
+		if(string_tree_add(&tf->bang_tree, &br->st, p) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
@@ -1073,13 +1063,8 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		}
 		INIT_LIST_HEAD(&ch->src_chain_list);
 		INIT_LIST_HEAD(&ch->banglist);
-		ch->st.s = strdup(p);
-		if(!ch->st.s) {
-			perror("strdup");
-			return -1;
-		}
-		ch->st.len = strlen(ch->st.s);
-		if(string_tree_insert(&tf->chain_tree, &ch->st) < 0) {
+
+		if(string_tree_add(&tf->chain_tree, &ch->st, p) < 0) {
 			fprintf(stderr, "Error inserting *-chain into tree\n");
 			return -1;
 		}
@@ -1226,8 +1211,9 @@ static void free_bang_tree(struct rb_root *root)
 	while((rbn = rb_first(root)) != NULL) {
 		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
 		struct bang_rule *br = container_of(st, struct bang_rule, st);
-		rb_erase(rbn, root);
-		free(st->s);
+
+		string_tree_free(root, st);
+
 		if(br->value) {
 			/* For regular macros */
 			free(br->value);
@@ -1251,8 +1237,7 @@ static void free_chain_tree(struct rb_root *root)
 		struct chain *ch = container_of(st, struct chain, st);
 		struct src_chain *sc;
 
-		rb_erase(rbn, root);
-		free(st->s);
+		string_tree_free(root, st);
 
 		while(!list_empty(&ch->src_chain_list)) {
 			sc = list_entry(ch->src_chain_list.next, struct src_chain, list);
