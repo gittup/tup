@@ -1,4 +1,4 @@
-.TH "tup" "1" "2009/11/29" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2010/09/07" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -23,6 +23,21 @@ Creates a '.tup' directory in the current directory and initialize the tup datab
 .TP
 .B upd
 Updates the project based on the dependency graph and the current state of the filesystem. This is what you run every time you make changes to your software to bring everything up-to-date. You can run this anywhere in the tup hierarchy, and it will always update everything. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
+.RS
+.TP
+.B -jN
+Temporarily override the num_jobs configuration option to 'N'. This will run up to N jobs in parallel, subject to the constraints of the DAG. Eg: 'tup upd -j2' will run up to two jobs in parallel, whereas 'tup upd' will run up to num_jobs in parallel. See the config secondary command below.
+.TP
+.B -k
+.PD 0
+.TP
+.B --keep-going
+.PD
+Temporarily override the keep_going configuration option to '1'. See the config secondary command below.
+.TP
+.B --no-keep-going
+Temporarily override the keep_going configuration option to '0'. See the config secondary command below.
+.RE
 .SH "SECONDARY COMMANDS"
 These commands are used to modify the behavior of tup or look at its internals. You probably won't need these very often.
 .TP
@@ -159,7 +174,7 @@ Translate the file on the left to the file on the right by substituting any @VAR
 .TP
 .B var := value
 .PD 1
-Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment.
+Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file.
 .TP
 .B var += value
 Append "value" to the end of the current value of "var". If "var" has not been set, this is equivalent to a regular '=' statement. If "var" already has a value, a space is appended to the $-variable before the new value is appended.
@@ -219,6 +234,9 @@ In this example, if CONFIG_FOO is set to 'y', then the foo.c file will be includ
 The @-variables can be used similar to $-variables, with the following distinctions: 1) @-variables are read-only in Tupfiles, and 2) @-variables are in the DAG, which means reading from them creates a dependency from the @-variable to the Tupfile. Therefore any Tupfile that reads @(FOO) like the above example will be reparsed if the value of CONFIG_FOO in tup.config changes.
 .P
 The reason for prefixing with "CONFIG_" in the tup.config file is to maintain compatibility with kconfig, which can be used to generate this file.
+.TP
+.B @(TUP_PLATFORM)
+TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", or "macosx".
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf
