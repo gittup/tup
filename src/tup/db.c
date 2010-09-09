@@ -12,6 +12,7 @@
 #include "graph.h"
 #include "version.h"
 #include "platform.h"
+#include "monitor.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -325,6 +326,20 @@ static int version_check(void)
 	}
 	if(version != DB_VERSION) {
 		printf("Updating tup database from version %i to %i. This may take a while...\n", version, DB_VERSION);
+		if(monitor_supported() == 0) {
+			/* Monitor is supported (funky return value is because
+			 * it can be returned by main).
+			 *
+			 * Also pass in TUP_MONITOR_SAFE_SHUTDOWN to
+			 * stop_monitor() so we don't get an error if there
+			 * isn't actually a monitor running. Note that we don't
+			 * actually restart the monitor for the user.
+			 */
+			if(stop_monitor(TUP_MONITOR_SAFE_SHUTDOWN) < 0) {
+				fprintf(stderr, "tup error: Unable to stop the monitor during the db version upgrade.\n");
+				return -1;
+			}
+		}
 		if(db_backup() < 0) {
 			fprintf(stderr, "tup error: Unable to backup the current database during the db version upgrade.\n");
 			return -1;

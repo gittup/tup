@@ -12,6 +12,7 @@ int monitor_get_pid(int restarting);
 enum {
 	TUP_MONITOR_SHUTDOWN=0,
 	TUP_MONITOR_RESTARTING=1,
+	TUP_MONITOR_SAFE_SHUTDOWN=2,
 };
 
 #endif
