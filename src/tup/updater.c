@@ -125,7 +125,14 @@ int updater(int argc, char **argv, int phase)
 	}
 
 	if(do_scan) {
-		if(monitor_get_pid() < 0) {
+		int rc;
+
+		rc = monitor_get_pid(0);
+		if(rc < 0) {
+			fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
+			return -1;
+		}
+		if(rc == 0) {
 			struct timeval t1, t2;
 			tup_main_progress("Scanning filesystem...");
 			fflush(stdout);

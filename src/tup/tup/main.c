@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		printf("tup %s\n", tup_version());
 		return 0;
 	} else if(strcmp(argv[1], "stop") == 0) {
-		return stop_monitor(0);
+		return stop_monitor(TUP_MONITOR_SHUTDOWN);
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;
-		pid = monitor_get_pid();
+		pid = monitor_get_pid(0);
 		if(pid > 0) {
 			fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
 			return -1;

@@ -18,7 +18,8 @@ int stop_monitor(int restarting)
 	return -1;
 }
 
-int monitor_get_pid(void)
+int monitor_get_pid(int restarting)
 {
+	if(restarting) {}
 	return -1;
 }

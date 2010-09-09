@@ -7,6 +7,11 @@
 int monitor_supported(void);
 int monitor(int argc, char **argv);
 int stop_monitor(int restarting);
-int monitor_get_pid(void);
+int monitor_get_pid(int restarting);
+
+enum {
+	TUP_MONITOR_SHUTDOWN=0,
+	TUP_MONITOR_RESTARTING=1,
+};
 
 #endif

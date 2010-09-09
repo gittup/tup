@@ -110,7 +110,7 @@ int monitor(int argc, char **argv)
 	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 
-	if(stop_monitor(1) < 0) {
+	if(stop_monitor(TUP_MONITOR_RESTARTING) < 0) {
 		fprintf(stderr, "Error: Unable to stop the current monitor process.\n");
 		return -1;
 	}
@@ -267,11 +267,11 @@ static int monitor_set_pid(int pid)
 	return 0;
 }
 
-int monitor_get_pid(void)
+int monitor_get_pid(int restarting)
 {
 	struct buf b;
 	int fd;
-	int rc = -1;
+	int rc = 0;
 
 	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDWR, 0666);
 	if(fd < 0) {
@@ -279,7 +279,7 @@ int monitor_get_pid(void)
 			perror(MONITOR_PID_FILE);
 			return -1;
 		}
-		return -1;
+		return 0;
 	}
 	if(tup_flock(fd) < 0) {
 		return -1;
@@ -290,6 +290,11 @@ int monitor_get_pid(void)
 
 	if(b.len > 0) {
 		rc = strtol(b.s, NULL, 0);
+		/* Differentiate between a monitor actually not running and an
+		 * error in getting the monitor pid.
+		 */
+		if(rc == -1)
+			rc = 0;
 	}
 	free(b.s);
 out:
@@ -305,8 +310,16 @@ out:
 		errno = 0;
 		if(getpriority(PRIO_PROCESS, rc) == -1 && errno == ESRCH) {
 			printf("Monitor pid %i doesn't exist anymore.\n", rc);
+			if(restarting == TUP_MONITOR_RESTARTING) {
+				/* If we are actually restarting the monitor
+				 * make sure we let them know that the 'pid
+				 * doesn't exist anymore' message isn't just
+				 * an error message.
+				 */
+				printf("Restarting the monitor.\n");
+			}
 			monitor_set_pid(-1);
-			rc = -1;
+			rc = 0;
 		}
 	}
 	return rc;
@@ -436,16 +449,23 @@ int stop_monitor(int restarting)
 		return -1;
 	}
 
-	pid = monitor_get_pid();
+	pid = monitor_get_pid(restarting);
 	if(pid < 0) {
-		if(restarting) {
-			printf("Restarting the monitor.\n");
-			return 0;
-		}
-		printf("No monitor process to kill (pid < 0)\n");
+		fprintf(stderr, "tup error: Unable to get the current monitor pid in order to shut it down.\n");
 		return -1;
 	}
-	if(restarting)
+	if(pid == 0) {
+		if(restarting == TUP_MONITOR_SHUTDOWN) {
+			/* This case returns an error so we can tell in the
+			 * test code if the monitor isn't actually running when
+			 * it should be.
+			 */
+			printf("No monitor process to kill (pid < 0)\n");
+			return -1;
+		}
+		return 0;
+	}
+	if(restarting == TUP_MONITOR_RESTARTING)
 		printf("Restarting the monitor.\n");
 	else
 		printf("Shutting down the monitor.\n");
