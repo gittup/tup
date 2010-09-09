@@ -213,8 +213,12 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
 		return -1;
 	if(!tent) {
-		fprintf(stderr, "[31mError: Trying to delete file '%s', which isn't in .tup/db[0m\n", file);
-		return -1;
+		/* If we are trying to delete a file that isn't in tup, that's
+		 * probably ok. This can happen if we create and delete a file
+		 * real quick before the monitor can create the tup entry
+		 * (t7037).
+		 */
+		return 0;
 	}
 	if(check_rm_tup_config(tent) < 0)
 		return -1;

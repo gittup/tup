@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
@@ -20,9 +21,16 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 	tupid_t newdt;
 
 	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		fprintf(stderr, "tup monitor error: fstatat failed\n");
-		perror(file);
-		return -1;
+		if(errno == ENOENT) {
+			/* The file may have been created and then removed before
+			 * we got here. Assume the file is now gone (t7037).
+			 */
+			return 0;
+		} else {
+			fprintf(stderr, "tup monitor error: fstatat failed\n");
+			perror(file);
+			return -1;
+		}
 	}
 
 	if(S_ISREG(buf.st_mode)) {
