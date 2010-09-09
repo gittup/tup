@@ -21,5 +21,8 @@ int stop_monitor(int restarting)
 int monitor_get_pid(int restarting)
 {
 	if(restarting) {}
-	return -1;
+	/* Always return 0 to say that we successfully don't have a monitor
+	 * running.
+	 */
+	return 0;
 }
