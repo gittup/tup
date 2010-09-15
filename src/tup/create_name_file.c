@@ -275,8 +275,19 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.
 		 */
-		if(modified == 1)
-			fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
+		if(modified == 1) {
+			struct tup_entry *tent;
+
+			tent = tup_entry_find(tupid);
+			if(!tent) {
+				fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
+			} else {
+				fprintf(stderr, "tup warning: generated file '");
+				print_tup_entry(stderr, tent->parent);
+				fprintf(stderr, "%s' was deleted outside of tup. This file may be re-created on the next update.\n", tent->name.s);
+			}
+		}
+
 		/* If we're not forcing the deletion, just return here (the
 		 * node won't actually be removed from tup). The fact that the
 		 * command is in modify will take care of dependencies, and

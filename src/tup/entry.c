@@ -171,13 +171,13 @@ struct tup_entry *tup_entry_find(tupid_t tupid)
 	return container_of(tnode, struct tup_entry, tnode);
 }
 
-void print_tup_entry(struct tup_entry *tent)
+void print_tup_entry(FILE *f, struct tup_entry *tent)
 {
-	/* Skip empty entries, and skip '.' here (dirt->parent == NULL) */
+	/* Skip empty entries, and skip '.' here (tent->parent == NULL) */
 	if(!tent || !tent->parent)
 		return;
-	print_tup_entry(tent->parent);
-	printf("%s/", tent->name.s);
+	print_tup_entry(f, tent->parent);
+	fprintf(f, "%s/", tent->name.s);
 }
 
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)

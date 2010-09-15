@@ -929,7 +929,7 @@ static int dump_dircache(void)
 			rc = -1;
 		} else {
 			printf("  wd %lli: [%lli] ", dc->wd_node.tupid, dc->dt_node.tupid);
-			print_tup_entry(tent);
+			print_tup_entry(stdout, tent);
 			printf("\n");
 		}
 	}

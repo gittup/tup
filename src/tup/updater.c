@@ -1153,7 +1153,7 @@ static void show_progress(int sum, int tot, struct node *n)
 			color = color_type(n->tent->type);
 			printf("[%s%s%.*s%s%.*s] ", color, color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 			if(n->tent && n->tent->parent) {
-				print_tup_entry(n->tent->parent);
+				print_tup_entry(stdout, n->tent->parent);
 			}
 			printf("%s%s%.*s%s\n", color, color_append_normal(), name_sz, name, color_end());
 		} else {
