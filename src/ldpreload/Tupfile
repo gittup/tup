@@ -1,4 +1,4 @@
 include_rules
 
 CFLAGS += $(FPIC)
-: foreach *.c |> !cc |> %B.o
+: foreach *.c |> !cc |>

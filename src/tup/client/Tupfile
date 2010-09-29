@@ -1,2 +1,2 @@
 include_rules
-: foreach *.c |> !cc |> %B.o
+: foreach *.c |> !cc |>

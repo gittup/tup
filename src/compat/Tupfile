@@ -15,4 +15,4 @@ srcs += dir_mutex.c
 srcs += mkdirat.c
 srcs += readlinkat.c
 endif
-: foreach $(srcs) |> !cc |> %B.o
+: foreach $(srcs) |> !cc |>

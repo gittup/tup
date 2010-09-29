@@ -6,4 +6,4 @@ else
 	srcs += colors.c
 endif
 
-: $(srcs) |> !cc |> %B.o
+: $(srcs) |> !cc |>
