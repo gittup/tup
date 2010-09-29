@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <time.h>
 #include <errno.h>
 #include <unistd.h>
 #include "tup/config.h"
@@ -720,7 +719,6 @@ static int fake_mtime(int argc, char **argv)
 
 static int flush(void)
 {
-	struct timespec ts = {0, 10000000};
 	printf("Flush\n");
 	while(tup_db_config_get_int(AUTOUPDATE_PID) > 0) {
 		printf(" -- flush (try again)\n");
@@ -729,7 +727,7 @@ static int flush(void)
 		 * release our lock and wait a bit.
 		 */
 		tup_cleanup();
-		nanosleep(&ts, NULL);
+		usleep(10000);
 		tup_init();
 	}
 	printf("Flushed.\n");

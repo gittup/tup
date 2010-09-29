@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <time.h>
 
 /* So...the tri-lock business. There are three locks. They lock one thing - the
  * database. It also lets the monitor ignore the file accesses while an update
@@ -158,8 +157,6 @@ int tup_wait_flock(int fd)
 	struct flock fl;
 
 	while(1) {
-		struct timespec ts = {0, 10000000};
-
 		fl.l_type = F_WRLCK;
 		fl.l_whence = SEEK_SET;
 		fl.l_start = 0;
@@ -172,7 +169,7 @@ int tup_wait_flock(int fd)
 
 		if(fl.l_type == F_WRLCK)
 			break;
-		nanosleep(&ts, NULL);
+		usleep(10000);
 	}
 	return 0;
 }
