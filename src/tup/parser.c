@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-#define _ATFILE_SOURCE
 #include "parser.h"
 #include "linux/list.h"
 #include "flist.h"
