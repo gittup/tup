@@ -1,4 +1,5 @@
 #include "debug.h"
+#include <stdio.h>
 
 static int debugging = 0;
 static const char *dstring = NULL;
