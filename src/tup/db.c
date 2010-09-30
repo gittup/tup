@@ -19,7 +19,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/socket.h>
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 12
