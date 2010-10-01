@@ -1,9 +1,9 @@
-#include "server.h"
-#include "file.h"
-#include "debug.h"
-#include "getexecwd.h"
-#include "fileio.h"
-#include "db.h"
+#include "tup/server.h"
+#include "tup/file.h"
+#include "tup/debug.h"
+#include "tup/getexecwd.h"
+#include "tup/fileio.h"
+#include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

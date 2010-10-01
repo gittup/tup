@@ -32,7 +32,7 @@ mkdir -p build
 mkdir -p build/ldpreload
 echo "  cd build"
 cd build
-for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/colors/colors.c ../src/tup/lock/fcntl.c $plat_files; do
+for i in ../src/linux/*.c ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/colors/colors.c ../src/tup/lock/fcntl.c ../src/tup/server/socketpair.c $plat_files; do
 	echo "  bootstrap CC (unoptimized) $i"
 	gcc -c $i -I../src $plat_cflags
 done

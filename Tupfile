@@ -10,6 +10,7 @@ LDFLAGS_tup-ldpreload.so += -ldl
 srcs = src/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/lock/*.o
+srcs += src/tup/server/*.o
 srcs += src/tup/colors/*.o
 srcs += src/linux/*.o
 srcs += src/sqlite3/*.o
