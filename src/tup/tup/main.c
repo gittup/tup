@@ -18,6 +18,10 @@
 #include "tup/path.h"
 #include "tup/entry.h"
 
+#ifdef _WIN32
+#define mkdir(a,b) mkdir(a)
+#endif
+
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent, int style);
 static int graph(int argc, char **argv);
