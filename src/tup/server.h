@@ -13,11 +13,14 @@ struct server {
 	struct file_info finfo;
 	char file1[PATH_MAX];
 	char file2[PATH_MAX];
+	int exited;
+	int signalled;
+	int exit_status;
+	int exit_sig;
 };
 
 int server_init(void);
-void server_setenv(struct server *s, int vardict_fd);
-int start_server(struct server *s);
-int stop_server(struct server *s);
+int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd);
+int server_is_dead(void);
 
 #endif

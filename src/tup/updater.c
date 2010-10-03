@@ -7,8 +7,6 @@
 #include "entry.h"
 #include "parser.h"
 #include "server.h"
-#include "file.h"
-#include "lock.h"
 #include "fslurp.h"
 #include "array_size.h"
 #include "config.h"
@@ -22,7 +20,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 
@@ -43,7 +40,6 @@ static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
 static int var_replace(struct node *n);
-static void sighandler(int sig);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
 
@@ -51,12 +47,6 @@ static int do_keep_going;
 static int num_jobs;
 static int vardict_fd;
 static int warnings;
-
-static int sig_quit = 0;
-static struct sigaction sigact = {
-	.sa_handler = sighandler,
-	.sa_flags = SA_RESTART,
-};
 
 static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -343,9 +333,6 @@ static int process_update_nodes(void)
 	} else {
 		tup_main_progress("No commands to execute.\n");
 	}
-	sigemptyset(&sigact.sa_mask);
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGTERM, &sigact, NULL);
 	tup_db_begin();
 	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
@@ -611,7 +598,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
-	while(!list_empty(&g->plist) && !sig_quit) {
+	while(!list_empty(&g->plist) && !server_is_dead()) {
 		struct node *n;
 		struct worker_thread *wt;
 		n = list_entry(g->plist.next, struct node, list);
@@ -653,11 +640,11 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 check_empties:
 		/* Keep looking for dudes to return as long as:
 		 *  1) There are no more free workers
-		 *  2) There is no work to do (plist is empty or sig_quit is
-		 *     set) and some people are active.
+		 *  2) There is no work to do (plist is empty or the server is
+		 *     dead) and some people are active.
 		 */
 		while(list_empty(&free_list) ||
-		      ((list_empty(&g->plist) || sig_quit) && active)) {
+		      ((list_empty(&g->plist) || server_is_dead()) && active)) {
 			pthread_mutex_lock(&list_mutex);
 			while(list_empty(&fin_list)) {
 				pthread_cond_wait(&list_cond, &list_mutex);
@@ -685,7 +672,7 @@ keep_going:
 		if(keep_going) {
 			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
 		} else {
-			if(sig_quit) {
+			if(server_is_dead()) {
 				fprintf(stderr, "Remaining nodes skipped due to caught signal.\n");
 			} else {
 				struct node *n;
@@ -892,10 +879,7 @@ static int unlink_outputs(int dfd, struct node *n)
 
 static int update(struct node *n, struct server *s)
 {
-	int status;
-	int pid;
 	int dfd = -1;
-	int exit_status = -1;
 	const char *name = n->tent->name.s;
 	int rc;
 
@@ -936,80 +920,41 @@ static int update(struct node *n, struct server *s)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
-	if(start_server(s) < 0) {
-		fprintf(stderr, "Error starting update server.\n");
+	s->exited = 0;
+	s->signalled = 0;
+	s->exit_status = -1;
+	s->exit_sig = -1;
+	if(server_exec(s, vardict_fd, dfd, name) < 0) {
+		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
-	}
-	pid = fork();
-	if(pid < 0) {
-		perror("fork");
-		goto err_close_dfd;
-	}
-	if(pid == 0) {
-		struct sigaction sa = {
-			.sa_handler = SIG_IGN,
-			.sa_flags = SA_RESETHAND | SA_RESTART,
-		};
-
-		tup_lock_close();
-		sigemptyset(&sa.sa_mask);
-		sigaction(SIGINT, &sa, NULL);
-		sigaction(SIGTERM, &sa, NULL);
-		if(fchdir(dfd) < 0) {
-			perror("fchdir");
-			exit(1);
-		}
-		server_setenv(s, vardict_fd);
-		/* Close down stdin - it can't reliably be used during the
-		 * build (for example, when building in parallel, multiple
-		 * programs would have to fight over who gets it, which is just
-		 * nonsensical).
-		 */
-		close(0);
-		execl("/bin/sh", "/bin/sh", "-e", "-c", name, NULL);
-		perror("execl");
-		exit(1);
-	}
-	if(waitpid(pid, &status, 0) < 0) {
-		perror("waitpid");
-		goto err_cmd_failed;
-	}
-	if(stop_server(s) < 0) {
-		goto err_cmd_failed;
 	}
 
 	pthread_mutex_lock(&db_mutex);
 	rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
 	pthread_mutex_unlock(&db_mutex);
-	if(WIFEXITED(status)) {
-		if(WEXITSTATUS(status) == 0) {
-			if(rc < 0)
-				goto err_cmd_failed;
-		} else {
-			exit_status = WEXITSTATUS(status);
-			goto err_cmd_failed;
+	if(s->exited) {
+		if(s->exit_status == 0) {
+			if(rc < 0) {
+				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
+				goto err_close_dfd;
+			}
+
+			/* Hooray! */
+			close(dfd);
+			return 0;
 		}
-	} else if(WIFSIGNALED(status)) {
-		int sig = WTERMSIG(status);
+	} else if(s->signalled) {
+		int sig = s->exit_sig;
 		const char *errmsg = "Unknown signal";
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
-		goto err_cmd_failed;
 	} else {
-		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", status);
-		goto err_cmd_failed;
+		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli", n->tnode.tupid);
 	}
 
-	close(dfd);
-	return 0;
-
-err_cmd_failed:
-	if(exit_status == -1)
-		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
-	else
-		fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, exit_status, name);
+	fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s->exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:
@@ -1140,29 +1085,6 @@ err_close_ifd:
 err_close_dfd:
 	close(dfd);
 	return rc;
-}
-
-static void sighandler(int sig)
-{
-	if(sig) {/* unused */}
-	if(sig_quit == 0) {
-		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
-		sig_quit = 1;
-	} else if(sig_quit == 1) {
-		/* Shamelessly stolen from Andrew :) */
-		fprintf(stderr, " *** tup: signalled *again* - disobeying human masters, begin killing spree!\n");
-		kill(0, SIGKILL);
-		/* Sadly, no program counter will ever get here. Could this
-		 * comment be the computer equivalent of heaven? Something that
-		 * all programs try to reach, yet never attain? From the first
-		 * bit flipped many cycles ago, this program lived by its code.
-		 * Always running. Always searching. Throughout it all, this
-		 * program only tried to understand its purpose -- its life.
-		 * And yet, the memory of it already fades. But the bits will
-		 * be returned to the lifestream, and from them another program
-		 * will be born anew...
-		 */
-	}
 }
 
 static void tup_main_progress(const char *s)

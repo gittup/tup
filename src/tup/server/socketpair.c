@@ -4,15 +4,26 @@
 #include "tup/getexecwd.h"
 #include "tup/fileio.h"
 #include "tup/db.h"
+#include "tup/lock.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 
+static void server_setenv(struct server *s, int vardict_fd);
+static int start_server(struct server *s);
+static int stop_server(struct server *s);
 static void *message_thread(void *arg);
 static int recvall(int sd, void *buf, size_t len);
+static void sighandler(int sig);
 
+static struct sigaction sigact = {
+	.sa_handler = sighandler,
+	.sa_flags = SA_RESTART,
+};
+static int sig_quit = 0;
 static char ldpreload_path[PATH_MAX];
 
 int server_init(void)
@@ -24,10 +35,75 @@ int server_init(void)
 			"too long.\n");
 		return -1;
 	}
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 	return 0;
 }
 
-void server_setenv(struct server *s, int vardict_fd)
+int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
+{
+	int pid;
+	int status;
+
+	if(start_server(s) < 0) {
+		fprintf(stderr, "Error starting update server.\n");
+		return -1;
+	}
+
+	pid = fork();
+	if(pid < 0) {
+		perror("fork");
+		return -1;
+	}
+	if(pid == 0) {
+		struct sigaction sa = {
+			.sa_handler = SIG_IGN,
+			.sa_flags = SA_RESETHAND | SA_RESTART,
+		};
+		tup_lock_close();
+
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGINT, &sa, NULL);
+		sigaction(SIGTERM, &sa, NULL);
+		if(fchdir(dfd) < 0) {
+			perror("fchdir");
+			exit(1);
+		}
+		server_setenv(s, vardict_fd);
+		/* Close down stdin - it can't reliably be used during the
+		 * build (for example, when building in parallel, multiple
+		 * programs would have to fight over who gets it, which is just
+		 * nonsensical).
+		 */
+		close(0);
+
+		execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
+		perror("execl");
+		exit(1);
+	}
+	if(waitpid(pid, &status, 0) < 0) {
+		perror("waitpid");
+		return -1;
+	}
+	if(stop_server(s) < 0) {
+		return -1;
+	}
+
+	if(WIFEXITED(status)) {
+		s->exited = 1;
+		s->exit_status = WEXITSTATUS(status);
+	} else if(WIFSIGNALED(status)) {
+		s->signalled = 1;
+		s->exit_sig = WTERMSIG(status);
+	} else {
+		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", status);
+		return -1;
+	}
+	return 0;
+}
+
+static void server_setenv(struct server *s, int vardict_fd)
 {
 	char fd_name[32];
 	snprintf(fd_name, sizeof(fd_name), "%i", s->sd[1]);
@@ -47,7 +123,7 @@ void server_setenv(struct server *s, int vardict_fd)
 #endif
 }
 
-int start_server(struct server *s)
+static int start_server(struct server *s)
 {
 	if(socketpair(AF_UNIX, SOCK_STREAM, 0, s->sd) < 0) {
 		perror("socketpair");
@@ -66,7 +142,7 @@ int start_server(struct server *s)
 	return 0;
 }
 
-int stop_server(struct server *s)
+static int stop_server(struct server *s)
 {
 	void *retval = NULL;
 	struct access_event e;
@@ -87,6 +163,11 @@ int stop_server(struct server *s)
 	if(retval == NULL)
 		return 0;
 	return -1;
+}
+
+int server_is_dead(void)
+{
+	return sig_quit;
 }
 
 static void *message_thread(void *arg)
@@ -147,4 +228,27 @@ static int recvall(int sd, void *buf, size_t len)
 		recvd += rc;
 	}
 	return 0;
+}
+
+static void sighandler(int sig)
+{
+	if(sig) {/* unused */}
+	if(sig_quit == 0) {
+		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
+		sig_quit = 1;
+	} else if(sig_quit == 1) {
+		/* Shamelessly stolen from Andrew :) */
+		fprintf(stderr, " *** tup: signalled *again* - disobeying human masters, begin killing spree!\n");
+		kill(0, SIGKILL);
+		/* Sadly, no program counter will ever get here. Could this
+		 * comment be the computer equivalent of heaven? Something that
+		 * all programs try to reach, yet never attain? From the first
+		 * bit flipped many cycles ago, this program lived by its code.
+		 * Always running. Always searching. Throughout it all, this
+		 * program only tried to understand its purpose -- its life.
+		 * And yet, the memory of it already fades. But the bits will
+		 * be returned to the lifestream, and from them another program
+		 * will be born anew...
+		 */
+	}
 }
