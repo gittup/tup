@@ -30,5 +30,4 @@ CFLAGS += -I$(TUP_CWD)/src
 FPIC = -fpic
 SHARED = -shared
 TUP_MONITOR = null
-TUP_LOCK = fcntl
 include @(TUP_PLATFORM).tup
