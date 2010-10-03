@@ -24,7 +24,6 @@
 #include <pthread.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 
 #define MAX_JOBS 65535
@@ -80,16 +79,30 @@ static const char *signal_err[] = {
 	"Termination signal", /* 15 */
 };
 
+/* The basic gist of these guys is they start out on the free_list, then they
+ * move to the active_list once they get setup with 'n' pointing to the node
+ * they should process, and their cond variable is signalled. Once they are
+ * done processing, they set retn to n and rc to the return code (ie: 0 for
+ * success, or an error code) for that node. They then move themselves over to
+ * the fin_list and signal the list_cond so that execute_graph() knows this
+ * work is done.
+ */
 struct worker_thread {
+	struct list_head list;
 	pthread_t pid;
-	int sock;        /* 1 sock and no shoes? What a life... */
 	int lockfd;      /* lock fd for .tup/jobXXXX/.tuplock */
 	struct graph *g; /* This should only be used in create_work() and todo_work */
-};
 
-struct work_rc {
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+
+	pthread_mutex_t *list_mutex;
+	pthread_cond_t *list_cond;
+	struct list_head *fin_list;
 	struct node *n;
+	struct node *retn;
 	int rc;
+	int quit;
 };
 
 int updater(int argc, char **argv, int phase)
@@ -519,14 +532,22 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	struct node *root;
 	struct worker_thread *workers;
 	int num_processed = 0;
-	int socks[2];
 	int rc = -1;
 	int x;
 	int active = 0;
 	int tupfd;
+	pthread_mutex_t list_mutex;
+	pthread_cond_t list_cond;
+	LIST_HEAD(active_list);
+	LIST_HEAD(fin_list);
+	LIST_HEAD(free_list);
 
-	if(socketpair(AF_UNIX, SOCK_DGRAM, 0, socks) < 0) {
-		perror("socketpair");
+	if(pthread_mutex_init(&list_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -2;
+	}
+	if(pthread_cond_init(&list_cond, NULL) != 0) {
+		perror("pthread_cond_init");
 		return -2;
 	}
 
@@ -544,7 +565,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	for(x=0; x<jobs; x++) {
 		char lockname[] = "jobXXXX/.tuplock";
 		workers[x].g = g;
-		workers[x].sock = socks[1];
 		snprintf(lockname+3, 5, "%04x", x);
 		lockname[7] = 0;
 		if(mkdirat(tupfd, lockname, 0777) < 0) {
@@ -559,6 +579,25 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			perror(lockname);
 			return -2;
 		}
+
+		if(pthread_mutex_init(&workers[x].lock, NULL) != 0) {
+			perror("pthread_mutex_init");
+			return -2;
+		}
+		if(pthread_cond_init(&workers[x].cond, NULL) != 0) {
+			perror("pthread_cond_init");
+			return -2;
+		}
+
+		workers[x].list_mutex = &list_mutex;
+		workers[x].list_cond = &list_cond;
+		workers[x].fin_list = &fin_list;
+		workers[x].n = NULL;
+		workers[x].retn = NULL;
+		workers[x].rc = -1;
+		workers[x].quit = 0;
+		list_add(&workers[x].list, &free_list);
+
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
 			perror("pthread_create");
 			return -2;
@@ -574,6 +613,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 
 	while(!list_empty(&g->plist) && !sig_quit) {
 		struct node *n;
+		struct worker_thread *wt;
 		n = list_entry(g->plist.next, struct node, list);
 		DEBUGP("cur node: %lli [%i]\n", n->tnode.tupid, n->incoming_count);
 		if(n->incoming_count) {
@@ -598,43 +638,46 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		}
 		list_del(&n->list);
 		active++;
-		if(send(socks[0], &n, sizeof(n), 0) != sizeof(n)) {
-			perror("send");
-			return -2;
-		}
+
+		wt = list_entry(free_list.next, struct worker_thread, list);
+		pthread_mutex_lock(&list_mutex);
+		list_move(&wt->list, &active_list);
+		pthread_mutex_unlock(&list_mutex);
+
+		pthread_mutex_lock(&wt->lock);
+		wt->n = n;
+		wt->rc = -1;
+		pthread_cond_signal(&wt->cond);
+		pthread_mutex_unlock(&wt->lock);
 
 check_empties:
 		/* Keep looking for dudes to return as long as:
 		 *  1) There are no more free workers
-		 *  2) There is no work to do (plist is empty or sigquit is
+		 *  2) There is no work to do (plist is empty or sig_quit is
 		 *     set) and some people are active.
 		 */
-		while(active == jobs ||
+		while(list_empty(&free_list) ||
 		      ((list_empty(&g->plist) || sig_quit) && active)) {
-			int ret;
-			struct work_rc wrc;
-
-			/* recv() might get EINTR if we ctrl-c or kill tup */
-			do {
-				ret = recv(socks[0], &wrc, sizeof(wrc), 0);
-				if(ret == sizeof(wrc))
-					break;
-				if(ret < 0 && errno != EINTR) {
-					perror("recv");
-					return -2;
-				}
-			} while(1);
-
+			pthread_mutex_lock(&list_mutex);
+			while(list_empty(&fin_list)) {
+				pthread_cond_wait(&list_cond, &list_mutex);
+			}
+			wt = list_entry(fin_list.next, struct worker_thread, list);
+			n = wt->retn;
+			wt->retn = NULL;
+			list_move(&wt->list, &free_list);
+			pthread_mutex_unlock(&list_mutex);
 			active--;
-			if(wrc.rc < 0) {
+
+			if(wt->rc < 0) {
 				if(keep_going)
 					goto keep_going;
 				goto out;
 			}
-			pop_node(g, wrc.n);
+			pop_node(g, n);
 
 keep_going:
-			remove_node(g, wrc.n);
+			remove_node(g, n);
 		}
 	}
 	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
@@ -663,17 +706,45 @@ keep_going:
 	rc = 0;
 out:
 	for(x=0; x<jobs; x++) {
-		struct node *n = NULL;
-		send(socks[0], &n, sizeof(n), 0);
+		pthread_mutex_lock(&workers[x].lock);
+		workers[x].quit = 1;
+		pthread_cond_signal(&workers[x].cond);
+		pthread_mutex_unlock(&workers[x].lock);
 	}
 	for(x=0; x<jobs; x++) {
 		pthread_join(workers[x].pid, NULL);
 		close(workers[x].lockfd);
+		pthread_cond_destroy(&workers[x].cond);
+		pthread_mutex_destroy(&workers[x].lock);
 	}
 	free(workers); /* Viva la revolucion! */
-	close(socks[0]);
-	close(socks[1]);
+	pthread_mutex_destroy(&list_mutex);
+	pthread_cond_destroy(&list_cond);
 	return rc;
+}
+
+static struct node *worker_wait(struct worker_thread *wt)
+{
+	pthread_mutex_lock(&wt->lock);
+	while(wt->n == NULL && wt->quit == 0) {
+		pthread_cond_wait(&wt->cond, &wt->lock);
+	}
+	pthread_mutex_unlock(&wt->lock);
+	if(wt->quit)
+		return (void*)-1;
+	return wt->n;
+}
+
+static void worker_ret(struct worker_thread *wt, int rc)
+{
+	wt->rc = rc;
+	wt->retn = wt->n;
+	wt->n = NULL;
+
+	pthread_mutex_lock(wt->list_mutex);
+	list_move(&wt->list, wt->fin_list);
+	pthread_cond_signal(wt->list_cond);
+	pthread_mutex_unlock(wt->list_mutex);
 }
 
 static void *create_work(void *arg)
@@ -682,11 +753,11 @@ static void *create_work(void *arg)
 	struct graph *g = wt->g;
 	struct node *n;
 
-	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
-		struct work_rc wrc;
+	while(1) {
 		int rc = 0;
 
-		if(n == NULL)
+		n = worker_wait(wt);
+		if(n == (void*)-1)
 			break;
 
 		if(n->tent->type == TUP_NODE_DIR) {
@@ -708,12 +779,7 @@ static void *create_work(void *arg)
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)
 			rc = -1;
 
-		wrc.rc = rc;
-		wrc.n = n;
-		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
-			perror("write");
-			return NULL;
-		}
+		worker_ret(wt, rc);
 	}
 	return NULL;
 }
@@ -731,12 +797,12 @@ static void *update_work(void *arg)
 	}
 	s->lockfd = wt->lockfd;
 
-	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
+	while(1) {
 		struct edge *e;
 		int rc = 0;
-		struct work_rc wrc;
 
-		if(n == NULL)
+		n = worker_wait(wt);
+		if(n == (void*)-1)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
@@ -782,12 +848,7 @@ static void *update_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		}
 
-		wrc.rc = rc;
-		wrc.n = n;
-		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
-			perror("write");
-			break;
-		}
+		worker_ret(wt, rc);
 	}
 	free(s);
 	return NULL;
@@ -799,21 +860,15 @@ static void *todo_work(void *arg)
 	struct graph *g = wt->g;
 	struct node *n;
 
-	while(recv(wt->sock, &n, sizeof(n), 0) == sizeof(n)) {
-		struct work_rc wrc;
-
-		if(n == NULL)
+	while(1) {
+		n = worker_wait(wt);
+		if(n == (void*)-1)
 			break;
 
 		if(n->tent->type == g->count_flags)
 			tup_db_print(stdout, n->tnode.tupid);
 
-		wrc.rc = 0;
-		wrc.n = n;
-		if(send(wt->sock, &wrc, sizeof(wrc), 0) != sizeof(wrc)) {
-			perror("write");
-			return NULL;
-		}
+		worker_ret(wt, 0);
 	}
 	return NULL;
 }
