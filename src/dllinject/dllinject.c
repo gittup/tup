@@ -19,12 +19,7 @@
 #define __reserved
 #endif
 
-_CRTIMP int __cdecl __MINGW_NOTHROW	stricmp (const char*, const char*);
-_CRTIMP int __cdecl __MINGW_NOTHROW	strnicmp (const char*, const char*, size_t);
-_CRTIMP int __cdecl __MINGW_NOTHROW	wcsicmp (const wchar_t*, const wchar_t*);
-_CRTIMP int __cdecl __MINGW_NOTHROW	wcsnicmp (const wchar_t*, const wchar_t*, size_t);
-
-void debug_hook(const char* format, ...)
+static void debug_hook(const char* format, ...)
 {
 	char buf[256];
 	va_list ap;
