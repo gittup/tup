@@ -22,10 +22,26 @@ CFLAGS += -Wwrite-strings
 CFLAGS += -fno-common
 CFLAGS += -I$(TUP_CWD)/src
 
+# Compatibility function prototypes and include path for wrapper functions
+MINGWCFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
+MINGWCFLAGS += -I$(TUP_CWD)/src/compat/win32
+
+# _GNU_SOURCE lets us use the %lli flag correctly
+MINGWCFLAGS += -D_GNU_SOURCE
+
+# No symlinks on windows
+MINGWCFLAGS += -D'S_ISLNK(a)=0'
+MINGWCFLAGS += -Dlstat=stat
+
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
 !ar = |> ^ AR %o^ ar crs %o %f |>
 !dot = |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
+ifeq (@(TUP_MINGW),)
+!mingwcc = |> |>
+else
+!mingwcc = |> ^ MINGW32CC %f^ @(TUP_MINGW)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw
+endif
 
 FPIC = -fpic
 SHARED = -shared
