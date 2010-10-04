@@ -59,9 +59,8 @@ int pthread_mutex_init(
 	return 0;
 }
 
-int pthread_mutex_destroy(pthread_mutex_t* mutex, const pthread_mutexattr_t* attr)
+int pthread_mutex_destroy(pthread_mutex_t* mutex)
 {
-	(void) attr;
 	DeleteCriticalSection(mutex);
 	return 0;
 }
