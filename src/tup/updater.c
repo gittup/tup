@@ -48,7 +48,7 @@ static int num_jobs;
 static int vardict_fd;
 static int warnings;
 
-static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t db_mutex;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -322,6 +322,10 @@ static int process_update_nodes(void)
 	struct graph g;
 	int rc;
 
+	if(pthread_mutex_init(&db_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
+	}
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
@@ -367,6 +371,7 @@ static int process_update_nodes(void)
 		return -1;
 	if(destroy_graph(&g) < 0)
 		return -1;
+	pthread_mutex_destroy(&db_mutex);
 	return 0;
 }
 
