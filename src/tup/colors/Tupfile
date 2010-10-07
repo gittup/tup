@@ -7,3 +7,4 @@ else
 endif
 
 : $(srcs) |> !cc |>
+: no_colors.c |> !mingwcc |>

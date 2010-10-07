@@ -18,3 +18,25 @@ srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
 : src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o
+
+# TODO: Uhhh...ifneq
+ifeq (@(TUP_MINGW),)
+else
+: src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -o %o |> tup-dllinject.dll
+
+mingwsrcs = src/tup/*.omingw
+mingwsrcs += src/tup/monitor/*.omingw
+mingwsrcs += src/tup/tup/*.omingw
+mingwsrcs += src/tup/lock/*.omingw
+mingwsrcs += src/tup/server/*.omingw
+mingwsrcs += src/tup/colors/*.omingw
+mingwsrcs += src/linux/*.omingw
+mingwsrcs += src/sqlite3/*.omingw
+mingwsrcs += src/compat/*.omingw
+mingwsrcs += src/compat/win32/*.omingw
+MINGWLDFLAGS += -lws2_32
+MINGWLDFLAGS += -Wl,--wrap=open
+MINGWLDFLAGS += -Wl,--wrap=close
+MINGWLDFLAGS += -Wl,--wrap=dup
+: $(mingwsrcs) tup-dllinject.dll |> ^ MINGW32LINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
+endif

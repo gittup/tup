@@ -13,3 +13,4 @@ CFLAGS += -DSQLITE_THREADSAFE=0
 CFLAGS += -DSQLITE_OMIT_LOAD_EXTENSION
 
 : foreach *.c |> !cc |>
+: foreach *.c |> !mingwcc |>

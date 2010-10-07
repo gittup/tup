@@ -20,3 +20,10 @@ srcs += mkdirat.c
 srcs += readlinkat.c
 endif
 : foreach $(srcs) |> !cc |>
+
+mingwsrcs += dir_mutex.c
+mingwsrcs += fstatat.c
+mingwsrcs += mkdirat.c
+mingwsrcs += openat.c
+mingwsrcs += unlinkat.c
+: foreach $(mingwsrcs) |> !mingwcc |>
