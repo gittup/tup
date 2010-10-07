@@ -19,6 +19,19 @@
 #define __reserved
 #endif
 
+#ifndef NDEBUG
+#	define DEBUG_HOOK debug_hook
+
+static const char* access_type_name[] = {
+	"read",
+	"write",
+	"rename",
+	"unlink",
+	"var",
+	"symlink",
+	"ghost",
+};
+
 static void debug_hook(const char* format, ...)
 {
 	char buf[256];
@@ -28,11 +41,8 @@ static void debug_hook(const char* format, ...)
 	buf[255] = '\0';
 	OutputDebugStringA(buf);
 }
-
-#ifndef NDEBUG
-#	define DEBUG_HOOK debug_hook
 #else
-#	define DEBUG_HOOK __noop
+#	define DEBUG_HOOK(...)
 #endif
 
 typedef HFILE (WINAPI *OpenFile_t)(
@@ -1278,16 +1288,6 @@ void tup_inject_setexecdir(const char* dir)
 }
 
 /* -------------------------------------------------------------------------- */
-
-static const char* access_type_name[] = {
-	"read",
-	"write",
-	"rename",
-	"unlink",
-	"var?",
-	"symlink",
-	"ghost",
-};
 
 static SOCKET sock = INVALID_SOCKET;
 
