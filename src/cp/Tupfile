@@ -1,5 +1,2 @@
 include_rules
-ifeq (@(TUP_PLATFORM),windows)
-  : *.c |> !cc |> %B.o
-endif
-
+: *.c |> !mingwcc |>
