@@ -101,7 +101,9 @@ tup_object_no_exist()
 		exit 1
 	fi
 	while [ $# -gt 0 ]; do
-		if tup node_exists $dir "$1"; then
+		# stderr redirection is to ignore warnings about non-existant
+		# directories when checking for ghost files
+		if tup node_exists $dir "$1" 2>/dev/null; then
 			echo "*** Node \"$1\" exists in .tup/db when it shouldn't" 1>&2
 			exit 1
 		fi
