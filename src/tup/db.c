@@ -1743,7 +1743,7 @@ static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree,
 		if(tupid_tree_search(tree, sqlite3_column_int64(*stmt, 2)) != NULL) {
 			continue;
 		}
-		*p = path_sep;
+		*p = PATH_SEP;
 		p++;
 		len = sqlite3_column_int(*stmt, 0);
 		memcpy(p, sqlite3_column_text(*stmt, 1), len);

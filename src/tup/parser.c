@@ -559,7 +559,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 	}
 	p = path;
 	for(x=0; x<num_dotdots; x++) {
-		strcpy(p, ".." path_sep_str);
+		strcpy(p, ".." PATH_SEP_STR);
 		p += 3;
 	}
 	strcpy(path + num_dotdots*3, tuprules);
@@ -696,7 +696,7 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 					return -1;
 				}
 				memcpy(newcwd, cwd, clen);
-				newcwd[clen] = path_sep;
+				newcwd[clen] = PATH_SEP;
 				memcpy(newcwd+clen+1, nle->path, nle->dirlen-1);
 				newcwd[newclen] = 0;
 			}
@@ -2201,7 +2201,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 		}
 
 		memcpy(path, dir, dirlen-1);
-		path[dirlen-1] = path_sep;
+		path[dirlen-1] = PATH_SEP;
 		strcpy(path + dirlen, name);
 	} else {
 		path = strdup(name);
@@ -2469,7 +2469,7 @@ static void set_nle_base(struct name_list_entry *nle)
 	nle->baselen = 0;
 	while(nle->base > nle->path) {
 		nle->base--;
-		if(nle->base[0] == path_sep) {
+		if(nle->base[0] == PATH_SEP) {
 			nle->base++;
 			goto out;
 		}
