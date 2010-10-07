@@ -12,10 +12,7 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 		return -1;
 	}
 
-	if(pthread_mutex_lock(&dir_mutex) < 0) {
-		perror("pthread_mutex_lock");
-		return -1;
-	}
+	pthread_mutex_lock(&dir_mutex);
 
 	if(fchdir(dirfd) < 0) {
 		perror("fchdir");

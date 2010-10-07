@@ -7,10 +7,7 @@ int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
 	int rc;
 
-	if(pthread_mutex_lock(&dir_mutex) < 0) {
-		perror("pthread_mutex_lock");
-		return -1;
-	}
+	pthread_mutex_lock(&dir_mutex);
 
 	if(fchdir(dirfd) < 0) {
 		perror("fchdir");

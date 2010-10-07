@@ -9,10 +9,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	int fd;
 	mode_t mode = 0;
 
-	if(pthread_mutex_lock(&dir_mutex) < 0) {
-		perror("pthread_mutex_lock");
-		return -1;
-	}
+	pthread_mutex_lock(&dir_mutex);
 
 	if(fchdir(dirfd) < 0) {
 		perror("fchdir");
