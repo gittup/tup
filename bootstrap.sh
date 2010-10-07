@@ -6,6 +6,9 @@ plat_files=""
 plat_preloadcflags="-fpic"
 plat_preloadldflags="-shared"
 case "$os" in
+	Linux)
+	plat_files="$plat_files ../src/compat/dummy.c"
+	;;
 	SunOS)
 	plat_files="$plat_files ../src/compat/dir_mutex.c"
 	plat_files="$plat_files ../src/compat/mkdirat.c"

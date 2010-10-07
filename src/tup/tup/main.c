@@ -51,6 +51,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	if(compat_init() < 0) {
+		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
+		return -1;
+	}
+
 	if(strcmp(argv[1], "init") == 0) {
 		argc--;
 		argv++;

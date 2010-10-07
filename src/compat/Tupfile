@@ -1,6 +1,10 @@
 include_rules
 
 # Changes here need to be reflected in the bootstrap.sh file
+ifeq (@(TUP_PLATFORM),linux)
+srcs += dummy.c
+endif
+
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += dir_mutex.c
 srcs += fstatat.c
