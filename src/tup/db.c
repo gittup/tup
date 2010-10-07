@@ -225,16 +225,20 @@ int tup_db_create(int db_sync)
 	return 0;
 }
 
-static int db_backup(void)
+static int db_backup(int version)
 {
-	char backup[sizeof(TUP_DB_BACKUP_FILE)];
+	char backup[256];
 	int fd;
 	int ifd;
 	int rc;
 	char buf[1024];
 
-	memcpy(backup, TUP_DB_BACKUP_FILE, sizeof(backup));
-	fd = mkstemp(backup);
+	if(snprintf(backup, sizeof(backup), ".tup/db_backup_%i", version) >=
+	   (signed)sizeof(backup)) {
+		fprintf(stderr, "tup internal error: db backup buffer mis-sized.\n");
+		return -1;
+	}
+	fd = creat(backup, 0666);
 	if(fd < 0) {
 		perror(backup);
 		return -1;
@@ -339,7 +343,7 @@ static int version_check(void)
 				return -1;
 			}
 		}
-		if(db_backup() < 0) {
+		if(db_backup(version) < 0) {
 			fprintf(stderr, "tup error: Unable to backup the current database during the db version upgrade.\n");
 			return -1;
 		}
