@@ -34,5 +34,20 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex);
 #define pthread_mutex_lock(plock)	EnterCriticalSection(plock)
 #define pthread_mutex_unlock(plock)	LeaveCriticalSection(plock)
 
-#endif
+/* Condition variable code is from:
+ * http://www.cs.wustl.edu/~schmidt/win32-cv-1.html
+ */
+typedef struct {
+	u_int waiters_count;
+	CRITICAL_SECTION waiters_count_lock;
+	HANDLE event;
+} pthread_cond_t;
 
+typedef void pthread_condattr_t;
+
+int pthread_cond_destroy(pthread_cond_t *cond);
+int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr);
+int pthread_cond_signal(pthread_cond_t *cond);
+int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+
+#endif
