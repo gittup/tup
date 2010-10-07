@@ -8,6 +8,30 @@
 #include <sys/stat.h>
 
 static char mycwd[PATH_MAX];
+
+#ifdef _WIN32
+#include <windows.h>
+#include "dllinject/dllinject.h"
+
+int init_getexecwd(const char *argv0)
+{
+	char* slash;
+
+	(void) argv0;
+	if (GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
+		return -1;
+
+	mycwd[PATH_MAX - 1] = '\0';
+	slash = strrchr(mycwd, '\\');
+	if (slash) {
+		*slash = '\0';
+	}
+
+	tup_inject_setexecdir(mycwd);
+
+	return 0;
+}
+#else
 static int check_path(const char *path, const char *file);
 
 int init_getexecwd(const char *argv0)
@@ -67,11 +91,6 @@ out_err:
 	return rc;
 }
 
-const char *getexecwd(void)
-{
-	return mycwd;
-}
-
 static int check_path(const char *path, const char *file)
 {
 	struct stat buf;
@@ -91,4 +110,10 @@ static int check_path(const char *path, const char *file)
 out_err:
 	mycwd[0] = 0;
 	return -1;
+}
+#endif
+
+const char *getexecwd(void)
+{
+	return mycwd;
 }
