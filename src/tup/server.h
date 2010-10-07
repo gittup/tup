@@ -17,6 +17,7 @@ struct server {
 	int signalled;
 	int exit_status;
 	int exit_sig;
+	int udp_port;
 };
 
 int server_init(void);
