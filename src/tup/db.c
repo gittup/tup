@@ -989,7 +989,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR_GLOB];
-	static char s[] = "select id, name, type, sym, mtime from node where dir=? and (type=? or type=?) and name glob ?";
+	static char s[] = "select id, name, type, sym, mtime from node where dir=? and (type=? or type=?) and name glob ?" SQL_NAME_COLLATION;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i, %i, '%s'][0m\n", s, dt, TUP_NODE_FILE, TUP_NODE_GENERATED, glob);
 	if(!*stmt) {
@@ -3255,7 +3255,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_VAR_FOREACH];
-	static char s[] = "select name, value, type from var, node where node.dir=? and node.id=var.id order by name";
+	static char s[] = "select name, value, type from var, node where node.dir=? and node.id=var.id order by name" SQL_NAME_COLLATION;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, VAR_DT);
 	if(!*stmt) {
@@ -4203,7 +4203,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	tupid_t sym;
 	int type;
 	int mtime;
-	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?";
+	static char s[] = "select id, type, sym, mtime from node where dir=? and name=?" SQL_NAME_COLLATION;
 
 	*entry = NULL;
 

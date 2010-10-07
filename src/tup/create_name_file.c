@@ -623,7 +623,7 @@ skip_num_elements:
 				top++;
 			}
 			pel = list_entry(pg->path_list.next, struct path_element, list);
-			if(strncmp(top, pel->path, pel->len) != 0) {
+			if(name_cmp_n(top, pel->path, pel->len) != 0) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
 				del_pel_list(&pg->path_list);
 				return 0;
@@ -649,7 +649,7 @@ int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
 
 		if(pela->len != pelb->len)
 			return 0;
-		if(strncmp(pela->path, pelb->path, pela->len) != 0)
+		if(name_cmp_n(pela->path, pelb->path, pela->len) != 0)
 			return 0;
 
 		la = la->next;

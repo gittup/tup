@@ -1795,7 +1795,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 		pl = list_entry(inp_list.next, struct path_list, list);
 
 		if(pl->pel->len > extlen) {
-			if(strcmp(pl->pel->path + pl->pel->len - extlen, ext) == 0) {
+			if(name_cmp(pl->pel->path + pl->pel->len - extlen, ext) == 0) {
 				struct rule tmpr;
 				char output_pattern[] = "";
 				char *tinput;
@@ -2330,9 +2330,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			free(onle);
 			return -1;
 		}
-		if(strcmp(onle->path, "Tupfile") == 0 ||
-		   strcmp(onle->path, "Tuprules.tup") == 0 ||
-		   strcmp(onle->path, "tup.config") == 0) {
+		if(name_cmp(onle->path, "Tupfile") == 0 ||
+		   name_cmp(onle->path, "Tuprules.tup") == 0 ||
+		   name_cmp(onle->path, "tup.config") == 0) {
 			fprintf(stderr, "Error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
 			free(onle->path);
 			free(onle);

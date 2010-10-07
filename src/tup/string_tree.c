@@ -1,4 +1,5 @@
 #include "string_tree.h"
+#include "compat.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -12,9 +13,9 @@ struct string_tree *string_tree_search(struct rb_root *root, const char *s,
 		int result;
 
 		if(n == -1) {
-			result = strcmp(s, data->s);
+			result = name_cmp(s, data->s);
 		} else {
-			result = strncmp(s, data->s, n);
+			result = name_cmp_n(s, data->s, n);
 			if(result == 0)
 				result = n - data->len;
 		}
@@ -38,10 +39,10 @@ struct string_tree *string_tree_search2(struct rb_root *root, const char *s1,
 		struct string_tree *data = rb_entry(node, struct string_tree, rbn);
 		int result;
 
-		result = strncmp(s1, data->s, s1len);
+		result = name_cmp_n(s1, data->s, s1len);
 		if(result == 0) {
 			if(s2)
-				result = strcmp(s2, data->s + s1len);
+				result = name_cmp(s2, data->s + s1len);
 			else
 				result = s1len - data->len;
 		}
@@ -63,7 +64,7 @@ int string_tree_insert(struct rb_root *root, struct string_tree *data)
 	/* Figure out where to put new node */
 	while (*new) {
 		struct string_tree *this = rb_entry(*new, struct string_tree, rbn);
-		int result = strcmp(data->s, this->s);
+		int result = name_cmp(data->s, this->s);
 
 		parent = *new;
 		if (result < 0)
