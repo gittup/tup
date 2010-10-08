@@ -38,8 +38,6 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex);
  * http://www.cs.wustl.edu/~schmidt/win32-cv-1.html
  */
 typedef struct {
-	u_int waiters_count;
-	CRITICAL_SECTION waiters_count_lock;
 	HANDLE event;
 } pthread_cond_t;
 

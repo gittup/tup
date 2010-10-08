@@ -74,9 +74,6 @@ int pthread_mutex_destroy(pthread_mutex_t* mutex)
 int pthread_cond_init(pthread_cond_t *cv, const pthread_condattr_t *attr)
 {
 	if(attr) {}
-	cv->waiters_count = 0;
-
-	pthread_mutex_init(&cv->waiters_count_lock, NULL);
 
 	cv->event = CreateEvent(NULL,  /* no security */
 				FALSE, /* auto-reset event */
@@ -97,10 +94,6 @@ int pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *external_mutex)
 {
 	int result;
 
-	EnterCriticalSection(&cv->waiters_count_lock);
-	cv->waiters_count++;
-	LeaveCriticalSection(&cv->waiters_count_lock);
-
 	/* It's ok to release the <external_mutex> here since Win32
 	 * manual-reset events maintain state when used with
 	 * <SetEvent>.  This avoids the "lost wakeup" bug...
@@ -114,24 +107,12 @@ int pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *external_mutex)
 		return -1;
 	}
 
-	EnterCriticalSection(&cv->waiters_count_lock);
-	cv->waiters_count--;
-	LeaveCriticalSection(&cv->waiters_count_lock);
-
-	/* Reacquire the <external_mutex>. */
 	EnterCriticalSection(external_mutex);
 	return 0;
 }
 
 int pthread_cond_signal (pthread_cond_t *cv)
 {
-	int have_waiters;
-
-	EnterCriticalSection(&cv->waiters_count_lock);
-	have_waiters = cv->waiters_count > 0;
-	LeaveCriticalSection(&cv->waiters_count_lock);
-
-	if(have_waiters)
-		SetEvent(cv->event);
+	SetEvent(cv->event);
 	return 0;
 }
