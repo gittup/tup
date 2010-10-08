@@ -108,7 +108,11 @@ int pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *external_mutex)
 	LeaveCriticalSection(external_mutex);
 
 	/* Wait for the event to become signaled due to pthread_cond_signal */
-	result = WaitForSingleObject(&cv->event, INFINITE);
+	result = WaitForSingleObject(cv->event, INFINITE);
+	if(result < 0) {
+		fprintf(stderr, "tup error: WaitForSingleObject failed.\n");
+		return -1;
+	}
 
 	EnterCriticalSection(&cv->waiters_count_lock);
 	cv->waiters_count--;
