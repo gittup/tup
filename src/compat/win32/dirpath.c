@@ -73,9 +73,11 @@ out_err:
 	return -1;
 }
 
-void win32_rm_dirpath(int dfd)
+int win32_rm_dirpath(int dfd)
 {
 	struct tupid_tree *tt;
+	int rc = 0;
+
 	pthread_mutex_lock(&dir_mutex);
 	tt = tupid_tree_search(&root, dfd);
 	if(tt) {
@@ -83,8 +85,10 @@ void win32_rm_dirpath(int dfd)
 		tupid_tree_rm(&root, tt);
 		free(dp->path);
 		free(dp);
+		rc = 1;
 	}
 	pthread_mutex_unlock(&dir_mutex);
+	return rc;
 }
 
 int win32_dup(int oldfd)
