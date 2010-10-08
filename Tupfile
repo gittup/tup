@@ -40,5 +40,6 @@ MINGWLDFLAGS += -Wl,--wrap=open
 MINGWLDFLAGS += -Wl,--wrap=close
 MINGWLDFLAGS += -Wl,--wrap=dup
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
+MINGWLDFLAGS += -Wl,--wrap=__mingw_vfprintf
 : $(mingwsrcs) tup-dllinject.dll |> ^ MINGW32LINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
 endif
