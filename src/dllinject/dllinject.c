@@ -3,6 +3,7 @@
 #include "tup/access_event.h"
 
 #include <windows.h>
+#include <ntdef.h>
 #include <psapi.h>
 #include <stdio.h>
 #include <string.h>
@@ -321,7 +322,27 @@ typedef BOOL (WINAPI *CreateProcessWithTokenW_t)(
     __in        LPSTARTUPINFOW lpStartupInfo,
     __out       LPPROCESS_INFORMATION lpProcessInformation);
 
+typedef void *PIO_STATUS_BLOCK;
+typedef NTSTATUS (WINAPI *NtOpenFile_t)(
+    __out  PHANDLE FileHandle,
+    __in   ACCESS_MASK DesiredAccess,
+    __in   POBJECT_ATTRIBUTES ObjectAttributes,
+    __out  PIO_STATUS_BLOCK IoStatusBlock,
+    __in   ULONG ShareAccess,
+    __in   ULONG OpenOptions);
 
+typedef NTSTATUS (WINAPI *NtCreateFile_t)(
+    __out     PHANDLE FileHandle,
+    __in      ACCESS_MASK DesiredAccess,
+    __in      POBJECT_ATTRIBUTES ObjectAttributes,
+    __out     PIO_STATUS_BLOCK IoStatusBlock,
+    __in_opt  PLARGE_INTEGER AllocationSize,
+    __in      ULONG FileAttributes,
+    __in      ULONG ShareAccess,
+    __in      ULONG CreateDisposition,
+    __in      ULONG CreateOptions,
+    __in      PVOID EaBuffer,
+    __in      ULONG EaLength);
 
 static OpenFile_t			OpenFile_orig;
 static CreateFileA_t			CreateFileA_orig;
@@ -362,7 +383,8 @@ static CreateProcessAsUserA_t		CreateProcessAsUserA_orig;
 static CreateProcessAsUserW_t		CreateProcessAsUserW_orig;
 static CreateProcessWithLogonW_t	CreateProcessWithLogonW_orig;
 static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
-
+static NtCreateFile_t			NtCreateFile_orig;
+static NtOpenFile_t			NtOpenFile_orig;
 
 static void handle_file(const char* file, const char* file2, enum access_type at);
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
@@ -534,6 +556,125 @@ HANDLE WINAPI CreateFileTransactedW_hook(
 	}
 
 	return h;
+}
+
+static char *unicode_to_ansi(PUNICODE_STRING uni)
+{
+	int len;
+	char *name = NULL;
+
+	len = WideCharToMultiByte(CP_ACP, 0, uni->Buffer, uni->Length, 0, 0, NULL, NULL);
+	if(len > 0) {
+		name = malloc(len + 1);
+		WideCharToMultiByte(CP_ACP, 0, uni->Buffer, uni->Length, name, len, NULL, NULL);
+		name[len] = 0;
+	}
+	return name;
+}
+
+NTSTATUS WINAPI NtCreateFile_hook(
+    __out     PHANDLE FileHandle,
+    __in      ACCESS_MASK DesiredAccess,
+    __in      POBJECT_ATTRIBUTES ObjectAttributes,
+    __out     PIO_STATUS_BLOCK IoStatusBlock,
+    __in_opt  PLARGE_INTEGER AllocationSize,
+    __in      ULONG FileAttributes,
+    __in      ULONG ShareAccess,
+    __in      ULONG CreateDisposition,
+    __in      ULONG CreateOptions,
+    __in      PVOID EaBuffer,
+    __in      ULONG EaLength)
+{
+	NTSTATUS rc = NtCreateFile_orig(FileHandle,
+					DesiredAccess,
+					ObjectAttributes,
+					IoStatusBlock,
+					AllocationSize,
+					FileAttributes,
+					ShareAccess,
+					CreateDisposition,
+					CreateOptions,
+					EaBuffer,
+					EaLength);
+	char *ansi;
+
+	ansi = unicode_to_ansi(ObjectAttributes->ObjectName);
+
+	if(ansi)  {
+		const char *name = ansi;
+
+		DEBUG_HOOK("NtCreateFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, CreateOptions);
+		if(strncmp(name, "\\??\\", 4) == 0) {
+			name += 4;
+		}
+
+		if (rc != STATUS_SUCCESS) {
+			handle_file(name, NULL, ACCESS_GHOST);
+		} else if (DesiredAccess & GENERIC_WRITE) {
+			handle_file(name, NULL, ACCESS_WRITE);
+		} else {
+			handle_file(name, NULL, ACCESS_READ);
+		}
+		free(ansi);
+	}
+
+	return rc;
+}
+
+NTSTATUS WINAPI NtOpenFile_hook(
+    __out  PHANDLE FileHandle,
+    __in   ACCESS_MASK DesiredAccess,
+    __in   POBJECT_ATTRIBUTES ObjectAttributes,
+    __out  PIO_STATUS_BLOCK IoStatusBlock,
+    __in   ULONG ShareAccess,
+    __in   ULONG OpenOptions)
+{
+	NTSTATUS rc = NtOpenFile_orig(FileHandle,
+				      DesiredAccess,
+				      ObjectAttributes,
+				      IoStatusBlock,
+				      ShareAccess,
+				      OpenOptions);
+	char *ansi;
+
+	ansi = unicode_to_ansi(ObjectAttributes->ObjectName);
+
+	if(ansi) {
+		const char *name = ansi;
+
+		DEBUG_HOOK("NtOpenFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, OpenOptions);
+		if(strncmp(name, "\\??\\", 4) == 0) {
+			name += 4;
+		}
+
+		/* The ShareAccess == FILE_SHARE_DELETE check might be
+		 * specific to how cygwin handles unlink(). It is very
+		 * confusing to follow, but it doesn't ever seem to go through
+		 * the DeleteFile() route. This is the only place I've found
+		 * that seems to be able to hook those events.
+		 */
+		if(ShareAccess == FILE_SHARE_DELETE) {
+			handle_file(name, NULL, ACCESS_UNLINK);
+		} else if(OpenOptions & FILE_OPEN_FOR_BACKUP_INTENT) {
+			/* The MSVC linker seems to successfully open
+			 * "prog.ilk" for reading (when linking "prog.exe"),
+			 * even though no such file exists. This confuses tup.
+			 * It seems that this flag is used for temporary files,
+			 * so that should be safe to ignore.
+			 */
+		} else {
+			if (rc != STATUS_SUCCESS) {
+				handle_file(name, NULL, ACCESS_GHOST);
+			} else if (DesiredAccess & GENERIC_WRITE) {
+				handle_file(name, NULL, ACCESS_WRITE);
+			} else {
+				handle_file(name, NULL, ACCESS_READ);
+			}
+		}
+		free(ansi);
+	}
+
+	return rc;
 }
 
 BOOL WINAPI DeleteFileA_hook(
@@ -1156,7 +1297,7 @@ struct remote_thread_t
 
 
 typedef void (*foreach_import_t)(HMODULE, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur);
-static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_t advapi32)
+static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_t advapi32, foreach_import_t nt)
 {
 	IMAGE_DOS_HEADER* dos_header;
 	IMAGE_NT_HEADERS* nt_headers;
@@ -1187,6 +1328,12 @@ static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_
 			} else if (stricmp(dllname, "advapi32.dll") == 0) {
 				while (cur->u1.Function && orig->u1.Function) {
 					advapi32(h, orig, cur);
+					cur++;
+					orig++;
+				}
+			} else if (stricmp(dllname, "ntdll.dll") == 0) {
+				while (cur->u1.Function && orig->u1.Function) {
+					nt(h, orig, cur);
 					cur++;
 					orig++;
 				}
@@ -1276,6 +1423,12 @@ static void have_advapi32_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_
 	HOOK(CreateProcessWithTokenW);
 }
 
+static void have_nt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
+{
+	HOOK(NtCreateFile);
+	HOOK(NtOpenFile);
+}
+
 /* -------------------------------------------------------------------------- */
 
 static char execdir[MAX_PATH];
@@ -1354,6 +1507,8 @@ static int ignore_file(const char* file)
 	if (strcasestr(file, "/temp\\") != NULL)
 		return 1;
 	if (strcasestr(file, "\\PIPE\\") != NULL)
+		return 1;
+	if (strcasestr(file, "\\Device\\") != NULL)
 		return 1;
 	if (strstr(file, "$") != NULL)
 		return 1;
@@ -1523,7 +1678,7 @@ DWORD tup_inject_init(remote_thread_t* r)
 			return 1;
 		}
 
-		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import);
+		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import);
 	}
 
 	tup_inject_setexecdir(r->execdir);
