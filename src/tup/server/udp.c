@@ -7,6 +7,7 @@
 #include "tup/graph.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
+#include "compat/dir_mutex.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +61,20 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 	pi.hProcess = INVALID_HANDLE_VALUE;
 	pi.hThread = INVALID_HANDLE_VALUE;
 
+	pthread_mutex_lock(&dir_mutex);
+	/* Passing in the directory to lpCurrentDirectory is insufficient
+	 * because the command may run as './foo.exe', so we need to change to
+	 * the correct directory before calling CreateProcessA. This may just
+	 * happen to work in most cases because the unlinkat() called to remove
+	 * the outputs will usually change to the correct directory anyway.
+	 * This isn't necessarily the case if the command has no outputs, and
+	 * also wouldn't be synchronized.
+	 */
+	if(chdir(win32_get_dirpath(dfd))) {
+		fprintf(stderr, "*** Command failed to change to working directory '%s': %s\n", win32_get_dirpath(dfd), cmd);
+		pthread_mutex_unlock(&dir_mutex);
+		goto end;
+	}
 	ret = CreateProcessA(
 		NULL,
 		cmdline,
@@ -68,9 +83,10 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 		FALSE,
 		CREATE_SUSPENDED,
 		NULL,
-		win32_get_dirpath(dfd),
+		NULL,
 		&sa,
 		&pi);
+	pthread_mutex_unlock(&dir_mutex);
 
 	if(!ret) {
 		fprintf(stderr, "*** Command failed to create child process '%s': %s\n", strerror(errno), cmd);
@@ -267,4 +283,3 @@ static void *message_thread(void *arg)
 	}
 	return NULL;
 }
-
