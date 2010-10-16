@@ -1673,14 +1673,6 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	modnum /= sizeof(HMODULE);
 
-	for (i = 0; i < modnum; i++) {
-		if (!GetModuleFileNameA(modules[i], filename, sizeof(filename))) {
-			return 1;
-		}
-
-		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import);
-	}
-
 	tup_inject_setexecdir(r->execdir);
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsa_data))
@@ -1690,6 +1682,17 @@ DWORD tup_inject_init(remote_thread_t* r)
 		return 1;
 
 	s_udp_port = r->udp_port;
+
+	handle_file(filename, NULL, ACCESS_READ);
+
+	for (i = 0; i < modnum; i++) {
+		if (!GetModuleFileNameA(modules[i], filename, sizeof(filename))) {
+			return 1;
+		}
+		handle_file(filename, NULL, ACCESS_READ);
+
+		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import);
+	}
 
 	return 0;
 }
