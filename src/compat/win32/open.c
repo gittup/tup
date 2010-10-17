@@ -20,12 +20,15 @@ int __wrap_open(const char *pathname, int flags, ...)
 
 		attributes = GetFileAttributesA(pathname);
 
-		if(attributes == INVALID_FILE_ATTRIBUTES) {
-			fprintf(stderr, "Error getting file attributes for file '%s'\n", pathname);
-			return -1;
-		}
-		if(attributes & FILE_ATTRIBUTE_DIRECTORY) {
-			return win32_add_dirpath(pathname);
+		/* If there was an error getting the file attributes, or if we
+		 * are trying to open a normal file, we want to fall through to
+		 * the __real_open case. Only things that we know are
+		 * directories go through the special dirpath logic.
+		 */
+		if(attributes != INVALID_FILE_ATTRIBUTES) {
+			if(attributes & FILE_ATTRIBUTE_DIRECTORY) {
+				return win32_add_dirpath(pathname);
+			}
 		}
 	}
 	return __real_open(pathname, flags, mode);
