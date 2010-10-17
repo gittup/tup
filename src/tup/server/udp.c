@@ -25,6 +25,7 @@ int server_init(void)
 #define CMDSTR "CMD.EXE /Q /C "
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 {
+	int rc = -1;
 	DWORD return_code = 1;
 	BOOL ret;
 	PROCESS_INFORMATION pi;
@@ -71,7 +72,7 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 	 * also wouldn't be synchronized.
 	 */
 	if(chdir(win32_get_dirpath(dfd))) {
-		fprintf(stderr, "*** Command failed to change to working directory '%s': %s\n", win32_get_dirpath(dfd), cmd);
+		fprintf(stderr, "tup error: Unable to change working directory to '%s'\n", win32_get_dirpath(dfd));
 		pthread_mutex_unlock(&dir_mutex);
 		goto end;
 	}
@@ -89,37 +90,38 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 	pthread_mutex_unlock(&dir_mutex);
 
 	if(!ret) {
-		fprintf(stderr, "*** Command failed to create child process '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
 		goto end;
 	}
 
 	if(tup_inject_dll(&pi, s->udp_port)) {
-		fprintf(stderr, "*** Command failed to inject dll '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to inject dll: %s\n", strerror(errno));
 		goto end;
 	}
 
 	if(ResumeThread(pi.hThread) == (DWORD)~0) {
-		fprintf(stderr, "*** Command failed to start thread '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to start thread: %s\n", strerror(errno));
 		goto end;
 	}
 
 	if(WaitForSingleObject(pi.hThread, INFINITE) != WAIT_OBJECT_0) {
-		fprintf(stderr, "*** Command failed to wait for thread '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to wait for thread: %s\n", strerror(errno));
 		goto end;
 	}
 
 	if(WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
-		fprintf(stderr, "*** Command failed to wait for process '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to wait for process: %s\n", strerror(errno));
 		goto end;
 	}
 
 	if(!GetExitCodeProcess(pi.hProcess, &return_code)) {
-		fprintf(stderr, "*** Command failed to get exit code '%s': %s\n", strerror(errno), cmd);
+		fprintf(stderr, "tup error: failed to get exit code: %s\n", strerror(errno));
 		goto end;
 	}
 
 	s->exited = 1;
 	s->exit_status = return_code;
+	rc = 0;
 
 end:
 	CloseHandle(pi.hThread);
@@ -128,7 +130,7 @@ end:
 	if(stop_server(s) < 0) {
 		return -1;
 	}
-	return 0;
+	return rc;
 }
 
 int server_is_dead(void)
