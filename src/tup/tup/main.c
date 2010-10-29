@@ -18,6 +18,7 @@
 #include "tup/version.h"
 #include "tup/path.h"
 #include "tup/entry.h"
+#include "tup/colors.h"
 
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent, int style);
@@ -46,6 +47,10 @@ int main(int argc, char **argv)
 	if(argc < 2) {
 		usage();
 		return 1;
+	}
+
+	if(!isatty(1)) {
+		color_disable();
 	}
 
 	if(strcmp(argv[1], "init") == 0) {
