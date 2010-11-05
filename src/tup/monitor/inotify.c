@@ -940,9 +940,11 @@ static int handle_event_nolock(struct monitor_event *m)
 	if(m->e.mask & IN_DELETE || m->e.mask & IN_MOVED_FROM) {
 		struct tup_entry *tent;
 		if(tup_entry_find_name_in_dir(dc->dt_node.tupid, m->e.name, -1, &tent) == 0) {
-			if(tup_entry_rm(tent->tnode.tupid) < 0) {
-				fprintf(stderr, "tup error: Unable to remove tup entry %lli\n", tent->tnode.tupid);
-				return -1;
+			if(tent) {
+				if(tup_entry_rm(tent->tnode.tupid) < 0) {
+					fprintf(stderr, "tup error: Unable to remove tup entry %lli\n", tent->tnode.tupid);
+					return -1;
+				}
 			}
 		}
 	}
