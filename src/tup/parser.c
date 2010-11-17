@@ -826,6 +826,7 @@ static char *split_eq(char *p)
 
 	eq = strchr(p, '=');
 	if(!eq) {
+		return NULL;
 	}
 	value = eq + 1;
 	while(*value && isspace(*value))
