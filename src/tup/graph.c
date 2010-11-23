@@ -2,6 +2,8 @@
 #include "graph.h"
 #include "entry.h"
 #include "debug.h"
+#include "fileio.h"
+#include "config.h"
 #include "db.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +31,8 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 		perror("malloc");
 		return NULL;
 	}
-	n->edges = NULL;
-	n->incoming_count = 0;
+	INIT_LIST_HEAD(&n->edges);
+	INIT_LIST_HEAD(&n->incoming);
 	n->tnode.tupid = tent->tnode.tupid;
 	n->tent = tent;
 	n->state = STATE_INITIALIZED;
@@ -47,19 +49,22 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 static void __remove_node(struct graph *g, struct node *n)
 {
 	list_del(&n->list);
-	while(n->edges) {
-		struct edge *tmp;
-		tmp = n->edges->next;
-		free(n->edges);
-		n->edges = tmp;
+	while(!list_empty(&n->edges)) {
+		remove_edge(list_entry(n->edges.next, struct edge, list));
+	}
+	while(!list_empty(&n->incoming)) {
+		remove_edge(list_entry(n->incoming.next, struct edge, destlist));
 	}
 	remove_node(g, n);
 }
 
 void remove_node(struct graph *g, struct node *n)
 {
-	if(n->edges) {
+	if(!list_empty(&n->edges)) {
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tnode.tupid);
+	}
+	if(!list_empty(&n->incoming)) {
+		DEBUGP("Warning: Node %lli still has incoming edges.\n", n->tnode.tupid);
 	}
 	rb_erase(&n->tnode.rbn, &g->tree);
 	free(n);
@@ -76,22 +81,20 @@ int create_edge(struct node *n1, struct node *n2, int style)
 	}
 
 	e->dest = n2;
+	e->src = n1;
 	e->style = style;
 
-	e->next = n1->edges;
-	n1->edges = e;
+	list_add(&e->list, &n1->edges);
+	list_add(&e->destlist, &n2->incoming);
 
-	n2->incoming_count++;
 	return 0;
 }
 
-struct edge *remove_edge(struct edge *e)
+void remove_edge(struct edge *e)
 {
-	struct edge *tmp;
-	tmp = e->next;
-	e->dest->incoming_count--;
+	list_del(&e->list);
+	list_del(&e->destlist);
 	free(e);
-	return tmp;
 }
 
 int create_graph(struct graph *g, int count_flags)
@@ -233,6 +236,102 @@ out_cleanup:
 	return 0;
 }
 
+/* Marks the node and everything that links to it, on up to the root node.
+ * Everything that is marked will stay in the PDAG; the rest are pruned.
+ *
+ * Note that this abuses the 'parsing' flag, since that flag is normally only
+ * used in the parsing phase, and this is only used during the update phase.
+ */
+static void mark_nodes(struct node *n)
+{
+	struct edge *e;
+
+	/* If we're already marked, no need to go any further. */
+	if(n->parsing)
+		return;
+
+	n->parsing = 1;
+	list_for_each_entry(e, &n->incoming, destlist) {
+		mark_nodes(e->src);
+	}
+}
+
+static int prune_node(struct graph *g, struct node *n, int *num_pruned)
+{
+	if(n->tent->type == g->count_flags && n->expanded) {
+		g->num_nodes--;
+		(*num_pruned)++;
+
+		if(n->tent->type != TUP_NODE_CMD) {
+			fprintf(stderr, "tup internal error: node of type %i trying to add to the modify list in prune_graph\n", n->tent->type);
+			return -1;
+		}
+		/* Mark all pruned commands as modify to make sure they are
+		 * still executed on the next update (since we won't hit the
+		 * logic that normally adds them in update_work())
+		 */
+		if(tup_db_add_modify_list(n->tent->tnode.tupid) < 0)
+			return -1;
+	}
+	__remove_node(g, n);
+	return 0;
+}
+
+int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
+{
+	struct list_head *prune_list;
+	int x;
+	int dashdash = 0;
+
+	*num_pruned = 0;
+
+	prune_list = tup_entry_get_list();
+	for(x=0; x<argc; x++) {
+		struct tup_entry *tent;
+
+		if(!dashdash) {
+			if(strcmp(argv[x], "--") == 0) {
+				dashdash = 1;
+			}
+			if(argv[x][0] == '-')
+				continue;
+		}
+		tent = get_tent_dt(get_sub_dir_dt(), argv[x]);
+		if(!tent) {
+			fprintf(stderr, "tup: Unable to find tupid for '%s'\n", argv[x]);
+			goto out_err;
+		}
+		tup_entry_list_add(tent, prune_list);
+	}
+
+	if(!list_empty(prune_list)) {
+		struct tup_entry *tent;
+		struct node *n;
+		struct node *tmp;
+
+		list_for_each_entry(tent, prune_list, list) {
+			n = find_node(g, tent->tnode.tupid);
+			if(n) {
+				mark_nodes(n);
+			} else {
+				printf("Node '%s' does not need to be updated.\n", tent->name.s);
+			}
+		}
+
+		list_for_each_entry_safe(n, tmp, &g->node_list, list) {
+			if(!n->parsing && n != g->root)
+				if(prune_node(g, n, num_pruned) < 0)
+					goto out_err;
+		}
+	}
+	tup_entry_release_list();
+	return 0;
+
+out_err:
+	tup_entry_release_list();
+	return -1;
+}
+
 void dump_graph(const struct graph *g, const char *filename)
 {
 	static int count = 0;
@@ -274,8 +373,8 @@ static void dump_node(FILE *f, struct node *n)
 	if(flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
-		n, n->tent->name.s, n->tnode.tupid, n->incoming_count, n->expanded, color);
-	for(e=n->edges; e; e=e->next) {
+		n, n->tent->name.s, n->tnode.tupid, list_empty(&n->incoming), n->expanded, color);
+	list_for_each_entry(e, &n->edges, list) {
 		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
 	}
 }

@@ -31,7 +31,7 @@
 
 static int update_tup_config(void);
 static int process_create_nodes(void);
-static int process_update_nodes(void);
+static int process_update_nodes(int argc, char **argv, int *num_pruned);
 static int check_create_todo(void);
 static int check_update_todo(void);
 static int build_graph(struct graph *g);
@@ -96,11 +96,15 @@ int updater(int argc, char **argv, int phase)
 {
 	int x;
 	int do_scan = 1;
+	int num_pruned = 0;
 
 	do_keep_going = tup_db_config_get_int("keep_going");
 	num_jobs = tup_db_config_get_int("num_jobs");
 
-	for(x=1; x<argc; x++) {
+	argc--;
+	argv++;
+
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
 		} else if(strcmp(argv[x], "--keep-going") == 0 ||
@@ -112,6 +116,8 @@ int updater(int argc, char **argv, int phase)
 			do_scan = 0;
 		} else if(strncmp(argv[x], "-j", 2) == 0) {
 			num_jobs = strtol(argv[x]+2, NULL, 0);
+		} else if(strcmp(argv[x], "--") == 0) {
+			break;
 		}
 	}
 
@@ -166,9 +172,14 @@ int updater(int argc, char **argv, int phase)
 		return -1;
 	if(phase == 2) /* ? */
 		return 0;
-	if(process_update_nodes() < 0)
+	if(process_update_nodes(argc, argv, &num_pruned) < 0)
 		return -1;
-	tup_main_progress("Updated.\n");
+	if(num_pruned) {
+		tup_main_progress("Partial update complete:");
+		printf(" skipped %i commands.\n", num_pruned);
+	} else {
+		tup_main_progress("Updated.\n");
+	}
 	return 0; /* Profit! */
 }
 
@@ -314,7 +325,7 @@ static int process_create_nodes(void)
 	return 0;
 }
 
-static int process_update_nodes(void)
+static int process_update_nodes(int argc, char **argv, int *num_pruned)
 {
 	struct graph g;
 	int rc;
@@ -325,6 +336,10 @@ static int process_update_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+
+	if(prune_graph(&g, argc, argv, num_pruned) < 0)
+		return -1;
+
 	if(g.num_nodes) {
 		tup_main_progress("Executing Commands...\n");
 	} else {
@@ -493,9 +508,9 @@ edge_create:
 
 static void pop_node(struct graph *g, struct node *n)
 {
-	while(n->edges) {
+	while(!list_empty(&n->edges)) {
 		struct edge *e;
-		e = n->edges;
+		e = list_entry(n->edges.next, struct edge, list);
 		if(e->dest->state != STATE_PROCESSING) {
 			/* Put the node back on the plist, and mark it as such
 			 * by changing the state to STATE_PROCESSING.
@@ -504,7 +519,7 @@ static void pop_node(struct graph *g, struct node *n)
 			e->dest->state = STATE_PROCESSING;
 		}
 
-		n->edges = remove_edge(e);
+		remove_edge(e);
 	}
 }
 
@@ -575,8 +590,8 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	while(!list_empty(&g->plist) && !sig_quit) {
 		struct node *n;
 		n = list_entry(g->plist.next, struct node, list);
-		DEBUGP("cur node: %lli [%i]\n", n->tnode.tupid, n->incoming_count);
-		if(n->incoming_count) {
+		DEBUGP("cur node: %lli\n", n->tnode.tupid);
+		if(!list_empty(&n->incoming)) {
 			/* Here STATE_FINISHED means we're on the node_list,
 			 * therefore not ready for processing.
 			 */
@@ -752,10 +767,10 @@ static void *update_work(void *arg)
 			 */
 			if(rc == 0) {
 				pthread_mutex_lock(&db_mutex);
-				for(e=n->edges; e; e=e->next) {
+				list_for_each_entry(e, &n->edges, list) {
 					struct edge *f;
 
-					for(f=e->dest->edges; f; f=f->next) {
+					list_for_each_entry(f, &e->dest->edges, list) {
 						if(f->style & TUP_LINK_NORMAL) {
 							if(tup_db_add_modify_list(f->dest->tnode.tupid) < 0)
 								rc = -1;
@@ -771,7 +786,7 @@ static void *update_work(void *arg)
 			/* Mark the next nodes as modify in case we hit
 			 * an error - we'll need to pick up there (t6006).
 			 */
-			for(e=n->edges; e; e=e->next) {
+			list_for_each_entry(e, &n->edges, list) {
 				if(e->style & TUP_LINK_NORMAL) {
 					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
 						rc = -1;
@@ -822,7 +837,7 @@ static int unlink_outputs(int dfd, struct node *n)
 {
 	struct edge *e;
 	struct node *output;
-	for(e = n->edges; e; e = e->next) {
+	list_for_each_entry(e, &n->edges, list) {
 		output = e->dest;
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {

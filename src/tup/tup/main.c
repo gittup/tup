@@ -374,10 +374,8 @@ static int graph(int argc, char **argv)
 		if(n->tent->sym != -1)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->tent->sym, n->tnode.tupid);
 
-		e = n->edges;
-		while(e) {
+		list_for_each_entry(e, &n->edges, list) {
 			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
-			e = e->next;
 		}
 	}
 	printf("}\n");

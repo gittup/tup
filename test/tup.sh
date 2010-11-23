@@ -131,7 +131,7 @@ tup_dep_no_exist()
 	fi
 }
 
-update()
+__update()
 {
 	if [ -z "$TUP_VALGRIND" ]; then
 		cmd="tup upd"
@@ -145,7 +145,17 @@ update()
 		echo "*** Failed to update!" 1>&2
 		exit 1
 	fi
+}
+
+update()
+{
+	__update $@
 	check_empty_tupdirs
+}
+
+update_partial()
+{
+	__update $@
 }
 
 update_fail()
