@@ -37,6 +37,7 @@ on rm -rf test-gcc, got a 'tup internal error: directory 123456 still has entrie
  - maybe related, get: tup error: Unable to find parent entry [169820] for node 219636 which is in libavcodec/x86/x86util.asm - for some reason, all the files in x86/ exist, but the x86 node itself does not.
 
 'tup todo': check for config update
+'tup todo': the command should be able to accept set of outputs, the same as 'tup upd <output>'
 
 tup 'next_dirs' - print out other directories that use files in the current dir?
 

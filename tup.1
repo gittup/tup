@@ -20,9 +20,14 @@ You can do all of your development with just 'tup init' and 'tup upd', along wit
 .TP
 .B init
 Creates a '.tup' directory in the current directory and initialize the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
+.RS
 .TP
-.B upd
-Updates the project based on the dependency graph and the current state of the filesystem. This is what you run every time you make changes to your software to bring everything up-to-date. You can run this anywhere in the tup hierarchy, and it will always update everything. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
+.B --no-sync
+Sets 'db_sync' configuration option of the project to '0'. In case if this flag is not specified then 'db_sync' option will be set to '1'.
+.RE
+.TP
+.B upd [<output_1> ... <output_n>]
+Updates the set of outputs based on the dependency graph and the current state of the filesystem. If none outputs are specified then whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
 .RS
 .TP
 .B -jN
@@ -37,6 +42,12 @@ Temporarily override the keep_going configuration option to '1'. See the config 
 .TP
 .B --no-keep-going
 Temporarily override the keep_going configuration option to '0'. See the config secondary command below.
+.TP
+.B --no-scan
+Do not scan the project for changed files.
+.TP
+.B -d
+Output debug log to screen.
 .RE
 .SH "SECONDARY COMMANDS"
 These commands are used to modify the behavior of tup or look at its internals. You probably won't need these very often.
@@ -69,6 +80,9 @@ This is used internally to update the database in case the schema changes. If a 
 .TP
 .B g
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
+.TP
+.B todo
+Prints out commands that needs to be done to bring the project up to date.
 .TP
 .B scan
 You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup g'. Scan is called automatically by 'upd' if the monitor isn't running.
