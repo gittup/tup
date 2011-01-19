@@ -23,11 +23,11 @@ Creates a '.tup' directory in the current directory and initialize the tup datab
 .RS
 .TP
 .B --no-sync
-Sets 'db_sync' configuration option of the project to '0'. In case if this flag is not specified then 'db_sync' option will be set to '1'.
+Sets the 'db_sync' configuration option of the project to '0'. By default the 'db_sync' option will be set to '1'.
 .RE
 .TP
 .B upd [<output_1> ... <output_n>]
-Updates the set of outputs based on the dependency graph and the current state of the filesystem. If none outputs are specified then whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
+Updates the set of outputs based on the dependency graph and the current state of the filesystem. If no outputs are specified then the whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update the requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
 .RS
 .TP
 .B -jN
@@ -44,7 +44,7 @@ Temporarily override the keep_going configuration option to '1'. See the config 
 Temporarily override the keep_going configuration option to '0'. See the config secondary command below.
 .TP
 .B --no-scan
-Do not scan the project for changed files.
+Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
 .TP
 .B -d
 Output debug log to screen.
@@ -82,7 +82,7 @@ This is used internally to update the database in case the schema changes. If a 
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
 .TP
 .B todo
-Prints out commands that needs to be done to bring the project up to date.
+Prints out the next step in the tup process that will execute when updating.
 .TP
 .B scan
 You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup g'. Scan is called automatically by 'upd' if the monitor isn't running.
@@ -197,6 +197,27 @@ Append "value" to the end of the current value of "var". If "var" has not been s
 The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup".
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
+.TP
+.B ifeq (lval,rval)
+Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored.
+.TP
+.B ifdef VARIABLE
+Tests of the @-variable named VARIABLE is defined at all in tup.config. If so, all lines between the 'ifdef' and following 'endif' statement are processed; otherwise, they are ignored. For example, suppose tup.config contains:
+.nf
+
+CONFIG_FOO=n
+
+.fi
+Then 'ifdef FOO' will evaluate to true. If tup.config doesn't exist, or does not set CONFIG_FOO in any way, then 'ifdef FOO' will be false.
+.TP
+.B ifndef VARIABLE
+Same as 'ifdef', but with the logic inverted.
+.TP
+.B else
+Toggles the true/false-ness of the previous if-statement.
+.TP
+.B endif
+Ends the previous ifeq/ifdef/ifndef. Note that if-statements do not nest at the moment, due to developer laziness.
 .TP
 .B !macro = [inputs] | [order-only inputs] |> command |> [outputs]
 Set the !-macro to the given command string. This syntax is very similar to the :-rule, since a !-macro is basically a macro for those rules. The !-macro is not expanded until it is used in the command string of a :-rule. As such, the primary use of the !-macro is to have a place to store command strings with %-flags that may be re-used. For example, we could have a !cc macro in a top-level Tuprules.tup file like so:
