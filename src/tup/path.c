@@ -8,6 +8,7 @@
 #include "config.h"
 #include "entry.h"
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -54,6 +55,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
 		int newfd;
+		struct tup_entry *gitignore_tent = NULL;
+		int gitignore_found = 0;
 
 		newdt = create_dir_file(dt, file);
 		if(tree) {
@@ -64,6 +67,9 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 			if(callback(newdt, dfd, file) < 0)
 				return -1;
 		}
+
+		if(tup_db_select_tent(newdt, ".gitignore", &gitignore_tent) < 0)
+			return -1;
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {
@@ -77,13 +83,25 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		}
 
 		flist_foreach(&f, ".") {
-			if(f.filename[0] == '.')
+			if(f.filename[0] == '.') {
+				if(strcmp(f.filename, ".gitignore") == 0)
+					gitignore_found = 1;
 				continue;
+			}
 			if(watch_path(newdt, newfd, f.filename, tree,
 				      callback) < 0)
 				return -1;
 		}
 		close(newfd);
+
+		/* If we should have a .gitignore file but it was removed for
+		 * some reason, re-parse the current Tupfile so it gets
+		 * created again (t2077).
+		 */
+		if(gitignore_tent && !gitignore_found) {
+			if(tup_db_add_create_list(newdt) < 0)
+				return -1;
+		}
 		return 0;
 	} else {
 		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",

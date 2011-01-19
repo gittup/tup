@@ -680,8 +680,11 @@ static void *wait_thread(void *arg)
 static int skip_event(struct inotify_event *e)
 {
 	/* Skip hidden files */
-	if(e->len && e->name[0] == '.')
+	if(e->len && e->name[0] == '.') {
+		if(strcmp(e->name, ".gitignore") == 0)
+			return 0;
 		return 1;
+	}
 	return 0;
 }
 

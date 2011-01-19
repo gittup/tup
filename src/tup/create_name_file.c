@@ -213,6 +213,9 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 {
 	struct tup_entry *tent;
 
+	if(len < 0)
+		len = strlen(file);
+
 	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
 		return -1;
 	if(!tent) {
@@ -225,6 +228,14 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 	}
 	if(check_rm_tup_config(tent) < 0)
 		return -1;
+
+	/* If .gitignore is removed, make sure we re-parse the Tupfile
+	 * (t7040).
+	 */
+	if(strncmp(file, ".gitignore", len) == 0 && len == 10) {
+		if(tup_db_add_create_list(dt) < 0)
+			return -1;
+	}
 	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
 }
 

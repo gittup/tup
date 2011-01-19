@@ -31,8 +31,6 @@ t5057 - make 'boo' dependency change update file?
 
 progress bar looks dumb when you have numbers in the thousands because of the space between the second number and the ']', and then another space before the program
 
-.gitignore should be re-generated if removed by user?
-
 on rm -rf test-gcc, got a 'tup internal error: directory 123456 still has entries'
  - maybe related, get: tup error: Unable to find parent entry [169820] for node 219636 which is in libavcodec/x86/x86util.asm - for some reason, all the files in x86/ exist, but the x86 node itself does not.
 
