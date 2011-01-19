@@ -620,9 +620,11 @@ static int rm(int argc, char **argv)
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_file_del(dt, pel->path, pel->len) < 0)
-			return -1;
-		free(pel);
+		if(pel) {
+			if(tup_file_del(dt, pel->path, pel->len) < 0)
+				return -1;
+			free(pel);
+		}
 	}
 	if(tup_db_commit() < 0)
 		return -1;
