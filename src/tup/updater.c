@@ -896,7 +896,7 @@ static int update(struct node *n, struct server *s)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
-	if(start_server(s) < 0) {
+	if(start_server(s, n->tent->dt) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		goto err_close_dfd;
 	}
@@ -939,7 +939,7 @@ static int update(struct node *n, struct server *s)
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
+	rc = write_files(n->tnode.tupid, name, &s->finfo, &warnings);
 	pthread_mutex_unlock(&db_mutex);
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0) {

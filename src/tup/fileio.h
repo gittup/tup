@@ -22,6 +22,7 @@ struct path_element {
 struct pel_group {
 	struct list_head path_list;
 	int pg_flags;
+	int num_elements;
 };
 
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
@@ -54,9 +55,14 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 int delete_file(tupid_t dt, const char *name);
 int delete_name_file(tupid_t tupid);
 
+void init_pel_group(struct pel_group *pg);
+int split_path_elements(const char *dir, struct pel_group *pg);
+int get_path_tupid(struct pel_group *pg, tupid_t *tupid);
 int get_path_elements(const char *dir, struct pel_group *pg);
+int append_path_elements(struct pel_group *pg, tupid_t dt);
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb);
-void del_pel(struct path_element *pel);
-void del_pel_list(struct list_head *list);
+void del_pel(struct path_element *pel, struct pel_group *pg);
+void del_pel_group(struct pel_group *pg);
+void print_pel_group(struct pel_group *pg);
 
 #endif

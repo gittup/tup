@@ -436,7 +436,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				 */
 				free(*last);
 				*last = NULL;
-				del_pel_list(&pg->path_list);
+				del_pel_group(pg);
 				return 0;
 			}
 			tent = tent->parent;
@@ -467,7 +467,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			}
 		}
 
-		del_pel(pel);
+		del_pel(pel, pg);
 	}
 
 	return tent->tnode.tupid;
@@ -552,17 +552,37 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 	return 0;
 }
 
-int get_path_elements(const char *dir, struct pel_group *pg)
+static int add_pel(const char *path, int len, struct pel_group *pg)
+{
+	struct path_element *pel;
+
+	pel = malloc(sizeof *pel);
+	if(!pel) {
+		perror("malloc");
+		return -1;
+	}
+	pel->path = path;
+	pel->len = len;
+	list_add_tail(&pel->list, &pg->path_list);
+	return 0;
+}
+
+void init_pel_group(struct pel_group *pg)
+{
+	pg->pg_flags = 0;
+	pg->num_elements = 0;
+	INIT_LIST_HEAD(&pg->path_list);
+}
+
+int split_path_elements(const char *dir, struct pel_group *pg)
 {
 	struct path_element *pel;
 	const char *p = dir;
-	int num_elements = 0;
 
-	pg->pg_flags = 0;
-	INIT_LIST_HEAD(&pg->path_list);
-
-	if(dir[0] == '/')
-		pg->pg_flags |= PG_ROOT;
+	if(dir[0] == '/') {
+		del_pel_group(pg);
+		pg->pg_flags = PG_ROOT;
+	}
 
 	while(1) {
 		const char *path;
@@ -588,10 +608,9 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 				 * include it if it's at the beginning of the
 				 * path.
 				 */
-				if(num_elements) {
+				if(pg->num_elements) {
 					pel = list_entry(pg->path_list.prev, struct path_element, list);
-					num_elements--;
-					del_pel(pel);
+					del_pel(pel, pg);
 					continue;
 				}
 				/* Don't set num_elements, since a ".." path
@@ -604,18 +623,66 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 			}
 		}
 
-		num_elements++;
+		pg->num_elements++;
 skip_num_elements:
 
-		pel = malloc(sizeof *pel);
-		if(!pel) {
-			perror("malloc");
+		if(add_pel(path, len, pg) < 0)
 			return -1;
-		}
-		pel->path = path;
-		pel->len = len;
-		list_add_tail(&pel->list, &pg->path_list);
 	}
+	return 0;
+}
+
+int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
+{
+	struct path_element *pel = list_entry(pg->path_list.next, struct path_element, list);
+	tupid_t dt = DOT_DT;
+	struct tup_entry *tent;
+	const char *top = get_tup_top();
+
+	if(pg->pg_flags & PG_ROOT) {
+		list_for_each_entry(pel, &pg->path_list, list) {
+			if(top[0] == '/') {
+				top++;
+				if(strncmp(top, pel->path, pel->len) != 0) {
+					/* Directory is outside tup */
+					*tupid = -1;
+					return 0;
+				}
+				top += pel->len;
+			} else {
+				if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+					return -1;
+				if(tent == NULL) {
+					fprintf(stderr, "tup error: Unable to find tup_entry for node '%.*s' relative to directory %lli\n", pel->len, pel->path, dt);
+					tup_db_print(stderr, dt);
+					return -1;
+				}
+				dt = tent->tnode.tupid;
+			}
+		}
+	} else {
+		fprintf(stderr, "tup internal error: trying to get_path_tupid() on a pel_group where PG_ROOT isn't set. Is there some funky chdir()ing going on?\n");
+		return -1;
+	}
+	/* If we've reached the end of the full path to the root of the tup
+	 * directory, then set our new dt. Otherwise, we are outside of the
+	 * tup hierarchy, so set tupid to -1.
+	 */
+	if(*top == 0) {
+		*tupid = dt;
+	} else {
+		*tupid = -1;
+	}
+	return 0;
+}
+
+int get_path_elements(const char *dir, struct pel_group *pg)
+{
+	struct path_element *pel;
+
+	init_pel_group(pg);
+	if(split_path_elements(dir, pg) < 0)
+		return -1;
 
 	if(pg->pg_flags & PG_ROOT) {
 		const char *top = get_tup_top();
@@ -632,15 +699,36 @@ skip_num_elements:
 			pel = list_entry(pg->path_list.next, struct path_element, list);
 			if(strncmp(top, pel->path, pel->len) != 0) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
-				del_pel_list(&pg->path_list);
+				del_pel_group(pg);
 				return 0;
 			}
 			top += pel->len;
 
-			del_pel(pel);
+			del_pel(pel, pg);
 		} while(*top);
 	}
 	return 0;
+}
+
+static int append_path_elements_tent(struct pel_group *pg, struct tup_entry *tent)
+{
+	if(tent->tnode.tupid != DOT_DT) {
+		if(append_path_elements_tent(pg, tent->parent) < 0)
+			return -1;
+		if(add_pel(tent->name.s, tent->name.len, pg) < 0)
+			return -1;
+		pg->num_elements++;
+	}
+	return 0;
+}
+
+int append_path_elements(struct pel_group *pg, tupid_t dt)
+{
+	struct tup_entry *tent;
+
+	if(tup_entry_add(dt, &tent) < 0)
+		return -1;
+	return append_path_elements_tent(pg, tent);
 }
 
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
@@ -667,20 +755,34 @@ int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
 	return 1;
 }
 
-void del_pel(struct path_element *pel)
+void del_pel(struct path_element *pel, struct pel_group *pg)
 {
 	list_del(&pel->list);
 	free(pel);
+	pg->num_elements--;
 }
 
-void del_pel_list(struct list_head *list)
+void del_pel_group(struct pel_group *pg)
 {
 	struct path_element *pel;
 
-	while(!list_empty(list)) {
-		pel = list_entry(list->prev, struct path_element, list);
-		del_pel(pel);
+	while(!list_empty(&pg->path_list)) {
+		pel = list_entry(pg->path_list.prev, struct path_element, list);
+		del_pel(pel, pg);
 	}
+}
+
+void print_pel_group(struct pel_group *pg)
+{
+	struct path_element *pel;
+	printf("Pel[%i, %08x]: ", pg->num_elements, pg->pg_flags);
+	if(pg->pg_flags & PG_ROOT) {
+		printf("/");
+	}
+	list_for_each_entry(pel, &pg->path_list, list) {
+		printf("%.*s/", pel->len, pel->path);
+	}
+	printf("\n");
 }
 
 static int ghost_to_file(struct tup_entry *tent)

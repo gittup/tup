@@ -14,30 +14,38 @@
 #include <sys/stat.h>
 
 struct file_entry {
+	tupid_t dt;
 	char *filename;
 	struct pel_group pg;
 	struct list_head list;
 };
 
 struct sym_entry {
+	tupid_t dt;
 	char *from;
 	char *to;
 	struct list_head list;
 };
 
-static struct file_entry *new_entry(const char *filename);
+struct dfd_info {
+	tupid_t dt;
+	int dfd;
+};
+
+static struct file_entry *new_entry(const char *filename, tupid_t dt);
 static void del_entry(struct file_entry *fent);
 static int handle_rename(const char *from, const char *to,
 			 struct file_info *info);
-static int handle_symlink(const char *from, const char *to,
+static int handle_symlink(const char *from, const char *to, tupid_t dt,
 			  struct file_info *info);
 static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
 static void handle_unlink(struct file_info *info);
-static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
-			     const char *debug_name, struct file_info *info,
-			     int *warnings, struct list_head *entrylist);
-static int update_read_info(tupid_t cmdid, tupid_t dt, struct file_info *info,
+static int update_write_info(tupid_t cmdid, const char *debug_name,
+			     struct file_info *info, int *warnings,
+			     struct list_head *entrylist, struct dfd_info *dinfo);
+static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct list_head *entrylist);
+static int dfd_open(struct dfd_info *dinfo, tupid_t dt);
 
 int init_file_info(struct file_info *info)
 {
@@ -51,7 +59,7 @@ int init_file_info(struct file_info *info)
 }
 
 int handle_file(enum access_type at, const char *filename, const char *file2,
-		struct file_info *info)
+		struct file_info *info, tupid_t dt)
 {
 	struct file_entry *fent;
 	int rc = 0;
@@ -62,10 +70,10 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 		return handle_rename(filename, file2, info);
 	}
 	if(at == ACCESS_SYMLINK) {
-		return handle_symlink(filename, file2, info);
+		return handle_symlink(filename, file2, dt, info);
 	}
 
-	fent = new_entry(filename);
+	fent = new_entry(filename, dt);
 	if(!fent) {
 		return -1;
 	}
@@ -96,20 +104,24 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, tupid_t dt, int dfd, const char *debug_name,
-		struct file_info *info, int *warnings)
+int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
+		int *warnings)
 {
 	struct list_head *entrylist;
+	struct dfd_info dinfo = {-1, -1};
 	int rc1, rc2;
 
 	handle_unlink(info);
 
 	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(cmdid, dt, dfd, debug_name, info, warnings, entrylist);
+	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist, &dinfo);
 	tup_entry_release_list();
+	if(dinfo.dfd != -1) {
+		close(dinfo.dfd);
+	}
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(cmdid, dt, info, entrylist);
+	rc2 = update_read_info(cmdid, info, entrylist);
 	tup_entry_release_list();
 
 	if(rc1 == 0 && rc2 == 0)
@@ -130,7 +142,7 @@ int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 	return 0;
 }
 
-static struct file_entry *new_entry(const char *filename)
+static struct file_entry *new_entry(const char *filename, tupid_t dt)
 {
 	struct file_entry *fent;
 
@@ -152,17 +164,19 @@ static struct file_entry *new_entry(const char *filename)
 		free(fent);
 		return NULL;
 	}
+	fent->dt = dt;
 	return fent;
 }
 
 static void del_entry(struct file_entry *fent)
 {
 	list_del(&fent->list);
-	del_pel_list(&fent->pg.path_list);
+	del_pel_group(&fent->pg);
 	free(fent->filename);
 	free(fent);
 }
 
+/* TODO: Needs knowledge of dt? */
 static int handle_rename(const char *from, const char *to,
 			 struct file_info *info)
 {
@@ -177,7 +191,7 @@ static int handle_rename(const char *from, const char *to,
 
 	list_for_each_entry(fent, &info->write_list, list) {
 		if(pg_eq(&fent->pg, &pg_from)) {
-			del_pel_list(&fent->pg.path_list);
+			del_pel_group(&fent->pg);
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -191,7 +205,7 @@ static int handle_rename(const char *from, const char *to,
 	}
 	list_for_each_entry(fent, &info->read_list, list) {
 		if(pg_eq(&fent->pg, &pg_from)) {
-			del_pel_list(&fent->pg.path_list);
+			del_pel_group(&fent->pg);
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -205,12 +219,12 @@ static int handle_rename(const char *from, const char *to,
 	}
 
 	check_unlink_list(&pg_to, &info->unlink_list);
-	del_pel_list(&pg_to.path_list);
-	del_pel_list(&pg_from.path_list);
+	del_pel_group(&pg_to);
+	del_pel_group(&pg_from);
 	return 0;
 }
 
-static int handle_symlink(const char *from, const char *to,
+static int handle_symlink(const char *from, const char *to, tupid_t dt,
 			  struct file_info *info)
 {
 	struct sym_entry *sym;
@@ -233,6 +247,7 @@ static int handle_symlink(const char *from, const char *to,
 		free(sym);
 		return -1;
 	}
+	sym->dt = dt;
 	list_add(&sym->list, &info->sym_list);
 	return 0;
 }
@@ -274,9 +289,9 @@ static void handle_unlink(struct file_info *info)
 	}
 }
 
-static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
-			     const char *debug_name, struct file_info *info,
-			     int *warnings, struct list_head *entrylist)
+static int update_write_info(tupid_t cmdid, const char *debug_name,
+			     struct file_info *info, int *warnings,
+			     struct list_head *entrylist, struct dfd_info *dinfo)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -291,6 +306,9 @@ static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
 		struct path_element *pel = NULL;
 
 		w = list_entry(info->write_list.next, struct file_entry, list);
+		if(w->dt < 0) {
+			goto out_skip;
+		}
 
 		/* Remove duplicate write entries */
 		list_for_each_entry_safe(r, tmp, &info->write_list, list) {
@@ -305,7 +323,7 @@ static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(dt, &w->pg, &pel, NULL, &symtree, 0);
+		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, NULL, &symtree, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
@@ -342,14 +360,26 @@ static int update_write_info(tupid_t cmdid, tupid_t dt, int dfd,
 		if(!tent) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
-			unlinkat(dfd, w->filename, 0);
+			if(dfd_open(dinfo, w->dt) < 0) {
+				fprintf(stderr, "tup error: Unable to open directory for node %lli in order to remove the file. You should remove it manually.\n", w->dt);
+				tup_db_print(stderr, w->dt);
+			} else {
+				unlinkat(dinfo->dfd, w->filename, 0);
+			}
 			write_bork = 1;
 		} else {
 			tup_entry_list_add(tent, entrylist);
-			if(file_set_mtime(tent, dfd, w->filename) < 0)
-				return -1;
-			if(tup_db_set_sym(tent, -1) < 0)
-				return -1;
+			if(dfd_open(dinfo, w->dt) < 0) {
+				fprintf(stderr, "tup error: Unable to open directory for node %lli in order to stat() the output file for command %lli\n", w->dt, cmdid);
+				tup_db_print(stderr, w->dt);
+				tup_db_print(stderr, cmdid);
+				write_bork = 1;
+			} else {
+				if(file_set_mtime(tent, dinfo->dfd, w->filename) < 0)
+					return -1;
+				if(tup_db_set_sym(tent, -1) < 0)
+					return -1;
+			}
 		}
 
 out_skip:
@@ -362,14 +392,16 @@ out_skip:
 		tupid_t sym;
 
 		sym_entry = list_entry(info->sym_list.next, struct sym_entry, list);
+		if(sym_entry->dt < 0)
+			goto skip_sym;
 
-		if(tup_db_select_tent(dt, sym_entry->to, &tent) < 0)
+		if(tup_db_select_tent(sym_entry->dt, sym_entry->to, &tent) < 0)
 			return -1;
 		if(!tent) {
 			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);
 			fprintf(stderr, " Unlink: [35m%s[0m\n", sym_entry->to);
-			dirfd = tup_entry_open_tupid(dt);
+			dirfd = tup_entry_open_tupid(sym_entry->dt);
 			if(dirfd < 0) {
 				fprintf(stderr, "Unable to automatically unlink file.\n");
 			} else {
@@ -381,7 +413,14 @@ out_skip:
 		}
 
 		tup_entry_list_add(tent, entrylist);
-		if(file_set_mtime(tent, dfd, sym_entry->to) < 0)
+		if(dfd_open(dinfo, sym_entry->dt) < 0) {
+			fprintf(stderr, "tup error: Unable to open directory for node %lli in order to stat() the output file for command %lli\n", sym_entry->dt, cmdid);
+			tup_db_print(stderr, sym_entry->dt);
+			tup_db_print(stderr, cmdid);
+			write_bork = 1;
+			goto skip_sym;
+		}
+		if(file_set_mtime(tent, dinfo->dfd, sym_entry->to) < 0)
 			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
@@ -399,7 +438,7 @@ out_skip:
 		 * the symlink file. These would get picked up by any command
 		 * that reads our symlink.
 		 */
-		if(gimme_node_or_make_ghost(dt, sym_entry->from, &link_tent) < 0)
+		if(gimme_node_or_make_ghost(sym_entry->dt, sym_entry->from, &link_tent) < 0)
 			return -1;
 		if(link_tent) {
 			sym = link_tent->tnode.tupid;
@@ -426,16 +465,17 @@ skip_sym:
 	return 0;
 }
 
-static int update_read_info(tupid_t cmdid, tupid_t dt, struct file_info *info,
+static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct list_head *entrylist)
 {
 	struct file_entry *r;
 
 	while(!list_empty(&info->read_list)) {
 		r = list_entry(info->read_list.next, struct file_entry, list);
-
-		if(add_node_to_list(dt, &r->pg, entrylist, 0) < 0)
-			return -1;
+		if(r->dt > 0) {
+			if(add_node_to_list(r->dt, &r->pg, entrylist, 0) < 0)
+				return -1;
+		}
 		del_entry(r);
 	}
 
@@ -450,11 +490,24 @@ static int update_read_info(tupid_t cmdid, tupid_t dt, struct file_info *info,
 	while(!list_empty(&info->ghost_list)) {
 		r = list_entry(info->ghost_list.next, struct file_entry, list);
 
-		if(add_node_to_list(dt, &r->pg, entrylist, 1) < 0)
-			return -1;
+		if(r->dt > 0) {
+			if(add_node_to_list(r->dt, &r->pg, entrylist, 1) < 0)
+				return -1;
+		}
 		del_entry(r);
 	}
 	if(tup_db_check_actual_inputs(cmdid, entrylist) < 0)
 		return -1;
+	return 0;
+}
+
+static int dfd_open(struct dfd_info *dinfo, tupid_t dt)
+{
+	if(dinfo->dt == dt)
+		return 0;
+	dinfo->dfd = tup_entry_open_tupid(dt);
+	if(dinfo->dfd < 0)
+		return -1;
+	dinfo->dt = dt;
 	return 0;
 }

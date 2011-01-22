@@ -38,6 +38,7 @@ static int (*s_execve)(const char *filename, char *const argv[],
 		       char *const envp[]);
 static int (*s_execv)(const char *path, char *const argv[]);
 static int (*s_execvp)(const char *file, char *const argv[]);
+static int (*s_chdir)(const char *path);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
@@ -303,10 +304,13 @@ int execvp(const char *file, char *const argv[])
 
 int chdir(const char *path)
 {
-	if(path) {}
-	fprintf(stderr, "tup error: chdir() is not supported.\n");
-	errno = ENOSYS;
-	return -1;
+	int rc;
+	WRAP(s_chdir, "chdir");
+	rc = s_chdir(path);
+	if(rc == 0) {
+		handle_file(path, "", ACCESS_CHDIR);
+	}
+	return rc;
 }
 
 int fchdir(int fd)
