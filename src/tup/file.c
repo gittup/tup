@@ -6,6 +6,7 @@
 #include "linux/list.h"
 #include "db.h"
 #include "fileio.h"
+#include "pel_group.h"
 #include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>

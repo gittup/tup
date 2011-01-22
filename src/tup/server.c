@@ -2,7 +2,6 @@
 #include "file.h"
 #include "debug.h"
 #include "getexecwd.h"
-#include "fileio.h"
 #include "db.h"
 #include "config.h"
 #include <stdio.h>

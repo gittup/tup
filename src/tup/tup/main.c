@@ -11,6 +11,7 @@
 #include "tup/getexecwd.h"
 #include "tup/monitor.h"
 #include "tup/fileio.h"
+#include "tup/pel_group.h"
 #include "tup/updater.h"
 #include "tup/graph.h"
 #include "tup/init.h"

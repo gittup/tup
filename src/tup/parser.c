@@ -4,6 +4,7 @@
 #include "linux/list.h"
 #include "flist.h"
 #include "fileio.h"
+#include "pel_group.h"
 #include "fslurp.h"
 #include "db.h"
 #include "vardb.h"
