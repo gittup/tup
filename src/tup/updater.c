@@ -33,7 +33,7 @@ static int update_tup_config(void);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
 static int check_create_todo(void);
-static int check_update_todo(void);
+static int check_update_todo(int argc, char **argv);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct tup_entry *tent, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
@@ -187,8 +187,8 @@ int todo(int argc, char **argv)
 {
 	int rc;
 
-	if(argc) {/* unused */}
-	if(argv) {/* unused */}
+	argc--;
+	argv++;
 
 	rc = check_create_todo();
 	if(rc < 0)
@@ -198,7 +198,7 @@ int todo(int argc, char **argv)
 		return 0;
 	}
 
-	rc = check_update_todo();
+	rc = check_update_todo(argc, argv);
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
@@ -415,17 +415,20 @@ static int check_create_todo(void)
 	return rc;
 }
 
-static int check_update_todo(void)
+static int check_update_todo(int argc, char **argv)
 {
 	struct graph g;
 	int rc;
 	int stuff_todo = 0;
+	int num_pruned = 0;
 
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
+		return -1;
+	if(prune_graph(&g, argc, argv, &num_pruned) < 0)
 		return -1;
 	if(g.num_nodes) {
 		printf("Tup phase 3: The following %i command%s will be executed:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
@@ -439,6 +442,9 @@ static int check_update_todo(void)
 	} else {
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
+	}
+	if(num_pruned) {
+		printf("Partial update: %i command%s will be skipped.\n", num_pruned, num_pruned == 1 ? "" : "s");
 	}
 	if(destroy_graph(&g) < 0)
 		return -1;
