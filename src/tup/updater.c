@@ -178,6 +178,15 @@ int todo(int argc, char **argv)
 			return -1;
 	}
 
+	rc = tup_db_in_create_list(VAR_DT);
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		printf("The tup.config file has been modified and needs to be read.\n");
+		printf("Run 'tup read' to proceed to phase 1.\n");
+		return 0;
+	}
+
 	rc = check_create_todo();
 	if(rc < 0)
 		return -1;
