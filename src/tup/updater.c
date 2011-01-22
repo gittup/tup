@@ -29,6 +29,7 @@
 
 #define MAX_JOBS 65535
 
+static int run_scan(void);
 static int update_tup_config(void);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
@@ -131,36 +132,8 @@ int updater(int argc, char **argv, int phase)
 	}
 
 	if(do_scan) {
-		int rc;
-
-		rc = monitor_get_pid(0);
-		if(rc < 0) {
-			fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
+		if(run_scan() < 0)
 			return -1;
-		}
-		if(rc == 0) {
-			struct timeval t1, t2;
-			tup_main_progress("Scanning filesystem...");
-			fflush(stdout);
-			gettimeofday(&t1, NULL);
-			if(tup_scan() < 0)
-				return -1;
-			gettimeofday(&t2, NULL);
-			printf("%.3fs\n",
-			       (double)(t2.tv_sec - t1.tv_sec) +
-			       (double)(t2.tv_usec - t1.tv_usec)/1e6);
-		} else {
-			/* tup_scan would normally add the @-directory to the
-			 * entry tree, so if that doesn't run we add it here.
-			 * When we query variables, I pass in VAR_DT directly,
-			 * since it is always the same, which means the db
-			 * isn't queried and therefore the entry wouldn't
-			 * necessarily get cached normally (t6039).
-			 */
-			if(tup_entry_add(VAR_DT, NULL) < 0)
-				return -1;
-			tup_main_progress("No filesystem scan - monitor is running.\n");
-		}
 	}
 	if(server_init() < 0)
 		return -1;
@@ -185,10 +158,25 @@ int updater(int argc, char **argv, int phase)
 
 int todo(int argc, char **argv)
 {
+	int x;
 	int rc;
+	int do_scan = 1;
 
 	argc--;
 	argv++;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(argv[x], "--no-scan") == 0) {
+			do_scan = 0;
+		} else if(strcmp(argv[x], "--") == 0) {
+			break;
+		}
+	}
+
+	if(do_scan) {
+		if(run_scan() < 0)
+			return -1;
+	}
 
 	rc = check_create_todo();
 	if(rc < 0)
@@ -206,6 +194,41 @@ int todo(int argc, char **argv)
 		return 0;
 	}
 	printf("tup: Everything is up-to-date.\n");
+	return 0;
+}
+
+static int run_scan(void)
+{
+	int rc;
+
+	rc = monitor_get_pid(0);
+	if(rc < 0) {
+		fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
+		return -1;
+	}
+	if(rc == 0) {
+		struct timeval t1, t2;
+		tup_main_progress("Scanning filesystem...");
+		fflush(stdout);
+		gettimeofday(&t1, NULL);
+		if(tup_scan() < 0)
+			return -1;
+		gettimeofday(&t2, NULL);
+		printf("%.3fs\n",
+		       (double)(t2.tv_sec - t1.tv_sec) +
+		       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+	} else {
+		/* tup_scan would normally add the @-directory to the
+		 * entry tree, so if that doesn't run we add it here.
+		 * When we query variables, I pass in VAR_DT directly,
+		 * since it is always the same, which means the db
+		 * isn't queried and therefore the entry wouldn't
+		 * necessarily get cached normally (t6039).
+		 */
+		if(tup_entry_add(VAR_DT, NULL) < 0)
+			return -1;
+		tup_main_progress("No filesystem scan - monitor is running.\n");
+	}
 	return 0;
 }
 
