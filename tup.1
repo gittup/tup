@@ -81,8 +81,13 @@ This is used internally to update the database in case the schema changes. If a 
 .B g
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
 .TP
-.B todo
-Prints out the next step in the tup process that will execute when updating.
+.B todo [<output_1>..<output_n>]
+Prints out the next steps in the tup process that will execute when updating given outputs. If no outputs are specified then it prints steps needed to update the whole project. This command scans project for file changes by default.
+.RS
+.TP
+.B --no-scan
+Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
+.RE
 .TP
 .B scan
 You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup g'. Scan is called automatically by 'upd' if the monitor isn't running.
