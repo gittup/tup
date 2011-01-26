@@ -2,10 +2,8 @@
 
 use strict;
 
-my ($num_files, $num_deps, @path_names, $x, $y, %dir_names, %mains, @paths, @pathcounts);
+my ($num_files, $num_deps, @path_names, $x, $y, %dir_names, %mains, @pathcounts);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
-
-$paths[0] = "";
 
 if($#ARGV < 0) {
 	&usage();
