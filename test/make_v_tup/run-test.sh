@@ -7,10 +7,15 @@ niter=3
 sync
 
 tool="make"
+initialize=":"
+start=":"
 update="make -rR > /dev/null"
+finish=":"
 cd t$tool
 find . -type f | while read i; do cat $i > /dev/null; done
+eval "$initialize"
 echo "$tool: initial"
+eval "$start"
 time -p eval "$update"
 sync
 cfile=`find . -name 0.c`;
@@ -32,15 +37,20 @@ echo "$tool: nothing"
 for i in `seq 1 $niter`; do
 	time -p eval "$update"
 done
+
+eval "$finish"
 cd ..
 
 tool="tup"
+initialize="tup init --force > /dev/null"
+start="tup monitor"
 update="tup upd > /dev/null"
+finish="tup stop"
 cd t$tool
 find . -type f | while read i; do cat $i > /dev/null; done
-tup init --force > /dev/null
+eval "$initialize"
 echo "$tool: initial"
-tup monitor
+eval "$start"
 time -p eval "$update"
 sync
 cfile=`find . -name 0.c`;
@@ -63,7 +73,7 @@ for i in `seq 1 $niter`; do
 	time -p eval "$update"
 done
 
-tup stop
+eval "$finish"
 cd ..
 
 #diff -r tmake ttup | grep -v Makefile | grep -v build | grep -v '\.d$' | grep -v '\.tup'
