@@ -2,7 +2,7 @@
 
 use strict;
 
-my ($num_files, $num_deps, @path_names, $x, $y, %dir_names, %mains, @pathcounts);
+my ($num_files, $num_deps, @path_names, $x, $y, %dir_names, %mains);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
 
 if($#ARGV < 0) {
@@ -98,7 +98,8 @@ sub usage
 
 sub generate_path
 {
-	my ($x, $num, $dir, $depth, $path);
+	use integer;
+	my ($num, $dirindex, $levelindex, @path_components);
 	my ($num_files_per_dir);
 	my ($num_subdirs_per_dir);
 
@@ -106,32 +107,22 @@ sub generate_path
 	$num_subdirs_per_dir = 5;
 
 	$num = $_[0];
-	$dir = $num / $num_files_per_dir;
-	$path = "";
-	if($num < $num_files_per_dir) {
-		# leave path empty
-	} else {
-		$depth = int(log($num / $num_files_per_dir) / log($num_subdirs_per_dir + 1)) + 1;
-		for($x=$depth; $x>0; $x--) {
-			$path .= $sample_paths[$pathcounts[$x]]."/";
+	$dirindex = $num / $num_files_per_dir;
+
+	if ($dirindex == 0) {
+		return "";
+	}
+
+	--$dirindex;
+
+	while (1) {
+		$levelindex = $dirindex % $num_subdirs_per_dir;
+		unshift(@path_components, $sample_paths[$levelindex]);
+		$dirindex /= $num_subdirs_per_dir;
+		if ($dirindex < 1) {
+			return join("/", @path_components) . "/";
+		} else {
+			--$dirindex;
 		}
 	}
-	$pathcounts[0]++;
-	if($pathcounts[0] >= $num_files_per_dir) {
-		$pathcounts[1]++;
-		$pathcounts[0] = 0;
-	}
-	for($x=1; $x<$depth+1; $x++) {
-		if($pathcounts[$x] >= $num_subdirs_per_dir) {
-			$pathcounts[$x] = 0;
-			$pathcounts[$x+1]++;
-		}
-	}
-	if($path =~ /^\//) {
-		for($x=1; $x<$depth+1; $x++) {
-			print "PC[$x]: $pathcounts[$x]\n";
-		}
-		die "[$num]: Path is: $path\n";
-	}
-	return $path;
 }
