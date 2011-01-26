@@ -5,56 +5,61 @@ cd .run_test
 niter=3
 ../gen-test-case.pl "$@" || exit 1
 sync
-cd tmake
+
+tool="make"
+update="make -rR > /dev/null"
+cd t$tool
 find . -type f | while read i; do cat $i > /dev/null; done
-echo "make: initial"
-time -p make -rR > /dev/null
+echo "$tool: initial"
+time -p eval "$update"
 sync
 cfile=`find . -name 0.c`;
 hfile=`find . -name 0.h`;
 
-echo "make: 0.c touched"
+echo "$tool: 0.c touched"
 for i in `seq 1 $niter`; do
 	sleep 1; touch $cfile
-	time -p make -rR > /dev/null
+	time -p eval "$update"
 done
 
-echo "make: 0.h touched"
+echo "$tool: 0.h touched"
 for i in `seq 1 $niter`; do
 	sleep 1; touch $hfile
-	time -p make -rR > /dev/null
+	time -p eval "$update"
 done
 
-echo "make: nothing"
+echo "$tool: nothing"
 for i in `seq 1 $niter`; do
-	time -p make -rR > /dev/null
+	time -p eval "$update"
 done
 
-cd ../ttup
+tool="tup"
+update="tup upd > /dev/null"
+cd ../t$tool
 find . -type f | while read i; do cat $i > /dev/null; done
 tup init --force > /dev/null
-echo "tup: initial"
+echo "$tool: initial"
 tup monitor
-time -p tup upd > /dev/null
+time -p eval "$update"
 sync
 cfile=`find . -name 0.c`;
 hfile=`find . -name 0.h`;
 
-echo "tup: 0.c touched"
+echo "$tool: 0.c touched"
 for i in `seq 1 $niter`; do
 	touch $cfile
-	time -p tup upd > /dev/null
+	time -p eval "$update"
 done
 
-echo "tup: 0.h touched"
+echo "$tool: 0.h touched"
 for i in `seq 1 $niter`; do
 	touch $hfile
-	time -p tup upd > /dev/null
+	time -p eval "$update"
 done
 
-echo "tup: nothing"
+echo "$tool: nothing"
 for i in `seq 1 $niter`; do
-	time -p tup upd > /dev/null
+	time -p eval "$update"
 done
 
 tup stop
