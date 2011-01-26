@@ -32,10 +32,11 @@ echo "$tool: nothing"
 for i in `seq 1 $niter`; do
 	time -p eval "$update"
 done
+cd ..
 
 tool="tup"
 update="tup upd > /dev/null"
-cd ../t$tool
+cd t$tool
 find . -type f | while read i; do cat $i > /dev/null; done
 tup init --force > /dev/null
 echo "$tool: initial"
@@ -63,6 +64,6 @@ for i in `seq 1 $niter`; do
 done
 
 tup stop
-
 cd ..
+
 #diff -r tmake ttup | grep -v Makefile | grep -v build | grep -v '\.d$' | grep -v '\.tup'
