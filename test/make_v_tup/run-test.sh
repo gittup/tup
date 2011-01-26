@@ -48,13 +48,13 @@ hfile=`find . -name 0.h`;
 
 echo "$tool: 0.c touched"
 for i in `seq 1 $niter`; do
-	touch $cfile
+	sleep 1; touch $cfile
 	time -p eval "$update"
 done
 
 echo "$tool: 0.h touched"
 for i in `seq 1 $niter`; do
-	touch $hfile
+	sleep 1; touch $hfile
 	time -p eval "$update"
 done
 
