@@ -11,8 +11,8 @@ endif
 
 syntax case match
 
-syntax match comment ,^#.*$,
-syntax match rule ,^[:,],
+syntax match comment ,^\s*#.*$,
+syntax match rule ,^\s*[:,],
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match chain ,^*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match chain ,[^a-zA-Z0-9_-]\*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
