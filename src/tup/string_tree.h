@@ -1,5 +1,5 @@
-#ifndef tup_string_tree
-#define tup_string_tree
+#ifndef tup_string_tree_h
+#define tup_string_tree_h
 
 #include "linux/rbtree.h"
 

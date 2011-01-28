@@ -1,3 +1,6 @@
+#ifndef tup_bin_h
+#define tup_bin_h
+
 #include "linux/list.h"
 #include "tupid.h"
 
@@ -26,3 +29,5 @@ struct bin *bin_add(const char *name, struct bin_list *bl);
 struct bin *bin_find(const char *name, struct bin_list *bl);
 int bin_add_entry(struct bin *b, const char *path, int len,
 		  struct tup_entry *tent);
+
+#endif
