@@ -22,6 +22,8 @@
 #include <ctype.h>
 #include <sys/stat.h>
 
+#define SYNTAX_ERROR -2
+
 struct name_list {
 	struct list_head entries;
 	int num_entries;
@@ -117,6 +119,7 @@ struct tupfile {
 static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			 const char *cwd, int clen);
 static int var_ifdef(struct tupfile *tf, const char *var);
+static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen);
 static int gitignore(struct tupfile *tf);
@@ -367,44 +370,21 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(strncmp(line, "ifeq ", 5) == 0) {
-			char *paren;
-			char *comma;
-			char *lval;
-			char *rval;
-
-			paren = strchr(line+5, '(');
-			if(!paren)
+			int rc;
+			rc = eval_eq(tf, line+5, newline);
+			if(rc == SYNTAX_ERROR)
 				goto syntax_error;
-			lval = paren + 1;
-			comma = strchr(lval, ',');
-			if(!comma)
+			if(rc < 0)
+				return -1;
+			if_true = rc;
+		} else if(strncmp(line, "ifneq ", 6) == 0) {
+			int rc;
+			rc = eval_eq(tf, line+6, newline);
+			if(rc == SYNTAX_ERROR)
 				goto syntax_error;
-			rval = comma + 1;
-
-			paren = line + linelen;
-			while(paren > line) {
-				if(*paren == ')')
-					goto found_paren;
-				paren--;
-			}
-			goto syntax_error;
-found_paren:
-			*comma = 0;
-			*paren = 0;
-
-			lval = eval(tf, lval, NULL, 0);
-			if(!lval)
+			if(rc < 0)
 				return -1;
-			rval = eval(tf, rval, NULL, 0);
-			if(!rval)
-				return -1;
-			if(strcmp(lval, rval) == 0) {
-				if_true = 1;
-			} else {
-				if_true = 0;
-			}
-			free(lval);
-			free(rval);
+			if_true = !rc;
 		} else if(strncmp(line, "ifdef ", 6) == 0) {
 			int rc;
 			rc = var_ifdef(tf, line+6);
@@ -502,6 +482,53 @@ syntax_error:
 	fprintf(stderr, "Error parsing Tupfile [%lli] line %i\n  Line was: '%s'\n", tf->tupid, lno, line);
 	tup_db_print(stderr, tf->tupid);
 	return -1;
+}
+
+static int eval_eq(struct tupfile *tf, char *expr, char *eol)
+{
+	char *paren;
+	char *comma;
+	char *lval;
+	char *rval;
+	int rc;
+
+	paren = strchr(expr, '(');
+	if(!paren)
+		return SYNTAX_ERROR;
+	lval = paren + 1;
+	comma = strchr(lval, ',');
+	if(!comma)
+		return SYNTAX_ERROR;
+	rval = comma + 1;
+
+	paren = eol;
+	while(paren > expr) {
+		if(*paren == ')')
+            goto found_paren;
+		paren--;
+	}
+	return SYNTAX_ERROR;
+found_paren:
+	*comma = 0;
+	*paren = 0;
+
+	lval = eval(tf, lval, NULL, 0);
+	if(!lval)
+		return -1;
+	rval = eval(tf, rval, NULL, 0);
+	if(!rval) {
+		free(lval);
+		return -1;
+	}
+
+	if(strcmp(lval, rval) == 0)
+		rc = 1;
+	else
+		rc = 0;
+	free(lval);
+	free(rval);
+
+	return rc;
 }
 
 static int var_ifdef(struct tupfile *tf, const char *var)
