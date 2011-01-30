@@ -2,15 +2,15 @@
 
 use strict;
 
-my ($num_files, $num_deps, @path_names, %dir_names, %mains);
+my (@path_names, %dir_names, %mains);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
 
 if($#ARGV < 0) {
 	&usage();
 }
 
-$num_files = 100;
-$num_deps = 7;
+my $num_files = 100;
+my $num_deps = 7;
 
 while(@ARGV) {
 	if($ARGV[0] eq "-n") {
@@ -65,8 +65,7 @@ for(my $x=0; $x<$num_files; $x++) {
 	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
 	for(my $y=0; $y<$num_deps; $y++) {
-		my ($tmp);
-		$tmp = ($x + $y) % $num_files;
+		my $tmp = ($x + $y) % $num_files;
 		print FILE "#include \"$path_names[$tmp]$tmp.h\"\n";
 	}
 	print FILE "void func_$x(void) {}\n";
@@ -101,15 +100,13 @@ sub usage
 sub generate_path
 {
 	use integer;
-	my ($num, $dirindex, $levelindex, @path_components);
-	my ($num_files_per_dir);
-	my ($num_subdirs_per_dir);
+	my (@path_components);
 
-	$num_files_per_dir = 10;
-	$num_subdirs_per_dir = 5;
+	my $num_files_per_dir = 10;
+	my $num_subdirs_per_dir = 5;
 
-	$num = $_[0];
-	$dirindex = $num / $num_files_per_dir;
+	my $num = $_[0];
+	my $dirindex = $num / $num_files_per_dir;
 
 	if ($dirindex == 0) {
 		return "";
@@ -118,7 +115,7 @@ sub generate_path
 	--$dirindex;
 
 	while (1) {
-		$levelindex = $dirindex % $num_subdirs_per_dir;
+		my $levelindex = $dirindex % $num_subdirs_per_dir;
 		unshift(@path_components, $sample_paths[$levelindex]);
 		$dirindex /= $num_subdirs_per_dir;
 		if ($dirindex < 1) {
