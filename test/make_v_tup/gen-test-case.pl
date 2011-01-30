@@ -41,11 +41,11 @@ close FILE;
 for($x=0; $x<$num_files; $x++) {
 	$path_names[$x] = &generate_path($x);
 	my $path_name = $path_names[$x];
-	if($path_name ne "") {
-		system("mkdir -p tmake/$path_name");
-		system("mkdir -p ttup/$path_name");
-	}
 	if($dir_names{$path_name} != 1) {
+		if($path_name ne "") {
+			mkdir "tmake/$path_name";
+			mkdir "ttup/$path_name";
+		}
 		$dir_names{$path_name} = 1;
 		$mains{$x} = 1;
 		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
