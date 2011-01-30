@@ -2,7 +2,7 @@
 
 use strict;
 
-my (@path_names, %dir_names, %mains);
+my (@path_names, %dir_names);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
 
 if($#ARGV < 0) {
@@ -51,13 +51,13 @@ print MAKEFILE "progs :=\n";
 
 for(my $x=0; $x<$num_files; $x++) {
 	my $path_name = $path_names[$x];
-	if($dir_names{$path_name} != 1) {
+	my $first_file_in_directory = ($dir_names{$path_name} != 1);
+	if($first_file_in_directory) {
 		if($path_name ne "") {
 			mkdir "tmake/$path_name";
 			mkdir "ttup/$path_name";
 		}
 		$dir_names{$path_name} = 1;
-		$mains{$x} = 1;
 		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
 	}
 
@@ -67,7 +67,7 @@ for(my $x=0; $x<$num_files; $x++) {
 		print FILE "#include \"$path_names[$tmp]$tmp.h\"\n";
 	}
 	print FILE "void func_$x(void) {}\n";
-	if($mains{$x}) {
+	if($first_file_in_directory) {
 		print FILE "int main(void) {return 0;}\n";
 	}
 	close FILE;
