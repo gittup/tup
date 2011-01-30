@@ -40,14 +40,15 @@ print FILE "TEST_TOP = \$(TUP_CWD)\n";
 close FILE;
 for($x=0; $x<$num_files; $x++) {
 	$path_names[$x] = &generate_path($x);
-	if($path_names[$x] ne "") {
-		system("mkdir -p tmake/$path_names[$x]");
-		system("mkdir -p ttup/$path_names[$x]");
+	my $path_name = $path_names[$x];
+	if($path_name ne "") {
+		system("mkdir -p tmake/$path_name");
+		system("mkdir -p ttup/$path_name");
 	}
-	if($dir_names{$path_names[$x]} != 1) {
-		$dir_names{$path_names[$x]} = 1;
+	if($dir_names{$path_name} != 1) {
+		$dir_names{$path_name} = 1;
 		$mains{$x} = 1;
-		system("cp ../testTupfile.tup ttup/$path_names[$x]/Tupfile");
+		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
 	}
 }
 
@@ -58,10 +59,11 @@ print MAKEFILE "objs :=\n";
 print MAKEFILE "progs :=\n";
 
 for($x=0; $x<$num_files; $x++) {
-	print MAKEFILE "objs += $path_names[$x]$x.o\n";
-	print MAKEFILE "progs += $path_names[$x]prog\n";
-	print MAKEFILE "$path_names[$x]prog: $path_names[$x]$x.o\n";
-	open FILE, ">ttup/$path_names[$x]$x.c" or die "Can't open ttup/$path_names[$x]$x.c for write\n";
+	my $path_name = $path_names[$x];
+	print MAKEFILE "objs += $path_name$x.o\n";
+	print MAKEFILE "progs += ${path_name}prog\n";
+	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
+	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
 	for($y=0; $y<$num_deps; $y++) {
 		my ($tmp);
 		$tmp = ($x + $y) % $num_files;
@@ -72,11 +74,11 @@ for($x=0; $x<$num_files; $x++) {
 		print FILE "int main(void) {return 0;}\n";
 	}
 	close FILE;
-	open FILE, ">ttup/$path_names[$x]$x.h" or die "Can't open ttup/$path_names[$x]$x.h for write\n";
+	open FILE, ">ttup/$path_name$x.h" or die "Can't open ttup/$path_name$x.h for write\n";
 	print FILE "void func_$x(void);\n";
 	close FILE;
-	system("cp ttup/$path_names[$x]$x.c tmake/$path_names[$x]$x.c");
-	system("cp ttup/$path_names[$x]$x.h tmake/$path_names[$x]$x.h");
+	system("cp ttup/$path_name$x.c tmake/$path_name$x.c");
+	system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
 }
 
 print MAKEFILE "progs := \$(sort \$(progs))\n";
