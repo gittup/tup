@@ -33,13 +33,23 @@ while(@ARGV) {
 	}
 }
 
+for(my $x=0; $x<$num_files; $x++) {
+	$path_names[$x] = &generate_path($x);
+}
+
 mkdir "tmake";
 mkdir "ttup";
+
 open FILE, ">ttup/Tuprules.tup" or die "Can't open ttup/Tuprules.tup for write.\n";
 print FILE "TEST_TOP = \$(TUP_CWD)\n";
 close FILE;
+
+open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
+print MAKEFILE "all:\n";
+print MAKEFILE "objs :=\n";
+print MAKEFILE "progs :=\n";
+
 for(my $x=0; $x<$num_files; $x++) {
-	$path_names[$x] = &generate_path($x);
 	my $path_name = $path_names[$x];
 	if($dir_names{$path_name} != 1) {
 		if($path_name ne "") {
@@ -50,19 +60,7 @@ for(my $x=0; $x<$num_files; $x++) {
 		$mains{$x} = 1;
 		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
 	}
-}
 
-open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
-
-print MAKEFILE "all:\n";
-print MAKEFILE "objs :=\n";
-print MAKEFILE "progs :=\n";
-
-for(my $x=0; $x<$num_files; $x++) {
-	my $path_name = $path_names[$x];
-	print MAKEFILE "objs += $path_name$x.o\n";
-	print MAKEFILE "progs += ${path_name}prog\n";
-	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
 	for(my $y=0; $y<$num_deps; $y++) {
 		my $tmp = ($x + $y) % $num_files;
@@ -73,11 +71,16 @@ for(my $x=0; $x<$num_files; $x++) {
 		print FILE "int main(void) {return 0;}\n";
 	}
 	close FILE;
+	system("cp ttup/$path_name$x.c tmake/$path_name$x.c");
+
 	open FILE, ">ttup/$path_name$x.h" or die "Can't open ttup/$path_name$x.h for write\n";
 	print FILE "void func_$x(void);\n";
 	close FILE;
-	system("cp ttup/$path_name$x.c tmake/$path_name$x.c");
 	system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
+
+	print MAKEFILE "objs += $path_name$x.o\n";
+	print MAKEFILE "progs += ${path_name}prog\n";
+	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 }
 
 print MAKEFILE "progs := \$(sort \$(progs))\n";
