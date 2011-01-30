@@ -2,7 +2,7 @@
 
 use strict;
 
-my ($num_files, $num_deps, @path_names, $x, $y, %dir_names, %mains);
+my ($num_files, $num_deps, @path_names, %dir_names, %mains);
 my @sample_paths = ("usr", "src", "linux", "mozilla", "marf", "tup", "test", "drivers", "include", "sound");
 
 if($#ARGV < 0) {
@@ -38,7 +38,7 @@ mkdir "ttup";
 open FILE, ">ttup/Tuprules.tup" or die "Can't open ttup/Tuprules.tup for write.\n";
 print FILE "TEST_TOP = \$(TUP_CWD)\n";
 close FILE;
-for($x=0; $x<$num_files; $x++) {
+for(my $x=0; $x<$num_files; $x++) {
 	$path_names[$x] = &generate_path($x);
 	my $path_name = $path_names[$x];
 	if($dir_names{$path_name} != 1) {
@@ -58,13 +58,13 @@ print MAKEFILE "all:\n";
 print MAKEFILE "objs :=\n";
 print MAKEFILE "progs :=\n";
 
-for($x=0; $x<$num_files; $x++) {
+for(my $x=0; $x<$num_files; $x++) {
 	my $path_name = $path_names[$x];
 	print MAKEFILE "objs += $path_name$x.o\n";
 	print MAKEFILE "progs += ${path_name}prog\n";
 	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
-	for($y=0; $y<$num_deps; $y++) {
+	for(my $y=0; $y<$num_deps; $y++) {
 		my ($tmp);
 		$tmp = ($x + $y) % $num_files;
 		print FILE "#include \"$path_names[$tmp]$tmp.h\"\n";
