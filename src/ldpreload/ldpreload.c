@@ -12,6 +12,10 @@
 #include <errno.h>
 #include <sys/socket.h>
 
+#if defined(__APPLE__)
+#include <sys/stat.h>
+#endif
+
 void tup_send_event(const char *file, int len, const char *file2, int len2, int at);
 
 static void handle_file(const char *file, const char *file2, int at);
@@ -40,6 +44,9 @@ static int (*s_execv)(const char *path, char *const argv[]);
 static int (*s_execvp)(const char *file, char *const argv[]);
 static int (*s_chdir)(const char *path);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
+#if defined(__APPLE__)
+static int (*s_stat)(const char *name, struct stat *buf);
+#endif
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
@@ -333,6 +340,21 @@ int __xstat(int vers, const char *name, struct stat *buf)
 	}
 	return rc;
 }
+
+#if defined(__APPLE__)
+int stat(const char *filename, struct stat *buf)
+{
+	int rc;
+	WRAP(s_stat, "stat"__DARWIN_SUF_64_BIT_INO_T);
+	rc = s_stat(filename, buf);
+	if(rc < 0) {
+		if(errno == ENOENT || errno == ENOTDIR) {
+			handle_file(filename, "", ACCESS_GHOST);
+		}
+	}
+	return rc;
+}
+#endif
 
 int stat64(const char *filename, struct stat64 *buf)
 {
