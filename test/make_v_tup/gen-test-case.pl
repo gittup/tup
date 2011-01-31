@@ -83,8 +83,8 @@ print MAKEFILE "progs := \$(sort \$(progs))\n";
 print MAKEFILE "all: \$(progs)\n";
 print MAKEFILE "deps := \$(objs:.o=.d)\n";
 print MAKEFILE "-include \$(deps)\n";
-print MAKEFILE "\$(progs): %: ; \$Qgcc -o \$@ \$^\n";
-print MAKEFILE "%.o: %.c\n\t\$Qgcc -MMD -I. -c \$< -o \$@\n";
+print MAKEFILE "\$(progs): %: ; gcc -o \$@ \$^\n";
+print MAKEFILE "%.o: %.c\n\tgcc -MMD -I. -c \$< -o \$@\n";
 print MAKEFILE "clean: ; \@rm -rf \$(objs) \$(deps) \$(progs)\n";
 print MAKEFILE ".PHONY: clean all\n";
 
