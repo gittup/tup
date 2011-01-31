@@ -59,6 +59,7 @@ for(my $x=0; $x<$num_files; $x++) {
 		}
 		$dir_names{$path_name} = 1;
 		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
+		print MAKEFILE "progs += ${path_name}prog\n";
 	}
 
 	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
@@ -79,7 +80,6 @@ for(my $x=0; $x<$num_files; $x++) {
 	system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
 
 	print MAKEFILE "src += $path_name$x.c\n";
-	print MAKEFILE "progs += ${path_name}prog\n";
 	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 }
 
