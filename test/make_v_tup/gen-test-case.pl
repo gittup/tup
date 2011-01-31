@@ -46,7 +46,7 @@ close FILE;
 
 open MAKEFILE, ">tmake/Makefile" or die "Can't open Makefile for write\n";
 print MAKEFILE "all:\n";
-print MAKEFILE "objs :=\n";
+print MAKEFILE "src :=\n";
 print MAKEFILE "progs :=\n";
 
 for(my $x=0; $x<$num_files; $x++) {
@@ -78,14 +78,15 @@ for(my $x=0; $x<$num_files; $x++) {
 	close FILE;
 	system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
 
-	print MAKEFILE "objs += $path_name$x.o\n";
+	print MAKEFILE "src += $path_name$x.c\n";
 	print MAKEFILE "progs += ${path_name}prog\n";
 	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 }
 
 print MAKEFILE "progs := \$(sort \$(progs))\n";
 print MAKEFILE "all: \$(progs)\n";
-print MAKEFILE "deps := \$(objs:.o=.d)\n";
+print MAKEFILE "objs := \$(src:.c=.o)\n";
+print MAKEFILE "deps := \$(src:.c=.d)\n";
 print MAKEFILE "-include \$(deps)\n";
 print MAKEFILE "\$(progs): %: ; gcc -o \$@ \$^\n";
 print MAKEFILE "%.o: %.c\n\tgcc -MMD -I. -c \$< -o \$@\n";
