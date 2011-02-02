@@ -68,7 +68,6 @@ print MAKEFILE "all: \$(progs)\n";
 print MAKEFILE "objs := \$(src:.c=.o)\n";
 print MAKEFILE "deps := \$(src:.c=.d)\n";
 print MAKEFILE "-include \$(deps)\n";
-print MAKEFILE "\$(progs): %: ; gcc -o \$@ \$^\n";
 print MAKEFILE "%.o: %.c\n\tgcc -MMD -I. -c \$< -o \$@\n";
 print MAKEFILE "clean: ; \@rm -rf \$(objs) \$(deps) \$(progs)\n";
 print MAKEFILE ".PHONY: clean all\n";
@@ -121,6 +120,9 @@ sub create_directory
 	}
 	system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
 	print MAKEFILE "progs += ${path_name}prog\n";
+	print MAKEFILE "src += " . &file_list($path_name, "c", @path_indexes) . "\n";
+	print MAKEFILE "${path_name}prog: " . &file_list($path_name, "o", @path_indexes) . "\n";
+	print MAKEFILE "\tgcc -o \$@ \$^\n";
 
 	my $first_file_in_directory = 1;
 	foreach my $x (@path_indexes) {
@@ -141,8 +143,18 @@ sub create_directory
 		print FILE "void func_$x(void);\n";
 		close FILE;
 		system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
-
-		print MAKEFILE "src += $path_name$x.c\n";
-		print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 	}
+}
+
+sub file_list
+{
+	my $path_name = shift;
+	my $extension = shift;
+	my @path_indexes = @_;
+
+	my @l = ();
+	foreach my $x (@path_indexes) {
+		push @l, "$path_name$x.$extension";
+	}
+	return join(" ", @l);
 }
