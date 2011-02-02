@@ -49,41 +49,19 @@ print MAKEFILE "all:\n";
 print MAKEFILE "src :=\n";
 print MAKEFILE "progs :=\n";
 
-my $path_name;
+my $path_name = $path_names[0];
+my @path_indexes = ();
 
 for(my $x=0; $x<$num_files; $x++) {
 	my $new_path_name = $path_names[$x];
-	my $first_file_in_directory = (! defined($path_name) || $new_path_name ne $path_name);
-	if($first_file_in_directory) {
+	if($new_path_name ne $path_name) {
+		&create_directory($path_name, @path_indexes);
 		$path_name = $new_path_name;
-		if($path_name ne "") {
-			mkdir "tmake/$path_name";
-			mkdir "ttup/$path_name";
-		}
-		system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
-		print MAKEFILE "progs += ${path_name}prog\n";
+		@path_indexes = ();
 	}
-
-	open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
-	for(my $y=0; $y<$num_deps; $y++) {
-		my $tmp = ($x + $y) % $num_files;
-		print FILE "#include \"$path_names[$tmp]$tmp.h\"\n";
-	}
-	print FILE "void func_$x(void) {}\n";
-	if($first_file_in_directory) {
-		print FILE "int main(void) {return 0;}\n";
-	}
-	close FILE;
-	system("cp ttup/$path_name$x.c tmake/$path_name$x.c");
-
-	open FILE, ">ttup/$path_name$x.h" or die "Can't open ttup/$path_name$x.h for write\n";
-	print FILE "void func_$x(void);\n";
-	close FILE;
-	system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
-
-	print MAKEFILE "src += $path_name$x.c\n";
-	print MAKEFILE "${path_name}prog: $path_name$x.o\n";
+	push @path_indexes, $x;
 }
+&create_directory($path_name, @path_indexes);
 
 print MAKEFILE "progs := \$(sort \$(progs))\n";
 print MAKEFILE "all: \$(progs)\n";
@@ -129,5 +107,42 @@ sub generate_path
 		} else {
 			--$dirindex;
 		}
+	}
+}
+
+sub create_directory
+{
+	my $path_name = shift;
+	my @path_indexes = @_;
+
+	if($path_name ne "") {
+		mkdir "tmake/$path_name";
+		mkdir "ttup/$path_name";
+	}
+	system("cp ../testTupfile.tup ttup/$path_name/Tupfile");
+	print MAKEFILE "progs += ${path_name}prog\n";
+
+	my $first_file_in_directory = 1;
+	foreach my $x (@path_indexes) {
+		open FILE, ">ttup/$path_name$x.c" or die "Can't open ttup/$path_name$x.c for write\n";
+		for(my $y=0; $y<$num_deps; $y++) {
+			my $tmp = ($x + $y) % $num_files;
+			print FILE "#include \"$path_names[$tmp]$tmp.h\"\n";
+		}
+		print FILE "void func_$x(void) {}\n";
+		if($first_file_in_directory) {
+			print FILE "int main(void) {return 0;}\n";
+			$first_file_in_directory = 0;
+		}
+		close FILE;
+		system("cp ttup/$path_name$x.c tmake/$path_name$x.c");
+
+		open FILE, ">ttup/$path_name$x.h" or die "Can't open ttup/$path_name$x.h for write\n";
+		print FILE "void func_$x(void);\n";
+		close FILE;
+		system("cp ttup/$path_name$x.h tmake/$path_name$x.h");
+
+		print MAKEFILE "src += $path_name$x.c\n";
+		print MAKEFILE "${path_name}prog: $path_name$x.o\n";
 	}
 }
