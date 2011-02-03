@@ -1,6 +1,6 @@
 #! /bin/bash
 
-TUP=tup
+TUP=$(pwd)/../../tup
 
 rm -rf .run_test
 mkdir .run_test
