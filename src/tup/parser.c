@@ -13,6 +13,7 @@
 #include "bin.h"
 #include "entry.h"
 #include "string_tree.h"
+#include "if_stmt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -270,13 +271,14 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 {
 	char *p, *e;
 	char *line;
-	int if_true = 1;
 	int lno = 0;
 	int linelen;
 	struct bin_list bl;
+	struct if_stmt ifs;
 
 	if(bin_list_init(&bl) < 0)
 		return -1;
+	if_init(&ifs);
 
 	p = b->s;
 	e = b->s + b->len;
@@ -319,11 +321,52 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 		}
 
 		if(strcmp(line, "else") == 0) {
-			if_true = !if_true;
+			if(if_else(&ifs) < 0)
+				goto syntax_error;
 		} else if(strcmp(line, "endif") == 0) {
-			/* TODO: Nested if */
-			if_true = 1;
-		} else if(!if_true) {
+			if(if_endif(&ifs) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifeq ", 5) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = eval_eq(tf, line+5, newline);
+				if(rc == SYNTAX_ERROR)
+					goto syntax_error;
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifneq ", 6) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = eval_eq(tf, line+6, newline);
+				if(rc == SYNTAX_ERROR)
+					goto syntax_error;
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, !rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifdef ", 6) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = var_ifdef(tf, line+6);
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifndef ", 7) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = var_ifdef(tf, line+7);
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, !rc) < 0)
+				goto syntax_error;
+		} else if(!if_true(&ifs)) {
 			/* Skip the false part of an if block */
 		} else if(strncmp(line, "include ", 8) == 0) {
 			char *file;
@@ -369,34 +412,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
-		} else if(strncmp(line, "ifeq ", 5) == 0) {
-			int rc;
-			rc = eval_eq(tf, line+5, newline);
-			if(rc == SYNTAX_ERROR)
-				goto syntax_error;
-			if(rc < 0)
-				return -1;
-			if_true = rc;
-		} else if(strncmp(line, "ifneq ", 6) == 0) {
-			int rc;
-			rc = eval_eq(tf, line+6, newline);
-			if(rc == SYNTAX_ERROR)
-				goto syntax_error;
-			if(rc < 0)
-				return -1;
-			if_true = !rc;
-		} else if(strncmp(line, "ifdef ", 6) == 0) {
-			int rc;
-			rc = var_ifdef(tf, line+6);
-			if(rc < 0)
-				return -1;
-			if_true = rc;
-		} else if(strncmp(line, "ifndef ", 7) == 0) {
-			int rc;
-			rc = var_ifdef(tf, line+7);
-			if(rc < 0)
-				return -1;
-			if_true = !rc;
 		} else if(line[0] == ':') {
 			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
@@ -472,6 +487,11 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			free(var);
 			free(value);
 		}
+	}
+	if(if_check(&ifs) < 0) {
+		fprintf(stderr, "Error parsing Tupfile [%lli]: missing endif before EOF.\n", tf->tupid);
+		tup_db_print(stderr, tf->tupid);
+		return -1;
 	}
 
 	bin_list_del(&bl);
