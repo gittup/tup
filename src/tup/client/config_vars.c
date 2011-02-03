@@ -29,7 +29,7 @@ static void tup_var_init(void)
 
 	tup_send_event_f = dlsym(RTLD_DEFAULT, "tup_send_event");
 	if(!tup_send_event_f) {
-		fprintf(stderr, "tup client error: Unable to resolve tup_send_event symbol (is tup-ldpreload.so preloaded?)\n");
+		fprintf(stderr, "tup client error: Unable to resolve tup_send_event symbol. This probably means that you are running this program outside of tup. Or, there may be an error pre-loading the shared library.\n");
 		abort();
 	}
 
