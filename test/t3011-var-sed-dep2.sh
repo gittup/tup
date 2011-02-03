@@ -5,7 +5,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-, foo.txt |> out.txt
+: foo.txt |> tup-varsed %f %o |> out.txt
 : out.txt |> cat %f > %o |> new.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
@@ -17,7 +17,9 @@ tup_object_exist . foo.txt out.txt new.txt
 (echo "hey sup yo") | diff new.txt -
 
 varsetall
-update_fail
+update
+(echo "hey  yo") | diff out.txt -
+(echo "hey  yo") | diff new.txt -
 
 varsetall FOO=diggity
 update

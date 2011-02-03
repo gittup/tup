@@ -7,6 +7,9 @@ LDFLAGS_tup-ldpreload.so += -ldl
 
 : src/tup/client/*.o |> !ar |> libtup_client.a
 
+LDFLAGS_tup-varsed += -ldl
+: src/tup/varsed/*.o src/tup/fslurp.o libtup_client.a |> !ld |> tup-varsed
+
 srcs = src/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/colors/*.o

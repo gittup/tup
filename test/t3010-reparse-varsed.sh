@@ -4,7 +4,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-, foo.txt |> out.txt
+: foo.txt |> tup-varsed %f %o |> out.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile
