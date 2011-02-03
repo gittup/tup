@@ -45,8 +45,6 @@ limit variable names: eg: 0-9a-zA-Z_-
 kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try to hit ctrl-c twice)
  - might have to worry about a file being written, but the notification of it doesn't reach tup
 
-ifneq
-
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
 'tup g' shows too much info when a directory changes?
@@ -111,11 +109,9 @@ make all error messages and such pretty print on things other than 80 columns
 make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
  - I was trying to do 'find . -type f | xargs tup g' to just show files
 
-allow 'tup upd foo.o' to construct a partial DAG only for things that eventually point to foo.o (and maybe print out the number of commands that were skipped)
-
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
 
-actually support chdir/fchdir?
+actually support fchdir?
 
 html:
   proof: no clean target
