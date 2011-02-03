@@ -1,4 +1,7 @@
 #! /bin/bash
+
+TUP=tup
+
 rm -rf .run_test
 mkdir .run_test
 cd .run_test
@@ -47,6 +50,6 @@ benchmark ()
 }
 
 benchmark "make" ":" ":" "make -rR > /dev/null" ":"
-benchmark "tup" "tup init --force > /dev/null" "tup monitor" "tup upd > /dev/null" "tup stop"
+benchmark "tup" "$TUP init --force > /dev/null" "$TUP monitor" "$TUP upd > /dev/null" "$TUP stop"
 
 #diff -r tmake ttup | grep -v Makefile | grep -v build | grep -v '\.d$' | grep -v '\.tup'
