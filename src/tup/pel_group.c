@@ -180,8 +180,11 @@ int append_path_elements(struct pel_group *pg, tupid_t dt)
 {
 	struct tup_entry *tent;
 
-	if(tup_entry_add(dt, &tent) < 0)
+	tent = tup_entry_find(dt);
+	if(!tent) {
+		fprintf(stderr, "tup internal error: tup entry not found for node %lli in append_path_elements\n", dt);
 		return -1;
+	}
 	return append_path_elements_tent(pg, tent);
 }
 
