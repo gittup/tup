@@ -12,7 +12,7 @@ endif
 syntax case match
 
 syntax match comment ,^\s*#.*$,
-syntax match rule ,^\s*[:,],
+syntax match rule ,^\s*:,
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match chain ,^*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match chain ,[^a-zA-Z0-9_-]\*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
@@ -28,7 +28,6 @@ syntax match control "^\(ifeq\>\|ifneq\>\|else\>\|endif\>\|include\>\|include_ru
 syntax match backslash /\\$/
 syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
-syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable,errfmt
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
 syntax region reversecommand matchgroup=reverseseparator start=/<|/ end=/<|/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
 

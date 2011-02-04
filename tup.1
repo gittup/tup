@@ -185,9 +185,6 @@ The name of the output file without the extension. This only works in the extra-
 .RE
 .RE
 .TP
-.B , foo.h.in |> foo.h
-Translate the file on the left to the file on the right by substituting any @VARIABLE@ sequences with the corresponding @-variable. This is only used in rare circumstances, such as by mimicing the process autoconf uses to generate files. Its use is discouraged.
-.TP
 .B var = value
 .PD 0
 .TP
@@ -261,7 +258,7 @@ Variable expansion in tup is immediate in every case except for !-macros. That i
 When tup parses a Tupfile, it makes a single pass through the file, parsing a line at a time. At the end of the Tupfile, all variable, !-macro, and {bin} definitions are discarded. The only lingering effects of parsing a Tupfile are the command nodes and dependencies that now exist in the tup database. Additionally, a .gitignore file may have been created if requested by the Tupfile.
 
 .SH "@-VARIABLES"
-@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used in ,-rules. Commands are be able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
+@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used by the tup-varsed program. Commands are be able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
 .nf
 
 CONFIG_FOO=y
@@ -283,6 +280,22 @@ The reason for prefixing with "CONFIG_" in the tup.config file is to maintain co
 .TP
 .B @(TUP_PLATFORM)
 TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", or "macosx".
+.TP
+.B tup-varsed
+tup-varsed is a client program for tup. It is used to read one file, and replace any variable references and write the output to a second file. Variable references are of the form @VARIABLE@, and are replaced with the corresponding value of the @-variable. For example, if foo.txt contains:
+.nf
+
+The architecture is set to @ARCH@
+
+.fi
+And you have a :-rule in a Tupfile like so:
+.nf
+
+: foo.txt |> tup-varsed %f %o |> foo-out.txt
+
+.fi
+Then on an update, the output file will be identical to the input file, except the string @ARCH@ will be replaced with whatever CONFIG_ARCH is set to in tup.config. The tup-varsed program automatically adds the dependency from CONFIG_ARCH to the particular tup-varsed command that used it (so if CONFIG_ARCH changes, the output file will be updated with the new value).
+
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf
