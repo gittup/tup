@@ -5,11 +5,11 @@ cp ../testTupfile.tup Tupfile
 
 (echo "#include \"foo.h\""; echo "int main(void) {}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
-echo "int x;" > foo.h
+echo "int marfx;" > foo.h
 tup touch foo.c bar.c foo.h
 update
-sym_check foo.o main x
-sym_check bar.o bar1 x
+sym_check foo.o main marfx
+sym_check bar.o bar1 marfx
 sym_check prog main bar1
 
 # If we re-compile bar.c without the header, foo.h will have a dangling ref
@@ -17,7 +17,7 @@ sym_check prog main bar1
 echo "void bar1(void) {}" > bar.c
 tup touch bar.c
 update
-sym_check bar.o bar1 ~x
+sym_check bar.o bar1 ~marfx
 
 # Now the tricky part - we touch foo.h (which has refs to both .o files) and
 # see if only foo.c is re-compiled. Also, the foo.h->bar.o link should be gone
@@ -27,7 +27,7 @@ tup touch foo.h
 update --no-scan
 check_same_link bar.o oldbar.o
 rm oldbar.o
-sym_check foo.o main x
+sym_check foo.o main marfx
 tup_dep_no_exist . foo.h . "gcc -c bar.c -o bar.o"
 
 # Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
