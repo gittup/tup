@@ -7,6 +7,13 @@ mkdir $tuptestdir
 cd $tuptestdir
 tup init --no-sync --force
 
+case $tupos in
+CYGWIN*)
+       # Avoid problems with CR/LF vs LF
+       alias diff='diff -b'
+;;
+esac
+
 tmkdir()
 {
 	mkdir $1
