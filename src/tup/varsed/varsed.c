@@ -6,45 +6,54 @@
 #include <unistd.h>
 #include <ctype.h>
 
-static int var_replace(int ifd, int ofd);
+static int var_replace(int ifd, int ofd, int binmode);
 
 int main(int argc, char **argv)
 {
 	int ifd = 0;
 	int ofd = 1;
+	int x;
+	int binmode = 0;
+	int input_found = 0;
 
-	if(argc >= 2) {
-		if(strcmp(argv[1], "-h") == 0 ||
-		   strcmp(argv[1], "--help") == 0) {
+	for(x=1; x<argc; x++) {
+		if(strcmp(argv[x], "-h") == 0 ||
+		   strcmp(argv[x], "--help") == 0) {
 			fprintf(stderr, "Usage: %s [infile] [outfile]\n", argv[0]);
 			fprintf(stderr, "This will replace all variable references of the form @VARIABLE@ in [infile] with the corresponding value in the tup database, and write the output to [outfile]. If not specified, or specified as \"-\", then the input and output default to stdin and stdout, respectively.\n");
 			return 1;
-		}
-		if(strcmp(argv[1], "-") != 0) {
-			ifd = open(argv[1], O_RDONLY);
-			if(ifd < 0) {
-				fprintf(stderr, "Error opening input file.\n");
-				perror(argv[1]);
-				return 1;
+		} else if(strcmp(argv[x], "--binary") == 0) {
+			binmode = 1;
+		} else {
+			if(!input_found) {
+				if(strcmp(argv[x], "-") != 0) {
+					ifd = open(argv[x], O_RDONLY);
+					if(ifd < 0) {
+						fprintf(stderr, "Error opening input file.\n");
+						perror(argv[x]);
+						return 1;
+					}
+				}
+				input_found = 1;
+			} else {
+				if(strcmp(argv[x], "-") != 0) {
+					ofd = creat(argv[x], 0666);
+					if(ofd < 0) {
+						fprintf(stderr, "Error creating output file.\n");
+						perror(argv[x]);
+						return 1;
+					}
+				}
 			}
 		}
 	}
-	if(argc >= 3) {
-		if(strcmp(argv[2], "-") != 0) {
-			ofd = creat(argv[2], 0666);
-			if(ofd < 0) {
-				fprintf(stderr, "Error creating output file.\n");
-				perror(argv[2]);
-				return 1;
-			}
-		}
-	}
-	if(var_replace(ifd, ofd) < 0)
+
+	if(var_replace(ifd, ofd, binmode) < 0)
 		return 1;
 	return 0;
 }
 
-static int var_replace(int ifd, int ofd)
+static int var_replace(int ifd, int ofd, int binmode)
 {
 	struct buf b;
 	char *p, *e;
@@ -80,6 +89,12 @@ static int var_replace(int ifd, int ofd)
 			if(value) {
 				int len;
 				len = strlen(value);
+				if(binmode && len == 1) {
+					if(value[0] == 'y')
+						value = "1";
+					else if(value[0] == 'n')
+						value = "0";
+				}
 				if(write(ofd, value, len) != len) {
 					perror("write");
 					return -1;
