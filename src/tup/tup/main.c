@@ -466,6 +466,19 @@ static int node_exists(int argc, char **argv)
 	argv++;
 	argc--;
 	for(x=1; x<argc; x++) {
+		char *p = argv[x];
+		/* Path replacement is a hack for windows to work. This is
+		 * only used by test code to check that commands & files
+		 * actually make it into the database. But for wildcarding,
+		 * windows will use '\\' instead of '/' for the separator, so
+		 * we have to replace those in the strings. This is
+		 * potentially the wrong thing to do in some situations, but
+		 * only test code will break.
+		 */
+		while((p = strchr(p, '/')) != NULL) {
+			*p = PATH_SEP;
+			p++;
+		}
 		if(tup_db_select_tent(dt, argv[x], &tent) < 0)
 			return -1;
 		if(!tent)
