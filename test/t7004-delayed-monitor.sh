@@ -46,7 +46,7 @@ stop_monitor
 rm bar.c
 tup monitor
 update
-sym_check prog ~bar ~bar2
+sym_check prog ^bar ^bar2
 stop_monitor
 
 eotup

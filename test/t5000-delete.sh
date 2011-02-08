@@ -20,7 +20,7 @@ rm baz.c
 tup rm baz.c
 update
 check_not_exist baz.o
-sym_check prog main bar1 ~baz1
+sym_check prog main bar1 ^baz1
 
 tup_object_exist . foo.c foo.o bar.c bar.o prog
 tup_object_no_exist . baz.c baz.o

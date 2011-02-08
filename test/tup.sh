@@ -33,8 +33,8 @@ sym_check()
 	fi
 	while [ $# -gt 0 ]; do
 		sym=$1
-		if echo $sym | grep '^~' > /dev/null; then
-			sym=`echo $sym | sed 's/^~//'`
+		if echo $sym | grep '^^' > /dev/null; then
+			sym=`echo $sym | sed 's/^^//'`
 			if nm $f | grep $sym > /dev/null; then
 				echo "*** '$sym' shouldn't exist in '$f'" 1>&2
 				exit 1
