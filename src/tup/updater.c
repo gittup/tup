@@ -44,7 +44,6 @@ static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
-static int var_replace(struct node *n);
 static void sighandler(int sig);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
@@ -897,14 +896,6 @@ static int update(struct node *n, struct server *s)
 	const char *name = n->tent->name.s;
 	int rc;
 
-	/* Commands that begin with a ',' are special var/sed commands */
-	if(name[0] == ',') {
-		pthread_mutex_lock(&db_mutex);
-		rc = var_replace(n);
-		pthread_mutex_unlock(&db_mutex);
-		return rc;
-	}
-
 	if(name[0] == '^') {
 		name++;
 		while(*name && *name != ' ') {
@@ -1012,132 +1003,6 @@ err_close_dfd:
 	close(dfd);
 err_out:
 	return -1;
-}
-
-static int var_replace(struct node *n)
-{
-	int dfd;
-	int ifd;
-	int ofd;
-	struct buf b;
-	char *input;
-	char *rbracket;
-	char *output;
-	char *p, *e;
-	int rc = -1;
-	struct tup_entry *tent;
-
-	if(n->tent->name.s[0] != ',') {
-		fprintf(stderr, "Error: var_replace command must begin with ','\n");
-		return -1;
-	}
-	input = n->tent->name.s + 1;
-	while(isspace(*input))
-		input++;
-
-	dfd = tup_entry_open(n->tent->parent);
-	if(dfd < 0)
-		return -1;
-	if(fchdir(dfd) < 0) {
-		perror("fchdir");
-		return -1;
-	}
-
-	rbracket = strchr(input, '>');
-	if(rbracket == NULL) {
-		fprintf(stderr, "Unable to find '>' in var/sed command '%s'\n",
-			input);
-		goto err_close_dfd;
-	}
-	/* Use -1 since the string is '%s > %s' and we need to set the space
-	 * before the '>' to 0.
-	 */
-	if(rbracket == input) {
-		fprintf(stderr, "Error: the '>' symbol can't be at the start of the var/sed command.\n");
-		return -1;
-	}
-	rbracket[-1] = 0;
-
-	/* Make sure the input file also becomes a normal link, so if the
-	 * input file changes in the future we'll continue to process the
-	 * required parts of the DAG. See t3009.
-	 */
-	if(tup_db_select_tent(n->tent->dt, input, &tent) < 0)
-		return -1;
-	if(!tent)
-		return -1;
-	if(tup_db_create_link(tent->tnode.tupid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
-		return -1;
-
-	ifd = open(input, O_RDONLY);
-	if(ifd < 0) {
-		perror(input);
-		goto err_close_dfd;
-	}
-	if(fslurp(ifd, &b) < 0) {
-		goto err_close_ifd;
-	}
-	output = rbracket+2;
-	ofd = creat(output, 0666);
-	if(ofd < 0) {
-		perror(output);
-		goto err_free_buf;
-	}
-
-	p = b.s;
-	e = b.s + b.len;
-	do {
-		char *at;
-		char *rat;
-		at = p;
-		while(at < e && *at != '@') {
-			at++;
-		}
-		if(write(ofd, p, at-p) != at-p) {
-			perror("write");
-			goto err_close_ofd;
-		}
-		if(at >= e)
-			break;
-
-		p = at;
-		rat = p+1;
-		while(rat < e && (isalnum(*rat) || *rat == '_')) {
-			rat++;
-		}
-		if(rat < e && *rat == '@') {
-			tupid_t varid;
-			varid = tup_db_write_var(p+1, rat-(p+1), ofd);
-			if(varid < 0)
-				return -1;
-			if(tup_db_create_link(varid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
-				return -1;
-			p = rat + 1;
-		} else {
-			if(write(ofd, p, rat-p) != rat-p) {
-				perror("write");
-				goto err_close_ofd;
-			}
-			p = rat;
-		}
-		
-	} while(p < e);
-
-	if(tup_db_select_tent(n->tent->dt, output, &tent) < 0)
-		return -1;
-	if(!tent)
-		return -1;
-	rc = file_set_mtime(tent, dfd, output);
-
-err_close_ofd:
-	close(ofd);
-err_free_buf:
-	free(b.s);
-err_close_ifd:
-	close(ifd);
-err_close_dfd:
-	close(dfd);
-	return rc;
 }
 
 static void sighandler(int sig)

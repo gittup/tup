@@ -128,8 +128,6 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			     const char *cwd, int clen);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen);
-static int parse_varsed(struct tupfile *tf, char *p, int lno,
-			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
@@ -140,7 +138,6 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 static void free_bang_tree(struct rb_root *root);
 static void free_chain_tree(struct rb_root *root);
 static void free_banglist(struct list_head *list);
-static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 			       int *o_cmdlen, char **o_output, char **o_bin,
 			       int *swapio);
@@ -414,9 +411,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			tf->ign = 1;
 		} else if(line[0] == ':') {
 			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
-				goto syntax_error;
-		} else if(line[0] == ',') {
-			if(parse_varsed(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else if(line[0] == '!') {
 			if(parse_bang_definition(tf, line, lno) < 0)
@@ -820,50 +814,6 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		rc = execute_reverse_rule(tf, &r, bl, cwd, clen);
 	else
 		rc = execute_rule(tf, &r, bl, cwd, clen);
-	return rc;
-}
-
-static int parse_varsed(struct tupfile *tf, char *p, int lno,
-			struct bin_list *bl, const char *cwd, int clen)
-{
-	char *input, *output;
-	char *ie;
-	int rc;
-	struct rule r;
-	char command[] = ", %f > %o";
-
-	input = p;
-	while(isspace(*input))
-		input++;
-	p = strstr(p, "|>");
-	if(!p)
-		return -1;
-	if(input < p) {
-		ie = p - 1;
-		while(isspace(*ie))
-			ie--;
-		ie[1] = 0;
-	} else {
-		input = NULL;
-	}
-	p += 2;
-	output = p;
-	while(isspace(*output))
-		output++;
-	if(parse_bin(p, bl, &r.bin, lno) < 0)
-		return -1;
-	/* Don't rely on p now, since parse_bin fiddles with things */
-
-	r.foreach = 1;
-	r.input_pattern = input;
-	r.output_pattern = output;
-	r.command = command;
-	r.command_len = sizeof(command) - 1;
-	r.line_number = lno;
-	r.empty_input = 0;
-	r.output_nl = NULL;
-
-	rc = execute_rule(tf, &r, bl, cwd, clen);
 	return rc;
 }
 
@@ -1309,44 +1259,6 @@ static void free_banglist(struct list_head *list)
 		list_del(&bal->list);
 		free(bal);
 	}
-}
-
-static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
-{
-	char *oe;
-	char *bin;
-
-	*b = NULL;
-
-	p = strchr(p, '{');
-	/* No bin is ok */
-	if(!p)
-		return 0;
-
-	/* Terminate the real end of the output list */
-	oe = p - 1;
-	while(isspace(*oe))
-		oe--;
-	oe[1] = 0;
-
-	bin = p+1;
-	p = strchr(p, '}');
-	if(!p) {
-		fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
-		return -1;
-	}
-	*p = 0;
-
-	/* Bin must be at the end of the line */
-	if(p[1] != 0) {
-		fprintf(stderr, "Parse error line %i: Trailing characters after output bin: '%s'\n", lno, p+1);
-		return -1;
-	}
-
-	*b = bin_add(bin, bl);
-	if(!*b)
-		return -1;
-	return 0;
 }
 
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
