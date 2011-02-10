@@ -15,7 +15,7 @@ update_partial foo.c
 update_partial foo.o
 
 sym_check foo.o foo
-sym_check prog ~foo
+sym_check prog ^foo
 
 update
 sym_check prog foo

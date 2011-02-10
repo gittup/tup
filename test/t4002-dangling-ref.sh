@@ -17,7 +17,7 @@ sym_check prog main bar1
 echo "void bar1(void) {}" > bar.c
 tup touch bar.c
 update
-sym_check bar.o bar1 ~x
+sym_check bar.o bar1 ^x
 
 # Now the tricky part - we touch foo.h (which has refs to both .o files) and
 # see if only foo.c is re-compiled. Also, the foo.h->bar.o link should be gone
