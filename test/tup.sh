@@ -1,4 +1,9 @@
 tupcurdir=$PWD
+
+# Prefix PATH so the test cases run the local tup
+PATH=$PWD/..:$PATH
+export PATH
+
 testname=`echo $0 | sed 's/\.\///' | sed 's/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
 tupos=`uname -s`
