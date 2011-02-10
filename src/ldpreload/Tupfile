@@ -1,4 +1,7 @@
 include_rules
 
 CFLAGS += $(FPIC)
-: foreach *.c |> !cc |> %B.o
+srcs += *.c
+srcs += ../tup/access_event.c
+srcs += ../tup/flock.c
+: foreach $(srcs) |> !cc |> %B.o

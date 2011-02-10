@@ -40,11 +40,15 @@ done
 echo "  bootstrap CC (unoptimized) ../src/sqlite3/sqlite3.c"
 gcc -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags
 
-echo "  bootstrap CC (unoptimized) ../src/ldpreload/ldpreload.c"
+echo "  bootstrap CC (unoptimized) ../src/ldpreload/ldpreload.c [ldpreload]"
 gcc -c ../src/ldpreload/ldpreload.c -o ldpreload/ldpreload.o $plat_preloadcflags $plat_cflags -I../src
+echo "  bootstrap CC (unoptimized) ../src/tup/access_event.c [ldpreload]"
+gcc -c ../src/tup/access_event.c -o ldpreload/access_event.o $plat_preloadcflags $plat_cflags -I../src
+echo "  bootstrap CC (unoptimized) ../src/tup/flock.c [ldpreload]"
+gcc -c ../src/tup/flock.c -o ldpreload/flock.o $plat_preloadcflags $plat_cflags -I../src
 
 echo "  bootstrap LD.so tup-ldpreload.so"
-gcc $plat_preloadcflags $plat_preloadldflags -o tup-ldpreload.so ldpreload/ldpreload.o -ldl $plat_ldflags
+gcc $plat_preloadcflags $plat_preloadldflags -o tup-ldpreload.so ldpreload/ldpreload.o ldpreload/access_event.o ldpreload/flock.o -ldl $plat_ldflags
 
 echo "  bootstrap LD tup"
 echo "const char *tup_version(void) {return \"bootstrap\";}" | gcc -x c -c - -o tup_version.o

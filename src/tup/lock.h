@@ -27,8 +27,6 @@ int tup_obj_lock(void);
 int tup_tri_lock(void);
 
 /* Wrappers for fcntl */
-int tup_flock(int fd);
-int tup_unflock(int fd);
 int tup_wait_flock(int fd);
 
 #endif

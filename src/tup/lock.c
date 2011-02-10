@@ -1,5 +1,6 @@
 #define _ATFILE_SOURCE
 #include "lock.h"
+#include "flock.h"
 #include "config.h"
 #include <stdio.h>
 #include <fcntl.h>
@@ -119,38 +120,6 @@ int tup_obj_lock(void)
 int tup_tri_lock(void)
 {
 	return tri_lock;
-}
-
-int tup_flock(int fd)
-{
-	struct flock fl = {
-		.l_type = F_WRLCK,
-		.l_whence = SEEK_SET,
-		.l_start = 0,
-		.l_len = 0,
-	};
-
-	if(fcntl(fd, F_SETLKW, &fl) < 0) {
-		perror("fcntl F_WRLCK");
-		return -1;
-	}
-	return 0;
-}
-
-int tup_unflock(int fd)
-{
-	struct flock fl = {
-		.l_type = F_UNLCK,
-		.l_whence = SEEK_SET,
-		.l_start = 0,
-		.l_len = 0,
-	};
-
-	if(fcntl(fd, F_SETLKW, &fl) < 0) {
-		perror("fcntl F_UNLCK");
-		return -1;
-	}
-	return 0;
 }
 
 int tup_wait_flock(int fd)

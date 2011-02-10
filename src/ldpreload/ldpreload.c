@@ -8,23 +8,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dlfcn.h>
-#include <pthread.h>
 #include <errno.h>
-#include <sys/socket.h>
 
 #if defined(__APPLE__)
 #include <sys/stat.h>
 #endif
 
-void tup_send_event(const char *file, int len, const char *file2, int len2, int at);
-
 static void handle_file(const char *file, const char *file2, int at);
 static int ignore_file(const char *file);
-static int sendall(int sd, const void *buf, size_t len);
-static int tup_flock(int fd);
-static int tup_unflock(int fd);
-static int tupsd;
-static int lockfd;
 
 static int (*s_open)(const char *, int, ...);
 static int (*s_open64)(const char *, int, ...);
@@ -409,117 +400,5 @@ static int ignore_file(const char *file)
 		return 1;
 	if(strncmp(file, "/dev/", 5) == 0)
 		return 1;
-	return 0;
-}
-
-void tup_send_event(const char *file, int len, const char *file2, int len2, int at)
-{
-	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-	struct access_event event;
-
-	pthread_mutex_lock(&mutex);
-	if(!file) {
-		fprintf(stderr, "tup.ldpreload internal error: file can't be NUL\n");
-		exit(1);
-	}
-	if(!file2) {
-		fprintf(stderr, "tup.ldpreload internal error: file2 can't be NUL\n");
-		exit(1);
-	}
-	if(!lockfd) {
-		char *path;
-
-		path = getenv(TUP_LOCK_NAME);
-		if(!path) {
-			fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
-				"path from the environment.\n", TUP_LOCK_NAME);
-			exit(1);
-		}
-		lockfd = strtol(path, NULL, 0);
-		if(lockfd <= 0) {
-			fprintf(stderr, "tup.ldpreload: Unable to get valid file lock.\n");
-			exit(1);
-		}
-	}
-
-	if(!tupsd) {
-		char *path;
-
-		path = getenv(TUP_SERVER_NAME);
-		if(!path) {
-			fprintf(stderr, "tup.ldpreload: Unable to get '%s' "
-				"path from the environment.\n", TUP_SERVER_NAME);
-			exit(1);
-		}
-		tupsd = strtol(path, NULL, 0);
-		if(tupsd <= 0) {
-			fprintf(stderr, "tup.ldpreload: Unable to get valid socket descriptor.\n");
-			exit(1);
-		}
-	}
-
-	if(tup_flock(lockfd) < 0) {
-		exit(1);
-	}
-	event.at = at;
-	event.len = len;
-	event.len2 = len2;
-	if(sendall(tupsd, &event, sizeof(event)) < 0)
-		exit(1);
-	if(sendall(tupsd, file, event.len) < 0)
-		exit(1);
-	if(sendall(tupsd, file2, event.len2) < 0)
-		exit(1);
-	if(tup_unflock(lockfd) < 0)
-		exit(1);
-	pthread_mutex_unlock(&mutex);
-}
-
-static int sendall(int sd, const void *buf, size_t len)
-{
-	size_t sent = 0;
-	const char *cur = buf;
-
-	while(sent < len) {
-		int rc;
-		rc = send(sd, cur + sent, len - sent, 0);
-		if(rc < 0) {
-			perror("send");
-			return -1;
-		}
-		sent += rc;
-	}
-	return 0;
-}
-
-static int tup_flock(int fd)
-{
-	struct flock fl = {
-		.l_type = F_WRLCK,
-		.l_whence = SEEK_SET,
-		.l_start = 0,
-		.l_len = 0,
-	};
-
-	if(fcntl(fd, F_SETLKW, &fl) < 0) {
-		perror("fcntl F_WRLCK");
-		return -1;
-	}
-	return 0;
-}
-
-static int tup_unflock(int fd)
-{
-	struct flock fl = {
-		.l_type = F_UNLCK,
-		.l_whence = SEEK_SET,
-		.l_start = 0,
-		.l_len = 0,
-	};
-
-	if(fcntl(fd, F_SETLKW, &fl) < 0) {
-		perror("fcntl F_UNLCK");
-		return -1;
-	}
 	return 0;
 }

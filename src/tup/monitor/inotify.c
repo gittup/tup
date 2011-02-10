@@ -37,6 +37,7 @@
 #include "tup/config.h"
 #include "tup/db.h"
 #include "tup/lock.h"
+#include "tup/flock.h"
 #include "tup/updater.h"
 #include "tup/path.h"
 #include "tup/entry.h"
