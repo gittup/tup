@@ -8,7 +8,7 @@ check_monitor_supported
 tup monitor
 
 cat > Tupfile << HERE
-: foo.txt |> tup-varsed %f %o |> out.txt
+: foo.txt |> tup varsed %f %o |> out.txt
 : out.txt |> cat %f > %o |> new.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt

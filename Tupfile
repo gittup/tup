@@ -5,10 +5,11 @@ LDFLAGS_tup-ldpreload.so += $(SHARED)
 LDFLAGS_tup-ldpreload.so += -ldl
 : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 
-: src/tup/client/*.o |> !ar |> libtup_client.a
-
-LDFLAGS_tup-varsed += -ldl
-: src/tup/varsed/*.o src/tup/fslurp.o libtup_client.a |> !ld |> tup-varsed
+client_objs += src/tup/vardict.o
+client_objs += src/tup/access_event.o
+client_objs += src/tup/flock.o
+: $(client_objs) |> !ar |> libtup_client.a
+: src/tup/vardict.h |> !cp |> tup_client.h
 
 srcs = src/tup/*.o
 srcs += src/tup/monitor/*.o

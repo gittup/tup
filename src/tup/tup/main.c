@@ -20,6 +20,7 @@
 #include "tup/path.h"
 #include "tup/entry.h"
 #include "tup/colors.h"
+#include "tup/varsed.h"
 
 static int init(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent, int style);
@@ -65,6 +66,10 @@ int main(int argc, char **argv)
 		return 0;
 	} else if(strcmp(argv[1], "stop") == 0) {
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
+	} else if(strcmp(argv[1], "varsed") == 0) {
+		argc--;
+		argv++;
+		return varsed(argc, argv);
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {

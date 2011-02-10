@@ -1,10 +1,10 @@
 #! /bin/sh -e
 
-# Test using the --binary flag to tup-varsed
+# Test using the --binary flag to tup varsed
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foo.txt |> tup-varsed --binary %f %o |> out.txt
+: foo.txt |> tup varsed --binary %f %o |> out.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
 tup touch foo.txt Tupfile

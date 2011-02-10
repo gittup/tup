@@ -1,5 +1,6 @@
-#include "tup/client/tup_config_vars.h"
-#include "tup/fslurp.h"
+#include "varsed.h"
+#include "vardict.h"
+#include "fslurp.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -8,7 +9,7 @@
 
 static int var_replace(int ifd, int ofd, int binmode);
 
-int main(int argc, char **argv)
+int varsed(int argc, char **argv)
 {
 	int ifd = 0;
 	int ofd = 1;
@@ -47,6 +48,9 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+
+	if(tup_vardict_init() < 0)
+		return 1;
 
 	if(var_replace(ifd, ofd, binmode) < 0)
 		return 1;

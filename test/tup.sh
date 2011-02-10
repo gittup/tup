@@ -330,12 +330,14 @@ re_init()
 make_tup_client()
 {
 	cat > client.c << HERE
-#include "../../src/tup/client/tup_config_vars.h"
+#include "../../tup_client.h"
 #include <stdio.h>
 
 int main(int argc, char **argv)
 {
 	const char *value;
+	if(tup_vardict_init() < 0)
+		return 1;
 	while(argc > 1) {
 		value = tup_config_var(argv[1], -1);
 		if(value)
