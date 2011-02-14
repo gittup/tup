@@ -3082,13 +3082,12 @@ static struct var_entry *get_var(const char *var, int varlen)
 		}
 		if(tent->type == TUP_NODE_VAR) {
 			ve = get_var_id(tent, var, varlen);
+		} else if(varlen == 12 && strncmp(var, "TUP_PLATFORM", varlen) == 0) {
+			ve = vardb_set2(&atvardb, var, varlen, tup_platform, tent);
+		} else if(varlen == 8 && strncmp(var, "TUP_ARCH", varlen) == 0) {
+			ve = vardb_set2(&atvardb, var, varlen, tup_arch, tent);
 		} else {
-			if(varlen == 12 &&
-			   strncmp(var, "TUP_PLATFORM", varlen) == 0) {
-				ve = vardb_set2(&atvardb, var, varlen, tup_platform, tent);
-			} else {
-				ve = vardb_set2(&atvardb, var, varlen, "", tent);
-			}
+			ve = vardb_set2(&atvardb, var, varlen, "", tent);
 		}
 	}
 	return ve;

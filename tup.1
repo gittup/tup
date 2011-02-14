@@ -295,6 +295,9 @@ The reason for prefixing with "CONFIG_" in the tup.config file is to maintain co
 .TP
 .B @(TUP_PLATFORM)
 TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", or "macosx".
+.TP
+.B @(TUP_ARCH)
+TUP_ARCH is another special @-variable. If CONFIG_TUP_ARCH is not set in the tup.config file, it has a default value according to the processor architecture that tup itself was compiled in. Currently the default value is one of "i386", "x86_64", "powerpc", "powerpc64", "ia64", "alpha", "sparc" or "arm".
 
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
