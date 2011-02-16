@@ -15,7 +15,6 @@ check()
 # Override HOME so we can control ~/.tupoptions
 export HOME=`pwd`
 re_init
-check num_jobs 1
 check keep_going 0
 
 cat > .tupoptions << HERE

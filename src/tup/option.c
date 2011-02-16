@@ -25,6 +25,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/sysctl.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#endif
 
 #define OPT_MAX 256
 
@@ -35,22 +41,25 @@ static const char *locations[] = {
 };
 #define NUM_OPTION_LOCATIONS (sizeof(locations) / sizeof(locations[0]))
 
+static const char *cpu_number(void);
+static int parse_option_file(const char *file, struct vardb *vdb);
+
 static struct option {
 	const char *name;
 	const char *default_value;
+	/* function that generates default value dynamically */
+	const char *(*generator)(void);
 } options[] = {
-	{"updater.num_jobs", "1"},
-	{"updater.keep_going", "0"},
-	{"display.color", "auto"},
-	{"monitor.autoupdate", "0"},
-	{"monitor.foreground", "0"},
-	{"db.sync", "1"},
+	{"updater.num_jobs", NULL, cpu_number},
+	{"updater.keep_going", "0", NULL},
+	{"display.color", "auto", NULL},
+	{"monitor.autoupdate", "0", NULL},
+	{"monitor.foreground", "0", NULL},
+	{"db.sync", "1", NULL},
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
 static struct vardb roots[NUM_OPTION_LOCATIONS];
-
-static int parse_option_file(const char *file, struct vardb *vdb);
 static int inited = 0;
 
 int tup_option_init(void)
@@ -58,6 +67,11 @@ int tup_option_init(void)
 	unsigned int x;
 	char homefile[PATH_MAX];
 	const char *home;
+
+	for(x=0; x<NUM_OPTIONS; x++) {
+		if(options[x].generator)
+			options[x].default_value = options[x].generator();
+	}
 
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		if(vardb_init(&roots[x]) < 0)
@@ -196,4 +210,36 @@ static int parse_option_file(const char *file, struct vardb *vdb)
 	if(rc == 0)
 		return 0;
 	return -1;
+}
+
+static const char *cpu_number(void)
+{
+	static char buf[10];
+
+	int count = 1;
+#if defined(__linux__) || defined(__sun__)
+	count = sysconf(_SC_NPROCESSORS_ONLN);
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+	int nm[2];
+	size_t len = 4;
+
+	nm[0] = CTL_HW; nm[1] = HW_AVAILCPU;
+	sysctl(nm, 2, &count, &len, NULL, 0);
+
+	if(count < 1) {
+		nm[1] = HW_NCPU;
+		sysctl(nm, 2, &count, &len, NULL, 0);
+		if(count < 1) { count = 1; }
+	}
+#elif defined(_WIN32)
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo(&sysinfo);
+	count = sysinfo.dwNumberOfProcessors;
+#endif
+
+	if (count > 100000 || count < 0)
+		count = 1;
+
+	snprintf(buf, sizeof(buf), "%d", count);
+	return buf;
 }
