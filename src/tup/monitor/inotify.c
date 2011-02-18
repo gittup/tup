@@ -37,6 +37,7 @@
 #include "tup/config.h"
 #include "tup/db.h"
 #include "tup/lock.h"
+#include "tup/flock.h"
 #include "tup/updater.h"
 #include "tup/path.h"
 #include "tup/entry.h"
@@ -61,8 +62,9 @@ static int monitor_set_pid(int pid);
 static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
-static int queue_event(struct inotify_event *e);
-static int flush_queue(void);
+static int queue_event(struct inotify_event *e, int locked);
+static int flush_queue(int locked);
+static int autoupdate(void);
 static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
@@ -72,6 +74,7 @@ static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void monitor_rmdir_cb(tupid_t dt);
 static int handle_event(struct monitor_event *m);
+static int handle_event_nolock(struct monitor_event *m);
 static void pinotify(void);
 static void sighandler(int sig);
 
@@ -389,7 +392,7 @@ static int monitor_loop(void)
 				return 0;
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
-					rc = flush_queue();
+					rc = flush_queue(locked);
 					if(rc < 0)
 						return rc;
 					locked = 0;
@@ -408,15 +411,15 @@ static int monitor_loop(void)
 					if(tup_unflock(tup_tri_lock()) < 0) {
 						return -1;
 					}
+					if(flush_queue(locked) < 0)
+						return -1;
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
 			} else {
-				if(locked) {
-					rc = queue_event(e);
-					if(rc < 0)
-						return rc;
-				}
+				rc = queue_event(e, locked);
+				if(rc < 0)
+					return rc;
 			}
 		}
 
@@ -430,7 +433,7 @@ static int monitor_loop(void)
 			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
 			if(ret == 0) {
 				/* Timeout, flush queue */
-				rc = flush_queue();
+				rc = flush_queue(locked);
 				if(rc < 0)
 					return rc;
 			}
@@ -505,7 +508,7 @@ static int events_queued(void)
 	return queue_start != queue_end;
 }
 
-static int queue_event(struct inotify_event *e)
+static int queue_event(struct inotify_event *e, int locked)
 {
 	int new_start;
 	int new_end;
@@ -534,7 +537,7 @@ static int queue_event(struct inotify_event *e)
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
-		rc = flush_queue();
+		rc = flush_queue(locked);
 		if(rc < 0)
 			return rc;
 		new_start = queue_end;
@@ -560,12 +563,14 @@ static int queue_event(struct inotify_event *e)
 	return 0;
 }
 
-static int flush_queue(void)
+static int flush_queue(int locked)
 {
 	int events_handled = 0;
 	int overflow = 0;
 
-	tup_db_begin();
+	if(locked)
+		tup_db_begin();
+
 	while(queue_start < queue_end) {
 		struct monitor_event *m;
 		struct inotify_event *e;
@@ -578,16 +583,20 @@ static int flush_queue(void)
 			overflow = 1;
 		} else {
 			if(e->mask != 0) {
-				if(handle_event(m) < 0) {
-					tup_db_rollback();
-					return -1;
+				if(locked) {
+					if(handle_event(m) < 0) {
+						tup_db_rollback();
+						return -1;
+					}
+				} else {
+					if(handle_event_nolock(m) < 0)
+						return -1;
 				}
 			}
 		}
 		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
 	}
-	tup_db_commit();
 
 	queue_start = 0;
 	queue_end = 0;
@@ -598,49 +607,59 @@ static int flush_queue(void)
 		return MONITOR_LOOP_RETRY;
 	}
 
-	if(events_handled && tup_db_config_get_int("autoupdate") == 1) {
-		/* This runs in a separate process (as opposed to just calling
-		 * updater() directly) so it can properly get the lock from us
-		 * (the monitor) and flush the queue correctly. Otherwise files
-		 * touched by the updater will be caught by us, which is
-		 * annoying.
-		 */
-		int pid = fork();
-		if(pid < 0) {
-			perror("fork");
+	if(locked) {
+		tup_db_commit();
+		if(events_handled && tup_db_config_get_int("autoupdate") == 1) {
+			if(autoupdate() < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+static int autoupdate(void)
+{
+	/* This runs in a separate process (as opposed to just calling
+	 * updater() directly) so it can properly get the lock from us (the
+	 * monitor) and flush the queue correctly. Otherwise files touched by
+	 * the updater will be caught by us after we return to regular event
+	 * processing mode, which is annoying.
+	 */
+	int pid = fork();
+	if(pid < 0) {
+		perror("fork");
+		return -1;
+	}
+	if(pid == 0) {
+		if(fchdir(tup_top_fd()) < 0) {
+			perror("fchdir tup_top");
+			exit(1);
+		}
+		if(tup_lock_init() < 0)
+			exit(1);
+		updater(1, NULL, 0);
+		tup_db_config_set_int(AUTOUPDATE_PID, -1);
+		tup_lock_exit();
+		exit(0);
+	} else {
+		int *newpid;
+		pthread_t tid;
+
+		newpid = malloc(sizeof(int));
+		if(!newpid) {
+			perror("malloc");
 			return -1;
 		}
-		if(pid == 0) {
-			if(fchdir(tup_top_fd()) < 0) {
-				perror("fchdir tup_top");
-				exit(1);
-			}
-			if(tup_lock_init() < 0)
-				exit(1);
-			updater(1, NULL, 0);
-			tup_db_config_set_int(AUTOUPDATE_PID, -1);
-			tup_lock_exit();
-			exit(0);
-		} else {
-			int *newpid;
-			pthread_t tid;
-
-			newpid = malloc(sizeof(int));
-			if(!newpid) {
-				perror("malloc");
-				return -1;
-			}
-			*newpid = pid;
-			if(pthread_create(&tid, NULL, wait_thread, (void*)newpid) < 0) {
-				perror("pthread_create");
-				return -1;
-			}
-			if(pthread_detach(tid) < 0) {
-				perror("pthread_detach");
-				return -1;
-			}
-			tup_db_config_set_int(AUTOUPDATE_PID, pid);
+		*newpid = pid;
+		if(pthread_create(&tid, NULL, wait_thread, (void*)newpid) < 0) {
+			perror("pthread_create");
+			return -1;
 		}
+		if(pthread_detach(tid) < 0) {
+			perror("pthread_detach");
+			return -1;
+		}
+		tup_db_config_set_int(AUTOUPDATE_PID, pid);
 	}
 	return 0;
 }
@@ -662,8 +681,11 @@ static void *wait_thread(void *arg)
 static int skip_event(struct inotify_event *e)
 {
 	/* Skip hidden files */
-	if(e->len && e->name[0] == '.')
+	if(e->len && e->name[0] == '.') {
+		if(strcmp(e->name, ".gitignore") == 0)
+			return 0;
 		return 1;
+	}
 	return 0;
 }
 
@@ -895,6 +917,42 @@ static int handle_event(struct monitor_event *m)
 		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1) < 0)
 			return -1;
 
+		/* An IN_MOVED_FROM event points to itself */
+		list_del(&m->from_event->list);
+	}
+	return 0;
+}
+
+static int handle_event_nolock(struct monitor_event *m)
+{
+	struct dircache *dc;
+
+	if(m->e.mask & IN_IGNORED) {
+		/* Ignore IN_IGNORED events - we'll already have removed the
+		 * wd from the dircache in the callback function.
+		 */
+		return 0;
+	}
+
+	dc = dircache_lookup_wd(&droot, m->e.wd);
+	if(!dc) {
+		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
+			m->e.wd);
+		return -1;
+	}
+
+	if(m->e.mask & IN_DELETE || m->e.mask & IN_MOVED_FROM) {
+		struct tup_entry *tent;
+		if(tup_entry_find_name_in_dir(dc->dt_node.tupid, m->e.name, -1, &tent) == 0) {
+			if(tent) {
+				if(tup_entry_rm(tent->tnode.tupid) < 0) {
+					fprintf(stderr, "tup error: Unable to remove tup entry %lli\n", tent->tnode.tupid);
+					return -1;
+				}
+			}
+		}
+	}
+	if(m->e.mask & IN_MOVED_FROM) {
 		/* An IN_MOVED_FROM event points to itself */
 		list_del(&m->from_event->list);
 	}

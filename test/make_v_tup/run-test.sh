@@ -1,63 +1,55 @@
 #! /bin/bash
+
+TUP=$(pwd)/../../tup
+
 rm -rf .run_test
 mkdir .run_test
 cd .run_test
 niter=3
 ../gen-test-case.pl "$@" || exit 1
 sync
-cd tmake
-find . -type f | while read i; do cat $i > /dev/null; done
-echo "make: initial"
-time -p make -rR > /dev/null
-sync
-cfile=`find . -name 0.c`;
-hfile=`find . -name 0.h`;
 
-echo "make: 0.c touched"
-for i in `seq 1 $niter`; do
-	sleep 1; touch $cfile
-	time -p make -rR > /dev/null
-done
+# Run the full gamut of tests for one of the tools:
+benchmark ()
+{
+	tool="$1"
+	initialize="$2"
+	start="$3"
+	update="$4"
+	finish="$5"
 
-echo "make: 0.h touched"
-for i in `seq 1 $niter`; do
-	sleep 1; touch $hfile
-	time -p make -rR > /dev/null
-done
+	cd t$tool
+	find . -type f | while read i; do cat $i > /dev/null; done
+	eval "$initialize"
+	echo "$tool: initial"
+	eval "$start"
+	time -p eval "$update"
+	sync
+	cfile=`find . -name 0.c`;
+	hfile=`find . -name 0.h`;
 
-echo "make: nothing"
-for i in `seq 1 $niter`; do
-	time -p make -rR > /dev/null
-done
+	echo "$tool: 0.c touched"
+	for i in `seq 1 $niter`; do
+		sleep 1; touch $cfile
+		time -p eval "$update"
+	done
 
-cd ../ttup
-find . -type f | while read i; do cat $i > /dev/null; done
-tup init --force > /dev/null
-echo "tup: initial"
-tup monitor
-time -p tup upd > /dev/null
-sync
-cfile=`find . -name 0.c`;
-hfile=`find . -name 0.h`;
+	echo "$tool: 0.h touched"
+	for i in `seq 1 $niter`; do
+		sleep 1; touch $hfile
+		time -p eval "$update"
+	done
 
-echo "tup: 0.c touched"
-for i in `seq 1 $niter`; do
-	touch $cfile
-	time -p tup upd > /dev/null
-done
+	echo "$tool: nothing"
+	for i in `seq 1 $niter`; do
+		time -p eval "$update"
+	done
 
-echo "tup: 0.h touched"
-for i in `seq 1 $niter`; do
-	touch $hfile
-	time -p tup upd > /dev/null
-done
+	eval "$finish"
+	cd ..
+}
 
-echo "tup: nothing"
-for i in `seq 1 $niter`; do
-	time -p tup upd > /dev/null
-done
+benchmark "make" ":" ":" "make -rR > /dev/null" ":"
+benchmark "tup" "$TUP init --force > /dev/null" "$TUP monitor" "$TUP upd > /dev/null" "$TUP stop"
 
-tup stop
-
-cd ..
 #diff -r tmake ttup | grep -v Makefile | grep -v build | grep -v '\.d$' | grep -v '\.tup'

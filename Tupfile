@@ -5,11 +5,16 @@ LDFLAGS_tup-ldpreload.so += $(SHARED)
 LDFLAGS_tup-ldpreload.so += -ldl
 : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 
-: src/tup/client/*.o |> !ar |> libtup_client.a
+client_objs += src/tup/vardict.o
+client_objs += src/tup/access_event/send_event.o
+client_objs += src/tup/flock/fcntl.o
+: $(client_objs) |> !ar |> libtup_client.a
+: src/tup/vardict.h |> !cp |> tup_client.h
 
 srcs = src/tup/*.o
+srcs += src/tup/access_event/*.o
 srcs += src/tup/monitor/*.o
-srcs += src/tup/lock/*.o
+srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
 srcs += src/tup/colors/*.o
 srcs += src/linux/*.o
@@ -26,9 +31,10 @@ else
 : src/cp/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc %f -o %o |> tup-cp.exe
 
 mingwsrcs = src/tup/*.omingw
+mingwsrcs += src/tup/access_event/*.omingw
 mingwsrcs += src/tup/monitor/*.omingw
 mingwsrcs += src/tup/tup/*.omingw
-mingwsrcs += src/tup/lock/*.omingw
+mingwsrcs += src/tup/flock/*.omingw
 mingwsrcs += src/tup/server/*.omingw
 mingwsrcs += src/tup/colors/*.omingw
 mingwsrcs += src/linux/*.omingw

@@ -1,6 +1,10 @@
 #include "tup/colors.h"
 #include "tup/db.h"
 
+void color_disable(void)
+{
+}
+
 const char *color_type(int type)
 {
 	if(type) {}

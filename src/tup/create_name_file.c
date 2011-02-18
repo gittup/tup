@@ -3,6 +3,7 @@
 #include "fileio.h"
 #include "db.h"
 #include "compat.h"
+#include "pel_group.h"
 #include "config.h"
 #include "entry.h"
 #include <stdio.h>
@@ -213,6 +214,9 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 {
 	struct tup_entry *tent;
 
+	if(len < 0)
+		len = strlen(file);
+
 	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
 		return -1;
 	if(!tent) {
@@ -225,6 +229,14 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 	}
 	if(check_rm_tup_config(tent) < 0)
 		return -1;
+
+	/* If .gitignore is removed, make sure we re-parse the Tupfile
+	 * (t7040).
+	 */
+	if(strncmp(file, ".gitignore", len) == 0 && len == 10) {
+		if(tup_db_add_create_list(dt) < 0)
+			return -1;
+	}
 	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
 }
 
@@ -425,7 +437,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				 */
 				free(*last);
 				*last = NULL;
-				del_pel_list(&pg->path_list);
+				del_pel_group(pg);
 				return 0;
 			}
 			tent = tent->parent;
@@ -458,7 +470,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			}
 		}
 
-		del_pel(pel);
+		del_pel(pel, pg);
 	}
 
 	return tent->tnode.tupid;
@@ -541,139 +553,6 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 	free(pel);
 
 	return 0;
-}
-
-int get_path_elements(const char *dir, struct pel_group *pg)
-{
-	struct path_element *pel;
-	const char *p = dir;
-	int num_elements = 0;
-
-	pg->pg_flags = 0;
-	INIT_LIST_HEAD(&pg->path_list);
-
-	if(is_path_abs(dir))
-		pg->pg_flags |= PG_ROOT;
-
-	while(1) {
-		const char *path;
-		int len;
-		while(*p && is_path_sep(p)) {
-			p++;
-		}
-		if(!*p)
-			break;
-		path = p;
-		while(*p && !is_path_sep(p)) {
-			p++;
-		}
-		len = p - path;
-		if(path[0] == '.') {
-			if(len == 1) {
-				/* Skip extraneous "." paths */
-				continue;
-			}
-			if(path[1] == '.' && len == 2) {
-				/* If it's a ".." path, then delete the
-				 * previous entry, if any. Otherwise we just
-				 * include it if it's at the beginning of the
-				 * path.
-				 */
-				if(num_elements) {
-					pel = list_entry(pg->path_list.prev, struct path_element, list);
-					num_elements--;
-					del_pel(pel);
-					continue;
-				}
-				/* Don't set num_elements, since a ".." path
-				 * can't be deleted by a subsequent ".."
-				 */
-				goto skip_num_elements;
-			} else {
-				/* Hidden paths have special treatment in tup */
-				pg->pg_flags |= PG_HIDDEN;
-			}
-		}
-
-		num_elements++;
-skip_num_elements:
-
-		pel = malloc(sizeof *pel);
-		if(!pel) {
-			perror("malloc");
-			return -1;
-		}
-		pel->path = path;
-		pel->len = len;
-		list_add_tail(&pel->list, &pg->path_list);
-	}
-
-	if(pg->pg_flags & PG_ROOT) {
-		const char *top = get_tup_top();
-
-		do {
-			/* Returns are 0 here to indicate file is outside of
-			 * .tup
-			 */
-			if(list_empty(&pg->path_list) || !is_path_abs(top)) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				return 0;
-			}
-			while (*top && is_path_sep(top)) {
-				top++;
-			}
-			pel = list_entry(pg->path_list.next, struct path_element, list);
-			if(name_cmp_n(top, pel->path, pel->len) != 0) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				del_pel_list(&pg->path_list);
-				return 0;
-			}
-			top += pel->len;
-
-			del_pel(pel);
-		} while(*top);
-	}
-	return 0;
-}
-
-int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
-{
-	const struct list_head *la, *lb;
-	struct path_element *pela, *pelb;
-
-	la = &pga->path_list;
-	lb = &pgb->path_list;
-	while(la->next != &pga->path_list && lb->next != &pgb->path_list) {
-		pela = list_entry(la->next, struct path_element, list);
-		pelb = list_entry(lb->next, struct path_element, list);
-
-		if(pela->len != pelb->len)
-			return 0;
-		if(name_cmp_n(pela->path, pelb->path, pela->len) != 0)
-			return 0;
-
-		la = la->next;
-		lb = lb->next;
-	}
-	if(la->next != &pga->path_list || lb->next != &pgb->path_list)
-		return 0;
-	return 1;
-}
-
-void del_pel(struct path_element *pel)
-{
-	list_del(&pel->list);
-	free(pel);
-}
-
-void del_pel_list(struct list_head *list)
-{
-	struct path_element *pel;
-
-	while(!list_empty(list)) {
-		pel = list_entry(list->prev, struct path_element, list);
-		del_pel(pel);
-	}
 }
 
 static int ghost_to_file(struct tup_entry *tent)

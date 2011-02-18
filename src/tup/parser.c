@@ -2,6 +2,7 @@
 #include "linux/list.h"
 #include "flist.h"
 #include "fileio.h"
+#include "pel_group.h"
 #include "fslurp.h"
 #include "db.h"
 #include "vardb.h"
@@ -11,6 +12,7 @@
 #include "entry.h"
 #include "string_tree.h"
 #include "compat.h"
+#include "if_stmt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +21,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+
+#define SYNTAX_ERROR -2
 
 struct name_list {
 	struct list_head entries;
@@ -115,6 +119,7 @@ struct tupfile {
 static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			 const char *cwd, int clen);
 static int var_ifdef(struct tupfile *tf, const char *var);
+static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen);
 static int gitignore(struct tupfile *tf);
@@ -122,8 +127,6 @@ static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			     const char *cwd, int clen);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 		      const char *cwd, int clen);
-static int parse_varsed(struct tupfile *tf, char *p, int lno,
-			struct bin_list *bl, const char *cwd, int clen);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
@@ -134,7 +137,6 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 static void free_bang_tree(struct rb_root *root);
 static void free_chain_tree(struct rb_root *root);
 static void free_banglist(struct list_head *list);
-static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 			       int *o_cmdlen, char **o_output, char **o_bin,
 			       int *swapio);
@@ -265,13 +267,14 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 {
 	char *p, *e;
 	char *line;
-	int if_true = 1;
 	int lno = 0;
 	int linelen;
 	struct bin_list bl;
+	struct if_stmt ifs;
 
 	if(bin_list_init(&bl) < 0)
 		return -1;
+	if_init(&ifs);
 
 	p = b->s;
 	e = b->s + b->len;
@@ -322,11 +325,52 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 		}
 
 		if(strcmp(line, "else") == 0) {
-			if_true = !if_true;
+			if(if_else(&ifs) < 0)
+				goto syntax_error;
 		} else if(strcmp(line, "endif") == 0) {
-			/* TODO: Nested if */
-			if_true = 1;
-		} else if(!if_true) {
+			if(if_endif(&ifs) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifeq ", 5) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = eval_eq(tf, line+5, newline);
+				if(rc == SYNTAX_ERROR)
+					goto syntax_error;
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifneq ", 6) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = eval_eq(tf, line+6, newline);
+				if(rc == SYNTAX_ERROR)
+					goto syntax_error;
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, !rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifdef ", 6) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = var_ifdef(tf, line+6);
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, rc) < 0)
+				goto syntax_error;
+		} else if(strncmp(line, "ifndef ", 7) == 0) {
+			int rc = 0;
+			if(if_true(&ifs)) {
+				rc = var_ifdef(tf, line+7);
+				if(rc < 0)
+					return -1;
+			}
+			if(if_add(&ifs, !rc) < 0)
+				goto syntax_error;
+		} else if(!if_true(&ifs)) {
 			/* Skip the false part of an if block */
 		} else if(strncmp(line, "include ", 8) == 0) {
 			char *file;
@@ -372,62 +416,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
-		} else if(strncmp(line, "ifeq ", 5) == 0) {
-			char *paren;
-			char *comma;
-			char *lval;
-			char *rval;
-
-			paren = strchr(line+5, '(');
-			if(!paren)
-				goto syntax_error;
-			lval = paren + 1;
-			comma = strchr(lval, ',');
-			if(!comma)
-				goto syntax_error;
-			rval = comma + 1;
-
-			paren = line + linelen;
-			while(paren > line) {
-				if(*paren == ')')
-					goto found_paren;
-				paren--;
-			}
-			goto syntax_error;
-found_paren:
-			*comma = 0;
-			*paren = 0;
-
-			lval = eval(tf, lval, NULL, 0);
-			if(!lval)
-				return -1;
-			rval = eval(tf, rval, NULL, 0);
-			if(!rval)
-				return -1;
-			if(strcmp(lval, rval) == 0) {
-				if_true = 1;
-			} else {
-				if_true = 0;
-			}
-			free(lval);
-			free(rval);
-		} else if(strncmp(line, "ifdef ", 6) == 0) {
-			int rc;
-			rc = var_ifdef(tf, line+6);
-			if(rc < 0)
-				return -1;
-			if_true = rc;
-		} else if(strncmp(line, "ifndef ", 7) == 0) {
-			int rc;
-			rc = var_ifdef(tf, line+7);
-			if(rc < 0)
-				return -1;
-			if_true = !rc;
 		} else if(line[0] == ':') {
 			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
-				goto syntax_error;
-		} else if(line[0] == ',') {
-			if(parse_varsed(tf, line+1, lno, &bl, cwd, clen) < 0)
 				goto syntax_error;
 		} else if(line[0] == '!') {
 			if(parse_bang_definition(tf, line, lno) < 0)
@@ -499,6 +489,11 @@ found_paren:
 			free(value);
 		}
 	}
+	if(if_check(&ifs) < 0) {
+		fprintf(stderr, "Error parsing Tupfile [%lli]: missing endif before EOF.\n", tf->tupid);
+		tup_db_print(stderr, tf->tupid);
+		return -1;
+	}
 
 	bin_list_del(&bl);
 
@@ -508,6 +503,53 @@ syntax_error:
 	fprintf(stderr, "Error parsing Tupfile [%lli] line %i\n  Line was: '%s'\n", tf->tupid, lno, line);
 	tup_db_print(stderr, tf->tupid);
 	return -1;
+}
+
+static int eval_eq(struct tupfile *tf, char *expr, char *eol)
+{
+	char *paren;
+	char *comma;
+	char *lval;
+	char *rval;
+	int rc;
+
+	paren = strchr(expr, '(');
+	if(!paren)
+		return SYNTAX_ERROR;
+	lval = paren + 1;
+	comma = strchr(lval, ',');
+	if(!comma)
+		return SYNTAX_ERROR;
+	rval = comma + 1;
+
+	paren = eol;
+	while(paren > expr) {
+		if(*paren == ')')
+            goto found_paren;
+		paren--;
+	}
+	return SYNTAX_ERROR;
+found_paren:
+	*comma = 0;
+	*paren = 0;
+
+	lval = eval(tf, lval, NULL, 0);
+	if(!lval)
+		return -1;
+	rval = eval(tf, rval, NULL, 0);
+	if(!rval) {
+		free(lval);
+		return -1;
+	}
+
+	if(strcmp(lval, rval) == 0)
+		rc = 1;
+	else
+		rc = 0;
+	free(lval);
+	free(rval);
+
+	return rc;
 }
 
 static int var_ifdef(struct tupfile *tf, const char *var)
@@ -782,50 +824,6 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	return rc;
 }
 
-static int parse_varsed(struct tupfile *tf, char *p, int lno,
-			struct bin_list *bl, const char *cwd, int clen)
-{
-	char *input, *output;
-	char *ie;
-	int rc;
-	struct rule r;
-	char command[] = ", %f > %o";
-
-	input = p;
-	while(isspace(*input))
-		input++;
-	p = strstr(p, "|>");
-	if(!p)
-		return -1;
-	if(input < p) {
-		ie = p - 1;
-		while(isspace(*ie))
-			ie--;
-		ie[1] = 0;
-	} else {
-		input = NULL;
-	}
-	p += 2;
-	output = p;
-	while(isspace(*output))
-		output++;
-	if(parse_bin(p, bl, &r.bin, lno) < 0)
-		return -1;
-	/* Don't rely on p now, since parse_bin fiddles with things */
-
-	r.foreach = 1;
-	r.input_pattern = input;
-	r.output_pattern = output;
-	r.command = command;
-	r.command_len = sizeof(command) - 1;
-	r.line_number = lno;
-	r.empty_input = 0;
-	r.output_nl = NULL;
-
-	rc = execute_rule(tf, &r, bl, cwd, clen);
-	return rc;
-}
-
 static char *split_eq(char *p)
 {
 	char *eq;
@@ -833,6 +831,7 @@ static char *split_eq(char *p)
 
 	eq = strchr(p, '=');
 	if(!eq) {
+		return NULL;
 	}
 	value = eq + 1;
 	while(*value && isspace(*value))
@@ -1267,44 +1266,6 @@ static void free_banglist(struct list_head *list)
 		list_del(&bal->list);
 		free(bal);
 	}
-}
-
-static int parse_bin(char *p, struct bin_list *bl, struct bin **b, int lno)
-{
-	char *oe;
-	char *bin;
-
-	*b = NULL;
-
-	p = strchr(p, '{');
-	/* No bin is ok */
-	if(!p)
-		return 0;
-
-	/* Terminate the real end of the output list */
-	oe = p - 1;
-	while(isspace(*oe))
-		oe--;
-	oe[1] = 0;
-
-	bin = p+1;
-	p = strchr(p, '}');
-	if(!p) {
-		fprintf(stderr, "Parse error line %i: Expecting end ']' for bin name.\n", lno);
-		return -1;
-	}
-	*p = 0;
-
-	/* Bin must be at the end of the line */
-	if(p[1] != 0) {
-		fprintf(stderr, "Parse error line %i: Trailing characters after output bin: '%s'\n", lno, p+1);
-		return -1;
-	}
-
-	*b = bin_add(bin, bl);
-	if(!*b)
-		return -1;
-	return 0;
 }
 
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,

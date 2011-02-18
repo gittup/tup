@@ -2,9 +2,9 @@
 #include "tup/file.h"
 #include "tup/debug.h"
 #include "tup/getexecwd.h"
-#include "tup/fileio.h"
 #include "tup/db.h"
 #include "tup/lock.h"
+#include "tup/config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +17,7 @@ static int start_server(struct server *s);
 static int stop_server(struct server *s);
 static void *message_thread(void *arg);
 static int recvall(int sd, void *buf, size_t len);
+static int handle_chdir(struct server *s);
 static void sighandler(int sig);
 
 static struct sigaction sigact = {
@@ -139,6 +140,12 @@ static int start_server(struct server *s)
 		return -1;
 	}
 
+	init_pel_group(&s->pg);
+	if(split_path_elements(get_tup_top(), &s->pg) < 0)
+		return -1;
+	if(append_path_elements(&s->pg, s->dt) < 0)
+		return -1;
+
 	return 0;
 }
 
@@ -202,7 +209,10 @@ static void *message_thread(void *arg)
 		s->file1[event.len] = 0;
 		s->file2[event.len2] = 0;
 
-		if(handle_file(event.at, s->file1, s->file2, &s->finfo) < 0) {
+		if(event.at == ACCESS_CHDIR) {
+			if(handle_chdir(s) < 0)
+				return (void*)-1;
+		} else if(handle_file(event.at, s->file1, s->file2, &s->finfo, s->dt) < 0) {
 			return (void*)-1;
 		}
 		/* Oh noes! An electric eel! */
@@ -227,6 +237,15 @@ static int recvall(int sd, void *buf, size_t len)
 			return -1;
 		recvd += rc;
 	}
+	return 0;
+}
+
+static int handle_chdir(struct server *s)
+{
+	if(split_path_elements(s->file1, &s->pg) < 0)
+		return -1;
+	if(get_path_tupid(&s->pg, &s->dt) < 0)
+		return -1;
 	return 0;
 }
 

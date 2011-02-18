@@ -18,6 +18,6 @@ sym_check lib.a foo bar
 rm foo.c
 tup rm foo.c
 update
-sym_check lib.a ~foo bar
+sym_check lib.a ^foo bar
 
 eotup

@@ -1,4 +1,4 @@
-#include "tup/lock.h"
+#include "tup/flock.h"
 #include <windows.h>
 #include <errno.h>
 

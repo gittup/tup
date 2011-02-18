@@ -10,6 +10,7 @@
 #include "tup/getexecwd.h"
 #include "tup/monitor.h"
 #include "tup/fileio.h"
+#include "tup/pel_group.h"
 #include "tup/updater.h"
 #include "tup/graph.h"
 #include "tup/init.h"
@@ -17,6 +18,8 @@
 #include "tup/version.h"
 #include "tup/path.h"
 #include "tup/entry.h"
+#include "tup/colors.h"
+#include "tup/varsed.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -55,6 +58,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
 		return -1;
 	}
+	if(!isatty(1)) {
+		color_disable();
+	}
 
 	if(strcmp(argv[1], "init") == 0) {
 		argc--;
@@ -67,6 +73,10 @@ int main(int argc, char **argv)
 		return 0;
 	} else if(strcmp(argv[1], "stop") == 0) {
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
+	} else if(strcmp(argv[1], "varsed") == 0) {
+		argc--;
+		argv++;
+		return varsed(argc, argv);
 	}
 
 	if(init_getexecwd(argv[0]) < 0) {
@@ -377,10 +387,8 @@ static int graph(int argc, char **argv)
 		if(n->tent->sym != -1)
 			printf("\tnode_%lli -> node_%lli [dir=back color=\"#00BBBB\" arrowtail=vee]\n", n->tent->sym, n->tnode.tupid);
 
-		e = n->edges;
-		while(e) {
+		list_for_each_entry(e, &n->edges, list) {
 			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
-			e = e->next;
 		}
 	}
 	printf("}\n");
@@ -638,9 +646,11 @@ static int rm(int argc, char **argv)
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(tup_file_del(dt, pel->path, pel->len) < 0)
-			return -1;
-		free(pel);
+		if(pel) {
+			if(tup_file_del(dt, pel->path, pel->len) < 0)
+				return -1;
+			free(pel);
+		}
 	}
 	if(tup_db_commit() < 0)
 		return -1;

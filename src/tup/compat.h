@@ -11,7 +11,6 @@ int compat_init(void);
 
 #ifdef _WIN32
 #define is_path_sep(str) ((str)[0] == '/' || (str)[0] == '\\' || (str)[0] == ':' || ((str)[0] != '\0' && (str)[1] == ':'))
-#define is_path_abs(str) (is_path_sep(str) || ((str)[0] == '\0' && (str)[1] == ':'))
 #define PATH_SEP '\\'
 #define PATH_SEP_STR "\\"
 #define SQL_NAME_COLLATION " collate nocase"
@@ -19,7 +18,6 @@ int compat_init(void);
 #define name_cmp_n strnicmp
 #else
 #define is_path_sep(ch) ((ch)[0] == '/')
-#define is_path_abs(str) is_path_sep(str)
 #define PATH_SEP '/'
 #define PATH_SEP_STR "/"
 #define SQL_NAME_COLLATION ""

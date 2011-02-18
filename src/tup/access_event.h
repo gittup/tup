@@ -22,6 +22,7 @@ enum access_type {
 	ACCESS_VAR,
 	ACCESS_SYMLINK,
 	ACCESS_GHOST,
+	ACCESS_CHDIR,
 	ACCESS_STOP_SERVER,
 };
 
@@ -45,5 +46,6 @@ struct access_event {
 };
 
 #define ACCESS_EVENT_MAX_SIZE (PATH_MAX * 2 + sizeof(struct access_event))
+void tup_send_event(const char *file, int len, const char *file2, int len2, int at);
 
 #endif

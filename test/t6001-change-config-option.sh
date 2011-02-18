@@ -27,7 +27,7 @@ tup touch Tupfile
 update
 
 sym_check bar.o bar main
-sym_check prog bar main ~foo
+sym_check prog bar main ^foo
 check_not_exist foo.o
 
 eotup

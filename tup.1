@@ -20,9 +20,14 @@ You can do all of your development with just 'tup init' and 'tup upd', along wit
 .TP
 .B init
 Creates a '.tup' directory in the current directory and initialize the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
+.RS
 .TP
-.B upd
-Updates the project based on the dependency graph and the current state of the filesystem. This is what you run every time you make changes to your software to bring everything up-to-date. You can run this anywhere in the tup hierarchy, and it will always update everything. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
+.B --no-sync
+Sets the 'db_sync' configuration option of the project to '0'. By default the 'db_sync' option will be set to '1'.
+.RE
+.TP
+.B upd [<output_1> ... <output_n>]
+Updates the set of outputs based on the dependency graph and the current state of the filesystem. If no outputs are specified then the whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update the requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
 .RS
 .TP
 .B -jN
@@ -37,6 +42,12 @@ Temporarily override the keep_going configuration option to '1'. See the config 
 .TP
 .B --no-keep-going
 Temporarily override the keep_going configuration option to '0'. See the config secondary command below.
+.TP
+.B --no-scan
+Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
+.TP
+.B -d
+Output debug log to screen.
 .RE
 .SH "SECONDARY COMMANDS"
 These commands are used to modify the behavior of tup or look at its internals. You probably won't need these very often.
@@ -69,6 +80,29 @@ This is used internally to update the database in case the schema changes. If a 
 .TP
 .B g
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
+.TP
+.B todo [<output_1>..<output_n>]
+Prints out the next steps in the tup process that will execute when updating the given outputs. If no outputs are specified then it prints the steps needed to update the whole project. Similar to the 'upd' command, 'todo' will automatically scan the project for file changes if a file monitor is not running.
+.RS
+.TP
+.B --no-scan
+Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
+.RE
+.TP
+.B varsed
+The varsed command is used as a subprogram in a Tupfile; you would not run it manually at the command-line. It is used to read one file, and replace any variable references and write the output to a second file. Variable references are of the form @VARIABLE@, and are replaced with the corresponding value of the @-variable. For example, if foo.txt contains:
+.nf
+
+The architecture is set to @ARCH@
+
+.fi
+And you have a :-rule in a Tupfile like so:
+.nf
+
+: foo.txt |> tup varsed %f %o |> foo-out.txt
+
+.fi
+Then on an update, the output file will be identical to the input file, except the string @ARCH@ will be replaced with whatever CONFIG_ARCH is set to in tup.config. The varsed command automatically adds the dependency from CONFIG_ARCH to the particular command node that used it (so if CONFIG_ARCH changes, the output file will be updated with the new value).
 .TP
 .B scan
 You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup g'. Scan is called automatically by 'upd' if the monitor isn't running.
@@ -166,9 +200,6 @@ The name of the output file without the extension. This only works in the extra-
 .RE
 .RE
 .TP
-.B , foo.h.in |> foo.h
-Translate the file on the left to the file on the right by substituting any @VARIABLE@ sequences with the corresponding @-variable. This is only used in rare circumstances, such as by mimicing the process autoconf uses to generate files. Its use is discouraged.
-.TP
 .B var = value
 .PD 0
 .TP
@@ -183,6 +214,30 @@ Append "value" to the end of the current value of "var". If "var" has not been s
 The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup".
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
+.TP
+.B ifeq (lval,rval)
+Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored.
+.TP
+.B ifneq (lval,rval)
+Same as 'ifeq', but with the logic inverted.
+.TP
+.B ifdef VARIABLE
+Tests of the @-variable named VARIABLE is defined at all in tup.config. If so, all lines between the 'ifdef' and following 'endif' statement are processed; otherwise, they are ignored. For example, suppose tup.config contains:
+.nf
+
+CONFIG_FOO=n
+
+.fi
+Then 'ifdef FOO' will evaluate to true. If tup.config doesn't exist, or does not set CONFIG_FOO in any way, then 'ifdef FOO' will be false.
+.TP
+.B ifndef VARIABLE
+Same as 'ifdef', but with the logic inverted.
+.TP
+.B else
+Toggles the true/false-ness of the previous if-statement.
+.TP
+.B endif
+Ends the previous ifeq/ifdef/ifndef. Note that only 8 levels of nesting if-statements is supported.
 .TP
 .B !macro = [inputs] | [order-only inputs] |> command |> [outputs]
 Set the !-macro to the given command string. This syntax is very similar to the :-rule, since a !-macro is basically a macro for those rules. The !-macro is not expanded until it is used in the command string of a :-rule. As such, the primary use of the !-macro is to have a place to store command strings with %-flags that may be re-used. For example, we could have a !cc macro in a top-level Tuprules.tup file like so:
@@ -208,6 +263,9 @@ Reads in Tuprules.tup files up the directory chain. The first Tuprules.tup file 
 .TP
 .B .gitignore
 Tells tup to automatically generate a .gitignore file in the current directory which contains a list of the output files that are generated by tup. This can be useful if you are using git, since the set of files generated by tup matches exactly the set of files that you want git to ignore. If you are using Tuprules.tup files, you may just want to specify .gitignore in the top-level Tuprules.tup, and then have every other Tupfile use include_rules to pick up the .gitignore definition. In this way you never have to maintain the .gitignore files manually.
+.TP
+.B #
+At the beginning of a line, a '#' character signifies a comment. A comment line is ignored by the parser. The comment can have leading whitespaces that is also ignored. If there is any non-whitespace before a '#' character, then the line is not a comment. It also means that if a previous line ended with '\\' (line wrap) then '#' is interpreted as a regular symbol.
 
 .SH "TUPFILE NOTES"
 Variable expansion in tup is immediate in every case except for !-macros. That is, if you see a :-rule or variable declaration, you can substitute the current values for the variables. The !-macros are only parsed when they used in a :-rule. In that case, the actual :-rule is a sort of a union between the :-rule as written and the current value of the !-macro.
@@ -215,7 +273,7 @@ Variable expansion in tup is immediate in every case except for !-macros. That i
 When tup parses a Tupfile, it makes a single pass through the file, parsing a line at a time. At the end of the Tupfile, all variable, !-macro, and {bin} definitions are discarded. The only lingering effects of parsing a Tupfile are the command nodes and dependencies that now exist in the tup database. Additionally, a .gitignore file may have been created if requested by the Tupfile.
 
 .SH "@-VARIABLES"
-@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used in ,-rules. Commands are be able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
+@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used by the varsed command. Commands are be able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
 .nf
 
 CONFIG_FOO=y
@@ -237,6 +295,10 @@ The reason for prefixing with "CONFIG_" in the tup.config file is to maintain co
 .TP
 .B @(TUP_PLATFORM)
 TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", "macosx", or "win32".
+.TP
+.B @(TUP_ARCH)
+TUP_ARCH is another special @-variable. If CONFIG_TUP_ARCH is not set in the tup.config file, it has a default value according to the processor architecture that tup itself was compiled in. Currently the default value is one of "i386", "x86_64", "powerpc", "powerpc64", "ia64", "alpha", "sparc" or "arm".
+
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf

@@ -1,3 +1,6 @@
+#ifndef tup_flist_h
+#define tup_flist_h
+
 /*
    Copyright (C) 2005 Mike Shal
 
@@ -53,3 +56,5 @@ struct flist {
 		 ((f)->_ent=readdir((f)->_d))!=0 &&\
 		 ((f)->filename=(f)->_ent->d_name)!=0) ||\
 		((f)->_d!=0 && closedir((f)->_d));)
+
+#endif

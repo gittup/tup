@@ -4,7 +4,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-, foo.txt |> out.txt {txt}
+: foo.txt |> tup varsed %f %o |> out.txt {txt}
 : foreach {txt} |> cp %f %o |> %B.copied
 HERE
 echo "hey @FOO@ yo" > foo.txt

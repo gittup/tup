@@ -1,9 +1,19 @@
 #include "tup/colors.h"
 #include "tup/db.h"
 
+static int disabled = 0;
+
+void color_disable(void)
+{
+	disabled = 1;
+}
+
 const char *color_type(int type)
 {
 	const char *color = "";
+
+	if(disabled)
+		return "";
 
 	switch(type) {
 		case TUP_NODE_DIR:
@@ -25,25 +35,35 @@ const char *color_type(int type)
 
 const char *color_append_normal(void)
 {
+	if(disabled)
+		return "";
 	return "m";
 }
 
 const char *color_append_reverse(void)
 {
+	if(disabled)
+		return "";
 	return ";07m";
 }
 
 const char *color_reverse(void)
 {
+	if(disabled)
+		return "";
 	return "[07m";
 }
 
 const char *color_end(void)
 {
+	if(disabled)
+		return "";
 	return "[0m";
 }
 
 const char *color_final(void)
 {
+	if(disabled)
+		return "";
 	return "[07;32m";
 }

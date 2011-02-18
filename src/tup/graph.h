@@ -6,8 +6,10 @@
 #include "tupid_tree.h"
 
 struct edge {
-	struct edge *next;
+	struct list_head list;
+	struct list_head destlist;
 	struct node *dest;
+	struct node *src;
 	int style;
 };
 
@@ -19,8 +21,8 @@ struct tup_entry;
 
 struct node {
 	struct list_head list;
-	struct edge *edges;
-	int incoming_count;
+	struct list_head edges;
+	struct list_head incoming;
 	struct tupid_tree tnode;
 	struct tup_entry *tent;
 
@@ -47,12 +49,13 @@ struct node *create_node(struct graph *g, struct tup_entry *tent);
 void remove_node(struct graph *g, struct node *n);
 
 int create_edge(struct node *n1, struct node *n2, int style);
-struct edge *remove_edge(struct edge *e);
+void remove_edge(struct edge *e);
 
 int create_graph(struct graph *g, int count_flags);
 int destroy_graph(struct graph *g);
 int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
 			int *connected);
+int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
 void dump_graph(const struct graph *g, const char *filename);
 
 #endif

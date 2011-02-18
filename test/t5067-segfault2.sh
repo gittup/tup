@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : tup_t5067_segfault2 |> ./%f |>
 HERE
 tup touch ok.c Tupfile
-update_fail_msg "signal 11 (Segmentation fault)"
+update_fail_msg "Segmentation fault"
 
 cat > Tupfile << HERE
 HERE

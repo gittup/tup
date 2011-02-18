@@ -30,7 +30,7 @@ sym_check prog bar bar2
 # Delete file
 rm bar.c
 tup upd
-sym_check prog ~bar ~bar2
+sym_check prog ^bar ^bar2
 
 # Modify Tupfile
 cat > Tupfile << HERE

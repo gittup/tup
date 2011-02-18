@@ -1,4 +1,9 @@
 tupcurdir=$PWD
+
+# Prefix PATH so the test cases run the local tup
+PATH=$PWD/..:$PATH
+export PATH
+
 testname=`echo $0 | sed 's/\.\///' | sed 's/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
 tupos=`uname -s`
@@ -40,8 +45,8 @@ sym_check()
 	fi
 	while [ $# -gt 0 ]; do
 		sym=$1
-		if echo $sym | grep '^~' > /dev/null; then
-			sym=`echo $sym | sed 's/^~//'`
+		if echo $sym | grep '^^' > /dev/null; then
+			sym=`echo $sym | sed 's/^^//'`
 			if nm $f | grep $sym > /dev/null; then
 				echo "*** '$sym' shouldn't exist in '$f'" 1>&2
 				exit 1
@@ -140,7 +145,7 @@ tup_dep_no_exist()
 	fi
 }
 
-update()
+__update()
 {
 	if [ -z "$TUP_VALGRIND" ]; then
 		cmd="tup upd"
@@ -154,7 +159,17 @@ update()
 		echo "*** Failed to update!" 1>&2
 		exit 1
 	fi
+}
+
+update()
+{
+	__update $@
 	check_empty_tupdirs
+}
+
+update_partial()
+{
+	__update $@
 }
 
 update_fail()
@@ -329,12 +344,14 @@ re_init()
 make_tup_client()
 {
 	cat > client.c << HERE
-#include "../../src/tup/client/tup_config_vars.h"
+#include "../../tup_client.h"
 #include <stdio.h>
 
 int main(int argc, char **argv)
 {
 	const char *value;
+	if(tup_vardict_init() < 0)
+		return 1;
 	while(argc > 1) {
 		value = tup_config_var(argv[1], -1);
 		if(value)

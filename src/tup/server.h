@@ -4,6 +4,7 @@
 #include "access_event.h"
 #include "compat.h"
 #include "file.h"
+#include "pel_group.h"
 #include <pthread.h>
 
 struct server {
@@ -11,6 +12,8 @@ struct server {
 	int lockfd;
 	pthread_t tid;
 	struct file_info finfo;
+	tupid_t dt;
+	struct pel_group pg;
 	char file1[PATH_MAX];
 	char file2[PATH_MAX];
 	int exited;

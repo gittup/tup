@@ -25,11 +25,12 @@
 
 #define MAX_JOBS 65535
 
+static int run_scan(void);
 static int update_tup_config(void);
 static int process_create_nodes(void);
-static int process_update_nodes(void);
+static int process_update_nodes(int argc, char **argv, int *num_pruned);
 static int check_create_todo(void);
-static int check_update_todo(void);
+static int check_update_todo(int argc, char **argv);
 static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct tup_entry *tent, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
@@ -39,7 +40,6 @@ static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n, struct server *s);
-static int var_replace(struct node *n);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
 
@@ -99,11 +99,15 @@ int updater(int argc, char **argv, int phase)
 {
 	int x;
 	int do_scan = 1;
+	int num_pruned = 0;
 
 	do_keep_going = tup_db_config_get_int("keep_going");
 	num_jobs = tup_db_config_get_int("num_jobs");
 
-	for(x=1; x<argc; x++) {
+	argc--;
+	argv++;
+
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
 		} else if(strcmp(argv[x], "--keep-going") == 0 ||
@@ -115,6 +119,8 @@ int updater(int argc, char **argv, int phase)
 			do_scan = 0;
 		} else if(strncmp(argv[x], "-j", 2) == 0) {
 			num_jobs = strtol(argv[x]+2, NULL, 0);
+		} else if(strcmp(argv[x], "--") == 0) {
+			break;
 		}
 	}
 
@@ -128,36 +134,8 @@ int updater(int argc, char **argv, int phase)
 	}
 
 	if(do_scan) {
-		int rc;
-
-		rc = monitor_get_pid(0);
-		if(rc < 0) {
-			fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
+		if(run_scan() < 0)
 			return -1;
-		}
-		if(rc == 0) {
-			struct timeval t1, t2;
-			tup_main_progress("Scanning filesystem...");
-			fflush(stdout);
-			gettimeofday(&t1, NULL);
-			if(tup_scan() < 0)
-				return -1;
-			gettimeofday(&t2, NULL);
-			printf("%.3fs\n",
-			       (double)(t2.tv_sec - t1.tv_sec) +
-			       (double)(t2.tv_usec - t1.tv_usec)/1e6);
-		} else {
-			/* tup_scan would normally add the @-directory to the
-			 * entry tree, so if that doesn't run we add it here.
-			 * When we query variables, I pass in VAR_DT directly,
-			 * since it is always the same, which means the db
-			 * isn't queried and therefore the entry wouldn't
-			 * necessarily get cached normally (t6039).
-			 */
-			if(tup_entry_add(VAR_DT, NULL) < 0)
-				return -1;
-			tup_main_progress("No filesystem scan - monitor is running.\n");
-		}
 	}
 	if(server_init() < 0)
 		return -1;
@@ -169,18 +147,47 @@ int updater(int argc, char **argv, int phase)
 		return -1;
 	if(phase == 2) /* ? */
 		return 0;
-	if(process_update_nodes() < 0)
+	if(process_update_nodes(argc, argv, &num_pruned) < 0)
 		return -1;
-	tup_main_progress("Updated.\n");
+	if(num_pruned) {
+		tup_main_progress("Partial update complete:");
+		printf(" skipped %i commands.\n", num_pruned);
+	} else {
+		tup_main_progress("Updated.\n");
+	}
 	return 0; /* Profit! */
 }
 
 int todo(int argc, char **argv)
 {
+	int x;
 	int rc;
+	int do_scan = 1;
 
-	if(argc) {/* unused */}
-	if(argv) {/* unused */}
+	argc--;
+	argv++;
+
+	for(x=0; x<argc; x++) {
+		if(strcmp(argv[x], "--no-scan") == 0) {
+			do_scan = 0;
+		} else if(strcmp(argv[x], "--") == 0) {
+			break;
+		}
+	}
+
+	if(do_scan) {
+		if(run_scan() < 0)
+			return -1;
+	}
+
+	rc = tup_db_in_create_list(VAR_DT);
+	if(rc < 0)
+		return -1;
+	if(rc == 1) {
+		printf("The tup.config file has been modified and needs to be read.\n");
+		printf("Run 'tup read' to proceed to phase 1.\n");
+		return 0;
+	}
 
 	rc = check_create_todo();
 	if(rc < 0)
@@ -190,7 +197,7 @@ int todo(int argc, char **argv)
 		return 0;
 	}
 
-	rc = check_update_todo();
+	rc = check_update_todo(argc, argv);
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
@@ -198,6 +205,41 @@ int todo(int argc, char **argv)
 		return 0;
 	}
 	printf("tup: Everything is up-to-date.\n");
+	return 0;
+}
+
+static int run_scan(void)
+{
+	int rc;
+
+	rc = monitor_get_pid(0);
+	if(rc < 0) {
+		fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
+		return -1;
+	}
+	if(rc == 0) {
+		struct timeval t1, t2;
+		tup_main_progress("Scanning filesystem...");
+		fflush(stdout);
+		gettimeofday(&t1, NULL);
+		if(tup_scan() < 0)
+			return -1;
+		gettimeofday(&t2, NULL);
+		printf("%.3fs\n",
+		       (double)(t2.tv_sec - t1.tv_sec) +
+		       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+	} else {
+		/* tup_scan would normally add the @-directory to the
+		 * entry tree, so if that doesn't run we add it here.
+		 * When we query variables, I pass in VAR_DT directly,
+		 * since it is always the same, which means the db
+		 * isn't queried and therefore the entry wouldn't
+		 * necessarily get cached normally (t6039).
+		 */
+		if(tup_entry_add(VAR_DT, NULL) < 0)
+			return -1;
+		tup_main_progress("No filesystem scan - monitor is running.\n");
+	}
 	return 0;
 }
 
@@ -317,7 +359,7 @@ static int process_create_nodes(void)
 	return 0;
 }
 
-static int process_update_nodes(void)
+static int process_update_nodes(int argc, char **argv, int *num_pruned)
 {
 	struct graph g;
 	int rc;
@@ -332,6 +374,10 @@ static int process_update_nodes(void)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+
+	if(prune_graph(&g, argc, argv, num_pruned) < 0)
+		return -1;
+
 	if(g.num_nodes) {
 		tup_main_progress("Executing Commands...\n");
 	} else {
@@ -405,17 +451,20 @@ static int check_create_todo(void)
 	return rc;
 }
 
-static int check_update_todo(void)
+static int check_update_todo(int argc, char **argv)
 {
 	struct graph g;
 	int rc;
 	int stuff_todo = 0;
+	int num_pruned = 0;
 
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
+		return -1;
+	if(prune_graph(&g, argc, argv, &num_pruned) < 0)
 		return -1;
 	if(g.num_nodes) {
 		printf("Tup phase 3: The following %i command%s will be executed:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
@@ -429,6 +478,9 @@ static int check_update_todo(void)
 	} else {
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
+	}
+	if(num_pruned) {
+		printf("Partial update: %i command%s will be skipped.\n", num_pruned, num_pruned == 1 ? "" : "s");
 	}
 	if(destroy_graph(&g) < 0)
 		return -1;
@@ -498,9 +550,9 @@ edge_create:
 
 static void pop_node(struct graph *g, struct node *n)
 {
-	while(n->edges) {
+	while(!list_empty(&n->edges)) {
 		struct edge *e;
-		e = n->edges;
+		e = list_entry(n->edges.next, struct edge, list);
 		if(e->dest->state != STATE_PROCESSING) {
 			/* Put the node back on the plist, and mark it as such
 			 * by changing the state to STATE_PROCESSING.
@@ -509,7 +561,7 @@ static void pop_node(struct graph *g, struct node *n)
 			e->dest->state = STATE_PROCESSING;
 		}
 
-		n->edges = remove_edge(e);
+		remove_edge(e);
 	}
 }
 
@@ -607,8 +659,8 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		struct node *n;
 		struct worker_thread *wt;
 		n = list_entry(g->plist.next, struct node, list);
-		DEBUGP("cur node: %lli [%i]\n", n->tnode.tupid, n->incoming_count);
-		if(n->incoming_count) {
+		DEBUGP("cur node: %lli\n", n->tnode.tupid);
+		if(!list_empty(&n->incoming)) {
 			/* Here STATE_FINISHED means we're on the node_list,
 			 * therefore not ready for processing.
 			 */
@@ -810,10 +862,10 @@ static void *update_work(void *arg)
 			 */
 			if(rc == 0) {
 				pthread_mutex_lock(&db_mutex);
-				for(e=n->edges; e; e=e->next) {
+				list_for_each_entry(e, &n->edges, list) {
 					struct edge *f;
 
-					for(f=e->dest->edges; f; f=f->next) {
+					list_for_each_entry(f, &e->dest->edges, list) {
 						if(f->style & TUP_LINK_NORMAL) {
 							if(tup_db_add_modify_list(f->dest->tnode.tupid) < 0)
 								rc = -1;
@@ -829,7 +881,7 @@ static void *update_work(void *arg)
 			/* Mark the next nodes as modify in case we hit
 			 * an error - we'll need to pick up there (t6006).
 			 */
-			for(e=n->edges; e; e=e->next) {
+			list_for_each_entry(e, &n->edges, list) {
 				if(e->style & TUP_LINK_NORMAL) {
 					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
 						rc = -1;
@@ -869,7 +921,7 @@ static int unlink_outputs(int dfd, struct node *n)
 {
 	struct edge *e;
 	struct node *output;
-	for(e = n->edges; e; e = e->next) {
+	list_for_each_entry(e, &n->edges, list) {
 		output = e->dest;
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
@@ -887,14 +939,6 @@ static int update(struct node *n, struct server *s)
 	int dfd = -1;
 	const char *name = n->tent->name.s;
 	int rc;
-
-	/* Commands that begin with a ',' are special var/sed commands */
-	if(name[0] == ',') {
-		pthread_mutex_lock(&db_mutex);
-		rc = var_replace(n);
-		pthread_mutex_unlock(&db_mutex);
-		return rc;
-	}
 
 	if(name[0] == '^') {
 		name++;
@@ -929,13 +973,14 @@ static int update(struct node *n, struct server *s)
 	s->signalled = 0;
 	s->exit_status = -1;
 	s->exit_sig = -1;
+	s->dt = n->tent->dt;
 	if(server_exec(s, vardict_fd, dfd, name) < 0) {
 		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = write_files(n->tnode.tupid, n->tent->dt, dfd, name, &s->finfo, &warnings);
+	rc = write_files(n->tnode.tupid, name, &s->finfo, &warnings);
 	pthread_mutex_unlock(&db_mutex);
 	if(s->exited) {
 		if(s->exit_status == 0) {
@@ -964,132 +1009,6 @@ err_close_dfd:
 	close(dfd);
 err_out:
 	return -1;
-}
-
-static int var_replace(struct node *n)
-{
-	int dfd;
-	int ifd;
-	int ofd;
-	struct buf b;
-	char *input;
-	char *rbracket;
-	char *output;
-	char *p, *e;
-	int rc = -1;
-	struct tup_entry *tent;
-
-	if(n->tent->name.s[0] != ',') {
-		fprintf(stderr, "Error: var_replace command must begin with ','\n");
-		return -1;
-	}
-	input = n->tent->name.s + 1;
-	while(isspace(*input))
-		input++;
-
-	dfd = tup_entry_open(n->tent->parent);
-	if(dfd < 0)
-		return -1;
-	if(fchdir(dfd) < 0) {
-		perror("fchdir");
-		return -1;
-	}
-
-	rbracket = strchr(input, '>');
-	if(rbracket == NULL) {
-		fprintf(stderr, "Unable to find '>' in var/sed command '%s'\n",
-			input);
-		goto err_close_dfd;
-	}
-	/* Use -1 since the string is '%s > %s' and we need to set the space
-	 * before the '>' to 0.
-	 */
-	if(rbracket == input) {
-		fprintf(stderr, "Error: the '>' symbol can't be at the start of the var/sed command.\n");
-		return -1;
-	}
-	rbracket[-1] = 0;
-
-	/* Make sure the input file also becomes a normal link, so if the
-	 * input file changes in the future we'll continue to process the
-	 * required parts of the DAG. See t3009.
-	 */
-	if(tup_db_select_tent(n->tent->dt, input, &tent) < 0)
-		return -1;
-	if(!tent)
-		return -1;
-	if(tup_db_create_link(tent->tnode.tupid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
-		return -1;
-
-	ifd = open(input, O_RDONLY);
-	if(ifd < 0) {
-		perror(input);
-		goto err_close_dfd;
-	}
-	if(fslurp(ifd, &b) < 0) {
-		goto err_close_ifd;
-	}
-	output = rbracket+2;
-	ofd = creat(output, 0666);
-	if(ofd < 0) {
-		perror(output);
-		goto err_free_buf;
-	}
-
-	p = b.s;
-	e = b.s + b.len;
-	do {
-		char *at;
-		char *rat;
-		at = p;
-		while(at < e && *at != '@') {
-			at++;
-		}
-		if(write(ofd, p, at-p) != at-p) {
-			perror("write");
-			goto err_close_ofd;
-		}
-		if(at >= e)
-			break;
-
-		p = at;
-		rat = p+1;
-		while(rat < e && (isalnum(*rat) || *rat == '_')) {
-			rat++;
-		}
-		if(rat < e && *rat == '@') {
-			tupid_t varid;
-			varid = tup_db_write_var(p+1, rat-(p+1), ofd);
-			if(varid < 0)
-				return -1;
-			if(tup_db_create_link(varid, n->tnode.tupid, TUP_LINK_NORMAL) < 0)
-				return -1;
-			p = rat + 1;
-		} else {
-			if(write(ofd, p, rat-p) != rat-p) {
-				perror("write");
-				goto err_close_ofd;
-			}
-			p = rat;
-		}
-		
-	} while(p < e);
-
-	if(tup_db_select_tent(n->tent->dt, output, &tent) < 0)
-		return -1;
-	if(!tent)
-		return -1;
-	rc = file_set_mtime(tent, dfd, output);
-
-err_close_ofd:
-	close(ofd);
-err_free_buf:
-	free(b.s);
-err_close_ifd:
-	close(ifd);
-err_close_dfd:
-	close(dfd);
-	return rc;
 }
 
 static void tup_main_progress(const char *s)

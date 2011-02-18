@@ -9,20 +9,8 @@
 #define TUP_CONFIG "tup.config"
 
 struct tup_entry;
-
-struct path_element {
-	struct list_head list;
-	const char *path; /* Not nul-terminated */
-	int len;
-};
-
-#define PG_HIDDEN 1
-#define PG_OUTSIDE_TUP 2
-#define PG_ROOT 4
-struct pel_group {
-	struct list_head path_list;
-	int pg_flags;
-};
+struct path_element;
+struct pel_group;
 
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
@@ -53,10 +41,5 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 
 int delete_file(tupid_t dt, const char *name);
 int delete_name_file(tupid_t tupid);
-
-int get_path_elements(const char *dir, struct pel_group *pg);
-int pg_eq(const struct pel_group *pga, const struct pel_group *pgb);
-void del_pel(struct path_element *pel);
-void del_pel_list(struct list_head *list);
 
 #endif

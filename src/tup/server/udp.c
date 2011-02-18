@@ -278,7 +278,7 @@ static void *message_thread(void *arg)
 			return (void*)-1;
 		}
 
-		if(handle_file(event->at, event1, event2, &s->finfo) < 0) {
+		if(handle_file(event->at, event1, event2, &s->finfo, s->dt) < 0) {
 			fprintf(stderr, "message_thread end\n");
 			return (void*)-1;
 		}

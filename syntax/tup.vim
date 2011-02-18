@@ -11,24 +11,23 @@ endif
 
 syntax case match
 
-syntax match comment ,^#.*$,
-syntax match rule ,^[:,],
+syntax match comment ,^\s*#.*$,
+syntax match rule ,^\s*:,
 syntax match bang ,![a-zA-Z0-9_.-]*,
 syntax match chain ,^*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match chain ,[^a-zA-Z0-9_-]\*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match separator /|>/
 syntax match reverseseparator /<|/
-syntax match format display "%\([%efoBb]\)" contained
-syntax match errfmt display "%\([^%efoBb]\)" contained
+syntax match format display "%\([%efoOBb]\)" contained
+syntax match errfmt display "%\([^%efoOBb]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match atvar /@([^)]*)/
 syntax match atvar /$(CONFIG_[^)]*)/
-syntax match control "^\(ifeq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\)"
+syntax match control "^\(ifeq\>\|ifneq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\)"
 syntax match backslash /\\$/
 syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
-syntax region varsed matchgroup=rule start=/,/ end=/$/ contains=separator,format,variable,errfmt
 syntax region command matchgroup=separator start=/|>/ end=/|>/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
 syntax region reversecommand matchgroup=reverseseparator start=/<|/ end=/<|/ end=/$/ contains=format,variable,atvar,bang,errfmt,chain
 

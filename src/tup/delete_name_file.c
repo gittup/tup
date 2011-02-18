@@ -38,8 +38,10 @@ int delete_file(tupid_t dt, const char *name)
 	}
 
 	if(unlinkat(dirfd, name, 0) < 0) {
-		/* Don't care if the file is already gone. */
-		if(errno != ENOENT) {
+		/* Don't care if the file is already gone, or if the name
+		 * is too long to exist in the filesystem anyway.
+		 */
+		if(errno != ENOENT && errno != ENAMETOOLONG) {
 			perror(name);
 			rc = -1;
 			goto out;

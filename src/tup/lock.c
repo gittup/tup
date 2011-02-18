@@ -1,5 +1,6 @@
 #define _ATFILE_SOURCE
 #include "lock.h"
+#include "flock.h"
 #include "config.h"
 #include <stdio.h>
 #include <fcntl.h>
