@@ -750,6 +750,29 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			if(type == TUP_NODE_VAR) {
 				if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 					return NULL;
+			} else if(type == TUP_NODE_GENERATED) {
+				/* t6046, t6047 - when a ghost is upgraded to a
+				 * generated node, we must effectively remove
+				 * the ghost from the DAG (flag all pointed-to
+				 * nodes as necessary and delete all the
+				 * links). The reason is if we have:
+				 *
+				 * ghost |> cmdA |>...
+				 *
+				 * then later we do
+				 *
+				 * |> cmdB |> ghost
+				 *
+				 * and try to upgrade the ghost to a generated
+				 * node, we will have bypassed the checking in
+				 * cmdA for a deleted node in the input list.
+				 */
+				if(tup_db_set_dependent_dir_flags(tent->tnode.tupid) < 0)
+					return NULL;
+				if(tup_db_modify_cmds_by_input(tent->tnode.tupid) < 0)
+					return NULL;
+				if(tup_db_delete_links(tent->tnode.tupid) < 0)
+					return NULL;
 			}
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 				return NULL;
