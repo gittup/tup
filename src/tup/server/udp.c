@@ -22,6 +22,7 @@ int server_init(void)
 	return 0;
 }
 
+#define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 {
@@ -40,7 +41,10 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 	int need_shell = strchr(cmd, '&') != NULL
 		|| strchr(cmd, '|') != NULL
 		|| strchr(cmd, '>') != NULL
-		|| strchr(cmd, '<') != NULL;
+		|| strchr(cmd, '<') != NULL
+		|| strncmp(cmd, "./", 2) == 0;
+
+	int need_sh = strncmp(cmd, "./", 2) == 0;
 
 	if(vardict_fd) {}
 
@@ -52,9 +56,18 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 	cmdline[0] = '\0';
 	/* Only pull in cmd if really necessary */
 	if(!have_shell && need_shell) {
-		strcat(cmdline, CMDSTR);
+		if(need_sh) {
+			strcat(cmdline, SHSTR);
+		} else {
+			strcat(cmdline, CMDSTR);
+		}
+	} else {
+		need_sh = 0;
 	}
 	strcat(cmdline, cmd);
+	if(need_sh) {
+		strcat(cmdline, "'");
+	}
 
 	memset(&sa, 0, sizeof(sa));
 	sa.cb = sizeof(STARTUPINFOW);
