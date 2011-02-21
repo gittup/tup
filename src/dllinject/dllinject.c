@@ -664,8 +664,12 @@ NTSTATUS WINAPI NtOpenFile_hook(
 		 * confusing to follow, but it doesn't ever seem to go through
 		 * the DeleteFile() route. This is the only place I've found
 		 * that seems to be able to hook those events.
+		 *
+		 * The DesiredAccess & DELETE check is how cygwin does a
+		 * rename() to remove the old file.
 		 */
-		if(ShareAccess == FILE_SHARE_DELETE) {
+		if(ShareAccess == FILE_SHARE_DELETE ||
+		   DesiredAccess & DELETE) {
 			handle_file(name, NULL, ACCESS_UNLINK);
 		} else if(OpenOptions & FILE_OPEN_FOR_BACKUP_INTENT) {
 			/* The MSVC linker seems to successfully open
