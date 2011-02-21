@@ -33,14 +33,26 @@ static const char* access_type_name[] = {
 	"ghost",
 };
 
+FILE *debugf = NULL;
+int opening = 0;
 static void debug_hook(const char* format, ...)
 {
 	char buf[256];
 	va_list ap;
+	if(debugf == NULL && !opening) {
+		opening = 1;
+		debugf = fopen("c:\\cygwin\\home\\marf\\ok.txt", "w+");
+		fflush(stdout);
+	}
+	if(debugf == NULL) {
+		printf("No file :(\n");
+		return;
+	}
 	va_start(ap, format);
 	vsnprintf(buf, 255, format, ap);
 	buf[255] = '\0';
-	OutputDebugStringA(buf);
+	fprintf(debugf, buf);
+	fflush(debugf);
 }
 #else
 #	define DEBUG_HOOK(...)
