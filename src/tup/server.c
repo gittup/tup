@@ -14,12 +14,30 @@ static void *message_thread(void *arg);
 static int recvall(int sd, void *buf, size_t len);
 static int handle_chdir(struct server *s);
 
-static char ldpreload_path[PATH_MAX];
+#if defined(__x86_64__) && !defined(__APPLE__)
+  // In case of 64bit linux/solaris (and any other OS that uses ELF format)
+  // ld.so should load one of the tup-ldpreload.so files (either 32bit or 64bit)
+  // from LD_LIBRARY_PATH
+  #define USE_LD_LIBRARY_PATH 1
+#endif
+
+#ifdef USE_LD_LIBRARY_PATH
+  #define LDPRELOAD_PATH_SIZE (2 * PATH_MAX)
+#else
+  #define LDPRELOAD_PATH_SIZE PATH_MAX
+#endif
+
+static char ldpreload_path[LDPRELOAD_PATH_SIZE];
 
 int server_init(void)
 {
 	if(snprintf(ldpreload_path, sizeof(ldpreload_path),
+#ifdef USE_LD_LIBRARY_PATH
+		    "%s:%s/lib32",
+		    getexecwd(),
+#else
 		    "%s/tup-ldpreload.so",
+#endif
 		    getexecwd()) >= (signed)sizeof(ldpreload_path)) {
 		fprintf(stderr, "Error: path for tup-ldpreload.so library is "
 			"too long.\n");
@@ -43,6 +61,9 @@ void server_setenv(struct server *s, int vardict_fd)
 #ifdef __APPLE__
 	setenv("DYLD_FORCE_FLAT_NAMESPACE", "", 1);
 	setenv("DYLD_INSERT_LIBRARIES", ldpreload_path, 1);
+#elif USE_LD_LIBRARY_PATH
+	setenv("LD_PRELOAD", "tup-ldpreload.so", 1);
+	setenv("LD_LIBRARY_PATH", ldpreload_path, 1);
 #else
 	setenv("LD_PRELOAD", ldpreload_path, 1);
 #endif

@@ -3,3 +3,7 @@ TUP_MONITOR = null
 # not-so-informative fashion.
 CFLAGS += -D_REENTRANT
 LDFLAGS += -lsocket
+
+ifeq (@(TUP_ARCH),x86_64)
+  X86_ARCH_SIBLINGS=y
+endif
