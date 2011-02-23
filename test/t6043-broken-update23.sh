@@ -6,6 +6,7 @@
 #
 # See also t5066.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo hey > ok.txt; exit 1 |> ok.txt

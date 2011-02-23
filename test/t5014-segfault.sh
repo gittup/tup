@@ -3,6 +3,7 @@
 # Make sure a command that segfaults actually fails (and doesn't hose the DAG).
 
 . ./tup.sh
+check_no_windows segfault
 cat > Tupfile << HERE
 : segfault.c |> gcc %f -o %o |> tup_t5014_segfault
 : tup_t5014_segfault |> ./%f |>

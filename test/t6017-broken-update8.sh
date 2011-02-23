@@ -12,6 +12,7 @@
 # to mimic the getdents() syscall that javac and gcj appear to use.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : B.java |> cat %f > %o |> B.class

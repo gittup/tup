@@ -4,6 +4,11 @@
 # re-executed when necessary (specifically, when a sticky link is removed that
 # is also a normal link).
 . ./tup.sh
+
+# Windows seems to have trouble getting the output from the gcc subprocess
+# in update_fail_msg
+check_no_windows
+
 tmkdir headers
 cat > headers/Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h

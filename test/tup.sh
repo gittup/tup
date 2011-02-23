@@ -381,6 +381,16 @@ check_monitor_supported()
 	fi
 }
 
+check_no_windows()
+{
+	case $tupos in
+	CYGWIN*)
+		echo "Not supported in Windows. Skipping test."
+		eotup
+		;;
+	esac
+}
+
 eotup()
 {
 	tup stop || true

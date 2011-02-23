@@ -3,6 +3,7 @@
 # Try to generate a ghost symlink in a subdir from a rule.
 
 . ./tup.sh
+check_no_windows symlink
 cat > Tupfile << HERE
 : |> ln -s secret/ghost %o |> foo
 HERE

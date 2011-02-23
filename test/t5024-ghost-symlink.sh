@@ -4,6 +4,7 @@
 # node there, and properly update things if the file is later created.
 
 . ./tup.sh
+check_no_windows shell
 echo "#define FOO 3" > foo-x86.h
 ln -s foo-x86.h foo.h
 cat > Tupfile << HERE

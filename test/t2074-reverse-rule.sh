@@ -3,6 +3,7 @@
 # Try a rule where we use the output names to drive the foreach
 
 . ./tup.sh
+check_no_windows symlink
 cat > Tupfile << HERE
 link-y += ar
 link-y += vi

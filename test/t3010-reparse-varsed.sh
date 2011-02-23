@@ -3,6 +3,7 @@
 # Seems I broke re-parsing a Tupfile with a var/sed command
 
 . ./tup.sh
+check_no_windows varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
 HERE

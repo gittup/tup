@@ -7,6 +7,7 @@
 # necessary anymore and is confusing.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : foo.txt bar.txt |> cat %f; echo yay |>
 HERE

@@ -5,6 +5,7 @@
 # would be silly. Let's *not* do the time warp again.
 
 . ./tup.sh
+check_no_windows symlink
 
 # Make the symlink first, in a separate directory. That way it will exist
 # and not be marked delete when we create a new Tupfile in the top-level

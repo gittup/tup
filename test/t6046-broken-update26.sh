@@ -5,6 +5,7 @@
 # now be writing the file, which causes a circular dependency.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> cat foo 2> /dev/null || true; touch foo |>
 HERE

@@ -4,6 +4,7 @@
 # command that creates a regular file.
 
 . ./tup.sh
+check_no_windows symlink
 
 cat > Tupfile << HERE
 : |> ln -s foo bar |> bar

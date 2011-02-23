@@ -4,6 +4,7 @@
 # too long will fail, and then shortening the filename will cause tup to
 # get stuck trying to unlink the file.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo 1 > %o |> foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo

@@ -3,6 +3,7 @@
 # Check support for mkstemp
 
 . ./tup.sh
+check_no_windows mkstemp
 cat > ok.c << HERE
 #include <stdlib.h>
 

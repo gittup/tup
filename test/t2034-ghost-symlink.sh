@@ -4,6 +4,7 @@
 # the broken symlink is removed.
 
 . ./tup.sh
+check_no_windows symlink
 ln -s ghost foo
 tup touch foo
 tup_object_exist . ghost foo

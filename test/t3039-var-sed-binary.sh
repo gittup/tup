@@ -3,6 +3,7 @@
 # Test using the --binary flag to tup varsed
 
 . ./tup.sh
+check_no_windows varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed --binary %f %o |> out.txt
 HERE

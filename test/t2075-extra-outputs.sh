@@ -3,6 +3,7 @@
 # Try extra-outputs, which are like order-only pre-requisites.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> echo blah > %o; touch bar |> foo.h | bar
 HERE

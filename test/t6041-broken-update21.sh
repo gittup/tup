@@ -16,6 +16,7 @@
 # fail with a circular dependency.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile <<HERE
 : |> if [ -f output ]; then cat output; fi |> output

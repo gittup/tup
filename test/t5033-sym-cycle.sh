@@ -2,6 +2,7 @@
 
 # sym-cycle: a game about a wheel?
 . ./tup.sh
+check_no_windows shell
 
 ln -s a b
 ln -s b a

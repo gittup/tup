@@ -3,6 +3,7 @@
 # Now try changing a variable and see the client re-execute
 
 . ./tup.sh
+check_no_windows client
 
 make_tup_client
 

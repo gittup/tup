@@ -6,6 +6,7 @@
 # files to use as input.
 
 . ./tup.sh
+check_no_windows symlink
 
 tmkdir arch-x86
 cat > Tupfile << HERE

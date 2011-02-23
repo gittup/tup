@@ -3,6 +3,7 @@
 # Make sure that if a command creates a file and exits with a failure code,
 # the outputs are still checked.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo hey > ok.txt; exit 1 |>

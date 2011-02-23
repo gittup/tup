@@ -4,6 +4,7 @@
 # causing those variables to become ghosts.
 
 . ./tup.sh
+check_no_windows client
 
 make_tup_client
 

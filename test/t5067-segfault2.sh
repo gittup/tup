@@ -3,6 +3,7 @@
 # Make sure that if a command creates a file and then segfaults, the outputs
 # the outputs are still checked.
 . ./tup.sh
+check_no_windows segfault
 
 cat > ok.c << HERE
 #include <stdio.h>

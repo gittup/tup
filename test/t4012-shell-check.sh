@@ -5,6 +5,7 @@
 # flag set after a successful update. That's annoying.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> echo hey > %o && ./foo.sh %o |> out.txt
 HERE

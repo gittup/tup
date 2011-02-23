@@ -3,6 +3,7 @@
 # Test using a var to sed a file
 
 . ./tup.sh
+check_no_windows varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
 HERE

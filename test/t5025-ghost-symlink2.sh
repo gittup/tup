@@ -4,6 +4,7 @@
 # node, and then re-create the destination.
 
 . ./tup.sh
+check_no_windows shell
 echo "#define FOO 3" > foo-x86.h
 ln -s foo-x86.h foo.h
 cat > Tupfile << HERE

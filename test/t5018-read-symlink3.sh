@@ -3,6 +3,7 @@
 # Same as t5017, only the symlink points to a directory instead of a file.
 
 . ./tup.sh
+check_no_windows symlink
 mkdir arch-x86
 mkdir arch-ppc
 tup touch arch-x86 arch-ppc

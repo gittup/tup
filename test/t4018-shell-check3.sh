@@ -6,6 +6,7 @@
 # command to now break if we didn't do this.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> echo foo; false; echo bar |>
 HERE

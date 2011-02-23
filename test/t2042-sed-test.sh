@@ -11,6 +11,7 @@
 # command is supposed to match the literal '$' in 'foo$').
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> echo 'foo\$' | sed 's/o\\\$/3/' > %o |> out.txt
 HERE

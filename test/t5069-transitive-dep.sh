@@ -19,6 +19,7 @@
 # violate the assumptions in the "strongly connected" graph.
 
 . ./tup.sh
+check_no_windows shlib
 
 cat > foo.c << HERE
 #include "foo.h"

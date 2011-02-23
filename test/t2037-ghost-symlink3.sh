@@ -4,6 +4,7 @@
 # one symlink doesn't kill the ghost.
 
 . ./tup.sh
+check_no_windows symlink
 ln -s ghost foo
 ln -s ghost bar
 tup touch foo bar

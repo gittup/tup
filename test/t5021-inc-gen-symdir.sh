@@ -5,6 +5,7 @@
 # later try to include a Tupfile by using that directory link.
 
 . ./tup.sh
+check_no_windows symlink
 
 tmkdir foo
 tmkdir foo/arch-x86

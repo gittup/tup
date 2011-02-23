@@ -4,6 +4,7 @@
 # is necessary in addition to t5027 because symlinks are handled differently
 # than normal output files.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1

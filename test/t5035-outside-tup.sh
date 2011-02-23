@@ -3,6 +3,7 @@
 # Make sure that files that go outside of tup are properly ignored.
 
 . ./tup.sh
+check_no_windows shell
 tmkdir foo
 tmkdir include
 cat > foo/Tupfile << HERE

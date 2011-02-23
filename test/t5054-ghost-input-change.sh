@@ -4,6 +4,7 @@
 # dependencies of the command do. The ghost node should still be removed.
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : ok.sh |> sh %f > %o |> output
 HERE

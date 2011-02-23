@@ -8,6 +8,7 @@
 # cpio - most normal commands don't have this).
 
 . ./tup.sh
+check_no_windows shell
 
 grep_yes()
 {

@@ -7,6 +7,7 @@
 # in ldpreload isn't called until after all shared libraries are loaded.
 
 . ./tup.sh
+check_no_windows shlib
 cat > Tupfile << HERE
 : lib.c |> gcc -fPIC -shared %f -o %o |> lib.so
 : prog.c lib.so |> gcc %f -o %o |> prog

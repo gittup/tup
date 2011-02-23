@@ -4,6 +4,7 @@
 # get the dependency on the symlink file.
 
 . ./tup.sh
+check_no_windows shell
 
 mkdir foo
 ln -s foo boo

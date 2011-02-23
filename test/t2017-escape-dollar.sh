@@ -3,6 +3,7 @@
 # See if we can escape a dollar-sign paren
 
 . ./tup.sh
+check_no_windows shell
 cat > Tupfile << HERE
 : |> FOO="hey"; export FOO; echo \$FOO |>
 : |> echo \\\$(ls) |>
