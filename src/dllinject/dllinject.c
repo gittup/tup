@@ -1524,6 +1524,8 @@ static int ignore_file(const char* file)
 		return 1;
 	if (strcasestr(file, "\\PIPE\\") != NULL)
 		return 1;
+	if (strnicmp(file, "PIPE\\", 5) == 0)
+		return 1;
 	if (strcasestr(file, "\\Device\\") != NULL)
 		return 1;
 	if (strstr(file, "$") != NULL)
