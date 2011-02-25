@@ -28,6 +28,13 @@ int main(void)
 }
 HERE
 
+if gcc ok.c -o tmp 2>/dev/null; then
+	rm tmp
+else
+	echo "[33mmkostemp not supported on this platform? Quitting successfully.[0m" 1>&2
+	exit 0
+fi
+
 cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> prog
 : prog |> ./prog |> output
