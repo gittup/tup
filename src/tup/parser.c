@@ -1,3 +1,5 @@
+/* _ATFILE_SOURCE needed at least on linux x86_64 */
+#define _ATFILE_SOURCE
 #include "parser.h"
 #include "linux/list.h"
 #include "flist.h"
