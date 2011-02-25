@@ -33,7 +33,7 @@ int win32_add_dirpath(const char *path)
 {
 	struct dirpath *dp;
 	char buf[PATH_MAX];
-	int len1;
+	int len1 = 0;
 	int len2;
 
 	dp = malloc(sizeof *dp);
@@ -41,21 +41,31 @@ int win32_add_dirpath(const char *path)
 		perror("malloc");
 		return -1;
 	}
-	if(getcwd(buf, sizeof(buf)) == NULL) {
-		perror("getcwd");
-		return -1;
+	if(!is_path_sep(path)) {
+		/* Relative paths get prefixed with getcwd */
+		if(getcwd(buf, sizeof(buf)) == NULL) {
+			perror("getcwd");
+			return -1;
+		}
+		len1 = strlen(buf);
 	}
-	len1 = strlen(buf);
 	len2 = strlen(path);
 	dp->path = malloc(len1 + len2 + 2);
 	if(!dp->path) {
 		perror("malloc");
 		return -1;
 	}
-	memcpy(dp->path, buf, len1);
-	dp->path[len1] = '\\';
-	memcpy(dp->path+len1+1, path, len2);
-	dp->path[len1 + len2 + 1] = 0;
+	if(!is_path_sep(path)) {
+		/* Relative paths */
+		memcpy(dp->path, buf, len1);
+		dp->path[len1] = '\\';
+		memcpy(dp->path+len1+1, path, len2);
+		dp->path[len1 + len2 + 1] = 0;
+	} else {
+		/* Full paths */
+		memcpy(dp->path, path, len2);
+		dp->path[len2] = 0;
+	}
 
 	pthread_mutex_lock(&dir_mutex);
 	dp->tnode.tupid = dp_fd;
