@@ -12,6 +12,19 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
+/* In case of 64bit linux/solaris (and any other OS that uses ELF format)
+ * ld.so should load one of the tup-ldpreload.so files (either 32bit or 64bit)
+ * from LD_LIBRARY_PATH
+ */
+#if defined(__x86_64__) && !defined(__APPLE__)
+#define USE_LD_LIBRARY_PATH
+#define LDPRELOAD_PATH_SIZE (2 * PATH_MAX)
+#define LDPRELOAD_ARGS "%s:%s/lib32", getexecwd(), getexecwd()
+#else
+#define LDPRELOAD_PATH_SIZE PATH_MAX
+#define LDPRELOAD_ARGS "%s/tup-ldpreload.so", getexecwd()
+#endif
+
 static void server_setenv(struct server *s, int vardict_fd);
 static int start_server(struct server *s);
 static int stop_server(struct server *s);
@@ -25,13 +38,12 @@ static struct sigaction sigact = {
 	.sa_flags = SA_RESTART,
 };
 static int sig_quit = 0;
-static char ldpreload_path[PATH_MAX];
+static char ldpreload_path[LDPRELOAD_PATH_SIZE];
 
 int server_init(void)
 {
 	if(snprintf(ldpreload_path, sizeof(ldpreload_path),
-		    "%s/tup-ldpreload.so",
-		    getexecwd()) >= (signed)sizeof(ldpreload_path)) {
+		    LDPRELOAD_ARGS) >= (signed)sizeof(ldpreload_path)) {
 		fprintf(stderr, "Error: path for tup-ldpreload.so library is "
 			"too long.\n");
 		return -1;
@@ -119,6 +131,9 @@ static void server_setenv(struct server *s, int vardict_fd)
 #ifdef __APPLE__
 	setenv("DYLD_FORCE_FLAT_NAMESPACE", "", 1);
 	setenv("DYLD_INSERT_LIBRARIES", ldpreload_path, 1);
+#elif defined(USE_LD_LIBRARY_PATH)
+	setenv("LD_PRELOAD", "tup-ldpreload.so", 1);
+	setenv("LD_LIBRARY_PATH", ldpreload_path, 1);
 #else
 	setenv("LD_PRELOAD", ldpreload_path, 1);
 #endif

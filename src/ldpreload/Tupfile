@@ -4,4 +4,11 @@ CFLAGS += $(FPIC)
 srcs += *.c
 srcs += ../tup/access_event/send_event.c
 srcs += ../tup/flock/fcntl.c
-: foreach $(srcs) |> !cc |>
+
+ifeq ($(X86_ARCH_SIBLINGS),y)
+  : foreach $(srcs) |> !cc |> %B.64.o
+  CFLAGS += -m32
+  : foreach $(srcs) |> !cc |> %B.32.o
+else
+  : foreach $(srcs) |> !cc |> %B.o
+endif

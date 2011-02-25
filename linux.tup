@@ -1,1 +1,5 @@
 TUP_MONITOR = inotify
+
+ifeq (@(TUP_ARCH),x86_64)
+  X86_ARCH_SIBLINGS=y
+endif
