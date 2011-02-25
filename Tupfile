@@ -1,16 +1,8 @@
 include_rules
 
-LDFLAGS_preload += $(FPIC)
-LDFLAGS_preload += $(SHARED)
-LDFLAGS_preload += -ldl
-
 ifeq ($(X86_ARCH_SIBLINGS),y)
-  LDFLAGS_tup-ldpreload.32.so += $(LDFLAGS_preload) -m32
-  LDFLAGS_tup-ldpreload.so += $(LDFLAGS_preload)
   : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
-  : src/ldpreload/*.32.o |> !ld |> tup-ldpreload.32.so
 else
-  LDFLAGS_tup-ldpreload.so += $(LDFLAGS_preload)
   : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 endif
 

@@ -48,3 +48,7 @@ FPIC = -fpic
 SHARED = -shared
 TUP_MONITOR = null
 include @(TUP_PLATFORM).tup
+
+LDFLAGS_tup-ldpreload.so += $(FPIC)
+LDFLAGS_tup-ldpreload.so += $(SHARED)
+LDFLAGS_tup-ldpreload.so += -ldl
