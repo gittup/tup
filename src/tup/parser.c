@@ -2370,10 +2370,6 @@ out_pl:
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
 				  list);
-		/* Note: If this link becomes sticky, be careful that var/sed
-		 * commands still work (since they don't go through the normal
-		 * server process to create links).
-		 */
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_tree, &tree) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
