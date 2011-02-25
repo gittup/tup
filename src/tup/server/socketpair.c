@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 
