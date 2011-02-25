@@ -90,7 +90,7 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 		 * programs would have to fight over who gets it, which is just
 		 * nonsensical).
 		 */
-		close(0);
+		close(STDIN_FILENO);
 
 		execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 		perror("execl");

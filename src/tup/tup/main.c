@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
 		return -1;
 	}
-	if(!isatty(1)) {
+	if(!isatty(STDOUT_FILENO)) {
 		color_disable();
 	}
 
