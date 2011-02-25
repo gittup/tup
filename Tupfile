@@ -24,9 +24,7 @@ srcs += src/compat/*.o
 
 : src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o
 
-# TODO: Uhhh...ifneq
-ifeq (@(TUP_MINGW),)
-else
+ifneq (@(TUP_MINGW),)
 : src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -o %o |> tup-dllinject.dll
 : src/cp/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc %f -o %o |> tup-cp.exe
 
