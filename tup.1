@@ -1,4 +1,4 @@
-.TH "tup" "1" "2010/09/07" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2011/02/24" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -19,11 +19,13 @@ Tup has no domain specific knowledge. You must tell tup how to build your progra
 You can do all of your development with just 'tup init' and 'tup upd', along with writing Tupfiles. See also the TUPFILES section below.
 .TP
 .B init
-Creates a '.tup' directory in the current directory and initialize the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
+Creates a '.tup' directory in the current directory and initializes the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
+
+If a ~/.tupconfig file exists, it is read and used to initialize config variables. The file is expected to contain one variable definition per line. See the 'config' command for more information about the variables.
 .RS
 .TP
 .B --no-sync
-Sets the 'db_sync' configuration option of the project to '0'. By default the 'db_sync' option will be set to '1'.
+Sets the 'db_sync' configuration option of the project to '0'. By default the 'db_sync' option will be set to '1'. This is mostly used for test cases, but you could also use this in any environment where you want to script tup and use no synchronization by default.
 .RE
 .TP
 .B upd [<output_1> ... <output_n>]
@@ -59,7 +61,15 @@ Starts the inotify-based file monitor. The monitor must scan the filesystem once
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
 .TP
 .B config [option value]
-Displays or sets the current tup options. With no further arguments, all of the options are displayed. The options can be set by specifying the option name and a new value. For example, 'tup config db_sync 0' would turn off the database disk synchronization. The configuration options are stored in the database in the 'config' table, so accessing these options cannot be done at the same time as an update.
+Displays or sets the current tup options. With no further arguments, all of the options are displayed. The options can be set by specifying the option name and a new value. For example, 'tup config db_sync 0' would turn off the database disk synchronization. The configuration options are stored in the database in the 'config' table, so accessing these options cannot be done at the same time as an update. The defaults listed here are the compiled-in defaults. They can be overridden by specifying them in a ~/.tupconfig file, one on each line. For example, if you have a .tupconfig file that contains:
+
+.nf
+num_jobs = 2
+keep_going = 1
+.fi
+
+Then 'tup init' will default to 2 jobs, and have the keep_going flag set.
+
 .RS
 .TP
 .B db_sync (default '1')

@@ -731,6 +731,84 @@ int tup_db_debug_add_all_ghosts(void)
 	return 0;
 }
 
+int process_tup_config(void)
+{
+	struct buf b;
+	int fd;
+	int dfd;
+	char *p;
+	int remaining;
+	char *home;
+	int rc = -1;
+
+	home = getenv("HOME");
+	if(!home)
+		return 0;
+	dfd = open(home, O_RDONLY);
+	if(dfd < 0) {
+		perror(home);
+		goto out_err;
+	}
+	fd = openat(dfd, ".tupconfig", O_RDONLY);
+	if(fd < 0) {
+		if(errno == ENOENT) {
+			/* No .tupconfig is ok */
+			rc = 0;
+		} else {
+			perror(".tupconfig");
+		}
+		goto out_close_dfd;
+	}
+	if(fslurp(fd, &b) < 0) {
+		fprintf(stderr, "tup error: Unable to read .tupconfig file\n");
+		goto out_close_fd;
+	}
+	p = b.s;
+	remaining = b.len;
+	while(p < b.s + b.len) {
+		char *start;
+		char *end;
+		char *eq;
+		char *value;
+		start = p;
+		end = memchr(p, '\n', remaining);
+		if(!end) {
+			fprintf(stderr, "tup: Error parsing .tupconfig line: %s\n", p);
+			goto out_free_buf;
+		}
+		*end = 0;
+		eq = strchr(p, '=');
+		if(!eq) {
+			fprintf(stderr, "tup: Error parsing .tupconfig line: %s\n", eq);
+			goto out_free_buf;
+		}
+		value = eq+1;
+		while(*value && isspace(*value)) {
+			value++;
+		}
+		eq--;
+		while(eq > p && isspace(*eq)) {
+			eq--;
+		}
+		eq[1] = 0;
+		if(tup_db_config_set_string(p, value) < 0)
+			goto out_free_buf;
+		p = end + 1;
+	}
+	rc = 0;
+
+out_free_buf:
+	free(b.s);
+out_close_fd:
+	close(fd);
+out_close_dfd:
+	close(dfd);
+out_err:
+	if(rc < 0)
+		fprintf(stderr, "tup error: Unable to read tup config\n");
+	return rc;
+}
+
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
 {
 	return tup_db_create_node_part(dt, name, -1, type);

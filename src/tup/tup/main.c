@@ -221,6 +221,8 @@ static int init(int argc, char **argv)
 		perror(TUP_VARDICT_FILE);
 		return -1;
 	}
+	if(process_tup_config() < 0)
+		return -1;
 	return 0;
 
 err_close:

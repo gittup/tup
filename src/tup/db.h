@@ -46,6 +46,7 @@ int tup_db_rollback(void);
 int tup_db_check_flags(int flags);
 void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);
+int process_tup_config(void);
 
 /* Node operations */
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);
