@@ -183,6 +183,8 @@ static int stop_server(struct server *s)
 	close(s->sd[0]);
 	close(s->sd[1]);
 
+	del_pel_group(&s->pg);
+
 	if(retval == NULL)
 		return 0;
 	return -1;
