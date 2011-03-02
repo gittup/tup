@@ -13,6 +13,7 @@
 #include "monitor.h"
 #include "path.h"
 #include "colors.h"
+#include "stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,13 +36,15 @@ static int build_graph(struct graph *g);
 static int add_file_cb(void *arg, struct tup_entry *tent, int style);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
+static void flush_buffer(FILE *from, FILE *to);
+static int std_errout_are_same(void);
 
 static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
 static void tup_main_progress(const char *s);
-static void show_progress(int sum, int total, struct node *n);
+static void show_progress(int sum, int total, struct node *n, int is_error);
 
 static int do_keep_going;
 static int num_jobs;
@@ -50,6 +53,9 @@ static int warnings;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t id_mutex;
+
+// TOASK(marf) or move it to a separate file?
+__thread FILE *thread_stdout, *thread_stderr;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -93,6 +99,9 @@ struct worker_thread {
 	struct node *retn;
 	int rc;
 	int quit;
+
+	FILE *out;
+	FILE *err;
 };
 
 int updater(int argc, char **argv, int phase)
@@ -273,7 +282,7 @@ static int delete_files(struct graph *g)
 				do_delete = 0;
 			}
 
-			show_progress(num_deleted, g->delete_count, &tmpn);
+			show_progress(num_deleted, g->delete_count, &tmpn, 0);
 			num_deleted++;
 
 			/* Only delete if the file wasn't modified (t6031) */
@@ -290,7 +299,7 @@ static int delete_files(struct graph *g)
 		free(te);
 	}
 	if(g->delete_count) {
-		show_progress(g->delete_count, g->delete_count, NULL);
+		show_progress(g->delete_count, g->delete_count, NULL, 0);
 	}
 	return 0;
 }
@@ -624,6 +633,8 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		perror("malloc");
 		return -2;
 	}
+
+	int errout_are_same = std_errout_are_same();
 	for(x=0; x<jobs; x++) {
 		workers[x].g = g;
 
@@ -643,6 +654,8 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		workers[x].retn = NULL;
 		workers[x].rc = -1;
 		workers[x].quit = 0;
+		workers[x].out = tmpfile();
+		workers[x].err = errout_are_same ? workers[x].out : tmpfile();
 		list_add(&workers[x].list, &free_list);
 
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
@@ -678,10 +691,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			goto check_empties;
 		}
 
-		if(n->tent->type == g->count_flags) {
-			show_progress(num_processed, g->num_nodes, n);
-			num_processed++;
-		}
 		list_del(&n->list);
 		active++;
 
@@ -714,6 +723,17 @@ check_empties:
 			list_move(&wt->list, &free_list);
 			pthread_mutex_unlock(&list_mutex);
 			active--;
+
+			if(n->tent->type == g->count_flags) {
+				show_progress(num_processed, g->num_nodes, n, wt->rc != 0);
+				flush_buffer(wt->out, stdout);
+				if (wt->out != wt->err) {
+					// We have separate buffers for stdout and stderr
+					flush_buffer(wt->err, stderr);
+				}
+
+				num_processed++;
+			}
 
 			if(wt->rc < 0) {
 				if(keep_going)
@@ -748,7 +768,7 @@ keep_going:
 		}
 		goto out;
 	}
-	show_progress(num_processed, g->num_nodes, NULL);
+	show_progress(num_processed, g->num_nodes, NULL, 0);
 	rc = 0;
 out:
 	/* First tell all the threads to quit */
@@ -761,6 +781,11 @@ out:
 	/* Then wait for all the threads to quit */
 	for(x=0; x<jobs; x++) {
 		pthread_join(workers[x].pid, NULL);
+
+		if (workers[x].out != workers[x].err)
+			fclose(workers[x].err);
+		fclose(workers[x].out);
+
 		pthread_cond_destroy(&workers[x].cond);
 		pthread_mutex_destroy(&workers[x].lock);
 	}
@@ -769,6 +794,40 @@ out:
 	pthread_mutex_destroy(&list_mutex);
 	pthread_cond_destroy(&list_cond);
 	return rc;
+}
+
+/*
+ * The function checks whether tup's stdout and stderr is the same physical file
+ * (such as terminal or disk file).
+ */
+static int std_errout_are_same() {
+	struct stat out, err;
+	fstat(STDOUT_FILENO, &out);
+	fstat(STDERR_FILENO, &err);
+	return (out.st_dev == err.st_dev) && (out.st_ino == err.st_ino);
+}
+
+static void flush_buffer(FILE *from, FILE *to) {
+	fflush(from);
+	rewind(from);
+	char buffer[4096];
+	while (1) {
+		int read_num = fread(buffer, sizeof(char), sizeof(buffer), from);
+		if (read_num == 0) {
+			break;
+		} else if (read_num > 0) {
+			int write_num = fwrite(buffer, sizeof(char), read_num, to);
+			if (write_num < 0)
+				perror("fwrite");
+		} else {
+			perror("fread");
+		}
+	}
+
+	fflush(to);
+
+	if (ftruncate(fileno(from), 0) < 0)
+		perror("ftruncate");
 }
 
 static struct node *worker_wait(struct worker_thread *wt)
@@ -801,6 +860,9 @@ static void *create_work(void *arg)
 	struct graph *g = wt->g;
 	struct node *n;
 
+	thread_stdout = wt->out;
+	thread_stderr = wt->err;
+
 	while(1) {
 		int rc = 0;
 
@@ -810,7 +872,7 @@ static void *create_work(void *arg)
 
 		if(n->tent->type == TUP_NODE_DIR) {
 			if(n->already_used) {
-				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
+				fprintf(thread_stdout, "Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
 				rc = 0;
 			} else {
 				rc = parse(n, g);
@@ -821,7 +883,7 @@ static void *create_work(void *arg)
 			  n->tent->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
-			fprintf(stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
+			fprintf(thread_stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
 			rc = -1;
 		}
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)
@@ -836,6 +898,9 @@ static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct node *n;
+
+	thread_stdout = wt->out;
+	thread_stderr = wt->err;
 
 	while(1) {
 		struct edge *e;
@@ -899,13 +964,16 @@ static void *todo_work(void *arg)
 	struct graph *g = wt->g;
 	struct node *n;
 
+	thread_stdout = wt->out;
+	thread_stderr = wt->err;
+
 	while(1) {
 		n = worker_wait(wt);
 		if(n == (void*)-1)
 			break;
 
 		if(n->tent->type == g->count_flags)
-			tup_db_print(stdout, n->tnode.tupid);
+			tup_db_print(thread_stdout, n->tnode.tupid);
 
 		worker_ret(wt, 0);
 	}
@@ -921,7 +989,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				perror("unlinkat");
-				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
+				fprintf(thread_stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				return -1;
 			}
 		}
@@ -949,13 +1017,13 @@ static int update(struct node *n)
 			/* This space reserved for flags for something. I dunno
 			 * what yet.
 			 */
-			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
+			fprintf(thread_stderr, "Error: Unknown ^ flag: '%c'\n", *name);
 			name++;
 			return -1;
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
-			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
+			fprintf(thread_stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			return -1;
 		}
 		name++;
@@ -964,8 +1032,8 @@ static int update(struct node *n)
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
-		fprintf(stderr, "Error: Unable to open directory for update work.\n");
-		tup_db_print(stderr, n->tent->parent->tnode.tupid);
+		fprintf(thread_stderr, "Error: Unable to open directory for update work.\n");
+		tup_db_print(thread_stderr, n->tent->parent->tnode.tupid);
 		goto err_out;
 	}
 
@@ -979,7 +1047,7 @@ static int update(struct node *n)
 	s.exit_sig = -1;
 	init_file_info(&s.finfo);
 	if(server_exec(&s, vardict_fd, dfd, name, n->tent->parent) < 0) {
-		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
+		fprintf(thread_stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
 
@@ -989,7 +1057,7 @@ static int update(struct node *n)
 			rc = write_files(n->tnode.tupid, name, &s.finfo, &warnings);
 			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0) {
-				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
+				fprintf(thread_stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
 				goto err_close_dfd;
 			}
 
@@ -1003,12 +1071,12 @@ static int update(struct node *n)
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
-		fprintf(stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
+		fprintf(thread_stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
 	} else {
-		fprintf(stderr, "tup internal error: Expected s.exited or s.signalled to be set for command %lli", n->tnode.tupid);
+		fprintf(thread_stderr, "tup internal error: Expected s.exited or s.signalled to be set for command %lli", n->tnode.tupid);
 	}
 
-	fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s.exit_status, name);
+	fprintf(thread_stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s.exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:
@@ -1023,7 +1091,7 @@ static void tup_main_progress(const char *s)
 	cur_phase++;
 }
 
-static void show_progress(int sum, int total, struct node *n)
+static void show_progress(int sum, int total, struct node *n, int is_error)
 {
 	if(total) {
 		const int max = 11;
@@ -1041,7 +1109,6 @@ static void show_progress(int sum, int total, struct node *n)
 		} else {
 			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
 		}
-		fill = max * sum / total;
 
 		if(n) {
 			name = n->tent->name.s;
@@ -1056,7 +1123,12 @@ static void show_progress(int sum, int total, struct node *n)
 			}
 
 			color = color_type(n->tent->type);
-			printf("[%s%s%.*s%s%.*s] ", color, color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+			if (is_error) {
+				printf("[%s%s%.*s%s] ", color_error(), color_append_reverse(), max, buf, color_end());
+			} else {
+				fill = max * sum / total;
+				printf("[%s%s%.*s%s%.*s] ", color, color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+			}
 			if(n->tent && n->tent->parent) {
 				print_tup_entry(stdout, n->tent->parent);
 			}

@@ -67,3 +67,10 @@ const char *color_final(void)
 		return "";
 	return "[07;32m";
 }
+
+const char *color_error(void)
+{
+	if(disabled)
+		return "";
+	return "[31";
+}

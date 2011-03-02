@@ -35,3 +35,8 @@ const char *color_final(void)
 {
 	return "";
 }
+
+const char *color_error(void)
+{
+	return "";
+};

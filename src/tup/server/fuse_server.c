@@ -6,6 +6,7 @@
 #include "tup/lock.h"
 #include "tup/flist.h"
 #include "tup/debug.h"
+#include "tup/stdio.h"
 #include "tup_fuse_fs.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -242,7 +243,12 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		 * programs would have to fight over who gets it, which is just
 		 * nonsensical).
 		 */
-		close(0);
+		close(STDIN_FILENO);
+
+		fflush(thread_stdout);
+		fflush(thread_stderr);
+		dup2(fileno(thread_stdout), STDOUT_FILENO);
+		dup2(fileno(thread_stderr), STDERR_FILENO);
 
 		execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 		perror("execl");

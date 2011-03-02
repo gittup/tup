@@ -13,6 +13,7 @@
 #include "tup/updater.h"
 #include "tup/debug.h"
 #include "tup/graph.h"
+#include "tup/stdio.h"
 #include "tup/init.h"
 #include "tup/compat.h"
 #include "tup/version.h"
@@ -86,6 +87,9 @@ int main(int argc, char **argv)
 
 	argc = argc - cmd_arg;
 	argv = &argv[cmd_arg];
+
+	thread_stdout = stdout;
+	thread_stderr = stderr;
 
 	if(strcmp(cmd, "init") == 0) {
 		return init(argc, argv);

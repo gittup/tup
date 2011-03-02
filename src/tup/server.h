@@ -5,6 +5,7 @@
 #include "compat.h"
 #include "file.h"
 #include "pel_group.h"
+#include <stdio.h>
 #include <pthread.h>
 
 struct tup_entry;

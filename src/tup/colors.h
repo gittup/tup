@@ -8,5 +8,6 @@ const char *color_append_reverse(void);
 const char *color_reverse(void);
 const char *color_end(void);
 const char *color_final(void);
+const char *color_error(void);
 
 #endif

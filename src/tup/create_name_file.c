@@ -6,6 +6,7 @@
 #include "pel_group.h"
 #include "config.h"
 #include "entry.h"
+#include "stdio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,12 +75,12 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 
 	rc = readlinkat(dfd, file, linkname, sizeof(linkname));
 	if(rc < 0) {
-		fprintf(stderr, "readlinkat: ");
+		fprintf(thread_stderr, "readlinkat: ");
 		perror(file);
 		return -1;
 	}
 	if(rc >= (signed)sizeof(linkname)) {
-		fprintf(stderr, "tup error: linkname buffer is too small for the symlink of '%s'\n", file);
+		fprintf(thread_stderr, "tup error: linkname buffer is too small for the symlink of '%s'\n", file);
 		return -1;
 	}
 	linkname[rc] = 0;
@@ -115,7 +116,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 	if(fd < 0)
 		return -1;
 	if(fstatat(fd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		fprintf(stderr, "tup error: tup_file_mod() fstatat failed.\n");
+		fprintf(thread_stderr, "tup error: tup_file_mod() fstatat failed.\n");
 		perror(file);
 		return -1;
 	}
@@ -158,9 +159,9 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				if(tup_db_modify_cmds_by_output(tent->tnode.tupid, &tmp) < 0)
 					return -1;
 				if(tmp == 1) {
-					fprintf(stderr, "tup warning: generated file '");
-					print_tup_entry(stderr, tent->parent);
-					fprintf(stderr, "%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
+					fprintf(thread_stderr, "tup warning: generated file '");
+					print_tup_entry(thread_stderr, tent->parent);
+					fprintf(thread_stderr, "%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
 				}
 			}
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
@@ -295,11 +296,11 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 
 			tent = tup_entry_find(tupid);
 			if(!tent) {
-				fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
+				fprintf(thread_stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
 			} else {
-				fprintf(stderr, "tup warning: generated file '");
-				print_tup_entry(stderr, tent->parent);
-				fprintf(stderr, "%s' was deleted outside of tup. This file may be re-created on the next update.\n", tent->name.s);
+				fprintf(thread_stderr, "tup warning: generated file '");
+				print_tup_entry(thread_stderr, tent->parent);
+				fprintf(thread_stderr, "%s' was deleted outside of tup. This file may be re-created on the next update.\n", tent->name.s);
 			}
 		}
 
@@ -417,7 +418,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 		list_del(&pel->list);
 	} else {
 		/* TODO */
-		fprintf(stderr, "[31mBork[0m\n");
+		fprintf(thread_stderr, "[31mBork[0m\n");
 		exit(1);
 	}
 
@@ -450,7 +451,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			if(!tent) {
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
-					fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
+					fprintf(thread_stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
 					return -1;
 				}
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
@@ -502,12 +503,12 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	if(!tent) {
 		if(sotgv) {
 			if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
-				fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+				fprintf(thread_stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 				return -1;
 			}
 		} else {
-			fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
-			tup_db_print(stderr, new_dt);
+			fprintf(thread_stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
+			tup_db_print(thread_stderr, new_dt);
 			return -1;
 		}
 	}
@@ -546,7 +547,7 @@ int gimme_node_or_make_ghost(tupid_t dt, const char *name,
 		return -1;
 	if(!*entry) {
 		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, entry) < 0) {
-			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+			fprintf(thread_stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
 	}
