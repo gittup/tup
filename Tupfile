@@ -1,7 +1,13 @@
 include_rules
 
-ifeq ($(X86_ARCH_SIBLINGS),y)
-  : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
+ifeq (@(TUP_ARCH),x86_64)
+  ifeq (@(TUP_PLATFORM),macosx)
+    LDFLAGS_tup-ldpreload.64.so = $(LDFLAGS_tup-ldpreload.so)
+    : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.64.so
+    : tup-ldpreload.64.so lib32/tup-ldpreload.so |> ^ LIPO %o^ lipo -create %f -output %o |> tup-ldpreload.so
+  else
+    : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
+  endif
 else
   : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
 endif

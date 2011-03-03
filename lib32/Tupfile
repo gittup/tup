@@ -1,6 +1,6 @@
 include_rules
 
-ifeq ($(X86_ARCH_SIBLINGS),y)
+ifeq (@(TUP_ARCH),x86_64)
   LDFLAGS_tup-ldpreload.so += -m32
   : ../src/ldpreload/*.32.o |> !ld |> tup-ldpreload.so
 endif
