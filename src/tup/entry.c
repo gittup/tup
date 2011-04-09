@@ -397,12 +397,20 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 
 int tup_entry_sym_follow(struct tup_entry *tent)
 {
+	const int max_loops = 10;
+	int x = 0;
 	while(tent->sym != -1) {
 		if(tent->symlink == NULL) {
 			if(tup_entry_resolve_sym(tent) < 0)
 				return -1;
 		}
 		tent = tent->symlink;
+		x++;
+		if(x > max_loops) {
+			fprintf(stderr, "tup error: symlink loop detected. Last entry was %lli\n", tent->tnode.tupid);
+			tup_db_print(stderr, tent->tnode.tupid);
+			return -1;
+		}
 	}
 	return 0;
 }

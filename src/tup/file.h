@@ -19,6 +19,9 @@ struct tup_entry;
 int init_file_info(struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info, tupid_t dt);
+int handle_open_file(enum access_type at, const char *filename,
+		     struct file_info *info, tupid_t dt);
+int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings);
 int file_set_mtime(struct tup_entry *tent, int dfd, const char *file);

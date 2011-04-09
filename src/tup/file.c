@@ -35,8 +35,6 @@ struct dfd_info {
 
 static struct file_entry *new_entry(const char *filename, tupid_t dt);
 static void del_entry(struct file_entry *fent);
-static int handle_rename(const char *from, const char *to,
-			 struct file_info *info);
 static int handle_symlink(const char *from, const char *to, tupid_t dt,
 			  struct file_info *info);
 static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
@@ -62,9 +60,6 @@ int init_file_info(struct file_info *info)
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info, tupid_t dt)
 {
-	struct file_entry *fent;
-	int rc = 0;
-
 	DEBUGP("received file '%s' in mode %i\n", filename, at);
 
 	if(at == ACCESS_RENAME) {
@@ -73,6 +68,15 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	if(at == ACCESS_SYMLINK) {
 		return handle_symlink(filename, file2, dt, info);
 	}
+
+	return handle_open_file(at, filename, info, dt);
+}
+
+int handle_open_file(enum access_type at, const char *filename,
+		     struct file_info *info, tupid_t dt)
+{
+	struct file_entry *fent;
+	int rc = 0;
 
 	fent = new_entry(filename, dt);
 	if(!fent) {
@@ -178,8 +182,7 @@ static void del_entry(struct file_entry *fent)
 }
 
 /* TODO: Needs knowledge of dt? */
-static int handle_rename(const char *from, const char *to,
-			 struct file_info *info)
+int handle_rename(const char *from, const char *to, struct file_info *info)
 {
 	struct file_entry *fent;
 	struct pel_group pg_from;
@@ -401,8 +404,7 @@ out_skip:
 		if(sym_entry->dt < 0)
 			goto skip_sym;
 
-		if(tup_db_select_tent(sym_entry->dt, sym_entry->to, &tent) < 0)
-			return -1;
+		tent = get_tent_dt(sym_entry->dt, sym_entry->to);
 		if(!tent) {
 			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);

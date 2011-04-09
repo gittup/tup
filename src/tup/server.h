@@ -7,24 +7,22 @@
 #include "pel_group.h"
 #include <pthread.h>
 
+struct tup_entry;
+
 struct server {
-	int sd[2];
-	int lockfd;
-	pthread_t tid;
 	struct file_info finfo;
-	tupid_t dt;
-	struct pel_group pg;
-	char file1[PATH_MAX];
-	char file2[PATH_MAX];
 	int exited;
 	int signalled;
 	int exit_status;
 	int exit_sig;
-	int udp_port;
+	void *internal;
 };
 
 int server_init(void);
-int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd);
+int server_setup(struct server *s, const char *jobdir);
+int server_quit(struct server *s);
+int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
+		struct tup_entry *dtent);
 int server_is_dead(void);
 
 #endif

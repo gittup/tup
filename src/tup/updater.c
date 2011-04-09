@@ -80,7 +80,7 @@ static const char *signal_err[] = {
 struct worker_thread {
 	struct list_head list;
 	pthread_t pid;
-	int lockfd;      /* lock fd for .tup/jobXXXX/.tuplock */
+	struct server s;
 	struct graph *g; /* This should only be used in create_work() and todo_work */
 
 	pthread_mutex_t lock;
@@ -600,6 +600,10 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		perror(TUP_DIR);
 		return -2;
 	}
+	if(fchdir(tupfd) < 0) {
+		perror("fchdir");
+		return -2;
+	}
 
 	workers = malloc(sizeof(*workers) * jobs);
 	if(!workers) {
@@ -607,22 +611,26 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		return -2;
 	}
 	for(x=0; x<jobs; x++) {
-		char lockname[] = "jobXXXX/.tuplock";
-		workers[x].g = g;
-		snprintf(lockname+3, 5, "%04x", x);
-		lockname[7] = 0;
-		if(mkdirat(tupfd, lockname, 0777) < 0) {
+		char jobdir[8];
+		snprintf(jobdir, sizeof(jobdir), "job%04x", x);
+		jobdir[7] = 0;
+
+		if(mkdir(jobdir, 0777) < 0) {
 			if(errno != EEXIST) {
-				perror("mkdirat");
+				perror("mkdir");
 				return -2;
 			}
 		}
-		lockname[7] = '/';
-		workers[x].lockfd = openat(tupfd, lockname, O_RDWR|O_CREAT, 0644);
-		if(workers[x].lockfd < 0) {
-			perror(lockname);
-			return -2;
+
+		/* TODO: Hack to only use server for update work */
+		if(work_func == update_work) {
+			if(server_setup(&workers[x].s, jobdir) < 0) {
+				return -2;
+			}
+		} else {
+			memset(&workers[x].s, 0, sizeof(workers[x].s));
 		}
+		workers[x].g = g;
 
 		if(pthread_mutex_init(&workers[x].lock, NULL) != 0) {
 			perror("pthread_mutex_init");
@@ -756,8 +764,9 @@ out:
 		pthread_mutex_unlock(&workers[x].lock);
 	}
 	for(x=0; x<jobs; x++) {
+		if(server_quit(&workers[x].s) < 0)
+			rc = -2;
 		pthread_join(workers[x].pid, NULL);
-		close(workers[x].lockfd);
 		pthread_cond_destroy(&workers[x].cond);
 		pthread_mutex_destroy(&workers[x].lock);
 	}
@@ -831,15 +840,7 @@ static void *create_work(void *arg)
 static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
-	struct server *s;
 	struct node *n;
-
-	s = malloc(sizeof *s);
-	if(!s) {
-		perror("malloc");
-		return NULL;
-	}
-	s->lockfd = wt->lockfd;
 
 	while(1) {
 		struct edge *e;
@@ -850,7 +851,7 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
-			rc = update(n, s);
+			rc = update(n, &wt->s);
 
 			/* If the command succeeds, mark any next commands (ie:
 			 * our output files' output links) as modify in case we
@@ -894,7 +895,6 @@ static void *update_work(void *arg)
 
 		worker_ret(wt, rc);
 	}
-	free(s);
 	return NULL;
 }
 
@@ -973,8 +973,7 @@ static int update(struct node *n, struct server *s)
 	s->signalled = 0;
 	s->exit_status = -1;
 	s->exit_sig = -1;
-	s->dt = n->tent->dt;
-	if(server_exec(s, vardict_fd, dfd, name) < 0) {
+	if(server_exec(s, vardict_fd, dfd, name, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}

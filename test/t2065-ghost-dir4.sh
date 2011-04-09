@@ -13,8 +13,6 @@ chmod +x ok.sh
 tup touch ok.sh Tupfile
 update
 tup_object_exist . super
-tup_object_exist super secret
-tup_object_exist super/secret ghost
 
 rm -f Tupfile
 tup rm Tupfile

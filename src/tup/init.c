@@ -8,6 +8,11 @@
 
 int tup_init(void)
 {
+	/* Initialize our process group to be our PID. This is used by our FUSE
+	 * filesystem to make sure only allowed processes can access it.
+	 */
+	setpgid(0, 0);
+
 	if(find_tup_dir() != 0) {
 		fprintf(stderr, "No .tup directory found. Run 'tup init' at the top of your project to create the dependency filesystem.\n");
 		return -1;

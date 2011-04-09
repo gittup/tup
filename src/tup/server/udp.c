@@ -1,7 +1,6 @@
 #include "tup/server.h"
 #include "tup/file.h"
 #include "tup/debug.h"
-#include "tup/getexecwd.h"
 #include "tup/fileio.h"
 #include "tup/db.h"
 #include "tup/graph.h"

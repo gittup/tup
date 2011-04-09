@@ -1,11 +1,5 @@
 include_rules
 
-ifeq ($(X86_ARCH_SIBLINGS),y)
-  : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
-else
-  : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
-endif
-
 client_objs += src/tup/vardict.o
 client_objs += src/tup/access_event/send_event.o
 client_objs += src/tup/flock/fcntl.o
@@ -23,6 +17,7 @@ srcs += src/sqlite3/*.o
 srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
+LDFLAGS += `pkg-config fuse --libs`
 : src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o
 
 ifneq (@(TUP_MINGW),)

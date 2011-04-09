@@ -19,27 +19,28 @@ chmod +x ok.sh
 tup touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
-tup_object_exist secret ghost
+tup_dep_exist . secret . './ok.sh > output.txt'
 
-# Remove output.txt to make sure it isn't re-created prematurely
-rm -f output.txt
-
-# Create 'secret' as a file - ghost should still be reachable
+# Create 'secret' as a file - this will cause the command to run
 echo 'foo' > secret
 tup touch secret
 update --no-scan
-tup_object_exist secret ghost
-check_not_exist output.txt
+tup_object_exist . secret
+tup_dep_exist . secret . './ok.sh > output.txt'
 
-# Delete the file - ghost should still be reachable
+# Delete the file
 rm -f secret
 tup rm secret
 update --no-scan
-tup_object_exist secret ghost
-check_not_exist output.txt
+tup_dep_exist . secret . './ok.sh > output.txt'
+
+# Once the dir exists we should get a dependency on 'ghost' too
+tmkdir secret
+update --no-scan
+tup_dep_exist . secret . './ok.sh > output.txt'
+tup_dep_exist secret ghost . './ok.sh > output.txt'
 
 # Now we finally re-create ghost. The command should execute at this point.
-tmkdir secret
 echo 'alive' > secret/ghost
 tup touch secret/ghost
 update
