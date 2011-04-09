@@ -764,11 +764,11 @@ out:
 		pthread_mutex_unlock(&workers[x].lock);
 	}
 	for(x=0; x<jobs; x++) {
-		if(server_quit(&workers[x].s) < 0)
-			rc = -2;
 		pthread_join(workers[x].pid, NULL);
 		pthread_cond_destroy(&workers[x].cond);
 		pthread_mutex_destroy(&workers[x].lock);
+		if(server_quit(&workers[x].s) < 0)
+			rc = -2;
 	}
 	free(workers); /* Viva la revolucion! */
 	pthread_mutex_destroy(&list_mutex);
