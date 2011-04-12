@@ -79,7 +79,8 @@ int server_setup(struct server *s, const char *jobdir)
 	}
 	if(mkdir(fs->mountpoint, 0777) < 0) {
 		if(errno != EEXIST) {
-			perror("mkdirat");
+			fprintf(stderr, "tup error: Unable to create mountpoint.\n");
+			perror(fs->mountpoint);
 			goto err_out;
 		}
 	}
