@@ -655,7 +655,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			return -2;
 		}
 	}
-	close(tupfd);
 
 	root = list_entry(g->node_list.next, struct node, list);
 	DEBUGP("root node: %lli\n", root->tnode.tupid);
@@ -767,9 +766,10 @@ out:
 		pthread_join(workers[x].pid, NULL);
 		pthread_cond_destroy(&workers[x].cond);
 		pthread_mutex_destroy(&workers[x].lock);
-		if(server_quit(&workers[x].s) < 0)
+		if(server_quit(&workers[x].s, tupfd) < 0)
 			rc = -2;
 	}
+	close(tupfd);
 	free(workers); /* Viva la revolucion! */
 	pthread_mutex_destroy(&list_mutex);
 	pthread_cond_destroy(&list_cond);

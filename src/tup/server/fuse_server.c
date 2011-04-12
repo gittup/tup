@@ -36,7 +36,6 @@ int server_init(void)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGHUP, &sigact, NULL);
-	sigaction(SIGUSR2, &sigact, NULL);
 	return 0;
 }
 
@@ -112,13 +111,16 @@ err_out:
 	return 0;
 }
 
-int server_quit(struct server *s)
+int server_quit(struct server *s, int tupfd)
 {
 	struct fuse_server *fs = s->internal;
 	if(fs) {
+		int fd;
 		fuse_exit(fs->fuse);
-		if(pthread_kill(fs->pid, SIGUSR2) != 0) {
-			perror("pthread_kill");
+		fd = openat(tupfd, fs->mountpoint, O_RDONLY);
+		if(fd >= 0) {
+			fprintf(stderr, "tup internal error: Expected open(%s) to fail on FUSE filesystem\n", fs->mountpoint);
+			return -1;
 		}
 		pthread_join(fs->pid, NULL);
 		free(fs);
@@ -244,10 +246,8 @@ int server_is_dead(void)
 
 static void sighandler(int sig)
 {
-	if(sig == SIGUSR2) {
-		/* This is used to signal fuse to wakeup */
-		return;
-	}
+	if(sig) {}
+
 	if(sig_quit == 0) {
 		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
 		sig_quit = 1;
