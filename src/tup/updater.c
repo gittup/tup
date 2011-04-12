@@ -756,16 +756,26 @@ keep_going:
 	show_progress(num_processed, g->num_nodes, NULL);
 	rc = 0;
 out:
+	/* First tell all the threads to quit */
 	for(x=0; x<jobs; x++) {
 		pthread_mutex_lock(&workers[x].lock);
 		workers[x].quit = 1;
 		pthread_cond_signal(&workers[x].cond);
 		pthread_mutex_unlock(&workers[x].lock);
 	}
+	/* Then wait for all the threads to quit */
 	for(x=0; x<jobs; x++) {
 		pthread_join(workers[x].pid, NULL);
 		pthread_cond_destroy(&workers[x].cond);
 		pthread_mutex_destroy(&workers[x].lock);
+	}
+
+	/* Finally shutdown all the servers to work around a FUSE bug. In
+	 * theory this could go at the end of the previous loop, but FUSE will
+	 * close down the same file descriptor twice, which may impact other
+	 * servers that are still running.
+	 */
+	for(x=0; x<jobs; x++) {
 		if(server_quit(&workers[x].s, tupfd) < 0)
 			rc = -2;
 	}
