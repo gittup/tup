@@ -7,16 +7,47 @@
 #include "tup/access_event.h"
 #include "tup/config.h"
 #include "tup/file.h"
-#include "tup/server.h"
+#include "tup/thread_tree.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
+#include <pthread.h>
 #include <sys/time.h>
 
-pthread_key_t fuse_key;
+static struct thread_root troot = THREAD_ROOT_INITIALIZER;
+
+int tup_fuse_add_group(int pid, struct file_info *finfo)
+{
+	finfo->tnode.id = pid;
+	if(thread_tree_insert(&troot, &finfo->tnode) < 0) {
+		fprintf(stderr, "tup error: Unable to insert pid %i into the fuse tree\n", pid);
+		return -1;
+	}
+	return 0;
+}
+
+int tup_fuse_rm_group(struct file_info *finfo)
+{
+	thread_tree_rm(&troot, &finfo->tnode);
+	return 0;
+}
+
+static struct file_info *get_finfo(void)
+{
+	int pgid;
+	struct thread_tree *tt;
+	int pid = fuse_get_context()->pid;
+
+	pgid = getpgid(pid);
+	tt = thread_tree_search(&troot, pgid);
+	if(tt) {
+		return container_of(tt, struct file_info, tnode);
+	}
+	return NULL;
+}
 
 static const char *peel(const char *path)
 {
@@ -30,19 +61,16 @@ static const char *peel(const char *path)
 
 static void tup_fuse_handle_file(const char *path, enum access_type at)
 {
-	struct server *s;
+	struct file_info *finfo;
 
-	s = (struct server*)pthread_getspecific(fuse_key);
-	if(!s) {
-		fprintf(stderr, "tup internal fuse error: Unable to get thread specific data.\n");
-		return;
-	}
-
-	/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
-	if(handle_open_file(at, peel(path), &s->finfo, 1) < 0) {
-		/* TODO: Set failure on internal server? */
-		fprintf(stderr, "tup internal error: handle open file failed\n");
-		return;
+	finfo = get_finfo();
+	if(finfo) {
+		/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
+		if(handle_open_file(at, peel(path), finfo, 1) < 0) {
+			/* TODO: Set failure on internal server? */
+			fprintf(stderr, "tup internal error: handle open file failed\n");
+			return;
+		}
 	}
 }
 
@@ -52,15 +80,14 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	int res;
 	const char *peeled;
 
-	/* tup_init() sets the main tup process to be its own procress group.
-	 * Now we can check if our process group in getpgrp (ie: the thread
-	 * running FUSE) is the same as the process group of the pid making
-	 * the request. If not we bail since nobody else is allowed to look
-	 * at our filesystem, since that would hose up our dependency analysis.
+	/* Each server should put its pgid into the tree before execing the
+	 * subprocess. If we don't find the current pgid in the tree, we bail
+	 * since nobody else is allowed to look at our filesystem. If they could,
+	 * that would hose up our dependency analysis.
 	 *
 	 * This check is only done here since everything starts with getattr.
 	 */
-	if(getpgrp() != getpgid(fuse_get_context()->pid)) {
+	if(thread_tree_search(&troot, getpgid(fuse_get_context()->pid)) == NULL) {
 		return -ENOENT;
 	}
 
@@ -207,20 +234,17 @@ static int tup_fs_rmdir(const char *path)
 static int tup_fs_symlink(const char *from, const char *to)
 {
 	int res;
-	struct server *s;
-
-	s = (struct server*)pthread_getspecific(fuse_key);
-	if(!s) {
-		fprintf(stderr, "tup internal fuse error: Unable to get thread specific data.\n");
-		return -1;
-	}
+	struct file_info *finfo;
 
 	res = symlink(from, to);
 	if (res == -1)
 		return -errno;
 
-	/* TODO: 1 == DOT_DT - is this still necessary? */
-	handle_file(ACCESS_SYMLINK, peel(from), peel(to), &s->finfo, 1);
+	finfo = get_finfo();
+	if(finfo) {
+		/* TODO: 1 == DOT_DT - is this still necessary? */
+		handle_file(ACCESS_SYMLINK, peel(from), peel(to), finfo, 1);
+	}
 
 	return 0;
 }
@@ -228,19 +252,16 @@ static int tup_fs_symlink(const char *from, const char *to)
 static int tup_fs_rename(const char *from, const char *to)
 {
 	int res;
-	struct server *s;
-
-	s = (struct server*)pthread_getspecific(fuse_key);
-	if(!s) {
-		fprintf(stderr, "tup internal fuse error: Unable to get thread specific data.\n");
-		return -1;
-	}
+	struct file_info *finfo;
 
 	res = rename(from, to);
 	if (res == -1)
 		return -errno;
 
-	handle_rename(peel(from), peel(to), &s->finfo);
+	finfo = get_finfo();
+	if(finfo) {
+		handle_rename(peel(from), peel(to), finfo);
+	}
 
 	return 0;
 }

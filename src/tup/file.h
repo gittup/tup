@@ -4,8 +4,10 @@
 #include "tupid.h"
 #include "access_event.h"
 #include "linux/list.h"
+#include "thread_tree.h"
 
 struct file_info {
+	struct thread_tree tnode;
 	struct list_head read_list;
 	struct list_head write_list;
 	struct list_head unlink_list;

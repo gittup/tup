@@ -39,7 +39,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
-static int update(struct node *n, struct server *s);
+static int update(struct node *n);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int tot, struct node *n);
 
@@ -137,8 +137,6 @@ int updater(int argc, char **argv, int phase)
 		if(run_scan() < 0)
 			return -1;
 	}
-	if(server_init() < 0)
-		return -1;
 	if(update_tup_config() < 0)
 		return -1;
 	if(phase == 1) /* Collect underpants */
@@ -403,7 +401,13 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		}
 	}
 	warnings = 0;
+	if(server_init() < 0) {
+		return -1;
+	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
+	if(server_quit() < 0) {
+		return -1;
+	}
 	if(warnings) {
 		fprintf(stderr, "tup warning: Update resulted in %i warning%s\n", warnings, warnings == 1 ? "" : "s");
 	}
@@ -579,7 +583,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int rc = -1;
 	int x;
 	int active = 0;
-	int tupfd;
 	pthread_mutex_t list_mutex;
 	pthread_cond_t list_cond;
 	LIST_HEAD(active_list);
@@ -595,41 +598,12 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		return -2;
 	}
 
-	tupfd = openat(tup_top_fd(), TUP_DIR, O_RDONLY);
-	if(tupfd < 0) {
-		perror(TUP_DIR);
-		return -2;
-	}
-	if(fchdir(tupfd) < 0) {
-		perror("fchdir");
-		return -2;
-	}
-
 	workers = malloc(sizeof(*workers) * jobs);
 	if(!workers) {
 		perror("malloc");
 		return -2;
 	}
 	for(x=0; x<jobs; x++) {
-		char jobdir[8];
-		snprintf(jobdir, sizeof(jobdir), "job%04x", x);
-		jobdir[7] = 0;
-
-		if(mkdir(jobdir, 0777) < 0) {
-			if(errno != EEXIST) {
-				perror("mkdir");
-				return -2;
-			}
-		}
-
-		/* TODO: Hack to only use server for update work */
-		if(work_func == update_work) {
-			if(server_setup(&workers[x].s, jobdir) < 0) {
-				return -2;
-			}
-		} else {
-			memset(&workers[x].s, 0, sizeof(workers[x].s));
-		}
 		workers[x].g = g;
 
 		if(pthread_mutex_init(&workers[x].lock, NULL) != 0) {
@@ -770,16 +744,6 @@ out:
 		pthread_mutex_destroy(&workers[x].lock);
 	}
 
-	/* Finally shutdown all the servers to work around a FUSE bug. In
-	 * theory this could go at the end of the previous loop, but FUSE will
-	 * close down the same file descriptor twice, which may impact other
-	 * servers that are still running.
-	 */
-	for(x=0; x<jobs; x++) {
-		if(server_quit(&workers[x].s, tupfd) < 0)
-			rc = -2;
-	}
-	close(tupfd);
 	free(workers); /* Viva la revolucion! */
 	pthread_mutex_destroy(&list_mutex);
 	pthread_cond_destroy(&list_cond);
@@ -861,7 +825,7 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
-			rc = update(n, &wt->s);
+			rc = update(n);
 
 			/* If the command succeeds, mark any next commands (ie:
 			 * our output files' output links) as modify in case we
@@ -944,10 +908,11 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int update(struct node *n, struct server *s)
+static int update(struct node *n)
 {
 	int dfd = -1;
 	const char *name = n->tent->name.s;
+	struct server s;
 	int rc;
 
 	if(name[0] == '^') {
@@ -979,20 +944,21 @@ static int update(struct node *n, struct server *s)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
-	s->exited = 0;
-	s->signalled = 0;
-	s->exit_status = -1;
-	s->exit_sig = -1;
-	if(server_exec(s, vardict_fd, dfd, name, n->tent->parent) < 0) {
+	s.exited = 0;
+	s.signalled = 0;
+	s.exit_status = -1;
+	s.exit_sig = -1;
+	init_file_info(&s.finfo);
+	if(server_exec(&s, vardict_fd, dfd, name, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = write_files(n->tnode.tupid, name, &s->finfo, &warnings);
+	rc = write_files(n->tnode.tupid, name, &s.finfo, &warnings);
 	pthread_mutex_unlock(&db_mutex);
-	if(s->exited) {
-		if(s->exit_status == 0) {
+	if(s.exited) {
+		if(s.exit_status == 0) {
 			if(rc < 0) {
 				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
 				goto err_close_dfd;
@@ -1002,18 +968,18 @@ static int update(struct node *n, struct server *s)
 			close(dfd);
 			return 0;
 		}
-	} else if(s->signalled) {
-		int sig = s->exit_sig;
+	} else if(s.signalled) {
+		int sig = s.exit_sig;
 		const char *errmsg = "Unknown signal";
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
 	} else {
-		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli", n->tnode.tupid);
+		fprintf(stderr, "tup internal error: Expected s.exited or s.signalled to be set for command %lli", n->tnode.tupid);
 	}
 
-	fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s->exit_status, name);
+	fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s.exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:

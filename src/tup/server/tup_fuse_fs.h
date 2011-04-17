@@ -4,9 +4,11 @@
 #define FUSE_USE_VERSION 26
 
 #include <fuse.h>
-#include <pthread.h>
 
-extern pthread_key_t fuse_key;
+struct file_info;
+
+int tup_fuse_add_group(int pid, struct file_info *finfo);
+int tup_fuse_rm_group(struct file_info *finfo);
 extern struct fuse_operations tup_fs_oper;
 
 #endif

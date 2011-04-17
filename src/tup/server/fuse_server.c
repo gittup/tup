@@ -6,19 +6,21 @@
 #include "tup_fuse_fs.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
 #include <sys/wait.h>
 
-struct fuse_server {
+#define TUP_MNT ".tup/mnt"
+
+static struct fuse_server {
 	pthread_t pid;
 	struct fuse *fuse;
 	struct fuse_chan *ch;
-	char mountpoint[32];
 	int failed;
-};
+} fs;
 
 static void sighandler(int sig);
 
@@ -27,123 +29,86 @@ static struct sigaction sigact = {
 };
 static int sig_quit = 0;
 
-int server_init(void)
-{
-	if(pthread_key_create(&fuse_key, NULL) < 0) {
-		perror("pthread_key_create");
-		return -1;
-	}
-	sigemptyset(&sigact.sa_mask);
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGHUP, &sigact, NULL);
-	return 0;
-}
-
 static void *fuse_thread(void *arg)
 {
-	struct server *s = arg;
-	struct fuse_server *fs = s->internal;
+	if(arg) {}
 
-	if(pthread_setspecific(fuse_key, arg) != 0) {
-		perror("pthread_setspecific");
-		return NULL;
-	}
-
-	if(fuse_loop(fs->fuse) < 0) {
+	if(fuse_loop(fs.fuse) < 0) {
 		perror("fuse_loop");
-		fs->failed = 1;
+		fs.failed = 1;
 	}
-	fuse_unmount(fs->mountpoint, fs->ch);
-	fuse_destroy(fs->fuse);
-	fs->fuse = NULL;
+	fuse_unmount(TUP_MNT, fs.ch);
+	fuse_destroy(fs.fuse);
+	fs.fuse = NULL;
 	return NULL;
 }
 
-int server_setup(struct server *s, const char *jobdir)
+int server_init(void)
 {
-	struct fuse_server *fs;
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGHUP, &sigact, NULL);
 
-	init_file_info(&s->finfo);
-
-	fs = malloc(sizeof *fs);
-	if(!fs) {
-		perror("malloc");
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
 		return -1;
 	}
 
-	s->internal = fs;
-
-	if(snprintf(fs->mountpoint, sizeof(fs->mountpoint), "%s/mnt", jobdir) >= (signed)sizeof(fs->mountpoint)) {
-		fprintf(stderr, "tup internal error: mountpoint is sized incorrectly.\n");
-		goto err_out;
-	}
-	if(mkdir(fs->mountpoint, 0777) < 0) {
+	if(mkdir(TUP_MNT, 0777) < 0) {
 		if(errno != EEXIST) {
-			fprintf(stderr, "tup error: Unable to create mountpoint.\n");
-			perror(fs->mountpoint);
-			goto err_out;
+			perror(TUP_MNT);
+			fprintf(stderr, "tup error: Unable to create FUSE mountpoint.\n");
+			return -1;
 		}
 	}
 
-	fs->ch = fuse_mount(fs->mountpoint, NULL);
-	if(!fs->ch) {
+	fs.ch = fuse_mount(TUP_MNT, NULL);
+	if(!fs.ch) {
 		perror("fuse_mount");
 		goto err_out;
 	}
-	fs->fuse = fuse_new(fs->ch, NULL, &tup_fs_oper, sizeof(tup_fs_oper), NULL);
-	if(!fs->fuse) {
+	fs.fuse = fuse_new(fs.ch, NULL, &tup_fs_oper, sizeof(tup_fs_oper), NULL);
+	if(!fs.fuse) {
 		perror("fuse_new");
 		goto err_unmount;
 	}
 
-	if(pthread_create(&fs->pid, NULL, fuse_thread, s) != 0) {
+	if(pthread_create(&fs.pid, NULL, fuse_thread, NULL) != 0) {
 		perror("pthread_create");
-		goto err_out;
+		goto err_unmount;
 	}
 	return 0;
 
 err_unmount:
-	fuse_unmount(fs->mountpoint, fs->ch);
+	fuse_unmount(TUP_MNT, fs.ch);
 err_out:
-	fprintf(stderr, "tup error: Unable to mount FUSE on %s\n", fs->mountpoint);
-	free(fs);
+	fprintf(stderr, "tup error: Unable to mount FUSE on %s\n", TUP_MNT);
 	return -1;
-
-	return 0;
 }
 
-int server_quit(struct server *s, int tupfd)
+int server_quit(void)
 {
-	struct fuse_server *fs = s->internal;
-	if(fs) {
-		int fd;
-		fuse_exit(fs->fuse);
-		fd = openat(tupfd, fs->mountpoint, O_RDONLY);
-		if(fd >= 0) {
-			fprintf(stderr, "tup internal error: Expected open(%s) to fail on FUSE filesystem\n", fs->mountpoint);
-			return -1;
-		}
-		pthread_join(fs->pid, NULL);
-		free(fs);
-		s->internal = NULL;
+	int fd;
+	fuse_exit(fs.fuse);
+	fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
+	if(fd >= 0) {
+		fprintf(stderr, "tup internal error: Expected open(%s) to fail on FUSE filesystem\n", TUP_MNT);
+		return -1;
 	}
+	pthread_join(fs.pid, NULL);
+	memset(&fs, 0, sizeof(fs));
 	return 0;
 }
 
 static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 {
 	if(tent->parent == NULL) {
-		struct fuse_server *fs = s->internal;
 		if(fchdir(tup_top_fd()) < 0) {
 			perror("fchdir");
 			return -1;
 		}
-		if(chdir(TUP_DIR) < 0) {
-			perror(TUP_DIR);
-			return -1;
-		}
-		if(chdir(fs->mountpoint) < 0) {
-			perror(fs->mountpoint);
+		if(chdir(TUP_MNT) < 0) {
+			perror(TUP_MNT);
 			return -1;
 		}
 		/* +1: Skip past top-level '/' to do a relative chdir into our
@@ -179,15 +144,14 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 {
 	int pid;
 	int status;
+	int fd[2];
 
 	if(dfd) {/* TODO */}
 
-	/* Even though this is initialized in server_setup(), if an earlier
-	 * command failed to process all the files and we are in keep-going
-	 * mode this may have some leftover stuff in it. So just re-initialize
-	 * it.
-	 */
-	init_file_info(&s->finfo);
+	if(pipe(fd) < 0) {
+		perror("pipe");
+		return -1;
+	}
 
 	pid = fork();
 	if(pid < 0) {
@@ -199,7 +163,28 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 			.sa_handler = SIG_IGN,
 			.sa_flags = SA_RESETHAND | SA_RESTART,
 		};
+		char c;
 		tup_lock_close();
+
+		/* Initialize our process group to be our PID. This is used by
+		 * our FUSE filesystem to make sure only allowed processes can
+		 * access it, and properly save dependencies when multiple
+		 * jobs access the filesystem in parallel.
+		 */
+		setpgid(0, 0);
+
+		/* Wait until the parent process is able to store away our PID
+		 * in the fuse tree so it knows who we are when we access
+		 * the filesystem.
+		 */
+		close(fd[1]);
+		if(read(fd[0], &c, 1) != 1) {
+			perror("read");
+			fprintf(stderr, "tup error: Unable to read from startup pipe\n");
+			exit(1);
+		}
+		close(fd[0]);
+
 
 		sigemptyset(&sa.sa_mask);
 		sigaction(SIGINT, &sa, NULL);
@@ -219,8 +204,21 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		perror("execl");
 		exit(1);
 	}
+	if(tup_fuse_add_group(pid, &s->finfo) < 0) {
+		return -1;
+	}
+	close(fd[0]);
+	if(write(fd[1], "\n", 1) != 1) {
+		perror("write");
+		fprintf(stderr, "tup error: Unable to write to startup pipe.\n");
+		return -1;
+	}
+	close(fd[1]);
 	if(waitpid(pid, &status, 0) < 0) {
 		perror("waitpid");
+		return -1;
+	}
+	if(tup_fuse_rm_group(&s->finfo) < 0) {
 		return -1;
 	}
 	/* TODO: Add check to count number of opens+releases to make sure we end
