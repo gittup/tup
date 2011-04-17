@@ -12,7 +12,7 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/mkdirat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
 	plat_ldflags="$plat_ldflags -lsocket"
-	plat_cflags="-D_REENTRANT"
+	plat_cflags="$plat_cflags -D_REENTRANT"
 	;;
 	Darwin)
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
@@ -21,7 +21,7 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/openat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
 	plat_files="$plat_files ../src/compat/unlinkat.c"
-	plat_cflags="-DAT_SYMLINK_NOFOLLOW=0x100"
+	plat_cflags="$plat_cflags -DAT_SYMLINK_NOFOLLOW=0x100"
 	;;
 esac
 
