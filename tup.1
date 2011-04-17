@@ -56,6 +56,14 @@ These commands are used to modify the behavior of tup or look at its internals. 
 .TP
 .B monitor
 Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor.
+.RS
+.TP
+.B -d
+Enable debugging of the monitor process.
+.TP
+.B -f
+Run in the foreground (don't daemonize).
+.RE
 .TP
 .B stop
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.

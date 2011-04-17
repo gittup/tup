@@ -101,10 +101,13 @@ int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
+	int background = 1;
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("monitor");
+		} else if(strcmp(argv[x], "-f") == 0) {
+			background = 0;
 		}
 	}
 
@@ -143,22 +146,28 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	if(fork() > 0) {
-		/* Remove our object lock, then wait for the child process to get
-		 * it.
-		 */
-		tup_unflock(tup_obj_lock());
-		if(tup_wait_flock(tup_obj_lock()) < 0)
-			exit(1);
-		exit(0);
-	}
+	if(background) {
+		if(fork() > 0) {
+			/* Remove our object lock, then wait for the child
+			 * process to get it.
+			 */
+			tup_unflock(tup_obj_lock());
+			if(tup_wait_flock(tup_obj_lock()) < 0)
+				exit(1);
+			exit(0);
+		}
 
-	/* Child must re-acquire the object lock, since we lost it at the
-	 * fork
-	 */
-	if(tup_flock(tup_obj_lock()) < 0) {
-		rc = -1;
-		goto close_inot;
+		/* Child must re-acquire the object lock, since we lost it at
+		 * the fork
+		 */
+		if(tup_flock(tup_obj_lock()) < 0) {
+			rc = -1;
+			goto close_inot;
+		}
+	} else {
+		if(tup_unflock(tup_sh_lock()) < 0) {
+			return -1;
+		}
 	}
 
 	if(monitor_set_pid(getpid()) < 0) {
