@@ -155,7 +155,7 @@ int tup_db_open(void)
 		stmts[x] = NULL;
 	}
 
-	if(tup_db_config_get_int("db_sync") == 0) {
+	if(tup_db_config_get_int("db_sync", 1) == 0) {
 		if(no_sync() < 0)
 			return -1;
 	}
@@ -317,7 +317,7 @@ static int version_check(void)
 	char sql_11f[] = "alter table node_new rename to node";
 	char sql_11g[] = "create index node_sym_index on node(sym)";
 
-	version = tup_db_config_get_int("db_version");
+	version = tup_db_config_get_int("db_version", -1);
 	if(version < 0) {
 		fprintf(stderr, "Error getting .tup/db version.\n");
 		return -1;
@@ -2870,10 +2870,11 @@ int tup_db_config_set_int(const char *lval, int x)
 	return 0;
 }
 
-int tup_db_config_get_int(const char *lval)
+int tup_db_config_get_int(const char *lval, int def)
 {
 	int rc;
 	int dbrc;
+	int use_default = 0;
 	sqlite3_stmt **stmt = &stmts[DB_CONFIG_GET_INT];
 	static char s[] = "select rval from config where lval=?";
 
@@ -2894,6 +2895,8 @@ int tup_db_config_get_int(const char *lval)
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
 		rc = -1;
+		if(def != -1)
+			use_default = 1;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -2908,6 +2911,12 @@ out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
+	}
+
+	if(use_default) {
+		if(tup_db_config_set_int(lval, def) < 0)
+			return -1;
+		rc = def;
 	}
 
 	return rc;

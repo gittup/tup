@@ -101,8 +101,8 @@ int updater(int argc, char **argv, int phase)
 	int do_scan = 1;
 	int num_pruned = 0;
 
-	do_keep_going = tup_db_config_get_int("keep_going");
-	num_jobs = tup_db_config_get_int("num_jobs");
+	do_keep_going = tup_db_config_get_int("keep_going", 0);
+	num_jobs = tup_db_config_get_int("num_jobs", 1);
 
 	argc--;
 	argv++;

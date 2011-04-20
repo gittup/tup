@@ -116,7 +116,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 /* Config operations */
 int tup_db_show_config(void);
 int tup_db_config_set_int(const char *lval, int x);
-int tup_db_config_get_int(const char *lval);
+int tup_db_config_get_int(const char *lval, int def);
 int tup_db_config_set_string(const char *lval, const char *rval);
 
 /* Var operations */

@@ -106,9 +106,7 @@ int monitor(int argc, char **argv)
 	int rc = 0;
 	int foreground;
 
-	foreground = tup_db_config_get_int("monitor_foreground");
-	if(foreground == -1)
-		foreground = 0;
+	foreground = tup_db_config_get_int("monitor_foreground", 0);
 	/* Arguments are cleared to "-" if they are used by the monitor. These
 	 * args are also passed on to the autoupdate process if that feature is
 	 * enabled, but we don't want the updater getting any args that are
@@ -605,7 +603,7 @@ static int autoupdate_enabled(void)
 {
 	if(autoupdate_flag == 1)
 		return 1;
-	if(autoupdate_flag == -1 && tup_db_config_get_int("autoupdate") == 1)
+	if(autoupdate_flag == -1 && tup_db_config_get_int("autoupdate", 0) == 1)
 		return 1;
 	return 0;
 }
