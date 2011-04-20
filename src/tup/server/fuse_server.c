@@ -2,7 +2,6 @@
 #include "tup/entry.h"
 #include "tup/config.h"
 #include "tup/lock.h"
-#include "tup/db.h" /* TODO: for TUP_DIR */
 #include "tup_fuse_fs.h"
 #include <stdio.h>
 #include <stdlib.h>
