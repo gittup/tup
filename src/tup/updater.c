@@ -338,6 +338,9 @@ static int process_create_nodes(void)
 	} else {
 		tup_main_progress("No Tupfiles to parse.\n");
 	}
+	if(graph_empty(&g))
+		goto out_destroy;
+
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
@@ -352,6 +355,8 @@ static int process_create_nodes(void)
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
+
+out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
 	return 0;
@@ -362,10 +367,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	struct graph g;
 	int rc;
 
-	if(pthread_mutex_init(&db_mutex, NULL) != 0) {
-		perror("pthread_mutex_init");
-		return -1;
-	}
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
@@ -380,6 +381,18 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		tup_main_progress("Executing Commands...\n");
 	} else {
 		tup_main_progress("No commands to execute.\n");
+	}
+	/* If the graph only has the root node, just bail. Note that this
+	 * may be different from g.num_nodes==0, since that only counts
+	 * command nodes (we may have to go through the DAG and clear out
+	 * some files marked modify that don't actually point to commands).
+	 */
+	if(graph_empty(&g))
+		goto out_destroy;
+
+	if(pthread_mutex_init(&db_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
 	}
 	tup_db_begin();
 	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
@@ -417,11 +430,12 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	}
 	close(vardict_fd);
 	tup_db_commit();
+	pthread_mutex_destroy(&db_mutex);
 	if(rc < 0)
 		return -1;
+out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
-	pthread_mutex_destroy(&db_mutex);
 	return 0;
 }
 

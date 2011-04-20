@@ -137,6 +137,13 @@ int destroy_graph(struct graph *g)
 	return 0;
 }
 
+int graph_empty(struct graph *g)
+{
+	if(g->node_list.prev == &g->root->list)
+		return 1;
+	return 0;
+}
+
 static int add_file_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;

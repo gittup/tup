@@ -53,6 +53,7 @@ void remove_edge(struct edge *e);
 
 int create_graph(struct graph *g, int count_flags);
 int destroy_graph(struct graph *g);
+int graph_empty(struct graph *g);
 int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
 			int *connected);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
