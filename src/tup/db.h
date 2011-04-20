@@ -117,10 +117,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 int tup_db_show_config(void);
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval);
-int tup_db_config_set_int64(const char *lval, sqlite3_int64 x);
-sqlite3_int64 tup_db_config_get_int64(const char *lval);
 int tup_db_config_set_string(const char *lval, const char *rval);
-int tup_db_config_get_string(char **res, const char *lval, const char *def);
 
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);
