@@ -338,8 +338,10 @@ static int process_create_nodes(void)
 	} else {
 		tup_main_progress("No Tupfiles to parse.\n");
 	}
-	if(graph_empty(&g))
+	if(graph_empty(&g)) {
+		tup_main_progress("No files to delete.\n");
 		goto out_destroy;
+	}
 
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
