@@ -44,6 +44,8 @@ static void *fuse_thread(void *arg)
 
 int server_init(void)
 {
+	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGHUP, &sigact, NULL);
@@ -61,12 +63,21 @@ int server_init(void)
 		}
 	}
 
-	fs.ch = fuse_mount(TUP_MNT, NULL);
+	/* Need a garbage arg first to count as the process name */
+	if(fuse_opt_add_arg(&args, "tup") < 0)
+		return -1;
+	if(tup_fuse_debug_enabled()) {
+		if(fuse_opt_add_arg(&args, "-d") < 0)
+			return -1;
+	}
+
+	fs.ch = fuse_mount(TUP_MNT, &args);
 	if(!fs.ch) {
 		perror("fuse_mount");
 		goto err_out;
 	}
-	fs.fuse = fuse_new(fs.ch, NULL, &tup_fs_oper, sizeof(tup_fs_oper), NULL);
+	fs.fuse = fuse_new(fs.ch, &args, &tup_fs_oper, sizeof(tup_fs_oper), NULL);
+	fuse_opt_free_args(&args);
 	if(!fs.fuse) {
 		perror("fuse_new");
 		goto err_unmount;

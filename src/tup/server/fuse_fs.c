@@ -18,6 +18,7 @@
 #include <sys/time.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
+static int fuse_debug = 0;
 
 int tup_fuse_add_group(int pid, struct file_info *finfo)
 {
@@ -33,6 +34,16 @@ int tup_fuse_rm_group(struct file_info *finfo)
 {
 	thread_tree_rm(&troot, &finfo->tnode);
 	return 0;
+}
+
+void tup_fuse_enable_debug(void)
+{
+	fuse_debug = 1;
+}
+
+int tup_fuse_debug_enabled(void)
+{
+	return fuse_debug;
 }
 
 static struct file_info *get_finfo(void)
@@ -88,6 +99,9 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 * This check is only done here since everything starts with getattr.
 	 */
 	if(thread_tree_search(&troot, getpgid(fuse_get_context()->pid)) == NULL) {
+		if(fuse_debug) {
+			fprintf(stderr, "[33mtup fuse warning: Process id %i is trying to access the tup server's fuse filesystem.[0m\n", fuse_get_context()->pid);
+		}
 		return -ENOENT;
 	}
 

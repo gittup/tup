@@ -11,6 +11,7 @@
 #include "tup/fileio.h"
 #include "tup/pel_group.h"
 #include "tup/updater.h"
+#include "tup/server/tup_fuse_fs.h"
 #include "tup/graph.h"
 #include "tup/init.h"
 #include "tup/compat.h"
@@ -46,9 +47,22 @@ static void usage(void);
 int main(int argc, char **argv)
 {
 	int rc = 0;
-	const char *cmd;
+	int x;
+	int cmd_arg = 0;
+	const char *cmd = NULL;
 
-	if(argc < 2) {
+	for(x=1; x<argc; x++) {
+		if(!cmd && argv[x][0] != '-') {
+			cmd = argv[x];
+			cmd_arg = x;
+		}
+		if(strcmp(argv[x], "--debug-sql") == 0)
+			tup_db_enable_sql_debug();
+		else if(strcmp(argv[x], "--debug-fuse") == 0)
+			tup_fuse_enable_debug();
+	}
+
+	if(!cmd) {
 		usage();
 		return 1;
 	}
@@ -61,39 +75,25 @@ int main(int argc, char **argv)
 		color_disable();
 	}
 
-	if(strcmp(argv[1], "init") == 0) {
-		argc--;
-		argv++;
+	argc = argc - cmd_arg;
+	argv = &argv[cmd_arg];
+
+	if(strcmp(cmd, "init") == 0) {
 		return init(argc, argv);
-	} else if(strcmp(argv[1], "version") == 0 ||
-		  strcmp(argv[1], "--version") == 0 ||
-		  strcmp(argv[1], "-v") == 0) {
+	} else if(strcmp(cmd, "version") == 0 ||
+		  strcmp(cmd, "--version") == 0 ||
+		  strcmp(cmd, "-v") == 0) {
 		printf("tup %s\n", tup_version());
 		return 0;
-	} else if(strcmp(argv[1], "stop") == 0) {
+	} else if(strcmp(cmd, "stop") == 0) {
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
-	} else if(strcmp(argv[1], "varsed") == 0) {
-		argc--;
-		argv++;
+	} else if(strcmp(cmd, "varsed") == 0) {
 		return varsed(argc, argv);
 	}
 
 	if(tup_init() < 0)
 		return 1;
 
-	if(strcmp(argv[1], "--debug-sql") == 0) {
-		tup_db_enable_sql_debug();
-		argc--;
-		argv++;
-		if(argc < 2) {
-			usage();
-			return 1;
-		}
-	}
-
-	cmd = argv[1];
-	argc--;
-	argv++;
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "g") == 0) {
