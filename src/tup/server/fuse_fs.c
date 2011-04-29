@@ -440,14 +440,10 @@ static int tup_fs_rename(const char *from, const char *to)
 
 static int tup_fs_link(const char *from, const char *to)
 {
-	int res;
+	if(from || to) {}
 
-	/* TODO: Unsupported */
-	res = link(from, to);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	fprintf(stderr, "tup error: hard links are not supported.\n");
+	return -EPERM;
 }
 
 static int tup_fs_chmod(const char *path, mode_t mode)
