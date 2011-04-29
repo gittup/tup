@@ -461,14 +461,15 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 
 static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 {
-	int res;
+	struct mapping *map;
 
-	/* TODO: Counts as write? */
-	res = lchown(path, uid, gid);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	map = find_mapping(path);
+	if(map) {
+		if(lchown(map->tmpname, uid, gid) < 0)
+			return -errno;
+		return 0;
+	}
+	return -EPERM;
 }
 
 static int tup_fs_truncate(const char *path, off_t size)
