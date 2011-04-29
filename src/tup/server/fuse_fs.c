@@ -330,6 +330,9 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 		if(!map) {
 			return -ENOMEM;
 		} else {
+			/* TODO: Error check */
+			tup_fuse_handle_file(path, ACCESS_WRITE);
+
 			rc = openat(tup_top_fd(), map->tmpname, flags, mode);
 			if(rc < 0)
 				return -errno;

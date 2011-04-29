@@ -443,27 +443,34 @@ skip_sym:
 		free(sym_entry);
 	}
 
+	if(write_bork) {
+		while(!list_empty(&info->mapping_list)) {
+			struct mapping *map;
+
+			map = list_entry(info->mapping_list.next, struct mapping, list);
+			unlink(map->tmpname);
+			del_map(map);
+		}
+		return -1;
+	}
+
+	if(tup_db_check_actual_outputs(cmdid, entrylist) < 0)
+		return -1;
+
 	while(!list_empty(&info->mapping_list)) {
 		struct mapping *map;
 
 		map = list_entry(info->mapping_list.next, struct mapping, list);
 
-		if(write_bork) {
-			unlink(map->tmpname);
-		} else {
-			if(rename(map->tmpname, map->realname) < 0) {
-				perror(map->realname);
-				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
-				write_bork = 1;
-			}
+		if(rename(map->tmpname, map->realname) < 0) {
+			perror(map->realname);
+			fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+			write_bork = 1;
 		}
 		del_map(map);
 	}
 
 	if(write_bork)
-		return -1;
-
-	if(tup_db_check_actual_outputs(cmdid, entrylist) < 0)
 		return -1;
 
 	return 0;

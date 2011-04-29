@@ -3821,17 +3821,7 @@ static int extra_output(tupid_t tupid, void *data)
 		 */
 	}
 
-	/* Clear the sym field in case we wrote a bad symlink (t5032) */
-	tup_db_set_sym(tent, -1);
-
-	/* Re-run whatever command was supposed to create this file (if any),
-	 * and remove the bad output. This is particularly helpful if a symlink
-	 * was created in the wrong spot.
-	 */
-	tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-	fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
-		tent->name.s, tent->dt);
-	delete_file(tent->dt, tent->name.s);
+	fprintf(stderr, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
 	return 0;
 }
 
