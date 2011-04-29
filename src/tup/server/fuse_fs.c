@@ -474,21 +474,15 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 
 static int tup_fs_truncate(const char *path, off_t size)
 {
-	int res;
-	const char *peeled;
 	struct mapping *map;
 
-	peeled = peel(path);
 	map = find_mapping(path);
-	if(map)
-		peeled = map->tmpname;
-
-	/* TODO: Counts as write? Or is it already open? */
-	res = truncate(peeled, size);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	if(map) {
+		if(truncate(map->tmpname, size) < 0)
+			return -errno;
+		return 0;
+	}
+	return -EPERM;
 }
 
 static int tup_fs_utimens(const char *path, const struct timespec ts[2])
