@@ -499,20 +499,21 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 
 	peeled = peel(path);
 	map = find_mapping(path);
-	if(map)
+	if(map) {
 		peeled = map->tmpname;
 
-	/* TODO: Counts as write? Sets mtimes */
-	tv[0].tv_sec = ts[0].tv_sec;
-	tv[0].tv_usec = ts[0].tv_nsec / 1000;
-	tv[1].tv_sec = ts[1].tv_sec;
-	tv[1].tv_usec = ts[1].tv_nsec / 1000;
+		tv[0].tv_sec = ts[0].tv_sec;
+		tv[0].tv_usec = ts[0].tv_nsec / 1000;
+		tv[1].tv_sec = ts[1].tv_sec;
+		tv[1].tv_usec = ts[1].tv_nsec / 1000;
 
-	res = utimes(peeled, tv);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+		res = utimes(peeled, tv);
+		if (res == -1)
+			return -errno;
+		return 0;
+	}
+	fprintf(stderr, "tup error: Unable to utimens() files not created by this job.\n");
+	return -EPERM;
 }
 
 static int tup_fs_open(const char *path, struct fuse_file_info *fi)
