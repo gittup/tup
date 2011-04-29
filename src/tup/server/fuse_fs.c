@@ -275,8 +275,13 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 {
 	int res;
 	const char *peeled;
+	struct mapping *map;
 
 	peeled = peel(path);
+
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
 
 	res = readlink(peeled, buf, size - 1);
 	if (res == -1)
