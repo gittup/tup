@@ -315,14 +315,15 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	int rc;
 	struct file_info *finfo;
+
+	if(rdev) {}
 
 	finfo = get_finfo(path);
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
-	/* TODO: Disallow anything not S_ISREG? */
 	if (S_ISREG(mode)) {
+		int rc;
 		struct mapping *map;
 		int flags = O_CREAT | O_EXCL | O_WRONLY;
 		map = add_mapping(path);
@@ -334,12 +335,12 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 				return -errno;
 			close(rc);
 		}
-	} else if (S_ISFIFO(mode))
-		rc = mkfifo(path, mode);
-	else
-		rc = mknod(path, mode, rdev);
-	if (rc == -1)
-		return -errno;
+	} else {
+		/* Other things (eg: fifos, actual device nodes) are not
+		 * permitted.
+		 */
+		return -EPERM;
+	}
 
 	return 0;
 }
