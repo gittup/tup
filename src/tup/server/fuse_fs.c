@@ -255,8 +255,13 @@ static int tup_fs_access(const char *path, int mask)
 {
 	int res;
 	const char *peeled;
+	struct mapping *map;
 
 	peeled = peel(path);
+
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
 
 	/* This is preceded by a getattr - no need to handle a read event */
 	res = access(peeled, mask);
