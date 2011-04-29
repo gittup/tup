@@ -1,0 +1,21 @@
+#! /bin/sh -e
+
+# mkdir&rmdir are currently not supported in a rule.
+
+. ./tup.sh
+
+cat > Tupfile << HERE
+: |> mkdir %o |> outdir
+HERE
+tup touch Tupfile
+update_fail_msg "outdir.*Operation not permitted"
+
+tmkdir outdir
+
+cat > Tupfile << HERE
+: |> rmdir outdir |>
+HERE
+tup touch Tupfile
+update_fail_msg "outdir.*Operation not permitted"
+
+eotup

@@ -347,14 +347,9 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int tup_fs_mkdir(const char *path, mode_t mode)
 {
-	int res;
-
-	/* TODO: Write? */
-	res = mkdir(path, mode);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	if(path || mode) {}
+	fprintf(stderr, "tup error: mkdir is not supported.\n");
+	return -EPERM;
 }
 
 static int tup_fs_unlink(const char *path)
@@ -373,14 +368,9 @@ static int tup_fs_unlink(const char *path)
 
 static int tup_fs_rmdir(const char *path)
 {
-	int res;
-
-	/* TODO: Only for dirs created by us */
-	res = rmdir(path);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	if(path) {}
+	fprintf(stderr, "tup error: rmdir is not supported.\n");
+	return -EPERM;
 }
 
 static int tup_fs_symlink(const char *from, const char *to)
