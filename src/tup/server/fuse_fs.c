@@ -258,7 +258,7 @@ static int tup_fs_access(const char *path, int mask)
 
 	peeled = peel(path);
 
-	/* TODO: Read? */
+	/* This is preceded by a getattr - no need to handle a read event */
 	res = access(peeled, mask);
 	if (res == -1)
 		return -errno;
