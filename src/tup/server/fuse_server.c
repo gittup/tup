@@ -2,6 +2,7 @@
 #include "tup/entry.h"
 #include "tup/config.h"
 #include "tup/lock.h"
+#include "tup/flist.h"
 #include "tup_fuse_fs.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +46,7 @@ static void *fuse_thread(void *arg)
 int server_init(void)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+	struct flist f = {0, 0, 0};
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -69,6 +71,24 @@ int server_init(void)
 			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
 			return -1;
 		}
+	}
+
+	/* Go into the tmp directory and remove any files that may have been
+	 * left over from a previous tup invocation.
+	 */
+	if(chdir(TUP_TMP) < 0) {
+		perror(TUP_TMP);
+		fprintf(stderr, "tup error: Unable to chdir to the tmp directory.\n");
+		return -1;
+	}
+	flist_foreach(&f, ".") {
+		if(f.filename[0] != '.') {
+			unlink(f.filename);
+		}
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
 	}
 
 	/* Need a garbage arg first to count as the process name */
