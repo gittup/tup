@@ -493,6 +493,8 @@ static int tup_fs_truncate(const char *path, off_t size)
 {
 	struct mapping *map;
 
+	/* TODO: error check? */
+	tup_fuse_handle_file(path, ACCESS_WRITE);
 	map = find_mapping(path);
 	if(map) {
 		if(truncate(map->tmpname, size) < 0)
