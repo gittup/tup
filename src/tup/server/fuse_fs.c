@@ -339,6 +339,7 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 		/* Other things (eg: fifos, actual device nodes) are not
 		 * permitted.
 		 */
+		fprintf(stderr, "tup error: mknod() with mode 0x%x is not permitted.\n", mode);
 		return -EPERM;
 	}
 
@@ -363,6 +364,7 @@ static int tup_fs_unlink(const char *path)
 		del_map(map);
 		return 0;
 	}
+	fprintf(stderr, "tup error: Unable to unlink files not created during this job.\n");
 	return -EPERM;
 }
 
@@ -456,6 +458,7 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 			return -errno;
 		return 0;
 	}
+	fprintf(stderr, "tup error: Unable to chmod() files not created by this job.\n");
 	return -EPERM;
 }
 
@@ -469,6 +472,7 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 			return -errno;
 		return 0;
 	}
+	fprintf(stderr, "tup error: Unable to chown() files not created by this job.\n");
 	return -EPERM;
 }
 
@@ -482,6 +486,7 @@ static int tup_fs_truncate(const char *path, off_t size)
 			return -errno;
 		return 0;
 	}
+	fprintf(stderr, "tup error: Unable to truncate() files not created by this job.\n");
 	return -EPERM;
 }
 

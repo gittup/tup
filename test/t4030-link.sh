@@ -8,6 +8,6 @@ cat > Tupfile << HERE
 : tmp |> link %f %o |> outlink
 HERE
 tup touch tmp Tupfile
-update_fail_msg "outlink.*Operation not permitted"
+update_fail_msg "tup error.*hard links"
 
 eotup

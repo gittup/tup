@@ -37,6 +37,6 @@ cat > Tupfile << HERE
 : foo |> ./foo |>
 HERE
 tup touch Tupfile tmp.txt
-update_fail_msg "tmp.txt.*Operation not permitted"
+update_fail_msg "tup error.*truncate"
 
 eotup

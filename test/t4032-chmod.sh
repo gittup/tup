@@ -14,6 +14,6 @@ cat > Tupfile << HERE
 : |> chmod 664 test2 |>
 HERE
 tup touch Tupfile test2
-update_fail_msg "test2.*Operation not permitted"
+update_fail_msg "tup error.*chmod"
 
 eotup

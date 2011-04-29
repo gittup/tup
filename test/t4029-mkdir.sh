@@ -8,7 +8,7 @@ cat > Tupfile << HERE
 : |> mkdir %o |> outdir
 HERE
 tup touch Tupfile
-update_fail_msg "outdir.*Operation not permitted"
+update_fail_msg "tup error.*mkdir"
 
 tmkdir outdir
 
@@ -16,6 +16,6 @@ cat > Tupfile << HERE
 : |> rmdir outdir |>
 HERE
 tup touch Tupfile
-update_fail_msg "outdir.*Operation not permitted"
+update_fail_msg "tup error.*rmdir"
 
 eotup
