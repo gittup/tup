@@ -6,6 +6,12 @@
 #include "linux/list.h"
 #include "thread_tree.h"
 
+struct mapping {
+	struct list_head list;
+	char *realname;
+	char *tmpname;
+};
+
 struct file_info {
 	struct thread_tree tnode;
 	struct list_head read_list;
@@ -14,6 +20,7 @@ struct file_info {
 	struct list_head var_list;
 	struct list_head sym_list;
 	struct list_head ghost_list;
+	struct list_head mapping_list;
 };
 
 struct tup_entry;
@@ -26,6 +33,6 @@ int handle_open_file(enum access_type at, const char *filename,
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings);
-int file_set_mtime(struct tup_entry *tent, int dfd, const char *file);
+void del_map(struct mapping *map);
 
 #endif

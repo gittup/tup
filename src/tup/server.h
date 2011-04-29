@@ -11,6 +11,7 @@ struct tup_entry;
 
 struct server {
 	struct file_info finfo;
+	int id;
 	int exited;
 	int signalled;
 	int exit_status;

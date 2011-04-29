@@ -63,6 +63,14 @@ int server_init(void)
 		}
 	}
 
+	if(mkdir(TUP_TMP, 0777) < 0) {
+		if(errno != EEXIST) {
+			perror(TUP_TMP);
+			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
+			return -1;
+		}
+	}
+
 	/* Need a garbage arg first to count as the process name */
 	if(fuse_opt_add_arg(&args, "tup") < 0)
 		return -1;
@@ -113,6 +121,7 @@ int server_quit(void)
 static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 {
 	if(tent->parent == NULL) {
+		char virtdir[100];
 		if(fchdir(tup_top_fd()) < 0) {
 			perror("fchdir");
 			return -1;
@@ -126,6 +135,13 @@ static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 		 */
 		if(chdir(get_tup_top() + 1) < 0) {
 			perror(get_tup_top() + 1);
+			return -1;
+		}
+		snprintf(virtdir, sizeof(virtdir), "@tupjob-%i", s->id);
+		virtdir[sizeof(virtdir)-1] = 0;
+		if(chdir(virtdir) < 0) {
+			perror(virtdir);
+			fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 			return -1;
 		}
 		return 0;
@@ -154,47 +170,24 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 {
 	int pid;
 	int status;
-	int fd[2];
 
 	if(dfd) {/* TODO */}
 
-	if(pipe(fd) < 0) {
-		perror("pipe");
+	if(tup_fuse_add_group(s->id, &s->finfo) < 0) {
 		return -1;
 	}
 
 	pid = fork();
 	if(pid < 0) {
 		perror("fork");
-		return -1;
+		goto err_rm_group;
 	}
 	if(pid == 0) {
 		struct sigaction sa = {
 			.sa_handler = SIG_IGN,
 			.sa_flags = SA_RESETHAND | SA_RESTART,
 		};
-		char c;
 		tup_lock_close();
-
-		/* Initialize our process group to be our PID. This is used by
-		 * our FUSE filesystem to make sure only allowed processes can
-		 * access it, and properly save dependencies when multiple
-		 * jobs access the filesystem in parallel.
-		 */
-		setpgid(0, 0);
-
-		/* Wait until the parent process is able to store away our PID
-		 * in the fuse tree so it knows who we are when we access
-		 * the filesystem.
-		 */
-		close(fd[1]);
-		if(read(fd[0], &c, 1) != 1) {
-			perror("read");
-			fprintf(stderr, "tup error: Unable to read from startup pipe\n");
-			exit(1);
-		}
-		close(fd[0]);
-
 
 		sigemptyset(&sa.sa_mask);
 		sigaction(SIGINT, &sa, NULL);
@@ -214,19 +207,9 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		perror("execl");
 		exit(1);
 	}
-	if(tup_fuse_add_group(pid, &s->finfo) < 0) {
-		return -1;
-	}
-	close(fd[0]);
-	if(write(fd[1], "\n", 1) != 1) {
-		perror("write");
-		fprintf(stderr, "tup error: Unable to write to startup pipe.\n");
-		return -1;
-	}
-	close(fd[1]);
 	if(waitpid(pid, &status, 0) < 0) {
 		perror("waitpid");
-		return -1;
+		goto err_rm_group;
 	}
 	if(tup_fuse_rm_group(&s->finfo) < 0) {
 		return -1;
@@ -246,6 +229,10 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		return -1;
 	}
 	return 0;
+
+err_rm_group:
+	tup_fuse_rm_group(&s->finfo);
+	return -1;
 }
 
 int server_is_dead(void)

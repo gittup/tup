@@ -1,5 +1,3 @@
-/* _ATFILE_SOURCE for fstatat */
-#define _ATFILE_SOURCE
 #include "file.h"
 #include "access_event.h"
 #include "debug.h"
@@ -41,10 +39,9 @@ static void check_unlink_list(const struct pel_group *pg, struct list_head *u_li
 static void handle_unlink(struct file_info *info);
 static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct file_info *info, int *warnings,
-			     struct list_head *entrylist, struct dfd_info *dinfo);
+			     struct list_head *entrylist);
 static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct list_head *entrylist);
-static int dfd_open(struct dfd_info *dinfo, tupid_t dt);
 
 int init_file_info(struct file_info *info)
 {
@@ -54,6 +51,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->sym_list);
 	INIT_LIST_HEAD(&info->ghost_list);
+	INIT_LIST_HEAD(&info->mapping_list);
 	return 0;
 }
 
@@ -113,17 +111,13 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings)
 {
 	struct list_head *entrylist;
-	struct dfd_info dinfo = {-1, -1};
 	int rc1, rc2;
 
 	handle_unlink(info);
 
 	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist, &dinfo);
+	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
 	tup_entry_release_list();
-	if(dinfo.dfd != -1) {
-		close(dinfo.dfd);
-	}
 
 	entrylist = tup_entry_get_list();
 	rc2 = update_read_info(cmdid, info, entrylist);
@@ -134,11 +128,11 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	return -1;
 }
 
-int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
+static int file_set_mtime(struct tup_entry *tent, const char *file)
 {
 	struct stat buf;
-	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
+	if(lstat(file, &buf) < 0) {
+		fprintf(stderr, "tup error: file_set_mtime() lstat failed.\n");
 		perror(file);
 		return -1;
 	}
@@ -181,7 +175,6 @@ static void del_entry(struct file_entry *fent)
 	free(fent);
 }
 
-/* TODO: Needs knowledge of dt? */
 int handle_rename(const char *from, const char *to, struct file_info *info)
 {
 	struct file_entry *fent;
@@ -226,6 +219,14 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 	del_pel_group(&pg_to);
 	del_pel_group(&pg_from);
 	return 0;
+}
+
+void del_map(struct mapping *map)
+{
+	list_del(&map->list);
+	free(map->tmpname);
+	free(map->realname);
+	free(map);
 }
 
 static int handle_symlink(const char *from, const char *to, tupid_t dt,
@@ -290,17 +291,13 @@ static void handle_unlink(struct file_info *info)
 			}
 		}
 
-		/* TODO: Do we need this? I think this should only apply to
-		 * temporary files.
-		 */
-/*		delete_name_file(u->tupid);*/
 		del_entry(u);
 	}
 }
 
 static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct file_info *info, int *warnings,
-			     struct list_head *entrylist, struct dfd_info *dinfo)
+			     struct list_head *entrylist)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -368,27 +365,19 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 		free(pel);
 		if(!tent) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
-			fprintf(stderr, " Unlink: [35m%s[0m\n", w->filename);
-			if(dfd_open(dinfo, w->dt) < 0) {
-				fprintf(stderr, "tup error: Unable to open directory for node %lli in order to remove the file. You should remove it manually.\n", w->dt);
-				tup_db_print(stderr, w->dt);
-			} else {
-				unlinkat(dinfo->dfd, w->filename, 0);
-			}
 			write_bork = 1;
 		} else {
+			struct mapping *map;
 			tup_entry_list_add(tent, entrylist);
-			if(dfd_open(dinfo, w->dt) < 0) {
-				fprintf(stderr, "tup error: Unable to open directory for node %lli in order to stat() the output file for command %lli\n", w->dt, cmdid);
-				tup_db_print(stderr, w->dt);
-				tup_db_print(stderr, cmdid);
-				write_bork = 1;
-			} else {
-				if(file_set_mtime(tent, dinfo->dfd, w->filename) < 0)
-					return -1;
-				if(tup_db_set_sym(tent, -1) < 0)
-					return -1;
+
+			list_for_each_entry(map, &info->mapping_list, list) {
+				if(strcmp(map->realname, w->filename) == 0) {
+					if(file_set_mtime(tent, map->tmpname) < 0)
+						return -1;
+				}
 			}
+			if(tup_db_set_sym(tent, -1) < 0)
+				return -1;
 		}
 
 out_skip:
@@ -398,6 +387,7 @@ out_skip:
 	while(!list_empty(&info->sym_list)) {
 		struct sym_entry *sym_entry;
 		struct tup_entry *link_tent;
+		struct mapping *map;
 		tupid_t sym;
 
 		sym_entry = list_entry(info->sym_list.next, struct sym_entry, list);
@@ -406,30 +396,19 @@ out_skip:
 
 		tent = get_tent_dt(sym_entry->dt, sym_entry->to);
 		if(!tent) {
-			int dirfd;
 			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);
-			fprintf(stderr, " Unlink: [35m%s[0m\n", sym_entry->to);
-			dirfd = tup_entry_open_tupid(sym_entry->dt);
-			if(dirfd < 0) {
-				fprintf(stderr, "Unable to automatically unlink file.\n");
-			} else {
-				unlinkat(dirfd, sym_entry->to, 0);
-				close(dirfd);
-			}
 			write_bork = 1;
 			goto skip_sym;
 		}
 
 		tup_entry_list_add(tent, entrylist);
-		if(dfd_open(dinfo, sym_entry->dt) < 0) {
-			fprintf(stderr, "tup error: Unable to open directory for node %lli in order to stat() the output file for command %lli\n", sym_entry->dt, cmdid);
-			tup_db_print(stderr, sym_entry->dt);
-			tup_db_print(stderr, cmdid);
-			write_bork = 1;
-			goto skip_sym;
+
+		list_for_each_entry(map, &info->mapping_list, list) {
+			if(strcmp(map->realname, sym_entry->to) == 0) {
+				if(file_set_mtime(tent, map->tmpname) < 0)
+					return -1;
+			}
 		}
-		if(file_set_mtime(tent, dinfo->dfd, sym_entry->to) < 0)
-			return -1;
 
 		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
 			/* Use strcmp instead of pg_eq because we don't have
@@ -462,6 +441,23 @@ skip_sym:
 		free(sym_entry->from);
 		free(sym_entry->to);
 		free(sym_entry);
+	}
+
+	while(!list_empty(&info->mapping_list)) {
+		struct mapping *map;
+
+		map = list_entry(info->mapping_list.next, struct mapping, list);
+
+		if(write_bork) {
+			unlink(map->tmpname);
+		} else {
+			if(rename(map->tmpname, map->realname) < 0) {
+				perror(map->realname);
+				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+				write_bork = 1;
+			}
+		}
+		del_map(map);
 	}
 
 	if(write_bork)
@@ -506,16 +502,5 @@ static int update_read_info(tupid_t cmdid, struct file_info *info,
 	}
 	if(tup_db_check_actual_inputs(cmdid, entrylist) < 0)
 		return -1;
-	return 0;
-}
-
-static int dfd_open(struct dfd_info *dinfo, tupid_t dt)
-{
-	if(dinfo->dt == dt)
-		return 0;
-	dinfo->dfd = tup_entry_open_tupid(dt);
-	if(dinfo->dfd < 0)
-		return -1;
-	dinfo->dt = dt;
 	return 0;
 }

@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #ifdef linux
 /* For pread()/pwrite() */
 #define _XOPEN_SOURCE 500
@@ -9,22 +10,22 @@
 #include "tup/file.h"
 #include "tup/thread_tree.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
-#include <pthread.h>
 #include <sys/time.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int fuse_debug = 0;
 
-int tup_fuse_add_group(int pid, struct file_info *finfo)
+int tup_fuse_add_group(int id, struct file_info *finfo)
 {
-	finfo->tnode.id = pid;
+	finfo->tnode.id = id;
 	if(thread_tree_insert(&troot, &finfo->tnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert pid %i into the fuse tree\n", pid);
+		fprintf(stderr, "tup error: Unable to insert id %i into the fuse tree\n", id);
 		return -1;
 	}
 	return 0;
@@ -46,17 +47,34 @@ int tup_fuse_debug_enabled(void)
 	return fuse_debug;
 }
 
-static struct file_info *get_finfo(void)
+#define TUP_JOB "@tupjob-"
+static struct file_info *get_finfo(const char *path)
 {
-	int pgid;
 	struct thread_tree *tt;
-	int pid = fuse_get_context()->pid;
+	int jobnum;
 
-	pgid = getpgid(pid);
-	tt = thread_tree_search(&troot, pgid);
+	if(strncmp(path, get_tup_top(), get_tup_top_len()) != 0) {
+		return NULL;
+	}
+
+	path += get_tup_top_len();
+	if(!path[0]) {
+		return NULL;
+	}
+	path++;
+	if(strncmp(path, TUP_JOB, sizeof(TUP_JOB)-1) != 0) {
+		return NULL;
+	}
+
+	path += sizeof(TUP_JOB)-1;
+	jobnum = strtol(path, NULL, 0);
+	tt = thread_tree_search(&troot, jobnum);
 	if(tt) {
+		struct file_info *finfo;
+		finfo = container_of(tt, struct file_info, tnode);
 		return container_of(tt, struct file_info, tnode);
 	}
+
 	return NULL;
 }
 
@@ -64,17 +82,90 @@ static const char *peel(const char *path)
 {
 	if(strncmp(path, get_tup_top(), get_tup_top_len()) == 0) {
 		path += get_tup_top_len();
-		if(path[0])
+		if(path[0]) {
 			path++;
+			if(strncmp(path, TUP_JOB, sizeof(TUP_JOB-1)) == 0) {
+				char *slash;
+				slash = strchr(path, '/');
+				if(slash) {
+					path = slash + 1;
+				} else {
+					path = ".";
+				}
+			}
+		} else {
+			path = ".";
+		}
 	}
 	return path;
+}
+
+static struct mapping *add_mapping(const char *path)
+{
+	static int filenum = 0;
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	struct file_info *finfo;
+	struct mapping *map = NULL;
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		int size;
+		int myfile;
+
+		map = malloc(sizeof *map);
+		if(!map) {
+			perror("malloc");
+			return NULL;
+		}
+		map->realname = strdup(peel(path));
+		if(!map->realname) {
+			perror("strdup");
+			return NULL;
+		}
+		size = sizeof(int) * 2 + sizeof(TUP_TMP) + 1;
+		map->tmpname = malloc(size);
+		if(!map->tmpname) {
+			perror("malloc");
+			return NULL;
+		}
+		pthread_mutex_lock(&lock);
+		myfile = filenum;
+		filenum++;
+		pthread_mutex_unlock(&lock);
+
+		if(snprintf(map->tmpname, size, TUP_TMP "/%x", myfile) >= size) {
+			fprintf(stderr, "tup internal error: mapping tmpname is sized incorrectly.\n");
+			return NULL;
+		}
+
+		list_add(&map->list, &finfo->mapping_list);
+	}
+	return map;
+}
+
+static struct mapping *find_mapping(const char *path)
+{
+	struct file_info *finfo;
+	const char *peeled;
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		struct mapping *map;
+		peeled = peel(path);
+		list_for_each_entry(map, &finfo->mapping_list, list) {
+			if(strcmp(peeled, map->realname) == 0) {
+				return map;
+			}
+		}
+	}
+	return NULL;
 }
 
 static void tup_fuse_handle_file(const char *path, enum access_type at)
 {
 	struct file_info *finfo;
 
-	finfo = get_finfo();
+	finfo = get_finfo(path);
 	if(finfo) {
 		/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
 		if(handle_open_file(at, peel(path), finfo, 1) < 0) {
@@ -90,15 +181,19 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
 	const char *peeled;
+	struct mapping *map;
 
-	/* Each server should put its pgid into the tree before execing the
-	 * subprocess. If we don't find the current pgid in the tree, we bail
-	 * since nobody else is allowed to look at our filesystem. If they could,
-	 * that would hose up our dependency analysis.
+	/* Only processes spawned by tup should be able to access our
+	 * file-system. This is determined by the fact that all sub-processes
+	 * should be in the same process group as tup itself. Since the fuse
+	 * thread runs in the main tup process, we can check our own pgid by
+	 * using getpgid(0). If their pgid doesn't match, we bail since nobody
+	 * else is allowed to look at our filesystem. If they could, that would
+	 * hose up our dependency analysis.
 	 *
 	 * This check is only done here since everything starts with getattr.
 	 */
-	if(thread_tree_search(&troot, getpgid(fuse_get_context()->pid)) == NULL) {
+	if(getpgid(0) != getpgid(fuse_get_context()->pid)) {
 		if(fuse_debug) {
 			fprintf(stderr, "[33mtup fuse warning: Process id %i is trying to access the tup server's fuse filesystem.[0m\n", fuse_get_context()->pid);
 		}
@@ -106,6 +201,10 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	}
 
 	peeled = peel(path);
+
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
 
 	/* First we get a getattr("@tup@"), then we get a
 	 * getattr("@tup@/CONFIG_FOO"). So first time we return success so fuse
@@ -120,21 +219,34 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 			stbuf->st_nlink = 2;
 			return 0;
 		} else {
+			struct file_info *finfo;
+
 			/* skip '/' */
 			var++;
-			tup_fuse_handle_file(var, ACCESS_VAR);
+
+			finfo = get_finfo(path);
+			if(finfo) {
+				/* TODO: 1 is always top */
+				if(handle_open_file(ACCESS_VAR, var, finfo, 1) < 0) {
+					fprintf(stderr, "tup error: Unable to save dependency on @-%s\n", var);
+					return 1;
+				}
+			}
+			/* Always return error, since we can't actually open
+			 * an @-variable.
+			 */
 			return -1;
 		}
 	}
 
-	res = lstat(path, stbuf);
+	res = lstat(peeled, stbuf);
 	if (res == -1) {
 		if(errno == ENOENT || errno == ENOTDIR) {
-			tup_fuse_handle_file(peeled, ACCESS_GHOST);
+			tup_fuse_handle_file(path, ACCESS_GHOST);
 		}
 		return -errno;
 	}
-	tup_fuse_handle_file(peeled, ACCESS_READ);
+	tup_fuse_handle_file(path, ACCESS_READ);
 
 	return 0;
 }
@@ -142,8 +254,12 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 static int tup_fs_access(const char *path, int mask)
 {
 	int res;
+	const char *peeled;
 
-	res = access(path, mask);
+	peeled = peel(path);
+
+	/* TODO: Read? */
+	res = access(peeled, mask);
 	if (res == -1)
 		return -errno;
 
@@ -153,8 +269,11 @@ static int tup_fs_access(const char *path, int mask)
 static int tup_fs_readlink(const char *path, char *buf, size_t size)
 {
 	int res;
+	const char *peeled;
 
-	res = readlink(path, buf, size - 1);
+	peeled = peel(path);
+
+	res = readlink(peeled, buf, size - 1);
 	if (res == -1)
 		return -errno;
 	tup_fuse_handle_file(path, ACCESS_READ);
@@ -169,12 +288,15 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
 	DIR *dp;
 	struct dirent *de;
+	const char *peeled;
 
 	(void) offset;
 	(void) fi;
 
+	peeled = peel(path);
+
 	tup_fuse_handle_file(path, ACCESS_READ);
-	dp = opendir(path);
+	dp = opendir(peeled);
 	if (dp == NULL)
 		return -errno;
 
@@ -193,19 +315,30 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	int res;
+	int rc;
+	struct file_info *finfo;
 
+	finfo = get_finfo(path);
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
+	/* TODO: Disallow anything not S_ISREG? */
 	if (S_ISREG(mode)) {
-		res = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
-		if (res >= 0)
-			res = close(res);
+		struct mapping *map;
+		int flags = O_CREAT | O_EXCL | O_WRONLY;
+		map = add_mapping(path);
+		if(!map) {
+			return -ENOMEM;
+		} else {
+			rc = openat(tup_top_fd(), map->tmpname, flags, mode);
+			if(rc < 0)
+				return -errno;
+			close(rc);
+		}
 	} else if (S_ISFIFO(mode))
-		res = mkfifo(path, mode);
+		rc = mkfifo(path, mode);
 	else
-		res = mknod(path, mode, rdev);
-	if (res == -1)
+		rc = mknod(path, mode, rdev);
+	if (rc == -1)
 		return -errno;
 
 	return 0;
@@ -215,6 +348,7 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 {
 	int res;
 
+	/* TODO: Write? */
 	res = mkdir(path, mode);
 	if (res == -1)
 		return -errno;
@@ -224,20 +358,23 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 
 static int tup_fs_unlink(const char *path)
 {
-	int res;
+	struct mapping *map;
 
-	res = unlink(path);
-	if (res == -1)
-		return -errno;
-	tup_fuse_handle_file(path, ACCESS_UNLINK);
-
-	return 0;
+	map = find_mapping(path);
+	if(map) {
+		tup_fuse_handle_file(path, ACCESS_UNLINK);
+		unlink(map->tmpname);
+		del_map(map);
+		return 0;
+	}
+	return -EPERM;
 }
 
 static int tup_fs_rmdir(const char *path)
 {
 	int res;
 
+	/* TODO: Only for dirs created by us */
 	res = rmdir(path);
 	if (res == -1)
 		return -errno;
@@ -249,15 +386,21 @@ static int tup_fs_symlink(const char *from, const char *to)
 {
 	int res;
 	struct file_info *finfo;
+	struct mapping *tomap;
 
-	res = symlink(from, to);
+	tomap = add_mapping(to);
+	if(!tomap) {
+		return -ENOMEM;
+	}
+
+	res = symlink(from, tomap->tmpname);
 	if (res == -1)
 		return -errno;
 
-	finfo = get_finfo();
+	finfo = get_finfo(to);
 	if(finfo) {
 		/* TODO: 1 == DOT_DT - is this still necessary? */
-		handle_file(ACCESS_SYMLINK, peel(from), peel(to), finfo, 1);
+		handle_file(ACCESS_SYMLINK, from, peel(to), finfo, 1);
 	}
 
 	return 0;
@@ -265,16 +408,40 @@ static int tup_fs_symlink(const char *from, const char *to)
 
 static int tup_fs_rename(const char *from, const char *to)
 {
-	int res;
 	struct file_info *finfo;
+	const char *peelfrom;
+	const char *peelto;
+	struct mapping *map;
 
-	res = rename(from, to);
-	if (res == -1)
-		return -errno;
+	peelfrom = peel(from);
+	peelto = peel(to);
 
-	finfo = get_finfo();
+	/* If we are re-naming to a previously created file, then delete the
+	 * old mapping. (eg: 'ar' will create an empty library, so we have one
+	 * mapping, then create a new temp file and rename it over to 'ar', so
+	 * we have a new mapping for the temp node. We need to delete the first
+	 * empty one since that file is overwritten).
+	 */
+	map = find_mapping(to);
+	if(map) {
+		unlink(map->tmpname);
+		del_map(map);
+	}
+
+	map = find_mapping(from);
+	if(!map)
+		return -ENOENT;
+
+	free(map->realname);
+	map->realname = strdup(peelto);
+	if(!map->realname) {
+		perror("strdup");
+		return -ENOMEM;
+	}
+
+	finfo = get_finfo(to);
 	if(finfo) {
-		handle_rename(peel(from), peel(to), finfo);
+		handle_rename(peelfrom, peelto, finfo);
 	}
 
 	return 0;
@@ -284,6 +451,7 @@ static int tup_fs_link(const char *from, const char *to)
 {
 	int res;
 
+	/* TODO: Unsupported */
 	res = link(from, to);
 	if (res == -1)
 		return -errno;
@@ -293,19 +461,22 @@ static int tup_fs_link(const char *from, const char *to)
 
 static int tup_fs_chmod(const char *path, mode_t mode)
 {
-	int res;
+	struct mapping *map;
 
-	res = chmod(path, mode);
-	if (res == -1)
-		return -errno;
-
-	return 0;
+	map = find_mapping(path);
+	if(map) {
+		if(chmod(map->tmpname, mode) < 0)
+			return -errno;
+		return 0;
+	}
+	return -EPERM;
 }
 
 static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 {
 	int res;
 
+	/* TODO: Counts as write? */
 	res = lchown(path, uid, gid);
 	if (res == -1)
 		return -errno;
@@ -316,8 +487,16 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 static int tup_fs_truncate(const char *path, off_t size)
 {
 	int res;
+	const char *peeled;
+	struct mapping *map;
 
-	res = truncate(path, size);
+	peeled = peel(path);
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
+
+	/* TODO: Counts as write? Or is it already open? */
+	res = truncate(peeled, size);
 	if (res == -1)
 		return -errno;
 
@@ -328,13 +507,21 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 {
 	int res;
 	struct timeval tv[2];
+	const char *peeled;
+	struct mapping *map;
 
+	peeled = peel(path);
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
+
+	/* TODO: Counts as write? Sets mtimes */
 	tv[0].tv_sec = ts[0].tv_sec;
 	tv[0].tv_usec = ts[0].tv_nsec / 1000;
 	tv[1].tv_sec = ts[1].tv_sec;
 	tv[1].tv_usec = ts[1].tv_nsec / 1000;
 
-	res = utimes(path, tv);
+	res = utimes(peeled, tv);
 	if (res == -1)
 		return -errno;
 
@@ -345,10 +532,21 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 {
 	int res;
 	enum access_type at = ACCESS_READ;
+	const char *peeled;
+	const char *openfile;
+	struct mapping *map;
+
+	peeled = peel(path);
+	map = find_mapping(path);
+	if(map) {
+		openfile = map->tmpname;
+	} else {
+		openfile = peeled;
+	}
 
 	if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
 		at = ACCESS_WRITE;
-	res = open(path, fi->flags);
+	res = open(openfile, fi->flags);
 	if(res < 0) {
 		res = -errno;
 		if(errno == ENOENT || errno == ENOTDIR) {
@@ -358,7 +556,6 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 	fi->fh = res;
 
 	tup_fuse_handle_file(path, at);
-
 	return 0;
 }
 

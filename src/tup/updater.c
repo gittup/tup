@@ -80,7 +80,6 @@ static const char *signal_err[] = {
 struct worker_thread {
 	struct list_head list;
 	pthread_t pid;
-	struct server s;
 	struct graph *g; /* This should only be used in create_work() and todo_work */
 
 	pthread_mutex_t lock;
@@ -926,10 +925,18 @@ static int unlink_outputs(int dfd, struct node *n)
 
 static int update(struct node *n)
 {
+	static int id = 0;
+	static pthread_mutex_t lock;
 	int dfd = -1;
 	const char *name = n->tent->name.s;
 	struct server s;
 	int rc;
+	int myid;
+
+	pthread_mutex_lock(&lock);
+	myid = id;
+	id++;
+	pthread_mutex_unlock(&lock);
 
 	if(name[0] == '^') {
 		name++;
@@ -960,6 +967,7 @@ static int update(struct node *n)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
+	s.id = myid;
 	s.exited = 0;
 	s.signalled = 0;
 	s.exit_status = -1;
