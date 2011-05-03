@@ -5,7 +5,7 @@ srcs += *.c
 srcs += ../tup/access_event/send_event.c
 srcs += ../tup/flock/fcntl.c
 
-ifeq ($(X86_ARCH_SIBLINGS),y)
+ifeq (@(TUP_ARCH),x86_64)
   : foreach $(srcs) |> !cc |> %B.64.o
   CFLAGS += -m32
   : foreach $(srcs) |> !cc |> %B.32.o
