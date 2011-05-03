@@ -593,8 +593,16 @@ static int tup_fs_write(const char *path, const char *buf, size_t size,
 static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 {
 	int res;
+	const char *peeled;
+	struct mapping *map;
 
-	res = statvfs(path, stbuf);
+	peeled = peel(path);
+
+	map = find_mapping(path);
+	if(map)
+		peeled = map->tmpname;
+
+	res = statvfs(peeled, stbuf);
 	if (res == -1)
 		return -errno;
 
