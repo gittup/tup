@@ -26,7 +26,7 @@
 
 int main(int argc, char **argv)
 {
-	int pid;
+	pid_t pid;
 	int test;
 	const char *ipath = "-I.";
 
