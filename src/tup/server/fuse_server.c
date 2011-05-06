@@ -188,7 +188,7 @@ static void server_setenv(int vardict_fd)
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		struct tup_entry *dtent)
 {
-	int pid;
+	pid_t pid;
 	int status;
 
 	if(dfd) {/* TODO */}

@@ -625,7 +625,7 @@ static int autoupdate(void)
 	 * the updater will be caught by us after we return to regular event
 	 * processing mode, which is annoying.
 	 */
-	int pid = fork();
+	pid_t pid = fork();
 	if(pid < 0) {
 		perror("fork");
 		return -1;
