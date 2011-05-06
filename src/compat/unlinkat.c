@@ -6,6 +6,7 @@
 int unlinkat(int dirfd, const char *pathname, int flags)
 {
 	int rc;
+	int cwd;
 
 	if(flags != 0) {
 		fprintf(stderr, "tup compat unlinkat error: flags=%i not supported\n", flags);
@@ -14,11 +15,15 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 
 	pthread_mutex_lock(&dir_mutex);
 
+	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
+		close(cwd);
 		perror("fchdir");
 		goto err_unlock;
 	}
 	rc = unlink(pathname);
+	fchdir(cwd);
+	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 
