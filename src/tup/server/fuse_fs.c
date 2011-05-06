@@ -182,6 +182,8 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	int res;
 	const char *peeled;
 	struct mapping *map;
+	struct tmpdir *tmpdir;
+	struct file_info *finfo;
 
 	/* Only processes spawned by tup should be able to access our
 	 * file-system. This is determined by the fact that all sub-processes
@@ -202,6 +204,22 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 
 	peeled = peel(path);
 
+	/* If we have a temporary directory of the name we're trying to do
+	 * getattr(), just pretend it has the same permissions as the top
+	 * tup directory. This isn't necessarily accurate, but should work for
+	 * most cases.
+	 */
+	finfo = get_finfo(path);
+	if(finfo) {
+		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				if(fstat(tup_top_fd(), stbuf) < 0)
+					return -errno;
+				return 0;
+			}
+		}
+	}
+
 	map = find_mapping(path);
 	if(map)
 		peeled = map->tmpname;
@@ -219,12 +237,9 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 			stbuf->st_nlink = 2;
 			return 0;
 		} else {
-			struct file_info *finfo;
-
 			/* skip '/' */
 			var++;
 
-			finfo = get_finfo(path);
 			if(finfo) {
 				/* TODO: 1 is always top */
 				if(handle_open_file(ACCESS_VAR, var, finfo, 1) < 0) {
@@ -361,8 +376,27 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int tup_fs_mkdir(const char *path, mode_t mode)
 {
-	if(path || mode) {}
-	fprintf(stderr, "tup error: mkdir is not supported.\n");
+	struct tmpdir *tmpdir;
+	struct file_info *finfo;
+
+	if(mode) {}
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		tmpdir = malloc(sizeof *tmpdir);
+		if(!tmpdir) {
+			perror("malloc");
+			return -ENOMEM;
+		}
+		tmpdir->dirname = strdup(peel(path));
+		if(!tmpdir->dirname) {
+			perror("strdup");
+			return -ENOMEM;
+		}
+
+		list_add(&tmpdir->list, &finfo->tmpdir_list);
+		return 0;
+	}
 	return -EPERM;
 }
 
@@ -383,8 +417,23 @@ static int tup_fs_unlink(const char *path)
 
 static int tup_fs_rmdir(const char *path)
 {
-	if(path) {}
-	fprintf(stderr, "tup error: rmdir is not supported.\n");
+	struct tmpdir *tmpdir;
+	const char *peeled;
+	struct file_info *finfo;
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		peeled = peel(path);
+		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				list_del(&tmpdir->list);
+				free(tmpdir->dirname);
+				free(tmpdir);
+				return 0;
+			}
+		}
+	}
+	fprintf(stderr, "tup error: Unable to rmdir a directory not created during this job.\n");
 	return -EPERM;
 }
 

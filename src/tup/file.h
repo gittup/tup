@@ -12,6 +12,11 @@ struct mapping {
 	char *tmpname;
 };
 
+struct tmpdir {
+	struct list_head list;
+	char *dirname;
+};
+
 struct file_info {
 	struct thread_tree tnode;
 	struct list_head read_list;
@@ -21,6 +26,7 @@ struct file_info {
 	struct list_head sym_list;
 	struct list_head ghost_list;
 	struct list_head mapping_list;
+	struct list_head tmpdir_list;
 };
 
 struct tup_entry;

@@ -52,6 +52,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->sym_list);
 	INIT_LIST_HEAD(&info->ghost_list);
 	INIT_LIST_HEAD(&info->mapping_list);
+	INIT_LIST_HEAD(&info->tmpdir_list);
 	return 0;
 }
 
@@ -111,9 +112,18 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings)
 {
 	struct list_head *entrylist;
+	struct tmpdir *tmpdir;
+	int tmpdir_bork = 0;
 	int rc1, rc2;
 
 	handle_unlink(info);
+
+	list_for_each_entry(tmpdir, &info->tmpdir_list, list) {
+		fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
+		tmpdir_bork = 1;
+	}
+	if(tmpdir_bork)
+		return -1;
 
 	entrylist = tup_entry_get_list();
 	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
