@@ -2222,6 +2222,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct rb_root tree = {NULL};
 	int extra_outputs = 0;
 	char sep[] = "|";
+	struct tup_entry *tmptent = NULL;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -2341,13 +2342,25 @@ out_pl:
 		return -1;
 	free(tcmd);
 
-	if(find_existing_command(&onl, &tf->g->delete_tree, &cmdid) < 0)
+	/* If we already have our command string in the db, then use that.
+	 * Otherwise, we try to find an existing command of a different
+	 * name that points to the output files we are trying to create.
+	 * If neither of those cases apply, we just create a new command
+	 * node.
+	 */
+	if(tup_db_select_tent(tf->tupid, cmd, &tmptent) < 0)
 		return -1;
-	if(cmdid == -1) {
-		cmdid = create_command_file(tf->tupid, cmd);
+	if(tmptent) {
+		cmdid = tmptent->tnode.tupid;
 	} else {
-		if(tup_db_set_name(cmdid, cmd) < 0)
+		if(find_existing_command(&onl, &tf->g->delete_tree, &cmdid) < 0)
 			return -1;
+		if(cmdid == -1) {
+			cmdid = create_command_file(tf->tupid, cmd);
+		} else {
+			if(tup_db_set_name(cmdid, cmd) < 0)
+				return -1;
+		}
 	}
 
 	free(cmd);
