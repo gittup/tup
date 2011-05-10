@@ -26,7 +26,7 @@ static void sighandler(int sig);
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
-	.sa_flags = SA_RESETHAND,
+	.sa_flags = SA_RESTART,
 };
 static int sig_quit = 0;
 
@@ -258,14 +258,13 @@ int server_is_dead(void)
 
 static void sighandler(int sig)
 {
-	/* This signal handler resets to the original handler when it is
-	 * fired. We just save the fact that the signal fired so we know for
-	 * error processing. All other processes in our group are also
-	 * signalled, so they will quit on their own.
-	 */
-	if(sig) {}
 	if(sig_quit == 0) {
 		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
 		sig_quit = 1;
+		/* Signal the process group, in case tup was signalled
+		 * directly (just a vanilla ctrl-C at the command-line doesn't
+		 * need this, but a kill -INT <pid> does).
+		 */
+		kill(0, sig);
 	}
 }
