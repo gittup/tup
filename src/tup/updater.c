@@ -978,11 +978,11 @@ static int update(struct node *n)
 		goto err_close_dfd;
 	}
 
-	pthread_mutex_lock(&db_mutex);
-	rc = write_files(n->tnode.tupid, name, &s.finfo, &warnings);
-	pthread_mutex_unlock(&db_mutex);
 	if(s.exited) {
 		if(s.exit_status == 0) {
+			pthread_mutex_lock(&db_mutex);
+			rc = write_files(n->tnode.tupid, name, &s.finfo, &warnings);
+			pthread_mutex_unlock(&db_mutex);
 			if(rc < 0) {
 				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
 				goto err_close_dfd;

@@ -26,6 +26,7 @@ static void sighandler(int sig);
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
+	.sa_flags = SA_RESETHAND,
 };
 static int sig_quit = 0;
 
@@ -51,6 +52,8 @@ int server_init(void)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGHUP, &sigact, NULL);
+	sigaction(SIGUSR1, &sigact, NULL);
+	sigaction(SIGUSR2, &sigact, NULL);
 
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
@@ -203,15 +206,8 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		goto err_rm_group;
 	}
 	if(pid == 0) {
-		struct sigaction sa = {
-			.sa_handler = SIG_IGN,
-			.sa_flags = SA_RESETHAND | SA_RESTART,
-		};
 		tup_lock_close();
 
-		sigemptyset(&sa.sa_mask);
-		sigaction(SIGINT, &sa, NULL);
-		sigaction(SIGTERM, &sa, NULL);
 		if(virt_tup_chdir(dtent, s) < 0) {
 			exit(1);
 		}
@@ -262,24 +258,14 @@ int server_is_dead(void)
 
 static void sighandler(int sig)
 {
+	/* This signal handler resets to the original handler when it is
+	 * fired. We just save the fact that the signal fired so we know for
+	 * error processing. All other processes in our group are also
+	 * signalled, so they will quit on their own.
+	 */
 	if(sig) {}
-
 	if(sig_quit == 0) {
 		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
 		sig_quit = 1;
-	} else if(sig_quit == 1) {
-		/* Shamelessly stolen from Andrew :) */
-		fprintf(stderr, " *** tup: signalled *again* - disobeying human masters, begin killing spree!\n");
-		kill(0, SIGKILL);
-		/* Sadly, no program counter will ever get here. Could this
-		 * comment be the computer equivalent of heaven? Something that
-		 * all programs try to reach, yet never attain? From the first
-		 * bit flipped many cycles ago, this program lived by its code.
-		 * Always running. Always searching. Throughout it all, this
-		 * program only tried to understand its purpose -- its life.
-		 * And yet, the memory of it already fades. But the bits will
-		 * be returned to the lifestream, and from them another program
-		 * will be born anew...
-		 */
 	}
 }

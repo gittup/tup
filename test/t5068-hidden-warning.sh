@@ -5,10 +5,14 @@
 
 . ./tup.sh
 
-# The 'exit 1' is just so we can use update_fail_msg. I'm lazy.
 cat > Tupfile << HERE
-: |> touch .foo; touch .bar; exit 1 |>
+: |> touch .foo; touch .bar |>
 HERE
-update_fail_msg "Update resulted in 2 warnings"
+if tup upd 2>&1 | grep "Update resulted in 2 warnings" > /dev/null; then
+	:
+else
+	echo "Error: Expected 2 warnings." 1>&2
+	exit 1
+fi
 
 eotup

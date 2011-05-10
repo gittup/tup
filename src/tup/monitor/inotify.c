@@ -358,6 +358,7 @@ static int monitor_loop(void)
 		x = read(inot_fd, buf, sizeof(buf));
 		if(x < 0) {
 			if(errno == EINTR) {
+				/* SA_RESTART doesn't work for inotify fds */
 				continue;
 			} else {
 				perror("read");
