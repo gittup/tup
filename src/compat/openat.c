@@ -14,8 +14,8 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
-		close(cwd);
 		perror("fchdir");
+		close(cwd);
 		goto err_unlock;
 	}
 	if(flags & O_CREAT) {

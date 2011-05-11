@@ -19,8 +19,8 @@ int mkdirat(int dirfd, const char *pathname, mode_t mode)
 
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
-		close(cwd);
 		perror("fchdir");
+		close(cwd);
 		goto err_unlock;
 	}
 	rc = mkdir(pathname, mode);

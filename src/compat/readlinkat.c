@@ -12,8 +12,8 @@ int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
-		close(cwd);
 		perror("fchdir");
+		close(cwd);
 		goto err_unlock;
 	}
 	rc = readlink(pathname, buf, bufsiz);
