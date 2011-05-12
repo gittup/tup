@@ -14,8 +14,8 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
-		close(cwd);
 		perror("fchdir");
+		close(cwd);
 		goto err_unlock;
 	}
 	if(flags & AT_SYMLINK_NOFOLLOW) {
