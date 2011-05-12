@@ -1,6 +1,6 @@
 #! /bin/sh -e
 os=`uname -s`
-plat_cflags="`pkg-config fuse --cflags`"
+plat_cflags="`pkg-config fuse --cflags` -D_FILE_OFFSET_BITS=64"
 plat_ldflags="`pkg-config fuse --libs`"
 plat_files=""
 case "$os" in
