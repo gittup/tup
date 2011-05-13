@@ -472,10 +472,13 @@ skip_sym:
 
 		map = list_entry(info->mapping_list.next, struct mapping, list);
 
-		if(rename(map->tmpname, map->realname) < 0) {
-			perror(map->realname);
-			fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
-			write_bork = 1;
+		/* TODO: strcmp only here for win32 support */
+		if(strcmp(map->tmpname, map->realname) != 0) {
+			if(rename(map->tmpname, map->realname) < 0) {
+				perror(map->realname);
+				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+				write_bork = 1;
+			}
 		}
 		del_map(map);
 	}

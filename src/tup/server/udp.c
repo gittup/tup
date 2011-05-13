@@ -312,6 +312,26 @@ static void *message_thread(void *arg)
 			return (void*)-1;
 		}
 
+		if(event->at == ACCESS_WRITE) {
+			struct mapping *map;
+
+			map = malloc(sizeof *map);
+			if(!map) {
+				perror("malloc");
+				return (void*)-1;
+			}
+			map->realname = strdup(event1);
+			if(!map->realname) {
+				perror("strdup");
+				return (void*)-1;
+			}
+			map->tmpname = strdup(event1);
+			if(!map->tmpname) {
+				perror("strdup");
+				return (void*)-1;
+			}
+			list_add(&map->list, &s->finfo.mapping_list);
+		}
 		if(handle_file(event->at, event1, event2, &s->finfo, s->dt) < 0) {
 			fprintf(stderr, "message_thread end\n");
 			return (void*)-1;
