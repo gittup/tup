@@ -16,6 +16,14 @@ struct server {
 	int signalled;
 	int exit_status;
 	int exit_sig;
+
+#ifdef _WIN32
+	/* TODO: Unify servers */
+	int udp_port;
+	int sd[2];
+	pthread_t tid;
+	tupid_t dt;
+#endif
 };
 
 int server_init(void);

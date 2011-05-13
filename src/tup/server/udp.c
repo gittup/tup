@@ -4,6 +4,7 @@
 #include "tup/fileio.h"
 #include "tup/db.h"
 #include "tup/graph.h"
+#include "tup/entry.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/dir_mutex.h"
@@ -18,12 +19,32 @@ static void *message_thread(void *arg);
 
 int server_init(void)
 {
+	char *slash;
+	char mycwd[PATH_MAX];
+
+	if (GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
+		return -1;
+
+	mycwd[PATH_MAX - 1] = '\0';
+	slash = strrchr(mycwd, '\\');
+	if (slash) {
+		*slash = '\0';
+	}
+
+	tup_inject_setexecdir(mycwd);
+
+	return 0;
+}
+
+int server_quit(void)
+{
 	return 0;
 }
 
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
-int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
+int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
+		struct tup_entry *dtent)
 {
 	int rc = -1;
 	DWORD return_code = 1;
@@ -47,6 +68,7 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd)
 
 	if(vardict_fd) {}
 
+	s->dt = dtent->tnode.tupid;
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		return -1;
