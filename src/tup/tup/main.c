@@ -11,7 +11,7 @@
 #include "tup/fileio.h"
 #include "tup/pel_group.h"
 #include "tup/updater.h"
-#include "tup/server/tup_fuse_fs.h"
+#include "tup/debug.h"
 #include "tup/graph.h"
 #include "tup/init.h"
 #include "tup/compat.h"
@@ -56,10 +56,11 @@ int main(int argc, char **argv)
 			cmd = argv[x];
 			cmd_arg = x;
 		}
-		if(strcmp(argv[x], "--debug-sql") == 0)
+		if(strcmp(argv[x], "--debug-sql") == 0) {
 			tup_db_enable_sql_debug();
-		else if(strcmp(argv[x], "--debug-fuse") == 0)
-			tup_fuse_enable_debug();
+		} else if(strcmp(argv[x], "--debug-fuse") == 0) {
+			server_enable_debug();
+		}
 	}
 
 	if(!cmd) {

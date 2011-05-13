@@ -9,6 +9,7 @@
 #include "tup/config.h"
 #include "tup/file.h"
 #include "tup/thread_tree.h"
+#include "tup/debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,6 @@
 #include <sys/time.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
-static int fuse_debug = 0;
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
 {
@@ -35,16 +35,6 @@ int tup_fuse_rm_group(struct file_info *finfo)
 {
 	thread_tree_rm(&troot, &finfo->tnode);
 	return 0;
-}
-
-void tup_fuse_enable_debug(void)
-{
-	fuse_debug = 1;
-}
-
-int tup_fuse_debug_enabled(void)
-{
-	return fuse_debug;
 }
 
 #define TUP_JOB "@tupjob-"
@@ -196,7 +186,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 * This check is only done here since everything starts with getattr.
 	 */
 	if(getpgid(0) != getpgid(fuse_get_context()->pid)) {
-		if(fuse_debug) {
+		if(server_debug_enabled()) {
 			fprintf(stderr, "[33mtup fuse warning: Process id %i is trying to access the tup server's fuse filesystem.[0m\n", fuse_get_context()->pid);
 		}
 		return -ENOENT;

@@ -11,5 +11,7 @@ int debug_enabled(void);
 const char *debug_string(void);
 void debug_enable(const char *label);
 void debug_disable(void);
+void server_enable_debug(void);
+int server_debug_enabled(void);
 
 #endif

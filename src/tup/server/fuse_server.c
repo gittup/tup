@@ -3,6 +3,7 @@
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/flist.h"
+#include "tup/debug.h"
 #include "tup_fuse_fs.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,7 +98,7 @@ int server_init(void)
 	/* Need a garbage arg first to count as the process name */
 	if(fuse_opt_add_arg(&args, "tup") < 0)
 		return -1;
-	if(tup_fuse_debug_enabled()) {
+	if(server_debug_enabled()) {
 		if(fuse_opt_add_arg(&args, "-d") < 0)
 			return -1;
 	}
