@@ -49,6 +49,7 @@ static int vardict_fd;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
+static pthread_mutex_t id_mutex;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -395,6 +396,10 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		perror("pthread_mutex_init");
 		return -1;
 	}
+	if(pthread_mutex_init(&id_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
+	}
 	tup_db_begin();
 	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
 	if(vardict_fd < 0) {
@@ -431,6 +436,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	}
 	close(vardict_fd);
 	tup_db_commit();
+	pthread_mutex_destroy(&id_mutex);
 	pthread_mutex_destroy(&db_mutex);
 	if(rc < 0)
 		return -1;
@@ -926,17 +932,16 @@ static int unlink_outputs(int dfd, struct node *n)
 static int update(struct node *n)
 {
 	static int id = 0;
-	static pthread_mutex_t lock;
 	int dfd = -1;
 	const char *name = n->tent->name.s;
 	struct server s;
 	int rc;
 	int myid;
 
-	pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&id_mutex);
 	myid = id;
 	id++;
-	pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&id_mutex);
 
 	if(name[0] == '^') {
 		name++;
