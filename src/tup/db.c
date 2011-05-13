@@ -1062,7 +1062,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style
 			goto out_reset;
 		}
 
-		/* This is used by the 'tup g' function if the user wants to
+		/* This is used by the 'tup graph' function if the user wants to
 		 * graph a directory. Since we want to expand all nodes in the
 		 * directory, we use TUP_LINK_NORMAL.
 		 */
