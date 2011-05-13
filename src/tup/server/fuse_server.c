@@ -12,9 +12,14 @@
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 
 #define TUP_MNT ".tup/mnt"
+
+#ifdef __APPLE__
+  #define umount2(path, flags) unmount(path, flags)
+#endif
 
 static struct fuse_server {
 	pthread_t pid;
@@ -62,7 +67,15 @@ int server_init(void)
 	}
 
 	if(mkdir(TUP_MNT, 0777) < 0) {
-		if(errno != EEXIST) {
+		if(errno == EEXIST) {
+			/* This directory might be still mounted, let's try to umount it */
+			if(umount2(TUP_MNT, MNT_FORCE) < 0) {
+				if (errno == EPERM || errno == EBUSY) {
+					fprintf(stderr, "tup error: Directory " TUP_MNT " is still mounted. Please unmount it with 'sudo umount -l " TUP_MNT "'.\n");
+					return -1;
+				}
+			}
+		} else {
 			perror(TUP_MNT);
 			fprintf(stderr, "tup error: Unable to create FUSE mountpoint.\n");
 			return -1;
