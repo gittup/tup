@@ -618,6 +618,13 @@ NTSTATUS WINAPI NtCreateFile_hook(
 		DEBUG_HOOK("NtCreateFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, CreateOptions);
 		if(strncmp(name, "\\??\\", 4) == 0) {
 			name += 4;
+			/* Windows started trying to read a file called
+			 * "\??\Ip", which broke some of the tests. This just
+			 * skips anything that doesn't begin with something
+			 * like "C:"
+			 */
+			if(name[0] != 0 && name[1] != ':')
+				goto out_free;
 		}
 
 		if (rc != STATUS_SUCCESS) {
@@ -627,6 +634,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
 		} else {
 			handle_file(name, NULL, ACCESS_READ);
 		}
+out_free:
 		free(ansi);
 	}
 
@@ -657,6 +665,12 @@ NTSTATUS WINAPI NtOpenFile_hook(
 		DEBUG_HOOK("NtOpenFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, OpenOptions);
 		if(strncmp(name, "\\??\\", 4) == 0) {
 			name += 4;
+			/* Windows started trying to read a file called "\??\Ip",
+			 * which broke some of the tests. This just skips
+			 * anything that doesn't begin with something like "C:"
+			 */
+			if(name[0] != 0 && name[1] != ':')
+				goto out_free;
 		}
 
 		/* The ShareAccess == FILE_SHARE_DELETE check might be
@@ -687,6 +701,7 @@ NTSTATUS WINAPI NtOpenFile_hook(
 				handle_file(name, NULL, ACCESS_READ);
 			}
 		}
+out_free:
 		free(ansi);
 	}
 
