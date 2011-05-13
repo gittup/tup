@@ -3819,6 +3819,13 @@ static int extra_output(tupid_t tupid, void *data)
 		/* Return success here so we can display all errant outputs.
 		 * Actual check is in tup_db_check_actual_outputs().
 		 */
+#ifdef _WIN32
+		/* TODO: This can be removed once win32 supports tmp files */
+		tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+		fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
+			tent->name.s, tent->dt);
+		delete_file(tent->dt, tent->name.s);
+#endif
 	}
 
 	fprintf(stderr, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
