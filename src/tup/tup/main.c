@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 	argv++;
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
-	} else if(strcmp(cmd, "g") == 0) {
+	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;

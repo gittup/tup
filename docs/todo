@@ -47,7 +47,7 @@ kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try 
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
-'tup g' shows too much info when a directory changes?
+'tup graph' shows too much info when a directory changes?
 
 access(2) support in ldpreload?
 
@@ -61,7 +61,7 @@ read in +/- in order to add/remove worker threads?
 
 rule without a : should be an error?
 
-reverse of tup g: give it a file, print the dir/command to create it?
+reverse of tup graph: give it a file, print the dir/command to create it?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
@@ -106,8 +106,8 @@ if you ctrl-c after files are deleted but before the commit finishes, the files 
 
 make all error messages and such pretty print on things other than 80 columns
 
-make 'tup g .gitignore' or 'tup g .git/refs/foo' have a better error message
- - I was trying to do 'find . -type f | xargs tup g' to just show files
+make 'tup graph .gitignore' or 'tup graph .git/refs/foo' have a better error message
+ - I was trying to do 'find . -type f | xargs tup graph' to just show files
 
 merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
 
