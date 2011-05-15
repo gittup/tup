@@ -36,7 +36,7 @@ static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = SA_RESTART,
 };
-static int sig_quit = 0;
+static volatile sig_atomic_t sig_quit = 0;
 
 static void *fuse_thread(void *arg)
 {
