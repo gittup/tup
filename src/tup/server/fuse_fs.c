@@ -304,11 +304,69 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	DIR *dp;
 	struct dirent *de;
 	const char *peeled;
+	struct file_info *finfo;
+	int is_tmpdir = 0;
 
 	(void) offset;
 	(void) fi;
 
 	peeled = peel(path);
+	finfo = get_finfo(path);
+	if(finfo) {
+		struct tmpdir *tmpdir;
+		struct mapping *map;
+		struct stat st;
+
+		/* If we are doing readdir() on a temporary directory, make
+		 * sure we don't try to save the dependency or do a real
+		 * opendir(), since that won't work.
+		 */
+		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				is_tmpdir = 1;
+				break;
+			}
+		}
+
+		/* Check any mappings to see if there are extra files that
+		 * we need to add to the list in addition to whatever we
+		 * get from the real opendir/readdir (if applicable).
+		 */
+		list_for_each_entry(map, &finfo->mapping_list, list) {
+			const char *realname;
+
+			/* Get the 'real' realname of the file. Eg: sub/bar.txt
+			 * becomes "bar.txt" if we are doing readdir("sub").
+			 */
+			if(peeled[0] == '.') {
+				realname = map->realname;
+			} else {
+				int len;
+				len = strlen(peeled);
+				if(strncmp(peeled, map->realname, len) != 0)
+					continue;
+				if(map->realname[len] != '/')
+					continue;
+				realname = &map->realname[len+1];
+			}
+			/* Make sure we don't include "sub/dir/bar.txt" if
+			 * we are just doing readdir("sub").
+			 */
+			if(strchr(realname, '/') != NULL)
+				continue;
+
+			if(lstat(map->tmpname, &st) < 0) {
+				perror("lstat");
+				fprintf(stderr, "tup error: Unable to stat temporary file '%s'\n", map->tmpname);
+				return -1;
+			}
+			if(filler(buf, realname, &st, 0))
+				break;
+		}
+	}
+
+	if(is_tmpdir)
+		return 0;
 
 	tup_fuse_handle_file(path, ACCESS_READ);
 	dp = opendir(peeled);
@@ -323,7 +381,6 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if (filler(buf, de->d_name, &st, 0))
 			break;
 	}
-
 	closedir(dp);
 	return 0;
 }
