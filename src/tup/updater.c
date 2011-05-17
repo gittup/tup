@@ -41,7 +41,7 @@ static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
 static void tup_main_progress(const char *s);
-static void show_progress(int sum, int tot, struct node *n);
+static void show_progress(int sum, int total, struct node *n);
 
 static int do_keep_going;
 static int num_jobs;
@@ -101,8 +101,8 @@ int updater(int argc, char **argv, int phase)
 	int do_scan = 1;
 	int num_pruned = 0;
 
-	do_keep_going = tup_db_config_get_int("keep_going");
-	num_jobs = tup_db_config_get_int("num_jobs");
+	do_keep_going = tup_db_config_get_int("keep_going", 0);
+	num_jobs = tup_db_config_get_int("num_jobs", 1);
 
 	argc--;
 	argv++;
@@ -1023,9 +1023,9 @@ static void tup_main_progress(const char *s)
 	cur_phase++;
 }
 
-static void show_progress(int sum, int tot, struct node *n)
+static void show_progress(int sum, int total, struct node *n)
 {
-	if(tot) {
+	if(total) {
 		const int max = 11;
 		const char *color = "";
 		char *name;
@@ -1036,12 +1036,12 @@ static void show_progress(int sum, int tot, struct node *n)
 		/* If it's a good enough limit for Final Fantasy VII, it's good
 		 * enough for me.
 		 */
-		if(tot > 9999) {
-			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/tot);
+		if(total > 9999) {
+			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/total);
 		} else {
-			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, tot);
+			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
 		}
-		fill = max * sum / tot;
+		fill = max * sum / total;
 
 		if(n) {
 			name = n->tent->name.s;

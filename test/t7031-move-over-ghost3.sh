@@ -7,7 +7,7 @@ check_monitor_supported
 tup monitor
 
 ln -s secret/ghost a
-if ! tup g | grep 'node_5 -> node_3'; then
+if ! tup graph | grep 'node_5 -> node_3'; then
 	echo "Error: Symlink points to the wrong place" 1>&2
 	exit 1
 fi
@@ -15,13 +15,13 @@ fi
 mkdir foo
 touch foo/ghost
 
-if ! tup g | grep 'node_5 -> node_3'; then
+if ! tup graph | grep 'node_5 -> node_3'; then
 	echo "Error: Symlink points to the wrong place" 1>&2
 	exit 1
 fi
 mv foo secret
 
-if ! tup g | grep 'node_7 -> node_3'; then
+if ! tup graph | grep 'node_7 -> node_3'; then
 	echo "Error: Symlink was not updated" 1>&2
 	exit 1
 fi

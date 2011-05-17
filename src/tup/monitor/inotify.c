@@ -90,6 +90,9 @@ static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
 static int queue_start = 0;
 static int queue_end = 0;
 static struct monitor_event *queue_last_e = NULL;
+static char **update_argv;
+static int update_argc;
+static int autoupdate_flag = -1;
 static LIST_HEAD(moved_from_list);
 
 int monitor_supported(void)
@@ -101,12 +104,39 @@ int monitor(int argc, char **argv)
 {
 	int x;
 	int rc = 0;
+	int foreground;
 
+	foreground = tup_db_config_get_int("monitor_foreground", 0);
+	/* Arguments are cleared to "-" if they are used by the monitor. These
+	 * args are also passed on to the autoupdate process if that feature is
+	 * enabled, but we don't want the updater getting any args that are
+	 * meant for the monitor. Ultimately the options may end up at
+	 * prune_graph(), which ignores args that begin with '-'.
+	 */
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
+			argv[x][1] = 0;
 			debug_enable("monitor");
+		} else if(strcmp(argv[x], "-f") == 0 ||
+			  strcmp(argv[x], "--foreground") == 0) {
+			argv[x][1] = 0;
+			foreground = 1;
+		} else if(strcmp(argv[x], "-b") == 0 ||
+			  strcmp(argv[x], "--background") == 0) {
+			argv[x][1] = 0;
+			foreground = 0;
+		} else if(strcmp(argv[x], "-a") == 0 ||
+			  strcmp(argv[x], "--autoupdate") == 0) {
+			argv[x][1] = 0;
+			autoupdate_flag = 1;
+		} else if(strcmp(argv[x], "-n") == 0 ||
+			  strcmp(argv[x], "--no-autoupdate") == 0) {
+			argv[x][1] = 0;
+			autoupdate_flag = 0;
 		}
 	}
+	update_argc = argc;
+	update_argv = argv;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -143,22 +173,28 @@ int monitor(int argc, char **argv)
 		goto close_inot;
 	}
 
-	if(fork() > 0) {
-		/* Remove our object lock, then wait for the child process to get
-		 * it.
-		 */
-		tup_unflock(tup_obj_lock());
-		if(tup_wait_flock(tup_obj_lock()) < 0)
-			exit(1);
-		exit(0);
-	}
+	if(foreground) {
+		if(tup_unflock(tup_sh_lock()) < 0) {
+			return -1;
+		}
+	} else {
+		if(fork() > 0) {
+			/* Remove our object lock, then wait for the child
+			 * process to get it.
+			 */
+			tup_unflock(tup_obj_lock());
+			if(tup_wait_flock(tup_obj_lock()) < 0)
+				exit(1);
+			exit(0);
+		}
 
-	/* Child must re-acquire the object lock, since we lost it at the
-	 * fork
-	 */
-	if(tup_flock(tup_obj_lock()) < 0) {
-		rc = -1;
-		goto close_inot;
+		/* Child must re-acquire the object lock, since we lost it at
+		 * the fork
+		 */
+		if(tup_flock(tup_obj_lock()) < 0) {
+			rc = -1;
+			goto close_inot;
+		}
 	}
 
 	if(monitor_set_pid(getpid()) < 0) {
@@ -564,6 +600,15 @@ static int queue_event(struct inotify_event *e, int locked)
 	return 0;
 }
 
+static int autoupdate_enabled(void)
+{
+	if(autoupdate_flag == 1)
+		return 1;
+	if(autoupdate_flag == -1 && tup_db_config_get_int("autoupdate", 0) == 1)
+		return 1;
+	return 0;
+}
+
 static int flush_queue(int locked)
 {
 	int events_handled = 0;
@@ -610,7 +655,7 @@ static int flush_queue(int locked)
 
 	if(locked) {
 		tup_db_commit();
-		if(events_handled && tup_db_config_get_int("autoupdate") == 1) {
+		if(events_handled && autoupdate_enabled()) {
 			if(autoupdate() < 0)
 				return -1;
 		}
@@ -638,7 +683,7 @@ static int autoupdate(void)
 		}
 		if(tup_lock_init() < 0)
 			exit(1);
-		updater(1, NULL, 0);
+		updater(update_argc, update_argv, 0);
 		tup_db_config_set_int(AUTOUPDATE_PID, -1);
 		tup_lock_exit();
 		exit(0);

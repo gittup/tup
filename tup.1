@@ -55,7 +55,40 @@ Output debug log to screen.
 These commands are used to modify the behavior of tup or look at its internals. You probably won't need these very often.
 .TP
 .B monitor
-Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor.
+Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor. The following arguments can be given on the command line. Any additional arguments not handled by the monitor will be passed along to the updater if autoupdate is enabled. For example, you could run the monitor as 'tup monitor -f -a -j2' to run the monitor in the foreground, and automatically update with 2 jobs when changes are detected. See also the config secondary command below.
+.RS
+.TP
+.B -d
+Enable debugging of the monitor process.
+.TP
+.B -f
+.PD 0
+.TP
+.B --foreground
+.PD
+Temporarily override the monitor_foreground config option to 1. The monitor will run in the foreground (don't daemonize).
+.TP
+.B -b
+.PD 0
+.TP
+.B --background
+.PD
+Temporarily override the monitor_foreground config option to 0. The monitor will run in the background (daemonize).
+.TP
+.B -a
+.PD 0
+.TP
+.B --autoupdate
+.PD
+Temporarily override the autoupdate config option to 1. This will automatically run an update when file changes are detected.
+.TP
+.B -n
+.PD 0
+.TP
+.B --no-autoupdate
+.PD
+Temporarily override the autoupdate config option to 0. This will prevent the monitor from automatically running an update when file changes are detected.
+.RE
 .TP
 .B stop
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
@@ -78,6 +111,9 @@ Set to '1' if the SQLite synchronous feature is enabled. When enabled, the datab
 .B autoupdate (default '0')
 Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
 .TP
+.B monitor_foreground (default '0')
+Set to '1' to run the monitor in the foreground, so control will not return to the terminal until the monitor is stopped (either by ctrl-C in the controlling terminal, or running 'tup stop' in another terminal). The default is '0', which means the monitor will run in the background.
+.TP
 .B num_jobs (default '1')
 Set to the maximum number of commands tup will run simultaneously. The default is '1', which means commands will be executed serially. If this number is greater than 1, commands will be run in parallel only if they are independent. See also the -j option.
 .TP
@@ -88,10 +124,10 @@ Set to '1' to keep building as much as possible even if errors are encountered. 
 This is used internally to update the database in case the schema changes. If a newer version of tup is used on an old database, the schema will be automatically updated and db_version will be set to the new version. If an older version of tup is used with a newer database, you will get an error message.
 .RE
 .TP
-.B g
+.B graph [<output_1> ... <output_n>]
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
 .TP
-.B todo [<output_1>..<output_n>]
+.B todo [<output_1> ... <output_n>]
 Prints out the next steps in the tup process that will execute when updating the given outputs. If no outputs are specified then it prints the steps needed to update the whole project. Similar to the 'upd' command, 'todo' will automatically scan the project for file changes if a file monitor is not running.
 .RS
 .TP
@@ -115,7 +151,7 @@ And you have a :-rule in a Tupfile like so:
 Then on an update, the output file will be identical to the input file, except the string @ARCH@ will be replaced with whatever CONFIG_ARCH is set to in tup.config. The varsed command automatically adds the dependency from CONFIG_ARCH to the particular command node that used it (so if CONFIG_ARCH changes, the output file will be updated with the new value).
 .TP
 .B scan
-You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup g'. Scan is called automatically by 'upd' if the monitor isn't running.
+You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup graph'. Scan is called automatically by 'upd' if the monitor isn't running.
 .SH "TUPFILES"
 You must create a file called "Tupfile" anywhere in the tup hierarchy that you want to create an output file based on the input files. The input files can be anywhere else in the tup hierarchy, but the output file(s) must be written in the same directory as the Tupfile.
 .TP

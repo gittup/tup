@@ -66,10 +66,7 @@ enum {
 	DB_SELECT_NODE_BY_LINK,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
-	DB_CONFIG_SET_INT64,
-	DB_CONFIG_GET_INT64,
 	DB_CONFIG_SET_STRING,
-	DB_CONFIG_GET_STRING,
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
 	DB_GET_VAR_ID_ALLOC,
@@ -158,7 +155,7 @@ int tup_db_open(void)
 		stmts[x] = NULL;
 	}
 
-	if(tup_db_config_get_int("db_sync") == 0) {
+	if(tup_db_config_get_int("db_sync", 1) == 0) {
 		if(no_sync() < 0)
 			return -1;
 	}
@@ -191,6 +188,7 @@ int tup_db_create(int db_sync)
 		"insert into config values('db_version', 0)",
 		"insert into config values('autoupdate', 0)",
 		"insert into config values('num_jobs', 1)",
+		"insert into config values('monitor_foreground', 0)",
 		"insert into node values(1, 0, 2, -1, -1, '.')",
 		"insert into node values(2, 1, 2, -1, -1, '@')",
 	};
@@ -319,7 +317,7 @@ static int version_check(void)
 	char sql_11f[] = "alter table node_new rename to node";
 	char sql_11g[] = "create index node_sym_index on node(sym)";
 
-	version = tup_db_config_get_int("db_version");
+	version = tup_db_config_get_int("db_version", -1);
 	if(version < 0) {
 		fprintf(stderr, "Error getting .tup/db version.\n");
 		return -1;
@@ -1064,7 +1062,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style
 			goto out_reset;
 		}
 
-		/* This is used by the 'tup g' function if the user wants to
+		/* This is used by the 'tup graph' function if the user wants to
 		 * graph a directory. Since we want to expand all nodes in the
 		 * directory, we use TUP_LINK_NORMAL.
 		 */
@@ -2872,10 +2870,11 @@ int tup_db_config_set_int(const char *lval, int x)
 	return 0;
 }
 
-int tup_db_config_get_int(const char *lval)
+int tup_db_config_get_int(const char *lval, int def)
 {
 	int rc;
 	int dbrc;
+	int use_default = 0;
 	sqlite3_stmt **stmt = &stmts[DB_CONFIG_GET_INT];
 	static char s[] = "select rval from config where lval=?";
 
@@ -2896,6 +2895,8 @@ int tup_db_config_get_int(const char *lval)
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
 		rc = -1;
+		if(def != -1)
+			use_default = 1;
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -2912,85 +2913,10 @@ out_reset:
 		return -1;
 	}
 
-	return rc;
-}
-
-int tup_db_config_set_int64(const char *lval, sqlite3_int64 x)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CONFIG_SET_INT64];
-	static char s[] = "insert or replace into config values(?, ?)";
-
-	if(sql_debug) fprintf(stderr, "%s [37m['%s', %lli][0m\n", s, lval, x);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
+	if(use_default) {
+		if(tup_db_config_set_int(lval, def) < 0)
 			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-	if(sqlite3_bind_int64(*stmt, 2, x) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	return 0;
-}
-
-sqlite3_int64 tup_db_config_get_int64(const char *lval)
-{
-	sqlite3_int64 rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_CONFIG_GET_INT64];
-	static char s[] = "select rval from config where lval=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m['%s'][0m\n", s, lval);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		rc = -1;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		rc = -1;
-		goto out_reset;
-	}
-
-	rc = sqlite3_column_int64(*stmt, 0);
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
+		rc = def;
 	}
 
 	return rc;
@@ -3032,50 +2958,6 @@ int tup_db_config_set_string(const char *lval, const char *rval)
 	}
 
 	return 0;
-}
-
-int tup_db_config_get_string(char **res, const char *lval, const char *def)
-{
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_CONFIG_GET_STRING];
-	static char s[] = "select rval from config where lval=?";
-
-	if(sql_debug) fprintf(stderr, "%s [37m['%s'][0m\n", s, lval);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
-				sqlite3_errmsg(tup_db), s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		*res = strdup(def);
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		*res = NULL;
-		goto out_reset;
-	}
-
-	*res = strdup((const char *)sqlite3_column_text(*stmt, 0));
-
-out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		return -1;
-	}
-
-	if(*res)
-		return 0;
-	return -1;
 }
 
 int tup_db_set_var(tupid_t tupid, const char *value)

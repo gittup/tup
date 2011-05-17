@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
 		return -1;
 	}
-	if(!isatty(1)) {
+	if(!isatty(STDOUT_FILENO)) {
 		color_disable();
 	}
 
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
-	} else if(strcmp(cmd, "g") == 0) {
+	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;
@@ -748,7 +748,7 @@ static int fake_mtime(int argc, char **argv)
 static int flush(void)
 {
 	printf("Flush\n");
-	while(tup_db_config_get_int(AUTOUPDATE_PID) > 0) {
+	while(tup_db_config_get_int(AUTOUPDATE_PID, -1) > 0) {
 		printf(" -- flush (try again)\n");
 		/* If we got the lock but autoupdate pid was set, it must've
 		 * just started but not gotten the lock yet.  So we need to
