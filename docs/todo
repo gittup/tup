@@ -1,10 +1,6 @@
 FD_CLOEXEC flag on file descriptors?
 
-remove var/sed commands in favor of an external client?
-
 find a way to avoid committing after the parsing/delete stage
-
-ldpreload: instead of a static msgbuf and mutex, just allocate msgbuf on the stack?
 
 let partial parsings commit rather than waiting for all directories to finish successfully
 
@@ -12,8 +8,6 @@ update node set sym=-1 where id=blah executed even when sym is already -1?
 
 can we have the monitor kill the updater if a file modification is detected? or restart it?
  - also what happens if there is no monitor? will the next update work properly?
-
-kill monitor if you ctrl-c twice? (maybe SIGHUP?) that way user has to restart it, which should catch any out of place files
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
@@ -27,12 +21,7 @@ don't continue down re-parse tree unless outputs of the dir have changed.
 
 give user an option to kill an autoupdate updater
 
-t5057 - make 'boo' dependency change update file?
-
 progress bar looks dumb when you have numbers in the thousands because of the space between the second number and the ']', and then another space before the program
-
-on rm -rf test-gcc, got a 'tup internal error: directory 123456 still has entries'
- - maybe related, get: tup error: Unable to find parent entry [169820] for node 219636 which is in libavcodec/x86/x86util.asm - for some reason, all the files in x86/ exist, but the x86 node itself does not.
 
 tup 'next_dirs' - print out other directories that use files in the current dir?
 
@@ -42,16 +31,9 @@ syntax: color %flags in output
 
 limit variable names: eg: 0-9a-zA-Z_-
 
-kill pending jobs outright when using ctrl-c so you don't have to wait? (Or try to hit ctrl-c twice)
- - might have to worry about a file being written, but the notification of it doesn't reach tup
-
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
 'tup graph' shows too much info when a directory changes?
-
-access(2) support in ldpreload?
-
-command that reads from stdin?
 
 move kconfig into tup?
 
@@ -64,9 +46,6 @@ rule without a : should be an error?
 reverse of tup graph: give it a file, print the dir/command to create it?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
-
-directly support symlinks in tup? Might make t5037 usable.
- - also t5032 when building in parallel and using the 'ln -sf %f %o' pattern rather than 'rm -f %o; ln -s %f %o'
 
  Add %1, %2, etc to reference first, second prereq?
 
@@ -84,17 +63,9 @@ replace 'tup monitor' with a tup.sh function and wrap it with valgrind
 
 monitor should move deleted files to use dir=-1 instead of actually doing the full node deletion. The full deletion is done at next tup upd. file should be renamed to avoid unique constraint violation (name=tupid?)
 
-monitor running, move directory away, then create new directory with similarly named files - things get screwed up? End up with files that had a 'dir' field with a tupid that was deleted, had to manually fix things
- - might be fixed in 0cca75675a?
-
-detect stupid build tools, like yacc
- - anyway to detect tmp files that didn't use a proper tmp name generator?
-
 get rid of 'Already parsed' messages - indent instead
 
 rm file, re-create as dir without monitor running
-
-can't tup upd using existing tup if tup-ldpreload.so changes, since tup-ldpreload.so is removed before running the link command. Investigate ptrace?
 
 look at gcov, gperf
 
@@ -102,16 +73,84 @@ highlight += differently from = to make it obvious when a var is overridden
 
 spaces in filenames and/or directories?
 
-if you ctrl-c after files are deleted but before the commit finishes, the files are gone but won't be re-created
-
 make all error messages and such pretty print on things other than 80 columns
 
 make 'tup graph .gitignore' or 'tup graph .git/refs/foo' have a better error message
  - I was trying to do 'find . -type f | xargs tup graph' to just show files
 
-merge windows support: http://github.com/jmckaskill/tup/tree/windows-port
+use auto-unmount for fuse?
 
-actually support fchdir?
+do we need access_ghost? Shouldn't all read attempts just link to the read node, or create a ghost and link to that? Who cares what the error code is
+
+fuse monitor - open fd to access underlying filesystem (overlay fs). Maybe fuse server can use fd to by-pass monitor when doing its writes? That way fuse monitor can always watch filesystem even during a build?
+
+Re-check symlinks? Is sym field necessary?
+ - need to watch parser for symlinks (after runscr?)
+
+make colors a config option, rather than a compile time thing
+
+remove .gitignore if Tupfile is removed? I had tup/src/tup/client/.gitignore lying around for some reason.
+
+create 'a' and 'b' with the same timestamps. move 'b' -> 'c', 'a' -> 'b', and 'b' is not rebuilt - timestamp problem
+ - add inode to node table?
+
+output files to a directory other than the current one?
+
+runscr: error message in parser about including generated Tupfiles: suggest using runscr instead
+
+runscr: Supports multi-outputs? eg: javac with inner classes
+
+runscr: change parser joblock? Is it necessary?
+
+runscr branch - need to wrap opendir/readdir to give generated files before they are created? Or else scripts won't wildcard properly?
+ - test: generate *.o in a sub/Tupfile, then use a python script in ./Tupfile to link sub/*.o - make sure ./Tupfile is run first (it should stop running and run sub/Tupfile once it opendirs() on sub/, then readdir() should include the generated list)
+
+after runscr: remove *-chain, <| rules
+
+avoid Scanning filesystem... tup warning blah problem
+
+print times before each [ tup ] line?
+
+when doing 'touch foo' without '|> foo', why is it a different error message when 'foo' is already a node or not? (ie: if foo is a ghost, or something)
+
+check use of fslurp() + strchr() in parser - should be fslurp_null? Or memchr?
+
+make resurrection more explicit than just different color (if no colors is on, you can't tell - and tup says it is "deleting files")
+
+add Kconfig file
+
+document emacs tricks for compiling (Sigurd emails)
+
+windows builds: Add a 'release' directory for new tags, and an 'experimental' directory for whenever a new set of commits is pushed.
+
+gentoo ebuild
+
+debian/ubuntu package
+
+use setsid() in monitor daemonize (or use daemon(3))
+
+add 'ls' command to show generated files and such in different colors?
+
+test suite: (bootstrap + tup) linux, linux64, solaris, mac osx, win, test with bash and dash as symlinks for /bin/sh
+
+separate link table for parser? eg: instead of 'select to_id from link where from_id=? and to_id blah type=TUP_NODE_DIR', maybe we can do 'select to_id from parser_link where from_id=?'
+
+use 'cmdid' field instead of a link to point to outputs?
+
+Back in the day, using a variable like $(FOO) if FOO was never set was an error, but that changed because of $(CFLAGS_%f) and the like. Can we get the best of both worlds by allowing %-flags in $-vars to force the empty-if-unspecified behavior, and give errors in other cases? Or maybe only do empty-if-unspecified in rules?
+
+should TUP_PLATFORM be a $-variable instead of an @-variable? ie: Does it make sense to be able to override it in tup.config, or should it always be static?
+
+use _root for tree roots, and _tree for the structures in the tree
+
+tup web: examples: change codec in mplayer / upgrade firefox
+tup web: compare parallelism in make to tup
+
+build variants
+ - default variant has empty tup.config to enforce a standard configuration?
+ - or allow to disable default variant for out-of-source only build?
+ - allow variants to interact? Or would this force users to have certain variants installed? eg: Rule that has debug/foo.exe and release/foo.exe as inputs is allowed or not?
+ - can variants have configs checked in?
 
 html:
   proof: no clean target
@@ -127,3 +166,7 @@ html:
   how dependencies are described/discovered
   man pages: tup command line, tup_api
   error messages (eg: you get this error message if...)
+  document !macro.c !macro.o
+  wc3 validate tup webpages
+  should be able to checkout, tup init, tup upd
+   - or checkout the project as a subdirectory: tup init at a higher level, tup upd
