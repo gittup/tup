@@ -4,6 +4,7 @@ ifeq (@(TUP_WWW),y)
 pages += index.html
 pages += getting_started.html
 pages += examples.html
+pages += tips_and_tricks.html
 pages += make_vs_tup.html
 pages += tup_vs_mordor.html
 : |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc

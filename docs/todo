@@ -119,8 +119,6 @@ make resurrection more explicit than just different color (if no colors is on, y
 
 add Kconfig file
 
-document emacs tricks for compiling (Sigurd emails)
-
 windows builds: Add a 'release' directory for new tags, and an 'experimental' directory for whenever a new set of commits is pushed.
 
 gentoo ebuild
