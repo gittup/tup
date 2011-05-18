@@ -1,3 +1,5 @@
+/* _ATFILE_SOURCE needed at least on linux x86_64 */
+#define _ATFILE_SOURCE
 #include "tup/server.h"
 #include "tup/entry.h"
 #include "tup/config.h"
