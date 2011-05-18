@@ -1,9 +1,9 @@
 <p>Getting started with tup is easy. Just follow these 7 steps:</p>
 <ol>
   <li><a href="index.html">Download and build tup</a>.</li>
-  <li>Make sure the <span class="filename">tup</span> and <span class="filename">tup-ldpreload.so</span> files are in the same directory in your path.</li>
+  <li>Make sure the <span class="filename">tup</span> executable is in your path.</li>
   <li>Make sure your source files are backed up, like in source control, or something. Tup is able to delete old files automatically, though it tries to prevent you from doing silly things like overwrite your hand-written C files. Still, it would suck if you got boned because tup has a bug or something. Hey, your hard disk can go at anytime, too.</li>
-  <li>Go to the top of your source tree and type 'tup init'. This will create a .tup/ directory and stick some files in there. The 'db' file is the database, which holds the entire DAG. The rest of the empty files are just used for locking.</li>
+  <li>Go to the top of your source tree and type 'tup init'. This will create a .tup/ directory that is used to store dependencies and manage the build system.</li>
   <li>Write a Tupfile to build things. It's probably easiest to start with a single rule and expand from there. You don't save anything by writing everything up front and trying to get it right the first time.</li>
   <li>Perform a build by running <span class="cmd">tup upd</span>. You can run this from anywhere in the source tree. This will always update the whole tree. You can't fake out tup by trying to build a part of your program if you run upd in a subdirectory or something. Don't even try. You can't win. Unless you want to update a single target at a time, like <span class="cmd">tup upd foo.o</span>, in which case tup will just build that. But, tup will always take the ramifications of the whole project space into consideration, not just the subdirectory that you're in.</li>
   <li>Now you just edit your source files, Tupfiles, or whatever and run <span class="cmd">tup upd</span> when you're done.</li>
