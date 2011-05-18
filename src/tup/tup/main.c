@@ -42,6 +42,7 @@ static int flush(void);
 static int ghost_check(void);
 static void print_name(const char *s, char c);
 
+static void version(void);
 static void usage(void);
 
 int main(int argc, char **argv)
@@ -64,6 +65,13 @@ int main(int argc, char **argv)
 	}
 
 	if(!cmd) {
+		if(argc > 1) {
+			if(strcmp(argv[1], "--version") == 0 ||
+			   strcmp(argv[1], "-v") == 0) {
+				version();
+				return 0;
+			}
+		}
 		usage();
 		return 1;
 	}
@@ -81,10 +89,8 @@ int main(int argc, char **argv)
 
 	if(strcmp(cmd, "init") == 0) {
 		return init(argc, argv);
-	} else if(strcmp(cmd, "version") == 0 ||
-		  strcmp(cmd, "--version") == 0 ||
-		  strcmp(cmd, "-v") == 0) {
-		printf("tup %s\n", tup_version());
+	} else if(strcmp(cmd, "version") == 0) {
+		version();
 		return 0;
 	} else if(strcmp(cmd, "stop") == 0) {
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
@@ -784,6 +790,11 @@ static void print_name(const char *s, char c)
 			printf("%c", *s);
 		}
 	}
+}
+
+static void version(void)
+{
+	printf("tup %s\n", tup_version());
 }
 
 static void usage(void)
