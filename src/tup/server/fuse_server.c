@@ -138,6 +138,11 @@ int server_init(void)
 		perror("pthread_create");
 		goto err_unmount;
 	}
+#ifdef __APPLE__
+	// Workaround for macfuse that does not mount syncroniously
+	// https://github.com/bfleischer/macfuse/issues/5
+	sleep(1);
+#endif
 	return 0;
 
 err_unmount:

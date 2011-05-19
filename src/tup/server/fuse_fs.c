@@ -185,7 +185,13 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 *
 	 * This check is only done here since everything starts with getattr.
 	 */
-	if(getpgid(0) != getpgid(fuse_get_context()->pid)) {
+	if(
+#ifdef __APPLE__
+			// Workaround for macfuse that does not mount a filesystem if Finder
+			// does not have access to the root folder.
+			(strcmp("/", path) != 0) &&
+#endif
+			(getpgid(0) != getpgid(fuse_get_context()->pid))) {
 		if(server_debug_enabled()) {
 			fprintf(stderr, "[33mtup fuse warning: Process id %i is trying to access the tup server's fuse filesystem.[0m\n", fuse_get_context()->pid);
 		}
