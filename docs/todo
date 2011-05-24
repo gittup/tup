@@ -141,6 +141,11 @@ should TUP_PLATFORM be a $-variable instead of an @-variable? ie: Does it make s
 
 use _root for tree roots, and _tree for the structures in the tree
 
+buffered output (anatol/buff*)
+
+use lemon to generate a parser?
+ - could also use grammar file to generate syntax file per http://code.google.com/p/autohighlight/
+
 tup web: examples: change codec in mplayer / upgrade firefox
 tup web: compare parallelism in make to tup
 
