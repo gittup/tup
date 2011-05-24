@@ -1,2 +1,7 @@
+# GCC on MacOSX is horribly outdated. Tup needs 4.6 version from MacPorts.
+# Take into account that if you have 64bits MacOSX you need to install gcc with universal binaries support:
+# port upgrade --enforce-variants gcc46 +universal
+CC = gcc-mp-4.6
+
 CFLAGS += -DAT_SYMLINK_NOFOLLOW=0x100
 CFLAGS += -DAT_FDCWD=-100
