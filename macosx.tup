@@ -5,3 +5,6 @@ CC = gcc-mp-4.6
 
 CFLAGS += -DAT_SYMLINK_NOFOLLOW=0x100
 CFLAGS += -DAT_FDCWD=-100
+
+# Implementation of *at() functions
+CFLAGS += -include compat/macosx.h

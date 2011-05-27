@@ -117,6 +117,10 @@ int server_init(void)
 		if(fuse_opt_add_arg(&args, "-d") < 0)
 			return -1;
 	}
+#ifdef __APPLE__
+	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)
+		return -1;
+#endif
 
 	fs.ch = fuse_mount(TUP_MNT, &args);
 	if(!fs.ch) {
