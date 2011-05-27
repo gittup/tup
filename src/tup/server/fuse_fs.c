@@ -62,7 +62,7 @@ static struct file_info *get_finfo(const char *path)
 	if(tt) {
 		struct file_info *finfo;
 		finfo = container_of(tt, struct file_info, tnode);
-		return container_of(tt, struct file_info, tnode);
+		return finfo;
 	}
 
 	return NULL;
@@ -387,11 +387,8 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	struct file_info *finfo;
-
 	if(rdev) {}
 
-	finfo = get_finfo(path);
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
 	if (S_ISREG(mode)) {

@@ -270,7 +270,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 	char *p, *e;
 	char *line;
 	int lno = 0;
-	int linelen;
 	struct bin_list bl;
 	struct if_stmt ifs;
 
@@ -318,8 +317,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			newline--;
 		}
 		*newline = 0;
-
-		linelen = newline - line;
 
 		if(line[0] == '#') {
 			/* Skip comments */

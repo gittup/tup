@@ -764,11 +764,9 @@ int process_tup_config(void)
 	p = b.s;
 	remaining = b.len;
 	while(p < b.s + b.len) {
-		char *start;
 		char *end;
 		char *eq;
 		char *value;
-		start = p;
 		end = memchr(p, '\n', remaining);
 		if(!end) {
 			fprintf(stderr, "tup: Error parsing .tupconfig line: %s\n", p);
@@ -3494,7 +3492,7 @@ static int files_to_tree(struct rb_root *tree)
 	if(tup_entry_resolve_dirsym() < 0)
 		return -1;
 
-	return 0;
+	return rc;
 }
 
 static int get_output_tree(tupid_t cmdid, struct rb_root *output_tree)
