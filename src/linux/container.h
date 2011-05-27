@@ -22,6 +22,6 @@
  */
 #define container_of(ptr, type, member) ({                      \
         typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
+        (type *)(void *)( (char *)__mptr - offsetof(type,member) );})
 
 #endif

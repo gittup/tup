@@ -61,7 +61,7 @@ int tup_vardict_init(void)
 	}
 
 	tup_vars.num_entries = *(unsigned int*)tup_vars.map;
-	tup_vars.offsets = (unsigned int*)((char*)tup_vars.map + expected);
+	tup_vars.offsets = (unsigned int*)(void*)((char*)tup_vars.map + expected);
 	expected += sizeof(unsigned int) * tup_vars.num_entries;
 	tup_vars.entries = (const char*)tup_vars.map + expected;
 	if(tup_vars.len < expected) {
