@@ -58,6 +58,7 @@ struct moved_from_event {
 	struct monitor_event *m;
 };
 
+static struct monitor_event *get_monitor_event(int pos);
 static int monitor_set_pid(int pid);
 static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
@@ -270,6 +271,15 @@ int monitor(int argc, char **argv)
 close_inot:
 	close(inot_fd);
 	return rc;
+}
+
+static struct monitor_event *get_monitor_event(int pos)
+{
+	/* This is a helper function to avoid the cast warning about
+	 * increasing alignment in clang.
+	 */
+	void *p = &queue_buf[pos];
+	return p;
 }
 
 static int monitor_set_pid(int pid)
@@ -585,7 +595,7 @@ static int queue_event(struct inotify_event *e, int locked)
 		}
 	}
 
-	queue_last_e = (struct monitor_event*)&queue_buf[new_start];
+	queue_last_e = get_monitor_event(new_start);
 	m = queue_last_e;
 
 	memcpy(&m->e, e, sizeof(*e));
@@ -621,7 +631,7 @@ static int flush_queue(int locked)
 		struct monitor_event *m;
 		struct inotify_event *e;
 
-		m = (struct monitor_event*)&queue_buf[queue_start];
+		m = get_monitor_event(queue_start);
 		e = &m->e;
 		DEBUGP("Handle[%li]: '%s' %08x\n",
 		       (long)sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
@@ -784,7 +794,7 @@ static int ephemeral_event(struct inotify_event *e)
 	}
 
 	for(x=queue_start; x<queue_end;) {
-		m = (struct monitor_event*)&queue_buf[x];
+		m = get_monitor_event(x);
 		qe = &m->e;
 
 		if(same_event(qe, e) == 0) {
