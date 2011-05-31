@@ -59,6 +59,7 @@ int server_init(void)
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 	sigaction(SIGHUP, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 	sigaction(SIGUSR2, &sigact, NULL);
