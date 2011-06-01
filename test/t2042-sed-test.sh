@@ -15,7 +15,6 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> echo 'foo\$' | sed 's/o\\\$/3/' > %o |> out.txt
 HERE
-cat Tupfile
 tup touch Tupfile
 update
 echo 'fo3' | diff - out.txt
