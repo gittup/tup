@@ -1,28 +1,16 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "dir_mutex.h"
+#include <sys/param.h>
+#include <string.h>
 
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
-	int rc;
-	int cwd;
+	char fullpath[MAXPATHLEN];
 
-	pthread_mutex_lock(&dir_mutex);
+	fcntl(dirfd, F_GETPATH, fullpath);
+	strlcat(fullpath, "/", MAXPATHLEN);
+	strlcat(fullpath, pathname, MAXPATHLEN);
 
-	cwd = open(".", O_RDONLY);
-	if(fchdir(dirfd) < 0) {
-		perror("fchdir");
-		close(cwd);
-		goto err_unlock;
-	}
-	rc = readlink(pathname, buf, bufsiz);
-	fchdir(cwd);
-	close(cwd);
-	pthread_mutex_unlock(&dir_mutex);
-	return rc;
-
-err_unlock:
-	pthread_mutex_unlock(&dir_mutex);
-	return -1;
+	return readlink(pathname, buf, bufsiz);
 }

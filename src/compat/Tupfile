@@ -6,7 +6,7 @@ srcs += dummy.c
 endif
 
 ifeq (@(TUP_PLATFORM),macosx)
-srcs += dir_mutex.c
+srcs += dummy.c
 srcs += fstatat.c
 srcs += mkdirat.c
 srcs += openat.c

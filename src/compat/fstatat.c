@@ -3,32 +3,20 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "dir_mutex.h"
+#include <sys/param.h>
+#include <string.h>
 
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 {
-	int rc;
-	int cwd;
+	char fullpath[MAXPATHLEN];
 
-	pthread_mutex_lock(&dir_mutex);
+	fcntl(dirfd, F_GETPATH, fullpath);
+	strlcat(fullpath, "/", MAXPATHLEN);
+	strlcat(fullpath, pathname, MAXPATHLEN);
 
-	cwd = open(".", O_RDONLY);
-	if(fchdir(dirfd) < 0) {
-		perror("fchdir");
-		close(cwd);
-		goto err_unlock;
-	}
 	if(flags & AT_SYMLINK_NOFOLLOW) {
-		rc = lstat(pathname, buf);
+		return lstat(fullpath, buf);
 	} else {
-		rc = stat(pathname, buf);
+		return stat(fullpath, buf);
 	}
-	fchdir(cwd);
-	close(cwd);
-	pthread_mutex_unlock(&dir_mutex);
-	return rc;
-
-err_unlock:
-	pthread_mutex_unlock(&dir_mutex);
-	return -1;
 }
