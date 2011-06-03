@@ -5,6 +5,7 @@
 #include "db.h"
 #include "fileio.h"
 #include "pel_group.h"
+#include "config.h"
 #include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,8 +142,8 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 static int file_set_mtime(struct tup_entry *tent, const char *file)
 {
 	struct stat buf;
-	if(lstat(file, &buf) < 0) {
-		fprintf(stderr, "tup error: file_set_mtime() lstat failed.\n");
+	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
 		perror(file);
 		return -1;
 	}
@@ -474,7 +475,7 @@ skip_sym:
 
 		/* TODO: strcmp only here for win32 support */
 		if(strcmp(map->tmpname, map->realname) != 0) {
-			if(rename(map->tmpname, map->realname) < 0) {
+			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
 				perror(map->realname);
 				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
 				write_bork = 1;

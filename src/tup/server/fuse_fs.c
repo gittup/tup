@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #define _ATFILE_SOURCE
 #ifdef linux
 /* For pread()/pwrite() */
@@ -245,7 +246,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 		}
 	}
 
-	res = lstat(peeled, stbuf);
+	res = fstatat(tup_top_fd(), peeled, stbuf, AT_SYMLINK_NOFOLLOW);
 	if (res == -1) {
 		if(errno == ENOENT || errno == ENOTDIR) {
 			tup_fuse_handle_file(path, ACCESS_GHOST);
@@ -270,7 +271,7 @@ static int tup_fs_access(const char *path, int mask)
 		peeled = map->tmpname;
 
 	/* This is preceded by a getattr - no need to handle a read event */
-	res = access(peeled, mask);
+	res = faccessat(tup_top_fd(), peeled, mask, AT_SYMLINK_NOFOLLOW);
 	if (res == -1)
 		return -errno;
 
@@ -289,7 +290,7 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 	if(map)
 		peeled = map->tmpname;
 
-	res = readlink(peeled, buf, size - 1);
+	res = readlinkat(tup_top_fd(), peeled, buf, size - 1);
 	if (res == -1)
 		return -errno;
 	tup_fuse_handle_file(path, ACCESS_READ);
@@ -307,6 +308,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	const char *peeled;
 	struct file_info *finfo;
 	int is_tmpdir = 0;
+	int fd;
 
 	(void) offset;
 	(void) fi;
@@ -356,7 +358,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			if(strchr(realname, '/') != NULL)
 				continue;
 
-			if(lstat(map->tmpname, &st) < 0) {
+			if(fstatat(tup_top_fd(), map->tmpname, &st, AT_SYMLINK_NOFOLLOW) < 0) {
 				perror("lstat");
 				fprintf(stderr, "tup error: Unable to stat temporary file '%s'\n", map->tmpname);
 				return -1;
@@ -370,7 +372,13 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		return 0;
 
 	tup_fuse_handle_file(path, ACCESS_READ);
-	dp = opendir(peeled);
+	fd = openat(tup_top_fd(), peeled, O_RDONLY);
+	if(fd < 0) {
+		perror(peeled);
+		fprintf(stderr, "tup error: Unable to open directory for reading entries in readdir().\n");
+		return -1;
+	}
+	dp = fdopendir(fd);
 	if (dp == NULL)
 		return -errno;
 
@@ -452,7 +460,7 @@ static int tup_fs_unlink(const char *path)
 	map = find_mapping(path);
 	if(map) {
 		tup_fuse_handle_file(path, ACCESS_UNLINK);
-		unlink(map->tmpname);
+		unlinkat(tup_top_fd(), map->tmpname, 0);
 		del_map(map);
 		return 0;
 	}
@@ -493,7 +501,7 @@ static int tup_fs_symlink(const char *from, const char *to)
 		return -ENOMEM;
 	}
 
-	res = symlink(from, tomap->tmpname);
+	res = symlinkat(from, tup_top_fd(), tomap->tmpname);
 	if (res == -1)
 		return -errno;
 
@@ -561,7 +569,7 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 
 	map = find_mapping(path);
 	if(map) {
-		if(chmod(map->tmpname, mode) < 0)
+		if(fchmodat(tup_top_fd(), map->tmpname, mode, 0) < 0)
 			return -errno;
 		return 0;
 	}
@@ -575,7 +583,7 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 
 	map = find_mapping(path);
 	if(map) {
-		if(lchown(map->tmpname, uid, gid) < 0)
+		if(fchownat(tup_top_fd(), map->tmpname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
 			return -errno;
 		return 0;
 	}
@@ -591,9 +599,15 @@ static int tup_fs_truncate(const char *path, off_t size)
 	tup_fuse_handle_file(path, ACCESS_WRITE);
 	map = find_mapping(path);
 	if(map) {
-		if(truncate(map->tmpname, size) < 0)
+		int fd;
+		int rc = 0;
+		fd = openat(tup_top_fd(), map->tmpname, O_WRONLY);
+		if(!fd)
 			return -errno;
-		return 0;
+		if(ftruncate(fd, size) < 0)
+			rc = -errno;
+		close(fd);
+		return rc;
 	}
 	fprintf(stderr, "tup error: Unable to truncate() files not created by this job.\n");
 	return -EPERM;
@@ -602,7 +616,6 @@ static int tup_fs_truncate(const char *path, off_t size)
 static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 {
 	int res;
-	struct timeval tv[2];
 	const char *peeled;
 	struct mapping *map;
 
@@ -611,12 +624,7 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	if(map) {
 		peeled = map->tmpname;
 
-		tv[0].tv_sec = ts[0].tv_sec;
-		tv[0].tv_usec = ts[0].tv_nsec / 1000;
-		tv[1].tv_sec = ts[1].tv_sec;
-		tv[1].tv_usec = ts[1].tv_nsec / 1000;
-
-		res = utimes(peeled, tv);
+		res = utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW);
 		if (res == -1)
 			return -errno;
 		return 0;
@@ -643,7 +651,7 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 
 	if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
 		at = ACCESS_WRITE;
-	res = open(openfile, fi->flags);
+	res = openat(tup_top_fd(), openfile, fi->flags);
 	if(res < 0) {
 		res = -errno;
 		if(errno == ENOENT || errno == ENOTDIR) {
@@ -686,7 +694,8 @@ static int tup_fs_write(const char *path, const char *buf, size_t size,
 
 static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 {
-	int res;
+	int fd;
+	int rc = 0;
 	const char *peeled;
 	struct mapping *map;
 
@@ -696,11 +705,14 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	if(map)
 		peeled = map->tmpname;
 
-	res = statvfs(peeled, stbuf);
-	if (res == -1)
+	fd = openat(tup_top_fd(), peeled, O_WRONLY);
+	if(fd < 0)
 		return -errno;
 
-	return 0;
+	if(fstatvfs(fd, stbuf) < 0)
+		rc = -errno;
+	close(fd);
+	return rc;
 }
 
 static int tup_fs_release(const char *path, struct fuse_file_info *fi)

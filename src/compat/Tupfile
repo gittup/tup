@@ -25,5 +25,6 @@ mingwsrcs += dir_mutex.c
 mingwsrcs += fstatat.c
 mingwsrcs += mkdirat.c
 mingwsrcs += openat.c
+mingwsrcs += renameat.c
 mingwsrcs += unlinkat.c
 : foreach $(mingwsrcs) |> !mingwcc |>

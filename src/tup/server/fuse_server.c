@@ -46,6 +46,11 @@ static void *fuse_thread(void *arg)
 		perror("fuse_loop");
 		fs.failed = 1;
 	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fs.failed = 1;
+		return NULL;
+	}
 	fuse_unmount(TUP_MNT, fs.ch);
 	fuse_destroy(fs.fuse);
 	fs.fuse = NULL;
