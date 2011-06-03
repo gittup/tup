@@ -20,16 +20,19 @@ int mkdirat(int dirfd, const char *pathname, mode_t mode)
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
 		perror("fchdir");
-		close(cwd);
-		goto err_unlock;
+		goto err_close;
 	}
 	rc = mkdir(pathname, mode);
-	fchdir(cwd);
+	if(fchdir(cwd) < 0) {
+		perror("fchdir");
+		goto err_close;
+	}
 	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 
-err_unlock:
+err_close:
+	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	return -1;
 }

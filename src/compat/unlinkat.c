@@ -18,16 +18,19 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 	cwd = open(".", O_RDONLY);
 	if(fchdir(dirfd) < 0) {
 		perror("fchdir");
-		close(cwd);
-		goto err_unlock;
+		goto err_close;
 	}
 	rc = unlink(pathname);
-	fchdir(cwd);
+	if(fchdir(cwd) < 0) {
+		perror("fchdir");
+		goto err_close;
+	}
 	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	return rc;
 
-err_unlock:
+err_close:
+	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	return -1;
 }
