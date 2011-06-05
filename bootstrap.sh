@@ -17,11 +17,18 @@ case "$os" in
 	;;
 	Darwin)
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
+	plat_files="$plat_files ../src/compat/faccessat.c"
+	plat_files="$plat_files ../src/compat/fchmodat.c"
+	plat_files="$plat_files ../src/compat/fchownat.c"
+	plat_files="$plat_files ../src/compat/fdopendir.c"
 	plat_files="$plat_files ../src/compat/fstatat.c"
 	plat_files="$plat_files ../src/compat/mkdirat.c"
 	plat_files="$plat_files ../src/compat/openat.c"
 	plat_files="$plat_files ../src/compat/readlinkat.c"
+	plat_files="$plat_files ../src/compat/renameat.c"
+	plat_files="$plat_files ../src/compat/symlinkat.c"
 	plat_files="$plat_files ../src/compat/unlinkat.c"
+	plat_files="$plat_files ../src/compat/utimensat.c"
 	plat_cflags="$plat_cflags -DAT_SYMLINK_NOFOLLOW=0x100"
 	CC=gcc-mp-4.6
 	;;
