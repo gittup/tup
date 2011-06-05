@@ -1,3 +1,4 @@
+#define _ATFILE_SOURCE
 #include "file.h"
 #include "access_event.h"
 #include "debug.h"
