@@ -10,13 +10,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	mode_t mode = 0;
 	int cwd;
 
-	pthread_mutex_lock(&dir_mutex);
-
-	cwd = open(".", O_RDONLY);
-	if(fchdir(dirfd) < 0) {
-		perror("fchdir");
-		goto err_close;
-	}
+	cwd = dir_mutex_lock(dirfd);
 	if(flags & O_CREAT) {
 		va_list ap;
 		va_start(ap, flags);
@@ -24,16 +18,6 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 	fd = open(pathname, flags, mode);
-	if(fchdir(cwd) < 0) {
-		perror("fchdir");
-		goto err_close;
-	}
-	close(cwd);
-	pthread_mutex_unlock(&dir_mutex);
+	dir_mutex_unlock(cwd);
 	return fd;
-
-err_close:
-	close(cwd);
-	pthread_mutex_unlock(&dir_mutex);
-	return -1;
 }
