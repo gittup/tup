@@ -3,6 +3,7 @@
 # Make sure we can use 'touch -h' on a generated symlink correctly.
 
 . ./tup.sh
+check_no_windows shell
 
 touch foo
 

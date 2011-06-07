@@ -4,6 +4,7 @@
 # the job.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > foo.c << HERE
 #include <stdio.h>

@@ -3,6 +3,7 @@
 # Try to use the access() function after opening a file for write.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > foo.c << HERE
 #include <unistd.h>
