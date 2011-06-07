@@ -140,10 +140,10 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	return -1;
 }
 
-static int file_set_mtime(struct tup_entry *tent, const char *file)
+static int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 {
 	struct stat buf;
-	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
 		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
 		perror(file);
 		return -1;
@@ -380,13 +380,30 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			write_bork = 1;
 		} else {
 			struct mapping *map;
+			int dfd;
 			tup_entry_list_add(tent, entrylist);
+
+			/* Some files in Windows still set dt to not be
+			 * DOT_DT, so we need to make sure we are in the
+			 * right path for fstatat() to work. The fuse
+			 * server always sets dt to DOT_DT, so we can just
+			 * use the existing tup_top_fd() descriptor in that
+			 * case.
+			 */
+			if(w->dt != DOT_DT) {
+				dfd = tup_entry_open_tupid(w->dt);
+			} else {
+				dfd = tup_top_fd();
+			}
 
 			list_for_each_entry(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
-					if(file_set_mtime(tent, map->tmpname) < 0)
+					if(file_set_mtime(tent, dfd, map->tmpname) < 0)
 						return -1;
 				}
+			}
+			if(w->dt != DOT_DT) {
+				close(dfd);
 			}
 			if(tup_db_set_sym(tent, -1) < 0)
 				return -1;
@@ -416,9 +433,18 @@ out_skip:
 		tup_entry_list_add(tent, entrylist);
 
 		list_for_each_entry(map, &info->mapping_list, list) {
+			int dfd;
+			if(sym_entry->dt != DOT_DT) {
+				dfd = tup_entry_open_tupid(sym_entry->dt);
+			} else {
+				dfd = tup_top_fd();
+			}
 			if(strcmp(map->realname, sym_entry->to) == 0) {
-				if(file_set_mtime(tent, map->tmpname) < 0)
+				if(file_set_mtime(tent, dfd, map->tmpname) < 0)
 					return -1;
+			}
+			if(sym_entry->dt != DOT_DT) {
+				close(dfd);
 			}
 		}
 
