@@ -705,7 +705,7 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	if(map)
 		peeled = map->tmpname;
 
-	fd = openat(tup_top_fd(), peeled, O_WRONLY);
+	fd = openat(tup_top_fd(), peeled, O_RDONLY);
 	if(fd < 0)
 		return -errno;
 

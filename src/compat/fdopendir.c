@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/param.h>
+#include <sys/fcntl.h>
 #include <dirent.h>
 
 DIR *fdopendir(int fd)
