@@ -3,6 +3,8 @@
 # Make sure 'tup init' works without the --force flag that is used by default
 # for these test cases.
 
+. ./tup.sh
+
 tmpdir="/tmp/tup-t0001"
 cleanup()
 {
@@ -23,3 +25,6 @@ for i in db object shared tri vardict; do
 	fi
 done
 cleanup
+
+cd $tupcurdir
+eotup
