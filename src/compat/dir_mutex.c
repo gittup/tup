@@ -21,6 +21,11 @@ int dir_mutex_lock(int dfd)
 
 	pthread_mutex_lock(&dir_mutex);
 	cwd = open(".", O_RDONLY);
+	if (cwd < 0) {
+		perror("open");
+		exit(1);
+	}
+
 	if(fchdir(dfd) < 0) {
 		perror("fchdir");
 		fprintf(stderr, "tup error: Failed to fchdir in a compat wrapper function.\n");
@@ -38,6 +43,7 @@ void dir_mutex_unlock(int cwd)
 		fprintf(stderr, "tup error: Failed to fchdir in a compat wrapper function.\n");
 		exit(1);
 	}
+	close(cwd);
 	pthread_mutex_unlock(&dir_mutex);
 	errno = olderrno;
 }
