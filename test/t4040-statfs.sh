@@ -5,7 +5,12 @@
 . ./tup.sh
 
 cat > ok.c << HERE
+#ifdef __APPLE__
+#include <sys/mount.h>
+#else
 #include <sys/vfs.h>
+#endif
+
 int main(void)
 {
 	struct statfs buf;
