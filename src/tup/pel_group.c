@@ -89,7 +89,7 @@ skip_num_elements:
 
 int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 {
-	struct path_element *pel = list_entry(pg->path_list.next, struct path_element, list);
+	struct path_element *pel;
 	tupid_t dt = DOT_DT;
 	struct tup_entry *tent;
 	const char *top = get_tup_top();

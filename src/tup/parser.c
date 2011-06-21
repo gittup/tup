@@ -2530,7 +2530,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 	int x;
 	const char *p;
 	const char *next;
-	int clen = strlen(cmd);
+	int clen;
 
 	if(!nl) {
 		fprintf(stderr, "tup internal error: tup_printf called with NULL name_list\n");
@@ -2744,7 +2744,6 @@ static char *eval(struct tupfile *tf, const char *string,
 					if(vlen < 0)
 						return NULL;
 					len += vlen;
-					s = rparen + 1;
 				} else {
 					vlen = vardb_len(&tf->vdb, var, rparen-var);
 					if(vlen < 0)
@@ -2832,7 +2831,6 @@ static char *eval(struct tupfile *tf, const char *string,
 						return NULL;
 					if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
 						return NULL;
-					s = rparen + 1;
 				} else {
 					if(vardb_copy(&tf->vdb, var, rparen-var, &p) < 0)
 						return NULL;

@@ -3613,8 +3613,6 @@ static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
 	struct rb_node *nb;
 	struct tupid_tree *ttb;
 
-	nb = rb_first(b);
-
 	list_for_each_entry(tent, a, list) {
 		ttb = tupid_tree_search(b, tent->tnode.tupid);
 		if(!ttb) {
