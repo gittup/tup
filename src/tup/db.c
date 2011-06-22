@@ -668,14 +668,14 @@ static const char *check_flags_name;
 static int check_flags_cb(void *arg, int argc, char **argv, char **col)
 {
 	int *iptr = arg;
-	if(argc) {}
-	if(argv) {}
 	if(col) {}
 	if(check_flags_name) {
 		fprintf(stderr, "*** %s_list:\n", check_flags_name);
 		check_flags_name = NULL;
 	}
-	fprintf(stderr, "%s\n", argv[0]);
+	if(argc >= 1 && argv) {
+		fprintf(stderr, "%s\n", argv[0]);
+	}
 	*iptr = 1;
 	return 0;
 }
