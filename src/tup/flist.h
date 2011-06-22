@@ -55,6 +55,6 @@ struct flist {
 		((f)->_d!=0 &&\
 		 ((f)->_ent=readdir((f)->_d))!=0 &&\
 		 ((f)->filename=(f)->_ent->d_name)!=0) ||\
-		((f)->_d!=0 && closedir((f)->_d));)
+		((f)->_d!=0 && closedir((f)->_d) && 0);)
 
 #endif
