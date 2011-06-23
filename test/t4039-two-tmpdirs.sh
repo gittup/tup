@@ -8,7 +8,7 @@
 cat > ok.sh << HERE
 mkdir tmp1
 mkdir tmp2
-echo -n foo > tmp1/ok.txt
+echo foo > tmp1/ok.txt
 echo bar > tmp2/ok.txt
 cat tmp1/ok.txt tmp2/ok.txt > output.txt
 rm tmp1/ok.txt
@@ -24,6 +24,6 @@ HERE
 tup touch ok.sh Tupfile
 update
 
-echo foobar | diff - output.txt
+(echo foo; echo bar) | diff - output.txt
 
 eotup

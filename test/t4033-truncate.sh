@@ -10,7 +10,7 @@ cat > foo.c << HERE
 
 int main(void)
 {
-	if(truncate("tmp.txt", 1) < 0) {
+	if(truncate("tmp.txt", 4) < 0) {
 		perror("tmp.txt");
 		return 1;
 	}
@@ -19,12 +19,12 @@ int main(void)
 HERE
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
-: foo |> echo heythere > %o; ./foo |> tmp.txt
+: foo |> (echo hey; echo there) > %o; ./foo |> tmp.txt
 HERE
 tup touch Tupfile foo.c
 update
 
-echo -n 'h' | diff - tmp.txt
+echo 'hey' | diff - tmp.txt
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 HERE
