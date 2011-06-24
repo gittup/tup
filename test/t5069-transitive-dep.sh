@@ -48,7 +48,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -fpic -c %f -o %o |> %B.o
 : foo.o |> gcc -fpic -shared %f -o %o |> libfoo.so
 : bar.o | libfoo.so |> gcc -fpic -shared %f -o %o -L. -lfoo |> libbar.so
-: main.o | libbar.so |> gcc main.o -o %o -Wl,-rpath=. -L. -lbar |> prog
+: main.o | libbar.so |> LD_LIBRARY_PATH=. gcc main.o -o %o -L. -lbar |> prog
 : prog |> LD_LIBRARY_PATH=. ./prog |>
 HERE
 update
