@@ -263,12 +263,31 @@ static int tup_fs_access(const char *path, int mask)
 	int res;
 	const char *peeled;
 	struct mapping *map;
+	struct file_info *finfo;
+	struct tmpdir *tmpdir;
 
 	peeled = peel(path);
 
 	map = find_mapping(path);
 	if(map)
 		peeled = map->tmpname;
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				/* For a temporary directory, just use the same
+				 * access permissions as the top-level directory.
+				 * This could be finer grained to use the actual
+				 * permissions assigned in mkdir for a temp
+				 * directory.
+				 */
+				if(faccessat(tup_top_fd(), ".", mask, AT_SYMLINK_NOFOLLOW) < 0)
+					return -errno;
+				return 0;
+			}
+		}
+	}
 
 	/* This is preceded by a getattr - no need to handle a read event */
 	res = faccessat(tup_top_fd(), peeled, mask, AT_SYMLINK_NOFOLLOW);
