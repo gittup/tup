@@ -5,7 +5,13 @@
 . ./tup.sh
 
 cat > ok.c << HERE
+#ifdef __linux__
 #include <sys/vfs.h>
+#elif __APPLE__
+#include <sys/mount.h>
+#else
+#error Please add support for this test in t4040-statfs.sh
+#endif
 int main(void)
 {
 	struct statfs buf;
