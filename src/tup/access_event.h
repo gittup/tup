@@ -6,6 +6,12 @@
 /** The file descriptor for the variable dictionary. */
 #define TUP_VARDICT_NAME "tup_vardict"
 
+/* The virtual directory used to pass @-variable dependencies from a client
+ * program to the server.
+ */
+#define TUP_VAR_VIRTUAL_DIR "@tup@"
+#define TUP_VAR_VIRTUAL_DIR_LEN (sizeof(TUP_VAR_VIRTUAL_DIR)-1)
+
 enum access_type {
 	ACCESS_READ,
 	ACCESS_WRITE,

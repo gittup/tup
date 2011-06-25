@@ -222,8 +222,8 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 * track of the variable and return failure because we're not actually
 	 * going to open anything.
 	 */
-	if(strncmp(peeled, "@tup@", 5) == 0) {
-		const char *var = peeled + 5;
+	if(strncmp(peeled, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
+		const char *var = peeled + TUP_VAR_VIRTUAL_DIR_LEN;
 		if(var[0] == 0) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
@@ -267,6 +267,16 @@ static int tup_fs_access(const char *path, int mask)
 	struct tmpdir *tmpdir;
 
 	peeled = peel(path);
+
+	/* OSX will call access() on the virtual directory before calling
+	 * getattr() on the variable name, so we check for that here.
+	 */
+	if(strncmp(peeled, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
+		const char *var = peeled + TUP_VAR_VIRTUAL_DIR_LEN;
+		if(var[0] == 0) {
+			return 0;
+		}
+	}
 
 	map = find_mapping(path);
 	if(map)
