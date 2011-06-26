@@ -88,6 +88,25 @@ int server_init(void)
 			fprintf(stderr, "tup error: Unable to create FUSE mountpoint.\n");
 			return -1;
 		}
+	} else {
+#ifdef __APPLE__
+		/* MacOSX is a wayward beast. On a filesystem mount event it notifies several processes such as
+		 * antivirus scanner, file content indexer.
+		 * The content indexer (Spotlight) creates a root-owned directory that keeps index data (.tup/mnt/.Spotlight-V100).
+		 * To prevent it we use "nobrowse" fuse4x flag - it tells Spotlight to skip the fs.
+		 * Unfortunately it does not help in case of a short-living filesystems (e.g. in tup tests).
+		 * Tup mounts and then quickly unmounts the fs and when Sportlight checks "nobrowse" flag on a filesystem
+		 * using statfs() - it gets data of the local filesystem (fuse fs is already unmount at this time).
+		 * The local fs does not have "nobrowse" flag thus Spotlight creates the index directory.
+		 * The only way to prevent it is to create an empty file ".metadata_never_index" in the mount folder.
+		 */
+		int neverindex_fd = open(TUP_MNT "/.metadata_never_index", O_WRONLY|O_CREAT, 0644);
+		if (neverindex_fd) {
+			close(neverindex_fd);
+		} else {
+			perror("create(metadata_never_index):");
+		}
+#endif
 	}
 
 	if(mkdir(TUP_TMP, 0777) < 0) {
