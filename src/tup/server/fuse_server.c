@@ -101,7 +101,7 @@ int server_init(void)
 		 * The only way to prevent it is to create an empty file ".metadata_never_index" in the mount folder.
 		 */
 		int neverindex_fd = open(TUP_MNT "/.metadata_never_index", O_WRONLY|O_CREAT, 0644);
-		if (neverindex_fd) {
+		if (neverindex_fd >= 0) {
 			close(neverindex_fd);
 		} else {
 			perror("create(metadata_never_index):");
