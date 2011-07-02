@@ -295,8 +295,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 
 		line = p;
 		newline = strchr(p, '\n');
-		if(!newline)
+		if(!newline) {
+			fprintf(stderr, "tup error: Missing newline character.\n");
 			goto syntax_error;
+		}
 		lno++;
 		while(newline[-1] == '\\' || (newline[-2] == '\\' && newline[-1] == '\r')) {
 			if (newline[-1] == '\r') {
@@ -305,8 +307,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, tupid_t curdir,
 			newline[-1] = ' ';
 			newline[0] = ' ';
 			newline = strchr(p, '\n');
-			if(!newline)
+			if(!newline) {
+				fprintf(stderr, "tup error: Missing newline character.\n");
 				goto syntax_error;
+			}
 			lno++;
 		}
 
