@@ -34,10 +34,9 @@ tup rm secret
 update --no-scan
 tup_dep_exist . secret . './ok.sh > output.txt'
 
-# Once the dir exists we should get a dependency on 'ghost' too
+# Once the dir exists we should get a dependency on 'ghost'
 tmkdir secret
 update --no-scan
-tup_dep_exist . secret . './ok.sh > output.txt'
 tup_dep_exist secret ghost . './ok.sh > output.txt'
 
 # Now we finally re-create ghost. The command should execute at this point.
