@@ -15,6 +15,7 @@
 #include "string_tree.h"
 #include "compat.h"
 #include "if_stmt.h"
+#include "server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,9 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
+
+#include "server/tup_fuse_fs.h" /* TODO */
 
 #define SYNTAX_ERROR -2
 
@@ -125,6 +129,7 @@ static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf, tupid_t curdir,
 			 const char *cwd, int clen);
 static int gitignore(struct tupfile *tf);
+static int rm_existing_gitignore(struct tup_entry *tent);
 static int include_name_list(struct tupfile *tf, struct name_list *nl,
 			     const char *cwd, int clen);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
@@ -199,12 +204,22 @@ int parse(struct node *n, struct graph *g)
 	int fd;
 	int rc = -1;
 	struct buf b;
+	struct server s;
 
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->tent->name.s);
 		return -1;
 	}
 	n->parsing = 1;
+
+	init_file_info(&s.finfo);
+	s.id = n->tnode.tupid;
+	if(rm_existing_gitignore(n->tent) < 0)
+		return -1;
+	if(virt_tup_chdir(n->tent, &s) < 0)
+		return -1;
+	if(tup_fuse_add_group(s.id, &s.finfo) < 0)
+		goto out_unchdir;
 
 	tf.tupid = n->tnode.tupid;
 	tf.g = g;
@@ -214,16 +229,16 @@ int parse(struct node *n, struct graph *g)
 	tf.chain_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
-		return -1;
+		goto out_rm_group;
 
 	/* Keep track of the commands and generated files that we had created
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_CMD) < 0)
-		return -1;
+		goto out_close_vdb;
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_GENERATED) < 0)
-		return -1;
+		goto out_close_vdb;
 
 	tf.dfd = tup_entry_open(n->tent);
 	if(tf.dfd < 0) {
@@ -232,23 +247,30 @@ int parse(struct node *n, struct graph *g)
 	}
 
 	fd = openat(tf.dfd, "Tupfile", O_RDONLY);
-	/* No Tupfile means we have nothing to do */
 	if(fd < 0) {
-		rc = 0;
-		goto out_close_dfd;
+		if(errno == ENOENT) {
+			/* No Tupfile means we have nothing to do */
+			rc = 0;
+			goto out_close_dfd;
+		} else {
+			perror("Tupfile");
+			goto out_close_dfd;
+		}
 	}
 
-	if((rc = fslurp(fd, &b)) < 0) {
+	if(fslurp(fd, &b) < 0)
 		goto out_close_file;
-	}
-	rc = parse_tupfile(&tf, &b, tf.tupid, ".", 1);
-	free(b.s);
+	if(parse_tupfile(&tf, &b, tf.tupid, ".", 1) < 0)
+		goto out_free_bs;
 	if(tf.ign) {
-		if(gitignore(&tf) < 0)
+		if(gitignore(&tf) < 0) {
 			rc = -1;
+			goto out_free_bs;
+		}
 	}
-	if(tup_db_write_dir_inputs(tf.tupid, &tf.input_tree) < 0)
-		return -1;
+	rc = 0;
+out_free_bs:
+	free(b.s);
 out_close_file:
 	close(fd);
 out_close_dfd:
@@ -256,6 +278,23 @@ out_close_dfd:
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
+out_rm_group:
+	if(tup_fuse_rm_group(&s.finfo) < 0)
+		rc = -1;
+out_unchdir:
+	if(virt_tup_unchdir() < 0)
+		rc = -1;
+
+	if(rc == 0) {
+		if(add_parser_files(&s.finfo, &tf.input_tree) < 0)
+			rc = -1;
+		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_tree) < 0)
+			rc = -1;
+	} else {
+		fprintf(stderr, "tup error: Failed to parse Tupfile in directory '");
+		print_tup_entry(stderr, n->tent->parent);
+		fprintf(stderr, "%s'\n", n->tent->name.s);
+	}
 	free_chain_tree(&tf.chain_tree);
 	free_tupid_tree(&tf.cmd_tree);
 	free_bang_tree(&tf.bang_tree);
@@ -616,7 +655,7 @@ static int include_rules(struct tupfile *tf, tupid_t curdir,
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p+=3, plen-=3) {
-		if(gimme_node_or_make_ghost(curdir, p, &tent) < 0)
+		if(gimme_tent_or_make_ghost(curdir, p, &tent) < 0)
 			return -1;
 		if(tent->type == TUP_NODE_GHOST) {
 			if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
@@ -690,6 +729,29 @@ static int gitignore(struct tupfile *tf)
 err_close:
 	close(fd);
 	return -1;
+}
+
+static int rm_existing_gitignore(struct tup_entry *tent)
+{
+	struct tup_entry *gitignore_tent;
+
+	if(tup_db_select_tent(tent->tnode.tupid, ".gitignore", &gitignore_tent) < 0)
+		return -1;
+	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
+		int dfd;
+		dfd = tup_entry_open(tent);
+		if(dfd < 0)
+			return -1;
+		if(unlinkat(dfd, ".gitignore", 0) < 0) {
+			if(errno != ENOENT) {
+				perror("unlinkat");
+				fprintf(stderr, "tup error: Unable to unlink the .gitignore file.\n");
+				return -1;
+			}
+		}
+		close(dfd);
+	}
+	return 0;
 }
 
 static int include_name_list(struct tupfile *tf, struct name_list *nl,

@@ -140,6 +140,60 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	return -1;
 }
 
+int add_parser_files(struct file_info *finfo, struct rb_root *root)
+{
+	struct file_entry *r;
+	struct mapping *map;
+	struct list_head *entrylist;
+	struct tup_entry *tent;
+	int map_bork = 0;
+
+	entrylist = tup_entry_get_list();
+	while(!list_empty(&finfo->read_list)) {
+		r = list_entry(finfo->read_list.next, struct file_entry, list);
+		if(r->dt > 0) {
+			if(add_node_to_list(r->dt, &r->pg, entrylist, 0) < 0)
+				return -1;
+		}
+		del_entry(r);
+	}
+	while(!list_empty(&finfo->ghost_list)) {
+		r = list_entry(finfo->ghost_list.next, struct file_entry, list);
+		if(r->dt > 0) {
+			if(add_node_to_list(r->dt, &r->pg, entrylist, 1) < 0)
+				return -1;
+		}
+		del_entry(r);
+	}
+
+	list_for_each_entry(tent, entrylist, list) {
+		if(strcmp(tent->name.s, ".gitignore") != 0)
+			if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
+				return -1;
+	}
+	tup_entry_release_list();
+
+	while(!list_empty(&finfo->mapping_list)) {
+		map = list_entry(finfo->mapping_list.next, struct mapping, list);
+
+		if(gimme_tent(map->realname, &tent) < 0)
+			return -1;
+		if(!tent || strcmp(tent->name.s, ".gitignore") != 0) {
+			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed. Only a .gitignore file may be created during the parsing stage.\n", map->realname);
+			map_bork = 1;
+		} else {
+			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
+				perror("renameat");
+				return -1;
+			}
+		}
+		del_map(map);
+	}
+	if(map_bork)
+		return -1;
+	return 0;
+}
+
 static int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 {
 	struct stat buf;
@@ -463,7 +517,7 @@ out_skip:
 		 * the symlink file. These would get picked up by any command
 		 * that reads our symlink.
 		 */
-		if(gimme_node_or_make_ghost(sym_entry->dt, sym_entry->from, &link_tent) < 0)
+		if(gimme_tent_or_make_ghost(sym_entry->dt, sym_entry->from, &link_tent) < 0)
 			return -1;
 		if(link_tent) {
 			sym = link_tent->tnode.tupid;

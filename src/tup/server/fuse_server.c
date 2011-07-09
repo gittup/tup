@@ -186,10 +186,11 @@ int server_quit(void)
 	return 0;
 }
 
-static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
+int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 {
 	if(tent->parent == NULL) {
 		char virtdir[100];
+		int fd;
 		if(fchdir(tup_top_fd()) < 0) {
 			perror("fchdir");
 			return -1;
@@ -212,6 +213,13 @@ static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 			fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 			return -1;
 		}
+		fd = open(".", O_RDONLY);
+		if(fd < 0) {
+			perror(".");
+			fprintf(stderr, "tup error: Unable to open the current virtual directory.\n");
+			return -1;
+		}
+		tup_entry_set_root(fd);
 		return 0;
 	}
 
@@ -222,6 +230,16 @@ static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 		perror(tent->name.s);
 		return -1;
 	}
+	return 0;
+}
+
+int virt_tup_unchdir(void)
+{
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	tup_entry_clear_root();
 	return 0;
 }
 

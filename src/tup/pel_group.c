@@ -72,6 +72,9 @@ int split_path_elements(const char *dir, struct pel_group *pg)
 				 * can't be deleted by a subsequent ".."
 				 */
 				goto skip_num_elements;
+			} else if(len == sizeof(".gitignore") - 1 &&
+				  strncmp(path, ".gitignore", len) == 0) {
+				/* .gitignore files are not considered hidden */
 			} else {
 				/* Hidden paths have special treatment in tup */
 				pg->pg_flags |= PG_HIDDEN;

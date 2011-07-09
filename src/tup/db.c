@@ -3992,7 +3992,16 @@ struct write_dir_input_data {
 static int add_dir_link(tupid_t tupid, void *data)
 {
 	struct write_dir_input_data *wdid = data;
+	struct tup_entry *tent;
 
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->type == TUP_NODE_GENERATED) {
+		fprintf(stderr, "tup error: Unable to read from generated file '");
+		print_tup_entry(stderr, tent->parent);
+		fprintf(stderr, "%s'. Your build configuration must be comprised of files you wrote yourself.\n", tent->name.s);
+		return -1;
+	}
 	if(link_insert(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
 		return -1;
 	return 0;

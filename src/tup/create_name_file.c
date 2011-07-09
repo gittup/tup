@@ -84,7 +84,7 @@ tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
 	}
 	linkname[rc] = 0;
 
-	if(gimme_node_or_make_ghost(dt, linkname, &link_entry) < 0)
+	if(gimme_tent_or_make_ghost(dt, linkname, &link_entry) < 0)
 		return -1;
 	if(link_entry) {
 		newsym = link_entry->tnode.tupid;
@@ -171,12 +171,6 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			 */
 			if(tup_db_set_dependent_dir_flags(tent->tnode.tupid) < 0)
 				return -1;
-
-			/* Need to re-parse the Tupfile if it was changed. */
-			if(strcmp(file, "Tupfile") == 0) {
-				if(tup_db_add_create_list(dt) < 0)
-					return -1;
-			}
 
 			if(tent->mtime != mtime)
 				if(tup_db_set_mtime(tent, mtime) < 0)
@@ -523,7 +517,29 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	return 0;
 }
 
-int gimme_node_or_make_ghost(tupid_t dt, const char *name,
+int gimme_tent(const char *name, struct tup_entry **entry)
+{
+	tupid_t dt;
+	struct path_element *pel = NULL;
+
+	dt = find_dir_tupid_dt(DOT_DT, name, &pel, NULL, 0);
+	if(dt < 0)
+		return -1;
+	if(dt == 0) {
+		*entry = NULL;
+		return 0;
+	}
+	if(pel == NULL) {
+		*entry = tup_entry_get(dt);
+		return 0;
+	}
+	if(tup_db_select_tent_part(dt, pel->path, pel->len, entry) < 0)
+		return -1;
+	free(pel);
+	return 0;
+}
+
+int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 			     struct tup_entry **entry)
 {
 	tupid_t new_dt;

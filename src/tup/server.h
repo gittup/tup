@@ -31,5 +31,7 @@ int server_quit(void);
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		struct tup_entry *dtent);
 int server_is_dead(void);
+int virt_tup_chdir(struct tup_entry *tent, struct server *s);
+int virt_tup_unchdir(void);
 
 #endif

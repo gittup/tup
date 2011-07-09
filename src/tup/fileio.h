@@ -36,7 +36,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct rb_root *symtree, int sotgv);
 int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 		     int sotgv);
-int gimme_node_or_make_ghost(tupid_t dt, const char *name,
+int gimme_tent(const char *name, struct tup_entry **entry);
+int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 			     struct tup_entry **entry);
 
 int delete_file(tupid_t dt, const char *name);

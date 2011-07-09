@@ -345,7 +345,13 @@ static int process_create_nodes(void)
 
 	tup_db_begin();
 	/* create_work must always use only 1 thread since no locking is done */
+	if(server_init() < 0) {
+		return -1;
+	}
 	rc = execute_graph(&g, 0, 1, create_work);
+	if(server_quit() < 0) {
+		return -1;
+	}
 	if(rc == 0)
 		rc = delete_files(&g);
 	if(rc == 0) {
