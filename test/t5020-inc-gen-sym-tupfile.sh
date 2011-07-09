@@ -21,6 +21,6 @@ cat > Tupfile << HERE
 include foo/arch.tup
 HERE
 tup touch Tupfile
-update_fail
+update_fail_msg "Unable to include generated file"
 
 eotup
