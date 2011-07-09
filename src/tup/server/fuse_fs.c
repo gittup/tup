@@ -253,7 +253,8 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 		}
 		return -errno;
 	}
-	tup_fuse_handle_file(path, ACCESS_READ);
+	if(!S_ISDIR(stbuf->st_mode))
+		tup_fuse_handle_file(path, ACCESS_READ);
 
 	return 0;
 }
