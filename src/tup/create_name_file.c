@@ -484,8 +484,7 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 		return 0;
 	}
 	if(pel == NULL) {
-		tent = tup_entry_get(new_dt);
-		tup_entry_list_add(tent, list);
+		/* This can happen for the '.' entry */
 		return 0;
 	}
 
