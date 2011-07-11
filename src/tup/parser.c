@@ -2792,6 +2792,11 @@ static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 			sprintf(dest + *len, "%s", endentry->tent->name.s);
 		(*len) += endentry->tent->name.len;
 	}
+	if(!first) {
+		if(dest)
+			sprintf(dest + *len, ".");
+		(*len)++;
+	}
 
 	free_tent_list(&endlist);
 	free_tent_list(&startlist);
