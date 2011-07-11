@@ -10,6 +10,6 @@ cat > Tupfile << HERE
 include {includes}
 HERE
 tup touch Tupfile
-parse_fail_msg "Bins are only usable in an input or output list"
+parse_fail_msg "Failed to parse included file '{includes}'"
 
 eotup
