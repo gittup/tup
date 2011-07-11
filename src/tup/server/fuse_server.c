@@ -37,6 +37,7 @@ static struct sigaction sigact = {
 	.sa_flags = SA_RESTART,
 };
 static volatile sig_atomic_t sig_quit = 0;
+static int server_inited = 0;
 
 static void *fuse_thread(void *arg)
 {
@@ -61,6 +62,9 @@ int server_init(void)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	struct flist f = {0, 0, 0};
+
+	if(server_inited)
+		return 0;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -163,6 +167,7 @@ int server_init(void)
 		perror("pthread_create");
 		goto err_unmount;
 	}
+	server_inited = 1;
 	return 0;
 
 err_unmount:
@@ -175,6 +180,8 @@ err_out:
 int server_quit(void)
 {
 	int fd;
+	if(!server_inited)
+		return 0;
 	fuse_exit(fs.fuse);
 	fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
 	if(fd >= 0) {

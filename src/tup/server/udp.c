@@ -16,11 +16,15 @@
 static int start_server(struct server *s);
 static int stop_server(struct server *s);
 static void *message_thread(void *arg);
+static int server_inited = 0;
 
 int server_init(void)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
+
+	if(server_inited)
+		return 0;
 
 	if (GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
 		return -1;
@@ -32,6 +36,7 @@ int server_init(void)
 	}
 
 	tup_inject_setexecdir(mycwd);
+	server_inited = 1;
 
 	return 0;
 }

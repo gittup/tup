@@ -100,6 +100,7 @@ int updater(int argc, char **argv, int phase)
 	int x;
 	int do_scan = 1;
 	int num_pruned = 0;
+	int rc = -1;
 
 	do_keep_going = tup_db_config_get_int("keep_going", 0);
 	num_jobs = tup_db_config_get_int("num_jobs", 1);
@@ -138,22 +139,30 @@ int updater(int argc, char **argv, int phase)
 			return -1;
 	}
 	if(update_tup_config() < 0)
-		return -1;
-	if(phase == 1) /* Collect underpants */
-		return 0;
+		goto out;
+	if(phase == 1) { /* Collect underpants */
+		rc = 0;
+		goto out;
+	}
 	if(process_create_nodes() < 0)
-		return -1;
-	if(phase == 2) /* ? */
-		return 0;
+		goto out;
+	if(phase == 2) { /* ? */
+		rc = 0;
+		goto out;
+	}
 	if(process_update_nodes(argc, argv, &num_pruned) < 0)
-		return -1;
+		goto out;
 	if(num_pruned) {
 		tup_main_progress("Partial update complete:");
 		printf(" skipped %i commands.\n", num_pruned);
 	} else {
 		tup_main_progress("Updated.\n");
 	}
-	return 0; /* Profit! */
+	rc = 0;
+out:
+	if(server_quit() < 0)
+		rc = -1;
+	return rc; /* Profit! */
 }
 
 int todo(int argc, char **argv)
@@ -344,14 +353,11 @@ static int process_create_nodes(void)
 	}
 
 	tup_db_begin();
-	/* create_work must always use only 1 thread since no locking is done */
 	if(server_init() < 0) {
 		return -1;
 	}
+	/* create_work must always use only 1 thread since no locking is done */
 	rc = execute_graph(&g, 0, 1, create_work);
-	if(server_quit() < 0) {
-		return -1;
-	}
 	if(rc == 0)
 		rc = delete_files(&g);
 	if(rc == 0) {
@@ -430,9 +436,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		return -1;
 	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
-	if(server_quit() < 0) {
-		return -1;
-	}
 	if(warnings) {
 		fprintf(stderr, "tup warning: Update resulted in %i warning%s\n", warnings, warnings == 1 ? "" : "s");
 	}
