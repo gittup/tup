@@ -123,24 +123,19 @@ struct tupfile {
 	int ign;
 };
 
-static int parse_tupfile(struct tupfile *tf, struct buf *b,
-			 const char *cwd, int clen);
+static int parse_tupfile(struct tupfile *tf, struct buf *b);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
-static int include_rules(struct tupfile *tf, const char *cwd, int clen);
+static int include_rules(struct tupfile *tf);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tup_entry *tent);
-static int include_file(struct tupfile *tf, const char *file,
-			const char *cwd, int clen);
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
-		      const char *cwd, int clen);
+static int include_file(struct tupfile *tf, const char *file);
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
-static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
-				 const char *cwd, int clen);
+static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
-			   struct name_list *nl,const char *ext,
-			   const char *cwd, int clen);
+			   struct name_list *nl,const char *ext);
 static void free_bang_tree(struct rb_root *root);
 static void free_chain_tree(struct rb_root *root);
 static void free_banglist(struct list_head *list);
@@ -150,18 +145,15 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_list *bl, int lno,
-			       const char *cwd, int clen, int required);
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
-			const char *cwd, int clen);
+			       struct bin_list *bl, int lno, int required);
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl);
 static int __execute_rule(struct tupfile *tf, struct rule *r,
-			  struct name_list *output_nl, const char *cwd, int clen);
+			  struct name_list *output_nl);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_list *bl, const char *cwd, int clen);
+				struct bin_list *bl);
 static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				 struct bin_list *bl,
-				 struct rule *r, const char *ext,
-				 const char *cwd, int clen);
+				 struct rule *r, const char *ext);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
 			       int lno, int required);
@@ -180,7 +172,7 @@ static int nl_add_bin(struct bin *b, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *cwd, int clen, const char *ext, int extlen,
+		   const char *ext, int extlen,
 		   struct name_list *output_nl);
 static void init_name_list(struct name_list *nl);
 static void set_nle_base(struct name_list_entry *nle);
@@ -195,8 +187,7 @@ static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			struct name_list *onl, const char *ext, int extlen,
 			int is_command);
-static char *eval(struct tupfile *tf, const char *string,
-		  const char *cwd, int clen);
+static char *eval(struct tupfile *tf, const char *string);
 
 int parse(struct node *n, struct graph *g)
 {
@@ -261,7 +252,7 @@ int parse(struct node *n, struct graph *g)
 
 	if(fslurp(fd, &b) < 0)
 		goto out_close_file;
-	if(parse_tupfile(&tf, &b, ".", 1) < 0)
+	if(parse_tupfile(&tf, &b) < 0)
 		goto out_free_bs;
 	if(tf.ign) {
 		if(gitignore(&tf) < 0) {
@@ -304,8 +295,7 @@ out_unchdir:
 	return rc;
 }
 
-static int parse_tupfile(struct tupfile *tf, struct buf *b,
-			 const char *cwd, int clen)
+static int parse_tupfile(struct tupfile *tf, struct buf *b)
 {
 	char *p, *e;
 	char *line;
@@ -419,19 +409,19 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b,
 			char *file;
 
 			file = line + 8;
-			file = eval(tf, file, NULL, 0);
+			file = eval(tf, file);
 			if(!file)
 				return -1;
-			if(include_file(tf, file, cwd, clen) < 0)
+			if(include_file(tf, file) < 0)
 				return -1;
 			free(file);
 		} else if(strcmp(line, "include_rules") == 0) {
-			if(include_rules(tf, cwd, clen) < 0)
+			if(include_rules(tf) < 0)
 				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(line[0] == ':') {
-			if(parse_rule(tf, line+1, lno, &bl, cwd, clen) < 0)
+			if(parse_rule(tf, line+1, lno, &bl) < 0)
 				goto syntax_error;
 		} else if(line[0] == '!') {
 			if(parse_bang_definition(tf, line, lno) < 0)
@@ -479,10 +469,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b,
 				eq--;
 			}
 
-			var = eval(tf, line, cwd, clen);
+			var = eval(tf, line);
 			if(!var)
 				return -1;
-			value = eval(tf, value, cwd, clen);
+			value = eval(tf, value);
 			if(!value)
 				return -1;
 
@@ -547,10 +537,10 @@ found_paren:
 	*comma = 0;
 	*paren = 0;
 
-	lval = eval(tf, lval, NULL, 0);
+	lval = eval(tf, lval);
 	if(!lval)
 		return -1;
-	rval = eval(tf, rval, NULL, 0);
+	rval = eval(tf, rval);
 	if(!rval) {
 		free(lval);
 		return -1;
@@ -586,7 +576,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	return rc;
 }
 
-static int include_rules(struct tupfile *tf, const char *cwd, int clen)
+static int include_rules(struct tupfile *tf)
 {
 	char tuprules[] = "Tuprules.tup";
 	int trlen = sizeof(tuprules) - 1;
@@ -623,7 +613,7 @@ static int include_rules(struct tupfile *tf, const char *cwd, int clen)
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
 		if(stat(p, &buf) == 0)
-			if(include_file(tf, p, cwd, clen) < 0)
+			if(include_file(tf, p) < 0)
 				goto out_free;
 	}
 	rc = 0;
@@ -716,17 +706,12 @@ static int rm_existing_gitignore(struct tup_entry *tent)
 	return 0;
 }
 
-static int include_file(struct tupfile *tf, const char *file,
-			const char *cwd, int clen)
+static int include_file(struct tupfile *tf, const char *file)
 {
 	struct buf incb;
 	int fd;
 	int rc = -1;
-	const char *cnc;
-	char *newcwd = NULL;
 	char *lastslash;
-	int pathlen;
-	int newclen;
 	int dfd;
 	struct pel_group pg;
 	struct path_element *pel;
@@ -757,40 +742,6 @@ static int include_file(struct tupfile *tf, const char *file,
 		goto out_err;
 	}
 
-	lastslash = strrchr(file, '/');
-	if(lastslash) {
-		pathlen = lastslash - file;
-		/* Just make a quick check to get rid of the annoying leading
-		 * "./" that would pop up.
-		 */
-		if(clen == 1) {
-			newclen = pathlen;
-			newcwd = malloc(newclen + 1);
-			if(!newcwd) {
-				perror("malloc");
-				return -1;
-			}
-			memcpy(newcwd, file, lastslash - file);
-			newcwd[newclen] = 0;
-		} else {
-			/* +1 for new PATH_SEP */
-			newclen = clen + pathlen + 1;
-			newcwd = malloc(newclen + 1);
-			if(!newcwd) {
-				perror("malloc");
-				return -1;
-			}
-			memcpy(newcwd, cwd, clen);
-			newcwd[clen] = PATH_SEP;
-			memcpy(newcwd+clen+1, file, pathlen);
-			newcwd[newclen] = 0;
-		}
-		cnc = newcwd;
-	} else {
-		cnc = cwd;
-		newclen = clen;
-	}
-
 	dfd = open(".", O_RDONLY);
 	if(dfd < 0) {
 		perror(".");
@@ -817,7 +768,7 @@ static int include_file(struct tupfile *tf, const char *file,
 	if(fslurp(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_tupfile(tf, &incb, cnc, newclen) < 0)
+	if(parse_tupfile(tf, &incb) < 0)
 		goto out_free;
 	rc = 0;
 out_free:
@@ -832,8 +783,6 @@ out_fchdir:
 out_close_dfd:
 	close(dfd);
 
-	if(newcwd)
-		free(newcwd);
 	if(newpath)
 		free(newpath);
 out_err:
@@ -846,8 +795,7 @@ out_err:
 	return 0;
 }
 
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
-		      const char *cwd, int clen)
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl)
 {
 	char *input, *cmd, *output, *bin;
 	int cmd_len;
@@ -883,9 +831,9 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl,
 	r.output_nl = NULL;
 
 	if(swapio)
-		rc = execute_reverse_rule(tf, &r, bl, cwd, clen);
+		rc = execute_reverse_rule(tf, &r, bl);
 	else
-		rc = execute_rule(tf, &r, bl, cwd, clen);
+		rc = execute_rule(tf, &r, bl);
 	return rc;
 }
 
@@ -1201,8 +1149,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 }
 
 static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
-			     struct string_tree *st, struct name_list *nl,
-			     const char *cwd, int clen)
+			     struct string_tree *st, struct name_list *nl)
 {
 	struct bang_rule *br;
 	char *tinput;
@@ -1217,7 +1164,7 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 		tinput = br->input;
 	}
 	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL,
-			       r->line_number, cwd, clen, 1) < 0)
+			       r->line_number, 1) < 0)
 		return -1;
 	if(nl) {
 		free(tinput);
@@ -1241,8 +1188,7 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 	return 0;
 }
 
-static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
-				 const char *cwd, int clen)
+static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r)
 {
 	struct string_tree *st;
 
@@ -1250,12 +1196,11 @@ static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r,
 				 ".EMPTY");
 	if(!st)
 		return 1;
-	return __parse_bang_rule(tf, r, st, NULL, cwd, clen);
+	return __parse_bang_rule(tf, r, st, NULL);
 }
 
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
-			   struct name_list *nl, const char *ext,
-			   const char *cwd, int clen)
+			   struct name_list *nl, const char *ext)
 {
 	struct string_tree *st;
 
@@ -1272,7 +1217,7 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			return -1;
 		}
 	}
-	return __parse_bang_rule(tf, r, st, nl, cwd, clen);
+	return __parse_bang_rule(tf, r, st, nl);
 }
 
 static void free_bang_tree(struct rb_root *root)
@@ -1417,7 +1362,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_list *bl, int lno,
-			       const char *cwd, int clen, int required)
+			       int required)
 {
 	char *eval_pattern;
 	char *oosep;
@@ -1425,7 +1370,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	if(!input_pattern)
 		return 0;
 
-	eval_pattern = eval(tf, input_pattern, cwd, clen);
+	eval_pattern = eval(tf, input_pattern);
 	if(!eval_pattern)
 		return -1;
 	oosep = strchr(eval_pattern, '|');
@@ -1457,8 +1402,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
-			const char *cwd, int clen)
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 {
 	struct name_list output_nl;
 	struct name_list_entry *nle;
@@ -1470,8 +1414,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 	init_name_list(&r->bang_oo_inputs);
 	r->bang_extra_outputs = NULL;
 	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
-			       &r->order_only_inputs, bl, r->line_number,
-			       cwd, clen, 1) < 0)
+			       &r->order_only_inputs, bl, r->line_number, 1) < 0)
 		return -1;
 
 	make_name_list_unique(&r->inputs);
@@ -1515,16 +1458,15 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 				tinput = tup_printf(sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, 0);
 				if(!tinput)
 					return -1;
-				input_pattern = eval(tf, tinput, cwd, clen);
+				input_pattern = eval(tf, tinput);
 				free(tinput);
 				if(!input_pattern)
 					return -1;
-				if(check_recursive_chain(tf, input_pattern, bl, r, ext, cwd, clen) < 0)
+				if(check_recursive_chain(tf, input_pattern, bl, r, ext) < 0)
 					return -1;
 				delete_name_list(&r->order_only_inputs);
 				if(parse_input_pattern(tf, input_pattern, &r->inputs,
-						       &r->order_only_inputs, bl, r->line_number,
-						       cwd, clen, 0) < 0)
+						       &r->order_only_inputs, bl, r->line_number, 0) < 0)
 					return -1;
 				make_name_list_unique(&r->inputs);
 				free(input_pattern);
@@ -1552,7 +1494,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 			r->command = bal->br->st.s;
 			r->command_len = bal->br->st.len;
 
-			if(__execute_rule(tf, r, &output_nl, cwd, clen) < 0)
+			if(__execute_rule(tf, r, &output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -1560,7 +1502,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 		}
 		delete_name_list(&r->inputs);
 	} else {
-		if(__execute_rule(tf, r, &output_nl, cwd, clen) < 0)
+		if(__execute_rule(tf, r, &output_nl) < 0)
 			return -1;
 		delete_name_list(&output_nl);
 	}
@@ -1569,7 +1511,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl,
 }
 
 static int __execute_rule(struct tupfile *tf, struct rule *r,
-			  struct name_list *output_nl, const char *cwd, int clen)
+			  struct name_list *output_nl)
 {
 	struct name_list_entry *nle;
 	int is_bang = 0;
@@ -1636,13 +1578,13 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
-				if(parse_bang_rule(tf, r, &tmp_nl, ext, cwd, clen) < 0)
+				if(parse_bang_rule(tf, r, &tmp_nl, ext) < 0)
 					return -1;
 			}
 			/* The extension in do_rule() does not include the
 			 * leading '.'
 			 */
-			if(do_rule(tf, r, &tmp_nl, cwd, clen, ext+1, extlen-1, output_nl) < 0)
+			if(do_rule(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
@@ -1672,11 +1614,11 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
-				if(parse_bang_rule(tf, r, NULL, NULL, cwd, clen) < 0)
+				if(parse_bang_rule(tf, r, NULL, NULL) < 0)
 					return -1;
 			}
 
-			if(do_rule(tf, r, &r->inputs, cwd, clen, NULL, 0, output_nl) < 0)
+			if(do_rule(tf, r, &r->inputs, NULL, 0, output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -1689,11 +1631,11 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 			if(is_bang) {
 				int rc;
 
-				rc = parse_empty_bang_rule(tf, r, cwd, clen);
+				rc = parse_empty_bang_rule(tf, r);
 				if(rc < 0)
 					return -1;
 				if(rc == 0) {
-					if(do_rule(tf, r, &r->inputs, cwd, clen,
+					if(do_rule(tf, r, &r->inputs,
 						   NULL, 0, output_nl) < 0)
 						return -1;
 				}
@@ -1708,7 +1650,7 @@ static int __execute_rule(struct tupfile *tf, struct rule *r,
 }
 
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_list *bl, const char *cwd, int clen)
+				struct bin_list *bl)
 {
 	LIST_HEAD(oplist);
 	struct path_list *pl;
@@ -1724,7 +1666,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		fprintf(stderr, "Error: reverse rule must have input list\n");
 		return -1;
 	}
-	eval_pattern = eval(tf, r->input_pattern, cwd, clen);
+	eval_pattern = eval(tf, r->input_pattern);
 	if(!eval_pattern)
 		return -1;
 
@@ -1769,7 +1711,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tinput = tup_printf(r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, 0);
 		if(!tinput)
 			return -1;
-		input_pattern = eval(tf, tinput, cwd, clen);
+		input_pattern = eval(tf, tinput);
 		free(tinput);
 		if(!input_pattern)
 			return -1;
@@ -1784,7 +1726,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.line_number = r->line_number;
 		tmpr.output_nl = &tmp_nl;
 
-		if(execute_rule(tf, &tmpr, bl, cwd, clen) < 0)
+		if(execute_rule(tf, &tmpr, bl) < 0)
 			return -1;
 		free(input_pattern);
 		free(tmp_nle.path);
@@ -1799,8 +1741,7 @@ out_skip:
 
 static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				 struct bin_list *bl,
-				 struct rule *r, const char *ext,
-				 const char *cwd, int clen)
+				 struct rule *r, const char *ext)
 {
 	LIST_HEAD(inp_list);
 	char *inp;
@@ -1843,7 +1784,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				tmpr.empty_input = 0;
 				tmpr.line_number = r->line_number;
 				tmpr.output_nl = NULL;
-				if(execute_reverse_rule(tf, &tmpr, bl, cwd, clen) < 0)
+				if(execute_reverse_rule(tf, &tmpr, bl) < 0)
 					return -1;
 				free(tinput);
 			}
@@ -2268,8 +2209,7 @@ static int find_existing_command(const struct name_list *onl,
 }
 
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *cwd, int clen, const char *ext, int extlen,
-		   struct name_list *output_nl)
+		   const char *ext, int extlen, struct name_list *output_nl)
 {
 	struct name_list onl;
 	struct name_list extra_onl;
@@ -2303,7 +2243,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	output_pattern = eval(tf, r->output_pattern, cwd, clen);
+	output_pattern = eval(tf, r->output_pattern);
 	if(!output_pattern)
 		return -1;
 	if(get_path_list(output_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
@@ -2312,7 +2252,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		/* Insert a fake separator in case the rule doesn't have one */
 		if(get_path_list(sep, &oplist, tf->tupid, NULL, NULL) < 0)
 			return -1;
-		extra_pattern = eval(tf, r->bang_extra_outputs, cwd, clen);
+		extra_pattern = eval(tf, r->bang_extra_outputs);
 		if(!extra_pattern)
 			return -1;
 		if(get_path_list(extra_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
@@ -2400,7 +2340,7 @@ out_pl:
 	tcmd = tup_printf(r->command, -1, nl, &onl, ext, extlen, 1);
 	if(!tcmd)
 		return -1;
-	cmd = eval(tf, tcmd, cwd, clen);
+	cmd = eval(tf, tcmd);
 	if(!cmd)
 		return -1;
 	free(tcmd);
@@ -2761,8 +2701,104 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 	return s;
 }
 
-static char *eval(struct tupfile *tf, const char *string,
-		  const char *cwd, int clen)
+struct tent_list {
+	struct list_head list;
+	struct tup_entry *tent;
+};
+
+static int get_tent_list(tupid_t tupid, struct list_head *list)
+{
+	struct tup_entry *tent;
+	struct tent_list *tlist;
+
+	tent = tup_entry_get(tupid);
+	while(tent) {
+		tlist = malloc(sizeof *tlist);
+		if(!tlist) {
+			perror("malloc");
+			return -1;
+		}
+		tlist->tent = tent;
+		list_add(&tlist->list, list);
+
+		tent = tent->parent;
+	}
+	return 0;
+}
+
+static void del_tent_list_entry(struct tent_list *tlist)
+{
+	list_del(&tlist->list);
+	free(tlist);
+}
+
+static void free_tent_list(struct list_head *list)
+{
+	struct tent_list *tlist;
+	while(!list_empty(list)) {
+		tlist = list_entry(list->next, struct tent_list, list);
+		del_tent_list_entry(tlist);
+	}
+}
+
+static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
+{
+	LIST_HEAD(startlist);
+	LIST_HEAD(endlist);
+	struct tent_list *startentry;
+	struct tent_list *endentry;
+	int first = 0;
+
+	*len = 0;
+
+	if(get_tent_list(start, &startlist) < 0)
+		return -1;
+	if(get_tent_list(end, &endlist) < 0)
+		return -1;
+
+	while(!list_empty(&startlist) && !list_empty(&endlist)) {
+		startentry = list_entry(startlist.next, struct tent_list, list);
+		endentry = list_entry(endlist.next, struct tent_list, list);
+
+		if(startentry->tent == endentry->tent) {
+			del_tent_list_entry(startentry);
+			del_tent_list_entry(endentry);
+		} else {
+			break;
+		}
+	}
+
+	list_for_each_entry(startentry, &startlist, list) {
+		if(!first) {
+			first = 1;
+		} else {
+			if(dest)
+				sprintf(dest + *len, "/");
+			(*len)++;
+		}
+		if(dest)
+			sprintf(dest + *len, "..");
+		(*len) += 2;
+	}
+	list_for_each_entry(endentry, &endlist, list) {
+		if(!first) {
+			first = 1;
+		} else {
+			if(dest)
+				sprintf(dest + *len, "/");
+			(*len)++;
+		}
+		if(dest)
+			sprintf(dest + *len, "%s", endentry->tent->name.s);
+		(*len) += endentry->tent->name.len;
+	}
+
+	free_tent_list(&endlist);
+	free_tent_list(&startlist);
+	return 0;
+}
+
+static char *eval(struct tupfile *tf, const char *string)
 {
 	int len = 0;
 	char *ret;
@@ -2797,8 +2833,11 @@ static char *eval(struct tupfile *tf, const char *string,
 				var = s + 2;
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
-					if(!cwd) {
-						fprintf(stderr, "Error: TUP_CWD is only valid in variable and rule definitions.\n");
+					int clen = 0;
+					if(get_relative_dir(NULL, tf->tupid, tf->curdt, &clen) < 0) {
+						fprintf(stderr, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curdt);
+						tup_db_print(stderr, tf->tupid);
+						tup_db_print(stderr, tf->curdt);
 						return NULL;
 					}
 					len += clen;
@@ -2880,11 +2919,13 @@ static char *eval(struct tupfile *tf, const char *string,
 				var = s + 2;
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
-					if(!cwd) {
-						fprintf(stderr, "Error: TUP_CWD is only valid in variable definitions.\n");
+					int clen = 0;
+					if(get_relative_dir(p, tf->tupid, tf->curdt, &clen) < 0) {
+						fprintf(stderr, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curdt);
+						tup_db_print(stderr, tf->tupid);
+						tup_db_print(stderr, tf->curdt);
 						return NULL;
 					}
-					memcpy(p, cwd, clen);
 					p += clen;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
