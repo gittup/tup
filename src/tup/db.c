@@ -23,7 +23,7 @@
 #include <ctype.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 12
+#define DB_VERSION 13
 
 enum {
 	DB_BEGIN,
@@ -170,13 +170,12 @@ int tup_db_create(int db_sync)
 	int rc;
 	int x;
 	const char *sql[] = {
-		"create table node (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
+		"create table node (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
 		"create table link (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
 		"create table var (id integer primary key not null, value varchar(4096))",
 		"create table config(lval varchar(256) unique, rval varchar(256))",
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
-		"create index node_sym_index on node(sym)",
 		"create index link_index2 on link(to_id)",
 		"insert into config values('keep_going', 0)",
 		"insert into config values('db_sync', 1)",
@@ -184,8 +183,8 @@ int tup_db_create(int db_sync)
 		"insert into config values('autoupdate', 0)",
 		"insert into config values('num_jobs', 1)",
 		"insert into config values('monitor_foreground', 0)",
-		"insert into node values(1, 0, 2, -1, -1, '.')",
-		"insert into node values(2, 1, 2, -1, -1, '@')",
+		"insert into node values(1, 0, 2, -1, '.')",
+		"insert into node values(2, 1, 2, -1, '@')",
 	};
 
 	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
@@ -311,6 +310,12 @@ static int version_check(void)
 	char sql_11e[] = "drop table node";
 	char sql_11f[] = "alter table node_new rename to node";
 	char sql_11g[] = "create index node_sym_index on node(sym)";
+
+	char sql_12a[] = "create table node_new (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))";
+	char sql_12b[] = "insert or ignore into node_new select id, dir, type, mtime, name from node";
+	char sql_12c[] = "drop index node_sym_index";
+	char sql_12d[] = "drop table node";
+	char sql_12e[] = "alter table node_new rename to node";
 
 	version = tup_db_config_get_int("db_version", -1);
 	if(version < 0) {
@@ -556,6 +561,36 @@ static int version_check(void)
 			if(tup_db_config_set_int("db_version", 12) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
+
+		case 12:
+			if(sqlite3_exec(tup_db, sql_12a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_12a);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_12b, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_12b);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_12c, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_12c);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_12d, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_12d);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_12e, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_12e);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 13) < 0)
+				return -1;
+			printf("NOTE: Tup database updated to version 13.\nThe sym field was removed, since symlinks are automatically handled by the filesystem layer.\n");
 
 			/***************************************/
 			/* Last case must fall through to here */
@@ -3982,7 +4017,7 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_NODE_INSERT];
-	static char s[] = "insert into node(dir, type, name, mtime, sym) values(?, ?, ?, ?, -1)";
+	static char s[] = "insert into node(dir, type, name, mtime) values(?, ?, ?, ?)";
 	tupid_t tupid;
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%lli, %i, '%.*s', %li][0m\n", s, dt, type, len, name, mtime);
