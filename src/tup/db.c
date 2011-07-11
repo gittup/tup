@@ -3998,8 +3998,8 @@ static int add_dir_link(tupid_t tupid, void *data)
 		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
 		fprintf(stderr, "tup error: Unable to read from generated file '");
-		print_tup_entry(stderr, tent->parent);
-		fprintf(stderr, "%s'. Your build configuration must be comprised of files you wrote yourself.\n", tent->name.s);
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "'. Your build configuration must be comprised of files you wrote yourself.\n");
 		return -1;
 	}
 	if(link_insert(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)

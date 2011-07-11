@@ -103,6 +103,13 @@ int main(int argc, char **argv)
 
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
+	} else if(strcmp(cmd, "entry") == 0) {
+		struct tup_entry *tent;
+		if(gimme_tent(argv[1], &tent) < 0) {
+			fprintf(stderr, "No tent :(\n");
+			return 1;
+		}
+		print_tup_entry(stdout, tent);
 	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {

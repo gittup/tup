@@ -284,8 +284,8 @@ out_unchdir:
 			rc = -1;
 	} else {
 		fprintf(stderr, "tup error: Failed to parse Tupfile in directory '");
-		print_tup_entry(stderr, n->tent->parent);
-		fprintf(stderr, "%s'\n", n->tent->name.s);
+		print_tup_entry(stderr, n->tent);
+		fprintf(stderr, "'\n");
 	}
 	free_chain_tree(&tf.chain_tree);
 	free_tupid_tree(&tf.cmd_tree);

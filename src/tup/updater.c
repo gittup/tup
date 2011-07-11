@@ -1033,9 +1033,6 @@ static void show_progress(int sum, int total, struct node *n)
 {
 	if(total) {
 		const int max = 11;
-		const char *color = "";
-		char *name;
-		int name_sz = 0;
 		int fill;
 		char buf[12];
 
@@ -1050,23 +1047,11 @@ static void show_progress(int sum, int total, struct node *n)
 		fill = max * sum / total;
 
 		if(n) {
-			name = n->tent->name.s;
-			name_sz = strlen(n->tent->name.s);
-			if(name[0] == '^') {
-				name++;
-				while(*name && *name != ' ') name++;
-				name++;
-				name_sz = 0;
-				while(name[name_sz] && name[name_sz] != '^')
-					name_sz++;
+			printf("[%s%s%.*s%s%.*s] ", color_type(n->tent->type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+			if(n->tent) {
+				print_tup_entry(stdout, n->tent);
 			}
-
-			color = color_type(n->tent->type);
-			printf("[%s%s%.*s%s%.*s] ", color, color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-			if(n->tent && n->tent->parent) {
-				print_tup_entry(stdout, n->tent->parent);
-			}
-			printf("%s%s%.*s%s\n", color, color_append_normal(), name_sz, name, color_end());
+			printf("\n");
 		} else {
 			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
 		}

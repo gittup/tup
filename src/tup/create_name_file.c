@@ -159,8 +159,8 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 					return -1;
 				if(tmp == 1) {
 					fprintf(stderr, "tup warning: generated file '");
-					print_tup_entry(stderr, tent->parent);
-					fprintf(stderr, "%s' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n", file);
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "' was modified outside of tup. This file will be overwritten on the next update, unless the rule that creates it is also removed.\n");
 				}
 			}
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
@@ -292,8 +292,8 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 				fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
 			} else {
 				fprintf(stderr, "tup warning: generated file '");
-				print_tup_entry(stderr, tent->parent);
-				fprintf(stderr, "%s' was deleted outside of tup. This file may be re-created on the next update.\n", tent->name.s);
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
 			}
 		}
 

@@ -3,6 +3,7 @@
 #include "config.h"
 #include "db.h"
 #include "compat.h"
+#include "colors.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -173,13 +174,35 @@ struct tup_entry *tup_entry_find(tupid_t tupid)
 	return container_of(tnode, struct tup_entry, tnode);
 }
 
-void print_tup_entry(FILE *f, struct tup_entry *tent)
+static void __print_tup_entry(FILE *f, struct tup_entry *tent)
 {
 	/* Skip empty entries, and skip '.' here (tent->parent == NULL) */
 	if(!tent || !tent->parent)
 		return;
-	print_tup_entry(f, tent->parent);
+	__print_tup_entry(f, tent->parent);
 	fprintf(f, "%s" PATH_SEP_STR, tent->name.s);
+}
+
+void print_tup_entry(FILE *f, struct tup_entry *tent)
+{
+	const char *name;
+	int name_sz = 0;
+
+	if(!tent)
+		return;
+	__print_tup_entry(f, tent->parent);
+	name = tent->name.s;
+	name_sz = tent->name.len;
+	if(name[0] == '^') {
+		name++;
+		while(*name && *name != ' ') name++;
+		name++;
+		name_sz = 0;
+		while(name[name_sz] && name[name_sz] != '^')
+			name_sz++;
+	}
+
+	fprintf(f, "%s%s%.*s%s", color_type(tent->type), color_append_normal(), name_sz, name, color_end());
 }
 
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
