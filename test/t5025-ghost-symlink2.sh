@@ -8,7 +8,7 @@ check_no_windows shell
 echo "#define FOO 3" > foo-x86.h
 ln -s foo-x86.h foo.h
 cat > Tupfile << HERE
-: foo.h |> (cat %f || echo 'nofile') > %o |> output.txt
+: foo.h |> (cat %f 2>/dev/null || echo 'nofile') > %o |> output.txt
 HERE
 tup touch foo-x86.h foo.h
 update

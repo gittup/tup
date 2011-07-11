@@ -6,7 +6,7 @@
 . ./tup.sh
 tmkdir foo
 cat > Tupfile << HERE
-: |> (cat foo/ghost || echo nofile) > %o |> output.txt
+: |> (cat foo/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
 tup touch Tupfile
 update

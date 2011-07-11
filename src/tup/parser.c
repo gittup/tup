@@ -145,7 +145,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_list *bl, int lno, int required);
+			       struct bin_list *bl, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl);
 static int __execute_rule(struct tupfile *tf, struct rule *r,
 			  struct name_list *output_nl);
@@ -156,9 +156,9 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				 struct rule *r, const char *ext);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
-			       int lno, int required);
+			       int required);
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
-			 struct bin_list *bl, struct rb_root *symtree);
+			 struct bin_list *bl);
 static void make_path_list_unique(struct list_head *plist);
 static void del_pl(struct path_list *pl);
 static void make_name_list_unique(struct name_list *nl);
@@ -722,7 +722,7 @@ static int include_file(struct tupfile *tf, const char *file)
 		fprintf(stderr, "tup error: Unable to include file with hidden path element.\n");
 		goto out_err;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->curdt, &pg, &pel, NULL, NULL, 0);
+	newdt = find_dir_tupid_dt_pg(tf->curdt, &pg, &pel, 0);
 	if(newdt <= 0) {
 		fprintf(stderr, "tup error: Unable to find directory for include file relative to '");
 		tup_db_print(stderr, tf->curdt);
@@ -1159,8 +1159,7 @@ static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
 	} else {
 		tinput = br->input;
 	}
-	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL,
-			       r->line_number, 1) < 0)
+	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 1) < 0)
 		return -1;
 	if(nl) {
 		free(tinput);
@@ -1357,8 +1356,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_list *bl, int lno,
-			       int required)
+			       struct bin_list *bl, int required)
 {
 	char *eval_pattern;
 	char *oosep;
@@ -1382,11 +1380,11 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			*oosep = 0;
 			oosep++;
 		}
-		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, lno, required) < 0)
+		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, required) < 0)
 			return -1;
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, lno, required) < 0)
+		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, required) < 0)
 			return -1;
 	} else {
 		if(eval_pattern[0]) {
@@ -1410,7 +1408,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 	init_name_list(&r->bang_oo_inputs);
 	r->bang_extra_outputs = NULL;
 	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
-			       &r->order_only_inputs, bl, r->line_number, 1) < 0)
+			       &r->order_only_inputs, bl, 1) < 0)
 		return -1;
 
 	make_name_list_unique(&r->inputs);
@@ -1462,7 +1460,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 					return -1;
 				delete_name_list(&r->order_only_inputs);
 				if(parse_input_pattern(tf, input_pattern, &r->inputs,
-						       &r->order_only_inputs, bl, r->line_number, 0) < 0)
+						       &r->order_only_inputs, bl, 0) < 0)
 					return -1;
 				make_name_list_unique(&r->inputs);
 				free(input_pattern);
@@ -1666,7 +1664,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 	if(!eval_pattern)
 		return -1;
 
-	if(get_path_list(eval_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
+	if(get_path_list(eval_pattern, &oplist, tf->tupid, NULL) < 0)
 		return -1;
 	make_path_list_unique(&oplist);
 
@@ -1750,7 +1748,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 		return -1;
 	}
 
-	if(get_path_list(inp, &inp_list, tf->tupid, NULL, NULL) < 0)
+	if(get_path_list(inp, &inp_list, tf->tupid, NULL) < 0)
 		return -1;
 	make_path_list_unique(&inp_list);
 
@@ -1794,29 +1792,13 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_list *bl,
-			       int lno, int required)
+			       int required)
 {
 	LIST_HEAD(plist);
-	struct rb_root symtree = RB_ROOT;
-	struct rb_node *rbn;
-	struct tup_entry *tent;
 	struct path_list *pl, *tmp;
-	int sym_bork = 0;
-	tupid_t symid;
 
-	if(get_path_list(p, &plist, tf->tupid, bl, &symtree) < 0)
+	if(get_path_list(p, &plist, tf->tupid, bl) < 0)
 		return -1;
-	tupid_tree_for_each(symid, rbn, &symtree) {
-		tent = tup_entry_get(symid);
-		if(tent->type == TUP_NODE_GENERATED) {
-			fprintf(stderr, "Error: Attempted to input files using a symlink that was generated by tup. Directory %lli, symlink used was %lli, line number %i\n", tf->tupid, tent->tnode.tupid, lno);
-			sym_bork = 1;
-		}
-	}
-	if(sym_bork)
-		return -1;
-	free_tupid_tree(&symtree);
-
 	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
 		return -1;
 	if(get_name_list(tf, &plist, nl, required) < 0)
@@ -1828,7 +1810,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 }
 
 static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
-			 struct bin_list *bl, struct rb_root *symtree)
+			 struct bin_list *bl)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -1883,7 +1865,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 				fprintf(stderr, "Error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
-			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, NULL, symtree, 0);
+			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, 0);
 			if(pl->dt <= 0) {
 				fprintf(stderr, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
@@ -2242,16 +2224,16 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	output_pattern = eval(tf, r->output_pattern);
 	if(!output_pattern)
 		return -1;
-	if(get_path_list(output_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
+	if(get_path_list(output_pattern, &oplist, tf->tupid, NULL) < 0)
 		return -1;
 	if(r->bang_extra_outputs) {
 		/* Insert a fake separator in case the rule doesn't have one */
-		if(get_path_list(sep, &oplist, tf->tupid, NULL, NULL) < 0)
+		if(get_path_list(sep, &oplist, tf->tupid, NULL) < 0)
 			return -1;
 		extra_pattern = eval(tf, r->bang_extra_outputs);
 		if(!extra_pattern)
 			return -1;
-		if(get_path_list(extra_pattern, &oplist, tf->tupid, NULL, NULL) < 0)
+		if(get_path_list(extra_pattern, &oplist, tf->tupid, NULL) < 0)
 			return -1;
 	}
 	while(!list_empty(&oplist)) {

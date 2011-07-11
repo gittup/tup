@@ -10,9 +10,7 @@
 struct tup_entry {
 	struct tupid_tree tnode;
 	tupid_t dt;
-	tupid_t sym;
 	struct tup_entry *parent;
-	struct tup_entry *symlink;
 	int type;
 	time_t mtime;
 	struct string_tree name;
@@ -30,12 +28,11 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 			       struct tup_entry **dest);
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, tupid_t sym, time_t mtime,
+			 int type, time_t mtime,
 			 struct tup_entry **dest);
-int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
+int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
 		      time_t mtime, const char *name, struct rb_root *root);
-int tup_entry_resolve_dirsym(void);
-int tup_entry_resolve_sym(struct tup_entry *tent);
+int tup_entry_resolve_dirs(void);
 int tup_entry_change_name(tupid_t tupid, const char *new_name);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_open_tupid(tupid_t tupid);

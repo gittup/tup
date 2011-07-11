@@ -6,7 +6,7 @@ check_monitor_supported
 tup monitor
 
 ln -s ghost foo
-tup_object_exist . ghost foo
+tup_object_exist . foo
 rm foo
 tup_object_no_exist . ghost foo
 

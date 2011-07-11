@@ -29,6 +29,7 @@ tup_dep_exist . 'gcc -c foo.c -o foo.o' . foo.o
 stop_monitor
 rm foo
 ln -s foo-ppc foo
+symtouch -t 202005080000 foo
 tup monitor
 update
 

@@ -4,12 +4,16 @@
 . ./tup.sh
 check_no_windows symlink
 ln -s spooky/ghost foo
-tup touch foo
+cat > Tupfile << HERE
+: |> cat foo 2>/dev/null || true |>
+HERE
+tup touch foo Tupfile
+update
 tup_object_exist . spooky foo
-tup_object_exist spooky ghost
 
-rm -f foo
-tup rm foo
+rm -f foo Tupfile
+tup rm foo Tupfile
+update
 tup_object_no_exist . foo
 tup_object_no_exist spooky ghost
 tup_object_no_exist . spooky

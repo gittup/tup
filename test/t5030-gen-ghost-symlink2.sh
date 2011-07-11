@@ -6,11 +6,11 @@
 check_no_windows symlink
 cat > Tupfile << HERE
 : |> ln -s secret/ghost %o |> foo
+: foo |> cat %f 2>/dev/null || true |>
 HERE
 tup touch Tupfile
 update
 tup_object_exist . foo secret
-tup_object_exist secret ghost
 
 rm -f Tupfile
 tup rm Tupfile

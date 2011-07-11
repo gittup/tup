@@ -23,7 +23,6 @@ struct file_info {
 	struct list_head write_list;
 	struct list_head unlink_list;
 	struct list_head var_list;
-	struct list_head sym_list;
 	struct list_head mapping_list;
 	struct list_head tmpdir_list;
 };

@@ -51,61 +51,6 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 	return -1;
 }
 
-tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
-			      time_t mtime, int force)
-{
-	int rc;
-	struct tup_entry *tent;
-	struct tup_entry *link_entry;
-	tupid_t newsym;
-	static char linkname[PATH_MAX];
-
-	if(tup_db_select_tent(dt, file, &tent) < 0)
-		return -1;
-	if(!tent) {
-		if(create_name_file(dt, file, mtime, &tent) < 0)
-			return -1;
-	} else {
-		if(tent->type == TUP_NODE_GHOST) {
-			if(ghost_to_file(tent) < 0)
-				return -1;
-		}
-	}
-
-	rc = readlinkat(dfd, file, linkname, sizeof(linkname));
-	if(rc < 0) {
-		fprintf(stderr, "readlinkat: ");
-		perror(file);
-		return -1;
-	}
-	if(rc >= (signed)sizeof(linkname)) {
-		fprintf(stderr, "tup error: linkname buffer is too small for the symlink of '%s'\n", file);
-		return -1;
-	}
-	linkname[rc] = 0;
-
-	if(gimme_tent_or_make_ghost(dt, linkname, &link_entry) < 0)
-		return -1;
-	if(link_entry) {
-		newsym = link_entry->tnode.tupid;
-	} else {
-		newsym = -1;
-	}
-
-	if(tent->sym != newsym || tent->mtime != mtime || force) {
-		if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
-			return -1;
-	}
-	if(tent->sym != newsym) {
-		if(tup_db_set_sym(tent, newsym) < 0)
-			return -1;
-	}
-	if(tent->mtime != mtime)
-		if(tup_db_set_mtime(tent, mtime) < 0)
-			return -1;
-	return tent->tnode.tupid;
-}
-
 tupid_t tup_file_mod(tupid_t dt, const char *file)
 {
 	int fd;
@@ -339,7 +284,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	dt = find_dir_tupid_dt(dt, path, &pel, NULL, 0);
+	dt = find_dir_tupid_dt(dt, path, &pel, 0);
 	if(dt < 0)
 		return NULL;
 
@@ -348,8 +293,6 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 			return NULL;
 		free(pel);
 		if(!tent)
-			return NULL;
-		if(tup_entry_sym_follow(tent) < 0)
 			return NULL;
 		return tent;
 	} else {
@@ -371,8 +314,7 @@ tupid_t find_dir_tupid(const char *dir)
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
-			  struct path_element **last, struct rb_root *symtree,
-			  int sotgv)
+			  struct path_element **last, int sotgv)
 {
 	struct pel_group pg;
 	tupid_t tupid;
@@ -380,14 +322,12 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, NULL, symtree, sotgv);
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, sotgv);
 	return tupid;
 }
 
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     struct path_element **last,
-			     struct list_head *symlist,
-			     struct rb_root *symtree, int sotgv)
+			     struct path_element **last, int sotgv)
 {
 	struct path_element *pel;
 	struct tup_entry *tent;
@@ -450,18 +390,6 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
 					return -1;
 			}
-			if(tup_entry_sym_follow(tent) < 0)
-				return -1;
-
-			for(; tent->sym != -1; tent = tent->symlink) {
-				if(symlist)  {
-					tup_entry_list_add(tent, symlist);
-				}
-				if(symtree) {
-					if(tupid_tree_add(symtree, tent->tnode.tupid) < 0)
-						return -1;
-				}
-			}
 		}
 
 		del_pel(pel, pg);
@@ -476,7 +404,7 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list)
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, NULL, 1);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, 1);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
@@ -497,11 +425,6 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list)
 	}
 	free(pel);
 
-	if(tup_entry_sym_follow(tent) < 0)
-		return -1;
-	for(; tent->sym != -1; tent = tent->symlink) {
-		tup_entry_list_add(tent, list);
-	}
 	tup_entry_list_add(tent, list);
 
 	return 0;
@@ -512,7 +435,7 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 	tupid_t dt;
 	struct path_element *pel = NULL;
 
-	dt = find_dir_tupid_dt(DOT_DT, name, &pel, NULL, 0);
+	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0);
 	if(dt < 0)
 		return -1;
 	if(dt == 0) {
@@ -535,7 +458,7 @@ int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
 
-	new_dt = find_dir_tupid_dt(dt, name, &pel, NULL, 1);
+	new_dt = find_dir_tupid_dt(dt, name, &pel, 1);
 	if(new_dt < 0)
 		return -1;
 

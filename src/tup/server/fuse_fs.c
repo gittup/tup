@@ -102,13 +102,23 @@ static struct mapping *add_mapping(const char *path)
 	if(finfo) {
 		int size;
 		int myfile;
+		const char *peeled;
+
+		peeled = peel(path);
+
+		/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
+		if(handle_open_file(ACCESS_WRITE, peeled, finfo, 1) < 0) {
+			/* TODO: Set failure on internal server? */
+			fprintf(stderr, "tup internal error: handle open file failed\n");
+			return NULL;
+		}
 
 		map = malloc(sizeof *map);
 		if(!map) {
 			perror("malloc");
 			return NULL;
 		}
-		map->realname = strdup(peel(path));
+		map->realname = strdup(peeled);
 		if(!map->realname) {
 			perror("strdup");
 			return NULL;
@@ -523,7 +533,6 @@ static int tup_fs_rmdir(const char *path)
 static int tup_fs_symlink(const char *from, const char *to)
 {
 	int res;
-	struct file_info *finfo;
 	struct mapping *tomap;
 
 	tomap = add_mapping(to);
@@ -534,12 +543,6 @@ static int tup_fs_symlink(const char *from, const char *to)
 	res = symlinkat(from, tup_top_fd(), tomap->tmpname);
 	if (res == -1)
 		return -errno;
-
-	finfo = get_finfo(to);
-	if(finfo) {
-		/* TODO: 1 == DOT_DT - is this still necessary? */
-		handle_file(ACCESS_SYMLINK, from, peel(to), finfo, 1);
-	}
 
 	return 0;
 }

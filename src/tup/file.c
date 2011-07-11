@@ -21,13 +21,6 @@ struct file_entry {
 	struct list_head list;
 };
 
-struct sym_entry {
-	tupid_t dt;
-	char *from;
-	char *to;
-	struct list_head list;
-};
-
 struct dfd_info {
 	tupid_t dt;
 	int dfd;
@@ -35,8 +28,6 @@ struct dfd_info {
 
 static struct file_entry *new_entry(const char *filename, tupid_t dt);
 static void del_entry(struct file_entry *fent);
-static int handle_symlink(const char *from, const char *to, tupid_t dt,
-			  struct file_info *info);
 static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
 static void handle_unlink(struct file_info *info);
 static int update_write_info(tupid_t cmdid, const char *debug_name,
@@ -51,7 +42,6 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->write_list);
 	INIT_LIST_HEAD(&info->unlink_list);
 	INIT_LIST_HEAD(&info->var_list);
-	INIT_LIST_HEAD(&info->sym_list);
 	INIT_LIST_HEAD(&info->mapping_list);
 	INIT_LIST_HEAD(&info->tmpdir_list);
 	return 0;
@@ -64,9 +54,6 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 
 	if(at == ACCESS_RENAME) {
 		return handle_rename(filename, file2, info);
-	}
-	if(at == ACCESS_SYMLINK) {
-		return handle_symlink(filename, file2, dt, info);
 	}
 
 	return handle_open_file(at, filename, info, dt);
@@ -282,34 +269,6 @@ void del_map(struct mapping *map)
 	free(map);
 }
 
-static int handle_symlink(const char *from, const char *to, tupid_t dt,
-			  struct file_info *info)
-{
-	struct sym_entry *sym;
-
-	sym = malloc(sizeof *sym);
-	if(!sym) {
-		perror("malloc");
-		return -1;
-	}
-	sym->from = strdup(from);
-	if(!sym->from) {
-		perror("strdup");
-		free(sym);
-		return -1;
-	}
-	sym->to = strdup(to);
-	if(!sym->to) {
-		perror("strdup");
-		free(sym->from);
-		free(sym);
-		return -1;
-	}
-	sym->dt = dt;
-	list_add(&sym->list, &info->sym_list);
-	return 0;
-}
-
 static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list)
 {
 	struct file_entry *fent, *tmp;
@@ -352,7 +311,6 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 	struct file_entry *tmp;
 	struct tup_entry *tent;
 	int write_bork = 0;
-	struct rb_root symtree = RB_ROOT;
 
 	while(!list_empty(&info->write_list)) {
 		tupid_t newdt;
@@ -376,7 +334,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, NULL, &symtree, 0);
+		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, 0);
 		if(newdt <= 0) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
 			return -1;
@@ -385,30 +343,9 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
-		if(!RB_EMPTY_ROOT(&symtree)) {
-			struct rb_node *rbn;
-			tupid_t tupid;
-			fprintf(stderr, "tup error: Attempt to write to a file using a symlink. The command should only  use the full non-symlinked path, or just write to the current directory.\n");
-			fprintf(stderr, " -- Command: '%s'\n", debug_name);
-			fprintf(stderr, " -- Filename: '%s'\n", w->filename);
-			tupid_tree_for_each(tupid, rbn, &symtree) {
-				tent = tup_entry_find(tupid);
-				if(tent) {
-					fprintf(stderr, " -- Symlink %lli -> %lli in dir %lli\n", tent->tnode.tupid, tent->sym, tent->dt);
-				} else {
-					fprintf(stderr, " -- Unknown symlink %lli\n", tupid);
-				}
-			}
-			return -1;
-		}
 
 		if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
 			return -1;
-		/* Don't need to follow the syms of tent here, since the output
-		 * file was removed by the updater. So our database
-		 * representation may not match the filesystem, until we reset
-		 * the sym field to -1 later.
-		 */
 		free(pel);
 		if(!tent) {
 			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
@@ -440,70 +377,10 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			if(w->dt != DOT_DT) {
 				close(dfd);
 			}
-			if(tup_db_set_sym(tent, -1) < 0)
-				return -1;
 		}
 
 out_skip:
 		del_entry(w);
-	}
-
-	while(!list_empty(&info->sym_list)) {
-		struct sym_entry *sym_entry;
-		struct tup_entry *link_tent;
-		struct mapping *map;
-		tupid_t sym;
-
-		sym_entry = list_entry(info->sym_list.next, struct sym_entry, list);
-		if(sym_entry->dt < 0)
-			goto skip_sym;
-
-		tent = get_tent_dt(sym_entry->dt, sym_entry->to);
-		if(!tent) {
-			fprintf(stderr, "tup error: File '%s' was written as a symlink, but is not in .tup/db. You probably should specify it as an output for command '%s'\n", sym_entry->to, debug_name);
-			write_bork = 1;
-			goto skip_sym;
-		}
-
-		tup_entry_list_add(tent, entrylist);
-
-		list_for_each_entry(map, &info->mapping_list, list) {
-			int dfd;
-			if(sym_entry->dt != DOT_DT) {
-				dfd = tup_entry_open_tupid(sym_entry->dt);
-			} else {
-				dfd = tup_top_fd();
-			}
-			if(strcmp(map->realname, sym_entry->to) == 0) {
-				if(file_set_mtime(tent, dfd, map->tmpname) < 0)
-					return -1;
-			}
-			if(sym_entry->dt != DOT_DT) {
-				close(dfd);
-			}
-		}
-
-		/* Don't pass in entrylist for the list parameter - we don't
-		 * actually need to track symlinks referenced by the path of
-		 * the symlink file. These would get picked up by any command
-		 * that reads our symlink.
-		 */
-		if(gimme_tent_or_make_ghost(sym_entry->dt, sym_entry->from, &link_tent) < 0)
-			return -1;
-		if(link_tent) {
-			sym = link_tent->tnode.tupid;
-		} else {
-			sym = -1;
-		}
-
-		if(tup_db_set_sym(tent, sym) < 0)
-			return -1;
-
-skip_sym:
-		list_del(&sym_entry->list);
-		free(sym_entry->from);
-		free(sym_entry->to);
-		free(sym_entry);
 	}
 
 	if(write_bork) {

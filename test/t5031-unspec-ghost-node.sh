@@ -6,7 +6,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: |> (cat ghost || echo nofile) > %o |> output.txt
+: |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
 tup touch Tupfile
 update
@@ -14,14 +14,14 @@ echo nofile | diff - output.txt
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
-: |> (cat ghost || echo nofile) > %o |> output.txt
+: |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
 tup touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
-: ghost |> (cat ghost || echo nofile) > %o |> output.txt
+: ghost |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
 tup touch Tupfile
 update

@@ -12,7 +12,7 @@ cat > Tupfile << HERE
 : |> if [ -f a ]; then cat a 2>/dev/null; else echo yo; fi > %o |> output.txt
 HERE
 tup touch Tupfile
-update_fail_msg 'symlink loop detected'
+update
 echo yo | diff - output.txt
 
 cat > Tupfile << HERE

@@ -5,7 +5,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: |> (cat secret/ghost || echo nofile) > %o |> output.txt
+: |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
 tup touch secret Tupfile
 update

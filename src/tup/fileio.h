@@ -16,8 +16,6 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
-tupid_t update_symlink_fileat(tupid_t dt, int dfd, const char *file,
-			      time_t mtime, int force);
 tupid_t tup_file_mod(tupid_t dt, const char *file);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force);
@@ -28,12 +26,9 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid));
 struct tup_entry *get_tent_dt(tupid_t dt, const char *path);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
-			  struct path_element **last, struct rb_root *symtree,
-			  int sotgv);
+			  struct path_element **last, int sotgv);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     struct path_element **last,
-			     struct list_head *symlist,
-			     struct rb_root *symtree, int sotgv);
+			     struct path_element **last, int sotgv);
 int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list);
 int gimme_tent(const char *name, struct tup_entry **entry);
 int gimme_tent_or_make_ghost(tupid_t dt, const char *name,

@@ -34,19 +34,9 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		}
 	}
 
-	if(S_ISREG(buf.st_mode)) {
+	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
 		tupid = tup_file_mod_mtime(dt, file, buf.st_mtime, 0);
-		if(tupid < 0)
-			return -1;
-		if(tree) {
-			tupid_tree_remove(tree, tupid);
-		}
-		return 0;
-	} else if(S_ISLNK(buf.st_mode)) {
-		tupid_t tupid;
-
-		tupid = update_symlink_fileat(dt, dfd, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
 		if(tree) {

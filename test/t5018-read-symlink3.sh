@@ -18,7 +18,6 @@ tup touch Tupfile foo.c arch-x86/foo.h arch-ppc/foo.h arch
 update
 check_exist foo.o
 
-check_updates arch/foo.h foo.o
 check_updates arch-x86/foo.h foo.o
 check_no_updates arch-ppc/foo.h foo.o
 
@@ -26,7 +25,6 @@ rm -f arch
 ln -sf arch-ppc arch
 tup touch arch
 update
-check_updates arch/foo.h foo.o
 check_no_updates arch-x86/foo.h foo.o
 check_updates arch-ppc/foo.h foo.o
 

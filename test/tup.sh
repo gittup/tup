@@ -25,6 +25,19 @@ tmkdir()
 	tup touch $1
 }
 
+symeotup()
+{
+	echo "[33m'touch -h' is not supported - skipping test.[0m" 1>&2
+	eotup
+}
+
+symtouch()
+{
+# Some machines may not support 'touch -h' to change the timestamp on the
+# symlink. In these cases, just quit the test.
+	touch -h $@ || symeotup
+}
+
 check_empty_tupdirs()
 {
 	if tup flags_exists; then

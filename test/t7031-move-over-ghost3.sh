@@ -1,29 +1,25 @@
 #! /bin/sh -e
 
 # We have a ghost node that is pointed to by another node, then move a
-# directory over the parent ghost. The symlink's tupid should be updated.
+# directory over the parent ghost. The rule should execute.
 . ./tup.sh
 check_monitor_supported
 tup monitor
 
 ln -s secret/ghost a
-if ! tup graph | grep 'node_5 -> node_3'; then
-	echo "Error: Symlink points to the wrong place" 1>&2
-	exit 1
-fi
+cat > Tupfile << HERE
+: |> (cat a 2>/dev/null || echo nofile) > %o |> output.txt
+HERE
+update
+echo nofile | diff - output.txt
 
 mkdir foo
-touch foo/ghost
+echo hey > foo/ghost
+update
+echo nofile | diff - output.txt
 
-if ! tup graph | grep 'node_5 -> node_3'; then
-	echo "Error: Symlink points to the wrong place" 1>&2
-	exit 1
-fi
 mv foo secret
-
-if ! tup graph | grep 'node_7 -> node_3'; then
-	echo "Error: Symlink was not updated" 1>&2
-	exit 1
-fi
+update
+echo hey | diff - output.txt
 
 eotup

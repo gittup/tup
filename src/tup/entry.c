@@ -15,11 +15,10 @@ static int list_out = 0;
 static struct list_head entry_list;
 static int root_fd = -1;
 
-static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
+static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
 				   time_t mtime);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
-static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
@@ -51,7 +50,6 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	tent->ghost_list.next = NULL;
 	tent->entries.rb_node = NULL;
 	tent->parent = NULL;
-	tent->symlink = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
 		return -1;
@@ -62,8 +60,6 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	}
 
 	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
-		return -1;
-	if(tup_entry_add_m1(tent->sym, &tent->symlink) < 0)
 		return -1;
 
 	if(tent->parent) {
@@ -215,42 +211,28 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 	return tup_entry_add(tupid, dest);
 }
 
-static int tup_entry_add_m1(tupid_t tupid, struct tup_entry **dest)
-{
-	if(tupid == -1) {
-		if(dest)
-			*dest = NULL;
-		return 0;
-	}
-	return tup_entry_add(tupid, dest);
-}
-
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, tupid_t sym, time_t mtime,
+			 int type, time_t mtime,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, sym, name, len, type, mtime);
+	tent = new_entry(tupid, dt, name, len, type, mtime);
 	if(!tent)
 		return -1;
 	if(resolve_parent(tent) < 0)
 		return -1;
-	/* TODO: Should symlink always be resolved here? Would simplify
-	 * add_ghost_dt_sym() and remove the need for tup_entry_sym_follow()
-	 * (I think)
-	 */
 	if(dest)
 		*dest = tent;
 	return 0;
 }
 
-int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
+int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
 		      time_t mtime, const char *name, struct rb_root *tree)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, sym, name, strlen(name), type, mtime);
+	tent = new_entry(tupid, dt, name, strlen(name), type, mtime);
 	if(!tent)
 		return -1;
 
@@ -260,27 +242,18 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type, tupid_t sym,
 	return 0;
 }
 
-int tup_entry_resolve_dirsym(void)
+int tup_entry_resolve_dirs(void)
 {
 	struct rb_node *rbn;
 
-	/* Resolve parents first, since those will all already be loaded into
-	 * the tree. Then resolve symlinks, since that may require loading
-	 * additional nodes (for example, a node may point to a ghost node).
-	 * In that case we'll need an already stable tup_tree before calling
-	 * tup_entry_add().
+	/* TODO: NEeded? */
+	/* Resolve parents - those will all already be loaded into the tree.
 	 */
 	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
 		struct tupid_tree *tnode = rb_entry(rbn, struct tupid_tree, rbn);
 		struct tup_entry *tent = container_of(tnode, struct tup_entry, tnode);
 
 		if(resolve_parent(tent) < 0)
-			return -1;
-	}
-	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tnode = rb_entry(rbn, struct tupid_tree, rbn);
-		struct tup_entry *tent = container_of(tnode, struct tup_entry, tnode);
-		if(tup_entry_resolve_sym(tent) < 0)
 			return -1;
 	}
 	return 0;
@@ -333,7 +306,7 @@ void tup_entry_clear_root(void)
 	root_fd = -1;
 }
 
-static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
+static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
 				   time_t mtime)
 {
@@ -352,9 +325,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt, tupid_t sym,
 	tent->list.next = NULL;
 	tent->ghost_list.next = NULL;
 	tent->dt = dt;
-	tent->sym = sym;
 	tent->parent = NULL;
-	tent->symlink = NULL;
 	tent->type = type;
 	tent->mtime = mtime;
 	tent->name.s = malloc(len+1);
@@ -395,21 +366,6 @@ static int resolve_parent(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_entry_resolve_sym(struct tup_entry *tent)
-{
-	if(tent->sym < 0) {
-		tent->symlink = NULL;
-	} else {
-		if(tup_entry_add(tent->sym, &tent->symlink) < 0)
-			return -1;
-		if(!tent->symlink) {
-			fprintf(stderr, "tup error: Unable to find sym entry [%lli] for node %lli\n", tent->sym, tent->tnode.tupid);
-			return -1;
-		}
-	}
-	return 0;
-}
-
 int tup_entry_change_name(tupid_t tupid, const char *new_name)
 {
 	struct tup_entry *tent;
@@ -427,26 +383,6 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	tent->dt = new_dt;
 
 	return change_name(tent, new_name);
-}
-
-int tup_entry_sym_follow(struct tup_entry *tent)
-{
-	const int max_loops = 10;
-	int x = 0;
-	while(tent->sym != -1) {
-		if(tent->symlink == NULL) {
-			if(tup_entry_resolve_sym(tent) < 0)
-				return -1;
-		}
-		tent = tent->symlink;
-		x++;
-		if(x > max_loops) {
-			fprintf(stderr, "tup error: symlink loop detected. Last entry was %lli\n", tent->tnode.tupid);
-			tup_db_print(stderr, tent->tnode.tupid);
-			return -1;
-		}
-	}
-	return 0;
 }
 
 int tup_entry_clear(void)
