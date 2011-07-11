@@ -4509,8 +4509,6 @@ out_reset:
 		ide = list_entry(del_list.next, struct id_entry, list);
 
 		tent = tup_entry_get(ide->tupid);
-		if(!tent)
-			return -1;
 		tent->symlink = NULL;
 		tent->sym = -1;
 

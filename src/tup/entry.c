@@ -392,8 +392,6 @@ int tup_entry_change_name(tupid_t tupid, const char *new_name)
 	struct tup_entry *tent;
 
 	tent = tup_entry_get(tupid);
-	if(!tent)
-		return -1;
 	return change_name(tent, new_name);
 }
 
@@ -403,9 +401,6 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	struct tup_entry *tent;
 
 	tent = tup_entry_get(tupid);
-	if(!tent)
-		return -1;
-
 	tent->dt = new_dt;
 
 	return change_name(tent, new_name);

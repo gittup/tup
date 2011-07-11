@@ -590,10 +590,6 @@ static int include_rules(struct tupfile *tf)
 
 	num_dotdots = 0;
 	tent = tup_entry_get(tf->curdt);
-	if(!tent) {
-		fprintf(stderr, "tup error: Unable to find tup entry for ID %lli\n", tf->curdt);
-		return -1;
-	}
 	while(tent->tnode.tupid != DOT_DT) {
 		tent = tent->parent;
 		num_dotdots++;
