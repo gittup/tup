@@ -175,6 +175,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	struct mapping *map;
 	struct tmpdir *tmpdir;
 	struct file_info *finfo;
+	int rc;
 
 	/* Only processes spawned by tup should be able to access our
 	 * file-system. This is determined by the fact that all sub-processes
@@ -248,15 +249,14 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 
 	res = fstatat(tup_top_fd(), peeled, stbuf, AT_SYMLINK_NOFOLLOW);
 	if (res == -1) {
-		if(errno == ENOENT || errno == ENOTDIR) {
-			tup_fuse_handle_file(path, ACCESS_GHOST);
-		}
-		return -errno;
+		rc = -errno;
+	} else {
+		rc = 0;
 	}
 	if(!S_ISDIR(stbuf->st_mode))
 		tup_fuse_handle_file(path, ACCESS_READ);
 
-	return 0;
+	return rc;
 }
 
 static int tup_fs_access(const char *path, int mask)
@@ -684,9 +684,6 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 	res = openat(tup_top_fd(), openfile, fi->flags);
 	if(res < 0) {
 		res = -errno;
-		if(errno == ENOENT || errno == ENOTDIR) {
-			at = ACCESS_GHOST;
-		}
 	}
 	fi->fh = res;
 

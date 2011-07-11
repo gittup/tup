@@ -470,14 +470,13 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
-		     int sotgv)
+int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, NULL, sotgv);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, list, NULL, 1);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
@@ -491,14 +490,8 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list,
 	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, &tent) < 0)
 		return -1;
 	if(!tent) {
-		if(sotgv) {
-			if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
-				fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
-				return -1;
-			}
-		} else {
-			fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, new_dt);
-			tup_db_print(stderr, new_dt);
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
+			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
 	}

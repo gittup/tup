@@ -52,7 +52,6 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->unlink_list);
 	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->sym_list);
-	INIT_LIST_HEAD(&info->ghost_list);
 	INIT_LIST_HEAD(&info->mapping_list);
 	INIT_LIST_HEAD(&info->tmpdir_list);
 	return 0;
@@ -97,9 +96,6 @@ int handle_open_file(enum access_type at, const char *filename,
 			break;
 		case ACCESS_VAR:
 			list_add(&fent->list, &info->var_list);
-			break;
-		case ACCESS_GHOST:
-			list_add(&fent->list, &info->ghost_list);
 			break;
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
@@ -152,20 +148,11 @@ int add_parser_files(struct file_info *finfo, struct rb_root *root)
 	while(!list_empty(&finfo->read_list)) {
 		r = list_entry(finfo->read_list.next, struct file_entry, list);
 		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist, 0) < 0)
+			if(add_node_to_list(r->dt, &r->pg, entrylist) < 0)
 				return -1;
 		}
 		del_entry(r);
 	}
-	while(!list_empty(&finfo->ghost_list)) {
-		r = list_entry(finfo->ghost_list.next, struct file_entry, list);
-		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist, 1) < 0)
-				return -1;
-		}
-		del_entry(r);
-	}
-
 	list_for_each_entry(tent, entrylist, list) {
 		if(strcmp(tent->name.s, ".gitignore") != 0)
 			if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
@@ -351,11 +338,6 @@ static void handle_unlink(struct file_info *info)
 				del_entry(fent);
 			}
 		}
-		list_for_each_entry_safe(fent, tmp, &info->ghost_list, list) {
-			if(pg_eq(&fent->pg, &u->pg)) {
-				del_entry(fent);
-			}
-		}
 
 		del_entry(u);
 	}
@@ -367,7 +349,6 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 {
 	struct file_entry *w;
 	struct file_entry *r;
-	struct file_entry *g;
 	struct file_entry *tmp;
 	struct tup_entry *tent;
 	int write_bork = 0;
@@ -502,16 +483,6 @@ out_skip:
 			}
 		}
 
-		list_for_each_entry_safe(g, tmp, &info->ghost_list, list) {
-			/* Use strcmp instead of pg_eq because we don't have
-			 * the pgs for sym_entries. Also this should only
-			 * happen when 'ln' does a stat() before it does a
-			 * symlink().
-			 */
-			if(strcmp(sym_entry->to, g->filename) == 0)
-				del_entry(g);
-		}
-
 		/* Don't pass in entrylist for the list parameter - we don't
 		 * actually need to track symlinks referenced by the path of
 		 * the symlink file. These would get picked up by any command
@@ -579,7 +550,7 @@ static int update_read_info(tupid_t cmdid, struct file_info *info,
 	while(!list_empty(&info->read_list)) {
 		r = list_entry(info->read_list.next, struct file_entry, list);
 		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist, 0) < 0)
+			if(add_node_to_list(r->dt, &r->pg, entrylist) < 0)
 				return -1;
 		}
 		del_entry(r);
@@ -588,20 +559,11 @@ static int update_read_info(tupid_t cmdid, struct file_info *info,
 	while(!list_empty(&info->var_list)) {
 		r = list_entry(info->var_list.next, struct file_entry, list);
 
-		if(add_node_to_list(VAR_DT, &r->pg, entrylist, 1) < 0)
+		if(add_node_to_list(VAR_DT, &r->pg, entrylist) < 0)
 			return -1;
 		del_entry(r);
 	}
 
-	while(!list_empty(&info->ghost_list)) {
-		r = list_entry(info->ghost_list.next, struct file_entry, list);
-
-		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist, 1) < 0)
-				return -1;
-		}
-		del_entry(r);
-	}
 	if(tup_db_check_actual_inputs(cmdid, entrylist) < 0)
 		return -1;
 	return 0;

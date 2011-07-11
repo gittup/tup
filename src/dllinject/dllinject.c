@@ -414,8 +414,6 @@ static HFILE WINAPI OpenFile_hook(
 		handle_file(lpFileName, NULL, ACCESS_UNLINK);
 	} else if (uStyle & (OF_READWRITE | OF_WRITE | OF_SHARE_DENY_WRITE | OF_SHARE_EXCLUSIVE | OF_CREATE)) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
-	} else if (uStyle & (OF_PARSE | OF_VERIFY)) {
-		handle_file(lpFileName, NULL, ACCESS_GHOST);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
 	}
@@ -455,9 +453,7 @@ static HANDLE WINAPI CreateFileA_hook(
 		dwCreationDisposition,
 		dwFlagsAndAttributes);
 
-	if (h == INVALID_HANDLE_VALUE) {
-		handle_file(lpFileName, NULL, ACCESS_GHOST);
-	} else if (dwDesiredAccess & GENERIC_WRITE) {
+	if (dwDesiredAccess & GENERIC_WRITE) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -487,9 +483,7 @@ static HANDLE WINAPI CreateFileW_hook(
 		dwFlagsAndAttributes,
 		hTemplateFile);
 
-	if (h == INVALID_HANDLE_VALUE) {
-		handle_file_w(lpFileName, NULL, ACCESS_GHOST);
-	} else if (dwDesiredAccess & GENERIC_WRITE) {
+	if (dwDesiredAccess & GENERIC_WRITE) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -524,9 +518,7 @@ HANDLE WINAPI CreateFileTransactedA_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (h == INVALID_HANDLE_VALUE) {
-		handle_file(lpFileName, NULL, ACCESS_GHOST);
-	} else if (dwDesiredAccess & GENERIC_WRITE) {
+	if (dwDesiredAccess & GENERIC_WRITE) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -559,9 +551,7 @@ HANDLE WINAPI CreateFileTransactedW_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (h == INVALID_HANDLE_VALUE) {
-		handle_file_w(lpFileName, NULL, ACCESS_GHOST);
-	} else if (dwDesiredAccess & GENERIC_WRITE) {
+	if (dwDesiredAccess & GENERIC_WRITE) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -627,9 +617,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
 				goto out_free;
 		}
 
-		if (rc != STATUS_SUCCESS) {
-			handle_file(name, NULL, ACCESS_GHOST);
-		} else if (DesiredAccess & GENERIC_WRITE) {
+		if (DesiredAccess & GENERIC_WRITE) {
 			handle_file(name, NULL, ACCESS_WRITE);
 		} else {
 			handle_file(name, NULL, ACCESS_READ);
@@ -693,9 +681,7 @@ NTSTATUS WINAPI NtOpenFile_hook(
 			 * so that should be safe to ignore.
 			 */
 		} else {
-			if (rc != STATUS_SUCCESS) {
-				handle_file(name, NULL, ACCESS_GHOST);
-			} else if (DesiredAccess & GENERIC_WRITE) {
+			if (DesiredAccess & GENERIC_WRITE) {
 				handle_file(name, NULL, ACCESS_WRITE);
 			} else {
 				handle_file(name, NULL, ACCESS_READ);
@@ -986,14 +972,14 @@ DWORD WINAPI GetFileAttributesA_hook(
     __in LPCSTR lpFileName)
 {
 	DEBUG_HOOK("GetFileAttributesA '%s'\n", lpFileName);
-	handle_file(lpFileName, NULL, ACCESS_GHOST);
+	handle_file(lpFileName, NULL, ACCESS_READ);
 	return GetFileAttributesA_orig(lpFileName);
 }
 
 DWORD WINAPI GetFileAttributesW_hook(
     __in LPCWSTR lpFileName)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_GHOST);
+	handle_file_w(lpFileName, NULL, ACCESS_READ);
 	return GetFileAttributesW_orig(lpFileName);
 }
 
@@ -1002,7 +988,7 @@ BOOL WINAPI GetFileAttributesExA_hook(
     __in  GET_FILEEX_INFO_LEVELS fInfoLevelId,
     __out LPVOID lpFileInformation)
 {
-	handle_file(lpFileName, NULL, ACCESS_GHOST);
+	handle_file(lpFileName, NULL, ACCESS_READ);
 	return GetFileAttributesExA_orig(
 		lpFileName,
 		fInfoLevelId,
@@ -1014,7 +1000,7 @@ BOOL WINAPI GetFileAttributesExW_hook(
     __in  GET_FILEEX_INFO_LEVELS fInfoLevelId,
     __out LPVOID lpFileInformation)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_GHOST);
+	handle_file_w(lpFileName, NULL, ACCESS_READ);
 	return GetFileAttributesExW_orig(
 		lpFileName,
 		fInfoLevelId,
