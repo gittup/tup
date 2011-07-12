@@ -115,8 +115,6 @@ when doing 'touch foo' without '|> foo', why is it a different error message whe
 
 check use of fslurp() + strchr() in parser - should be fslurp_null? Or memchr?
 
-make resurrection more explicit than just different color (if no colors is on, you can't tell - and tup says it is "deleting files")
-
 add Kconfig file
 
 windows builds: Add a 'release' directory for new tags, and an 'experimental' directory for whenever a new set of commits is pushed.

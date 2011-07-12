@@ -254,14 +254,17 @@ static int run_scan(void)
 static int delete_files(struct graph *g)
 {
 	struct rb_node *rbn;
-	struct tup_entry *tent;
 	int num_deleted = 0;
+	struct tup_entry *tent;
+	struct list_head *entrylist;
+	int rc = -1;
 
 	if(g->delete_count) {
 		tup_main_progress("Deleting files...\n");
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
+	entrylist = tup_entry_get_list();
 	while((rbn = rb_first(&g->delete_tree)) != NULL) {
 		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -269,40 +272,50 @@ static int delete_files(struct graph *g)
 
 		do_delete = 1;
 		if(te->type == TUP_NODE_GENERATED) {
-			int rc;
+			int tmp;
 
 			if(tup_entry_add(tt->tupid, &tent) < 0)
-				return -1;
+				goto out_err;
 
-			rc = tup_db_in_modify_list(tt->tupid);
-			if(rc < 0)
-				return -1;
-			if(rc == 1) {
-				if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
-					return -1;
+			tmp = tup_db_in_modify_list(tt->tupid);
+			if(tmp < 0)
+				goto out_err;
+			if(tmp == 1) {
+				tup_entry_list_add(tent, entrylist);
 				do_delete = 0;
 			}
 
-			show_progress(num_deleted, g->delete_count, tent);
-			num_deleted++;
-
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
+				show_progress(num_deleted, g->delete_count, tent);
+				num_deleted++;
 				if(delete_file(tent->dt, tent->name.s) < 0)
-					return -1;
+					goto out_err;
 			}
 		}
 		if(do_delete) {
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
-				return -1;
+				goto out_err;
 		}
 		rb_erase(rbn, &g->delete_tree);
 		free(te);
 	}
+	if(!list_empty(entrylist)) {
+		tup_show_message("Converting generated files to normal files...\n");
+	}
+	list_for_each_entry(tent, entrylist, list) {
+		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
+			goto out_err;
+		show_progress(num_deleted, g->delete_count, tent);
+		num_deleted++;
+	}
 	if(g->delete_count) {
 		show_progress(g->delete_count, g->delete_count, NULL);
 	}
-	return 0;
+	rc = 0;
+out_err:
+	tup_entry_release_list();
+	return rc;
 }
 
 static int update_tup_config(void)
