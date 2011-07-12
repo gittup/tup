@@ -41,7 +41,7 @@ static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
 static void tup_main_progress(const char *s);
-static void show_progress(int sum, int total, struct node *n);
+static void show_progress(int sum, int total, struct tup_entry *tent);
 
 static int do_keep_going;
 static int num_jobs;
@@ -253,6 +253,7 @@ static int run_scan(void)
 static int delete_files(struct graph *g)
 {
 	struct rb_node *rbn;
+	struct tup_entry *tent;
 	int num_deleted = 0;
 
 	if(g->delete_count) {
@@ -267,27 +268,26 @@ static int delete_files(struct graph *g)
 
 		do_delete = 1;
 		if(te->type == TUP_NODE_GENERATED) {
-			struct node tmpn;
 			int rc;
 
-			if(tup_entry_add(tt->tupid, &tmpn.tent) < 0)
+			if(tup_entry_add(tt->tupid, &tent) < 0)
 				return -1;
 
 			rc = tup_db_in_modify_list(tt->tupid);
 			if(rc < 0)
 				return -1;
 			if(rc == 1) {
-				if(tup_db_set_type(tmpn.tent, TUP_NODE_FILE) < 0)
+				if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 					return -1;
 				do_delete = 0;
 			}
 
-			show_progress(num_deleted, g->delete_count, &tmpn);
+			show_progress(num_deleted, g->delete_count, tent);
 			num_deleted++;
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				if(delete_file(tmpn.tent->dt, tmpn.tent->name.s) < 0)
+				if(delete_file(tent->dt, tent->name.s) < 0)
 					return -1;
 			}
 		}
@@ -688,7 +688,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		}
 
 		if(n->tent->type == g->count_flags) {
-			show_progress(num_processed, g->num_nodes, n);
+			show_progress(num_processed, g->num_nodes, n->tent);
 			num_processed++;
 		}
 		list_del(&n->list);
@@ -1032,7 +1032,7 @@ static void tup_main_progress(const char *s)
 	cur_phase++;
 }
 
-static void show_progress(int sum, int total, struct node *n)
+static void show_progress(int sum, int total, struct tup_entry *tent)
 {
 	if(total) {
 		const int max = 11;
@@ -1049,10 +1049,10 @@ static void show_progress(int sum, int total, struct node *n)
 		}
 		fill = max * sum / total;
 
-		if(n) {
-			printf("[%s%s%.*s%s%.*s] ", color_type(n->tent->type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-			if(n->tent) {
-				print_tup_entry(stdout, n->tent);
+		if(tent) {
+			printf("[%s%s%.*s%s%.*s] ", color_type(tent->type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+			if(tent) {
+				print_tup_entry(stdout, tent);
 			}
 			printf("\n");
 		} else {
