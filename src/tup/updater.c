@@ -40,6 +40,7 @@ static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
+static void tup_show_message(const char *s);
 static void tup_main_progress(const char *s);
 static void show_progress(int sum, int total, struct tup_entry *tent);
 
@@ -1024,12 +1025,17 @@ err_out:
 	return -1;
 }
 
-static void tup_main_progress(const char *s)
+static int cur_phase = -1;
+static void tup_show_message(const char *s)
 {
-	static int cur_phase = 0;
 	const char *tup = " tup ";
 	printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
+}
+
+static void tup_main_progress(const char *s)
+{
 	cur_phase++;
+	tup_show_message(s);
 }
 
 static void show_progress(int sum, int total, struct tup_entry *tent)
