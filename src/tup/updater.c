@@ -103,8 +103,10 @@ int updater(int argc, char **argv, int phase)
 	int num_pruned = 0;
 	int rc = -1;
 
-	do_keep_going = tup_db_config_get_int("keep_going", 0);
-	num_jobs = tup_db_config_get_int("num_jobs", 1);
+	if(tup_db_config_get_int("keep_going", 0, &do_keep_going) < 0)
+		return -1;
+	if(tup_db_config_get_int("num_jobs", 1, &num_jobs) < 0)
+		return -1;
 
 	argc--;
 	argv++;

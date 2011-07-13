@@ -107,7 +107,8 @@ int monitor(int argc, char **argv)
 	int rc = 0;
 	int foreground;
 
-	foreground = tup_db_config_get_int("monitor_foreground", 0);
+	if(tup_db_config_get_int("monitor_foreground", 0, &foreground) < 0)
+		return -1;
 	/* Arguments are cleared to "-" if they are used by the monitor. These
 	 * args are also passed on to the autoupdate process if that feature is
 	 * enabled, but we don't want the updater getting any args that are
@@ -612,9 +613,12 @@ static int queue_event(struct inotify_event *e, int locked)
 
 static int autoupdate_enabled(void)
 {
+	int autoupdate_config;
 	if(autoupdate_flag == 1)
 		return 1;
-	if(autoupdate_flag == -1 && tup_db_config_get_int("autoupdate", 0) == 1)
+	if(tup_db_config_get_int("autoupdate", 0, &autoupdate_config) < 0)
+		exit(1);
+	if(autoupdate_flag == -1 && autoupdate_config == 1)
 		return 1;
 	return 0;
 }

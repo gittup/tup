@@ -742,8 +742,13 @@ static int fake_mtime(int argc, char **argv)
 
 static int flush(void)
 {
+	int autoupdate_pid;
 	printf("Flush\n");
-	while(tup_db_config_get_int(AUTOUPDATE_PID, -1) > 0) {
+	while(1) {
+		if(tup_db_config_get_int(AUTOUPDATE_PID, -1, &autoupdate_pid) < 0)
+			return -1;
+		if(autoupdate_pid < 0)
+			break;
 		printf(" -- flush (try again)\n");
 		/* If we got the lock but autoupdate pid was set, it must've
 		 * just started but not gotten the lock yet.  So we need to
