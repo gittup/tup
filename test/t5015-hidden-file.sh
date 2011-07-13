@@ -28,6 +28,7 @@ if tup touch yo/.hidden_dir/foo 2>/dev/null; then
 fi
 tup touch Tupfile
 update
-tup_dep_no_exist . .hidden . 'cat .hidden'
+tup_object_no_exist . .hidden
+tup_object_exist . 'cat .hidden'
 
 eotup

@@ -512,10 +512,7 @@ static int link_exists(int argc, char **argv)
 		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
 		return -1;
 	}
-	if(strcmp(argv[1], "0") == 0)
-		dta = 0;
-	else
-		dta = find_dir_tupid(argv[1]);
+	dta = find_dir_tupid(argv[1]);
 	if(dta < 0) {
 		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[1]);
 		return -1;
@@ -528,10 +525,7 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	if(strcmp(argv[3], "0") == 0)
-		dtb = 0;
-	else
-		dtb = find_dir_tupid(argv[3]);
+	dtb = find_dir_tupid(argv[3]);
 	if(dtb < 0) {
 		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[3]);
 		return -1;

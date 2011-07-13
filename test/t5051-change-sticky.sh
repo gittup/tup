@@ -22,7 +22,7 @@ update
 
 check_exist foo.o
 tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
-tup_dep_no_exist headers bar.h . 'gcc -c foo.c -o foo.o'
+tup_object_no_exist headers bar.h
 
 # Secretly remove foo.o
 rm foo.o
@@ -48,7 +48,7 @@ update --no-scan
 
 check_not_exist foo.o
 tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
-tup_dep_no_exist headers bar.h . 'gcc -c foo.c -o foo.o'
+tup_object_no_exist headers bar.h
 
 # Only removing a sticky link that is used should try to re-compile (and fail)
 cat > headers/Tupfile << HERE
@@ -60,7 +60,7 @@ update_fail_msg "headers/foo.h: No such file or directory"
 echo '' > foo.c
 tup touch foo.c
 update --no-scan
-tup_dep_no_exist headers foo.h . 'gcc -c foo.c -o foo.o'
-tup_dep_no_exist headers bar.h . 'gcc -c foo.c -o foo.o'
+tup_object_no_exist headers foo.h
+tup_object_no_exist headers bar.h
 
 eotup

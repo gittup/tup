@@ -23,8 +23,7 @@ HERE
 tup touch Tupfile
 # Parse here to remove the old command
 tup parse
-tup_dep_no_exist . 'foo.o' . 'gcc foo.o bar.o -o prog'
-tup_dep_no_exist . 'bar.o' . 'gcc foo.o bar.o -o prog'
+tup_object_no_exist . 'gcc foo.o bar.o -o prog'
 tup_dep_exist . 'foo.o' . 'gcc bar.o foo.o -o prog'
 tup_dep_exist . 'bar.o' . 'gcc bar.o foo.o -o prog'
 

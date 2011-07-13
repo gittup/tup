@@ -154,7 +154,13 @@ tup_dep_no_exist()
 				echo "*** Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
 				exit 1
 			fi
+		else
+			echo "*** Object $4 [$3] does not exist" 1>&2
+			exit 1;
 		fi
+	else
+		echo "*** Object $2 [$1] does not exist" 1>&2
+		exit 1;
 	fi
 }
 

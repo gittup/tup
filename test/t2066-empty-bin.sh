@@ -20,7 +20,7 @@ tup_object_no_exist . 'ar crs built-in.o'
 
 varsetall FOO=n
 tup parse
-tup_dep_no_exist . 'foo.c' . 'gcc -c foo.c -o foo.o'
+tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_object_no_exist . 'gcc -Wl,-r foo.o -o built-in.o'
 tup_object_exist . 'ar crs built-in.o'
 

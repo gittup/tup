@@ -25,7 +25,6 @@ tup touch ok.sh
 update
 
 echo 'heyo' | diff - output
-tup_dep_no_exist . ghost . 'sh ok.sh > output'
 tup_object_no_exist . ghost
 
 eotup

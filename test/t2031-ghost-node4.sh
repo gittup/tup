@@ -23,7 +23,7 @@ echo nofile
 HERE
 tup touch ok.sh
 update
-tup_dep_no_exist . ghost . './ok.sh > output.txt'
+tup_object_no_exist . ghost
 
 # Just as a double-check of sorts - actually create the ghost node and update,
 # after deleting output.txt from behind tup's back. The output.txt file

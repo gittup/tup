@@ -15,7 +15,7 @@ for i in foo.c bar.c 1.d 2.d 3.d 5.e; do
 done
 for i in boo.cc 4.d 52.e; do
 	check_exist $i
-	tup_dep_no_exist . $i . "test $i"
+	tup_object_no_exist . "test $i"
 done
 
 eotup

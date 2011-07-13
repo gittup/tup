@@ -307,6 +307,11 @@ tupid_t find_dir_tupid(const char *dir)
 {
 	struct tup_entry *tent;
 
+	/* This check is used for tests to get the parent tupid for the '.'
+	 * directory.
+	 */
+	if(strcmp(dir, "0") == 0)
+		return 0;
 	tent = get_tent_dt(DOT_DT, dir);
 	if(!tent)
 		return -1;
