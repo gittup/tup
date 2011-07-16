@@ -265,6 +265,7 @@ static int graph(int argc, char **argv)
 	int x;
 	struct graph g;
 	struct node *n;
+	int show_dirs = 1;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -283,6 +284,11 @@ static int graph(int argc, char **argv)
 	}
 	for(x=1; x<argc; x++) {
 		struct tup_entry *tent;
+
+		if(strcmp(argv[x], "--no-dirs") == 0) {
+			show_dirs = 0;
+			continue;
+		}
 
 		tent = get_tent_dt(sub_dir_dt, argv[x]);
 		if(!tent) {
@@ -331,12 +337,19 @@ static int graph(int argc, char **argv)
 		switch(n->tent->type) {
 			case TUP_NODE_FILE:
 			case TUP_NODE_GENERATED:
+				/* Skip Tupfiles in no-dirs mode since they
+				 * point to directories.
+				 */
+				if(!show_dirs && strcmp(n->tent->name.s, "Tupfile") == 0)
+					continue;
 				shape = "oval";
 				break;
 			case TUP_NODE_CMD:
 				shape = "rectangle";
 				break;
 			case TUP_NODE_DIR:
+				if(!show_dirs)
+					continue;
 				shape = "diamond";
 				break;
 			case TUP_NODE_VAR:
@@ -387,7 +400,7 @@ static int graph(int argc, char **argv)
 			print_name(s, 0);
 		}
 		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
-		if(n->tent->dt) {
+		if(show_dirs && n->tent->dt) {
 			struct node *tmp;
 			tmp = find_node(&g, n->tent->dt);
 			if(tmp)
