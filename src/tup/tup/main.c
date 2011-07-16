@@ -266,6 +266,7 @@ static int graph(int argc, char **argv)
 	struct graph g;
 	struct node *n;
 	int show_dirs = 1;
+	int show_ghosts = 1;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -287,6 +288,10 @@ static int graph(int argc, char **argv)
 
 		if(strcmp(argv[x], "--no-dirs") == 0) {
 			show_dirs = 0;
+			continue;
+		}
+		if(strcmp(argv[x], "--no-ghosts") == 0) {
+			show_ghosts = 0;
 			continue;
 		}
 
@@ -356,6 +361,8 @@ static int graph(int argc, char **argv)
 				shape = "octagon";
 				break;
 			case TUP_NODE_GHOST:
+				if(!show_ghosts)
+					continue;
 				/* Ghost nodes won't have flags set */
 				color = 0x888888;
 				fontcolor = 0x888888;
