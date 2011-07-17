@@ -9,7 +9,7 @@ cat << HERE
 	<li><h2>Site Map</h2></li>
 HERE
 for i in $@; do
-	text=`echo $i | sed 's/\.html//' | sed 's/_/\&nbsp;/g' | sed 's/index/home/'`
+	text=`echo $i | sed 's/\.html//; s/_/\&nbsp;/g; s/index/home/'`
 	echo "	<li><a href=\"$i\">$text</a></li>"
 done
 

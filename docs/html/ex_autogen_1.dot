@@ -1,0 +1,27 @@
+digraph G {
+	node_8 [label="gcc -Wall -c hello.c -o hello.o\n8" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_7 -> node_8 [dir=back,style="solid",arrowtail="empty"]
+	node_10 [label="gcc -Wall -c square.c -o square.o\n10" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_9 -> node_10 [dir=back,style="solid",arrowtail="empty"]
+	node_12 [label="gcc hello.o square.o -o hello\n12" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_11 -> node_12 [dir=back,style="solid",arrowtail="empty"]
+	node_16 [label="gen_triangle.sh\n16" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_18 -> node_16 [dir=back,style="solid",arrowtail="empty"]
+	node_11 [label="hello\n11" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_5 [label="hello.c\n5" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_8 -> node_5 [dir=back,style="solid",arrowtail="normal"]
+	node_7 [label="hello.o\n7" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_7 [dir=back,style="solid",arrowtail="normal"]
+	node_18 [label="sh gen_triangle.sh > triangle.h\n18" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_17 -> node_18 [dir=back,style="solid",arrowtail="empty"]
+	node_3 [label="square.c\n3" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_10 -> node_3 [dir=back,style="solid",arrowtail="normal"]
+	node_6 [label="square.h\n6" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_10 -> node_6 [dir=back,style="solid",arrowtail="empty"]
+	node_8 -> node_6 [dir=back,style="solid",arrowtail="empty"]
+	node_9 [label="square.o\n9" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_9 [dir=back,style="solid",arrowtail="normal"]
+	node_17 [label="triangle.h\n17" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_10 -> node_17 [dir=back,style="dotted",arrowtail="normal"]
+	node_8 -> node_17 [dir=back,style="solid",arrowtail="normal"]
+}

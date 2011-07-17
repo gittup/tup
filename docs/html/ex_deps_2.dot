@@ -1,0 +1,17 @@
+digraph G {
+	node_13 [label="./test.sh > output.txt\n13" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_13 [dir=back,style="solid",arrowtail="empty"]
+	node_16 [label="echo \"generated text\" > generated.txt\n16" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_15 -> node_16 [dir=back,style="solid",arrowtail="empty"]
+	node_18 [label="echo \"unused text\" > unused.txt\n18" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_17 -> node_18 [dir=back,style="solid",arrowtail="empty"]
+	node_15 [label="generated.txt\n15" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_13 -> node_15 [dir=back,style="solid",arrowtail="normal"]
+	node_14 [label="header.txt\n14" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_13 -> node_14 [dir=back,style="solid",arrowtail="empty"]
+	node_12 [label="output.txt\n12" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_3 [label="test.sh\n3" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_13 -> node_3 [dir=back,style="solid",arrowtail="empty"]
+	node_17 [label="unused.txt\n17" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_13 -> node_17 [dir=back,style="dotted",arrowtail="normal"]
+}

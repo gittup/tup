@@ -7,7 +7,15 @@ pages += examples.html
 pages += tips_and_tricks.html
 pages += make_vs_tup.html
 pages += tup_vs_mordor.html
+
+examples += ex_a_first_tupfile.html
+examples += ex_dependencies.html
+examples += ex_generated_header.html
+
 : |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
-: foreach $(pages) | menu.inc |> ^ GEN %f^ ./gen_page.sh %f > %o |> %f.gen
+: |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
+: |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
+: foreach $(pages) | menu.inc |> ^ GEN %o^ ./gen_page.sh %f > %o |> %f.gen
+: foreach $(examples) | menu.inc examples.inc |> ^ GEN %o^ ./gen_page.sh -x %f > %o |> %f.gen
 
 endif

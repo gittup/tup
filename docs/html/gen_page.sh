@@ -1,6 +1,11 @@
 #! /bin/sh -e
 
-text=`echo $1 | sed 's/\.html//' | sed 's/_/ /g' | sed 's/index/home/'`
+example=0
+if [ $1 = "-x" ]; then
+	example=1
+	shift
+fi
+text=`echo $1 | sed 's/\.html//; s/_/ /g; s/index/home/; s/^ex //'`
 cat << HERE
 <html>
 <head>
@@ -16,8 +21,13 @@ cat menu.inc
 
 cat << HERE
 </td><td valign="top">
-<h1>$text</h1>
 HERE
+
+if [ $example = "1" ]; then
+cat examples.inc
+else
+echo "<h1>$text</h1>"
+fi
 
 cat $1
 
