@@ -3,6 +3,7 @@
 # More TUP_CWD tests.
 
 . ./tup.sh
+check_no_windows paths # The path frobbing in node_exists() breaks this test
 cat > Tupfile << HERE
 include test1.tup
 cflags += \$(TUP_CWD)
