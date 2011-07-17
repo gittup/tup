@@ -126,7 +126,7 @@ possible this could randomly break in the future.
 <code>: <font style="background-color: #ffbbff">foreach *.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o 
 </code>
 
-<p>Note that we can't simply list <span class="filename">triangle.h</span> as another input here, because the foreach keyword will try to iterate over it and generate a rule to compile the header file directly. Instead, we want to make use of the order-only inputs section, which is separated from the rest of the inputs by a single '|' (pipe) character. The difference between regular inputs and order-only inputs is that foreach only iterates over regular inputs, and only regular inputs show up in flags like <span class="keyword">%f</span>. The order-only inputs simply add dependency links from the file pointing to the commands.</p>
+<p>Note that we can't simply list <span class="filename">triangle.h</span> as another input here, because the foreach keyword will try to iterate over it and generate a rule to compile the header file directly. Instead, we want to make use of the order-only inputs section, which is separated from the rest of the inputs by a single '|' (pipe) character. The difference between regular inputs and order-only inputs is that regular inputs are used in foreach and flags like <span class="keyword">%f</span>, while order-only inputs are not. All inputs also add dependency links from the file pointing to the commands.</p>
 
 <span class="modfileheader">Tupfile</span>
 <code>: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h
@@ -184,3 +184,4 @@ possible this could randomly break in the future.
 </pre>
 
 <p>Although it is difficult to show in this example, the presence of the dotted-line dependency from <span class="filename">triangle.h</span> to the <span class="cmd">gcc -Wall -c square.c -o square.o</span> command is very important. If we were to, in a single patch perhaps, change the <span class="filename">gen_triangle.sh</span> script, <b>and</b> change <span class="filename">square.c</span> to include the generated header, the dependency ensures that the header is generated before the C file is compiled. Until the C file actually includes the header, however, the dependency link is somewhat dormant - changing the header will not cause the C file to be re-compiled.</p>
+<p>The result is that tup only re-compiles the minimum number of files necessary, even if inputs in the Tupfile are over-specified. Additionally, inputs in the Tupfile always guarantee the order that the commands are executed in, even if the commands do not actually read from the input files.</p>
