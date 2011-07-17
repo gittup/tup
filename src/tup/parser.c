@@ -2045,9 +2045,14 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(tupid_tree_search(&tf->g->delete_tree, tent->tnode.tupid) != NULL) {
 			if(!required)
 				return 0;
-			fprintf(stderr, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
-			tup_db_print(stderr, pl->dt);
-			return -1;
+			/* If the file is in the modify list, it is going to be
+			 * resurrected, so it is still a valid input (t6053).
+			 */
+			if(!tup_db_in_modify_list(tent->tnode.tupid)) {
+				fprintf(stderr, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
+				tup_db_print(stderr, pl->dt);
+				return -1;
+			}
 		}
 		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
