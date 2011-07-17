@@ -24,9 +24,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
-
-#include "server/tup_fuse_fs.h" /* TODO */
 
 #define SYNTAX_ERROR -2
 
@@ -207,10 +204,8 @@ int parse(struct node *n, struct graph *g)
 	s.id = n->tnode.tupid;
 	if(rm_existing_gitignore(n->tent) < 0)
 		return -1;
-	if(virt_tup_chdir(n->tent, &s) < 0)
+	if(server_parser_start(n->tent, &s) < 0)
 		return -1;
-	if(tup_fuse_add_group(s.id, &s.finfo) < 0)
-		goto out_unchdir;
 
 	tf.tupid = n->tnode.tupid;
 	tf.curdt = tf.tupid;
@@ -221,7 +216,7 @@ int parse(struct node *n, struct graph *g)
 	tf.chain_tree.rb_node = NULL;
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
-		goto out_rm_group;
+		goto out_server_stop;
 
 	/* Keep track of the commands and generated files that we had created
 	 * previously. We'll check these against the new ones in order to see
@@ -270,11 +265,8 @@ out_close_dfd:
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
-out_rm_group:
-	if(tup_fuse_rm_group(&s.finfo) < 0)
-		rc = -1;
-out_unchdir:
-	if(virt_tup_unchdir() < 0)
+out_server_stop:
+	if(server_parser_stop(&s) < 0)
 		rc = -1;
 
 	if(rc == 0) {

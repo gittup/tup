@@ -193,7 +193,7 @@ int server_quit(void)
 	return 0;
 }
 
-int virt_tup_chdir(struct tup_entry *tent, struct server *s)
+static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 {
 	if(tent->parent == NULL) {
 		char virtdir[100];
@@ -240,7 +240,7 @@ int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 	return 0;
 }
 
-int virt_tup_unchdir(void)
+static int virt_tup_unchdir(void)
 {
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
@@ -324,6 +324,27 @@ err_rm_group:
 int server_is_dead(void)
 {
 	return sig_quit;
+}
+
+int server_parser_start(struct tup_entry *tent, struct server *s)
+{
+	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
+		return -1;
+	if(virt_tup_chdir(tent, s) < 0) {
+		tup_fuse_rm_group(&s->finfo);
+		return -1;
+	}
+	return 0;
+}
+
+int server_parser_stop(struct server *s)
+{
+	int rc = 0;
+	if(virt_tup_unchdir() < 0)
+		rc = -1;
+	if(tup_fuse_rm_group(&s->finfo) < 0)
+		rc = -1;
+	return rc;
 }
 
 static void sighandler(int sig)

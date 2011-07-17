@@ -178,6 +178,18 @@ int server_is_dead(void)
 	return 0;
 }
 
+int server_parser_start(struct tup_entry *tent, struct server *s)
+{
+	if(tent || s) { /* TODO */}
+	return 0;
+}
+
+int server_parser_stop(struct server *s)
+{
+	if(s) {/* TODO */}
+	return 0;
+}
+
 static int connect_udp(int socks[2])
 {
 	int port;
