@@ -4,9 +4,13 @@ tupcurdir=$PWD
 PATH=$PWD/..:$PATH
 export PATH
 
-testname=`echo $0 | sed 's/\.\///' | sed 's/\.sh//'`
+testname=`echo $0 | sed 's/\.\///; s/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
-tupos=`uname -s`
+
+# tupos may be set already by test.sh - this is an optimization to
+# avoid extra forks in win32
+: ${tupos:=`uname -s`}
+
 rm -rf $tuptestdir
 mkdir $tuptestdir
 cd $tuptestdir

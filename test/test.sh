@@ -26,6 +26,8 @@ if [ "$files" = "" ]; then
 	files="t[0-9]*.sh"
 fi
 
+export tupos=`uname -s`
+
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
 	if ./$i; then
