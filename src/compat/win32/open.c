@@ -29,6 +29,23 @@ int __wrap_open(const char *pathname, int flags, ...)
 		struct finfo_list *flist;
 		struct stat buf;
 		enum access_type at = ACCESS_READ;
+		char fullpath[PATH_MAX];
+		int cwdlen;
+		int pathlen;
+
+		if(getcwd(fullpath, sizeof(fullpath)) != fullpath) {
+			perror("getcwd");
+			return -1;
+		}
+		cwdlen = strlen(fullpath);
+		pathlen = strlen(pathname);
+		if(cwdlen + pathlen + 2 >= (signed)sizeof(fullpath)) {
+			fprintf(stderr, "tup internal error: max pathname exceeded.\n");
+			return -1;
+		}
+		fullpath[cwdlen] = PATH_SEP;
+		memcpy(fullpath + cwdlen + 1, pathname, pathlen);
+		fullpath[cwdlen + pathlen + 1] = 0;
 
 		/* If the stat fails, or if the stat works and we know it
 		 * is a directory, don't actually add the dependency. We
@@ -39,7 +56,7 @@ int __wrap_open(const char *pathname, int flags, ...)
 			flist = list_entry(finfo_list_head.next, struct finfo_list, list);
 			if(flags & O_WRONLY || flags & O_RDWR)
 				at = ACCESS_WRITE;
-			if(handle_open_file(at, pathname, flist->finfo, DOT_DT) < 0)
+			if(handle_open_file(at, fullpath, flist->finfo, DOT_DT) < 0)
 				return -1;
 		}
 	}
