@@ -453,7 +453,7 @@ static HANDLE WINAPI CreateFileA_hook(
 		dwCreationDisposition,
 		dwFlagsAndAttributes);
 
-	if (dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -483,7 +483,7 @@ static HANDLE WINAPI CreateFileW_hook(
 		dwFlagsAndAttributes,
 		hTemplateFile);
 
-	if (dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -518,7 +518,7 @@ HANDLE WINAPI CreateFileTransactedA_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -551,7 +551,7 @@ HANDLE WINAPI CreateFileTransactedW_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -617,7 +617,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
 				goto out_free;
 		}
 
-		if (DesiredAccess & GENERIC_WRITE) {
+		if (rc == STATUS_SUCCESS && DesiredAccess & GENERIC_WRITE) {
 			handle_file(name, NULL, ACCESS_WRITE);
 		} else {
 			handle_file(name, NULL, ACCESS_READ);
@@ -681,7 +681,7 @@ NTSTATUS WINAPI NtOpenFile_hook(
 			 * so that should be safe to ignore.
 			 */
 		} else {
-			if (DesiredAccess & GENERIC_WRITE) {
+			if (rc == STATUS_SUCCESS && DesiredAccess & GENERIC_WRITE) {
 				handle_file(name, NULL, ACCESS_WRITE);
 			} else {
 				handle_file(name, NULL, ACCESS_READ);
