@@ -295,15 +295,16 @@ int tup_entry_open(struct tup_entry *tent)
 	return newdfd;
 }
 
-void tup_entry_set_root(int new_root)
+void tup_entry_set_root(int new_root, int *old_root_fd)
 {
+	if(old_root_fd)
+		*old_root_fd = root_fd;
 	root_fd = new_root;
 }
 
-void tup_entry_clear_root(void)
+void tup_entry_clear_root(int old_root_fd)
 {
-	close(root_fd);
-	root_fd = -1;
+	root_fd = old_root_fd;
 }
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,

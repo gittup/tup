@@ -147,6 +147,12 @@ int add_parser_files(struct file_info *finfo, struct rb_root *root)
 	}
 	tup_entry_release_list();
 
+	/* TODO: write_list not needed here? */
+	while(!list_empty(&finfo->write_list)) {
+		r = list_entry(finfo->write_list.next, struct file_entry, list);
+		del_entry(r);
+	}
+
 	while(!list_empty(&finfo->mapping_list)) {
 		map = list_entry(finfo->mapping_list.next, struct mapping, list);
 

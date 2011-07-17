@@ -17,6 +17,10 @@ struct server {
 	int exit_status;
 	int exit_sig;
 
+	/* For the parser */
+	int my_root_fd;
+	int old_root_fd;
+
 #ifdef _WIN32
 	/* TODO: Unify servers */
 	int udp_port;

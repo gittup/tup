@@ -716,6 +716,8 @@ static int include_file(struct tupfile *tf, const char *file)
 		goto out_err;
 	}
 	newdt = find_dir_tupid_dt_pg(tf->curdt, &pg, &pel, 0);
+	free(pel);
+	del_pel_group(&pg);
 	if(newdt <= 0) {
 		fprintf(stderr, "tup error: Unable to find directory for include file relative to '");
 		tup_db_print(stderr, tf->curdt);
@@ -723,7 +725,6 @@ static int include_file(struct tupfile *tf, const char *file)
 		goto out_err;
 	}
 	tf->curdt = newdt;
-	del_pel_group(&pg);
 
 	newpath = strdup(file);
 	if(!newpath) {
