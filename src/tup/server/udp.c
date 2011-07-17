@@ -7,6 +7,7 @@
 #include "tup/entry.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
+#include "compat/win32/open_notify.h"
 #include "compat/dir_mutex.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,13 +181,16 @@ int server_is_dead(void)
 
 int server_parser_start(struct tup_entry *tent, struct server *s)
 {
-	if(tent || s) { /* TODO */}
+	if(tent) {/* unused */}
+	if(open_notify_push(&s->finfo) < 0)
+		return -1;
 	return 0;
 }
 
 int server_parser_stop(struct server *s)
 {
-	if(s) {/* TODO */}
+	if(open_notify_pop(&s->finfo) < 0)
+		return -1;
 	return 0;
 }
 
