@@ -3023,8 +3023,11 @@ static struct var_entry *get_var(const char *var, int varlen)
 	ve = vardb_get(&atvardb, var, varlen);
 	if(!ve) {
 		struct tup_entry *tent;
+		struct tup_entry *var_tent;
 
-		if(node_select(VAR_DT, var, varlen, &tent) < 0)
+		if(tup_entry_add(VAR_DT, &var_tent) < 0)
+			return NULL;
+		if(node_select(var_tent->tnode.tupid, var, varlen, &tent) < 0)
 			return NULL;
 		if(!tent) {
 			tent = tup_db_node_insert(VAR_DT, var, varlen,
@@ -3276,10 +3279,13 @@ static int remove_var(struct var_entry *ve)
 static int add_var(struct var_entry *ve)
 {
 	struct tup_entry *tent;
+	struct tup_entry *var_tent;
 
 	tup_db_var_changed++;
 
-	tent = tup_db_create_node(VAR_DT, ve->var.s, TUP_NODE_VAR);
+	if(tup_entry_add(VAR_DT, &var_tent) < 0)
+		return -1;
+	tent = tup_db_create_node(var_tent->tnode.tupid, ve->var.s, TUP_NODE_VAR);
 	if(!tent)
 		return -1;
 	return tup_db_set_var(tent->tnode.tupid, ve->value);
