@@ -5,6 +5,7 @@
 #include "tup/db.h"
 #include "tup/graph.h"
 #include "tup/entry.h"
+#include "tup/config.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
@@ -181,7 +182,16 @@ int server_is_dead(void)
 
 int server_parser_start(struct tup_entry *tent, struct server *s)
 {
-	if(tent) {/* unused */}
+	int fd;
+
+	fd = tup_entry_open(tent);
+	if(fd < 0)
+		return -1;
+	if(fchdir(fd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	close(fd);
 	if(open_notify_push(&s->finfo) < 0)
 		return -1;
 	return 0;
@@ -191,6 +201,10 @@ int server_parser_stop(struct server *s)
 {
 	if(open_notify_pop(&s->finfo) < 0)
 		return -1;
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
 	return 0;
 }
 
