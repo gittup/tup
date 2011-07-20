@@ -38,6 +38,7 @@ static struct sigaction sigact = {
 };
 static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
+static int null_fd = -1;
 
 static void *fuse_thread(void *arg)
 {
@@ -65,6 +66,13 @@ int server_init(void)
 
 	if(server_inited)
 		return 0;
+
+	null_fd = open("/dev/null", O_RDONLY);
+	if(null_fd < 0) {
+		perror("/dev/null");
+		fprintf(stderr, "tup error: Unable to open /dev/null for dup'ing stdin\n");
+		return -1;
+	}
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -182,6 +190,7 @@ int server_quit(void)
 	int fd;
 	if(!server_inited)
 		return 0;
+	close(null_fd);
 	fuse_exit(fs.fuse);
 	fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
 	if(fd >= 0) {
@@ -282,12 +291,20 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 			exit(1);
 		}
 		server_setenv(vardict_fd);
-		/* Close down stdin - it can't reliably be used during the
-		 * build (for example, when building in parallel, multiple
-		 * programs would have to fight over who gets it, which is just
-		 * nonsensical).
+		/* Use /dev/null for stdin, since stdin can't reliably be used
+		 * during the build (for example, when building in parallel,
+		 * multiple programs would have to fight over who gets it,
+		 * which is just nonsensical).
+		 *
+		 * The dup is used instead of close, because some programs
+		 * (such as awk on OSX) expect a valid file descriptor for
+		 * stdin, even if it is unused.
 		 */
-		close(STDIN_FILENO);
+		if(dup2(null_fd, STDIN_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdin for the child process.\n");
+			exit(1);
+		}
 
 		execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 		perror("execl");

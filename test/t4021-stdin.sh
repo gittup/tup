@@ -13,8 +13,8 @@ int main(void)
 	int i;
 	char c = 0;
 	i = read(0, &c, 1);
-	if(i != -1) {
-		fprintf(stderr, "Error: read test should return -1\n");
+	if(i != 0) {
+		fprintf(stderr, "Error: read test should return 0\n");
 		return 1;
 	}
 	if(c != 0) {

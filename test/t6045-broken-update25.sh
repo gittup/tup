@@ -18,7 +18,7 @@
 . ./tup.sh
 
 cat > ok1.sh << HERE
-cat foo
+if cat foo | grep blah; then echo yay; else echo no; fi
 HERE
 
 chmod +x ok1.sh
