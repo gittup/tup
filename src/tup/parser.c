@@ -227,7 +227,7 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
-	tf.dfd = tup_entry_open(n->tent);
+	tf.dfd = tup_entry_openat(s.root_fd, n->tent);
 	if(tf.dfd < 0) {
 		fprintf(stderr, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;

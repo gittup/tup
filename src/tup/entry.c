@@ -13,7 +13,6 @@
 static struct rb_root tup_tree = RB_ROOT;
 static int list_out = 0;
 static struct list_head entry_list;
-static int root_fd = -1;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
@@ -270,17 +269,19 @@ int tup_entry_open_tupid(tupid_t tupid)
 
 int tup_entry_open(struct tup_entry *tent)
 {
+	return tup_entry_openat(tup_top_fd(), tent);
+}
+
+int tup_entry_openat(int root_dfd, struct tup_entry *tent)
+{
 	int dfd;
 	int newdfd;
 
 	if(tent->parent == NULL) {
-		if(root_fd == -1)
-			return dup(tup_top_fd());
-		else
-			return dup(root_fd);
+		return dup(root_dfd);
 	}
 
-	dfd = tup_entry_open(tent->parent);
+	dfd = tup_entry_openat(root_dfd, tent->parent);
 	if(dfd < 0)
 		return dfd;
 
@@ -293,18 +294,6 @@ int tup_entry_open(struct tup_entry *tent)
 		return -1;
 	}
 	return newdfd;
-}
-
-void tup_entry_set_root(int new_root, int *old_root_fd)
-{
-	if(old_root_fd)
-		*old_root_fd = root_fd;
-	root_fd = new_root;
-}
-
-void tup_entry_clear_root(int old_root_fd)
-{
-	root_fd = old_root_fd;
 }
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,

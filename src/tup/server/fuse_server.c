@@ -228,13 +228,12 @@ static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
 			fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 			return -1;
 		}
-		s->my_root_fd = open(".", O_RDONLY);
-		if(s->my_root_fd < 0) {
+		s->root_fd = open(".", O_RDONLY);
+		if(s->root_fd < 0) {
 			perror(".");
 			fprintf(stderr, "tup error: Unable to open the current virtual directory.\n");
 			return -1;
 		}
-		tup_entry_set_root(s->my_root_fd, &s->old_root_fd);
 		return 0;
 	}
 
@@ -254,8 +253,7 @@ static int virt_tup_unchdir(struct server *s)
 		perror("fchdir");
 		return -1;
 	}
-	tup_entry_clear_root(s->old_root_fd);
-	close(s->my_root_fd);
+	close(s->root_fd);
 	return 0;
 }
 
