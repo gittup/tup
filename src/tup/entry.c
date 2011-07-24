@@ -277,6 +277,8 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 	int dfd;
 	int newdfd;
 
+	if(!tent)
+		return -1;
 	if(tent->parent == NULL) {
 		return dup(root_dfd);
 	}
