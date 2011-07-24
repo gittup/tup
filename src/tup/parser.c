@@ -111,6 +111,7 @@ struct tupfile {
 	tupid_t tupid;
 	tupid_t curdt;
 	int dfd;
+	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
 	struct rb_root cmd_tree;
@@ -209,6 +210,7 @@ int parse(struct node *n, struct graph *g)
 
 	tf.tupid = n->tnode.tupid;
 	tf.curdt = tf.tupid;
+	tf.root_fd = s.root_fd;
 	tf.g = g;
 	tf.cmd_tree.rb_node = NULL;
 	tf.bang_tree.rb_node = NULL;
@@ -700,12 +702,9 @@ static int include_file(struct tupfile *tf, const char *file)
 	struct buf incb;
 	int fd;
 	int rc = -1;
-	char *lastslash;
-	int dfd;
 	struct pel_group pg;
 	struct path_element *pel;
-	char *newpath = NULL;
-	char *openpath;
+	struct tup_entry *tent = NULL;
 	tupid_t newdt;
 	tupid_t olddt = tf->curdt;
 
@@ -716,44 +715,25 @@ static int include_file(struct tupfile *tf, const char *file)
 		goto out_err;
 	}
 	newdt = find_dir_tupid_dt_pg(tf->curdt, &pg, &pel, 0);
-	free(pel);
-	del_pel_group(&pg);
 	if(newdt <= 0) {
 		fprintf(stderr, "tup error: Unable to find directory for include file relative to '");
 		tup_db_print(stderr, tf->curdt);
 		fprintf(stderr, "'\n");
 		goto out_err;
 	}
-	tf->curdt = newdt;
-
-	newpath = strdup(file);
-	if(!newpath) {
-		perror("strdup");
+	if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0 || !tent) {
+		fprintf(stderr, "tup error: Unable to find tup entry for file '%s'\n", file);
+		free(pel);
 		goto out_err;
 	}
+	free(pel);
+	del_pel_group(&pg);
+	tf->curdt = newdt;
 
-	dfd = open(".", O_RDONLY);
-	if(dfd < 0) {
-		perror(".");
-		return -1;
-	}
-	lastslash = strrchr(newpath, '/');
-	if(lastslash) {
-		*lastslash = 0;
-		if(chdir(newpath) < 0) {
-			perror(newpath);
-			fprintf(stderr, "tup error: Unable to change to include file's directory.\n");
-			goto out_close_dfd;
-		}
-
-		openpath = lastslash + 1;
-	} else {
-		openpath = newpath;
-	}
-	fd = open(openpath, O_RDONLY);
+	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
-		perror(openpath);
-		goto out_fchdir;
+		perror(file);
+		goto out_err;
 	}
 	if(fslurp(fd, &incb) < 0)
 		goto out_close;
@@ -765,16 +745,7 @@ out_free:
 	free(incb.s);
 out_close:
 	close(fd);
-out_fchdir:
-	if(fchdir(dfd) < 0) {
-		perror("fchdir");
-		rc = -1;
-	}
-out_close_dfd:
-	close(dfd);
 
-	if(newpath)
-		free(newpath);
 out_err:
 	tf->curdt = olddt;
 	if(rc < 0) {
