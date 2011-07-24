@@ -11,12 +11,11 @@
 int mkdirat(int dirfd, const char *pathname, mode_t mode)
 {
 	int rc;
-	int cwd;
 
 	if(mode) {/* for win32 */}
 
-	cwd = dir_mutex_lock(dirfd);
+	dir_mutex_lock(dirfd);
 	rc = mkdir(pathname, mode);
-	dir_mutex_unlock(cwd);
+	dir_mutex_unlock();
 	return rc;
 }

@@ -6,14 +6,13 @@
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags)
 {
 	int rc;
-	int cwd;
 
-	cwd = dir_mutex_lock(dirfd);
+	dir_mutex_lock(dirfd);
 	if(flags & AT_SYMLINK_NOFOLLOW) {
 		rc = lchown(pathname, owner, group);
 	} else {
 		rc = chown(pathname, owner, group);
 	}
-	dir_mutex_unlock(cwd);
+	dir_mutex_unlock();
 	return rc;
 }

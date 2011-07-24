@@ -5,7 +5,7 @@
 
 extern pthread_mutex_t dir_mutex;
 
-int dir_mutex_lock(int dfd);
-void dir_mutex_unlock(int handle);
+void dir_mutex_lock(int dfd);
+void dir_mutex_unlock(void);
 
 #endif

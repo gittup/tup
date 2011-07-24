@@ -8,9 +8,8 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 {
 	int fd;
 	mode_t mode = 0;
-	int cwd;
 
-	cwd = dir_mutex_lock(dirfd);
+	dir_mutex_lock(dirfd);
 	if(flags & O_CREAT) {
 		va_list ap;
 		va_start(ap, flags);
@@ -18,6 +17,6 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 	fd = open(pathname, flags, mode);
-	dir_mutex_unlock(cwd);
+	dir_mutex_unlock();
 	return fd;
 }

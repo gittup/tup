@@ -6,12 +6,11 @@
 int faccessat(int dirfd, const char *pathname, int mode, int flags)
 {
 	int rc;
-	int cwd;
 
 	if(flags) {/* No way to access() a symlink? */}
 
-	cwd = dir_mutex_lock(dirfd);
+	dir_mutex_lock(dirfd);
 	rc = access(pathname, mode);
-	dir_mutex_unlock(cwd);
+	dir_mutex_unlock();
 	return rc;
 }
