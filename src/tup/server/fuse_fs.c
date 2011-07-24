@@ -162,6 +162,26 @@ static struct mapping *find_mapping(const char *path)
 	return NULL;
 }
 
+static int context_check(void)
+{
+	/* Only processes spawned by tup should be able to access our
+	 * file-system. This is determined by the fact that all sub-processes
+	 * should be in the same process group as tup itself. Since the fuse
+	 * thread runs in the main tup process, we can check our own pgid by
+	 * using getpgid(0). If their pgid doesn't match, we bail since nobody
+	 * else is allowed to look at our filesystem. If they could, that would
+	 * hose up our dependency analysis.
+	 */
+	if(getpgid(0) != getpgid(fuse_get_context()->pid)) {
+		if(server_debug_enabled()) {
+			fprintf(stderr, "[33mtup fuse warning: Process pid=%i, uid=%i, gid=%i is trying to access the tup server's fuse filesystem.[0m\n",
+					fuse_get_context()->pid, fuse_get_context()->uid, fuse_get_context()->gid);
+		}
+		return -1;
+	}
+	return 0;
+}
+
 static void tup_fuse_handle_file(const char *path, enum access_type at)
 {
 	struct file_info *finfo;
@@ -187,23 +207,8 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	struct file_info *finfo;
 	int rc;
 
-	/* Only processes spawned by tup should be able to access our
-	 * file-system. This is determined by the fact that all sub-processes
-	 * should be in the same process group as tup itself. Since the fuse
-	 * thread runs in the main tup process, we can check our own pgid by
-	 * using getpgid(0). If their pgid doesn't match, we bail since nobody
-	 * else is allowed to look at our filesystem. If they could, that would
-	 * hose up our dependency analysis.
-	 *
-	 * This check is only done here since everything starts with getattr.
-	 */
-	if(getpgid(0) != getpgid(fuse_get_context()->pid)) {
-		if(server_debug_enabled()) {
-			fprintf(stderr, "[33mtup fuse warning: Process pid=%i, uid=%i, gid=%i is trying to access the tup server's fuse filesystem.[0m\n",
-					fuse_get_context()->pid, fuse_get_context()->uid, fuse_get_context()->gid);
-		}
+	if(context_check() < 0)
 		return -EPERM;
-	}
 
 	peeled = peel(path);
 
@@ -352,6 +357,9 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	(void) offset;
 	(void) fi;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	peeled = peel(path);
 	finfo = get_finfo(path);
