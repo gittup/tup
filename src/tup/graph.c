@@ -258,7 +258,20 @@ static void mark_nodes(struct node *n)
 
 	n->parsing = 1;
 	list_for_each_entry(e, &n->incoming, destlist) {
-		mark_nodes(e->src);
+		struct node *mark = e->src;
+
+		mark_nodes(mark);
+
+		/* A command node must have all of its outputs marked, or we
+		 * risk not unlinking all of its outputs in the updater before
+		 * running it (t6055).
+		 */
+		if(mark->tent->type == TUP_NODE_CMD) {
+			struct edge *e2;
+			list_for_each_entry(e2, &mark->edges, list) {
+				mark_nodes(e2->dest);
+			}
+		}
 	}
 }
 
