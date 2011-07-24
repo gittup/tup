@@ -202,46 +202,33 @@ int server_quit(void)
 	return 0;
 }
 
-static int virt_tup_chdir(struct tup_entry *tent, struct server *s)
+static int virt_tup_chdir(struct server *s)
 {
-	if(tent->parent == NULL) {
-		char virtdir[100];
-		if(fchdir(tup_top_fd()) < 0) {
-			perror("fchdir");
-			return -1;
-		}
-		if(chdir(TUP_MNT) < 0) {
-			perror(TUP_MNT);
-			return -1;
-		}
-		/* +1: Skip past top-level '/' to do a relative chdir into our
-		 * fake fs.
-		 */
-		if(chdir(get_tup_top() + 1) < 0) {
-			perror(get_tup_top() + 1);
-			return -1;
-		}
-		snprintf(virtdir, sizeof(virtdir), "@tupjob-%i", s->id);
-		virtdir[sizeof(virtdir)-1] = 0;
-		if(chdir(virtdir) < 0) {
-			perror(virtdir);
-			fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
-			return -1;
-		}
-		s->root_fd = open(".", O_RDONLY);
-		if(s->root_fd < 0) {
-			perror(".");
-			fprintf(stderr, "tup error: Unable to open the current virtual directory.\n");
-			return -1;
-		}
-		return 0;
-	}
-
-	if(virt_tup_chdir(tent->parent, s) < 0)
+	char virtdir[100];
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
 		return -1;
-
-	if(chdir(tent->name.s) < 0) {
-		perror(tent->name.s);
+	}
+	if(chdir(TUP_MNT) < 0) {
+		perror(TUP_MNT);
+		return -1;
+	}
+	/* +1: Skip past top-level '/' to do a relative chdir into our fake fs. */
+	if(chdir(get_tup_top() + 1) < 0) {
+		perror(get_tup_top() + 1);
+		return -1;
+	}
+	snprintf(virtdir, sizeof(virtdir), "@tupjob-%i", s->id);
+	virtdir[sizeof(virtdir)-1] = 0;
+	if(chdir(virtdir) < 0) {
+		perror(virtdir);
+		fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
+		return -1;
+	}
+	s->root_fd = open(".", O_RDONLY);
+	if(s->root_fd < 0) {
+		perror(".");
+		fprintf(stderr, "tup error: Unable to open the current virtual directory.\n");
 		return -1;
 	}
 	return 0;
@@ -283,9 +270,21 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		goto err_rm_group;
 	}
 	if(pid == 0) {
+		int fd;
 		tup_lock_close();
 
-		if(virt_tup_chdir(dtent, s) < 0) {
+		if(virt_tup_chdir(s) < 0) {
+			exit(1);
+		}
+		fd = tup_entry_openat(s->root_fd, dtent);
+		if(fd < 0) {
+			fprintf(stderr, "tup error: Unable to open directory for entry '");
+			print_tup_entry(stderr, dtent);
+			fprintf(stderr, "'\n");
+			exit(1);
+		}
+		if(fchdir(fd) < 0) {
+			perror("fchdir");
 			exit(1);
 		}
 		server_setenv(vardict_fd);
@@ -341,11 +340,11 @@ int server_is_dead(void)
 	return sig_quit;
 }
 
-int server_parser_start(struct tup_entry *tent, struct server *s)
+int server_parser_start(struct server *s)
 {
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
-	if(virt_tup_chdir(tent, s) < 0) {
+	if(virt_tup_chdir(s) < 0) {
 		tup_fuse_rm_group(&s->finfo);
 		return -1;
 	}

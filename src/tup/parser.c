@@ -205,7 +205,7 @@ int parse(struct node *n, struct graph *g)
 	s.id = n->tnode.tupid;
 	if(rm_existing_gitignore(n->tent) < 0)
 		return -1;
-	if(server_parser_start(n->tent, &s) < 0)
+	if(server_parser_start(&s) < 0)
 		return -1;
 
 	tf.tupid = n->tnode.tupid;

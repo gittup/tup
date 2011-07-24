@@ -34,7 +34,7 @@ int server_quit(void);
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		struct tup_entry *dtent);
 int server_is_dead(void);
-int server_parser_start(struct tup_entry *tent, struct server *s);
+int server_parser_start(struct server *s);
 int server_parser_stop(struct server *s);
 
 #endif

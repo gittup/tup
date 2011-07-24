@@ -180,18 +180,8 @@ int server_is_dead(void)
 	return 0;
 }
 
-int server_parser_start(struct tup_entry *tent, struct server *s)
+int server_parser_start(struct server *s)
 {
-	int fd;
-
-	fd = tup_entry_open(tent);
-	if(fd < 0)
-		return -1;
-	if(fchdir(fd) < 0) {
-		perror("fchdir");
-		return -1;
-	}
-	close(fd);
 	if(open_notify_push(&s->finfo) < 0)
 		return -1;
 	return 0;
@@ -201,10 +191,6 @@ int server_parser_stop(struct server *s)
 {
 	if(open_notify_pop(&s->finfo) < 0)
 		return -1;
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		return -1;
-	}
 	return 0;
 }
 
