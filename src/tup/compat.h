@@ -8,6 +8,8 @@
 #endif
 
 int compat_init(void);
+void compat_lock_enable(void);
+void compat_lock_disable(void);
 
 #ifdef _WIN32
 #define is_path_sep(str) ((str)[0] == '/' || (str)[0] == '\\' || (str)[0] == ':' || ((str)[0] != '\0' && (str)[1] == ':'))

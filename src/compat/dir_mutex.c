@@ -7,6 +7,7 @@
 #include <errno.h>
 
 pthread_mutex_t dir_mutex;
+int dir_mutex_enabled = 1;
 
 int compat_init(void)
 {
@@ -15,9 +16,20 @@ int compat_init(void)
 	return 0;
 }
 
+void compat_lock_enable(void)
+{
+	dir_mutex_enabled = 1;
+}
+
+void compat_lock_disable(void)
+{
+	dir_mutex_enabled = 0;
+}
+
 void dir_mutex_lock(int dfd)
 {
-	pthread_mutex_lock(&dir_mutex);
+	if(dir_mutex_enabled)
+		pthread_mutex_lock(&dir_mutex);
 
 	if(fchdir(dfd) < 0) {
 		perror("fchdir");
@@ -28,7 +40,6 @@ void dir_mutex_lock(int dfd)
 
 void dir_mutex_unlock(void)
 {
-	int olderrno = errno;
-	pthread_mutex_unlock(&dir_mutex);
-	errno = olderrno;
+	if(dir_mutex_enabled)
+		pthread_mutex_unlock(&dir_mutex);
 }

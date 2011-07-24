@@ -364,7 +364,9 @@ static int process_create_nodes(void)
 		return -1;
 	}
 	/* create_work must always use only 1 thread since no locking is done */
+	compat_lock_disable();
 	rc = execute_graph(&g, 0, 1, create_work);
+	compat_lock_enable();
 	if(rc == 0)
 		rc = delete_files(&g);
 	if(rc == 0) {

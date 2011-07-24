@@ -602,7 +602,7 @@ static int include_rules(struct tupfile *tf)
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
-		if(stat(p, &buf) == 0)
+		if(fstatat(tf->dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
 			if(include_file(tf, p) < 0)
 				goto out_free;
 	}
