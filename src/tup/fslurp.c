@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 
 static int do_slurp(int fd, struct buf *b, int extra);
@@ -45,7 +46,7 @@ static int do_slurp(int fd, struct buf *b, int extra)
 		goto err_out;
 	}
 	if(rc != st.st_size) {
-		fprintf(stderr, "tup error: read %i bytes, but expected %lli bytes\n", rc, st.st_size);
+		fprintf(stderr, "tup error: read %i bytes, but expected %ji bytes\n", rc, (intmax_t)st.st_size);
 		errno = EIO;
 		goto err_out;
 	}
