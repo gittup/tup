@@ -202,39 +202,46 @@ int server_quit(void)
 	return 0;
 }
 
-static int virt_tup_chdir(struct server *s)
+static int re_openat(int fd, const char *path)
 {
-	char virtdir[100];
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
+	int newfd;
+
+	newfd = openat(fd, path, O_RDONLY);
+	close(fd);
+	if(newfd < 0) {
+		perror(path);
 		return -1;
 	}
-	if(chdir(TUP_MNT) < 0) {
+	return newfd;
+}
+
+static int virt_tup_open(struct server *s)
+{
+	char virtdir[100];
+	int fd;
+
+	fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
+	if(fd < 0) {
 		perror(TUP_MNT);
 		return -1;
 	}
 	/* +1: Skip past top-level '/' to do a relative chdir into our fake fs. */
-	if(chdir(get_tup_top() + 1) < 0) {
-		perror(get_tup_top() + 1);
+	fd = re_openat(fd, get_tup_top() + 1);
+	if(fd < 0) {
 		return -1;
 	}
 	snprintf(virtdir, sizeof(virtdir), "@tupjob-%i", s->id);
 	virtdir[sizeof(virtdir)-1] = 0;
-	if(chdir(virtdir) < 0) {
-		perror(virtdir);
+	s->root_fd = re_openat(fd, virtdir);
+	if(s->root_fd < 0) {
 		fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 		return -1;
 	}
-	s->root_fd = open(".", O_RDONLY);
-	if(s->root_fd < 0) {
-		perror(".");
-		fprintf(stderr, "tup error: Unable to open the current virtual directory.\n");
-		return -1;
-	}
+
 	return 0;
 }
 
-static int virt_tup_unchdir(struct server *s)
+static int virt_tup_close(struct server *s)
 {
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
@@ -273,7 +280,15 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		int fd;
 		tup_lock_close();
 
-		if(virt_tup_chdir(s) < 0) {
+		/* After a fork, any mutex locks we have (such as dir_mutex)
+		 * will stay locked according to the child process. So we have
+		 * to disable locking before trying to open here, since it
+		 * will use openat() and try to get dir_mutex. Obviously
+		 * we don't care about locking the current working directory
+		 * since the child doesn't use threads here.
+		 */
+		compat_lock_disable();
+		if(virt_tup_open(s) < 0) {
 			exit(1);
 		}
 		fd = tup_entry_openat(s->root_fd, dtent);
@@ -344,7 +359,7 @@ int server_parser_start(struct server *s)
 {
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
-	if(virt_tup_chdir(s) < 0) {
+	if(virt_tup_open(s) < 0) {
 		tup_fuse_rm_group(&s->finfo);
 		return -1;
 	}
@@ -354,7 +369,7 @@ int server_parser_start(struct server *s)
 int server_parser_stop(struct server *s)
 {
 	int rc = 0;
-	if(virt_tup_unchdir(s) < 0)
+	if(virt_tup_close(s) < 0)
 		rc = -1;
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		rc = -1;
