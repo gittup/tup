@@ -182,6 +182,7 @@ int server_is_dead(void)
 
 int server_parser_start(struct server *s)
 {
+	s->root_fd = tup_top_fd();
 	if(open_notify_push(&s->finfo) < 0)
 		return -1;
 	return 0;
