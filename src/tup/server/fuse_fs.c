@@ -282,6 +282,9 @@ static int tup_fs_access(const char *path, int mask)
 	struct file_info *finfo;
 	struct tmpdir *tmpdir;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	peeled = peel(path);
 
 	/* OSX will call access() on the virtual directory before calling
@@ -328,6 +331,9 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 	int res;
 	const char *peeled;
 	struct mapping *map;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	peeled = peel(path);
 
@@ -446,6 +452,9 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	if(rdev) {}
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
 	if (S_ISREG(mode)) {
@@ -482,6 +491,9 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 
 	if(mode) {}
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	finfo = get_finfo(path);
 	if(finfo) {
 		tmpdir = malloc(sizeof *tmpdir);
@@ -505,6 +517,9 @@ static int tup_fs_unlink(const char *path)
 {
 	struct mapping *map;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	map = find_mapping(path);
 	if(map) {
 		tup_fuse_handle_file(path, ACCESS_UNLINK);
@@ -521,6 +536,9 @@ static int tup_fs_rmdir(const char *path)
 	struct tmpdir *tmpdir;
 	const char *peeled;
 	struct file_info *finfo;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	finfo = get_finfo(path);
 	if(finfo) {
@@ -543,6 +561,9 @@ static int tup_fs_symlink(const char *from, const char *to)
 	int res;
 	struct mapping *tomap;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	tomap = add_mapping(to);
 	if(!tomap) {
 		return -ENOMEM;
@@ -561,6 +582,9 @@ static int tup_fs_rename(const char *from, const char *to)
 	const char *peelfrom;
 	const char *peelto;
 	struct mapping *map;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	peelfrom = peel(from);
 	peelto = peel(to);
@@ -608,6 +632,9 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 {
 	struct mapping *map;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	map = find_mapping(path);
 	if(map) {
 		if(fchmodat(tup_top_fd(), map->tmpname, mode, 0) < 0)
@@ -622,6 +649,9 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 {
 	struct mapping *map;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	map = find_mapping(path);
 	if(map) {
 		if(fchownat(tup_top_fd(), map->tmpname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
@@ -635,6 +665,9 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 static int tup_fs_truncate(const char *path, off_t size)
 {
 	struct mapping *map;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	/* TODO: error check? */
 	tup_fuse_handle_file(path, ACCESS_WRITE);
@@ -660,6 +693,9 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	const char *peeled;
 	struct mapping *map;
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	peeled = peel(path);
 	map = find_mapping(path);
 	if(map) {
@@ -681,6 +717,9 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 	const char *peeled;
 	const char *openfile;
 	struct mapping *map;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	peeled = peel(path);
 	map = find_mapping(path);
@@ -709,6 +748,9 @@ static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
 
 	if(path) {}
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	res = pread(fi->fh, buf, size, offset);
 	if (res == -1)
 		res = -errno;
@@ -723,6 +765,9 @@ static int tup_fs_write(const char *path, const char *buf, size_t size,
 
 	if(path) {}
 
+	if(context_check() < 0)
+		return -EPERM;
+
 	res = pwrite(fi->fh, buf, size, offset);
 	if (res == -1)
 		res = -errno;
@@ -736,6 +781,9 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	int rc = 0;
 	const char *peeled;
 	struct mapping *map;
+
+	if(context_check() < 0)
+		return -EPERM;
 
 	peeled = peel(path);
 
@@ -756,6 +804,8 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 {
 	if(path) {}
+	if(context_check() < 0)
+		return -EPERM;
 	close(fi->fh);
 	return 0;
 }
