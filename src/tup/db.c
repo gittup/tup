@@ -202,6 +202,8 @@ int tup_db_create(int db_sync)
 			return -1;
 	}
 
+	if(tup_db_begin() < 0)
+		return -1;
 	for(x=0; x<ARRAY_SIZE(sql); x++) {
 		char *errmsg;
 		if(sqlite3_exec(tup_db, sql[x], NULL, NULL, &errmsg) != 0) {
@@ -216,6 +218,8 @@ int tup_db_create(int db_sync)
 			return -1;
 	}
 	if(tup_db_config_set_int("db_version", DB_VERSION) < 0)
+		return -1;
+	if(tup_db_commit() < 0)
 		return -1;
 
 	return 0;
