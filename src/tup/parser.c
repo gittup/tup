@@ -247,7 +247,7 @@ int parse(struct node *n, struct graph *g)
 		}
 	}
 
-	if(fslurp(fd, &b) < 0)
+	if(fslurp_null(fd, &b) < 0)
 		goto out_close_file;
 	if(parse_tupfile(&tf, &b) < 0)
 		goto out_free_bs;
@@ -735,7 +735,7 @@ static int include_file(struct tupfile *tf, const char *file)
 		perror(file);
 		goto out_err;
 	}
-	if(fslurp(fd, &incb) < 0)
+	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
 	if(parse_tupfile(tf, &incb) < 0)
