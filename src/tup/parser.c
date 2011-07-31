@@ -109,7 +109,7 @@ struct build_name_list_args {
 
 struct tupfile {
 	tupid_t tupid;
-	tupid_t curdt;
+	struct tup_entry *curtent;
 	int dfd;
 	int root_fd;
 	struct graph *g;
@@ -209,7 +209,7 @@ int parse(struct node *n, struct graph *g)
 		return -1;
 
 	tf.tupid = n->tnode.tupid;
-	tf.curdt = tf.tupid;
+	tf.curtent = tup_entry_get(tf.tupid);
 	tf.root_fd = s.root_fd;
 	tf.g = g;
 	tf.cmd_tree.rb_node = NULL;
@@ -588,7 +588,7 @@ static int include_rules(struct tupfile *tf)
 	int x;
 
 	num_dotdots = 0;
-	tent = tup_entry_get(tf->curdt);
+	tent = tf->curtent;
 	while(tent->tnode.tupid != DOT_DT) {
 		tent = tent->parent;
 		num_dotdots++;
@@ -625,20 +625,31 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	char *eval_cmdline;
 	struct run_script_info rsi;
 	int rslno = 0;
+	int dfd;
 	int rc;
 
-	eval_cmdline = eval(tf, cmdline);
-	if(!eval_cmdline)
+	dfd = tup_entry_openat(tf->root_fd, tf->curtent);
+	if(dfd < 0)
 		return -1;
 
-	if(server_run_script(&rsi, tf->dfd, eval_cmdline) < 0)
+	eval_cmdline = eval(tf, cmdline);
+	if(!eval_cmdline) {
+		close(dfd);
 		return -1;
+	}
+
+	rc = server_run_script(&rsi, dfd, eval_cmdline);
+	free(eval_cmdline);
+	close(dfd);
+	if(rc < 0)
+		return -1;
+
 	do {
 		char rule[4096];
 		int len;
 		rc = server_script_get_next_rule(&rsi, rule, sizeof(rule));
 		if(rc < 0)
-			return -1;
+			goto out_err;
 		if(rc == 0)
 			break;
 		rslno++;
@@ -656,6 +667,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	if(server_run_script_quit(&rsi) < 0)
 		return -1;
 	return 0;
+
 out_err:
 	server_run_script_fail(&rsi);
 	return -1;
@@ -753,7 +765,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	struct path_element *pel;
 	struct tup_entry *tent = NULL;
 	tupid_t newdt;
-	tupid_t olddt = tf->curdt;
+	struct tup_entry *oldtent = tf->curtent;
 
 	if(get_path_elements(file, &pg) < 0)
 		goto out_err;
@@ -761,10 +773,10 @@ static int include_file(struct tupfile *tf, const char *file)
 		fprintf(stderr, "tup error: Unable to include file with hidden path element.\n");
 		goto out_err;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->curdt, &pg, &pel, 0);
+	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0);
 	if(newdt <= 0) {
 		fprintf(stderr, "tup error: Unable to find directory for include file relative to '");
-		tup_db_print(stderr, tf->curdt);
+		tup_db_print(stderr, tf->curtent->tnode.tupid);
 		fprintf(stderr, "'\n");
 		goto out_err;
 	}
@@ -775,7 +787,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 	free(pel);
 	del_pel_group(&pg);
-	tf->curdt = newdt;
+	tf->curtent = tup_entry_get(newdt);
 
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
@@ -794,7 +806,7 @@ out_close:
 	close(fd);
 
 out_err:
-	tf->curdt = olddt;
+	tf->curtent = oldtent;
 	if(rc < 0) {
 		fprintf(stderr, "tup error: Failed to parse included file '%s'\n", file);
 		return -1;
@@ -2834,10 +2846,10 @@ static char *eval(struct tupfile *tf, const char *string)
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
-					if(get_relative_dir(NULL, tf->tupid, tf->curdt, &clen) < 0) {
-						fprintf(stderr, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curdt);
+					if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+						fprintf(stderr, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(stderr, tf->tupid);
-						tup_db_print(stderr, tf->curdt);
+						tup_db_print(stderr, tf->curtent->tnode.tupid);
 						return NULL;
 					}
 					len += clen;
@@ -2920,10 +2932,10 @@ static char *eval(struct tupfile *tf, const char *string)
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
-					if(get_relative_dir(p, tf->tupid, tf->curdt, &clen) < 0) {
-						fprintf(stderr, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curdt);
+					if(get_relative_dir(p, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+						fprintf(stderr, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(stderr, tf->tupid);
-						tup_db_print(stderr, tf->curdt);
+						tup_db_print(stderr, tf->curtent->tnode.tupid);
 						return NULL;
 					}
 					p += clen;
