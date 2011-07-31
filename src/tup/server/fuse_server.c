@@ -350,6 +350,103 @@ err_rm_group:
 	return -1;
 }
 
+int server_run_script(struct run_script_info *rsi, int dfd, const char *cmdline)
+{
+	if(pipe(rsi->pfd) < 0) {
+		perror("pipe");
+		return -1;
+	}
+	rsi->pid = fork();
+	if(rsi->pid < 0) {
+		perror("fork");
+		goto err_pipe;
+	}
+	if(rsi->pid == 0) {
+		if(fchdir(dfd) < 0) {
+			perror("fchdir");
+			exit(1);
+		}
+
+		close(rsi->pfd[0]);
+		if(dup2(rsi->pfd[1], STDOUT_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+			exit(1);
+		}
+		if(dup2(null_fd, STDIN_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdin for the child process.\n");
+			exit(1);
+		}
+		execl("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL);
+		exit(1);
+	}
+	close(rsi->pfd[1]);
+	rsi->input = fdopen(rsi->pfd[0], "r");
+	if(rsi->input == NULL) {
+		perror("fdopen");
+		return -1;
+	}
+	return 0;
+
+err_pipe:
+	close(rsi->pfd[0]);
+	close(rsi->pfd[1]);
+	return -1;
+}
+
+int server_script_get_next_rule(struct run_script_info *rsi, char *buf, int size)
+{
+	char c = '1'; /* Just a non-nul char to test if the line is too long */
+
+	buf[size - 1] = c;
+	if(fgets(buf, size, rsi->input) == NULL) {
+		if(feof(rsi->input)) {
+			return 0;
+		}
+		perror("fgets");
+		return -1;
+	}
+
+	if(buf[size - 1] != c) {
+		fprintf(stderr, "tup error: Line too long in run-script\n");
+		return -1;
+	}
+	/* Still might be more lines to process - return 1 */
+	return 1;
+}
+
+int server_run_script_quit(struct run_script_info *rsi)
+{
+	int status;
+
+	fclose(rsi->input);
+	if(waitpid(rsi->pid, &status, 0) < 0) {
+		perror("waitpid");
+		return -1;
+	}
+	if(WIFEXITED(status)) {
+		if(WEXITSTATUS(status) == 0)
+			return 0;
+		fprintf(stderr, "Error: run-script exited with failure code: %i\n", WEXITSTATUS(status));
+	} else {
+		if(WIFSIGNALED(status)) {
+			fprintf(stderr, "Error: run-script terminated with signal %i\n", WTERMSIG(status));
+		} else {
+			fprintf(stderr, "Error: run-script terminated abnormally.\n");
+		}
+	}
+	return -1;
+}
+
+void server_run_script_fail(struct run_script_info *rsi)
+{
+	if(kill(rsi->pid, SIGKILL) < 0) {
+		perror("kill");
+		fprintf(stderr, "tup error: Unable to kill the run-script sub-process.\n");
+	}
+}
+
 int server_is_dead(void)
 {
 	return sig_quit;

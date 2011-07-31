@@ -125,6 +125,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
+static int run_script(struct tupfile *tf, char *cmdline, int lno,
+		      struct bin_list *bl);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
@@ -412,6 +414,9 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b)
 		} else if(strcmp(line, "include_rules") == 0) {
 			if(include_rules(tf) < 0)
 				return -1;
+		} else if(strncmp(line, "run ", 4) == 0) {
+			if(run_script(tf, line+4, lno, &bl) < 0)
+				return -1;
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(line[0] == ':') {
@@ -612,6 +617,48 @@ out_free:
 	free(path);
 
 	return rc;
+}
+
+static int run_script(struct tupfile *tf, char *cmdline, int lno,
+		      struct bin_list *bl)
+{
+	char *eval_cmdline;
+	struct run_script_info rsi;
+	int rslno = 0;
+	int rc;
+
+	eval_cmdline = eval(tf, cmdline);
+	if(!eval_cmdline)
+		return -1;
+
+	if(server_run_script(&rsi, tf->dfd, eval_cmdline) < 0)
+		return -1;
+	do {
+		char rule[4096];
+		int len;
+		rc = server_script_get_next_rule(&rsi, rule, sizeof(rule));
+		if(rc < 0)
+			return -1;
+		if(rc == 0)
+			break;
+		rslno++;
+		if(rule[0] != ':') {
+			fprintf(stderr, "Error: run-script line %i is not a :-rule - '%s'\n", rslno, rule);
+			goto out_err;
+		}
+		len = strlen(rule);
+		if(len > 0 && rule[len-1] == '\n')
+			rule[len-1] = 0;
+		if(parse_rule(tf, rule+1, lno, bl) < 0)
+			goto out_err;
+	} while(rc == 1);
+
+	if(server_run_script_quit(&rsi) < 0)
+		return -1;
+	return 0;
+out_err:
+	server_run_script_fail(&rsi);
+	return -1;
 }
 
 static int gitignore(struct tupfile *tf)

@@ -29,6 +29,12 @@ struct server {
 #endif
 };
 
+struct run_script_info {
+	int pfd[2];
+	FILE *input;
+	pid_t pid;
+};
+
 int server_init(void);
 int server_quit(void);
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
@@ -36,5 +42,10 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 int server_is_dead(void);
 int server_parser_start(struct server *s);
 int server_parser_stop(struct server *s);
+
+int server_run_script(struct run_script_info *rsi, int dfd, const char *cmdline);
+int server_script_get_next_rule(struct run_script_info *rsi, char *buf, int size);
+int server_run_script_quit(struct run_script_info *rsi);
+void server_run_script_fail(struct run_script_info *rsi);
 
 #endif
