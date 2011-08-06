@@ -654,14 +654,16 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 			break;
 		rslno++;
 		if(rule[0] != ':') {
-			fprintf(stderr, "Error: run-script line %i is not a :-rule - '%s'\n", rslno, rule);
+			fprintf(stderr, "tup error: run-script line %i is not a :-rule - '%s'\n", rslno, rule);
 			goto out_err;
 		}
 		len = strlen(rule);
 		if(len > 0 && rule[len-1] == '\n')
 			rule[len-1] = 0;
-		if(parse_rule(tf, rule+1, lno, bl) < 0)
+		if(parse_rule(tf, rule+1, lno, bl) < 0) {
+			fprintf(stderr, "tup error: Unable to parse :-rule from run script: '%s'\n", rule);
 			goto out_err;
+		}
 	} while(rc == 1);
 
 	if(server_run_script_quit(&rsi) < 0)
