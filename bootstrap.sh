@@ -31,7 +31,6 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/utimensat.c"
 	plat_cflags="$plat_cflags -include ../src/compat/macosx.h"
 	plat_cflags="$plat_cflags -DAT_SYMLINK_NOFOLLOW=0x100"
-	CC=gcc-mp-4.6
 	;;
 esac
 

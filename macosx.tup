@@ -1,7 +1,3 @@
-# GCC on MacOSX is horribly outdated. Tup needs 4.6 version from MacPorts.
-# Install it as 'sudo port install gcc46'
-CC = gcc-mp-4.6
-
 CFLAGS += -DAT_SYMLINK_NOFOLLOW=0x100
 CFLAGS += -DAT_FDCWD=-100
 
