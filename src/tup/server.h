@@ -7,6 +7,7 @@
 #include "pel_group.h"
 #include <pthread.h>
 
+struct rb_root;
 struct tup_entry;
 
 struct server {
@@ -19,6 +20,7 @@ struct server {
 
 	/* For the parser */
 	int root_fd;
+	tupid_t oldid;
 
 #ifdef _WIN32
 	/* TODO: Unify servers */
@@ -35,7 +37,12 @@ struct run_script_info {
 	pid_t pid;
 };
 
-int server_init(void);
+enum server_mode {
+	SERVER_PARSER_MODE,
+	SERVER_UPDATER_MODE,
+};
+
+int server_init(enum server_mode mode, struct rb_root *delete_tree);
 int server_quit(void);
 int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		struct tup_entry *dtent);

@@ -20,10 +20,12 @@ static int stop_server(struct server *s);
 static void *message_thread(void *arg);
 static int server_inited = 0;
 
-int server_init(void)
+int server_init(enum server_mode mode, struct rb_root *delete_tree)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
+
+	if(mode || delete_tree) {/* unused */}
 
 	if(server_inited)
 		return 0;

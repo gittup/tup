@@ -9,8 +9,12 @@
 #include "tup/access_event.h"
 #include "tup/config.h"
 #include "tup/file.h"
+#include "tup/fileio.h"
 #include "tup/thread_tree.h"
 #include "tup/debug.h"
+#include "tup/entry.h"
+#include "tup/server.h"
+#include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +25,8 @@
 #include <sys/time.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
+static int server_mode = 0;
+static struct rb_root *server_delete_tree = NULL;
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
 {
@@ -36,6 +42,12 @@ int tup_fuse_rm_group(struct file_info *finfo)
 {
 	thread_tree_rm(&troot, &finfo->tnode);
 	return 0;
+}
+
+void tup_fuse_set_parser_mode(int mode, struct rb_root *delete_tree)
+{
+	server_mode = mode;
+	server_delete_tree = delete_tree;
 }
 
 #define TUP_JOB "@tupjob-"
@@ -366,6 +378,37 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
+struct readdir_parser_params {
+	void *buf;
+	fuse_fill_dir_t filler;
+};
+
+static int readdir_parser_cb(void *arg, struct tup_entry *tent)
+{
+	struct readdir_parser_params *rpp = arg;
+	if(rpp->filler(rpp->buf, tent->name.s, NULL, 0))
+		return -EIO;
+	return 0;
+}
+
+static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
+{
+	struct tup_entry *dtent;
+	struct readdir_parser_params rpp = {buf, filler};
+
+	if(gimme_tent(path, &dtent) < 0)
+		return -EIO;
+	if(!dtent)
+		return -EIO;
+	if(dtent->tnode.tupid != tup_fuse_server_get_curid()) {
+		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
+		return -EPERM;
+	}
+	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dtent->tnode.tupid,
+				       "*", -1,  server_delete_tree) < 0)
+		return -EIO;
+	return 0;
+}
 
 static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			  off_t offset, struct fuse_file_info *fi)
@@ -389,6 +432,12 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		struct tmpdir *tmpdir;
 		struct mapping *map;
 		struct stat st;
+
+		/* In the parser, we have to look at the tup database, not
+		 * the filesystem.
+		 */
+		if(server_mode == SERVER_PARSER_MODE)
+			return readdir_parser(peeled, buf, filler);
 
 		/* If we are doing readdir() on a temporary directory, make
 		 * sure we don't try to save the dependency or do a real

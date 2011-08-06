@@ -39,6 +39,7 @@ static struct sigaction sigact = {
 static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
+static tupid_t curid = -1;
 
 static void *fuse_thread(void *arg)
 {
@@ -59,10 +60,12 @@ static void *fuse_thread(void *arg)
 	return NULL;
 }
 
-int server_init(void)
+int server_init(enum server_mode mode, struct rb_root *delete_tree)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	struct flist f = {0, 0, 0};
+
+	tup_fuse_set_parser_mode(mode, delete_tree);
 
 	if(server_inited)
 		return 0;
@@ -460,17 +463,25 @@ int server_parser_start(struct server *s)
 		tup_fuse_rm_group(&s->finfo);
 		return -1;
 	}
+	s->oldid = curid;
+	curid = s->id;
 	return 0;
 }
 
 int server_parser_stop(struct server *s)
 {
 	int rc = 0;
+	curid = s->oldid;
 	if(virt_tup_close(s) < 0)
 		rc = -1;
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		rc = -1;
 	return rc;
+}
+
+tupid_t tup_fuse_server_get_curid(void)
+{
+	return curid;
 }
 
 static void sighandler(int sig)

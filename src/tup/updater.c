@@ -360,7 +360,7 @@ static int process_create_nodes(void)
 	}
 
 	tup_db_begin();
-	if(server_init() < 0) {
+	if(server_init(SERVER_PARSER_MODE, &g.delete_tree) < 0) {
 		return -1;
 	}
 	/* create_work must always use only 1 thread since no locking is done */
@@ -441,7 +441,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		}
 	}
 	warnings = 0;
-	if(server_init() < 0) {
+	if(server_init(SERVER_UPDATER_MODE, NULL) < 0) {
 		return -1;
 	}
 	rc = execute_graph(&g, do_keep_going, num_jobs, update_work);
