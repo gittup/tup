@@ -625,22 +625,15 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	char *eval_cmdline;
 	struct run_script_info rsi;
 	int rslno = 0;
-	int dfd;
 	int rc;
-
-	dfd = tup_entry_openat(tf->root_fd, tf->curtent);
-	if(dfd < 0)
-		return -1;
 
 	eval_cmdline = eval(tf, cmdline);
 	if(!eval_cmdline) {
-		close(dfd);
 		return -1;
 	}
 
-	rc = server_run_script(&rsi, dfd, eval_cmdline);
+	rc = server_run_script(&rsi, tf->dfd, eval_cmdline);
 	free(eval_cmdline);
-	close(dfd);
 	if(rc < 0)
 		return -1;
 

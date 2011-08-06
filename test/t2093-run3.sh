@@ -6,21 +6,21 @@
 tmkdir sub
 cat > sub/gen.sh << HERE
 #! /bin/sh
-for i in foo bar; do
-	echo ": |> touch %o |> \$i"
+for i in *.c; do
+	echo ": \$i |> gcc -c %f -o %o |> %B.o"
 done
 HERE
 chmod +x sub/gen.sh
 
 cat > sub/inc.tup << HERE
-run ./gen.sh
+run \$(TUP_CWD)/gen.sh
 HERE
 cat > Tupfile << HERE
 include sub/inc.tup
 HERE
-tup touch Tupfile sub/inc.tup sub/gen.sh
+tup touch Tupfile sub/inc.tup sub/gen.sh foo.c bar.c
 update
 
-check_exist foo bar
+check_exist foo.o bar.o
 
 eotup
