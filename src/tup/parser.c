@@ -203,8 +203,6 @@ int parse(struct node *n, struct graph *g)
 
 	init_file_info(&s.finfo);
 	s.id = n->tnode.tupid;
-	if(rm_existing_gitignore(n->tent) < 0)
-		return -1;
 	if(server_parser_start(&s) < 0)
 		return -1;
 
@@ -252,6 +250,8 @@ int parse(struct node *n, struct graph *g)
 	if(parse_tupfile(&tf, &b) < 0)
 		goto out_free_bs;
 	if(tf.ign) {
+		if(rm_existing_gitignore(n->tent) < 0)
+			return -1;
 		if(gitignore(&tf) < 0) {
 			rc = -1;
 			goto out_free_bs;
