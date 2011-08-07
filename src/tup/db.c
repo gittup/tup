@@ -24,6 +24,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 13
+#define PARSER_VERSION 1
 
 enum {
 	DB_BEGIN,
@@ -218,6 +219,8 @@ int tup_db_create(int db_sync)
 			return -1;
 	}
 	if(tup_db_config_set_int("db_version", DB_VERSION) < 0)
+		return -1;
+	if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
@@ -608,6 +611,27 @@ static int version_check(void)
 			break;
 		default:
 			fprintf(stderr, "Error: Unable to convert database version %i to version %i\n", version, DB_VERSION);
+			return -1;
+	}
+
+	if(tup_db_config_get_int("parser_version", 0, &version) < 0)
+		return -1;
+	if(version < 0) {
+		fprintf(stderr, "Error getting tup parser version.\n");
+		return -1;
+	}
+	if(version != PARSER_VERSION) {
+		printf("Tup parser version has been updated to %i. All Tupfiles will be re-parsed to ensure that nothing broke.\n", PARSER_VERSION);
+		if(tup_db_begin() < 0)
+			return -1;
+		if(sqlite3_exec(tup_db, sql_1b, NULL, NULL, &errmsg) != 0) {
+			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+				errmsg, sql_1b);
+			return -1;
+		}
+		if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
+			return -1;
+		if(tup_db_commit() < 0)
 			return -1;
 	}
 

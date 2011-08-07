@@ -38,6 +38,7 @@ static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
 static int config(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
+static int fake_parser_version(int argc, char **argv);
 static int flush(void);
 static int ghost_check(void);
 static void print_name(const char *s, char c);
@@ -150,6 +151,8 @@ int main(int argc, char **argv)
 		rc = config(argc, argv);
 	} else if(strcmp(cmd, "fake_mtime") == 0) {
 		rc = fake_mtime(argc, argv);
+	} else if(strcmp(cmd, "fake_parser_version") == 0) {
+		rc = fake_parser_version(argc, argv);
 	} else if(strcmp(cmd, "flush") == 0) {
 		rc = flush();
 	} else if(strcmp(cmd, "ghost_check") == 0) {
@@ -757,6 +760,14 @@ static int fake_mtime(int argc, char **argv)
 	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
 	free(pel);
+	return 0;
+}
+
+static int fake_parser_version(int argc, char **argv)
+{
+	if(argc || argv) {}
+	if(tup_db_config_set_int("parser_version", 0) < 0)
+		return -1;
 	return 0;
 }
 
