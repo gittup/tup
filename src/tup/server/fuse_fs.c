@@ -436,8 +436,14 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		/* In the parser, we have to look at the tup database, not
 		 * the filesystem.
 		 */
-		if(server_mode == SERVER_PARSER_MODE)
-			return readdir_parser(peeled, buf, filler);
+		if(server_mode == SERVER_PARSER_MODE) {
+			int rc;
+			rc = readdir_parser(peeled, buf, filler);
+			if(rc < 0) {
+				finfo->server_fail = 1;
+			}
+			return rc;
+		}
 
 		/* If we are doing readdir() on a temporary directory, make
 		 * sure we don't try to save the dependency or do a real

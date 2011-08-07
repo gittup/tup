@@ -44,6 +44,7 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->mapping_list);
 	INIT_LIST_HEAD(&info->tmpdir_list);
+	info->server_fail = 0;
 	return 0;
 }
 

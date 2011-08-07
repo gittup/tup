@@ -25,6 +25,7 @@ struct file_info {
 	struct list_head var_list;
 	struct list_head mapping_list;
 	struct list_head tmpdir_list;
+	int server_fail;
 };
 
 struct tup_entry;

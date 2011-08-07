@@ -7,7 +7,6 @@ cat > Tupfile << HERE
 run sh -e ok.sh
 HERE
 cat > ok.sh << HERE
-ls sub
 for i in sub/*.[co]; do
 	echo ": |> echo \$i |>"
 done
@@ -18,7 +17,7 @@ cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile ok.sh sub/foo.c sub/bar.c
-update_fail_msg 'Unable to readdir.*sub'
+update_fail_msg 'Fuse server reported an access violation'
 
 # TODO: Allow readdir() to parse subdirs automatically? Would cause a loop
 # in fuse, so multi-threaded fuse may be required.

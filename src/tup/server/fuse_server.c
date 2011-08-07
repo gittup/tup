@@ -476,6 +476,16 @@ int server_parser_stop(struct server *s)
 		rc = -1;
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		rc = -1;
+	/* This is probably misplaced, but there is currently no easy way to
+	 * stop the server if it detects an error (in fuse_fs.c), so it just
+	 * saves a flag in the file_info structure, since that's all that
+	 * fuse_fs has access to. We then check it afterward the server
+	 * is shutdown.
+	 */
+	if(s->finfo.server_fail) {
+		fprintf(stderr, "tup error: Fuse server reported an access violation.\n");
+		rc = -1;
+	}
 	return rc;
 }
 
