@@ -623,7 +623,8 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_list *bl)
 {
 	char *eval_cmdline;
-	struct run_script_info rsi;
+	char *rules;
+	char *p;
 	int rslno = 0;
 	int rc;
 
@@ -632,39 +633,36 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		return -1;
 	}
 
-	rc = server_run_script(&rsi, tf->dfd, eval_cmdline);
+	rc = server_run_script(tf->dfd, eval_cmdline, &rules);
 	free(eval_cmdline);
 	if(rc < 0)
 		return -1;
 
-	do {
-		char rule[4096];
-		int len;
-		rc = server_script_get_next_rule(&rsi, rule, sizeof(rule));
-		if(rc < 0)
-			goto out_err;
-		if(rc == 0)
-			break;
+	p = rules;
+	while(p[0]) {
+		char *newline;
 		rslno++;
-		if(rule[0] != ':') {
-			fprintf(stderr, "tup error: run-script line %i is not a :-rule - '%s'\n", rslno, rule);
+		if(p[0] != ':') {
+			fprintf(stderr, "tup error: run-script line %i is not a :-rule - '%s'\n", rslno, p);
 			goto out_err;
 		}
-		len = strlen(rule);
-		if(len > 0 && rule[len-1] == '\n')
-			rule[len-1] = 0;
-		if(parse_rule(tf, rule+1, lno, bl) < 0) {
-			fprintf(stderr, "tup error: Unable to parse :-rule from run script: '%s'\n", rule);
+		newline = strchr(p, '\n');
+		if(!newline) {
+			fprintf(stderr, "tup error: Missing newline from :-rule in run script: '%s'\n", p);
+		}
+		*newline = 0;
+		if(parse_rule(tf, p+1, lno, bl) < 0) {
+			fprintf(stderr, "tup error: Unable to parse :-rule from run script: '%s'\n", p);
 			goto out_err;
 		}
-	} while(rc == 1);
+		p = newline + 1;
+	}
 
-	if(server_run_script_quit(&rsi) < 0)
-		return -1;
+	free(rules);
 	return 0;
 
 out_err:
-	server_run_script_fail(&rsi);
+	free(rules);
 	return -1;
 }
 

@@ -197,28 +197,11 @@ int server_parser_stop(struct server *s)
 	return 0;
 }
 
-int server_run_script(struct run_script_info *rsi, int dfd, const char *cmdline)
+int server_run_script(int dfd, const char *cmdline, char **rules)
 {
-	if(rsi || dfd || cmdline) {/* unsupported */}
+	if(dfd || cmdline || rules) {/* unsupported */}
 	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
 	return -1;
-}
-
-int server_script_get_next_rule(struct run_script_info *rsi, char *buf, int size)
-{
-	if(rsi || buf || size) {/* unsupported */}
-	return -1;
-}
-
-int server_run_script_quit(struct run_script_info *rsi)
-{
-	if(rsi) {/* unsupported */}
-	return -1;
-}
-
-void server_run_script_fail(struct run_script_info *rsi)
-{
-	if(rsi) {/* unsupported */}
 }
 
 static int connect_udp(int socks[2])

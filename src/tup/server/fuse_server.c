@@ -353,25 +353,72 @@ err_rm_group:
 	return -1;
 }
 
-int server_run_script(struct run_script_info *rsi, int dfd, const char *cmdline)
+static int read_full(char **dest, int fd)
 {
-	if(pipe(rsi->pfd) < 0) {
+       int size = 1024;
+       int cur = 0;
+       int rc;
+       char *p;
+
+       p = malloc(size);
+       if(!p) {
+               perror("malloc");
+               return -1;
+       }
+       do {
+               /* 1-adjusting is to save room for the \0 */
+               rc = read(fd, p + cur, size - cur - 1);
+               if(rc < 0) {
+                       perror("read");
+                       goto out_err;
+               }
+               if(rc == 0)
+                       break;
+               cur += rc;
+               if(cur == size - 1) {
+                       size *= 2;
+                       p = realloc(p, size);
+                       if(!p) {
+                               perror("realloc");
+                               return -1;
+                       }
+               }
+       } while(1);
+
+       /* Room is saved for this by the 1-adjusting in the loop */
+       p[cur] = 0;
+
+       *dest = p;
+       return 0;
+out_err:
+       free(p);
+       return -1;
+}
+
+
+int server_run_script(int dfd, const char *cmdline, char **rules)
+{
+	int pfd[2];
+	pid_t pid;
+	int status;
+
+	if(pipe(pfd) < 0) {
 		perror("pipe");
 		return -1;
 	}
-	rsi->pid = fork();
-	if(rsi->pid < 0) {
+	pid = fork();
+	if(pid < 0) {
 		perror("fork");
 		goto err_pipe;
 	}
-	if(rsi->pid == 0) {
+	if(pid == 0) {
 		if(fchdir(dfd) < 0) {
 			perror("fchdir");
 			exit(1);
 		}
 
-		close(rsi->pfd[0]);
-		if(dup2(rsi->pfd[1], STDOUT_FILENO) < 0) {
+		close(pfd[0]);
+		if(dup2(pfd[1], STDOUT_FILENO) < 0) {
 			perror("dup2");
 			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
 			exit(1);
@@ -384,70 +431,36 @@ int server_run_script(struct run_script_info *rsi, int dfd, const char *cmdline)
 		execl("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL);
 		exit(1);
 	}
-	close(rsi->pfd[1]);
-	rsi->input = fdopen(rsi->pfd[0], "r");
-	if(rsi->input == NULL) {
-		perror("fdopen");
-		return -1;
-	}
-	return 0;
-
-err_pipe:
-	close(rsi->pfd[0]);
-	close(rsi->pfd[1]);
-	return -1;
-}
-
-int server_script_get_next_rule(struct run_script_info *rsi, char *buf, int size)
-{
-	char c = '1'; /* Just a non-nul char to test if the line is too long */
-
-	buf[size - 1] = c;
-	if(fgets(buf, size, rsi->input) == NULL) {
-		if(feof(rsi->input)) {
-			return 0;
-		}
-		perror("fgets");
-		return -1;
-	}
-
-	if(buf[size - 1] != c) {
-		fprintf(stderr, "tup error: Line too long in run-script\n");
-		return -1;
-	}
-	/* Still might be more lines to process - return 1 */
-	return 1;
-}
-
-int server_run_script_quit(struct run_script_info *rsi)
-{
-	int status;
-
-	fclose(rsi->input);
-	if(waitpid(rsi->pid, &status, 0) < 0) {
+	close(pfd[1]);
+	if(read_full(rules, pfd[0]) < 0)
+		goto err_kill;
+	if(waitpid(pid, &status, 0) < 0) {
 		perror("waitpid");
 		return -1;
 	}
+	close(pfd[0]);
 	if(WIFEXITED(status)) {
 		if(WEXITSTATUS(status) == 0)
 			return 0;
-		fprintf(stderr, "Error: run-script exited with failure code: %i\n", WEXITSTATUS(status));
+		fprintf(stderr, "tup error: run-script exited with failure code: %i\n", WEXITSTATUS(status));
 	} else {
 		if(WIFSIGNALED(status)) {
-			fprintf(stderr, "Error: run-script terminated with signal %i\n", WTERMSIG(status));
+			fprintf(stderr, "tup error: run-script terminated with signal %i\n", WTERMSIG(status));
 		} else {
-			fprintf(stderr, "Error: run-script terminated abnormally.\n");
+			fprintf(stderr, "tup error: run-script terminated abnormally.\n");
 		}
 	}
 	return -1;
-}
 
-void server_run_script_fail(struct run_script_info *rsi)
-{
-	if(kill(rsi->pid, SIGKILL) < 0) {
+err_kill:
+	if(kill(pid, SIGKILL) < 0) {
 		perror("kill");
-		fprintf(stderr, "tup error: Unable to kill the run-script sub-process.\n");
+		fprintf(stderr, "tup error: Unable to kill the run-script sub-process, pid=%i\n", pid);
 	}
+err_pipe:
+	close(pfd[0]);
+	close(pfd[1]);
+	return -1;
 }
 
 int server_is_dead(void)
