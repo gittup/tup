@@ -31,6 +31,7 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/utimensat.c"
 	plat_cflags="$plat_cflags -include ../src/compat/macosx.h"
 	plat_cflags="$plat_cflags -DAT_SYMLINK_NOFOLLOW=0x100"
+	CC=clang
 	;;
 esac
 
@@ -48,7 +49,7 @@ echo "  bootstrap CC (unoptimized) ../src/sqlite3/sqlite3.c"
 $CC -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags
 
 echo "  bootstrap LD tup"
-echo "const char *tup_version(void) {return \"bootstrap\";}" | gcc -x c -c - -o tup_version.o
+echo "const char *tup_version(void) {return \"bootstrap\";}" | $(CC) -x c -c - -o tup_version.o
 $CC *.o -o tup -lpthread $plat_ldflags
 
 cd ..
