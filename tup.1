@@ -343,6 +343,16 @@ In this example, if CONFIG_FOO is set to 'y', then the foo.c file will be includ
 The @-variables can be used similar to $-variables, with the following distinctions: 1) @-variables are read-only in Tupfiles, and 2) @-variables are in the DAG, which means reading from them creates a dependency from the @-variable to the Tupfile. Therefore any Tupfile that reads @(FOO) like the above example will be reparsed if the value of CONFIG_FOO in tup.config changes.
 .P
 The reason for prefixing with "CONFIG_" in the tup.config file is to maintain compatibility with kconfig, which can be used to generate this file.
+.P
+Note that the syntax for tup.config is fairly strict. For a statement like "CONFIG_FOO=y", tup will create an @-variable using the string starting after "CONFIG_", and up to the '=' sign. The value is everything immediately after the '=' sign until the newline, but if there is a surrounding pair of quotes, they are stripped. In this example, it would set "FOO" to "y". Note that if instead the line were "CONFIG_FOO = y", then the variable "FOO " would be set to " y".
+.P
+In tup.config, comments are determined by a '#' character in the first column. These are ignored, unless the comment is of the form:
+.nf
+
+# CONFIG_FOO is not set
+
+.fi
+In this case, the @-variable "FOO" is explicitly set to "n".
 .TP
 .B @(TUP_PLATFORM)
 TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", "macosx", or "win32".
