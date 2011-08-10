@@ -20,4 +20,11 @@ tup rm foo.c
 update
 sym_check lib.a ^foo bar
 
+# This is a quick check for commit 794c3ae9ac7bcffe6b6418e4daf03f5c844e1f3a
+# to make sure OSX doesn't create .fuse_hidden files from 'ar'.
+if ls -la | grep .fuse_hidden > /dev/null; then
+	echo "Error: .fuse_hidden file found!" 1>&2
+	exit 1
+fi
+
 eotup
