@@ -256,7 +256,13 @@ The name of the output file without the extension. This only works in the extra-
 .TP
 .B var := value
 .PD 1
-Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file.
+Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file. Note that you may see a syntax using back-ticks when setting variables, such as:
+.nf
+
+CFLAGS += `pkg-config fuse --cflags`
+
+.fi
+Tup does not do any special processing for back-ticks, so the pkg-config command is not actually executed when the variable is set in this example. Instead, this is passed verbatim to any place that uses it. Therefore if a command later references $(CFLAGS), it will contain the string `pkg-config fuse --cflags`, so it will be parsed by the shell.
 .TP
 .B var += value
 Append "value" to the end of the current value of "var". If "var" has not been set, this is equivalent to a regular '=' statement. If "var" already has a value, a space is appended to the $-variable before the new value is appended.
