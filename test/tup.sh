@@ -173,7 +173,7 @@ __update()
 	if [ -z "$TUP_VALGRIND" ]; then
 		cmd="tup upd"
 	else
-		cmd="valgrind -q --track-fds=yes --track-origins=yes --leak-check=full tup upd"
+		cmd="valgrind -q --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup upd"
 	fi
 
 	if $cmd "$@"; then
