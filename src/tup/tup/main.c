@@ -20,6 +20,7 @@
 #include "tup/entry.h"
 #include "tup/colors.h"
 #include "tup/varsed.h"
+#include "tup/access_event.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -88,6 +89,20 @@ int main(int argc, char **argv)
 	argc = argc - cmd_arg;
 	argv = &argv[cmd_arg];
 
+	/* Commands that can run as a sub-process to tup (eg: in a :-rule) */
+	if(strcmp(cmd, "varsed") == 0) {
+		return varsed(argc, argv);
+	}
+
+	/* Check if we are a sub-process by looking for the vardict environment
+	 * variable that gets set.
+	 */
+	if(getenv(TUP_VARDICT_NAME)) {
+		fprintf(stderr, "tup error: Command '%s' is not valid when running as a sub-process, or is unknown.\n", cmd);
+		return -1;
+	}
+
+	/* Commands that don't use a normal tup_init() */
 	if(strcmp(cmd, "init") == 0) {
 		return init(argc, argv);
 	} else if(strcmp(cmd, "version") == 0) {
@@ -95,8 +110,6 @@ int main(int argc, char **argv)
 		return 0;
 	} else if(strcmp(cmd, "stop") == 0) {
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
-	} else if(strcmp(cmd, "varsed") == 0) {
-		return varsed(argc, argv);
 	}
 
 	if(tup_init() < 0)
