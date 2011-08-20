@@ -10,7 +10,7 @@ if ! which python > /dev/null 2>&1; then
 	eotup
 fi
 
-export PYTHONPATH=$PYTHONPATH:../../..
+export PYTHONPATH=../../..:$PYTHONPATH
 
 cat > foo.py << HERE
 import tup_client
