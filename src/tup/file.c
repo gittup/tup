@@ -141,6 +141,13 @@ int add_parser_files(struct file_info *finfo, struct rb_root *root)
 		}
 		del_entry(r);
 	}
+	while(!list_empty(&finfo->var_list)) {
+		r = list_entry(finfo->var_list.next, struct file_entry, list);
+
+		if(add_node_to_list(VAR_DT, &r->pg, entrylist) < 0)
+			return -1;
+		del_entry(r);
+	}
 	list_for_each_entry(tent, entrylist, list) {
 		if(strcmp(tent->name.s, ".gitignore") != 0)
 			if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)

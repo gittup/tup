@@ -46,7 +46,6 @@ static void show_progress(int sum, int total, struct tup_entry *tent);
 
 static int do_keep_going;
 static int num_jobs;
-static int vardict_fd;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
@@ -334,6 +333,8 @@ static int update_tup_config(void)
 	} else {
 		tup_main_progress("No tup.config changes.\n");
 	}
+	if(tup_vardict_open() < 0)
+		return -1;
 
 	return 0;
 }
@@ -422,24 +423,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		return -1;
 	}
 	tup_db_begin();
-	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
-	if(vardict_fd < 0) {
-		/* Create vardict if it doesn't exist, since I forgot to add
-		 * that to the database update part whenever I added this file.
-		 * Not sure if this is the best approach, but it at least
-		 * prevents a useless error message from coming up.
-		 */
-		if(errno == ENOENT) {
-			vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_CREAT|O_RDONLY, 0666);
-			if(vardict_fd < 0) {
-				perror(TUP_VARDICT_FILE);
-				return -1;
-			}
-		} else {
-			perror(TUP_VARDICT_FILE);
-			return -1;
-		}
-	}
 	warnings = 0;
 	if(server_init(SERVER_UPDATER_MODE, NULL) < 0) {
 		return -1;
@@ -452,7 +435,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
-	close(vardict_fd);
 	tup_db_commit();
 	pthread_mutex_destroy(&id_mutex);
 	pthread_mutex_destroy(&db_mutex);
@@ -996,7 +978,7 @@ static int update(struct node *n)
 	s.exit_status = -1;
 	s.exit_sig = -1;
 	init_file_info(&s.finfo);
-	if(server_exec(&s, vardict_fd, dfd, name, n->tent->parent) < 0) {
+	if(server_exec(&s, dfd, name, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}

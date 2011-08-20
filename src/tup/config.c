@@ -7,6 +7,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 static char tup_wd[PATH_MAX];
@@ -15,6 +16,7 @@ static int tup_top_len;
 static int tup_sub_len;
 static tupid_t tup_sub_dir_dt = -1;
 static int top_fd = -1;
+static int vardict_fd = -1;
 
 int find_tup_dir(void)
 {
@@ -96,4 +98,38 @@ int get_sub_dir_len(void)
 int tup_top_fd(void)
 {
 	return top_fd;
+}
+
+int tup_vardict_fd(void)
+{
+	return vardict_fd;
+}
+
+int tup_vardict_open(void)
+{
+	vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_RDONLY);
+	if(vardict_fd < 0) {
+		/* Create vardict if it doesn't exist, since I forgot to add
+		 * that to the database update part whenever I added this file.
+		 * Not sure if this is the best approach, but it at least
+		 * prevents a useless error message from coming up.
+		 */
+		if(errno == ENOENT) {
+			vardict_fd = openat(tup_top_fd(), TUP_VARDICT_FILE, O_CREAT|O_RDONLY, 0666);
+			if(vardict_fd < 0) {
+				perror(TUP_VARDICT_FILE);
+				return -1;
+			}
+		} else {
+			perror(TUP_VARDICT_FILE);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+void tup_vardict_close(void)
+{
+	close(vardict_fd);
+	vardict_fd = -1;
 }

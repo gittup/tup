@@ -52,7 +52,7 @@ int server_quit(void)
 
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
-int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd,
 		struct tup_entry *dtent)
 {
 	int rc = -1;
@@ -74,8 +74,6 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 		|| strncmp(cmd, "./", 2) == 0;
 
 	int need_sh = strncmp(cmd, "./", 2) == 0;
-
-	if(vardict_fd) {}
 
 	s->dt = dtent->tnode.tupid;
 	if(start_server(s) < 0) {

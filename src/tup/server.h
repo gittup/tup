@@ -38,7 +38,7 @@ enum server_mode {
 
 int server_init(enum server_mode mode, struct rb_root *delete_tree);
 int server_quit(void);
-int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd,
 		struct tup_entry *dtent);
 int server_is_dead(void);
 int server_parser_start(struct server *s);

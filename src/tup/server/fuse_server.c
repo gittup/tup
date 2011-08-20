@@ -254,15 +254,15 @@ static int virt_tup_close(struct server *s)
 	return 0;
 }
 
-static void server_setenv(int vardict_fd)
+static void server_setenv(void)
 {
 	char fd_name[32];
-	snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
+	snprintf(fd_name, sizeof(fd_name), "%i", tup_vardict_fd());
 	fd_name[31] = 0;
 	setenv(TUP_VARDICT_NAME, fd_name, 1);
 }
 
-int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd,
 		struct tup_entry *dtent)
 {
 	pid_t pid;
@@ -305,7 +305,7 @@ int server_exec(struct server *s, int vardict_fd, int dfd, const char *cmd,
 			perror("fchdir");
 			exit(1);
 		}
-		server_setenv(vardict_fd);
+		server_setenv();
 		/* Use /dev/null for stdin, since stdin can't reliably be used
 		 * during the build (for example, when building in parallel,
 		 * multiple programs would have to fight over who gets it,
@@ -428,6 +428,7 @@ int server_run_script(int dfd, const char *cmdline, char **rules)
 			fprintf(stderr, "tup error: Unable to dup stdin for the child process.\n");
 			exit(1);
 		}
+		server_setenv();
 		execl("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL);
 		exit(1);
 	}

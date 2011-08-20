@@ -10,5 +10,8 @@ int get_tup_top_len(void);
 const char *get_sub_dir(void);
 int get_sub_dir_len(void);
 int tup_top_fd(void);
+int tup_vardict_fd(void);
+int tup_vardict_open(void);
+void tup_vardict_close(void);
 
 #endif

@@ -34,6 +34,7 @@ void tup_cleanup(void)
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
 	}
+	tup_vardict_close();
 	tup_db_close();
 	tup_lock_exit();
 	close(tup_top_fd());
