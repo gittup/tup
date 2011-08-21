@@ -32,10 +32,13 @@ void tup_cleanup(void)
 	 * done conditionally.
 	 *
 	 * Also close out the standard file descriptors, so valgrind doesn't
-	 * complain about those as well.
+	 * complain about those as well. The outputs need to be flushed,
+	 * otherwise 'tup config | grep foo' will not see the output from tup.
 	 */
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
+		fflush(stdout);
+		fflush(stderr);
 		close(2);
 		close(1);
 		close(0);
