@@ -30,9 +30,15 @@ void tup_cleanup(void)
 	 * do it (we're quitting soon anyway). However, when valgrind is
 	 * running it looks like there's a bunch of memory leaks, so this is
 	 * done conditionally.
+	 *
+	 * Also close out the standard file descriptors, so valgrind doesn't
+	 * complain about those as well.
 	 */
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
+		close(2);
+		close(1);
+		close(0);
 	}
 	tup_vardict_close();
 	tup_db_close();
