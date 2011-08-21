@@ -21,7 +21,6 @@ gitignore_good .tup .gitignore
 
 mkdir .git
 update
-gitignore_good .*.swp .gitignore
 gitignore_good .gitignore .gitignore
 
 eotup

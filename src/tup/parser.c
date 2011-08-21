@@ -639,7 +639,7 @@ static int gitignore(struct tupfile *tf)
 		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
 		if(fd < 0) {
 			perror(".gitignore");
-			fprintf(stderr, "tup error: Unable to create the .gitignore file. If you want tup to create the .gitignore file for you, please remove your manually created file. Or if you wish to keep your .gitignore file, remove the .gitignore directive from the Tupfile.\n");
+			fprintf(stderr, "tup error: Unable to create the .gitignore file.\n");
 			return -1;
 		}
 		if(tf->tupid == 1) {
@@ -647,10 +647,6 @@ static int gitignore(struct tupfile *tf)
 				perror("write");
 				goto err_close;
 			}
-		}
-		if(write(fd, "/.*.swp\n", 8) < 0) {
-			perror("write");
-			goto err_close;
 		}
 		if(write(fd, "/.gitignore\n", 12) < 0) {
 			perror("write");
