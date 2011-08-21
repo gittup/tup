@@ -676,24 +676,18 @@ err_close:
 
 static int rm_existing_gitignore(struct tup_entry *tent)
 {
-	struct tup_entry *gitignore_tent;
-
-	if(tup_db_select_tent(tent->tnode.tupid, ".gitignore", &gitignore_tent) < 0)
+	int dfd;
+	dfd = tup_entry_open(tent);
+	if(dfd < 0)
 		return -1;
-	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
-		int dfd;
-		dfd = tup_entry_open(tent);
-		if(dfd < 0)
+	if(unlinkat(dfd, ".gitignore", 0) < 0) {
+		if(errno != ENOENT) {
+			perror("unlinkat");
+			fprintf(stderr, "tup error: Unable to unlink the .gitignore file.\n");
 			return -1;
-		if(unlinkat(dfd, ".gitignore", 0) < 0) {
-			if(errno != ENOENT) {
-				perror("unlinkat");
-				fprintf(stderr, "tup error: Unable to unlink the .gitignore file.\n");
-				return -1;
-			}
 		}
-		close(dfd);
 	}
+	close(dfd);
 	return 0;
 }
 
