@@ -124,12 +124,15 @@ Set to '1' to keep building as much as possible even if errors are encountered. 
 This is used internally to update the database in case the schema changes. If a newer version of tup is used on an old database, the schema will be automatically updated and db_version will be set to the new version. If an older version of tup is used with a newer database, you will get an error message.
 .RE
 .TP
-.B graph [--no-dirs] [<output_1> ... <output_n>]
+.B graph [--no-dirs] [--no-ghosts] [<output_1> ... <output_n>]
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
 .RS
 .TP
 .B --no-dirs
 Add this flag to the 'tup graph' command and tup will avoid showing the directory nodes and their ownership links. Tupfiles are also not displayed, since they point to directory nodes. This can help unclutter the graph in some cases to make it easier to see how the program is structured.
+.TP
+.B --no-ghosts
+Similar to --no-dirs, but all ghost nodes are pruned. Some commands may try to read from many files that don't exist, causing ghost nodes to be created. In these cases, specifying --no-ghosts can produce a simpler graph.
 .RE
 .TP
 .B todo [<output_1> ... <output_n>]
