@@ -4,8 +4,6 @@ find a way to avoid committing after the parsing/delete stage
 
 let partial parsings commit rather than waiting for all directories to finish successfully
 
-update node set sym=-1 where id=blah executed even when sym is already -1?
-
 can we have the monitor kill the updater if a file modification is detected? or restart it?
  - also what happens if there is no monitor? will the next update work properly?
 
@@ -33,8 +31,6 @@ limit variable names: eg: 0-9a-zA-Z_-
 
 when you include a generated file, print path relative to command that was executed? eg: foo/bar.c includes ../blah/baz.c, print it out as ../blah/baz.c
 
-'tup graph' shows too much info when a directory changes?
-
 move kconfig into tup?
 
 tup show to list the Tupfile as read in the current dir?
@@ -47,15 +43,9 @@ reverse of tup graph: give it a file, print the dir/command to create it?
 
 autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
- Add %1, %2, etc to reference first, second prereq?
-
 sqlite style graphs for parser
 
 indent dependent dirs while parsing?
-
-add to ghost list from parser, then fail - ghost is still reclaimed?
-
-dynamic bins - don't let *.o match files in dynamic bins...the files must be referenced by their bin only
 
 cache flags and write out the diff before a commit? eg: no need to add a command to modify (in order to pick up where we left off), then remove it a second later when the command executes.
 
@@ -80,16 +70,9 @@ make 'tup graph .gitignore' or 'tup graph .git/refs/foo' have a better error mes
 
 use auto-unmount for fuse?
 
-do we need access_ghost? Shouldn't all read attempts just link to the read node, or create a ghost and link to that? Who cares what the error code is
-
 fuse monitor - open fd to access underlying filesystem (overlay fs). Maybe fuse server can use fd to by-pass monitor when doing its writes? That way fuse monitor can always watch filesystem even during a build?
 
-Re-check symlinks? Is sym field necessary?
- - need to watch parser for symlinks (after runscr?)
-
 make colors a config option, rather than a compile time thing
-
-remove .gitignore if Tupfile is removed? I had tup/src/tup/client/.gitignore lying around for some reason.
 
 create 'a' and 'b' with the same timestamps. move 'b' -> 'c', 'a' -> 'b', and 'b' is not rebuilt - timestamp problem
  - add inode to node table?
@@ -99,8 +82,6 @@ output files to a directory other than the current one?
 runscr: error message in parser about including generated Tupfiles: suggest using runscr instead
 
 runscr: Supports multi-outputs? eg: javac with inner classes
-
-runscr: change parser joblock? Is it necessary?
 
 runscr branch - need to wrap opendir/readdir to give generated files before they are created? Or else scripts won't wildcard properly?
  - test: generate *.o in a sub/Tupfile, then use a python script in ./Tupfile to link sub/*.o - make sure ./Tupfile is run first (it should stop running and run sub/Tupfile once it opendirs() on sub/, then readdir() should include the generated list)
@@ -112,8 +93,6 @@ avoid Scanning filesystem... tup warning blah problem
 print times before each [ tup ] line?
 
 when doing 'touch foo' without '|> foo', why is it a different error message when 'foo' is already a node or not? (ie: if foo is a ghost, or something)
-
-check use of fslurp() + strchr() in parser - should be fslurp_null? Or memchr?
 
 add Kconfig file
 
@@ -132,8 +111,6 @@ test suite: (bootstrap + tup) linux, linux64, solaris, mac osx, win, test with b
 separate link table for parser? eg: instead of 'select to_id from link where from_id=? and to_id blah type=TUP_NODE_DIR', maybe we can do 'select to_id from parser_link where from_id=?'
 
 use 'cmdid' field instead of a link to point to outputs?
-
-Back in the day, using a variable like $(FOO) if FOO was never set was an error, but that changed because of $(CFLAGS_%f) and the like. Can we get the best of both worlds by allowing %-flags in $-vars to force the empty-if-unspecified behavior, and give errors in other cases? Or maybe only do empty-if-unspecified in rules?
 
 should TUP_PLATFORM be a $-variable instead of an @-variable? ie: Does it make sense to be able to override it in tup.config, or should it always be static?
 
