@@ -56,7 +56,6 @@ static void *fuse_thread(void *arg)
 	}
 	fuse_unmount(TUP_MNT, fs.ch);
 	fuse_destroy(fs.fuse);
-	fs.fuse = NULL;
 	return NULL;
 }
 
@@ -201,6 +200,7 @@ int server_quit(void)
 		return -1;
 	}
 	pthread_join(fs.pid, NULL);
+	fs.fuse = NULL;
 	memset(&fs, 0, sizeof(fs));
 	return 0;
 }
