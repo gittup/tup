@@ -13,6 +13,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 struct file_entry {
 	tupid_t dt;
@@ -35,6 +36,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct list_head *entrylist);
 static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct list_head *entrylist);
+static int add_parser_files_locked(struct file_info *finfo, struct rb_root *root);
 
 int init_file_info(struct file_info *info)
 {
@@ -44,20 +46,36 @@ int init_file_info(struct file_info *info)
 	INIT_LIST_HEAD(&info->var_list);
 	INIT_LIST_HEAD(&info->mapping_list);
 	INIT_LIST_HEAD(&info->tmpdir_list);
+	pthread_mutex_init(&info->lock, NULL);
 	info->server_fail = 0;
 	return 0;
+}
+
+void finfo_lock(struct file_info *info)
+{
+	pthread_mutex_lock(&info->lock);
+}
+
+void finfo_unlock(struct file_info *info)
+{
+	pthread_mutex_unlock(&info->lock);
 }
 
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info, tupid_t dt)
 {
 	DEBUGP("received file '%s' in mode %i\n", filename, at);
+	int rc;
 
+	finfo_lock(info);
 	if(at == ACCESS_RENAME) {
-		return handle_rename(filename, file2, info);
+		rc = handle_rename(filename, file2, info);
+	} else {
+		rc = handle_open_file(at, filename, info, dt);
 	}
+	finfo_unlock(info);
 
-	return handle_open_file(at, filename, info, dt);
+	return rc;
 }
 
 int handle_open_file(enum access_type at, const char *filename,
@@ -102,14 +120,17 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	int tmpdir_bork = 0;
 	int rc1, rc2;
 
+	finfo_lock(info);
 	handle_unlink(info);
 
 	list_for_each_entry(tmpdir, &info->tmpdir_list, list) {
 		fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
 		tmpdir_bork = 1;
 	}
-	if(tmpdir_bork)
+	if(tmpdir_bork) {
+		finfo_unlock(info);
 		return -1;
+	}
 
 	entrylist = tup_entry_get_list();
 	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
@@ -118,6 +139,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	entrylist = tup_entry_get_list();
 	rc2 = update_read_info(cmdid, info, entrylist);
 	tup_entry_release_list();
+	finfo_unlock(info);
 
 	if(rc1 == 0 && rc2 == 0)
 		return 0;
@@ -125,6 +147,15 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 }
 
 int add_parser_files(struct file_info *finfo, struct rb_root *root)
+{
+	int rc;
+	finfo_lock(finfo);
+	rc = add_parser_files_locked(finfo, root);
+	finfo_unlock(finfo);
+	return rc;
+}
+
+static int add_parser_files_locked(struct file_info *finfo, struct rb_root *root)
 {
 	struct file_entry *r;
 	struct mapping *map;

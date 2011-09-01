@@ -75,10 +75,16 @@ static struct file_info *get_finfo(const char *path)
 	if(tt) {
 		struct file_info *finfo;
 		finfo = container_of(tt, struct file_info, tnode);
+		finfo_lock(finfo);
 		return finfo;
 	}
 
 	return NULL;
+}
+
+static void put_finfo(struct file_info *finfo)
+{
+	finfo_unlock(finfo);
 }
 
 static const char *peel(const char *path)
@@ -152,23 +158,20 @@ static struct mapping *add_mapping(const char *path)
 		}
 
 		list_add(&map->list, &finfo->mapping_list);
+		put_finfo(finfo);
 	}
 	return map;
 }
 
-static struct mapping *find_mapping(const char *path)
+static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 {
-	struct file_info *finfo;
 	const char *peeled;
+	struct mapping *map;
 
-	finfo = get_finfo(path);
-	if(finfo) {
-		struct mapping *map;
-		peeled = peel(path);
-		list_for_each_entry(map, &finfo->mapping_list, list) {
-			if(strcmp(peeled, map->realname) == 0) {
-				return map;
-			}
+	peeled = peel(path);
+	list_for_each_entry(map, &finfo->mapping_list, list) {
+		if(strcmp(peeled, map->realname) == 0) {
+			return map;
 		}
 	}
 	return NULL;
@@ -220,8 +223,8 @@ static void tup_fuse_handle_file(const char *path, enum access_type at)
 		if(handle_open_file(at, peel(path), finfo, 1) < 0) {
 			/* TODO: Set failure on internal server? */
 			fprintf(stderr, "tup internal error: handle open file failed\n");
-			return;
 		}
+		put_finfo(finfo);
 	}
 }
 
@@ -247,18 +250,20 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 */
 	finfo = get_finfo(path);
 	if(finfo) {
+		rc = 0;
 		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				if(fstat(tup_top_fd(), stbuf) < 0)
-					return -errno;
-				return 0;
+					rc = -errno;
+				put_finfo(finfo);
+				return rc;
 			}
 		}
+		map = find_mapping(finfo, path);
+		if(map)
+			peeled = map->tmpname;
+		put_finfo(finfo);
 	}
-
-	map = find_mapping(path);
-	if(map)
-		peeled = map->tmpname;
 
 	/* First we get a getattr("@tup@"), then we get a
 	 * getattr("@tup@/CONFIG_FOO"). So first time we return success so fuse
@@ -277,11 +282,13 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 			var++;
 
 			if(finfo) {
+				finfo_lock(finfo);
 				/* TODO: 1 is always top */
 				if(handle_open_file(ACCESS_VAR, var, finfo, 1) < 0) {
 					fprintf(stderr, "tup error: Unable to save dependency on @-%s\n", var);
 					return 1;
 				}
+				finfo_unlock(finfo);
 			}
 			/* Always return error, since we can't actually open
 			 * an @-variable.
@@ -325,12 +332,15 @@ static int tup_fs_access(const char *path, int mask)
 		}
 	}
 
-	map = find_mapping(path);
-	if(map)
-		peeled = map->tmpname;
-
 	finfo = get_finfo(path);
 	if(finfo) {
+		int entry_found = 0;
+		int rc = 0;
+
+		map = find_mapping(finfo, path);
+		if(map)
+			peeled = map->tmpname;
+
 		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				/* For a temporary directory, just use the same
@@ -340,10 +350,14 @@ static int tup_fs_access(const char *path, int mask)
 				 * directory.
 				 */
 				if(faccessat(tup_top_fd(), ".", mask, AT_SYMLINK_NOFOLLOW) < 0)
-					return -errno;
-				return 0;
+					rc = -errno;
+				entry_found = 1;
+				break;
 			}
 		}
+		put_finfo(finfo);
+		if(entry_found)
+			return rc;
 	}
 
 	/* This is preceded by a getattr - no need to handle a read event */
@@ -358,6 +372,7 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 {
 	int res;
 	const char *peeled;
+	struct file_info *finfo;
 	struct mapping *map;
 
 	if(context_check() < 0)
@@ -365,9 +380,13 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 
 	peeled = peel(path);
 
-	map = find_mapping(path);
-	if(map)
-		peeled = map->tmpname;
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map)
+			peeled = map->tmpname;
+		put_finfo(finfo);
+	}
 
 	res = readlinkat(tup_top_fd(), peeled, buf, size - 1);
 	if (res == -1)
@@ -442,6 +461,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			if(rc < 0) {
 				finfo->server_fail = 1;
 			}
+			put_finfo(finfo);
 			return rc;
 		}
 
@@ -486,11 +506,13 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			if(fstatat(tup_top_fd(), map->tmpname, &st, AT_SYMLINK_NOFOLLOW) < 0) {
 				perror("lstat");
 				fprintf(stderr, "tup error: Unable to stat temporary file '%s'\n", map->tmpname);
+				put_finfo(finfo);
 				return -1;
 			}
 			if(filler(buf, realname, &st, 0))
 				break;
 		}
+		put_finfo(finfo);
 	}
 
 	if(is_tmpdir)
@@ -567,19 +589,23 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 
 	finfo = get_finfo(path);
 	if(finfo) {
+		int rc = -1;
 		tmpdir = malloc(sizeof *tmpdir);
 		if(!tmpdir) {
 			perror("malloc");
-			return -ENOMEM;
+			rc = -ENOMEM;
 		}
 		tmpdir->dirname = strdup(peel(path));
 		if(!tmpdir->dirname) {
 			perror("strdup");
-			return -ENOMEM;
+			rc = -ENOMEM;
 		}
-
-		list_add(&tmpdir->list, &finfo->tmpdir_list);
-		return 0;
+		if(tmpdir && tmpdir->dirname) {
+			list_add(&tmpdir->list, &finfo->tmpdir_list);
+			rc = 0;
+		}
+		put_finfo(finfo);
+		return rc;
 	}
 	return -EPERM;
 }
@@ -587,16 +613,22 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 static int tup_fs_unlink(const char *path)
 {
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
-	map = find_mapping(path);
-	if(map) {
-		tup_fuse_handle_file(path, ACCESS_UNLINK);
-		unlinkat(tup_top_fd(), map->tmpname, 0);
-		del_map(map);
-		return 0;
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map) {
+			unlinkat(tup_top_fd(), map->tmpname, 0);
+			del_map(map);
+			put_finfo(finfo);
+			tup_fuse_handle_file(path, ACCESS_UNLINK);
+			return 0;
+		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to unlink files not created during this job.\n");
 	return -EPERM;
@@ -619,9 +651,11 @@ static int tup_fs_rmdir(const char *path)
 				list_del(&tmpdir->list);
 				free(tmpdir->dirname);
 				free(tmpdir);
+				put_finfo(finfo);
 				return 0;
 			}
 		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to rmdir a directory not created during this job.\n");
 	return -EPERM;
@@ -660,32 +694,37 @@ static int tup_fs_rename(const char *from, const char *to)
 	peelfrom = peel(from);
 	peelto = peel(to);
 
-	/* If we are re-naming to a previously created file, then delete the
-	 * old mapping. (eg: 'ar' will create an empty library, so we have one
-	 * mapping, then create a new temp file and rename it over to 'ar', so
-	 * we have a new mapping for the temp node. We need to delete the first
-	 * empty one since that file is overwritten).
-	 */
-	map = find_mapping(to);
-	if(map) {
-		unlink(map->tmpname);
-		del_map(map);
-	}
-
-	map = find_mapping(from);
-	if(!map)
-		return -ENOENT;
-
-	free(map->realname);
-	map->realname = strdup(peelto);
-	if(!map->realname) {
-		perror("strdup");
-		return -ENOMEM;
-	}
-
 	finfo = get_finfo(to);
 	if(finfo) {
+		/* If we are re-naming to a previously created file, then
+		 * delete the old mapping. (eg: 'ar' will create an empty
+		 * library, so we have one mapping, then create a new temp file
+		 * and rename it over to 'ar', so we have a new mapping for the
+		 * temp node. We need to delete the first empty one since that
+		 * file is overwritten).
+		 */
+		map = find_mapping(finfo, to);
+		if(map) {
+			unlink(map->tmpname);
+			del_map(map);
+		}
+
+		map = find_mapping(finfo, from);
+		if(!map) {
+			put_finfo(finfo);
+			return -ENOENT;
+		}
+
+		free(map->realname);
+		map->realname = strdup(peelto);
+		if(!map->realname) {
+			perror("strdup");
+			put_finfo(finfo);
+			return -ENOMEM;
+		}
+
 		handle_rename(peelfrom, peelto, finfo);
+		put_finfo(finfo);
 	}
 
 	return 0;
@@ -702,15 +741,22 @@ static int tup_fs_link(const char *from, const char *to)
 static int tup_fs_chmod(const char *path, mode_t mode)
 {
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
-	map = find_mapping(path);
-	if(map) {
-		if(fchmodat(tup_top_fd(), map->tmpname, mode, 0) < 0)
-			return -errno;
-		return 0;
+	finfo = get_finfo(path);
+	if(finfo) {
+		int rc = 0;
+		map = find_mapping(finfo, path);
+		if(map) {
+			if(fchmodat(tup_top_fd(), map->tmpname, mode, 0) < 0)
+				rc = -errno;
+			put_finfo(finfo);
+			return rc;
+		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to chmod() files not created by this job.\n");
 	return -EPERM;
@@ -719,15 +765,22 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 {
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
-	map = find_mapping(path);
-	if(map) {
-		if(fchownat(tup_top_fd(), map->tmpname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
-			return -errno;
-		return 0;
+	finfo = get_finfo(path);
+	if(finfo) {
+		int rc = 0;
+		map = find_mapping(finfo, path);
+		if(map) {
+			if(fchownat(tup_top_fd(), map->tmpname, uid, gid, AT_SYMLINK_NOFOLLOW) < 0)
+				rc = -errno;
+			put_finfo(finfo);
+			return rc;
+		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to chown() files not created by this job.\n");
 	return -EPERM;
@@ -736,23 +789,31 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 static int tup_fs_truncate(const char *path, off_t size)
 {
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	/* TODO: error check? */
 	tup_fuse_handle_file(path, ACCESS_WRITE);
-	map = find_mapping(path);
-	if(map) {
-		int fd;
-		int rc = 0;
-		fd = openat(tup_top_fd(), map->tmpname, O_WRONLY);
-		if(!fd)
-			return -errno;
-		if(ftruncate(fd, size) < 0)
-			rc = -errno;
-		close(fd);
-		return rc;
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map) {
+			int fd;
+			int rc = 0;
+			fd = openat(tup_top_fd(), map->tmpname, O_WRONLY);
+			if(!fd) {
+				put_finfo(finfo);
+				return -errno;
+			}
+			if(ftruncate(fd, size) < 0)
+				rc = -errno;
+			close(fd);
+			put_finfo(finfo);
+			return rc;
+		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to truncate() files not created by this job.\n");
 	return -EPERM;
@@ -763,19 +824,26 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	int res;
 	const char *peeled;
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	peeled = peel(path);
-	map = find_mapping(path);
-	if(map) {
-		peeled = map->tmpname;
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map) {
+			int rc = 0;
+			peeled = map->tmpname;
 
-		res = utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW);
-		if (res == -1)
-			return -errno;
-		return 0;
+			res = utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW);
+			if (res == -1)
+				rc = -errno;
+			put_finfo(finfo);
+			return rc;
+		}
+		put_finfo(finfo);
 	}
 	fprintf(stderr, "tup error: Unable to utimens() files not created by this job.\n");
 	return -EPERM;
@@ -788,16 +856,21 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 	const char *peeled;
 	const char *openfile;
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	peeled = peel(path);
-	map = find_mapping(path);
-	if(map) {
-		openfile = map->tmpname;
-	} else {
-		openfile = peeled;
+	openfile = peeled;
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map) {
+			openfile = map->tmpname;
+		}
+		put_finfo(finfo);
 	}
 
 	if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
@@ -852,15 +925,20 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	int rc = 0;
 	const char *peeled;
 	struct mapping *map;
+	struct file_info *finfo;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	peeled = peel(path);
 
-	map = find_mapping(path);
-	if(map)
-		peeled = map->tmpname;
+	finfo = get_finfo(path);
+	if(finfo) {
+		map = find_mapping(finfo, path);
+		if(map)
+			peeled = map->tmpname;
+		put_finfo(finfo);
+	}
 
 	fd = openat(tup_top_fd(), peeled, O_RDONLY);
 	if(fd < 0)

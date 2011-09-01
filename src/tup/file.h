@@ -5,6 +5,7 @@
 #include "access_event.h"
 #include "linux/list.h"
 #include "thread_tree.h"
+#include <pthread.h>
 
 struct mapping {
 	struct list_head list;
@@ -18,6 +19,7 @@ struct tmpdir {
 };
 
 struct file_info {
+	pthread_mutex_t lock;
 	struct thread_tree tnode;
 	struct list_head read_list;
 	struct list_head write_list;
@@ -31,6 +33,8 @@ struct file_info {
 struct tup_entry;
 
 int init_file_info(struct file_info *info);
+void finfo_lock(struct file_info *info);
+void finfo_unlock(struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info, tupid_t dt);
 int handle_open_file(enum access_type at, const char *filename,
