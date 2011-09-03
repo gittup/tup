@@ -222,6 +222,14 @@ static int master_fork_loop(void)
 		fprintf(stderr, "tup error: Unable to send notification to shutdown the child wait thread. This process may not shutdown cleanly.\n");
 		return -1;
 	}
+	close(msd[0]);
+	if(vardict_fd != -2)
+		close(vardict_fd);
+	if(getenv("TUP_VALGRIND")) {
+		close(0);
+		close(1);
+		close(2);
+	}
 	return 0;
 }
 
