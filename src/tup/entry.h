@@ -43,6 +43,7 @@ struct tup_entry *tup_entry_get(tupid_t tupid);
 struct tup_entry *tup_entry_find(tupid_t tupid);
 int tup_entry_sym_follow(struct tup_entry *tent);
 void print_tup_entry(FILE *f, struct tup_entry *tent);
+int snprint_tup_entry(char *dest, int len, struct tup_entry *tent);
 int tup_entry_clear(void);
 struct list_head *tup_entry_get_list(void);
 void tup_entry_release_list(void);

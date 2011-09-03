@@ -7,6 +7,7 @@
 #include "tup/flist.h"
 #include "tup/debug.h"
 #include "tup_fuse_fs.h"
+#include "master_fork.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -265,8 +266,8 @@ static void server_setenv(void)
 int server_exec(struct server *s, int dfd, const char *cmd,
 		struct tup_entry *dtent)
 {
-	pid_t pid;
 	int status;
+	struct execmsg em;
 
 	if(dfd) {/* TODO */}
 
@@ -274,61 +275,30 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		return -1;
 	}
 
-	pid = fork();
-	if(pid < 0) {
-		perror("fork");
+	em.sid = s->id;
+	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
+	 * adjusting.
+	 */
+	em.dirlen = snprintf(em.text, PATH_MAX - 1, TUP_MNT "/%s/@tupjob-%i", get_tup_top()+1, s->id);
+	em.dirlen += snprint_tup_entry(em.text + em.dirlen,
+					PATH_MAX - em.dirlen - 1,
+					dtent) + 1;
+	if(em.dirlen >= PATH_MAX) {
+		fprintf(stderr, "tup error: Directory for tup entry %lli is too long.\n", dtent->tnode.tupid);
+		print_tup_entry(stderr, dtent);
+		return -1;
+	}
+	em.cmdlen = strlen(cmd) + 1;
+	if(em.cmdlen >= PATH_MAX) {
+		fprintf(stderr, "tup error: Command string '%s' is too long.\n", cmd);
+		return -1;
+	}
+	memcpy(em.text + em.dirlen, cmd, em.cmdlen);
+	if(master_fork_exec(&em, sizeof(em) - sizeof(em.text) + em.dirlen + em.cmdlen, &status) < 0) {
+		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
 		goto err_rm_group;
 	}
-	if(pid == 0) {
-		int fd;
-		tup_lock_close();
 
-		/* After a fork, any mutex locks we have (such as dir_mutex)
-		 * will stay locked according to the child process. So we have
-		 * to disable locking before trying to open here, since it
-		 * will use openat() and try to get dir_mutex. Obviously
-		 * we don't care about locking the current working directory
-		 * since the child doesn't use threads here.
-		 */
-		compat_lock_disable();
-		if(virt_tup_open(s) < 0) {
-			exit(1);
-		}
-		fd = tup_entry_openat(s->root_fd, dtent);
-		if(fd < 0) {
-			fprintf(stderr, "tup error: Unable to open directory for entry '");
-			print_tup_entry(stderr, dtent);
-			fprintf(stderr, "'\n");
-			exit(1);
-		}
-		if(fchdir(fd) < 0) {
-			perror("fchdir");
-			exit(1);
-		}
-		server_setenv();
-		/* Use /dev/null for stdin, since stdin can't reliably be used
-		 * during the build (for example, when building in parallel,
-		 * multiple programs would have to fight over who gets it,
-		 * which is just nonsensical).
-		 *
-		 * The dup is used instead of close, because some programs
-		 * (such as awk on OSX) expect a valid file descriptor for
-		 * stdin, even if it is unused.
-		 */
-		if(dup2(null_fd, STDIN_FILENO) < 0) {
-			perror("dup2");
-			fprintf(stderr, "tup error: Unable to dup stdin for the child process.\n");
-			exit(1);
-		}
-
-		execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
-		perror("execl");
-		exit(1);
-	}
-	if(waitpid(pid, &status, 0) < 0) {
-		perror("waitpid");
-		goto err_rm_group;
-	}
 	if(tup_fuse_rm_group(&s->finfo) < 0) {
 		return -1;
 	}

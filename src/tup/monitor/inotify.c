@@ -42,6 +42,7 @@
 #include "tup/path.h"
 #include "tup/entry.h"
 #include "tup/fslurp.h"
+#include "tup/server.h"
 #include "linux/rbtree.h"
 
 #define MONITOR_LOOP_RETRY -2
@@ -107,6 +108,9 @@ int monitor(int argc, char **argv)
 	int rc = 0;
 	int foreground;
 
+	/* Close down the fork process, since we don't need it. */
+	if(server_post_exit() < 0)
+		return -1;
 	if(tup_db_config_get_int("monitor_foreground", 0, &foreground) < 0)
 		return -1;
 	/* Arguments are cleared to "-" if they are used by the monitor. These
@@ -461,6 +465,10 @@ static int monitor_loop(void)
 					}
 					if(flush_queue(locked) < 0)
 						return -1;
+					if(tup_db_config_set_int(AUTOUPDATE_PID, -1) < 0) {
+						fprintf(stderr, "tup monitor error: Unable to clear the autoupdate pid.\n");
+						return -1;
+					}
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
@@ -499,6 +507,8 @@ int stop_monitor(int restarting)
 		fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
 		return -1;
 	}
+	if(open_tup_top() < 0)
+		return -1;
 
 	pid = monitor_get_pid(restarting);
 	if(pid < 0) {
@@ -691,16 +701,35 @@ static int autoupdate(void)
 		return -1;
 	}
 	if(pid == 0) {
-		if(fchdir(tup_top_fd()) < 0) {
-			perror("fchdir tup_top");
+		char **args;
+		int x;
+
+		args = malloc((sizeof *args) * (update_argc + 2));
+		if(!args) {
+			perror("malloc");
 			exit(1);
 		}
-		if(tup_lock_init() < 0)
+		args[0] = strdup("tup");
+		if(!args[0]) {
+			perror("strdup");
 			exit(1);
-		updater(update_argc, update_argv, 0);
-		tup_db_config_set_int(AUTOUPDATE_PID, -1);
-		tup_lock_exit();
-		exit(0);
+		}
+		args[1] = strdup("upd");
+		if(!args[1]) {
+			perror("strdup");
+			exit(1);
+		}
+		for(x=1; x<update_argc; x++) {
+			args[x+1] = strdup(update_argv[x]);
+			if(!args[x+1]) {
+				perror("strdup");
+				exit(1);
+			}
+		}
+		args[update_argc+1] = NULL;
+		execvp("tup", args);
+		perror("execvp");
+		exit(1);
 	} else {
 		int *newpid;
 		pthread_t tid;

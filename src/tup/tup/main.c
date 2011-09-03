@@ -177,7 +177,8 @@ int main(int argc, char **argv)
 		rc = 1;
 	}
 
-	tup_cleanup();
+	if(tup_cleanup() < 0)
+		rc = 1;
 	return rc;
 }
 

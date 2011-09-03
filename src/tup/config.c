@@ -54,10 +54,16 @@ int find_tup_dir(void)
 			return -1;
 		}
 	}
+	return 0;
+}
+
+int open_tup_top(void)
+{
 	top_fd = open(".", O_RDONLY);
 	if(top_fd < 0) {
 		perror(".");
-		exit(1);
+		fprintf(stderr, "tup error: Unable to open the tup root directory.\n");
+		return -1;
 	}
 	return 0;
 }

@@ -1,2 +1,2 @@
 int tup_init(void);
-void tup_cleanup(void);
+int tup_cleanup(void);

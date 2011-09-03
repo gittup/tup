@@ -36,6 +36,8 @@ enum server_mode {
 	SERVER_UPDATER_MODE,
 };
 
+int server_pre_init(void);
+int server_post_exit(void);
 int server_init(enum server_mode mode, struct rb_root *delete_tree);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd,

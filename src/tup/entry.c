@@ -169,9 +169,8 @@ struct tup_entry *tup_entry_find(tupid_t tupid)
 	return container_of(tnode, struct tup_entry, tnode);
 }
 
-/*
- * Returns 0 in case if a root tup entry has been passed and thus nothing has been printed,
- * otherwise 1 is returned.
+/* Returns 0 in case if a root tup entry has been passed and thus nothing has
+ * been printed, otherwise 1 is returned.
  */
 static int __print_tup_entry(FILE *f, struct tup_entry *tent)
 {
@@ -207,6 +206,16 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	}
 
 	fprintf(f, "%s%s%.*s%s", color_type(tent->type), color_append_normal(), name_sz, name, color_end());
+}
+
+int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
+{
+	int rc;
+	if(!tent || !tent->parent)
+		return 0;
+	rc = snprint_tup_entry(dest, len, tent->parent);
+	rc += snprintf(dest + rc, len - rc, "/%s", tent->name.s);
+	return rc;
 }
 
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)

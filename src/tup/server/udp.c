@@ -20,6 +20,16 @@ static int stop_server(struct server *s);
 static void *message_thread(void *arg);
 static int server_inited = 0;
 
+int server_pre_init(void)
+{
+	return 0;
+}
+
+int server_post_exit(void)
+{
+	return 0;
+}
+
 int server_init(enum server_mode mode, struct rb_root *delete_tree)
 {
 	char *slash;
