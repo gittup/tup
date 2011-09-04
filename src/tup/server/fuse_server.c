@@ -338,7 +338,6 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 
 int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 {
-	int rc;
 	struct tup_entry *tent;
 	struct server s;
 
@@ -349,7 +348,8 @@ int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 	s.exit_status = 0;
 	s.signalled = 0;
 	tent = tup_entry_get(tupid);
-	rc = exec_internal(&s, cmdline, tent);
+	if(exec_internal(&s, cmdline, tent) < 0)
+		return -1;
 
 	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
 		return -1;
