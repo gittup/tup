@@ -17,6 +17,8 @@ struct server {
 	int signalled;
 	int exit_status;
 	int exit_sig;
+	int output_fd;
+	int error_fd;
 
 	/* For the parser */
 	int root_fd;

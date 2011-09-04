@@ -268,6 +268,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 {
 	int status;
 	struct execmsg em;
+	char buf[64];
 
 	if(dfd) {/* TODO */}
 
@@ -302,9 +303,24 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	if(tup_fuse_rm_group(&s->finfo) < 0) {
 		return -1;
 	}
-	/* TODO: Add check to count number of opens+releases to make sure we end
-	 * up back at 0?
-	 */
+
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
+	if(s->output_fd < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
+		return -1;
+	}
+
+	snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	s->error_fd = openat(tup_top_fd(), buf, O_RDONLY);
+	if(s->error_fd < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+		return -1;
+	}
 
 	if(WIFEXITED(status)) {
 		s->exited = 1;

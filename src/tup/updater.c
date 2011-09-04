@@ -927,6 +927,83 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
+static int display_output(int fd, int iserr, const char *name)
+{
+	if(fd != -1) {
+		char buf[1024];
+		int rc;
+		int displayed = 0;
+		FILE *out = stdout;
+
+		if(iserr)
+			out = stderr;
+
+		while(1) {
+			rc = read(fd, buf, sizeof(buf));
+			if(rc < 0) {
+				perror("read");
+				return -1;
+			}
+			if(rc == 0)
+				break;
+			if(!displayed) {
+				displayed = 1;
+				if(iserr) {
+					if(num_jobs > 1) {
+						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
+					} else {
+						fprintf(stderr, " *** tup: stderr ***\n");
+					}
+				} else {
+					if(num_jobs > 1) {
+						printf(" -- tup: stdout from command '%s%s%s%s' --\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
+					} else {
+						printf(" -- tup: stdout --\n");
+					}
+				}
+			}
+			fprintf(out, "%.*s", rc, buf);
+		}
+		close(fd);
+	}
+	return 0;
+}
+
+static int process_output(struct server *s, tupid_t tupid, const char *name)
+{
+	if(display_output(s->output_fd, 0, name) < 0)
+		return -1;
+	if(display_output(s->error_fd, 1, name) < 0)
+		return -1;
+	if(s->exited) {
+		if(s->exit_status == 0) {
+			int rc;
+			rc = write_files(tupid, name, &s->finfo, &warnings);
+			if(rc < 0) {
+				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", tupid, name);
+				return -1;
+			}
+
+			/* Hooray! */
+			return 0;
+		} else {
+			fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", tupid, s->exit_status, name);
+			return -1;
+		}
+	} else if(s->signalled) {
+		int sig = s->exit_sig;
+		const char *errmsg = "Unknown signal";
+
+		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
+			errmsg = signal_err[sig];
+		fprintf(stderr, " *** Command %lli killed by signal %i (%s): %s\n", tupid, sig, errmsg, name);
+		return -1;
+	} else {
+		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli: %s", tupid, name);
+		return -1;
+	}
+}
+
 static int update(struct node *n)
 {
 	static int id = 0;
@@ -975,38 +1052,20 @@ static int update(struct node *n)
 	s.signalled = 0;
 	s.exit_status = -1;
 	s.exit_sig = -1;
+	s.output_fd = -1;
+	s.error_fd = -1;
 	init_file_info(&s.finfo);
 	if(server_exec(&s, dfd, name, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
+	close(dfd);
 
-	if(s.exited) {
-		if(s.exit_status == 0) {
-			pthread_mutex_lock(&db_mutex);
-			rc = write_files(n->tnode.tupid, name, &s.finfo, &warnings);
-			pthread_mutex_unlock(&db_mutex);
-			if(rc < 0) {
-				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", n->tnode.tupid, name);
-				goto err_close_dfd;
-			}
+	pthread_mutex_lock(&db_mutex);
+	rc = process_output(&s, n->tnode.tupid, name);
+	pthread_mutex_unlock(&db_mutex);
+	return rc;
 
-			/* Hooray! */
-			close(dfd);
-			return 0;
-		}
-	} else if(s.signalled) {
-		int sig = s.exit_sig;
-		const char *errmsg = "Unknown signal";
-
-		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
-			errmsg = signal_err[sig];
-		fprintf(stderr, " *** Killed by signal %i (%s)\n", sig, errmsg);
-	} else {
-		fprintf(stderr, "tup internal error: Expected s.exited or s.signalled to be set for command %lli", n->tnode.tupid);
-	}
-
-	fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", n->tnode.tupid, s.exit_status, name);
 err_close_dfd:
 	close(dfd);
 err_out:
