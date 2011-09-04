@@ -250,6 +250,13 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 */
 	finfo = get_finfo(path);
 	if(finfo) {
+		if(strcmp(peeled, ".tup") == 0) {
+			/* t6056 - don't allow sub-processes to mess with our
+			 * data.
+			 */
+			put_finfo(finfo);
+			return -EPERM;
+		}
 		rc = 0;
 		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
