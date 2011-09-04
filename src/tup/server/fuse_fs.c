@@ -541,8 +541,14 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		memset(&st, 0, sizeof(st));
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
-		if (filler(buf, de->d_name, &st, 0))
-			break;
+
+		/* If we have finfo (we're in the .tup hierarchy) and we see
+		 * the .tup directory, just pretend it's not there by not
+		 * calling filler().
+		 */
+		if(!finfo || strcmp(de->d_name, ".tup") != 0)
+			if (filler(buf, de->d_name, &st, 0))
+				break;
 	}
 	closedir(dp);
 	return 0;
