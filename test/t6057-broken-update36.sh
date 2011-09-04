@@ -19,7 +19,7 @@ cat > Tupfile << HERE
 : |> ./do_stuff.sh b.out |> b.out
 HERE
 cat > do_stuff.sh << HERE
-find . -type f >& /dev/null
+find . -type f > /dev/null 2>&1
 touch \$1
 HERE
 chmod +x do_stuff.sh
