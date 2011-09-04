@@ -48,6 +48,6 @@ int server_is_dead(void);
 int server_parser_start(struct server *s);
 int server_parser_stop(struct server *s);
 
-int server_run_script(int dfd, const char *cmdline, char **rules);
+int server_run_script(tupid_t tupid, const char *cmdline, char **rules);
 
 #endif

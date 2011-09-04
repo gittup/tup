@@ -205,9 +205,9 @@ int server_parser_stop(struct server *s)
 	return 0;
 }
 
-int server_run_script(int dfd, const char *cmdline, char **rules)
+int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 {
-	if(dfd || cmdline || rules) {/* unsupported */}
+	if(tupid || cmdline || rules) {/* unsupported */}
 	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
 	return -1;
 }

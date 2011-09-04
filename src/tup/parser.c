@@ -633,7 +633,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		return -1;
 	}
 
-	rc = server_run_script(tf->dfd, eval_cmdline, &rules);
+	rc = server_run_script(tf->tupid, eval_cmdline, &rules);
 	free(eval_cmdline);
 	if(rc < 0)
 		return -1;

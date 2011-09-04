@@ -6,6 +6,7 @@
 #include "tup/lock.h"
 #include "tup/flist.h"
 #include "tup/debug.h"
+#include "tup/fslurp.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -255,26 +256,12 @@ static int virt_tup_close(struct server *s)
 	return 0;
 }
 
-static void server_setenv(void)
-{
-	char fd_name[32];
-	snprintf(fd_name, sizeof(fd_name), "%i", tup_vardict_fd());
-	fd_name[31] = 0;
-	setenv(TUP_VARDICT_NAME, fd_name, 1);
-}
-
-int server_exec(struct server *s, int dfd, const char *cmd,
-		struct tup_entry *dtent)
+static int exec_internal(struct server *s, const char *cmd,
+			 struct tup_entry *dtent)
 {
 	int status;
 	struct execmsg em;
 	char buf[64];
-
-	if(dfd) {/* TODO */}
-
-	if(tup_fuse_add_group(s->id, &s->finfo) < 0) {
-		return -1;
-	}
 
 	em.sid = s->id;
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
@@ -297,10 +284,6 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	memcpy(em.text + em.dirlen, cmd, em.cmdlen);
 	if(master_fork_exec(&em, sizeof(em) - sizeof(em.text) + em.dirlen + em.cmdlen, &status) < 0) {
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
-		goto err_rm_group;
-	}
-
-	if(tup_fuse_rm_group(&s->finfo) < 0) {
 		return -1;
 	}
 
@@ -333,120 +316,61 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		return -1;
 	}
 	return 0;
-
-err_rm_group:
-	tup_fuse_rm_group(&s->finfo);
-	return -1;
 }
 
-static int read_full(char **dest, int fd)
+int server_exec(struct server *s, int dfd, const char *cmd,
+		struct tup_entry *dtent)
 {
-       int size = 1024;
-       int cur = 0;
-       int rc;
-       char *p;
+	int rc;
 
-       p = malloc(size);
-       if(!p) {
-               perror("malloc");
-               return -1;
-       }
-       do {
-               /* 1-adjusting is to save room for the \0 */
-               rc = read(fd, p + cur, size - cur - 1);
-               if(rc < 0) {
-                       perror("read");
-                       goto out_err;
-               }
-               if(rc == 0)
-                       break;
-               cur += rc;
-               if(cur == size - 1) {
-                       size *= 2;
-                       p = realloc(p, size);
-                       if(!p) {
-                               perror("realloc");
-                               return -1;
-                       }
-               }
-       } while(1);
+	if(dfd) {/* TODO */}
 
-       /* Room is saved for this by the 1-adjusting in the loop */
-       p[cur] = 0;
+	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
+		return -1;
 
-       *dest = p;
-       return 0;
-out_err:
-       free(p);
-       return -1;
+	rc = exec_internal(s, cmd, dtent);
+
+	if(tup_fuse_rm_group(&s->finfo) < 0)
+		return -1;
+
+	return rc;
 }
 
-
-int server_run_script(int dfd, const char *cmdline, char **rules)
+int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 {
-	int pfd[2];
-	pid_t pid;
-	int status;
+	int rc;
+	struct tup_entry *tent;
+	struct server s;
 
-	if(pipe(pfd) < 0) {
-		perror("pipe");
-		return -1;
-	}
-	pid = fork();
-	if(pid < 0) {
-		perror("fork");
-		goto err_pipe;
-	}
-	if(pid == 0) {
-		if(fchdir(dfd) < 0) {
-			perror("fchdir");
-			exit(1);
-		}
+	s.id = curid;
+	s.output_fd = -1;
+	s.error_fd = -1;
+	s.exited = 0;
+	s.exit_status = 0;
+	s.signalled = 0;
+	tent = tup_entry_get(tupid);
+	rc = exec_internal(&s, cmdline, tent);
 
-		close(pfd[0]);
-		if(dup2(pfd[1], STDOUT_FILENO) < 0) {
-			perror("dup2");
-			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
-			exit(1);
-		}
-		if(dup2(null_fd, STDIN_FILENO) < 0) {
-			perror("dup2");
-			fprintf(stderr, "tup error: Unable to dup stdin for the child process.\n");
-			exit(1);
-		}
-		server_setenv();
-		execl("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL);
-		exit(1);
-	}
-	close(pfd[1]);
-	if(read_full(rules, pfd[0]) < 0)
-		goto err_kill;
-	if(waitpid(pid, &status, 0) < 0) {
-		perror("waitpid");
+	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
 		return -1;
-	}
-	close(pfd[0]);
-	if(WIFEXITED(status)) {
-		if(WEXITSTATUS(status) == 0)
+
+	if(s.exited) {
+		if(s.exit_status == 0) {
+			struct buf b;
+			if(fslurp_null(s.output_fd, &b) < 0)
+				return -1;
+			close(s.output_fd);
+			*rules = b.s;
 			return 0;
-		fprintf(stderr, "tup error: run-script exited with failure code: %i\n", WEXITSTATUS(status));
+		}
+		fprintf(stderr, "tup error: run-script exited with failure code: %i\n", s.exit_status);
 	} else {
-		if(WIFSIGNALED(status)) {
-			fprintf(stderr, "tup error: run-script terminated with signal %i\n", WTERMSIG(status));
+		if(s.signalled) {
+			fprintf(stderr, "tup error: run-script terminated with signal %i\n", s.exit_sig);
 		} else {
 			fprintf(stderr, "tup error: run-script terminated abnormally.\n");
 		}
 	}
-	return -1;
-
-err_kill:
-	if(kill(pid, SIGKILL) < 0) {
-		perror("kill");
-		fprintf(stderr, "tup error: Unable to kill the run-script sub-process, pid=%i\n", pid);
-	}
-err_pipe:
-	close(pfd[0]);
-	close(pfd[1]);
 	return -1;
 }
 

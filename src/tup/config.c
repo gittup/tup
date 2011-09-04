@@ -1,5 +1,6 @@
 #include "config.h"
 #include "compat.h"
+#include "colors.h"
 #include "db.h"
 #include "fileio.h"
 #include <stdio.h>
@@ -138,4 +139,46 @@ void tup_vardict_close(void)
 {
 	close(vardict_fd);
 	vardict_fd = -1;
+}
+
+int display_output(int fd, int iserr, const char *name, int display_name)
+{
+	if(fd != -1) {
+		char buf[1024];
+		int rc;
+		int displayed = 0;
+		FILE *out = stdout;
+
+		if(iserr)
+			out = stderr;
+
+		while(1) {
+			rc = read(fd, buf, sizeof(buf));
+			if(rc < 0) {
+				perror("read");
+				return -1;
+			}
+			if(rc == 0)
+				break;
+			if(!displayed) {
+				displayed = 1;
+				if(iserr) {
+					if(display_name) {
+						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
+					} else {
+						fprintf(stderr, " *** tup: stderr ***\n");
+					}
+				} else {
+					if(display_name) {
+						printf(" -- tup: stdout from command '%s%s%s%s' --\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
+					} else {
+						printf(" -- tup: stdout --\n");
+					}
+				}
+			}
+			fprintf(out, "%.*s", rc, buf);
+		}
+		close(fd);
+	}
+	return 0;
 }

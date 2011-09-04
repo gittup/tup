@@ -14,5 +14,6 @@ int tup_top_fd(void);
 int tup_vardict_fd(void);
 int tup_vardict_open(void);
 void tup_vardict_close(void);
+int display_output(int fd, int iserr, const char *name, int display_name);
 
 #endif

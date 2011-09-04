@@ -927,53 +927,11 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int display_output(int fd, int iserr, const char *name)
-{
-	if(fd != -1) {
-		char buf[1024];
-		int rc;
-		int displayed = 0;
-		FILE *out = stdout;
-
-		if(iserr)
-			out = stderr;
-
-		while(1) {
-			rc = read(fd, buf, sizeof(buf));
-			if(rc < 0) {
-				perror("read");
-				return -1;
-			}
-			if(rc == 0)
-				break;
-			if(!displayed) {
-				displayed = 1;
-				if(iserr) {
-					if(num_jobs > 1) {
-						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
-					} else {
-						fprintf(stderr, " *** tup: stderr ***\n");
-					}
-				} else {
-					if(num_jobs > 1) {
-						printf(" -- tup: stdout from command '%s%s%s%s' --\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
-					} else {
-						printf(" -- tup: stdout --\n");
-					}
-				}
-			}
-			fprintf(out, "%.*s", rc, buf);
-		}
-		close(fd);
-	}
-	return 0;
-}
-
 static int process_output(struct server *s, tupid_t tupid, const char *name)
 {
-	if(display_output(s->output_fd, 0, name) < 0)
+	if(display_output(s->output_fd, 0, name, num_jobs > 1) < 0)
 		return -1;
-	if(display_output(s->error_fd, 1, name) < 0)
+	if(display_output(s->error_fd, 1, name, num_jobs > 1) < 0)
 		return -1;
 	if(s->exited) {
 		if(s->exit_status == 0) {
