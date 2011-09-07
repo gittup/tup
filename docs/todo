@@ -1,5 +1,3 @@
-FD_CLOEXEC flag on file descriptors?
-
 find a way to avoid committing after the parsing/delete stage
 
 let partial parsings commit rather than waiting for all directories to finish successfully
@@ -40,8 +38,6 @@ read in +/- in order to add/remove worker threads?
 rule without a : should be an error?
 
 reverse of tup graph: give it a file, print the dir/command to create it?
-
-autoupdate doesn't do everything in tup_init() - is find_tup_dir() needed? what   about db open?
 
 sqlite style graphs for parser
 
@@ -88,6 +84,9 @@ runscr branch - need to wrap opendir/readdir to give generated files before they
 
 after runscr: remove *-chain, <| rules
 
+use runscr to create a file during parsing stage - fail?
+use runscr to create a directory during parsing stage - fail?
+
 avoid Scanning filesystem... tup warning blah problem
 
 print times before each [ tup ] line?
@@ -129,6 +128,72 @@ build variants
  - or allow to disable default variant for out-of-source only build?
  - allow variants to interact? Or would this force users to have certain variants installed? eg: Rule that has debug/foo.exe and release/foo.exe as inputs is allowed or not?
  - can variants have configs checked in?
+ - in tree build - disable via config option? Out of tree build uses tup.config for variant?
+ - variants: Make a mingw variant, and a linux-uses-compat-libs variant, and a debug variant (-g -O)
+
+[    1/2    ] ./do_stuff.sh b.out
+-- write files
+update node set mtime=? where id=? [1315168842, 7]
+select to_id from link where from_id=? [8]
+select to_id from link where from_id=? [8]
+ - why read from the link table twice?
+
+fuse server: open(Tupfile) adds Tupfile to the read list twice - for getattr and open. Need both?
+
+fuse as a separate process fixes readdir? Ie: it can block and get data from tup
+
+Fix fuse_fs - don't depend on db, but preload the generated file list somehow
+
+remove tup_vardict_init() and just initialize on first use
+
+tup-cpp that replaces macros with @-variables
+ - also work for busybox and uClibc
+
+is tf->dfd the right thing to use in include_rules? What if you include another file that then does include_rules?
+
+https://github.com/gittup/tup/issues/28 (README)
+
+remove TUP_NODE_DIR - any file or ghost (or generated?) can be a directory
+ - use "Tupfile" as the magic for parser, instead of directories
+ - can now create directories in rules?
+ : |> mkdir foo |> foo
+ : foo |> touch foo/bar |> foo/bar ?
+
+built-in build logging (eg: dump graph before each stage) - instead of using 'mtup' alias to do this. Can be enabled via config option. also timestamp various stages.
+
+tup test forward and backwards commits in tup itself (eg: git checkout a; tup upd; git checkout b; tup upd)
+
+: |> cat foo |>
+touch "cat foo"
+ - Separate namespace for commands and files?
+
+tup klee
+
+win path canonicalization
+
+html: add tup.config example
+
+run script share site/wiki?
+
+gimme_node_or_make_ghost - if(new_dt == 0) block never used?
+
+write_list not needed? Just use mapping list?
+ - use string_trees instead of read/write/mapping list once all files are full path/canonicalized
+
+autoupdate/monitor fail:
+[    0/2    ] docs/html
+[    1/2    ] docs/html/pub
+[    2/2    ]
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+tup error: tup_file_mod() fstatat failed.
+ex_dependencies.html.new: No such file or directory
+ -- Maybe ephemeral file doesn't get handled properly if there is a delay?
+
+check using mmap instead of open/read for reading in files via fslurp? Use madvise to say it's a sequential read?
+
+use strsignal: http://www.cs.utah.edu/dept/old/texinfo/glibc-manual-0.02/library_21.html#SEC343
 
 html:
   proof: no clean target
