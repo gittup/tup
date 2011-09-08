@@ -29,8 +29,6 @@ static const char* access_type_name[] = {
 	"rename",
 	"unlink",
 	"var",
-	"symlink",
-	"ghost",
 };
 
 FILE *debugf = NULL;
