@@ -13,7 +13,9 @@ HERE
 tup touch Tupfile
 update
 
-text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 2 .*errors' | grep -v '/\.tup/vardict'`
+# On Gentoo, stdout points to output-0, while on Ubuntu, it points to the
+# redirected file (fds.txt). This might be a bash vs dash thing.
+text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors' | grep -v '/\.tup/vardict'`
 if [ "$text" != "total 0" ]; then
 	echo "Error: These fds shouldn't be open: $text" 1>&2
 	exit 1
