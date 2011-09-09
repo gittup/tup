@@ -80,12 +80,15 @@ int server_post_exit(void)
 		perror("waitpid");
 		return -1;
 	}
-	close(msd[1]);
 	if(status != 0) {
 		fprintf(stderr, "tup error: Master fork process returned %i\n", status);
 		return -1;
 	}
 	pthread_join(cw_tid, NULL);
+	/* Only close our side of the socket once the child_wait_notifier has
+	 * joined, since that thread needs to read from it.
+	 */
+	close(msd[1]);
 	return 0;
 }
 
@@ -120,7 +123,8 @@ err_out:
 	return -1;
 }
 
-static int read_all(int sd, void *dest, int size)
+#define read_all(a, b, c) read_all_internal(a, b, c, __LINE__)
+static int read_all_internal(int sd, void *dest, int size, int line)
 {
 	int rc;
 	int bytes_read = 0;
@@ -130,11 +134,11 @@ static int read_all(int sd, void *dest, int size)
 		rc = read(sd, p + bytes_read, size - bytes_read);
 		if(rc < 0) {
 			perror("read");
-			fprintf(stderr, "tup error: Unable to read from the master fork socket.\n");
+			fprintf(stderr, "tup error: Unable to read from the master fork socket (read_all called from line %i).\n", line);
 			return -1;
 		}
 		if(rc == 0) {
-			fprintf(stderr, "tup error: Expected to read %i bytes, but the master fork socket closed after %i bytes.\n", size, bytes_read);
+			fprintf(stderr, "tup error: Expected to read %i bytes, but the master fork socket closed after %i bytes (read_all called from line %i).\n", size, bytes_read, line);
 			return -1;
 		}
 		bytes_read += rc;
