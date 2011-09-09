@@ -291,6 +291,11 @@ static int exec_internal(struct server *s, const char *cmd,
 		fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
 		return -1;
 	}
+	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
+		return -1;
+	}
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
 	buf[sizeof(buf)-1] = 0;
@@ -298,6 +303,11 @@ static int exec_internal(struct server *s, const char *cmd,
 	if(s->error_fd < 0) {
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+		return -1;
+	}
+	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
 		return -1;
 	}
 
