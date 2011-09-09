@@ -260,29 +260,25 @@ static int exec_internal(struct server *s, const char *cmd,
 			 struct tup_entry *dtent)
 {
 	int status;
-	struct execmsg em;
 	char buf[64];
+	char dir[PATH_MAX];
+	struct execmsg em;
 
 	em.sid = s->id;
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
 	 * adjusting.
 	 */
-	em.dirlen = snprintf(em.text, PATH_MAX - 1, TUP_MNT "/%s/@tupjob-%i", get_tup_top()+1, s->id);
-	em.dirlen += snprint_tup_entry(em.text + em.dirlen,
-					PATH_MAX - em.dirlen - 1,
-					dtent) + 1;
+	em.dirlen = snprintf(dir, PATH_MAX - 1, TUP_MNT "/%s/@tupjob-%i", get_tup_top()+1, s->id);
+	em.dirlen += snprint_tup_entry(dir + em.dirlen,
+				       sizeof(dir) - em.dirlen - 1,
+				       dtent) + 1;
 	if(em.dirlen >= PATH_MAX) {
 		fprintf(stderr, "tup error: Directory for tup entry %lli is too long.\n", dtent->tnode.tupid);
 		print_tup_entry(stderr, dtent);
 		return -1;
 	}
 	em.cmdlen = strlen(cmd) + 1;
-	if(em.cmdlen >= PATH_MAX) {
-		fprintf(stderr, "tup error: Command string '%s' is too long.\n", cmd);
-		return -1;
-	}
-	memcpy(em.text + em.dirlen, cmd, em.cmdlen);
-	if(master_fork_exec(&em, sizeof(em) - sizeof(em.text) + em.dirlen + em.cmdlen, &status) < 0) {
+	if(master_fork_exec(&em, dir, cmd, &status) < 0) {
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
 		return -1;
 	}

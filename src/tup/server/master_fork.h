@@ -7,9 +7,9 @@ struct execmsg {
 	int sid;
 	int dirlen;
 	int cmdlen;
-	char text[PATH_MAX * 2];
 };
 
-int master_fork_exec(struct execmsg *em, int size, int *status);
+int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
+		     int *status);
 
 #endif

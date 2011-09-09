@@ -46,7 +46,7 @@ static struct sigaction sigact = {
 
 int server_pre_init(void)
 {
-	if(socketpair(AF_LOCAL, SOCK_DGRAM, 0, msd) < 0) {
+	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, msd) < 0) {
 		perror("socketpair");
 		return -1;
 	}
@@ -70,8 +70,8 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	int sid = -1;
-	if(write(msd[1], &sid, sizeof(sid)) != sizeof(sid)) {
+	struct execmsg em = {-1, 0, 0};
+	if(write(msd[1], &em, sizeof(em)) != sizeof(em)) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write to the master fork socket. This process may not shutdown properly.\n");
 		return -1;
@@ -89,22 +89,55 @@ int server_post_exit(void)
 	return 0;
 }
 
-int master_fork_exec(struct execmsg *em, int size, int *status)
+static int write_all(const void *data, int size)
 {
-	if(write(msd[1], em, size) != size) {
+	if(write(msd[1], data, size) != size) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write %i bytes to the master fork socket.\n", size);
 		return -1;
 	}
-	*status = wait_for_my_sid(em->sid);
 	return 0;
 }
 
-static int rc_check(int actual, int expected, int exactly)
+int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
+		     int *status)
 {
-	if(actual < expected) {
-		fprintf(stderr, "tup error: Master fork only received %i bytes, need %s %i.\n", actual, exactly ? "exactly" : "at least", expected);
-		return -1;
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+	pthread_mutex_lock(&lock);
+	if(write_all(em, sizeof(*em)) < 0)
+		goto err_out;
+	if(write_all(dir, em->dirlen) < 0)
+		goto err_out;
+	if(write_all(cmd, em->cmdlen) < 0)
+		goto err_out;
+	pthread_mutex_unlock(&lock);
+	*status = wait_for_my_sid(em->sid);
+	return 0;
+
+err_out:
+	pthread_mutex_unlock(&lock);
+	return -1;
+}
+
+static int read_all(int sd, void *dest, int size)
+{
+	int rc;
+	int bytes_read = 0;
+	char *p = dest;
+
+	while(bytes_read < size) {
+		rc = read(sd, p + bytes_read, size - bytes_read);
+		if(rc < 0) {
+			perror("read");
+			fprintf(stderr, "tup error: Unable to read from the master fork socket.\n");
+			return -1;
+		}
+		if(rc == 0) {
+			fprintf(stderr, "tup error: Expected to read %i bytes, but the master fork socket closed after %i bytes.\n", size, bytes_read);
+			return -1;
+		}
+		bytes_read += rc;
 	}
 	return 0;
 }
@@ -115,6 +148,9 @@ static int master_fork_loop(void)
 	pthread_attr_t attr;
 	int null_fd;
 	int vardict_fd = -2;
+	char dir[PATH_MAX];
+	char *cmd;
+	int cmdsize = 4096;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -122,6 +158,12 @@ static int master_fork_loop(void)
 	sigaction(SIGHUP, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 	sigaction(SIGUSR2, &sigact, NULL);
+
+	cmd = malloc(cmdsize);
+	if(!cmd) {
+		perror("malloc");
+		return -1;
+	}
 
 	null_fd = open("/dev/null", O_RDONLY);
 	if(null_fd < 0) {
@@ -145,30 +187,31 @@ static int master_fork_loop(void)
 		exit(1);
 	}
 	while(1) {
-		int rc;
 		int ofd, efd;
 		struct child_waiter *waiter;
 		char buf[64];
 		pid_t pid;
 		pthread_t pt;
 
-		rc = read(msd[0], &em, sizeof(em));
-		if(rc == 0)
-			break;
-		if(rc < 0) {
-			perror("read");
+		if(read_all(msd[0], &em, sizeof(em)) < 0)
 			return -1;
-		}
+
 		/* See if we get the shutdown message. */
-		if(rc_check(rc, sizeof(em.sid), 0) < 0)
-			return -1;
 		if(em.sid == -1)
 			break;
 
-		/* Make sure we have at least a header. */
-		if(rc_check(rc, sizeof(em) - sizeof(em.text), 0) < 0)
+		if(read_all(msd[0], dir, em.dirlen) < 0)
 			return -1;
-		if(rc_check(rc, sizeof(em) - sizeof(em.text) + em.dirlen + em.cmdlen, 1) < 0)
+		if(em.cmdlen > cmdsize) {
+			free(cmd);
+			cmdsize = em.cmdlen;
+			cmd = malloc(cmdsize);
+			if(!cmd) {
+				perror("malloc");
+				return -1;
+			}
+		}
+		if(read_all(msd[0], cmd, em.cmdlen) < 0)
 			return -1;
 
 		/* Only open vardict_fd the first time we get an event (this
@@ -209,8 +252,6 @@ static int master_fork_loop(void)
 			exit(1);
 		}
 		if(pid == 0) {
-			char *dir = em.text;
-			char *cmd = &em.text[em.dirlen];
 			char fd_name[32];
 
 			close(msd[0]);
@@ -249,15 +290,17 @@ static int master_fork_loop(void)
 		waiter->sid = em.sid;
 		pthread_create(&pt, &attr, child_waiter, waiter);
 	}
-	/* Just write something smaller than an rcmsg to stop the
-	 * child_wait_notifier thread.
-	 */
-	if(write(msd[0], &null_fd, sizeof(null_fd)) != sizeof(null_fd)) {
-		perror("write");
-		fprintf(stderr, "tup error: Unable to send notification to shutdown the child wait thread. This process may not shutdown cleanly.\n");
-		return -1;
+
+	{
+		struct rcmsg rcm = {-1, 0};
+		if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
+			perror("write");
+			fprintf(stderr, "tup error: Unable to send notification to shutdown the child wait thread. This process may not shutdown cleanly.\n");
+			return -1;
+		}
+		close(msd[0]);
 	}
-	close(msd[0]);
+
 	if(vardict_fd != -2)
 		close(vardict_fd);
 	if(getenv("TUP_VALGRIND")) {
@@ -272,15 +315,18 @@ static void *child_waiter(void *arg)
 {
 	struct child_waiter *waiter = arg;
 	struct rcmsg rcm;
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 	rcm.sid = waiter->sid;
 	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
 		perror("waitpid");
 	}
+	pthread_mutex_lock(&lock);
 	if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write return status value to the socket. Subprocess %i may not exit properly.\n", waiter->pid);
 	}
+	pthread_mutex_unlock(&lock);
 	free(waiter);
 	return NULL;
 }
@@ -290,7 +336,9 @@ static void *child_wait_notifier(void *arg)
 	if(arg) {}
 	while(1) {
 		struct rcmsg rcm;
-		if(read(msd[1], &rcm, sizeof(rcm)) != sizeof(rcm))
+		if(read_all(msd[1], &rcm, sizeof(rcm)) < 0)
+			return NULL;
+		if(rcm.sid == -1)
 			return NULL;
 		pthread_mutex_lock(&statuslock);
 		status_table[rcm.sid].status = rcm.status;
