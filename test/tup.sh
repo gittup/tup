@@ -213,14 +213,17 @@ update_fail_msg()
 		echo "*** Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
-		if grep "$1" .tupoutput > /dev/null; then
-			echo "Update expected to fail, and failed for the right reason."
-		else
-			echo "*** Update expected to fail because of: $1" 1>&2
-			echo "*** But failed because of:" 1>&2
-			cat .tupoutput 1>&2
-			exit 1
-		fi
+		while [ $# -gt 0 ]; do
+			if grep "$1" .tupoutput > /dev/null; then
+				echo "Update expected to fail, and failed for the right reason."
+			else
+				echo "*** Update expected to fail because of: $1" 1>&2
+				echo "*** But failed because of:" 1>&2
+				cat .tupoutput 1>&2
+				exit 1
+			fi
+			shift
+		done
 	fi
 }
 
