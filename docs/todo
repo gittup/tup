@@ -199,9 +199,6 @@ use a unique server id for updater and parser, in case there is a way to log the
 
 checksum - calculate as file is written out in fuse fs wrapper (can be used to skip future parts of the build if checksums match)
 
-call write_files() even on failure? I had a program that failed to link because a libfoo.a wasn't created correctly - after updating libfoo.a to be correct, it still fails to link because the new :-rules to create the correct libfoo.a haven't been executed yet. the problem is the link rule doesn't specify libfoo.a as a dependency, but we never see that error because the sub-process returns an error.
- - t5073-double-failure.sh, needs to check only read inputs (since outputs won't be written on command failure), but we need the outputs to be removed from input list (do this automatically in fuse when finfo uses trees instead of lists?)
-
 html:
   proof: no clean target
   graphs

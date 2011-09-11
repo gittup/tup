@@ -113,28 +113,30 @@ int handle_open_file(enum access_type at, const char *filename,
 }
 
 int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
-		int *warnings)
+		int *warnings, int check_only)
 {
 	struct list_head *entrylist;
 	struct tmpdir *tmpdir;
 	int tmpdir_bork = 0;
-	int rc1, rc2;
+	int rc1 = 0, rc2;
 
 	finfo_lock(info);
 	handle_unlink(info);
 
-	list_for_each_entry(tmpdir, &info->tmpdir_list, list) {
-		fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
-		tmpdir_bork = 1;
-	}
-	if(tmpdir_bork) {
-		finfo_unlock(info);
-		return -1;
-	}
+	if(!check_only) {
+		list_for_each_entry(tmpdir, &info->tmpdir_list, list) {
+			fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
+			tmpdir_bork = 1;
+		}
+		if(tmpdir_bork) {
+			finfo_unlock(info);
+			return -1;
+		}
 
-	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
-	tup_entry_release_list();
+		entrylist = tup_entry_get_list();
+		rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
+		tup_entry_release_list();
+	}
 
 	entrylist = tup_entry_get_list();
 	rc2 = update_read_info(cmdid, info, entrylist);

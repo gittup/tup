@@ -935,9 +935,7 @@ static int process_output(struct server *s, tupid_t tupid, const char *name)
 		return -1;
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			int rc;
-			rc = write_files(tupid, name, &s->finfo, &warnings);
-			if(rc < 0) {
+			if(write_files(tupid, name, &s->finfo, &warnings, 0) < 0) {
 				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", tupid, name);
 				return -1;
 			}
@@ -946,6 +944,9 @@ static int process_output(struct server *s, tupid_t tupid, const char *name)
 			return 0;
 		} else {
 			fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", tupid, s->exit_status, name);
+			if(write_files(tupid, name, &s->finfo, &warnings, 1) < 0) {
+				fprintf(stderr, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tupid);
+			}
 			return -1;
 		}
 	} else if(s->signalled) {
