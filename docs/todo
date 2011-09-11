@@ -195,8 +195,6 @@ check using mmap instead of open/read for reading in files via fslurp? Use madvi
 
 use strsignal: http://www.cs.utah.edu/dept/old/texinfo/glibc-manual-0.02/library_21.html#SEC343
 
-use a unique server id for updater and parser, in case there is a way to log these in the future
-
 checksum - calculate as file is written out in fuse fs wrapper (can be used to skip future parts of the build if checksums match)
 
 html:

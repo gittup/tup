@@ -47,7 +47,6 @@ static int num_jobs;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
-static pthread_mutex_t id_mutex;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -416,10 +415,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		perror("pthread_mutex_init");
 		return -1;
 	}
-	if(pthread_mutex_init(&id_mutex, NULL) != 0) {
-		perror("pthread_mutex_init");
-		return -1;
-	}
 	tup_db_begin();
 	warnings = 0;
 	if(server_init(SERVER_UPDATER_MODE, NULL) < 0) {
@@ -434,7 +429,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		return -1;
 	}
 	tup_db_commit();
-	pthread_mutex_destroy(&id_mutex);
 	pthread_mutex_destroy(&db_mutex);
 	if(rc < 0)
 		return -1;
@@ -965,17 +959,10 @@ static int process_output(struct server *s, tupid_t tupid, const char *name)
 
 static int update(struct node *n)
 {
-	static int id = 0;
 	int dfd = -1;
 	const char *name = n->tent->name.s;
 	struct server s;
 	int rc;
-	int myid;
-
-	pthread_mutex_lock(&id_mutex);
-	myid = id;
-	id++;
-	pthread_mutex_unlock(&id_mutex);
 
 	if(name[0] == '^') {
 		name++;
@@ -1006,7 +993,7 @@ static int update(struct node *n)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
-	s.id = myid;
+	s.id = n->tnode.tupid;
 	s.exited = 0;
 	s.signalled = 0;
 	s.exit_status = -1;
