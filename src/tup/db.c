@@ -3690,7 +3690,7 @@ static int extra_output(tupid_t tupid, void *data)
 
 	if(!(aod->output_error & 1)) {
 		aod->output_error |= 1;
-		fprintf(stderr, "tup error: Unspecified output files - A command is writing to files that you    didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
+		fprintf(stderr, "tup error: Unspecified output files - A command is writing to files that you didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
 		fprintf(stderr, " -- Command ID: %lli\n", aod->cmdid);
 		/* Return success here so we can display all errant outputs.
 		 * Actual check is in tup_db_check_actual_outputs().
@@ -3850,7 +3850,7 @@ static int new_input(tupid_t tupid, void *data)
 		}
 
 		if(!aid->input_error) {
-			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not         specified as an input link for the command. This is an issue because the file   was created from another command, and without the input link the commands may   execute out of order. You should add this file as an input, since it is         possible this could randomly break in the future.\n");
+			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
 			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);
 		}
 		if(tupid_tree_add(&aid->missing_input_tree, tent->tnode.tupid) < 0)
