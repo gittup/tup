@@ -2,9 +2,10 @@
 #define tup_master_fork_h
 
 #include "tup/compat.h"
+#include "tup/tupid.h"
 
 struct execmsg {
-	int sid;
+	tupid_t sid;
 	int dirlen;
 	int cmdlen;
 };

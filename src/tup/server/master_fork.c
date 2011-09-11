@@ -2,6 +2,7 @@
 #include "tup/updater.h"
 #include "tup/server.h"
 #include "tup/db.h"
+#include "tup/tupid_tree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,22 +14,25 @@
 #include <signal.h>
 
 struct rcmsg {
-	int sid;
+	tupid_t sid;
 	int status;
 };
 
 struct child_waiter {
 	pid_t pid;
-	int sid;
+	tupid_t sid;
 };
 
-struct {
+struct status_tree {
+	struct tupid_tree tnode;
 	int status;
 	int set;
-} status_table[MAX_JOBS];
+	pthread_cond_t cond;
+	pthread_mutex_t lock;
+};
 
 static pthread_mutex_t statuslock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t statuscond = PTHREAD_COND_INITIALIZER;
+static struct rb_root status_root = RB_ROOT;
 static pid_t master_fork_pid;
 static int msd[2];
 static pthread_t cw_tid;
@@ -36,7 +40,7 @@ static pthread_t cw_tid;
 static int master_fork_loop(void);
 static void *child_waiter(void *arg);
 static void *child_wait_notifier(void *arg);
-static int wait_for_my_sid(int sid);
+static int wait_for_my_sid(struct status_tree *st);
 static void sighandler(int sig);
 
 static struct sigaction sigact = {
@@ -106,6 +110,27 @@ int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
 		     int *status)
 {
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	struct status_tree st;
+
+	st.tnode.tupid = em->sid;
+	if(pthread_cond_init(&st.cond, NULL) != 0) {
+		perror("pthread_cond_init");
+		return -1;
+	}
+	if(pthread_mutex_init(&st.lock, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
+	}
+	st.status = 0;
+	st.set = 0;
+
+	pthread_mutex_lock(&statuslock);
+	if(tupid_tree_insert(&status_root, &st.tnode) < 0) {
+		fprintf(stderr, "tup error: Unable to add status tree entry.\n");
+		pthread_mutex_unlock(&statuslock);
+		return -1;
+	}
+	pthread_mutex_unlock(&statuslock);
 
 	pthread_mutex_lock(&lock);
 	if(write_all(em, sizeof(*em)) < 0)
@@ -115,7 +140,7 @@ int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
 	if(write_all(cmd, em->cmdlen) < 0)
 		goto err_out;
 	pthread_mutex_unlock(&lock);
-	*status = wait_for_my_sid(em->sid);
+	*status = wait_for_my_sid(&st);
 	return 0;
 
 err_out:
@@ -232,7 +257,7 @@ static int master_fork_loop(void)
 			}
 		}
 
-		snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", em.sid);
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", em.sid);
 		buf[sizeof(buf)-1] = 0;
 		ofd = creat(buf, 0600);
 		if(ofd < 0) {
@@ -241,7 +266,7 @@ static int master_fork_loop(void)
 			return -1;
 		}
 
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", em.sid);
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", em.sid);
 		buf[sizeof(buf)-1] = 0;
 		efd = creat(buf, 0600);
 		if(efd < 0) {
@@ -340,29 +365,40 @@ static void *child_wait_notifier(void *arg)
 	if(arg) {}
 	while(1) {
 		struct rcmsg rcm;
+		struct tupid_tree *tt;
+		struct status_tree *st;
 		if(read_all(msd[1], &rcm, sizeof(rcm)) < 0)
 			return NULL;
 		if(rcm.sid == -1)
 			return NULL;
 		pthread_mutex_lock(&statuslock);
-		status_table[rcm.sid].status = rcm.status;
-		status_table[rcm.sid].set = 1;
-		pthread_cond_broadcast(&statuscond);
+		tt = tupid_tree_search(&status_root, rcm.sid);
+		if(!tt) {
+			fprintf(stderr, "tup internal error: Unable to find status root entry for tupid %lli\n", rcm.sid);
+			pthread_mutex_unlock(&statuslock);
+			return NULL;
+		}
+		st = container_of(tt, struct status_tree, tnode);
+		pthread_mutex_lock(&st->lock);
+		tupid_tree_rm(&status_root, tt);
+		st->status = rcm.status;
+		st->set = 1;
+		pthread_cond_signal(&st->cond);
+		pthread_mutex_unlock(&st->lock);
 		pthread_mutex_unlock(&statuslock);
 	}
 	return NULL;
 }
 
-static int wait_for_my_sid(int sid)
+static int wait_for_my_sid(struct status_tree *st)
 {
 	int status;
-	pthread_mutex_lock(&statuslock);
-	while(status_table[sid].set == 0) {
-		pthread_cond_wait(&statuscond, &statuslock);
+	pthread_mutex_lock(&st->lock);
+	while(st->set == 0) {
+		pthread_cond_wait(&st->cond, &st->lock);
 	}
-	status = status_table[sid].status;
-	status_table[sid].set = 0;
-	pthread_mutex_unlock(&statuslock);
+	status = st->status;
+	pthread_mutex_unlock(&st->lock);
 	return status;
 }
 

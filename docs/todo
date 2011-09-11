@@ -195,6 +195,8 @@ check using mmap instead of open/read for reading in files via fslurp? Use madvi
 
 use strsignal: http://www.cs.utah.edu/dept/old/texinfo/glibc-manual-0.02/library_21.html#SEC343
 
+get_output_tree called for both tup_db_check_actual_inputs and tup_db_check_actual_outputs?
+
 checksum - calculate as file is written out in fuse fs wrapper (can be used to skip future parts of the build if checksums match)
 
 html:

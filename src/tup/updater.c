@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#define MAX_JOBS 65535
+
 static int run_scan(void);
 static int update_tup_config(void);
 static int process_create_nodes(void);
