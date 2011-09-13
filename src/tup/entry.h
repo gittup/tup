@@ -14,7 +14,7 @@ struct tup_entry {
 	int type;
 	time_t mtime;
 	struct string_tree name;
-	struct rb_root entries;
+	struct string_entries entries;
 	struct list_head ghost_list;
 
 	/* Only valid inside of get/release list. The next pointer is used to

@@ -48,7 +48,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	tent->tnode.tupid = tupid;
 	tent->list.next = NULL;
 	tent->ghost_list.next = NULL;
-	tent->entries.rb_node = NULL;
+	RB_INIT(&tent->entries);
 	tent->parent = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
@@ -123,7 +123,7 @@ static int rm_entry(tupid_t tupid, int safe)
 		 */
 		return 0;
 	}
-	if(tent->entries.rb_node != NULL) {
+	if(!RB_EMPTY(&tent->entries)) {
 		if(safe) {
 			return 0;
 		} else {
@@ -353,7 +353,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	strncpy(tent->name.s, name, len);
 	tent->name.s[len] = 0;
 	tent->name.len = len;
-	tent->entries.rb_node = NULL;
+	RB_INIT(&tent->entries);
 
 	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree in new_entry\n", tent->tnode.tupid);

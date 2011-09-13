@@ -107,7 +107,7 @@ int create_graph(struct graph *g, int count_flags)
 	root_entry.mtime = -1;
 	root_entry.name.len = strlen(root_name);
 	root_entry.name.s = root_name;
-	root_entry.entries.rb_node = NULL;
+	RB_INIT(&root_entry.entries);
 
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);

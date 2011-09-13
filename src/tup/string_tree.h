@@ -1,28 +1,29 @@
 #ifndef tup_string_tree_h
 #define tup_string_tree_h
 
-#include "linux/rbtree.h"
+#include "bsd/tree.h"
 
 struct string_tree {
-	struct rb_node rbn;
+	RB_ENTRY(string_tree) linkage;
 	char *s;
 	int len;
 };
 
-struct string_tree *string_tree_search(struct rb_root *root, const char *s,
-				       int n);
-struct string_tree *string_tree_search2(struct rb_root *root, const char *s1,
-					int s1len, const char *s2);
-int string_tree_insert(struct rb_root *root, struct string_tree *data);
-static inline void string_tree_rm(struct rb_root *root, struct string_tree *st)
-{
-	rb_erase(&st->rbn, root);
-}
+RB_HEAD(string_entries, string_tree);
+RB_PROTOTYPE(string_entries, string_tree, linkage, x);
+
+int string_tree_insert(struct string_entries *root, struct string_tree *st);
+struct string_tree *string_tree_search(struct string_entries *root, const char *s,
+				       int len);
 
 /* _add is like _insert, but also malloc()s and copies 's' into 'st->s'. _free
  * just free()s st->s and calls _rm.
  */
-int string_tree_add(struct rb_root *root, struct string_tree *st, const char *s);
-void string_tree_free(struct rb_root *root, struct string_tree *st);
+int string_tree_add(struct string_entries *root, struct string_tree *st, const char *s);
+void string_tree_free(struct string_entries *root, struct string_tree *st);
+static inline void string_tree_rm(struct string_entries *root, struct string_tree *st)
+{
+	RB_REMOVE(string_entries, root, st);
+}
 
 #endif

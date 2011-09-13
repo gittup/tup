@@ -6,19 +6,18 @@
 
 int vardb_init(struct vardb *v)
 {
-	v->tree.rb_node = NULL;
+	RB_INIT(&v->root);
 	v->count = 0;
 	return 0;
 }
 
 int vardb_close(struct vardb *v)
 {
-	struct rb_node *rbn;
+	struct string_tree *st;
 
-	while((rbn = rb_first(&v->tree)) != NULL) {
-		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+	while((st = BSD_RB_ROOT(&v->root)) != NULL) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
-		rb_erase(rbn, &v->tree);
+		string_tree_rm(&v->root, st);
 		free(st->s);
 		free(ve->value);
 		free(ve);
@@ -29,7 +28,7 @@ int vardb_close(struct vardb *v)
 int vardb_set(struct vardb *v, const char *var, const char *value,
 	      struct tup_entry *tent)
 {
-	if(vardb_set2(v, var, -1, value, tent) == NULL)
+	if(vardb_set2(v, var, strlen(var), value, tent) == NULL)
 		return -1;
 	return 0;
 }
@@ -40,7 +39,7 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 	struct string_tree *st;
 	struct var_entry *ve;
 
-	st = string_tree_search(&v->tree, var, varlen);
+	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
 		free(ve->value);
@@ -79,7 +78,7 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 			return NULL;
 		}
 		strcpy(ve->value, value);
-		if(string_tree_insert(&v->tree, &ve->var) < 0) {
+		if(string_tree_insert(&v->root, &ve->var) < 0) {
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
 			free(ve->value);
 			free(ve->var.s);
@@ -97,7 +96,7 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 {
 	struct string_tree *st;
 
-	st = string_tree_search(&v->tree, var, -1);
+	st = string_tree_search(&v->root, var, strlen(var));
 	if(st) {
 		int vallen;
 		char *new;
@@ -126,7 +125,7 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 {
 	struct string_tree *st;
 
-	st = string_tree_search(&v->tree, var, varlen);
+	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 		return ve->vallen;
@@ -139,7 +138,7 @@ int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest)
 {
 	struct string_tree *st;
 
-	st = string_tree_search(&v->tree, var, varlen);
+	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 		memcpy(*dest, ve->value, ve->vallen);
@@ -154,7 +153,7 @@ struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen)
 {
 	struct string_tree *st;
 
-	st = string_tree_search(&v->tree, var, varlen);
+	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 		return ve;
@@ -167,51 +166,45 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 		  int (*extra_b)(struct var_entry *ve),
 		  int (*same)(struct var_entry *vea, struct var_entry *veb))
 {
-	struct rb_node *na;
-	struct rb_node *nb;
 	struct string_tree *sta;
 	struct string_tree *stb;
 	struct var_entry *vea;
 	struct var_entry *veb;
-	struct rb_root *a = &vdba->tree;
-	struct rb_root *b = &vdbb->tree;
+	struct string_entries *a = &vdba->root;
+	struct string_entries *b = &vdbb->root;
 
-	na = rb_first(a);
-	nb = rb_first(b);
+	sta = RB_MIN(string_entries, a);
+	stb = RB_MIN(string_entries, b);
 
-	while(na || nb) {
-		if(!na) {
-			stb = container_of(nb, struct string_tree, rbn);
+	while(sta || stb) {
+		if(!sta) {
 			veb = container_of(stb, struct var_entry, var);
 			if(extra_b && extra_b(veb) < 0)
 				return -1;
-			nb = rb_next(nb);
-		} else if(!nb) {
-			sta = container_of(na, struct string_tree, rbn);
+			stb = RB_NEXT(string_entries, b, stb);
+		} else if(!stb) {
 			vea = container_of(sta, struct var_entry, var);
 			if(extra_a && extra_a(vea) < 0)
 				return -1;
-			na = rb_next(na);
+			sta = RB_NEXT(string_entries, a, sta);
 		} else {
 			int rc;
-			sta = container_of(na, struct string_tree, rbn);
-			stb = container_of(nb, struct string_tree, rbn);
 			vea = container_of(sta, struct var_entry, var);
 			veb = container_of(stb, struct var_entry, var);
 			rc = strcmp(sta->s, stb->s);
 			if(rc == 0) {
 				if(same && same(vea, veb) < 0)
 					return -1;
-				na = rb_next(na);
-				nb = rb_next(nb);
+				sta = RB_NEXT(string_entries, a, sta);
+				stb = RB_NEXT(string_entries, b, stb);
 			} else if(rc < 0) {
 				if(extra_a && extra_a(vea) < 0)
 					return -1;
-				na = rb_next(na);
+				sta = RB_NEXT(string_entries, a, sta);
 			} else {
 				if(extra_b && extra_b(veb) < 0)
 					return -1;
-				nb = rb_next(nb);
+				stb = RB_NEXT(string_entries, b, stb);
 			}
 		}
 	}
@@ -220,14 +213,11 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 
 void vardb_dump(struct vardb *v)
 {
-	struct rb_node *rbn;
+	struct string_tree *st;
 
-	rbn = rb_first(&v->tree);
 	printf(" ----------- VARDB -----------\n");
-	while(rbn) {
-		struct string_tree *st = container_of(rbn, struct string_tree, rbn);
+	RB_FOREACH(st, string_entries, &v->root) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 		printf(" [%i] '%s' [33m=[0m [%i] '%s'\n", st->len, st->s, ve->vallen, ve->value);
-		rbn = rb_next(rbn);
 	}
 }

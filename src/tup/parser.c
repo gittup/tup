@@ -115,9 +115,9 @@ struct tupfile {
 	struct graph *g;
 	struct vardb vdb;
 	struct rb_root cmd_tree;
-	struct rb_root bang_tree;
+	struct string_entries bang_root;
 	struct rb_root input_tree;
-	struct rb_root chain_tree;
+	struct string_entries chain_root;
 	int ign;
 };
 
@@ -135,9 +135,9 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
-			   struct name_list *nl,const char *ext);
-static void free_bang_tree(struct rb_root *root);
-static void free_chain_tree(struct rb_root *root);
+			   struct name_list *nl,const char *ext, int extlen);
+static void free_bang_tree(struct string_entries *root);
+static void free_chain_tree(struct string_entries *root);
 static void free_banglist(struct list_head *list);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 			       int *o_cmdlen, char **o_output, char **o_bin,
@@ -213,9 +213,9 @@ int parse(struct node *n, struct graph *g)
 	tf.root_fd = s.root_fd;
 	tf.g = g;
 	tf.cmd_tree.rb_node = NULL;
-	tf.bang_tree.rb_node = NULL;
+	RB_INIT(&tf.bang_root);
 	tf.input_tree.rb_node = NULL;
-	tf.chain_tree.rb_node = NULL;
+	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		goto out_server_stop;
@@ -283,9 +283,9 @@ out_server_stop:
 		print_tup_entry(stderr, n->tent);
 		fprintf(stderr, "'\n");
 	}
-	free_chain_tree(&tf.chain_tree);
+	free_chain_tree(&tf.chain_root);
 	free_tupid_tree(&tf.cmd_tree);
-	free_bang_tree(&tf.bang_tree);
+	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_tree);
 
 	return rc;
@@ -562,7 +562,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 
 	if(strncmp(var, "CONFIG_", 7) == 0)
 		var += 7;
-	tent = tup_db_get_var(var, -1, NULL);
+	tent = tup_db_get_var(var, strlen(var), NULL);
 	if(!tent)
 		return -1;
 	if(tent->type == TUP_NODE_VAR) {
@@ -917,7 +917,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		/* Alias one macro as another */
 		struct bang_rule *cur_br;
 
-		st = string_tree_search(&tf->bang_tree, value, -1);
+		st = string_tree_search(&tf->bang_root, value, strlen(value));
 		if(!st) {
 			fprintf(stderr, "Error: Unable to find !-macro '%s'\n", value);
 			return -1;
@@ -961,7 +961,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 		br->command_len = cur_br->command_len;
 
-		if(string_tree_add(&tf->bang_tree, &br->st, p) < 0) {
+		if(string_tree_add(&tf->bang_root, &br->st, p) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
@@ -994,7 +994,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		}
 	}
 
-	st = string_tree_search(&tf->bang_tree, p, -1);
+	st = string_tree_search(&tf->bang_root, p, strlen(p));
 	if(st) {
 		/* Replace existing !-macro */
 		struct bang_rule *cur_br;
@@ -1025,7 +1025,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			goto err_cleanup_br;
 		br->value = alloc_value;
 
-		if(string_tree_add(&tf->bang_tree, &br->st, p) < 0) {
+		if(string_tree_add(&tf->bang_root, &br->st, p) < 0) {
 			fprintf(stderr, "Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
@@ -1069,7 +1069,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		}
 		*rbracket = 0;
 	}
-	st = string_tree_search(&tf->chain_tree, p, -1);
+	st = string_tree_search(&tf->chain_root, p, strlen(p));
 	if(st) {
 		/* Replace existing *-chain */
 		ch = container_of(st, struct chain, st);
@@ -1086,7 +1086,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		INIT_LIST_HEAD(&ch->src_chain_list);
 		INIT_LIST_HEAD(&ch->banglist);
 
-		if(string_tree_add(&tf->chain_tree, &ch->st, p) < 0) {
+		if(string_tree_add(&tf->chain_root, &ch->st, p) < 0) {
 			fprintf(stderr, "Error inserting *-chain into tree\n");
 			return -1;
 		}
@@ -1130,7 +1130,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			fprintf(stderr, "Error: *-chain must be composed of !-macros, not '%s'\n", value);
 			return -1;
 		}
-		bst = string_tree_search(&tf->bang_tree, value, -1);
+		bst = string_tree_search(&tf->bang_root, value, strlen(value));
 		if(!bst) {
 			fprintf(stderr, "Error: Unable to find !-macro: '%s'\n", value);
 			return -1;
@@ -1193,26 +1193,35 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r)
 {
 	struct string_tree *st;
+	char empty[] = ".EMPTY";
+	char tmp[r->command_len + sizeof(empty)];
 
-	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len,
-				 ".EMPTY");
+	memcpy(tmp, r->command, r->command_len);
+	memcpy(tmp + r->command_len, empty, sizeof(empty));
+
+	st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
 	if(!st)
 		return 1;
 	return parse_bang_rule_internal(tf, r, st, NULL);
 }
 
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
-			   struct name_list *nl, const char *ext)
+			   struct name_list *nl, const char *ext, int extlen)
 {
 	struct string_tree *st;
+	char tmp[r->command_len + extlen + 1];
+
+	memcpy(tmp, r->command, r->command_len);
+	if(ext)
+		memcpy(tmp + r->command_len, ext, extlen + 1);
 
 	/* First try to find the extension-specific rule, and if not then use
 	 * the general one. Eg: if the input is foo.c, then the extension is ".c",
 	 * so try "!cc.c" first, then "!cc" second.
 	 */
-	st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, ext);
+	st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
 	if(!st) {
-		st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, NULL);
+		st = string_tree_search(&tf->bang_root, r->command, r->command_len);
 		if(!st) {
 			fprintf(stderr, "Error finding bang variable: '%s'\n",
 				r->command);
@@ -1222,12 +1231,11 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 	return parse_bang_rule_internal(tf, r, st, nl);
 }
 
-static void free_bang_tree(struct rb_root *root)
+static void free_bang_tree(struct string_entries *root)
 {
-	struct rb_node *rbn;
+	struct string_tree *st;
 
-	while((rbn = rb_first(root)) != NULL) {
-		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+	while((st = BSD_RB_ROOT(root)) != NULL) {
 		struct bang_rule *br = container_of(st, struct bang_rule, st);
 
 		string_tree_free(root, st);
@@ -1246,12 +1254,11 @@ static void free_bang_tree(struct rb_root *root)
 	}
 }
 
-static void free_chain_tree(struct rb_root *root)
+static void free_chain_tree(struct string_entries *root)
 {
-	struct rb_node *rbn;
+	struct string_tree *st;
 
-	while((rbn = rb_first(root)) != NULL) {
-		struct string_tree *st = rb_entry(rbn, struct string_tree, rbn);
+	while((st = BSD_RB_ROOT(root)) != NULL) {
 		struct chain *ch = container_of(st, struct chain, st);
 		struct src_chain *sc;
 
@@ -1431,7 +1438,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 		last_output_pattern = r->output_pattern;
 		r->output_pattern = empty_pattern;
 
-		st = string_tree_search(&tf->chain_tree, r->command, r->command_len);
+		st = string_tree_search(&tf->chain_root, r->command, r->command_len);
 		if(!st) {
 			fprintf(stderr, "Error: Unable to find *-chain: '%s'\n", r->command);
 			return -1;
@@ -1528,7 +1535,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 		 * are only extension-specific macros, in which case the rule
 		 * itself determines the foreach-ness.
 		 */
-		st = string_tree_search2(&tf->bang_tree, r->command, r->command_len, NULL);
+		st = string_tree_search(&tf->bang_root, r->command, r->command_len);
 		if(st) {
 			br = container_of(st, struct bang_rule, st);
 			foreach = br->foreach;
@@ -1579,7 +1586,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
-				if(parse_bang_rule(tf, r, &tmp_nl, ext) < 0)
+				if(parse_bang_rule(tf, r, &tmp_nl, ext, strlen(ext)) < 0)
 					return -1;
 			}
 			/* The extension in do_rule() does not include the
@@ -1615,7 +1622,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
-				if(parse_bang_rule(tf, r, NULL, NULL) < 0)
+				if(parse_bang_rule(tf, r, NULL, NULL, 0) < 0)
 					return -1;
 			}
 

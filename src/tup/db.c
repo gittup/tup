@@ -3220,8 +3220,8 @@ static int save_vardict_file(struct vardb *vdb)
 	int dfd;
 	int fd;
 	int rc = -1;
-	struct rb_node *rbn;
 	unsigned int x;
+	struct string_tree *st;
 
 	if(tup_db_var_changed == 0)
 		return 0;
@@ -3242,10 +3242,8 @@ static int save_vardict_file(struct vardb *vdb)
 	}
 	/* Write out index */
 	x = 0;
-	for(rbn = rb_first(&vdb->tree); rbn; rbn = rb_next(rbn)) {
-		struct string_tree *st;
+	RB_FOREACH(st, string_entries, &vdb->root) {
 		struct var_entry *ve;
-		st = rb_entry(rbn, struct string_tree, rbn);
 		ve = container_of(st, struct var_entry, var);
 		if(write(fd, &x, sizeof(x)) != sizeof(x)) {
 			perror("write");
@@ -3258,10 +3256,8 @@ static int save_vardict_file(struct vardb *vdb)
 	}
 
 	/* Write out the variables */
-	for(rbn = rb_first(&vdb->tree); rbn; rbn = rb_next(rbn)) {
-		struct string_tree *st;
+	RB_FOREACH(st, string_entries, &vdb->root) {
 		struct var_entry *ve;
-		st = rb_entry(rbn, struct string_tree, rbn);
 		ve = container_of(st, struct var_entry, var);
 
 		if(write(fd, st->s, st->len) != st->len) {

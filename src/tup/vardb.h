@@ -7,7 +7,7 @@
 struct tup_entry;
 
 struct vardb {
-	struct rb_root tree;
+	struct string_entries root;
 	int count;
 };
 
