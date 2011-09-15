@@ -337,6 +337,7 @@ static int master_fork_loop(void)
 		close(1);
 		close(2);
 	}
+	free(cmd);
 	return 0;
 }
 
