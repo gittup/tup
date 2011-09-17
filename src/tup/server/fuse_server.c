@@ -21,10 +21,6 @@
 
 #define TUP_MNT ".tup/mnt"
 
-#ifdef __APPLE__
-  #define umount2(path, flags) unmount(path, flags)
-#endif
-
 static struct fuse_server {
 	pthread_t pid;
 	struct fuse *fuse;
@@ -61,6 +57,46 @@ static void *fuse_thread(void *arg)
 	return NULL;
 }
 
+#if defined(__linux__)
+static int os_unmount(void)
+{
+	int rc;
+	rc = system("fusermount -u -z " TUP_MNT);
+	if(rc == -1) {
+		perror("system");
+	}
+	return rc;
+}
+#elif defined(__APPLE__)
+static int os_unmount(void)
+{
+	if(unmount(TUP_MNT, MNT_FORCE) < 0) {
+		perror("unmount");
+		return -1;
+	}
+	return 0;
+}
+#else
+#error Unsupported platform. Please add unmounting code to fuse_server.c
+#endif
+
+static int tup_unmount(void)
+{
+	int rc;
+
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		rc = -2;
+	} else {
+		rc = os_unmount();
+	}
+	if(rc != 0) {
+		fprintf(stderr, "tup error: Unable to unmount the fuse file-system on .tup/mnt (return code = %i). You may have to unmount this manually as root: umount -f .tup/mnt\n", rc);
+		return -1;
+	}
+	return 0;
+}
+
 int server_init(enum server_mode mode, struct rb_root *delete_tree)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
@@ -92,12 +128,28 @@ int server_init(enum server_mode mode, struct rb_root *delete_tree)
 
 	if(mkdir(TUP_MNT, 0777) < 0) {
 		if(errno == EEXIST) {
-			/* This directory might be still mounted, let's try to umount it */
-			if(umount2(TUP_MNT, MNT_FORCE) < 0) {
-				if (errno == EPERM || errno == EBUSY) {
-					fprintf(stderr, "tup error: Directory " TUP_MNT " is still mounted. Please unmount it with 'sudo umount -l " TUP_MNT "'.\n");
+			struct stat st;
+			struct stat homest;
+			int try_unmount = 0;
+			if(stat(TUP_MNT, &st) < 0) {
+				try_unmount = 1;
+			} else {
+				if(fstat(tup_top_fd(), &homest) < 0) {
+					perror("fstat");
+					fprintf(stderr, "tup error: Unable to stat the project root directory.\n");
 					return -1;
 				}
+				if(major(st.st_dev) != major(homest.st_dev) ||
+				   minor(st.st_dev) != minor(homest.st_dev)) {
+					try_unmount = 1;
+				}
+			}
+			if(try_unmount) {
+				/* This directory is still mounted, let's try
+				 * to umount it
+				 */
+				if(tup_unmount() < 0)
+					return -1;
 			}
 		} else {
 			perror(TUP_MNT);
@@ -191,16 +243,12 @@ err_out:
 
 int server_quit(void)
 {
-	int fd;
 	if(!server_inited)
 		return 0;
 	close(null_fd);
-	fuse_exit(fs.fuse);
-	fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
-	if(fd >= 0) {
-		fprintf(stderr, "tup internal error: Expected open(%s) to fail on FUSE filesystem\n", TUP_MNT);
+
+	if(tup_unmount() < 0)
 		return -1;
-	}
 	pthread_join(fs.pid, NULL);
 	fs.fuse = NULL;
 	memset(&fs, 0, sizeof(fs));
