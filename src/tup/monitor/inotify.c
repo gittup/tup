@@ -43,7 +43,6 @@
 #include "tup/entry.h"
 #include "tup/fslurp.h"
 #include "tup/server.h"
-#include "linux/rbtree.h"
 
 #define MONITOR_LOOP_RETRY -2
 
