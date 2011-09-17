@@ -3,7 +3,6 @@
 
 #include "tupid.h"
 #include "linux/list.h"
-#include "linux/rbtree.h"
 #include <time.h>
 
 #define TUP_CONFIG "tup.config"
