@@ -1,65 +1,38 @@
 #include "thread_tree.h"
 
+static int thread_tree_cmp(struct thread_tree *tt1, struct thread_tree *tt2)
+{
+	return tt1->id - tt2->id;
+}
+
+RB_GENERATE(thread_entries, thread_tree, linkage, thread_tree_cmp);
+
 struct thread_tree *thread_tree_search(struct thread_root *troot, int id)
 {
-	struct rb_node *node;
+	struct thread_tree tt = {
+		.id = id,
+	};
 	struct thread_tree *ret = NULL;
 
 	pthread_mutex_lock(&troot->lock);
-	node = troot->root.rb_node;
-	while (node) {
-		struct thread_tree *data = rb_entry(node, struct thread_tree, rbn);
-		int result;
-
-		result = id - data->id;
-
-		if (result < 0)
-			node = node->rb_left;
-		else if (result > 0)
-			node = node->rb_right;
-		else {
-			ret = data;
-			break;
-		}
-	}
+	ret = RB_FIND(thread_entries, &troot->root, &tt);
 	pthread_mutex_unlock(&troot->lock);
 	return ret;
 }
 
 int thread_tree_insert(struct thread_root *troot, struct thread_tree *data)
 {
-	struct rb_node **new;
-	struct rb_node *parent = NULL;
-
+	int rc = 0;
 	pthread_mutex_lock(&troot->lock);
-	new = &(troot->root.rb_node);
-	/* Figure out where to put new node */
-	while (*new) {
-		struct thread_tree *this = rb_entry(*new, struct thread_tree, rbn);
-		int result = data->id - this->id;
-
-		parent = *new;
-		if (result < 0)
-			new = &((*new)->rb_left);
-		else if (result > 0)
-			new = &((*new)->rb_right);
-		else {
-			pthread_mutex_unlock(&troot->lock);
-			return -1;
-		}
-	}
-
-	/* Add new node and rebalance tree. */
-	rb_link_node(&data->rbn, parent, new);
-	rb_insert_color(&data->rbn, &troot->root);
-
+	if(RB_INSERT(thread_entries, &troot->root, data) != NULL)
+		rc = -1;
 	pthread_mutex_unlock(&troot->lock);
-	return 0;
+	return rc;
 }
 
 void thread_tree_rm(struct thread_root *troot, struct thread_tree *data)
 {
 	pthread_mutex_lock(&troot->lock);
-	rb_erase(&data->rbn, &troot->root);
+	RB_REMOVE(thread_entries, &troot->root, data);
 	pthread_mutex_unlock(&troot->lock);
 }
