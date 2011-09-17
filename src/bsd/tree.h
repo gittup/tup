@@ -303,8 +303,8 @@ void name##_SPLAY_MINMAX(struct name *head, int __comp) \
 	(root)->rbh_root = NULL;                                        \
 } while (/*CONSTCOND*/ 0)
 
-#define BSD_RB_BLACK        0
-#define BSD_RB_RED          1
+#define RB_BLACK        0
+#define RB_RED          1
 #define RB_ENTRY(type)                                                  \
 	struct {                                                                \
 		struct type *rbe_left;          /* left element */              \
@@ -317,18 +317,18 @@ void name##_SPLAY_MINMAX(struct name *head, int __comp) \
 #define RB_RIGHT(elm, field)            (elm)->field.rbe_right
 #define RB_PARENT(elm, field)           (elm)->field.rbe_parent
 #define RB_COLOR(elm, field)            (elm)->field.rbe_color
-#define BSD_RB_ROOT(head)                   (head)->rbh_root
-#define RB_EMPTY(head)                  (BSD_RB_ROOT(head) == NULL)
+#define RB_ROOT(head)                   (head)->rbh_root
+#define RB_EMPTY(head)                  (RB_ROOT(head) == NULL)
 
 #define RB_SET(elm, parent, field) do {                                 \
 	RB_PARENT(elm, field) = parent;                                 \
 	RB_LEFT(elm, field) = RB_RIGHT(elm, field) = NULL;              \
-	RB_COLOR(elm, field) = BSD_RB_RED;                                  \
+	RB_COLOR(elm, field) = RB_RED;                                  \
 } while (/*CONSTCOND*/ 0)
 
 #define RB_SET_BLACKRED(black, red, field) do {                         \
-	RB_COLOR(black, field) = BSD_RB_BLACK;                              \
-	RB_COLOR(red, field) = BSD_RB_RED;                                  \
+	RB_COLOR(black, field) = RB_BLACK;                              \
+	RB_COLOR(red, field) = RB_RED;                                  \
 } while (/*CONSTCOND*/ 0)
 
 #ifndef RB_AUGMENT
@@ -405,12 +405,12 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)             \
 {                                                                       \
 	struct type *parent, *gparent, *tmp;                            \
 	while ((parent = RB_PARENT(elm, field)) != NULL &&              \
-	       RB_COLOR(parent, field) == BSD_RB_RED) {                        \
+	       RB_COLOR(parent, field) == RB_RED) {                        \
 		gparent = RB_PARENT(parent, field);                     \
 		if (parent == RB_LEFT(gparent, field)) {                \
 			tmp = RB_RIGHT(gparent, field);                 \
-			if (tmp && RB_COLOR(tmp, field) == BSD_RB_RED) {    \
-				RB_COLOR(tmp, field) = BSD_RB_BLACK;        \
+			if (tmp && RB_COLOR(tmp, field) == RB_RED) {    \
+				RB_COLOR(tmp, field) = RB_BLACK;        \
 				RB_SET_BLACKRED(parent, gparent, field);\
 				elm = gparent;                          \
 				continue;                               \
@@ -425,8 +425,8 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)             \
 			RB_ROTATE_RIGHT(head, gparent, tmp, field);     \
 		} else {                                                \
 			tmp = RB_LEFT(gparent, field);                  \
-			if (tmp && RB_COLOR(tmp, field) == BSD_RB_RED) {    \
-				RB_COLOR(tmp, field) = BSD_RB_BLACK;        \
+			if (tmp && RB_COLOR(tmp, field) == RB_RED) {    \
+				RB_COLOR(tmp, field) = RB_BLACK;        \
 				RB_SET_BLACKRED(parent, gparent, field);\
 				elm = gparent;                          \
 				continue;                               \
@@ -441,85 +441,85 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)             \
 			RB_ROTATE_LEFT(head, gparent, tmp, field);      \
 		}                                                       \
 	}                                                               \
-	RB_COLOR(head->rbh_root, field) = BSD_RB_BLACK;                     \
+	RB_COLOR(head->rbh_root, field) = RB_BLACK;                     \
 }                                                                       \
 \
 attr void                                                               \
 name##_RB_REMOVE_COLOR(struct name *head, struct type *parent, struct type *elm) \
 {                                                                       \
 	struct type *tmp;                                               \
-	while ((elm == NULL || RB_COLOR(elm, field) == BSD_RB_BLACK) &&     \
-	       elm != BSD_RB_ROOT(head)) {                                     \
+	while ((elm == NULL || RB_COLOR(elm, field) == RB_BLACK) &&     \
+	       elm != RB_ROOT(head)) {                                     \
 		if (RB_LEFT(parent, field) == elm) {                    \
 			tmp = RB_RIGHT(parent, field);                  \
-			if (RB_COLOR(tmp, field) == BSD_RB_RED) {           \
+			if (RB_COLOR(tmp, field) == RB_RED) {           \
 				RB_SET_BLACKRED(tmp, parent, field);    \
 				RB_ROTATE_LEFT(head, parent, tmp, field);\
 				tmp = RB_RIGHT(parent, field);          \
 			}                                               \
 			if ((RB_LEFT(tmp, field) == NULL ||             \
-			     RB_COLOR(RB_LEFT(tmp, field), field) == BSD_RB_BLACK) &&\
+			     RB_COLOR(RB_LEFT(tmp, field), field) == RB_BLACK) &&\
 			    (RB_RIGHT(tmp, field) == NULL ||            \
-			     RB_COLOR(RB_RIGHT(tmp, field), field) == BSD_RB_BLACK)) {\
-				RB_COLOR(tmp, field) = BSD_RB_RED;          \
+			     RB_COLOR(RB_RIGHT(tmp, field), field) == RB_BLACK)) {\
+				RB_COLOR(tmp, field) = RB_RED;          \
 				elm = parent;                           \
 				parent = RB_PARENT(elm, field);         \
 			} else {                                        \
 				if (RB_RIGHT(tmp, field) == NULL ||     \
-				    RB_COLOR(RB_RIGHT(tmp, field), field) == BSD_RB_BLACK) {\
+				    RB_COLOR(RB_RIGHT(tmp, field), field) == RB_BLACK) {\
 					struct type *oleft;             \
 					if ((oleft = RB_LEFT(tmp, field)) \
 					    != NULL)                    \
-					RB_COLOR(oleft, field) = BSD_RB_BLACK;\
-					RB_COLOR(tmp, field) = BSD_RB_RED;  \
+					RB_COLOR(oleft, field) = RB_BLACK;\
+					RB_COLOR(tmp, field) = RB_RED;  \
 					RB_ROTATE_RIGHT(head, tmp, oleft, field);\
 					tmp = RB_RIGHT(parent, field);  \
 				}                                       \
 				RB_COLOR(tmp, field) = RB_COLOR(parent, field);\
-				RB_COLOR(parent, field) = BSD_RB_BLACK;     \
+				RB_COLOR(parent, field) = RB_BLACK;     \
 				if (RB_RIGHT(tmp, field))               \
-				RB_COLOR(RB_RIGHT(tmp, field), field) = BSD_RB_BLACK;\
+				RB_COLOR(RB_RIGHT(tmp, field), field) = RB_BLACK;\
 				RB_ROTATE_LEFT(head, parent, tmp, field);\
-				elm = BSD_RB_ROOT(head);                    \
+				elm = RB_ROOT(head);                    \
 				break;                                  \
 			}                                               \
 		} else {                                                \
 			tmp = RB_LEFT(parent, field);                   \
-			if (RB_COLOR(tmp, field) == BSD_RB_RED) {           \
+			if (RB_COLOR(tmp, field) == RB_RED) {           \
 				RB_SET_BLACKRED(tmp, parent, field);    \
 				RB_ROTATE_RIGHT(head, parent, tmp, field);\
 				tmp = RB_LEFT(parent, field);           \
 			}                                               \
 			if ((RB_LEFT(tmp, field) == NULL ||             \
-			     RB_COLOR(RB_LEFT(tmp, field), field) == BSD_RB_BLACK) &&\
+			     RB_COLOR(RB_LEFT(tmp, field), field) == RB_BLACK) &&\
 			    (RB_RIGHT(tmp, field) == NULL ||            \
-			     RB_COLOR(RB_RIGHT(tmp, field), field) == BSD_RB_BLACK)) {\
-				RB_COLOR(tmp, field) = BSD_RB_RED;          \
+			     RB_COLOR(RB_RIGHT(tmp, field), field) == RB_BLACK)) {\
+				RB_COLOR(tmp, field) = RB_RED;          \
 				elm = parent;                           \
 				parent = RB_PARENT(elm, field);         \
 			} else {                                        \
 				if (RB_LEFT(tmp, field) == NULL ||      \
-				    RB_COLOR(RB_LEFT(tmp, field), field) == BSD_RB_BLACK) {\
+				    RB_COLOR(RB_LEFT(tmp, field), field) == RB_BLACK) {\
 					struct type *oright;            \
 					if ((oright = RB_RIGHT(tmp, field)) \
 					    != NULL)                    \
-					RB_COLOR(oright, field) = BSD_RB_BLACK;\
-					RB_COLOR(tmp, field) = BSD_RB_RED;  \
+					RB_COLOR(oright, field) = RB_BLACK;\
+					RB_COLOR(tmp, field) = RB_RED;  \
 					RB_ROTATE_LEFT(head, tmp, oright, field);\
 					tmp = RB_LEFT(parent, field);   \
 				}                                       \
 				RB_COLOR(tmp, field) = RB_COLOR(parent, field);\
-				RB_COLOR(parent, field) = BSD_RB_BLACK;     \
+				RB_COLOR(parent, field) = RB_BLACK;     \
 				if (RB_LEFT(tmp, field))                \
-				RB_COLOR(RB_LEFT(tmp, field), field) = BSD_RB_BLACK;\
+				RB_COLOR(RB_LEFT(tmp, field), field) = RB_BLACK;\
 				RB_ROTATE_RIGHT(head, parent, tmp, field);\
-				elm = BSD_RB_ROOT(head);                    \
+				elm = RB_ROOT(head);                    \
 				break;                                  \
 			}                                               \
 		}                                                       \
 	}                                                               \
 	if (elm)                                                        \
-	RB_COLOR(elm, field) = BSD_RB_BLACK;                        \
+	RB_COLOR(elm, field) = RB_BLACK;                        \
 }                                                                       \
 \
 attr struct type *                                                      \
@@ -548,7 +548,7 @@ name##_RB_REMOVE(struct name *head, struct type *elm)                   \
 			RB_RIGHT(parent, field) = child;        \
 			RB_AUGMENT(parent);                             \
 		} else                                                  \
-		BSD_RB_ROOT(head) = child;                          \
+		RB_ROOT(head) = child;                          \
 		if (RB_PARENT(elm, field) == old)                       \
 		parent = elm;                                   \
 		(elm)->field = (old)->field;                            \
@@ -559,7 +559,7 @@ name##_RB_REMOVE(struct name *head, struct type *elm)                   \
 			RB_RIGHT(RB_PARENT(old, field), field) = elm;\
 			RB_AUGMENT(RB_PARENT(old, field));              \
 		} else                                                  \
-		BSD_RB_ROOT(head) = elm;                            \
+		RB_ROOT(head) = elm;                            \
 		RB_PARENT(RB_LEFT(old, field), field) = elm;            \
 		if (RB_RIGHT(old, field))                               \
 		RB_PARENT(RB_RIGHT(old, field), field) = elm;   \
@@ -582,9 +582,9 @@ name##_RB_REMOVE(struct name *head, struct type *elm)                   \
 		RB_RIGHT(parent, field) = child;                \
 		RB_AUGMENT(parent);                                     \
 	} else                                                          \
-	BSD_RB_ROOT(head) = child;                                  \
+	RB_ROOT(head) = child;                                  \
 	color:                                                                  \
-	if (color == BSD_RB_BLACK)                                          \
+	if (color == RB_BLACK)                                          \
 	name##_RB_REMOVE_COLOR(head, parent, child);            \
 	return (old);                                                   \
 }                                                                       \
@@ -596,7 +596,7 @@ name##_RB_INSERT(struct name *head, struct type *elm)                   \
 	struct type *tmp;                                               \
 	struct type *parent = NULL;                                     \
 	int comp = 0;                                                   \
-	tmp = BSD_RB_ROOT(head);                                            \
+	tmp = RB_ROOT(head);                                            \
 	while (tmp) {                                                   \
 		parent = tmp;                                           \
 		comp = (cmp)(elm, parent);                              \
@@ -615,7 +615,7 @@ name##_RB_INSERT(struct name *head, struct type *elm)                   \
 		RB_RIGHT(parent, field) = elm;                  \
 		RB_AUGMENT(parent);                                     \
 	} else                                                          \
-	BSD_RB_ROOT(head) = elm;                                    \
+	RB_ROOT(head) = elm;                                    \
 	name##_RB_INSERT_COLOR(head, elm);                              \
 	return (NULL);                                                  \
 }                                                                       \
@@ -624,7 +624,7 @@ name##_RB_INSERT(struct name *head, struct type *elm)                   \
 attr struct type *                                                      \
 name##_RB_FIND(struct name *head, struct type *elm)                     \
 {                                                                       \
-	struct type *tmp = BSD_RB_ROOT(head);                               \
+	struct type *tmp = RB_ROOT(head);                               \
 	int comp;                                                       \
 	while (tmp) {                                                   \
 		comp = cmp(elm, tmp);                                   \
@@ -642,7 +642,7 @@ name##_RB_FIND(struct name *head, struct type *elm)                     \
 attr struct type *                                                      \
 name##_RB_NFIND(struct name *head, struct type *elm)                    \
 {                                                                       \
-	struct type *tmp = BSD_RB_ROOT(head);                               \
+	struct type *tmp = RB_ROOT(head);                               \
 	struct type *res = NULL;                                        \
 	int comp;                                                       \
 	while (tmp) {                                                   \
@@ -706,7 +706,7 @@ name##_RB_PREV(struct type *elm)                                        \
 attr struct type *                                                      \
 name##_RB_MINMAX(struct name *head, int val)                            \
 {                                                                       \
-	struct type *tmp = BSD_RB_ROOT(head);                               \
+	struct type *tmp = RB_ROOT(head);                               \
 	struct type *parent = NULL;                                     \
 	while (tmp) {                                                   \
 		parent = tmp;                                           \

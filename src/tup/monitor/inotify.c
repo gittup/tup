@@ -225,7 +225,7 @@ int monitor(int argc, char **argv)
 			 * we return from tup_lock_init(). Then we should be
 			 * good to go.
 			 */
-			while((tt = BSD_RB_ROOT(&droot.wd_root)) != NULL) {
+			while((tt = RB_ROOT(&droot.wd_root)) != NULL) {
 				struct dircache *dc = container_of(tt, struct dircache, wd_node);
 				inotify_rm_watch(inot_fd, dc->wd_node.tupid);
 				dircache_del(&droot, dc);

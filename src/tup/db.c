@@ -3399,7 +3399,7 @@ int tup_db_scan_end(struct tupid_entries *root)
 {
 	struct tupid_tree *tt;
 
-	while((tt = BSD_RB_ROOT(root)) != NULL) {
+	while((tt = RB_ROOT(root)) != NULL) {
 		struct tup_entry *tent;
 
 		/* It is possible that the node has already been removed. For

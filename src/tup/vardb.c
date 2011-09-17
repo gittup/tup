@@ -17,7 +17,7 @@ int vardb_close(struct vardb *v)
 {
 	struct string_tree *st;
 
-	while((st = BSD_RB_ROOT(&v->root)) != NULL) {
+	while((st = RB_ROOT(&v->root)) != NULL) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 		string_tree_rm(&v->root, st);
 		free(st->s);

@@ -1235,7 +1235,7 @@ static void free_bang_tree(struct string_entries *root)
 {
 	struct string_tree *st;
 
-	while((st = BSD_RB_ROOT(root)) != NULL) {
+	while((st = RB_ROOT(root)) != NULL) {
 		struct bang_rule *br = container_of(st, struct bang_rule, st);
 
 		string_tree_free(root, st);
@@ -1258,7 +1258,7 @@ static void free_chain_tree(struct string_entries *root)
 {
 	struct string_tree *st;
 
-	while((st = BSD_RB_ROOT(root)) != NULL) {
+	while((st = RB_ROOT(root)) != NULL) {
 		struct chain *ch = container_of(st, struct chain, st);
 		struct src_chain *sc;
 

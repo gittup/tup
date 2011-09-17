@@ -258,7 +258,7 @@ static int delete_files(struct graph *g)
 		tup_main_progress("No files to delete.\n");
 	}
 	entrylist = tup_entry_get_list();
-	while((tt = BSD_RB_ROOT(&g->delete_root)) != NULL) {
+	while((tt = RB_ROOT(&g->delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int do_delete;
 

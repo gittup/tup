@@ -84,7 +84,7 @@ void free_tupid_tree(struct tupid_entries *root)
 {
 	struct tupid_tree *tt;
 
-	while((tt = BSD_RB_ROOT(root)) != NULL) {
+	while((tt = RB_ROOT(root)) != NULL) {
 		tupid_tree_rm(root, tt);
 		free(tt);
 	}
