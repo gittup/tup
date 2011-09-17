@@ -2,52 +2,30 @@
 #include "db.h"
 #include <stdlib.h>
 
-struct tupid_tree *tupid_tree_search(struct rb_root *root, tupid_t tupid)
+static int tupid_tree_cmp(struct tupid_tree *tt1, struct tupid_tree *tt2)
 {
-	struct rb_node *node = root->rb_node;
-
-	while (node) {
-		struct tupid_tree *data = rb_entry(node, struct tupid_tree, rbn);
-		int result;
-
-		result = tupid - data->tupid;
-
-		if (result < 0)
-			node = node->rb_left;
-		else if (result > 0)
-			node = node->rb_right;
-		else
-			return data;
-	}
-	return NULL;
+	return tt1->tupid - tt2->tupid;
 }
 
-int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data)
+RB_GENERATE(tupid_entries, tupid_tree, linkage, tupid_tree_cmp);
+
+struct tupid_tree *tupid_tree_search(struct tupid_entries *root, tupid_t tupid)
 {
-	struct rb_node **new = &(root->rb_node), *parent = NULL;
+	struct tupid_tree tt = {
+		.tupid = tupid,
+	};
+	return RB_FIND(tupid_entries, root, &tt);
+}
 
-	/* Figure out where to put new node */
-	while (*new) {
-		struct tupid_tree *this = rb_entry(*new, struct tupid_tree, rbn);
-		int result = data->tupid - this->tupid;
-
-		parent = *new;
-		if (result < 0)
-			new = &((*new)->rb_left);
-		else if (result > 0)
-			new = &((*new)->rb_right);
-		else
-			return -1;
+int tupid_tree_insert(struct tupid_entries *root, struct tupid_tree *data)
+{
+	if(RB_INSERT(tupid_entries, root, data) != NULL) {
+		return -1;
 	}
-
-	/* Add new node and rebalance tree. */
-	rb_link_node(&data->rbn, parent, new);
-	rb_insert_color(&data->rbn, root);
-
 	return 0;
 }
 
-int tupid_tree_add(struct rb_root *root, tupid_t tupid)
+int tupid_tree_add(struct tupid_entries *root, tupid_t tupid)
 {
 	struct tupid_tree *tt;
 
@@ -65,7 +43,7 @@ int tupid_tree_add(struct rb_root *root, tupid_t tupid)
 	return 0;
 }
 
-int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid)
+int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid)
 {
 	struct tupid_tree *tt;
 
@@ -80,19 +58,17 @@ int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid)
 	return 0;
 }
 
-int tupid_tree_copy(struct rb_root *dest, struct rb_root *src)
+int tupid_tree_copy(struct tupid_entries *dest, struct tupid_entries *src)
 {
-	struct rb_node *rbn;
-	for(rbn = rb_first(src); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tt;
-		tt = rb_entry(rbn, struct tupid_tree, rbn);
+	struct tupid_tree *tt;
+	RB_FOREACH(tt, tupid_entries, src) {
 		if(tupid_tree_add(dest, tt->tupid) < 0)
 			return -1;
 	}
 	return 0;
 }
 
-void tupid_tree_remove(struct rb_root *root, tupid_t tupid)
+void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid)
 {
 	struct tupid_tree *tt;
 
@@ -104,18 +80,17 @@ void tupid_tree_remove(struct rb_root *root, tupid_t tupid)
 	free(tt);
 }
 
-void free_tupid_tree(struct rb_root *root)
+void free_tupid_tree(struct tupid_entries *root)
 {
-	struct rb_node *rbn;
+	struct tupid_tree *tt;
 
-	while((rbn = rb_first(root)) != NULL) {
-		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
-		rb_erase(rbn, root);
+	while((tt = BSD_RB_ROOT(root)) != NULL) {
+		tupid_tree_rm(root, tt);
 		free(tt);
 	}
 }
 
-int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count)
+int tree_entry_add(struct tupid_entries *root, tupid_t tupid, int type, int *count)
 {
 	struct tree_entry *te;
 
@@ -126,7 +101,7 @@ int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count)
 	}
 	te->tnode.tupid = tupid;
 	te->type = type;
-	if(tupid_tree_insert(tree, &te->tnode) < 0) {
+	if(tupid_tree_insert(root, &te->tnode) < 0) {
 		fprintf(stderr, "tup internal error: Duplicate tupid %lli in tree_entry_add?\n", tupid);
 		free(te);
 		return -1;
@@ -137,15 +112,15 @@ int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count)
 	return 0;
 }
 
-void tree_entry_remove(struct rb_root *tree, tupid_t tupid, int *count)
+void tree_entry_remove(struct tupid_entries *root, tupid_t tupid, int *count)
 {
 	struct tree_entry *te;
 	struct tupid_tree *tt;
 
-	tt = tupid_tree_search(tree, tupid);
+	tt = tupid_tree_search(root, tupid);
 	if(!tt)
 		return;
-	rb_erase(&tt->rbn, tree);
+	tupid_tree_rm(root, tt);
 	te = container_of(tt, struct tree_entry, tnode);
 	if(te->type == TUP_NODE_GENERATED && count)
 		(*count)--;

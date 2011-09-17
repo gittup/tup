@@ -31,6 +31,7 @@ struct file_info {
 };
 
 struct tup_entry;
+struct tupid_entries;
 
 int init_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);
@@ -42,7 +43,7 @@ int handle_open_file(enum access_type at, const char *filename,
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings, int check_only);
-int add_parser_files(struct file_info *info, struct rb_root *root);
+int add_parser_files(struct file_info *info, struct tupid_entries *root);
 void del_map(struct mapping *map);
 
 #endif

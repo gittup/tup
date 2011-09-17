@@ -38,9 +38,9 @@ struct graph {
 	struct node *root;
 	struct node *cur;
 	int num_nodes;
-	struct rb_root tree;
+	struct tupid_entries node_root;
 	int count_flags;
-	struct rb_root delete_tree;
+	struct tupid_entries delete_root;
 	int delete_count;
 };
 

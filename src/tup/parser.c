@@ -114,9 +114,9 @@ struct tupfile {
 	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
-	struct rb_root cmd_tree;
+	struct tupid_entries cmd_root;
 	struct string_entries bang_root;
-	struct rb_root input_tree;
+	struct tupid_entries input_root;
 	struct string_entries chain_root;
 	int ign;
 };
@@ -212,9 +212,9 @@ int parse(struct node *n, struct graph *g)
 	tf.curtent = tup_entry_get(tf.tupid);
 	tf.root_fd = s.root_fd;
 	tf.g = g;
-	tf.cmd_tree.rb_node = NULL;
+	RB_INIT(&tf.cmd_root);
 	RB_INIT(&tf.bang_root);
-	tf.input_tree.rb_node = NULL;
+	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
@@ -224,9 +224,9 @@ int parse(struct node *n, struct graph *g)
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_root, &g->delete_count, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_tree, &g->delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_root, &g->delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
 	tf.dfd = tup_entry_openat(s.root_fd, n->tent);
@@ -274,9 +274,9 @@ out_server_stop:
 		rc = -1;
 
 	if(rc == 0) {
-		if(add_parser_files(&s.finfo, &tf.input_tree) < 0)
+		if(add_parser_files(&s.finfo, &tf.input_root) < 0)
 			rc = -1;
-		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_tree) < 0)
+		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_root) < 0)
 			rc = -1;
 	} else {
 		fprintf(stderr, "tup error: Failed to parse Tupfile in directory '");
@@ -284,9 +284,9 @@ out_server_stop:
 		fprintf(stderr, "'\n");
 	}
 	free_chain_tree(&tf.chain_root);
-	free_tupid_tree(&tf.cmd_tree);
+	free_tupid_tree(&tf.cmd_root);
 	free_bang_tree(&tf.bang_root);
-	free_tupid_tree(&tf.input_tree);
+	free_tupid_tree(&tf.input_root);
 
 	return rc;
 }
@@ -570,7 +570,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	} else {
 		rc = 0;
 	}
-	if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
+	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 		return -1;
 	return rc;
 }
@@ -672,7 +672,7 @@ static int gitignore(struct tupfile *tf)
 	int len;
 	int fd;
 
-	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_tree) < 0)
+	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_root) < 0)
 		return -1;
 	if((s && len) || tf->tupid == 1) {
 		struct tup_entry *tent;
@@ -683,7 +683,7 @@ static int gitignore(struct tupfile *tf)
 			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) == NULL)
 				return -1;
 		} else {
-			tree_entry_remove(&tf->g->delete_tree,
+			tree_entry_remove(&tf->g->delete_root,
 					  tent->tnode.tupid,
 					  &tf->g->delete_count);
 		}
@@ -1981,7 +1981,7 @@ static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 				if(parse(n, g) < 0)
 					return -1;
 			}
-			if(tupid_tree_add_dup(&tf->input_tree, pl->dt) < 0)
+			if(tupid_tree_add_dup(&tf->input_root, pl->dt) < 0)
 				return -1;
 		}
 	}
@@ -2055,7 +2055,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			tup_db_print(stderr, tent->tnode.tupid);
 			return -1;
 		}
-		if(tupid_tree_search(&tf->g->delete_tree, tent->tnode.tupid) != NULL) {
+		if(tupid_tree_search(&tf->g->delete_root, tent->tnode.tupid) != NULL) {
 			if(!required)
 				return 0;
 			/* If the file is in the modify list, it is going to be
@@ -2070,7 +2070,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	} else {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->delete_tree) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->delete_root) < 0)
 			return -1;
 	}
 	return 0;
@@ -2178,7 +2178,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 }
 
 static int find_existing_command(const struct name_list *onl,
-				 struct rb_root *del_tree,
+				 struct tupid_entries *del_root,
 				 tupid_t *cmdid)
 {
 	struct name_list_entry *onle;
@@ -2189,13 +2189,13 @@ static int find_existing_command(const struct name_list *onl,
 		rc = tup_db_get_incoming_link(onle->tent->tnode.tupid, &incoming);
 		if(rc < 0)
 			return -1;
-		/* Only want commands that are still in the del_tree. Any
-		 * command not in the del_tree will mean it has already been
+		/* Only want commands that are still in the del_root. Any
+		 * command not in the del_root will mean it has already been
 		 * parsed, and so will probably cause an error later in the
 		 * duplicate link check.
 		 */
 		if(incoming != -1) {
-			if(tupid_tree_search(del_tree, incoming) != NULL) {
+			if(tupid_tree_search(del_root, incoming) != NULL) {
 				*cmdid = incoming;
 				return 0;
 			}
@@ -2219,7 +2219,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tupid_tree *cmd_tt;
 	tupid_t cmdid = -1;
 	LIST_HEAD(oplist);
-	struct rb_root tree = {NULL};
+	struct tupid_entries root = {NULL};
 	int extra_outputs = 0;
 	char sep[] = "|";
 	struct tup_entry *tmptent = NULL;
@@ -2353,7 +2353,7 @@ out_pl:
 	if(tmptent) {
 		cmdid = tmptent->tnode.tupid;
 	} else {
-		if(find_existing_command(&onl, &tf->g->delete_tree, &cmdid) < 0)
+		if(find_existing_command(&onl, &tf->g->delete_root, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
 			cmdid = create_command_file(tf->tupid, cmd);
@@ -2373,21 +2373,21 @@ out_pl:
 		return -1;
 	}
 	cmd_tt->tupid = cmdid;
-	if(tupid_tree_insert(&tf->cmd_tree, cmd_tt) < 0) {
+	if(tupid_tree_insert(&tf->cmd_root, cmd_tt) < 0) {
 		fprintf(stderr, "Error: Attempted to add duplicate command ID %lli\n", cmdid);
 		tup_db_print(stderr, cmdid);
 		return -1;
 	}
-	tree_entry_remove(&tf->g->delete_tree, cmdid, &tf->g->delete_count);
+	tree_entry_remove(&tf->g->delete_root, cmdid, &tf->g->delete_count);
 
 	while(!list_empty(&onl.entries)) {
 		onle = list_entry(onl.entries.next, struct name_list_entry,
 				  list);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_tree, &tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
+		tree_entry_remove(&tf->g->delete_root, onle->tent->tnode.tupid,
 				  &tf->g->delete_count);
 		move_name_list_entry(output_nl, &onl, onle);
 	}
@@ -2395,34 +2395,34 @@ out_pl:
 	while(!list_empty(&extra_onl.entries)) {
 		onle = list_entry(extra_onl.entries.next, struct name_list_entry,
 				  list);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_tree, &tree) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		tree_entry_remove(&tf->g->delete_tree, onle->tent->tnode.tupid,
+		tree_entry_remove(&tf->g->delete_root, onle->tent->tnode.tupid,
 				  &tf->g->delete_count);
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &tree) < 0)
+	if(tup_db_write_outputs(cmdid, &root) < 0)
 		return -1;
-	free_tupid_tree(&tree);
+	free_tupid_tree(&root);
 
 	list_for_each_entry(nle, &nl->entries, list) {
-		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
+		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
-		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
+		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
-		if(tupid_tree_add_dup(&tree, nle->tent->tnode.tupid) < 0)
+		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &tree, &tf->g->delete_tree) < 0)
+	if(tup_db_write_inputs(cmdid, &root, &tf->g->delete_root) < 0)
 		return -1;
-	free_tupid_tree(&tree);
+	free_tupid_tree(&root);
 	return 0;
 }
 
@@ -2938,7 +2938,7 @@ static char *eval(struct tupfile *tf, const char *string)
 					tent = tup_db_get_var(atvar, rparen-atvar, &p);
 					if(!tent)
 						return NULL;
-					if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
+					if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 						return NULL;
 				} else {
 					if(vardb_copy(&tf->vdb, var, rparen-var, &p) < 0)
@@ -2965,7 +2965,7 @@ static char *eval(struct tupfile *tf, const char *string)
 				tent = tup_db_get_var(var, rparen-var, &p);
 				if(!tent)
 					return NULL;
-				if(tupid_tree_add_dup(&tf->input_tree, tent->tnode.tupid) < 0)
+				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {

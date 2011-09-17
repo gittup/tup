@@ -2,10 +2,9 @@
 #define tup_path_h
 
 #include "tupid.h"
+#include "tupid_tree.h"
 
-struct rb_root;
-
-int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
+int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *tree,
 	       int (*callback)(tupid_t newdt, int dfd, const char *file));
 int tup_scan(void);
 

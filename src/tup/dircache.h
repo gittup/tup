@@ -2,7 +2,6 @@
 #define dircache_h
 
 #include "tupid_tree.h"
-#include "linux/rbtree.h"
 
 /* The tupid in wd_node isn't a real tupid, but rather the watch descriptor
  * for inotify. The tupid in dt_node is the directory's tupid, like usual.
@@ -16,8 +15,8 @@ struct dircache {
  * watch descriptor or the dir tupid.
  */
 struct dircache_root {
-	struct rb_root wd_tree;
-	struct rb_root dt_tree;
+	struct tupid_entries wd_root;
+	struct tupid_entries dt_root;
 };
 
 /* Initializes the dircache_root structure */

@@ -17,7 +17,7 @@ static char root_name[] = "root";
 struct node *find_node(struct graph *g, tupid_t tupid)
 {
 	struct tupid_tree *tnode;
-	tnode = tupid_tree_search(&g->tree, tupid);
+	tnode = tupid_tree_search(&g->node_root, tupid);
 	if(!tnode)
 		return NULL;
 	return container_of(tnode, struct node, tnode);
@@ -42,7 +42,7 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	n->parsing = 0;
 	list_add_tail(&n->list, &g->node_list);
 
-	if(tupid_tree_insert(&g->tree, &n->tnode) < 0)
+	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
 		return NULL;
 	return n;
 }
@@ -67,7 +67,7 @@ void remove_node(struct graph *g, struct node *n)
 	if(!list_empty(&n->incoming)) {
 		DEBUGP("Warning: Node %lli still has incoming edges.\n", n->tnode.tupid);
 	}
-	rb_erase(&n->tnode.rbn, &g->tree);
+	tupid_tree_rm(&g->node_root, &n->tnode);
 	free(n);
 }
 
@@ -111,10 +111,10 @@ int create_graph(struct graph *g, int count_flags)
 
 	INIT_LIST_HEAD(&g->node_list);
 	INIT_LIST_HEAD(&g->plist);
-	g->delete_tree.rb_node = NULL;
+	RB_INIT(&g->delete_root);
 	g->delete_count = 0;
 
-	g->tree.rb_node = NULL;
+	RB_INIT(&g->node_root);
 
 	g->cur = g->root = create_node(g, &root_entry);
 	if(!g->root)

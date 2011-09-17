@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
+int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root,
 	       int (*callback)(tupid_t newdt, int dfd, const char *file))
 {
 	struct flist f = {0, 0, 0};
@@ -39,8 +39,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		tupid = tup_file_mod_mtime(dt, file, buf.st_mtime, 0);
 		if(tupid < 0)
 			return -1;
-		if(tree) {
-			tupid_tree_remove(tree, tupid);
+		if(root) {
+			tupid_tree_remove(root, tupid);
 		}
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
@@ -49,8 +49,8 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 		int gitignore_found = 0;
 
 		newdt = create_dir_file(dt, file);
-		if(tree) {
-			tupid_tree_remove(tree, newdt);
+		if(root) {
+			tupid_tree_remove(root, newdt);
 		}
 
 		if(callback) {
@@ -78,7 +78,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 					gitignore_found = 1;
 				continue;
 			}
-			if(watch_path(newdt, newfd, f.filename, tree,
+			if(watch_path(newdt, newfd, f.filename, root,
 				      callback) < 0)
 				return -1;
 		}
@@ -102,12 +102,12 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct rb_root *tree,
 
 int tup_scan(void)
 {
-	struct rb_root scan_tree = RB_ROOT;
-	if(tup_db_scan_begin(&scan_tree) < 0)
+	struct tupid_entries scan_root = {NULL};
+	if(tup_db_scan_begin(&scan_root) < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", &scan_tree, NULL) < 0)
+	if(watch_path(0, tup_top_fd(), ".", &scan_root, NULL) < 0)
 		return -1;
-	if(tup_db_scan_end(&scan_tree) < 0)
+	if(tup_db_scan_end(&scan_root) < 0)
 		return -1;
 	return 0;
 }

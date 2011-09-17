@@ -246,8 +246,8 @@ static int run_scan(void)
 
 static int delete_files(struct graph *g)
 {
-	struct rb_node *rbn;
 	int num_deleted = 0;
+	struct tupid_tree *tt;
 	struct tup_entry *tent;
 	struct list_head *entrylist;
 	int rc = -1;
@@ -258,8 +258,7 @@ static int delete_files(struct graph *g)
 		tup_main_progress("No files to delete.\n");
 	}
 	entrylist = tup_entry_get_list();
-	while((rbn = rb_first(&g->delete_tree)) != NULL) {
-		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+	while((tt = BSD_RB_ROOT(&g->delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int do_delete;
 
@@ -290,7 +289,7 @@ static int delete_files(struct graph *g)
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				goto out_err;
 		}
-		rb_erase(rbn, &g->delete_tree);
+		tupid_tree_rm(&g->delete_root, tt);
 		free(te);
 	}
 	if(!list_empty(entrylist)) {
@@ -362,7 +361,7 @@ static int process_create_nodes(void)
 	}
 
 	tup_db_begin();
-	if(server_init(SERVER_PARSER_MODE, &g.delete_tree) < 0) {
+	if(server_init(SERVER_PARSER_MODE, &g.delete_root) < 0) {
 		return -1;
 	}
 	/* create_work must always use only 1 thread since no locking is done */

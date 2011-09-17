@@ -97,12 +97,12 @@ static int tup_unmount(void)
 	return 0;
 }
 
-int server_init(enum server_mode mode, struct rb_root *delete_tree)
+int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	struct flist f = {0, 0, 0};
 
-	tup_fuse_set_parser_mode(mode, delete_tree);
+	tup_fuse_set_parser_mode(mode, delete_root);
 
 	if(server_inited)
 		return 0;

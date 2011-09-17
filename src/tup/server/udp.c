@@ -30,12 +30,12 @@ int server_post_exit(void)
 	return 0;
 }
 
-int server_init(enum server_mode mode, struct rb_root *delete_tree)
+int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
 
-	if(mode || delete_tree) {/* unused */}
+	if(mode || delete_root) {/* unused */}
 
 	if(server_inited)
 		return 0;

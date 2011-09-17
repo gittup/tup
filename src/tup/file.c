@@ -36,7 +36,8 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct list_head *entrylist);
 static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct list_head *entrylist);
-static int add_parser_files_locked(struct file_info *finfo, struct rb_root *root);
+static int add_parser_files_locked(struct file_info *finfo,
+				   struct tupid_entries *root);
 
 int init_file_info(struct file_info *info)
 {
@@ -148,7 +149,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	return -1;
 }
 
-int add_parser_files(struct file_info *finfo, struct rb_root *root)
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root)
 {
 	int rc;
 	finfo_lock(finfo);
@@ -157,7 +158,8 @@ int add_parser_files(struct file_info *finfo, struct rb_root *root)
 	return rc;
 }
 
-static int add_parser_files_locked(struct file_info *finfo, struct rb_root *root)
+static int add_parser_files_locked(struct file_info *finfo,
+				   struct tupid_entries *root)
 {
 	struct file_entry *r;
 	struct mapping *map;

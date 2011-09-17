@@ -7,7 +7,7 @@
 #include "pel_group.h"
 #include <pthread.h>
 
-struct rb_root;
+struct tupid_entries;
 struct tup_entry;
 
 struct server {
@@ -40,7 +40,7 @@ enum server_mode {
 
 int server_pre_init(void);
 int server_post_exit(void);
-int server_init(enum server_mode mode, struct rb_root *delete_tree);
+int server_init(enum server_mode mode, struct tupid_entries *delete_root);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd,
 		struct tup_entry *dtent);

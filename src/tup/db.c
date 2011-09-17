@@ -118,7 +118,7 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
 static int link_remove(tupid_t a, tupid_t b);
 static int node_has_ghosts(tupid_t tupid);
-static int files_to_tree(struct rb_root *tree);
+static int files_to_tree(struct tupid_entries *root);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int reclaim_ghosts(void);
@@ -131,8 +131,8 @@ static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int generated_nodelist_len(tupid_t dt);
-static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree,
-				  int *total_len);
+static int get_generated_nodelist(char *dest, tupid_t dt,
+				  struct tupid_entries *root, int *total_len);
 static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct list_head *list);
 static int get_dir_entries(tupid_t dt, struct list_head *list);
@@ -1141,7 +1141,7 @@ out_reset:
 
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
-				int len, struct rb_root *delete_tree)
+				int len, struct tupid_entries *delete_root)
 {
 	int rc;
 	int dbrc;
@@ -1193,7 +1193,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_tree_search(delete_tree, tupid) == NULL) {
+		if(tupid_tree_search(delete_root, tupid) == NULL) {
 			tent = tup_entry_find(tupid);
 			if(!tent) {
 				name = (const char *)sqlite3_column_text(*stmt, 1);
@@ -1722,7 +1722,7 @@ int tup_db_print(FILE *stream, tupid_t tupid)
 }
 
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
-				    struct rb_root *tree)
+				    struct tupid_entries *root)
 {
 	int alloc_len;
 
@@ -1741,7 +1741,7 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 		perror("calloc");
 		return -1;
 	}
-	if(get_generated_nodelist(*s, dt, tree, len) < 0)
+	if(get_generated_nodelist(*s, dt, root, len) < 0)
 		return -1;
 	return 0;
 }
@@ -1793,8 +1793,8 @@ out_reset:
 	return rc;
 }
 
-static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree,
-				  int *total_len)
+static int get_generated_nodelist(char *dest, tupid_t dt,
+				  struct tupid_entries *root, int *total_len)
 {
 	int rc;
 	int dbrc;
@@ -1833,7 +1833,7 @@ static int get_generated_nodelist(char *dest, tupid_t dt, struct rb_root *tree,
 			rc = -1;
 			goto out_reset;
 		}
-		if(tupid_tree_search(tree, sqlite3_column_int64(*stmt, 2)) != NULL) {
+		if(tupid_tree_search(root, sqlite3_column_int64(*stmt, 2)) != NULL) {
 			continue;
 		}
 		*p = PATH_SEP;
@@ -2356,8 +2356,8 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *deltree,
-			      struct rb_root *tree)
+int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroot,
+			      struct tupid_entries *root)
 {
 	int rc;
 	tupid_t incoming;
@@ -2366,7 +2366,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *deltree,
 	if(rc < 0)
 		return -1;
 	if(incoming != -1) {
-		if(tupid_tree_search(deltree, incoming) != NULL) {
+		if(tupid_tree_search(delroot, incoming) != NULL) {
 			/* Delete any old links (t6029) */
 			if(link_remove(incoming, b) < 0)
 				return -1;
@@ -2375,7 +2375,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct rb_root *deltree,
 	}
 	/* See if we already own the link, or if the link doesn't exist yet */
 	if(a == incoming || incoming == -1) {
-		if(tupid_tree_add(tree, b) < 0)
+		if(tupid_tree_add(root, b) < 0)
 			return -1;
 		return 0;
 	}
@@ -2568,7 +2568,7 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct rb_root *tree, int *count, int type)
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type)
 {
 	int rc = 0;
 	int dbrc;
@@ -2608,7 +2608,7 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct rb_root *tree, int *count, int typ
 
 		tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(tree_entry_add(tree, tupid, type, count) < 0) {
+		if(tree_entry_add(root, tupid, type, count) < 0) {
 			rc = -1;
 			break;
 		}
@@ -3385,22 +3385,21 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 	return 0;
 }
 
-int tup_db_scan_begin(struct rb_root *tree)
+int tup_db_scan_begin(struct tupid_entries *root)
 {
 	if(tup_db_begin() < 0)
 		return -1;
-	if(files_to_tree(tree) < 0)
+	if(files_to_tree(root) < 0)
 		return -1;
-	tupid_tree_remove(tree, VAR_DT);
+	tupid_tree_remove(root, VAR_DT);
 	return 0;
 }
 
-int tup_db_scan_end(struct rb_root *tree)
+int tup_db_scan_end(struct tupid_entries *root)
 {
-	struct rb_node *rbn;
+	struct tupid_tree *tt;
 
-	while((rbn = rb_first(tree)) != NULL) {
-		struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+	while((tt = BSD_RB_ROOT(root)) != NULL) {
 		struct tup_entry *tent;
 
 		/* It is possible that the node has already been removed. For
@@ -3413,7 +3412,7 @@ int tup_db_scan_end(struct rb_root *tree)
 			if(tup_file_missing(tent) < 0)
 				return -1;
 		}
-		tupid_tree_rm(tree, tt);
+		tupid_tree_rm(root, tt);
 		free(tt);
 	}
 
@@ -3422,7 +3421,7 @@ int tup_db_scan_end(struct rb_root *tree)
 	return 0;
 }
 
-static int files_to_tree(struct rb_root *tree)
+static int files_to_tree(struct tupid_entries *root)
 {
 	int rc = -1;
 	int dbrc;
@@ -3474,7 +3473,7 @@ static int files_to_tree(struct rb_root *tree)
 		mtime = sqlite3_column_int64(*stmt, 3);
 		name = (const char*)sqlite3_column_text(*stmt, 4);
 
-		if(tup_entry_add_all(tupid, dt, type, mtime, name, tree) < 0)
+		if(tup_entry_add_all(tupid, dt, type, mtime, name, root) < 0)
 			break;
 	}
 
@@ -3489,7 +3488,7 @@ static int files_to_tree(struct rb_root *tree)
 	return rc;
 }
 
-static int get_output_tree(tupid_t cmdid, struct rb_root *output_tree)
+static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 {
 	int rc = 0;
 	int dbrc;
@@ -3524,7 +3523,7 @@ static int get_output_tree(tupid_t cmdid, struct rb_root *output_tree)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add(output_tree, tupid);
+		rc = tupid_tree_add(output_root, tupid);
 
 		if(rc < 0) {
 			fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
@@ -3540,8 +3539,8 @@ static int get_output_tree(tupid_t cmdid, struct rb_root *output_tree)
 	return rc;
 }
 
-static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
-		     struct rb_root *normal_tree)
+static int get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
+		     struct tupid_entries *normal_root)
 {
 	int rc = 0;
 	int dbrc;
@@ -3579,10 +3578,10 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 		tupid = sqlite3_column_int64(*stmt, 0);
 		style = sqlite3_column_int(*stmt, 1);
 		if(style & TUP_LINK_STICKY) {
-			rc = tupid_tree_add(sticky_tree, tupid);
+			rc = tupid_tree_add(sticky_root, tupid);
 		}
 		if(style & TUP_LINK_NORMAL) {
-			rc = tupid_tree_add(normal_tree, tupid);
+			rc = tupid_tree_add(normal_root, tupid);
 		}
 
 		if(rc < 0) {
@@ -3599,12 +3598,12 @@ static int get_links(tupid_t cmdid, struct rb_root *sticky_tree,
 	return rc;
 }
 
-static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
+static int compare_list_tree(struct list_head *a, struct tupid_entries *b,
+			     void *data,
 			     int (*extra_a)(tupid_t tupid, void *data),
 			     int (*extra_b)(tupid_t tupid, void *data))
 {
 	struct tup_entry *tent;
-	struct rb_node *nb;
 	struct tupid_tree *ttb;
 
 	list_for_each_entry(tent, a, list) {
@@ -3618,8 +3617,7 @@ static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
 		}
 	}
 
-	for(nb = rb_first(b); nb; nb = rb_next(nb)) {
-		ttb = rb_entry(nb, struct tupid_tree, rbn);
+	RB_FOREACH(ttb, tupid_entries, b) {
 		if(extra_b && extra_b(ttb->tupid, data) < 0)
 			return -1;
 	}
@@ -3627,44 +3625,39 @@ static int compare_list_tree(struct list_head *a, struct rb_root *b, void *data,
 	return 0;
 }
 
-static int compare_trees(struct rb_root *a, struct rb_root *b, void *data,
+static int compare_trees(struct tupid_entries *a, struct tupid_entries *b,
+			 void *data,
 			 int (*extra_a)(tupid_t tupid, void *data),
 			 int (*extra_b)(tupid_t tupid, void *data))
 {
-	struct rb_node *na;
-	struct rb_node *nb;
 	struct tupid_tree *tta;
 	struct tupid_tree *ttb;
 
-	na = rb_first(a);
-	nb = rb_first(b);
+	tta = RB_MIN(tupid_entries, a);
+	ttb = RB_MIN(tupid_entries, b);
 
-	while(na || nb) {
-		if(!na) {
-			ttb = container_of(nb, struct tupid_tree, rbn);
+	while(tta || ttb) {
+		if(!tta) {
 			if(extra_b && extra_b(ttb->tupid, data) < 0)
 				return -1;
-			nb = rb_next(nb);
-		} else if(!nb) {
-			tta = container_of(na, struct tupid_tree, rbn);
+			ttb = RB_NEXT(tupid_entries, b, ttb);
+		} else if(!ttb) {
 			if(extra_a && extra_a(tta->tupid, data) < 0)
 				return -1;
-			na = rb_next(na);
+			tta = RB_NEXT(tupid_entries, a, tta);
 		} else {
-			tta = container_of(na, struct tupid_tree, rbn);
-			ttb = container_of(nb, struct tupid_tree, rbn);
 			if(tta->tupid == ttb->tupid) {
 				/* Would call same() here if necessary */
-				na = rb_next(na);
-				nb = rb_next(nb);
+				tta = RB_NEXT(tupid_entries, a, tta);
+				ttb = RB_NEXT(tupid_entries, b, ttb);
 			} else if(tta->tupid < ttb->tupid) {
 				if(extra_a && extra_a(tta->tupid, data) < 0)
 					return -1;
-				na = rb_next(na);
+				tta = RB_NEXT(tupid_entries, a, tta);
 			} else {
 				if(extra_b && extra_b(ttb->tupid, data) < 0)
 					return -1;
-				nb = rb_next(nb);
+				ttb = RB_NEXT(tupid_entries, b, ttb);
 			}
 		}
 	}
@@ -3725,18 +3718,18 @@ static int missing_output(tupid_t tupid, void *data)
 
 int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
 {
-	struct rb_root output_tree = {NULL};
+	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
 		.cmdid = cmdid,
 		.output_error = 0,
 	};
 
-	if(get_output_tree(cmdid, &output_tree) < 0)
+	if(get_output_tree(cmdid, &output_root) < 0)
 		return -1;
-	if(compare_list_tree(writelist, &output_tree, &aod,
+	if(compare_list_tree(writelist, &output_root, &aod,
 			     extra_output, missing_output) < 0)
 		return -1;
-	free_tupid_tree(&output_tree);
+	free_tupid_tree(&output_root);
 	if(aod.output_error)
 		return -1;
 	return 0;
@@ -3744,8 +3737,8 @@ int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
 
 struct write_input_data {
 	tupid_t cmdid;
-	struct rb_root *normal_tree;
-	struct rb_root *delete_tree;
+	struct tupid_entries *normal_root;
+	struct tupid_entries *delete_root;
 };
 
 static int add_sticky(tupid_t tupid, void *data)
@@ -3753,7 +3746,7 @@ static int add_sticky(tupid_t tupid, void *data)
 	struct write_input_data *wid = data;
 	int rc;
 
-	if(tupid_tree_search(wid->normal_tree, tupid) == NULL) {
+	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
 		/* Not a normal link, insert it */
 		rc = link_insert(tupid, wid->cmdid, TUP_LINK_STICKY);
 	} else {
@@ -3767,12 +3760,12 @@ static int rm_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
 
-	if(tupid_tree_search(wid->normal_tree, tupid) == NULL) {
+	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
 		/* Not a normal link, kill it */
 		if(link_remove(tupid, wid->cmdid) < 0)
 			return -1;
 	} else {
-		if(tupid_tree_search(wid->delete_tree, tupid) == NULL) {
+		if(tupid_tree_search(wid->delete_root, tupid) == NULL) {
 			/* Demote to a normal link */
 			if(link_update(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
 				return -1;
@@ -3794,33 +3787,33 @@ static int rm_sticky(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_inputs(tupid_t cmdid, struct rb_root *input_tree,
-			struct rb_root *delete_tree)
+int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
+			struct tupid_entries *delete_root)
 {
-	struct rb_root sticky_tree = {NULL};
-	struct rb_root normal_tree = {NULL};
+	struct tupid_entries sticky_root = {NULL};
+	struct tupid_entries normal_root = {NULL};
 	struct write_input_data wid = {
 		.cmdid = cmdid,
-		.normal_tree = &normal_tree,
-		.delete_tree = delete_tree,
+		.normal_root = &normal_root,
+		.delete_root = delete_root,
 	};
 
-	if(get_links(cmdid, &sticky_tree, &normal_tree) < 0)
+	if(get_links(cmdid, &sticky_root, &normal_root) < 0)
 		return -1;
-	if(compare_trees(input_tree, &sticky_tree, &wid,
+	if(compare_trees(input_root, &sticky_root, &wid,
 			 add_sticky, rm_sticky) < 0)
 		return -1;
-	free_tupid_tree(&sticky_tree);
-	free_tupid_tree(&normal_tree);
+	free_tupid_tree(&sticky_root);
+	free_tupid_tree(&normal_root);
 	return 0;
 }
 
 struct actual_input_data {
 	tupid_t cmdid;
 	int input_error;
-	struct rb_root sticky_tree;
-	struct rb_root output_tree;
-	struct rb_root missing_input_tree;
+	struct tupid_entries sticky_root;
+	struct tupid_entries output_root;
+	struct tupid_entries missing_input_root;
 	struct list_head *readlist;
 };
 
@@ -3830,7 +3823,7 @@ static int new_input(tupid_t tupid, void *data)
 	struct actual_input_data *aid = data;
 
 	/* Skip any files that are supposed to be used as outputs */
-	if(tupid_tree_search(&aid->output_tree, tupid) != NULL)
+	if(tupid_tree_search(&aid->output_root, tupid) != NULL)
 		return 0;
 
 	if(tup_entry_add(tupid, &tent) < 0)
@@ -3849,7 +3842,7 @@ static int new_input(tupid_t tupid, void *data)
 			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
 			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);
 		}
-		if(tupid_tree_add(&aid->missing_input_tree, tent->tnode.tupid) < 0)
+		if(tupid_tree_add(&aid->missing_input_root, tent->tnode.tupid) < 0)
 			return -1;
 		tup_db_print(stderr, tupid);
 		aid->input_error = 1;
@@ -3867,13 +3860,13 @@ static int new_normal_link(tupid_t tupid, void *data)
 	int rc;
 
 	/* Skip any files that are supposed to be used as outputs */
-	if(tupid_tree_search(&aid->output_tree, tupid) != NULL)
+	if(tupid_tree_search(&aid->output_root, tupid) != NULL)
 		return 0;
 	/* t6057 - Skip any files that were reported as errors in new_input() */
-	if(tupid_tree_search(&aid->missing_input_tree, tupid) != NULL)
+	if(tupid_tree_search(&aid->missing_input_root, tupid) != NULL)
 		return 0;
 
-	if(tupid_tree_search(&aid->sticky_tree, tupid) == NULL) {
+	if(tupid_tree_search(&aid->sticky_root, tupid) == NULL) {
 		/* Not a sticky link, insert it */
 		rc = link_insert(tupid, aid->cmdid, TUP_LINK_NORMAL);
 	} else {
@@ -3887,7 +3880,7 @@ static int del_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
 
-	if(tupid_tree_search(&aid->sticky_tree, tupid) == NULL) {
+	if(tupid_tree_search(&aid->sticky_root, tupid) == NULL) {
 		/* Not a sticky link, kill it. Also check if it was a ghost
 		 * (t5054).
 		 */
@@ -3905,22 +3898,22 @@ static int del_normal_link(tupid_t tupid, void *data)
 
 int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 {
-	struct rb_root normal_tree = {NULL};
-	struct rb_root sticky_copy = {NULL};
+	struct tupid_entries normal_root = {NULL};
+	struct tupid_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
 		.cmdid = cmdid,
 		.input_error = 0,
-		.sticky_tree = {NULL},
-		.output_tree = {NULL},
-		.missing_input_tree = {NULL},
+		.sticky_root = {NULL},
+		.output_root = {NULL},
+		.missing_input_root = {NULL},
 		.readlist = readlist,
 	};
 
-	if(get_output_tree(cmdid, &aid.output_tree) < 0)
+	if(get_output_tree(cmdid, &aid.output_root) < 0)
 		return -1;
-	if(get_links(cmdid, &aid.sticky_tree, &normal_tree) < 0)
+	if(get_links(cmdid, &aid.sticky_root, &normal_root) < 0)
 		return -1;
-	if(tupid_tree_copy(&sticky_copy, &aid.sticky_tree) < 0)
+	if(tupid_tree_copy(&sticky_copy, &aid.sticky_root) < 0)
 		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
@@ -3929,14 +3922,14 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 			     new_input, NULL) < 0)
 		return -1;
 
-	if(compare_list_tree(readlist, &normal_tree, &aid,
+	if(compare_list_tree(readlist, &normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
 		return -1;
-	free_tupid_tree(&aid.sticky_tree);
-	free_tupid_tree(&normal_tree);
+	free_tupid_tree(&aid.sticky_root);
+	free_tupid_tree(&normal_root);
 	free_tupid_tree(&sticky_copy);
-	free_tupid_tree(&aid.output_tree);
-	free_tupid_tree(&aid.missing_input_tree);
+	free_tupid_tree(&aid.output_root);
+	free_tupid_tree(&aid.missing_input_root);
 	if(aid.input_error)
 		return -1;
 	return 0;
@@ -3967,23 +3960,23 @@ static int rm_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_outputs(tupid_t cmdid, struct rb_root *tree)
+int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root)
 {
-	struct rb_root output_tree = {NULL};
+	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
 		.cmdid = cmdid,
 		.outputs_differ = 0,
 	};
 
-	if(get_output_tree(cmdid, &output_tree) < 0)
+	if(get_output_tree(cmdid, &output_root) < 0)
 		return -1;
-	if(compare_trees(&output_tree, tree, &pod, rm_output, add_output) < 0)
+	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
 	if(pod.outputs_differ == 1) {
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
 	}
-	free_tupid_tree(&output_tree);
+	free_tupid_tree(&output_root);
 	return 0;
 }
 
@@ -4020,26 +4013,26 @@ static int rm_dir_link(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_dir_inputs(tupid_t dt, struct rb_root *tree)
+int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
 {
-	struct rb_root sticky_tree = {NULL};
-	struct rb_root normal_tree = {NULL};
+	struct tupid_entries sticky_root = {NULL};
+	struct tupid_entries normal_root = {NULL};
 	struct write_dir_input_data wdid = {
 		.dt = dt,
 	};
 
-	if(get_links(dt, &sticky_tree, &normal_tree) < 0)
+	if(get_links(dt, &sticky_root, &normal_root) < 0)
 		return -1;
-	if(sticky_tree.rb_node != NULL) {
+	if(!RB_EMPTY(&sticky_root)) {
 		/* All links to directories should be TUP_LINK_NORMAL */
 		fprintf(stderr, "tup internal error: sticky link found to dir %lli\n", dt);
 		return -1;
 	}
-	if(compare_trees(tree, &normal_tree, &wdid,
+	if(compare_trees(root, &normal_root, &wdid,
 			 add_dir_link, rm_dir_link) < 0)
 		return -1;
-	free_tupid_tree(&sticky_tree);
-	free_tupid_tree(&normal_tree);
+	free_tupid_tree(&sticky_root);
+	free_tupid_tree(&normal_root);
 	return 0;
 }
 

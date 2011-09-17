@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-static struct rb_root tup_tree = RB_ROOT;
+static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
 static struct list_head entry_list;
 static int do_verbose = 0;
@@ -54,7 +54,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
 		return -1;
 
-	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
+	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree\n", tent->tnode.tupid);
 		return -1;
 	}
@@ -140,7 +140,7 @@ static int rm_entry(tupid_t tupid, int safe)
 		list_del(&tent->ghost_list);
 	}
 
-	tupid_tree_rm(&tup_tree, &tent->tnode);
+	tupid_tree_rm(&tup_root, &tent->tnode);
 	if(tent->parent) {
 		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
@@ -164,7 +164,7 @@ struct tup_entry *tup_entry_get(tupid_t tupid)
 struct tup_entry *tup_entry_find(tupid_t tupid)
 {
 	struct tupid_tree *tnode;
-	tnode = tupid_tree_search(&tup_tree, tupid);
+	tnode = tupid_tree_search(&tup_root, tupid);
 	if(!tnode)
 		return NULL;
 	return container_of(tnode, struct tup_entry, tnode);
@@ -251,7 +251,7 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
-		      time_t mtime, const char *name, struct rb_root *tree)
+		      time_t mtime, const char *name, struct tupid_entries *root)
 {
 	struct tup_entry *tent;
 
@@ -259,22 +259,20 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
 	if(!tent)
 		return -1;
 
-	if(tree)
-		if(tupid_tree_add(tree, tupid) < 0)
+	if(root)
+		if(tupid_tree_add(root, tupid) < 0)
 			return -1;
 	return 0;
 }
 
 int tup_entry_resolve_dirs(void)
 {
-	struct rb_node *rbn;
-
+	struct tupid_tree *tt;
 	/* TODO: NEeded? */
 	/* Resolve parents - those will all already be loaded into the tree.
 	 */
-	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tnode = rb_entry(rbn, struct tupid_tree, rbn);
-		struct tup_entry *tent = container_of(tnode, struct tup_entry, tnode);
+	RB_FOREACH(tt, tupid_entries, &tup_root) {
+		struct tup_entry *tent = container_of(tt, struct tup_entry, tnode);
 
 		if(resolve_parent(tent) < 0)
 			return -1;
@@ -355,7 +353,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->name.len = len;
 	RB_INIT(&tent->entries);
 
-	if(tupid_tree_insert(&tup_tree, &tent->tnode) < 0) {
+	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree in new_entry\n", tent->tnode.tupid);
 		tup_db_print(stderr, tent->tnode.tupid);
 		return NULL;
@@ -403,8 +401,6 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 
 int tup_entry_clear(void)
 {
-	struct rb_node *rbn;
-
 	/* The rm_entry with safe=1 will only remove the node if all of the
 	 * children nodes are gone. Rather than try to smartly remove things
 	 * in the correct order, the outer loop will just keep going until
@@ -415,16 +411,13 @@ int tup_entry_clear(void)
 	 * when the monitor needs to restart or during certain database
 	 * upgrades.
 	 */
-	while((rbn = rb_first(&tup_tree)) != NULL) {
-		struct rb_node *next;
+	while(!RB_EMPTY(&tup_root)) {
 		struct tupid_tree *tt;
+		struct tupid_tree *tmp;
 
-		while(rbn != NULL) {
-			next = rb_next(rbn);
-			tt = rb_entry(rbn, struct tupid_tree, rbn);
+		RB_FOREACH_SAFE(tt, tupid_entries, &tup_root, tmp) {
 			if(rm_entry(tt->tupid, 1) < 0)
 				return -1;
-			rbn = next;
 		}
 	}
 	return 0;
@@ -513,15 +506,12 @@ int tup_entry_del_ghost_list(struct tup_entry *tent)
 
 int tup_entry_debug_add_all_ghosts(struct list_head *list)
 {
-	struct rb_node *rbn;
+	struct tupid_tree *tt;
 
-	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tt;
+	RB_FOREACH(tt, tupid_entries, &tup_root) {
 		struct tup_entry *tent;
 
-		tt = rb_entry(rbn, struct tupid_tree, rbn);
 		tent = container_of(tt, struct tup_entry, tnode);
-
 		tup_entry_add_ghost_list(tent, list);
 	}
 	return 0;
@@ -548,14 +538,12 @@ static int change_name(struct tup_entry *tent, const char *new_name)
 
 void dump_tup_entry(void)
 {
-	struct rb_node *rbn;
+	struct tupid_tree *tt;
 
 	printf("Tup entries:\n");
-	for(rbn = rb_first(&tup_tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tt;
+	RB_FOREACH(tt, tupid_entries, &tup_root) {
 		struct tup_entry *tent;
 
-		tt = rb_entry(rbn, struct tupid_tree, rbn);
 		tent = container_of(tt, struct tup_entry, tnode);
 		printf("  [%lli, dir=%lli, type=%i] name=%s\n", tent->tnode.tupid, tent->dt, tent->type, tent->name.s);
 	}

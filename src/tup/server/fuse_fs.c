@@ -26,7 +26,7 @@
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
-static struct rb_root *server_delete_tree = NULL;
+static struct tupid_entries *server_delete_root = NULL;
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
 {
@@ -44,10 +44,10 @@ int tup_fuse_rm_group(struct file_info *finfo)
 	return 0;
 }
 
-void tup_fuse_set_parser_mode(int mode, struct rb_root *delete_tree)
+void tup_fuse_set_parser_mode(int mode, struct tupid_entries *delete_root)
 {
 	server_mode = mode;
-	server_delete_tree = delete_tree;
+	server_delete_root = delete_root;
 }
 
 #define TUP_JOB "@tupjob-"
@@ -431,7 +431,7 @@ static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
 		return -EPERM;
 	}
 	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dtent->tnode.tupid,
-				       "*", -1,  server_delete_tree) < 0)
+				       "*", -1,  server_delete_root) < 0)
 		return -EIO;
 	return 0;
 }

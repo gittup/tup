@@ -32,7 +32,7 @@ struct status_tree {
 };
 
 static pthread_mutex_t statuslock = PTHREAD_MUTEX_INITIALIZER;
-static struct rb_root status_root = RB_ROOT;
+static struct tupid_entries status_root = {NULL};
 static pid_t master_fork_pid;
 static int msd[2];
 static pthread_t cw_tid;

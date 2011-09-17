@@ -214,7 +214,7 @@ int monitor(int argc, char **argv)
 	do {
 		rc = monitor_loop();
 		if(rc == MONITOR_LOOP_RETRY) {
-			struct rb_node *rbn;
+			struct tupid_tree *tt;
 			struct timeval tv = {0, 0};
 			int ret;
 			fd_set rfds;
@@ -226,8 +226,7 @@ int monitor(int argc, char **argv)
 			 * we return from tup_lock_init(). Then we should be
 			 * good to go.
 			 */
-			while((rbn = rb_first(&droot.wd_tree)) != NULL) {
-				struct tupid_tree *tt = rb_entry(rbn, struct tupid_tree, rbn);
+			while((tt = BSD_RB_ROOT(&droot.wd_root)) != NULL) {
 				struct dircache *dc = container_of(tt, struct dircache, wd_node);
 				inotify_rm_watch(inot_fd, dc->wd_node.tupid);
 				dircache_del(&droot, dc);
@@ -385,16 +384,16 @@ static int monitor_loop(void)
 	int rc;
 	struct timeval t1, t2;
 	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
-	struct rb_root scan_tree = RB_ROOT;
+	struct tupid_entries scan_root = {NULL};
 	int locked = 1;
 
 	gettimeofday(&t1, NULL);
 
-	if(tup_db_scan_begin(&scan_tree) < 0)
+	if(tup_db_scan_begin(&scan_root) < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", &scan_tree, wp_callback) < 0)
+	if(watch_path(0, tup_top_fd(), ".", &scan_root, wp_callback) < 0)
 		return -1;
-	if(tup_db_scan_end(&scan_tree) < 0)
+	if(tup_db_scan_end(&scan_root) < 0)
 		return -1;
 
 	gettimeofday(&t2, NULL);
@@ -1058,16 +1057,14 @@ static void pinotify(void)
 
 static int dump_dircache(void)
 {
-	struct rb_node *rbn;
+	struct tupid_tree *tt;
 	int rc = 0;
 
 	printf("Dircache:\n");
-	for(rbn = rb_first(&droot.wd_tree); rbn; rbn = rb_next(rbn)) {
-		struct tupid_tree *tt;
+	RB_FOREACH(tt, tupid_entries, &droot.wd_root) {
 		struct dircache *dc;
 		struct tup_entry *tent;
 
-		tt = rb_entry(rbn, struct tupid_tree, rbn);
 		dc = container_of(tt, struct dircache, wd_node);
 
 		tent = tup_entry_find(dc->dt_node.tupid);

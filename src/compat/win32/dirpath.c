@@ -3,8 +3,10 @@
 #include "tup/tupid_tree.h"
 #include "tup/compat.h"
 #include "tup/config.h"
+#include "tup/container.h"
+#include <stdio.h>
 
-static struct rb_root root = RB_ROOT;
+static struct tupid_entries root = {NULL};
 static int dp_fd = 10000;
 
 struct dirpath {

@@ -1,11 +1,11 @@
 #ifndef tup_tupid_tree
 #define tup_tupid_tree
 
-#include "linux/rbtree.h"
+#include "bsd/tree.h"
 #include "tupid.h"
 
 struct tupid_tree {
-	struct rb_node rbn;
+	RB_ENTRY(tupid_tree) linkage;
 	tupid_t tupid;
 };
 
@@ -14,19 +14,22 @@ struct tree_entry {
 	int type;
 };
 
-struct tupid_tree *tupid_tree_search(struct rb_root *root, tupid_t tupid);
-int tupid_tree_insert(struct rb_root *root, struct tupid_tree *data);
-int tupid_tree_add(struct rb_root *root, tupid_t tupid);
-int tupid_tree_add_dup(struct rb_root *root, tupid_t tupid);
-int tupid_tree_copy(struct rb_root *dest, struct rb_root *src);
-void tupid_tree_remove(struct rb_root *root, tupid_t tupid);
-static inline void tupid_tree_rm(struct rb_root *root, struct tupid_tree *tt)
+RB_HEAD(tupid_entries, tupid_tree);
+RB_PROTOTYPE(tupid_entries, tupid_tree, linkage, x);
+
+struct tupid_tree *tupid_tree_search(struct tupid_entries *root, tupid_t tupid);
+int tupid_tree_insert(struct tupid_entries *root, struct tupid_tree *data);
+int tupid_tree_add(struct tupid_entries *root, tupid_t tupid);
+int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid);
+int tupid_tree_copy(struct tupid_entries *dest, struct tupid_entries *src);
+void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid);
+static inline void tupid_tree_rm(struct tupid_entries *root, struct tupid_tree *tt)
 {
-	rb_erase(&tt->rbn, root);
+	RB_REMOVE(tupid_entries, root, tt);
 }
-void free_tupid_tree(struct rb_root *root);
-int tree_entry_add(struct rb_root *tree, tupid_t tupid, int type, int *count);
-void tree_entry_remove(struct rb_root *tree, tupid_t tupid, int *count);
+void free_tupid_tree(struct tupid_entries *root);
+int tree_entry_add(struct tupid_entries *root, tupid_t tupid, int type, int *count);
+void tree_entry_remove(struct tupid_entries *root, tupid_t tupid, int *count);
 #define tupid_tree_for_each(_tupid, rbn, tree) \
 	for(rbn = rb_first(tree), _tupid = rbn ? rb_entry(rbn, struct tupid_tree, rbn)->tupid : -1; \
 	    rbn; \
