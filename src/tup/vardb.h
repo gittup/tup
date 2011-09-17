@@ -1,7 +1,6 @@
 #ifndef tup_vardb_h
 #define tup_vardb_h
 
-#include "linux/rbtree.h"
 #include "string_tree.h"
 
 struct tup_entry;

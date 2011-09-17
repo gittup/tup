@@ -1,8 +1,10 @@
 #include "vardb.h"
 #include "string_tree.h"
+#include "container.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 int vardb_init(struct vardb *v)
 {
