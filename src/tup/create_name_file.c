@@ -344,16 +344,16 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	/* The list can be empty if dir is "." or something like "foo/..". In
 	 * this case just return dt (the start dir).
 	 */
-	if(list_empty(&pg->path_list)) {
+	if(TAILQ_EMPTY(&pg->path_list)) {
 		if(tup_entry_add(dt, &tent) < 0)
 			return -1;
 		return dt;
 	}
 
 	if(last) {
-		pel = list_entry(pg->path_list.prev, struct path_element, list);
+		pel = TAILQ_LAST(&pg->path_list, path_element_head);
 		*last = pel;
-		list_del(&pel->list);
+		TAILQ_REMOVE(&pg->path_list, pel, list);
 	} else {
 		/* TODO */
 		fprintf(stderr, "[31mBork[0m\n");
@@ -365,8 +365,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	if(tup_entry_add(dt, &tent) < 0)
 		return -1;
 
-	while(!list_empty(&pg->path_list)) {
-		pel = list_entry(pg->path_list.next, struct path_element, list);
+	while(!TAILQ_EMPTY(&pg->path_list)) {
+		pel = TAILQ_FIRST(&pg->path_list);
 		if(pel->len == 2 && pel->path[0] == '.' && pel->path[1] == '.') {
 			if(tent->parent == NULL) {
 				/* If we're at the top of the tup hierarchy and
@@ -403,7 +403,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list)
+int add_node_to_list(tupid_t dt, struct pel_group *pg, struct tup_entry_head *head)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
@@ -430,7 +430,7 @@ int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list)
 	}
 	free(pel);
 
-	tup_entry_list_add(tent, list);
+	tup_entry_list_add(tent, head);
 
 	return 0;
 }

@@ -3,35 +3,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-int bin_list_init(struct bin_list *bl)
+void bin_list_del(struct bin_head *head)
 {
-	INIT_LIST_HEAD(&bl->bins);
-	return 0;
-}
+	while(!LIST_EMPTY(head)) {
+		struct bin *b = LIST_FIRST(head);
 
-void bin_list_del(struct bin_list *bl)
-{
-	while(!list_empty(&bl->bins)) {
-		struct bin *b;
-		b = list_entry(bl->bins.next, struct bin, list);
-
-		while(!list_empty(&b->entries)) {
-			struct bin_entry *be;
-			be = list_entry(b->entries.next, struct bin_entry, list);
-			list_del(&be->list);
+		while(!TAILQ_EMPTY(&b->entries)) {
+			struct bin_entry *be = TAILQ_FIRST(&b->entries);
+			TAILQ_REMOVE(&b->entries, be, list);
 			free(be->path);
 			free(be);
 		}
-		list_del(&b->list);
+		LIST_REMOVE(b, list);
 		free(b);
 	}
 }
 
-struct bin *bin_add(const char *name, struct bin_list *bl)
+struct bin *bin_add(const char *name, struct bin_head *head)
 {
 	struct bin *b;
 
-	b = bin_find(name, bl);
+	b = bin_find(name, head);
 	if(b)
 		return b;
 
@@ -41,16 +33,16 @@ struct bin *bin_add(const char *name, struct bin_list *bl)
 		return NULL;
 	}
 	b->name = name;
-	INIT_LIST_HEAD(&b->entries);
-	list_add(&b->list, &bl->bins);
+	TAILQ_INIT(&b->entries);
+	LIST_INSERT_HEAD(head, b, list);
 	return b;
 }
 
-struct bin *bin_find(const char *name, struct bin_list *bl)
+struct bin *bin_find(const char *name, struct bin_head *head)
 {
 	struct bin *b;
 
-	list_for_each_entry(b, &bl->bins, list) {
+	LIST_FOREACH(b, head, list) {
 		if(strcmp(b->name, name) == 0) {
 			return b;
 		}
@@ -79,6 +71,6 @@ int bin_add_entry(struct bin *b, const char *path, int len,
 	be->len = len;
 
 	be->tent = tent;
-	list_add_tail(&be->list, &b->entries);
+	TAILQ_INSERT_TAIL(&b->entries, be, list);
 	return 0;
 }

@@ -4,6 +4,7 @@
 #include "db.h"
 #include "compat.h"
 #include "colors.h"
+#include "container.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -12,7 +13,7 @@
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
-static struct list_head entry_list;
+static struct tup_entry_head entry_list;
 static int do_verbose = 0;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
@@ -46,8 +47,8 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return -1;
 	}
 	tent->tnode.tupid = tupid;
-	tent->list.next = NULL;
-	tent->ghost_list.next = NULL;
+	tent->list.le_prev = NULL;
+	tent->ghost_list.le_prev = NULL;
 	RB_INIT(&tent->entries);
 	tent->parent = NULL;
 
@@ -132,12 +133,12 @@ static int rm_entry(tupid_t tupid, int safe)
 		}
 	}
 
-	if(tent->list.next != NULL) {
+	if(tent->list.le_prev != NULL) {
 		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which is in the entry list [%lli:%s]\n", tupid, tent->dt, tent->name.s);
 		return -1;
 	}
-	if(tent->ghost_list.next != NULL) {
-		list_del(&tent->ghost_list);
+	if(tent->ghost_list.le_prev != NULL) {
+		LIST_REMOVE(tent, ghost_list);
 	}
 
 	tupid_tree_rm(&tup_root, &tent->tnode);
@@ -336,8 +337,8 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 		len = strlen(name);
 
 	tent->tnode.tupid = tupid;
-	tent->list.next = NULL;
-	tent->ghost_list.next = NULL;
+	tent->list.le_prev = NULL;
+	tent->ghost_list.le_prev = NULL;
 	tent->dt = dt;
 	tent->parent = NULL;
 	tent->type = type;
@@ -423,14 +424,14 @@ int tup_entry_clear(void)
 	return 0;
 }
 
-struct list_head *tup_entry_get_list(void)
+struct tup_entry_head *tup_entry_get_list(void)
 {
 	if(list_out) {
 		fprintf(stderr, "tup internal error: entry list is already out\n");
 		exit(1);
 	}
 	list_out = 1;
-	INIT_LIST_HEAD(&entry_list);
+	LIST_INIT(&entry_list);
 	return &entry_list;
 }
 
@@ -440,22 +441,21 @@ void tup_entry_release_list(void)
 		fprintf(stderr, "tup internal error: entry list isn't out\n");
 		exit(1);
 	}
-	while(!list_empty(&entry_list)) {
-		struct tup_entry *tent;
-		tent = list_entry(entry_list.next, struct tup_entry, list);
+	while(!LIST_EMPTY(&entry_list)) {
+		struct tup_entry *tent = LIST_FIRST(&entry_list);
 		tup_entry_list_del(tent);
 	}
 	list_out = 0;
 }
 
-void tup_entry_list_add(struct tup_entry *tent, struct list_head *list)
+void tup_entry_list_add(struct tup_entry *tent, struct tup_entry_head *head)
 {
 	if(!list_out) {
 		fprintf(stderr, "tup internal error: tup_entry_list_add called without the list\n");
 		exit(1);
 	}
-	if(tent->list.next == NULL) {
-		list_add(&tent->list, list);
+	if(tent->list.le_prev == NULL) {
+		LIST_INSERT_HEAD(head, tent, list);
 	}
 }
 
@@ -465,46 +465,39 @@ void tup_entry_list_del(struct tup_entry *tent)
 		fprintf(stderr, "tup internal error: tup_entry_list_del called without the list\n");
 		exit(1);
 	}
-	list_del(&tent->list);
-	tent->list.next = NULL;
+	LIST_REMOVE(tent, list);
+	tent->list.le_prev = NULL;
 }
 
 int tup_entry_in_list(struct tup_entry *tent)
 {
-	return !(tent->list.next == NULL);
+	return !(tent->list.le_prev == NULL);
 }
 
-void tup_entry_add_ghost_list(struct tup_entry *tent, struct list_head *list)
+void tup_entry_add_ghost_list(struct tup_entry *tent, struct tup_entry_head *head)
 {
 	if(tent->type == TUP_NODE_GHOST) {
 		/* It is fine if the ghost is already in the list - just make
-		 * sure we don't try to list_add it twice.
+		 * sure we don't try to add it twice.
 		 */
-		if(tent->ghost_list.next == NULL) {
-			/* Use list_add_tail so new ghosts go to the back. This
-			 * way if we need to re-check a directory, we will only
-			 * check it again at the end (in case multiple ghosts
-			 * are in a ghost directory, it would be silly to
-			 * check one ghost, then check the dir, then check the
-			 * next ghost, then check the dir again, etc).
-			 */
-			list_add_tail(&tent->ghost_list, list);
+		if(tent->ghost_list.le_prev == NULL) {
+			LIST_INSERT_HEAD(head, tent, ghost_list);
 		}
 	}
 }
 
 int tup_entry_del_ghost_list(struct tup_entry *tent)
 {
-	if(tent->ghost_list.next == NULL) {
+	if(tent->ghost_list.le_prev == NULL) {
 		fprintf(stderr, "tup internal error: ghost_list.next is NULL in tup_entry_del_ghost_list %lli [%lli:%s]\n", tent->tnode.tupid, tent->dt, tent->name.s);
 		return -1;
 	}
-	list_del(&tent->ghost_list);
-	tent->ghost_list.next = NULL;
+	LIST_REMOVE(tent, ghost_list);
+	tent->ghost_list.le_prev = NULL;
 	return 0;
 }
 
-int tup_entry_debug_add_all_ghosts(struct list_head *list)
+int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head)
 {
 	struct tupid_tree *tt;
 
@@ -512,7 +505,7 @@ int tup_entry_debug_add_all_ghosts(struct list_head *list)
 		struct tup_entry *tent;
 
 		tent = container_of(tt, struct tup_entry, tnode);
-		tup_entry_add_ghost_list(tent, list);
+		tup_entry_add_ghost_list(tent, head);
 	}
 	return 0;
 }

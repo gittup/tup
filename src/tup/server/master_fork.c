@@ -3,6 +3,7 @@
 #include "tup/server.h"
 #include "tup/db.h"
 #include "tup/tupid_tree.h"
+#include "tup/container.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

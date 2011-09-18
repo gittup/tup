@@ -2,19 +2,20 @@
 #define tup_pel_group_h
 
 #include "tupid.h"
-#include "linux/list.h"
+#include "bsd/queue.h"
 
 struct path_element {
-	struct list_head list;
+	TAILQ_ENTRY(path_element) list;
 	const char *path; /* Not nul-terminated */
 	int len;
 };
+TAILQ_HEAD(path_element_head, path_element);
 
 #define PG_HIDDEN 1
 #define PG_OUTSIDE_TUP 2
 #define PG_ROOT 4
 struct pel_group {
-	struct list_head path_list;
+	struct path_element_head path_list;
 	int pg_flags;
 	int num_elements;
 };

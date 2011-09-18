@@ -1,16 +1,15 @@
 #include "open_notify.h"
-#include "linux/list.h"
+#include "bsd/queue.h"
 #include "tup/file.h"
 #include "tup/db.h"
 #include <stdio.h>
 #include <sys/stat.h>
 
 struct finfo_list {
-	struct list_head list;
+	LIST_ENTRY(finfo_list) list;
 	struct file_info *finfo;
 };
-
-static LIST_HEAD(finfo_list_head);
+LIST_HEAD(,finfo_list) finfo_list_head;
 
 /* The stat() wrapper will call open_notify(), which uses stat(), so we have
  * to call the real version to avoid an infinite recursion.
@@ -27,23 +26,23 @@ int open_notify_push(struct file_info *finfo)
 		return -1;
 	}
 	flist->finfo = finfo;
-	list_add(&flist->list, &finfo_list_head);
+	LIST_INSERT_HEAD(&finfo_list_head, flist, list);
 	return 0;
 }
 
 int open_notify_pop(struct file_info *finfo)
 {
 	struct finfo_list *flist;
-	if(list_empty(&finfo_list_head)) {
+	if(LIST_EMPTY(&finfo_list_head)) {
 		fprintf(stderr, "tup internal error: finfo_list is empty.\n");
 		return -1;
 	}
-	flist = list_entry(finfo_list_head.next, struct finfo_list, list);
+	flist = LIST_FIRST(&finfo_list_head);
 	if(flist->finfo != finfo) {
 		fprintf(stderr, "tup internal error: open_notify_pop() element is not at the head of the list.\n");
 		return -1;
 	}
-	list_del(&flist->list);
+	LIST_REMOVE(flist, list);
 	free(flist);
 	return 0;
 }
@@ -53,7 +52,7 @@ int open_notify(enum access_type at, const char *pathname)
 	/* For the parser: manually keep track of file accesses, since we
 	 * don't run the UDP server for the parsing stage in win32.
 	 */
-	if(!list_empty(&finfo_list_head)) {
+	if(!LIST_EMPTY(&finfo_list_head)) {
 		struct finfo_list *flist;
 		struct stat buf;
 		char fullpath[PATH_MAX];
@@ -80,7 +79,7 @@ int open_notify(enum access_type at, const char *pathname)
 		 * file accesses.
 		 */
 		if(__real_stat(pathname, &buf) < 0 || !S_ISDIR(buf.st_mode)) {
-			flist = list_entry(finfo_list_head.next, struct finfo_list, list);
+			flist = LIST_FIRST(&finfo_list_head);
 			if(handle_open_file(at, fullpath, flist->finfo, DOT_DT) < 0)
 				return -1;
 		}

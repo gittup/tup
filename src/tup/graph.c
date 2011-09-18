@@ -7,6 +7,7 @@
 #include "fileio.h"
 #include "config.h"
 #include "db.h"
+#include "container.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,15 +33,15 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 		perror("malloc");
 		return NULL;
 	}
-	INIT_LIST_HEAD(&n->edges);
-	INIT_LIST_HEAD(&n->incoming);
+	LIST_INIT(&n->edges);
+	LIST_INIT(&n->incoming);
 	n->tnode.tupid = tent->tnode.tupid;
 	n->tent = tent;
 	n->state = STATE_INITIALIZED;
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
-	list_add_tail(&n->list, &g->node_list);
+	TAILQ_INSERT_TAIL(&g->node_list, n, list);
 
 	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
 		return NULL;
@@ -49,22 +50,22 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 
 static void remove_node_internal(struct graph *g, struct node *n)
 {
-	list_del(&n->list);
-	while(!list_empty(&n->edges)) {
-		remove_edge(list_entry(n->edges.next, struct edge, list));
+	TAILQ_REMOVE(&g->node_list, n, list);
+	while(!LIST_EMPTY(&n->edges)) {
+		remove_edge(LIST_FIRST(&n->edges));
 	}
-	while(!list_empty(&n->incoming)) {
-		remove_edge(list_entry(n->incoming.next, struct edge, destlist));
+	while(!LIST_EMPTY(&n->incoming)) {
+		remove_edge(LIST_FIRST(&n->incoming));
 	}
 	remove_node(g, n);
 }
 
 void remove_node(struct graph *g, struct node *n)
 {
-	if(!list_empty(&n->edges)) {
+	if(!LIST_EMPTY(&n->edges)) {
 		DEBUGP("Warning: Node %lli still has edges.\n", n->tnode.tupid);
 	}
-	if(!list_empty(&n->incoming)) {
+	if(!LIST_EMPTY(&n->incoming)) {
 		DEBUGP("Warning: Node %lli still has incoming edges.\n", n->tnode.tupid);
 	}
 	tupid_tree_rm(&g->node_root, &n->tnode);
@@ -85,16 +86,16 @@ int create_edge(struct node *n1, struct node *n2, int style)
 	e->src = n1;
 	e->style = style;
 
-	list_add(&e->list, &n1->edges);
-	list_add(&e->destlist, &n2->incoming);
+	LIST_INSERT_HEAD(&n1->edges, e, list);
+	LIST_INSERT_HEAD(&n2->incoming, e, destlist);
 
 	return 0;
 }
 
 void remove_edge(struct edge *e)
 {
-	list_del(&e->list);
-	list_del(&e->destlist);
+	LIST_REMOVE(e, list);
+	LIST_REMOVE(e, destlist);
 	free(e);
 }
 
@@ -109,8 +110,8 @@ int create_graph(struct graph *g, int count_flags)
 	root_entry.name.s = root_name;
 	RB_INIT(&root_entry.entries);
 
-	INIT_LIST_HEAD(&g->node_list);
-	INIT_LIST_HEAD(&g->plist);
+	TAILQ_INIT(&g->node_list);
+	TAILQ_INIT(&g->plist);
 	RB_INIT(&g->delete_root);
 	g->delete_count = 0;
 
@@ -126,18 +127,18 @@ int create_graph(struct graph *g, int count_flags)
 
 int destroy_graph(struct graph *g)
 {
-	while(!list_empty(&g->plist)) {
-		remove_node_internal(g, list_entry(g->plist.next, struct node, list));
+	while(!TAILQ_EMPTY(&g->plist)) {
+		remove_node_internal(g, TAILQ_FIRST(&g->plist));
 	}
-	while(!list_empty(&g->node_list)) {
-		remove_node_internal(g, list_entry(g->node_list.next, struct node, list));
+	while(!TAILQ_EMPTY(&g->node_list)) {
+		remove_node_internal(g, TAILQ_FIRST(&g->node_list));
 	}
 	return 0;
 }
 
 int graph_empty(struct graph *g)
 {
-	if(g->node_list.prev == &g->root->list)
+	if(g->node_list.tqh_last == &TAILQ_NEXT(g->root, list))
 		return 1;
 	return 0;
 }
@@ -180,7 +181,8 @@ edge_create:
 		if(n->tent->type == g->count_flags)
 			g->num_nodes++;
 		n->expanded = 1;
-		list_move(&n->list, &g->plist);
+		TAILQ_REMOVE(&g->node_list, n, list);
+		TAILQ_INSERT_HEAD(&g->plist, n, list);
 	}
 
 	if(create_edge(g->cur, n, style) < 0)
@@ -188,7 +190,7 @@ edge_create:
 	return 0;
 }
 
-int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
+int nodes_are_connected(struct tup_entry *src, struct tup_entry_head *dest_head,
 			int *connected)
 {
 	struct graph g;
@@ -202,14 +204,15 @@ int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
 	if(create_edge(g.cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	n->expanded = 1;
-	list_move(&n->list, &g.plist);
+	TAILQ_REMOVE(&g.node_list, n, list);
+	TAILQ_INSERT_HEAD(&g.plist, n, list);
 
 	*connected = 0;
-	while(!list_empty(&g.plist)) {
+	while(!TAILQ_EMPTY(&g.plist)) {
 		struct tup_entry *tent;
-		n = list_entry(g.plist.next, struct node, list);
+		n = TAILQ_FIRST(&g.plist);
 
-		list_for_each_entry(tent, dest_list, list) {
+		LIST_FOREACH(tent, dest_head, list) {
 			if(tent == src)
 				continue;
 			if(tent == n->tent) {
@@ -226,8 +229,8 @@ int nodes_are_connected(struct tup_entry *src, struct list_head *dest_list,
 			n->state = STATE_PROCESSING;
 		} else if(n->state == STATE_PROCESSING) {
 			DEBUGP("remove node from stack: %lli\n", n->tnode.tupid);
-			list_del(&n->list);
-			list_add_tail(&n->list, &g.node_list);
+			TAILQ_REMOVE(&g.plist, n, list);
+			TAILQ_INSERT_TAIL(&g.node_list, n, list);
 			n->state = STATE_FINISHED;
 		} else if(n->state == STATE_FINISHED) {
 			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", n->tnode.tupid);
@@ -257,7 +260,7 @@ static void mark_nodes(struct node *n)
 		return;
 
 	n->parsing = 1;
-	list_for_each_entry(e, &n->incoming, destlist) {
+	LIST_FOREACH(e, &n->incoming, destlist) {
 		struct node *mark = e->src;
 
 		mark_nodes(mark);
@@ -268,7 +271,7 @@ static void mark_nodes(struct node *n)
 		 */
 		if(mark->tent->type == TUP_NODE_CMD) {
 			struct edge *e2;
-			list_for_each_entry(e2, &mark->edges, list) {
+			LIST_FOREACH(e2, &mark->edges, list) {
 				mark_nodes(e2->dest);
 			}
 		}
@@ -298,7 +301,7 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 {
-	struct list_head *prune_list;
+	struct tup_entry_head *prune_list;
 	int x;
 	int dashdash = 0;
 
@@ -323,12 +326,12 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		tup_entry_list_add(tent, prune_list);
 	}
 
-	if(!list_empty(prune_list)) {
+	if(!LIST_EMPTY(prune_list)) {
 		struct tup_entry *tent;
 		struct node *n;
 		struct node *tmp;
 
-		list_for_each_entry(tent, prune_list, list) {
+		LIST_FOREACH(tent, prune_list, list) {
 			n = find_node(g, tent->tnode.tupid);
 			if(n) {
 				mark_nodes(n);
@@ -337,7 +340,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			}
 		}
 
-		list_for_each_entry_safe(n, tmp, &g->node_list, list) {
+		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
 			if(!n->parsing && n != g->root)
 				if(prune_node(g, n, num_pruned) < 0)
 					goto out_err;
@@ -364,8 +367,8 @@ static void dump_node(FILE *f, struct node *n)
 	if(flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
-		n, n->tent->name.s, n->tnode.tupid, list_empty(&n->incoming), n->expanded, color);
-	list_for_each_entry(e, &n->edges, list) {
+		n, n->tent->name.s, n->tnode.tupid, LIST_EMPTY(&n->incoming), n->expanded, color);
+	LIST_FOREACH(e, &n->edges, list) {
 		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
 	}
 }
@@ -389,10 +392,10 @@ void dump_graph(const struct graph *g, const char *filename)
 		return;
 	}
 	fprintf(f, "digraph G {\n");
-	list_for_each_entry(n, &g->node_list, list) {
+	LIST_FOREACH(&g->node_list, n, list) {
 		dump_node(f, n);
 	}
-	list_for_each_entry(n, &g->plist, list) {
+	LIST_FOREACH(&g->plist, n, list) {
 		dump_node(f, n);
 	}
 	fprintf(f, "}\n");

@@ -3,30 +3,41 @@
 
 #include "tupid.h"
 #include "access_event.h"
-#include "linux/list.h"
+#include "bsd/queue.h"
 #include "thread_tree.h"
+#include "pel_group.h"
 #include <pthread.h>
 
 struct mapping {
-	struct list_head list;
+	LIST_ENTRY(mapping) list;
 	char *realname;
 	char *tmpname;
 };
+LIST_HEAD(mapping_head, mapping);
 
 struct tmpdir {
-	struct list_head list;
+	LIST_ENTRY(tmpdir) list;
 	char *dirname;
 };
+LIST_HEAD(tmpdir_head, tmpdir);
+
+struct file_entry {
+	LIST_ENTRY(file_entry) list;
+	tupid_t dt;
+	char *filename;
+	struct pel_group pg;
+};
+LIST_HEAD(file_entry_head, file_entry);
 
 struct file_info {
 	pthread_mutex_t lock;
 	struct thread_tree tnode;
-	struct list_head read_list;
-	struct list_head write_list;
-	struct list_head unlink_list;
-	struct list_head var_list;
-	struct list_head mapping_list;
-	struct list_head tmpdir_list;
+	struct file_entry_head read_list;
+	struct file_entry_head write_list;
+	struct file_entry_head unlink_list;
+	struct file_entry_head var_list;
+	struct mapping_head mapping_list;
+	struct tmpdir_head tmpdir_list;
 	int server_fail;
 };
 

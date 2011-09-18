@@ -369,7 +369,7 @@ static void *message_thread(void *arg)
 				perror("strdup");
 				return (void*)-1;
 			}
-			list_add(&map->list, &s->finfo.mapping_list);
+			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
 		}
 		if(handle_file(event->at, event1, event2, &s->finfo, s->dt) < 0) {
 			fprintf(stderr, "message_thread end\n");

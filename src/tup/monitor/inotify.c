@@ -43,6 +43,7 @@
 #include "tup/entry.h"
 #include "tup/fslurp.h"
 #include "tup/server.h"
+#include "tup/container.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -54,9 +55,10 @@ struct monitor_event {
 };
 
 struct moved_from_event {
-	struct list_head list;
+	LIST_ENTRY(moved_from_event) list;
 	struct monitor_event *m;
 };
+LIST_HEAD(moved_from_event_head, moved_from_event);
 
 static struct monitor_event *get_monitor_event(int pos);
 static int monitor_set_pid(int pid);
@@ -94,7 +96,7 @@ static struct monitor_event *queue_last_e = NULL;
 static char **update_argv;
 static int update_argc;
 static int autoupdate_flag = -1;
-static LIST_HEAD(moved_from_list);
+static struct moved_from_event_head moved_from_list = LIST_HEAD_INITIALIZER(&moved_from_list);
 
 int monitor_supported(void)
 {
@@ -879,7 +881,7 @@ static struct moved_from_event *add_from_event(struct monitor_event *m)
 	/* The mfe is removed from the list in either check_from_events, or in
 	 * handle_event if this event is never claimed.
 	 */
-	list_add(&mfe->list, &moved_from_list);
+	LIST_INSERT_HEAD(&moved_from_list, mfe, list);
 
 	return mfe;
 }
@@ -887,10 +889,10 @@ static struct moved_from_event *add_from_event(struct monitor_event *m)
 static struct moved_from_event *check_from_events(struct inotify_event *e)
 {
 	struct moved_from_event *mfe;
-	list_for_each_entry(mfe, &moved_from_list, list) {
+	LIST_FOREACH(mfe, &moved_from_list, list) {
 		if(mfe->m->e.cookie == e->cookie) {
 			mfe->m->e.mask = 0;
-			list_del(&mfe->list);
+			LIST_REMOVE(mfe, list);
 			return mfe;
 		}
 	}
@@ -1005,7 +1007,7 @@ static int handle_event(struct monitor_event *m)
 			return -1;
 
 		/* An IN_MOVED_FROM event points to itself */
-		list_del(&m->from_event->list);
+		LIST_REMOVE(m->from_event, list);
 	}
 	return 0;
 }
@@ -1041,7 +1043,7 @@ static int handle_event_nolock(struct monitor_event *m)
 	}
 	if(m->e.mask & IN_MOVED_FROM) {
 		/* An IN_MOVED_FROM event points to itself */
-		list_del(&m->from_event->list);
+		LIST_REMOVE(m->from_event, list);
 	}
 	return 0;
 }

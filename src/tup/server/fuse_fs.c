@@ -14,6 +14,7 @@
 #include "tup/debug.h"
 #include "tup/entry.h"
 #include "tup/server.h"
+#include "tup/container.h"
 #include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,7 +158,7 @@ static struct mapping *add_mapping(const char *path)
 			return NULL;
 		}
 
-		list_add(&map->list, &finfo->mapping_list);
+		LIST_INSERT_HEAD(&finfo->mapping_list, map, list);
 		put_finfo(finfo);
 	}
 	return map;
@@ -169,7 +170,7 @@ static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 	struct mapping *map;
 
 	peeled = peel(path);
-	list_for_each_entry(map, &finfo->mapping_list, list) {
+	LIST_FOREACH(map, &finfo->mapping_list, list) {
 		if(strcmp(peeled, map->realname) == 0) {
 			return map;
 		}
@@ -258,7 +259,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 			return -EPERM;
 		}
 		rc = 0;
-		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				if(fstat(tup_top_fd(), stbuf) < 0)
 					rc = -errno;
@@ -348,7 +349,7 @@ static int tup_fs_access(const char *path, int mask)
 		if(map)
 			peeled = map->tmpname;
 
-		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				/* For a temporary directory, just use the same
 				 * access permissions as the top-level directory.
@@ -476,7 +477,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		 * sure we don't try to save the dependency or do a real
 		 * opendir(), since that won't work.
 		 */
-		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				is_tmpdir = 1;
 				break;
@@ -487,7 +488,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		 * we need to add to the list in addition to whatever we
 		 * get from the real opendir/readdir (if applicable).
 		 */
-		list_for_each_entry(map, &finfo->mapping_list, list) {
+		LIST_FOREACH(map, &finfo->mapping_list, list) {
 			const char *realname;
 
 			/* Get the 'real' realname of the file. Eg: sub/bar.txt
@@ -614,7 +615,7 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 			rc = -ENOMEM;
 		}
 		if(tmpdir && tmpdir->dirname) {
-			list_add(&tmpdir->list, &finfo->tmpdir_list);
+			LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
 			rc = 0;
 		}
 		put_finfo(finfo);
@@ -659,9 +660,9 @@ static int tup_fs_rmdir(const char *path)
 	finfo = get_finfo(path);
 	if(finfo) {
 		peeled = peel(path);
-		list_for_each_entry(tmpdir, &finfo->tmpdir_list, list) {
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
-				list_del(&tmpdir->list);
+				LIST_REMOVE(tmpdir, list);
 				free(tmpdir->dirname);
 				free(tmpdir);
 				put_finfo(finfo);

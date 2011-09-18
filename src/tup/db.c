@@ -2,7 +2,6 @@
 #include "db.h"
 #include "db_util.h"
 #include "array_size.h"
-#include "linux/list.h"
 #include "tupid_tree.h"
 #include "fileio.h"
 #include "config.h"
@@ -14,6 +13,7 @@
 #include "platform.h"
 #include "monitor.h"
 #include "compat.h"
+#include "container.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -91,20 +91,22 @@ enum {
 };
 
 struct id_entry {
-	struct list_head list;
+	LIST_ENTRY(id_entry) list;
 	tupid_t tupid;
 };
+LIST_HEAD(id_entry_head, id_entry);
 
 struct half_entry {
-	struct list_head list;
+	LIST_ENTRY(half_entry) list;
 	tupid_t tupid;
 	tupid_t dt;
 	int type;
 };
+LIST_HEAD(half_entry_head, half_entry);
 
 static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
-static LIST_HEAD(ghost_list);
+static struct tup_entry_head ghost_list;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
@@ -134,8 +136,8 @@ static int generated_nodelist_len(tupid_t dt);
 static int get_generated_nodelist(char *dest, tupid_t dt,
 				  struct tupid_entries *root, int *total_len);
 static int db_print(FILE *stream, tupid_t tupid);
-static int get_recurse_dirs(tupid_t dt, struct list_head *list);
-static int get_dir_entries(tupid_t dt, struct list_head *list);
+static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head);
+static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
 
 int tup_db_open(void)
 {
@@ -1284,17 +1286,18 @@ int delete_node(tupid_t tupid)
 
 int tup_db_delete_dir(tupid_t dt)
 {
-	LIST_HEAD(subdir_list);
+	struct half_entry_head subdir_list;
 
+	LIST_INIT(&subdir_list);
 	if(get_dir_entries(dt, &subdir_list) < 0)
 		return -1;
-	while(!list_empty(&subdir_list)) {
-		struct half_entry *he = list_entry(subdir_list.next,
-						   struct half_entry, list);
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct half_entry *he = LIST_FIRST(&subdir_list);
+
 		/* tup_del_id_force may call back to tup_db_delete_dir() */
 		if(tup_del_id_force(he->tupid, he->type) < 0)
 			return -1;
-		list_del(&he->list);
+		LIST_REMOVE(he, list);
 		free(he);
 	}
 
@@ -1304,8 +1307,9 @@ int tup_db_delete_dir(tupid_t dt)
 static int recurse_delete_ghost_tree(tupid_t tupid)
 {
 	struct half_entry *he;
-	LIST_HEAD(subdir_list);
+	struct half_entry_head subdir_list;
 
+	LIST_INIT(&subdir_list);
 	if(get_dir_entries(tupid, &subdir_list) < 0)
 		return -1;
 
@@ -1328,7 +1332,7 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 	if(tup_db_delete_links(tupid) < 0)
 		return -1;
 
-	list_for_each_entry(he, &subdir_list, list) {
+	LIST_FOREACH(he, &subdir_list, list) {
 		if(he->type != TUP_NODE_GHOST) {
 			fprintf(stderr, "tup internal error: Why does a node of type %i have a ghost dir?\n", he->type);
 			tup_db_print(stderr, he->tupid);
@@ -1344,7 +1348,7 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 
 int tup_db_modify_dir(tupid_t dt)
 {
-	LIST_HEAD(subdir_list);
+	struct id_entry_head subdir_list;
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
 	static char s[] = "insert or ignore into modify_list select id from node where dir=? and type!=?";
@@ -1380,13 +1384,13 @@ int tup_db_modify_dir(tupid_t dt)
 		return -1;
 	}
 
+	LIST_INIT(&subdir_list);
 	if(get_recurse_dirs(dt, &subdir_list) < 0)
 		return -1;
-	while(!list_empty(&subdir_list)) {
-		struct id_entry *ide = list_entry(subdir_list.next,
-						  struct id_entry, list);
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct id_entry *ide = LIST_FIRST(&subdir_list);
 		tup_db_modify_dir(ide->tupid);
-		list_del(&ide->list);
+		LIST_REMOVE(ide, list);
 		free(ide);
 	}
 
@@ -2225,7 +2229,7 @@ int tup_db_unflag_modify(tupid_t tupid)
 	return 0;
 }
 
-static int get_recurse_dirs(tupid_t dt, struct list_head *list)
+static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head)
 {
 	int rc;
 	int dbrc;
@@ -2271,7 +2275,7 @@ static int get_recurse_dirs(tupid_t dt, struct list_head *list)
 			goto out_reset;
 		}
 		ide->tupid = sqlite3_column_int64(*stmt, 0);
-		list_add(&ide->list, list);
+		LIST_INSERT_HEAD(head, ide, list);
 	}
 
 out_reset:
@@ -2283,7 +2287,7 @@ out_reset:
 	return rc;
 }
 
-static int get_dir_entries(tupid_t dt, struct list_head *list)
+static int get_dir_entries(tupid_t dt, struct half_entry_head *head)
 {
 	int rc;
 	int dbrc;
@@ -2327,7 +2331,7 @@ static int get_dir_entries(tupid_t dt, struct list_head *list)
 		he->tupid = sqlite3_column_int64(*stmt, 0);
 		he->dt = dt;
 		he->type = sqlite3_column_int(*stmt, 1);
-		list_add(&he->list, list);
+		LIST_INSERT_HEAD(head, he, list);
 	}
 
 out_reset:
@@ -3598,7 +3602,7 @@ static int get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 	return rc;
 }
 
-static int compare_list_tree(struct list_head *a, struct tupid_entries *b,
+static int compare_list_tree(struct tup_entry_head *a, struct tupid_entries *b,
 			     void *data,
 			     int (*extra_a)(tupid_t tupid, void *data),
 			     int (*extra_b)(tupid_t tupid, void *data))
@@ -3606,7 +3610,7 @@ static int compare_list_tree(struct list_head *a, struct tupid_entries *b,
 	struct tup_entry *tent;
 	struct tupid_tree *ttb;
 
-	list_for_each_entry(tent, a, list) {
+	LIST_FOREACH(tent, a, list) {
 		ttb = tupid_tree_search(b, tent->tnode.tupid);
 		if(!ttb) {
 			if(extra_a && extra_a(tent->tnode.tupid, data) < 0)
@@ -3716,7 +3720,7 @@ static int missing_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
+int tup_db_check_actual_outputs(tupid_t cmdid, struct tup_entry_head *writehead)
 {
 	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
@@ -3726,7 +3730,7 @@ int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist)
 
 	if(get_output_tree(cmdid, &output_root) < 0)
 		return -1;
-	if(compare_list_tree(writelist, &output_root, &aod,
+	if(compare_list_tree(writehead, &output_root, &aod,
 			     extra_output, missing_output) < 0)
 		return -1;
 	free_tupid_tree(&output_root);
@@ -3814,7 +3818,7 @@ struct actual_input_data {
 	struct tupid_entries sticky_root;
 	struct tupid_entries output_root;
 	struct tupid_entries missing_input_root;
-	struct list_head *readlist;
+	struct tup_entry_head *readhead;
 };
 
 static int new_input(tupid_t tupid, void *data)
@@ -3831,7 +3835,7 @@ static int new_input(tupid_t tupid, void *data)
 	if(tent->type == TUP_NODE_GENERATED) {
 		int connected;
 
-		if(nodes_are_connected(tent, aid->readlist, &connected) < 0)
+		if(nodes_are_connected(tent, aid->readhead, &connected) < 0)
 			return -1;
 
 		if(connected) {
@@ -3896,7 +3900,7 @@ static int del_normal_link(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
+int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
 {
 	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries sticky_copy = {NULL};
@@ -3906,7 +3910,7 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 		.sticky_root = {NULL},
 		.output_root = {NULL},
 		.missing_input_root = {NULL},
-		.readlist = readlist,
+		.readhead = readhead,
 	};
 
 	if(get_output_tree(cmdid, &aid.output_root) < 0)
@@ -3918,11 +3922,11 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist)
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
 	 */
-	if(compare_list_tree(readlist, &sticky_copy, &aid,
+	if(compare_list_tree(readhead, &sticky_copy, &aid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	if(compare_list_tree(readlist, &normal_root, &aid,
+	if(compare_list_tree(readhead, &normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
 		return -1;
 	free_tupid_tree(&aid.sticky_root);
@@ -4433,12 +4437,15 @@ static int reclaim_ghosts(void)
 	 * having a ghost subdir - the subdir would be removed in one pass,
 	 * then the other dir in the next pass.
 	 */
+	struct tup_entry_head tmp_list;
 
-	while(!list_empty(&ghost_list)) {
+	LIST_INIT(&tmp_list);
+
+	while(!LIST_EMPTY(&ghost_list)) {
 		struct tup_entry *tent;
 		int rc;
 
-		tent = list_entry(ghost_list.next, struct tup_entry, ghost_list);
+		tent = LIST_FIRST(&ghost_list);
 		if(tent->type != TUP_NODE_GHOST) {
 			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_list shouldn't be type %i\n", tent->tnode.tupid, tent->type);
 			return -1;
@@ -4455,10 +4462,14 @@ static int reclaim_ghosts(void)
 			}
 
 			/* Re-check the parent again later */
-			tup_entry_add_ghost_list(tent->parent, &ghost_list);
+			tup_entry_add_ghost_list(tent->parent, &tmp_list);
 
 			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
+		}
+
+		if(LIST_EMPTY(&ghost_list)) {
+			LIST_SWAP(&ghost_list, &tmp_list, tup_entry, ghost_list);
 		}
 	}
 

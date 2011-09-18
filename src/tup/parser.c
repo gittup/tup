@@ -1,7 +1,6 @@
 /* _ATFILE_SOURCE needed at least on linux x86_64 */
 #define _ATFILE_SOURCE
 #include "parser.h"
-#include "linux/list.h"
 #include "flist.h"
 #include "fileio.h"
 #include "pel_group.h"
@@ -14,6 +13,7 @@
 #include "entry.h"
 #include "string_tree.h"
 #include "compat.h"
+#include "container.h"
 #include "if_stmt.h"
 #include "server.h"
 #include <stdio.h>
@@ -27,16 +27,8 @@
 
 #define SYNTAX_ERROR -2
 
-struct name_list {
-	struct list_head entries;
-	int num_entries;
-	int totlen;
-	int basetotlen;
-	int extlessbasetotlen;
-};
-
 struct name_list_entry {
-	struct list_head list;
+	TAILQ_ENTRY(name_list_entry) list;
 	char *path;
 	char *base;
 	int len;
@@ -46,9 +38,18 @@ struct name_list_entry {
 	int dirlen;
 	struct tup_entry *tent;
 };
+TAILQ_HEAD(name_list_entry_head, name_list_entry);
+
+struct name_list {
+	struct name_list_entry_head entries;
+	int num_entries;
+	int totlen;
+	int basetotlen;
+	int extlessbasetotlen;
+};
 
 struct path_list {
-	struct list_head list;
+	TAILQ_ENTRY(path_list) list;
 	/* For files: */
 	char *path;
 	struct path_element *pel;
@@ -56,6 +57,7 @@ struct path_list {
 	/* For bins: */
 	struct bin *bin;
 };
+TAILQ_HEAD(path_list_head, path_list);
 
 struct rule {
 	int foreach;
@@ -85,20 +87,22 @@ struct bang_rule {
 };
 
 struct bang_list {
-	struct list_head list;
+	TAILQ_ENTRY(bang_list) list;
 	struct bang_rule *br;
 };
+TAILQ_HEAD(bang_list_head, bang_list);
 
 struct src_chain {
-	struct list_head list;
+	TAILQ_ENTRY(src_chain) list;
 	char *input_pattern;
-	struct list_head banglist;
+	struct bang_list_head banglist;
 };
+TAILQ_HEAD(src_chain_head, src_chain);
 
 struct chain {
 	struct string_tree st;
-	struct list_head src_chain_list;
-	struct list_head banglist;
+	struct src_chain_head src_chain_list;
+	struct bang_list_head banglist;
 };
 
 struct build_name_list_args {
@@ -126,11 +130,11 @@ static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
-		      struct bin_list *bl);
+		      struct bin_head *bl);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl);
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
@@ -138,33 +142,33 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			   struct name_list *nl,const char *ext, int extlen);
 static void free_bang_tree(struct string_entries *root);
 static void free_chain_tree(struct string_entries *root);
-static void free_banglist(struct list_head *list);
+static void free_banglist(struct bang_list_head *head);
 static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 			       int *o_cmdlen, char **o_output, char **o_bin,
 			       int *swapio);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_list *bl, int required);
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl);
+			       struct bin_head *bl, int required);
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				 struct name_list *output_nl);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_list *bl);
+				struct bin_head *bl);
 static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
-				 struct bin_list *bl,
+				 struct bin_head *bl,
 				 struct rule *r, const char *ext);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_list *bl,
+			       struct name_list *nl, struct bin_head *bl,
 			       int required);
-static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
-			 struct bin_list *bl);
-static void make_path_list_unique(struct list_head *plist);
-static void del_pl(struct path_list *pl);
+static int get_path_list(char *p, struct path_list_head *plist, tupid_t dt,
+			 struct bin_head *bl);
+static void make_path_list_unique(struct path_list_head *plist);
+static void del_pl(struct path_list *pl, struct path_list_head *head);
 static void make_name_list_unique(struct name_list *nl);
-static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
-				    struct graph *g);
-static int get_name_list(struct tupfile *tf, struct list_head *plist,
+static int parse_dependent_tupfiles(struct path_list_head *plist,
+				    struct tupfile *tf, struct graph *g);
+static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			 struct name_list *nl, int required);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required);
@@ -296,11 +300,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b)
 	char *p, *e;
 	char *line;
 	int lno = 0;
-	struct bin_list bl;
+	struct bin_head bl;
 	struct if_stmt ifs;
 
-	if(bin_list_init(&bl) < 0)
-		return -1;
+	LIST_INIT(&bl);
 	if_init(&ifs);
 
 	p = b->s;
@@ -620,7 +623,7 @@ out_free:
 }
 
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
-		      struct bin_list *bl)
+		      struct bin_head *bl)
 {
 	char *eval_cmdline;
 	char *rules;
@@ -798,7 +801,7 @@ out_err:
 	return 0;
 }
 
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_list *bl)
+static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 {
 	char *input, *cmd, *output, *bin;
 	int cmd_len;
@@ -1049,7 +1052,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 	struct chain *ch;
 	char *lbracket;
 	char *input_pattern = NULL;
-	struct list_head *destlist;
+	struct bang_list_head *destlist;
 
 	value = split_eq(p);
 	if(!value) {
@@ -1083,8 +1086,8 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			perror("malloc");
 			return -1;
 		}
-		INIT_LIST_HEAD(&ch->src_chain_list);
-		INIT_LIST_HEAD(&ch->banglist);
+		TAILQ_INIT(&ch->src_chain_list);
+		TAILQ_INIT(&ch->banglist);
 
 		if(string_tree_add(&tf->chain_root, &ch->st, p) < 0) {
 			fprintf(stderr, "Error inserting *-chain into tree\n");
@@ -1106,8 +1109,8 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			free(sc);
 			return -1;
 		}
-		INIT_LIST_HEAD(&sc->banglist);
-		list_add_tail(&sc->list, &ch->src_chain_list);
+		TAILQ_INIT(&sc->banglist);
+		TAILQ_INSERT_TAIL(&ch->src_chain_list, sc, list);
 		destlist = &sc->banglist;
 	}
 
@@ -1143,7 +1146,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 			return -1;
 		}
 		bal->br = br;
-		list_add_tail(&bal->list, destlist);
+		TAILQ_INSERT_TAIL(destlist, bal, list);
 
 		value = p;
 	} while(p != NULL);
@@ -1264,9 +1267,9 @@ static void free_chain_tree(struct string_entries *root)
 
 		string_tree_free(root, st);
 
-		while(!list_empty(&ch->src_chain_list)) {
-			sc = list_entry(ch->src_chain_list.next, struct src_chain, list);
-			list_del(&sc->list);
+		while(!TAILQ_EMPTY(&ch->src_chain_list)) {
+			sc = TAILQ_FIRST(&ch->src_chain_list);
+			TAILQ_REMOVE(&ch->src_chain_list, sc, list);
 			free_banglist(&sc->banglist);
 			free(sc->input_pattern);
 			free(sc);
@@ -1277,12 +1280,11 @@ static void free_chain_tree(struct string_entries *root)
 	}
 }
 
-static void free_banglist(struct list_head *list)
+static void free_banglist(struct bang_list_head *head)
 {
-	struct bang_list *bal;
-	while(!list_empty(list)) {
-		bal = list_entry(list->next, struct bang_list, list);
-		list_del(&bal->list);
+	while(!TAILQ_EMPTY(head)) {
+		struct bang_list *bal = TAILQ_FIRST(head);
+		TAILQ_REMOVE(head, bal, list);
 		free(bal);
 	}
 }
@@ -1370,7 +1372,7 @@ static int split_input_pattern(char *p, char **o_input, char **o_cmd,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_list *bl, int required)
+			       struct bin_head *bl, int required)
 {
 	char *eval_pattern;
 	char *oosep;
@@ -1410,7 +1412,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
 	struct name_list output_nl;
 	struct name_list_entry *nle;
@@ -1433,7 +1435,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 		struct string_tree *st;
 		struct chain *ch;
 		struct bang_list *bal;
-		struct list_head *banglist;
+		struct bang_list_head *banglist;
 
 		last_output_pattern = r->output_pattern;
 		r->output_pattern = empty_pattern;
@@ -1451,13 +1453,13 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 			const char *ext = NULL;
 
 			if(r->output_nl->num_entries > 0) {
-				nle = list_entry(r->output_nl->entries.next, struct name_list_entry, list);
+				nle = TAILQ_FIRST(&r->output_nl->entries);
 				if(nle->base &&
 				   nle->extlessbaselen != nle->baselen) {
 					ext = nle->base + nle->extlessbaselen;
 				}
 			}
-			list_for_each_entry(sc, &ch->src_chain_list, list) {
+			TAILQ_FOREACH(sc, &ch->src_chain_list, list) {
 				char *tinput;
 				char *input_pattern;
 
@@ -1487,8 +1489,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 			}
 		}
 
-		list_for_each_entry(bal, banglist, list) {
-			if(bal->list.next == banglist) {
+		TAILQ_FOREACH(bal, banglist, list) {
+			if(bal == TAILQ_LAST(banglist, bang_list_head)) {
 				/* Apply the output pattern specified in the rule
 				 * to the last !-macro in the *-chain.
 				 */
@@ -1564,11 +1566,11 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 		 * TODO: Compare ext to previous ext to re-use the bang parsing?
 		 * or would that be a confusing premature optimization?
 		 */
-		while(!list_empty(&r->inputs.entries)) {
-			nle = list_entry(r->inputs.entries.next,
-					 struct name_list_entry, list);
+		while(!TAILQ_EMPTY(&r->inputs.entries)) {
 			const char *ext = NULL;
 			int extlen = 0;
+
+			nle = TAILQ_FIRST(&r->inputs.entries);
 
 			init_name_list(&tmp_nl);
 			memcpy(&tmp_nle, nle, sizeof(*nle));
@@ -1658,9 +1660,9 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 }
 
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_list *bl)
+				struct bin_head *bl)
 {
-	LIST_HEAD(oplist);
+	struct path_list_head oplist;
 	struct path_list *pl;
 	char *eval_pattern;
 	struct name_list tmp_nl;
@@ -1678,16 +1680,17 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 	if(!eval_pattern)
 		return -1;
 
+	TAILQ_INIT(&oplist);
 	if(get_path_list(eval_pattern, &oplist, tf->tupid, NULL) < 0)
 		return -1;
 	make_path_list_unique(&oplist);
 
-	while(!list_empty(&oplist)) {
+	while(!TAILQ_EMPTY(&oplist)) {
 		struct rule tmpr;
 		char *tinput;
 		char *input_pattern;
 
-		pl = list_entry(oplist.next, struct path_list, list);
+		pl = TAILQ_FIRST(&oplist);
 
 		if(pl->path) {
 			/* Things with paths (eg: foo/built-in.o) get skipped.
@@ -1740,7 +1743,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		free(tmp_nle.path);
 
 out_skip:
-		del_pl(pl);
+		del_pl(pl, &oplist);
 	}
 	free(eval_pattern);
 
@@ -1748,10 +1751,10 @@ out_skip:
 }
 
 static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
-				 struct bin_list *bl,
+				 struct bin_head *bl,
 				 struct rule *r, const char *ext)
 {
-	LIST_HEAD(inp_list);
+	struct path_list_head inp_list;
 	char *inp;
 	struct path_list *pl;
 	int extlen = strlen(ext);;
@@ -1762,12 +1765,13 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 		return -1;
 	}
 
+	TAILQ_INIT(&inp_list);
 	if(get_path_list(inp, &inp_list, tf->tupid, NULL) < 0)
 		return -1;
 	make_path_list_unique(&inp_list);
 
-	while(!list_empty(&inp_list)) {
-		pl = list_entry(inp_list.next, struct path_list, list);
+	while(!TAILQ_EMPTY(&inp_list)) {
+		pl = TAILQ_FIRST(&inp_list);
 
 		if(pl->pel->len > extlen) {
 			if(name_cmp(pl->pel->path + pl->pel->len - extlen, ext) == 0) {
@@ -1798,33 +1802,34 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 			}
 		}
 
-		del_pl(pl);
+		del_pl(pl, &inp_list);
 	}
 	free(inp);
 	return 0;
 }
 
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_list *bl,
+			       struct name_list *nl, struct bin_head *bl,
 			       int required)
 {
-	LIST_HEAD(plist);
+	struct path_list_head plist;
 	struct path_list *pl, *tmp;
 
+	TAILQ_INIT(&plist);
 	if(get_path_list(p, &plist, tf->tupid, bl) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
 		return -1;
 	if(get_name_list(tf, &plist, nl, required) < 0)
 		return -1;
-	list_for_each_entry_safe(pl, tmp, &plist, list) {
-		del_pl(pl);
+	TAILQ_FOREACH_SAFE(pl, &plist, list, tmp) {
+		del_pl(pl, &plist);
 	}
 	return 0;
 }
 
-static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
-			 struct bin_list *bl)
+static int get_path_list(char *p, struct path_list_head *plist, tupid_t dt,
+			 struct bin_head *bl)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -1893,7 +1898,7 @@ static int get_path_list(char *p, struct list_head *plist, tupid_t dt,
 				pl->path[pl->pel->path - pl->path - 1] = 0;
 			}
 		}
-		list_add_tail(&pl->list, plist);
+		TAILQ_INSERT_TAIL(plist, pl, list);
 
 skip_empty_space:
 		p += spc_index + 1;
@@ -1902,7 +1907,7 @@ skip_empty_space:
 	return 0;
 }
 
-static void make_path_list_unique(struct list_head *plist)
+static void make_path_list_unique(struct path_list_head *plist)
 {
 	/* When make_name_list_unique can't be used, this can make a path_list
 	 * unique in O(n^2) time.
@@ -1910,26 +1915,24 @@ static void make_path_list_unique(struct list_head *plist)
 	struct path_list *pl;
 	struct path_list *tmp;
 
-	list_for_each_entry_safe(pl, tmp, plist, list) {
+	TAILQ_FOREACH_SAFE(pl, plist, list, tmp) {
 		struct path_list *pl2;
-		struct list_head *tlist;
 
-		tlist = pl->list.next;
-		while(tlist != plist) {
-			pl2 = list_entry(tlist, struct path_list, list);
+		pl2 = TAILQ_NEXT(pl, list);
+		while(pl2 != NULL) {
 			if(pl->pel->len == pl2->pel->len &&
 			   memcmp(pl->pel->path, pl2->pel->path, pl->pel->len) == 0) {
-				del_pl(pl);
+				del_pl(pl, plist);
 				break;
 			}
-			tlist = pl2->list.next;
+			pl2 = TAILQ_NEXT(pl2, list);
 		}
 	}
 }
 
-static void del_pl(struct path_list *pl)
+static void del_pl(struct path_list *pl, struct path_list_head *head)
 {
-	list_del(&pl->list);
+	TAILQ_REMOVE(head, pl, list);
 	free(pl->pel);
 	free(pl);
 }
@@ -1937,7 +1940,7 @@ static void del_pl(struct path_list *pl)
 static void make_name_list_unique(struct name_list *nl)
 {
 	struct name_list_entry *tmp;
-	struct list_head *input_list;
+	struct tup_entry_head *input_list;
 	struct name_list_entry *nle;
 
 	/* Use the tup entry list as an easy cheat to remove duplicates. Only
@@ -1953,7 +1956,7 @@ static void make_name_list_unique(struct name_list *nl)
 	 * present, the second and further duplicates will be removed.
 	 */
 	input_list = tup_entry_get_list();
-	list_for_each_entry_safe(nle, tmp, &nl->entries, list) {
+	TAILQ_FOREACH_SAFE(nle, &nl->entries, list, tmp) {
 		if(tup_entry_in_list(nle->tent)) {
 			delete_name_list_entry(nl, nle);
 		} else {
@@ -1963,12 +1966,12 @@ static void make_name_list_unique(struct name_list *nl)
 	tup_entry_release_list();
 }
 
-static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
-				    struct graph *g)
+static int parse_dependent_tupfiles(struct path_list_head *plist,
+				    struct tupfile *tf, struct graph *g)
 {
 	struct path_list *pl;
 
-	list_for_each_entry(pl, plist, list) {
+	TAILQ_FOREACH(pl, plist, list) {
 		/* Only care about non-bins, and directories that are not our
 		 * own.
 		 */
@@ -1988,12 +1991,12 @@ static int parse_dependent_tupfiles(struct list_head *plist, struct tupfile *tf,
 	return 0;
 }
 
-static int get_name_list(struct tupfile *tf, struct list_head *plist,
+static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			 struct name_list *nl, int required)
 {
 	struct path_list *pl;
 
-	list_for_each_entry(pl, plist, list) {
+	TAILQ_FOREACH(pl, plist, list) {
 		if(pl->bin) {
 			if(nl_add_bin(pl->bin, nl) < 0)
 				return -1;
@@ -2082,7 +2085,7 @@ static int nl_add_bin(struct bin *b, struct name_list *nl)
 	struct name_list_entry *nle;
 	int extlesslen;
 
-	list_for_each_entry(be, &b->entries, list) {
+	TAILQ_FOREACH(be, &b->entries, list) {
 		extlesslen = be->len - 1;
 		while(extlesslen > 0 && be->path[extlesslen] != '.')
 			extlesslen--;
@@ -2182,7 +2185,7 @@ static int find_existing_command(const struct name_list *onl,
 				 tupid_t *cmdid)
 {
 	struct name_list_entry *onle;
-	list_for_each_entry(onle, &onl->entries, list) {
+	TAILQ_FOREACH(onle, &onl->entries, list) {
 		int rc;
 		tupid_t incoming;
 
@@ -2218,7 +2221,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct path_list *pl;
 	struct tupid_tree *cmd_tt;
 	tupid_t cmdid = -1;
-	LIST_HEAD(oplist);
+	struct path_list_head oplist;
 	struct tupid_entries root = {NULL};
 	int extra_outputs = 0;
 	char sep[] = "|";
@@ -2229,7 +2232,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	 */
 	if(r->command_len == 0) {
 		if(r->bin) {
-			list_for_each_entry(nle, &nl->entries, list) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
 				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
 					return -1;
 			}
@@ -2239,6 +2242,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
+	TAILQ_INIT(&oplist);
 
 	output_pattern = eval(tf, r->output_pattern);
 	if(!output_pattern)
@@ -2255,9 +2259,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(get_path_list(extra_pattern, &oplist, tf->tupid, NULL) < 0)
 			return -1;
 	}
-	while(!list_empty(&oplist)) {
+	while(!TAILQ_EMPTY(&oplist)) {
 		struct name_list *use_onl;
-		pl = list_entry(oplist.next, struct path_list, list);
+		pl = TAILQ_FIRST(&oplist);
 
 		if(pl->path) {
 			fprintf(stderr, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
@@ -2328,7 +2332,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 
 out_pl:
-		del_pl(pl);
+		del_pl(pl, &oplist);
 	}
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
@@ -2380,9 +2384,8 @@ out_pl:
 	}
 	tree_entry_remove(&tf->g->delete_root, cmdid, &tf->g->delete_count);
 
-	while(!list_empty(&onl.entries)) {
-		onle = list_entry(onl.entries.next, struct name_list_entry,
-				  list);
+	while(!TAILQ_EMPTY(&onl.entries)) {
+		onle = TAILQ_FIRST(&onl.entries);
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
@@ -2392,9 +2395,8 @@ out_pl:
 		move_name_list_entry(output_nl, &onl, onle);
 	}
 
-	while(!list_empty(&extra_onl.entries)) {
-		onle = list_entry(extra_onl.entries.next, struct name_list_entry,
-				  list);
+	while(!TAILQ_EMPTY(&extra_onl.entries)) {
+		onle = TAILQ_FIRST(&extra_onl.entries);
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
 			fprintf(stderr, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
@@ -2408,15 +2410,15 @@ out_pl:
 		return -1;
 	free_tupid_tree(&root);
 
-	list_for_each_entry(nle, &nl->entries, list) {
+	TAILQ_FOREACH(nle, &nl->entries, list) {
 		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	list_for_each_entry(nle, &r->order_only_inputs.entries, list) {
+	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
 		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	list_for_each_entry(nle, &r->bang_oo_inputs.entries, list) {
+	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
 		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
@@ -2428,7 +2430,7 @@ out_pl:
 
 static void init_name_list(struct name_list *nl)
 {
-	INIT_LIST_HEAD(&nl->entries);
+	TAILQ_INIT(&nl->entries);
 	nl->num_entries = 0;
 	nl->totlen = 0;
 	nl->basetotlen = 0;
@@ -2457,7 +2459,7 @@ out:
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle)
 {
-	list_add_tail(&nle->list, &nl->entries);
+	TAILQ_INSERT_TAIL(&nl->entries, nle, list);
 	nl->num_entries++;
 	nl->totlen += nle->len;
 	nl->basetotlen += nle->baselen;
@@ -2467,9 +2469,8 @@ static void add_name_list_entry(struct name_list *nl,
 static void delete_name_list(struct name_list *nl)
 {
 	struct name_list_entry *nle;
-	while(!list_empty(&nl->entries)) {
-		nle = list_entry(nl->entries.next, struct name_list_entry,
-				 list);
+	while(!TAILQ_EMPTY(&nl->entries)) {
+		nle = TAILQ_FIRST(&nl->entries);
 		delete_name_list_entry(nl, nle);
 	}
 }
@@ -2482,7 +2483,7 @@ static void delete_name_list_entry(struct name_list *nl,
 	nl->basetotlen -= nle->baselen;
 	nl->extlessbasetotlen -= nle->extlessbaselen;
 
-	list_del(&nle->list);
+	TAILQ_REMOVE(&nl->entries, nle, list);
 	free(nle->path);
 	free(nle);
 }
@@ -2495,21 +2496,21 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 	oldnl->basetotlen -= nle->baselen;
 	oldnl->extlessbasetotlen -= nle->extlessbaselen;
 
-	list_del(&nle->list);
+	TAILQ_REMOVE(&oldnl->entries, nle, list);
 
 	newnl->num_entries++;
 	newnl->totlen += nle->len;
 	newnl->basetotlen += nle->baselen;
 	newnl->extlessbasetotlen += nle->extlessbaselen;
-	list_add_tail(&nle->list, &newnl->entries);
+	TAILQ_INSERT_TAIL(&newnl->entries, nle, list);
 }
 
 static void move_name_list(struct name_list *newnl, struct name_list *oldnl)
 {
 	struct name_list_entry *nle;
 
-	while(!list_empty(&oldnl->entries)) {
-		nle = list_entry(oldnl->entries.next, struct name_list_entry, list);
+	while(!TAILQ_EMPTY(&oldnl->entries)) {
+		nle = TAILQ_FIRST(&oldnl->entries);
 		move_name_list_entry(newnl, oldnl, nle);
 	}
 }
@@ -2579,9 +2580,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			if(!ext) {
 				fprintf(stderr, "Error: %%e is only valid with a foreach rule for files that have extensions.\n");
 				if(nl->num_entries == 1) {
-					nle = list_entry(nl->entries.next,
-							 struct name_list_entry,
-							 list);
+					nle = TAILQ_FIRST(&nl->entries);
 					fprintf(stderr, " -- Path: '%s'\n", nle->path);
 				} else {
 					fprintf(stderr, " -- This does not appear to be a foreach rule\n");
@@ -2633,7 +2632,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 		p = next + 1;
 		if(*next == 'f') {
 			int first = 1;
-			list_for_each_entry(nle, &nl->entries, list) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
 				if(!first) {
 					s[x] = ' ';
 					x++;
@@ -2644,7 +2643,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			}
 		} else if(*next == 'b') {
 			int first = 1;
-			list_for_each_entry(nle, &nl->entries, list) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
 				if(!first) {
 					s[x] = ' ';
 					x++;
@@ -2655,7 +2654,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			}
 		} else if(*next == 'B') {
 			int first = 1;
-			list_for_each_entry(nle, &nl->entries, list) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
 				if(!first) {
 					s[x] = ' ';
 					x++;
@@ -2669,7 +2668,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			x += extlen;
 		} else if(*next == 'o') {
 			int first = 1;
-			list_for_each_entry(nle, &onl->entries, list) {
+			TAILQ_FOREACH(nle, &onl->entries, list) {
 				if(!first) {
 					s[x] = ' ';
 					x++;
@@ -2679,7 +2678,7 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 				first = 0;
 			}
 		} else if(*next == 'O') {
-			nle = list_entry(onl->entries.next, struct name_list_entry, list);
+			nle = TAILQ_FIRST(&onl->entries);
 			memcpy(&s[x], nle->path, nle->extlessbaselen);
 			x += nle->extlessbaselen;
 		} else if(*next == '%') {
@@ -2699,11 +2698,12 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 }
 
 struct tent_list {
-	struct list_head list;
+	LIST_ENTRY(tent_list) list;
 	struct tup_entry *tent;
 };
+LIST_HEAD(tent_list_head, tent_list);
 
-static int get_tent_list(tupid_t tupid, struct list_head *list)
+static int get_tent_list(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
 	struct tent_list *tlist;
@@ -2716,7 +2716,7 @@ static int get_tent_list(tupid_t tupid, struct list_head *list)
 			return -1;
 		}
 		tlist->tent = tent;
-		list_add(&tlist->list, list);
+		LIST_INSERT_HEAD(head, tlist, list);
 
 		tent = tent->parent;
 	}
@@ -2725,37 +2725,39 @@ static int get_tent_list(tupid_t tupid, struct list_head *list)
 
 static void del_tent_list_entry(struct tent_list *tlist)
 {
-	list_del(&tlist->list);
+	LIST_REMOVE(tlist, list);
 	free(tlist);
 }
 
-static void free_tent_list(struct list_head *list)
+static void free_tent_list(struct tent_list_head *head)
 {
 	struct tent_list *tlist;
-	while(!list_empty(list)) {
-		tlist = list_entry(list->next, struct tent_list, list);
+	while(!LIST_EMPTY(head)) {
+		tlist = LIST_FIRST(head);
 		del_tent_list_entry(tlist);
 	}
 }
 
 static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 {
-	LIST_HEAD(startlist);
-	LIST_HEAD(endlist);
+	struct tent_list_head startlist;
+	struct tent_list_head endlist;
 	struct tent_list *startentry;
 	struct tent_list *endentry;
 	int first = 0;
 
 	*len = 0;
 
+	LIST_INIT(&startlist);
+	LIST_INIT(&endlist);
 	if(get_tent_list(start, &startlist) < 0)
 		return -1;
 	if(get_tent_list(end, &endlist) < 0)
 		return -1;
 
-	while(!list_empty(&startlist) && !list_empty(&endlist)) {
-		startentry = list_entry(startlist.next, struct tent_list, list);
-		endentry = list_entry(endlist.next, struct tent_list, list);
+	while(!LIST_EMPTY(&startlist) && !LIST_EMPTY(&endlist)) {
+		startentry = LIST_FIRST(&startlist);
+		endentry = LIST_FIRST(&endlist);
 
 		if(startentry->tent == endentry->tent) {
 			del_tent_list_entry(startentry);
@@ -2765,7 +2767,7 @@ static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 		}
 	}
 
-	list_for_each_entry(startentry, &startlist, list) {
+	LIST_FOREACH(startentry, &startlist, list) {
 		if(!first) {
 			first = 1;
 		} else {
@@ -2777,7 +2779,7 @@ static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 			sprintf(dest + *len, "..");
 		(*len) += 2;
 	}
-	list_for_each_entry(endentry, &endlist, list) {
+	LIST_FOREACH(endentry, &endlist, list) {
 		if(!first) {
 			first = 1;
 		} else {

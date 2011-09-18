@@ -3,7 +3,7 @@
 
 #include "tupid.h"
 #include "tupid_tree.h"
-#include "linux/list.h"
+#include "bsd/queue.h"
 #include <stdio.h>
 #include <time.h>
 
@@ -14,6 +14,7 @@
 #define VAR_DT 2
 
 struct tup_entry;
+struct tup_entry_head;
 
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
@@ -134,7 +135,7 @@ int tup_db_scan_begin(struct tupid_entries *root);
 int tup_db_scan_end(struct tupid_entries *root);
 
 /* updater operations */
-int tup_db_check_actual_outputs(tupid_t cmdid, struct list_head *writelist);
-int tup_db_check_actual_inputs(tupid_t cmdid, struct list_head *readlist);
+int tup_db_check_actual_outputs(tupid_t cmdid, struct tup_entry_head *writehead);
+int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead);
 
 #endif

@@ -2,10 +2,8 @@
 #include "file.h"
 #include "access_event.h"
 #include "debug.h"
-#include "linux/list.h"
 #include "db.h"
 #include "fileio.h"
-#include "pel_group.h"
 #include "config.h"
 #include "entry.h"
 #include <stdio.h>
@@ -15,13 +13,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-struct file_entry {
-	tupid_t dt;
-	char *filename;
-	struct pel_group pg;
-	struct list_head list;
-};
-
 struct dfd_info {
 	tupid_t dt;
 	int dfd;
@@ -29,24 +20,25 @@ struct dfd_info {
 
 static struct file_entry *new_entry(const char *filename, tupid_t dt);
 static void del_entry(struct file_entry *fent);
-static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list);
+static void check_unlink_list(const struct pel_group *pg,
+			      struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
 static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct file_info *info, int *warnings,
-			     struct list_head *entrylist);
+			     struct tup_entry_head *entryhead);
 static int update_read_info(tupid_t cmdid, struct file_info *info,
-			    struct list_head *entrylist);
+			    struct tup_entry_head *entryhead);
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root);
 
 int init_file_info(struct file_info *info)
 {
-	INIT_LIST_HEAD(&info->read_list);
-	INIT_LIST_HEAD(&info->write_list);
-	INIT_LIST_HEAD(&info->unlink_list);
-	INIT_LIST_HEAD(&info->var_list);
-	INIT_LIST_HEAD(&info->mapping_list);
-	INIT_LIST_HEAD(&info->tmpdir_list);
+	LIST_INIT(&info->read_list);
+	LIST_INIT(&info->write_list);
+	LIST_INIT(&info->unlink_list);
+	LIST_INIT(&info->var_list);
+	LIST_INIT(&info->mapping_list);
+	LIST_INIT(&info->tmpdir_list);
 	pthread_mutex_init(&info->lock, NULL);
 	info->server_fail = 0;
 	return 0;
@@ -92,17 +84,17 @@ int handle_open_file(enum access_type at, const char *filename,
 
 	switch(at) {
 		case ACCESS_READ:
-			list_add(&fent->list, &info->read_list);
+			LIST_INSERT_HEAD(&info->read_list, fent, list);
 			break;
 		case ACCESS_WRITE:
 			check_unlink_list(&fent->pg, &info->unlink_list);
-			list_add(&fent->list, &info->write_list);
+			LIST_INSERT_HEAD(&info->write_list, fent, list);
 			break;
 		case ACCESS_UNLINK:
-			list_add(&fent->list, &info->unlink_list);
+			LIST_INSERT_HEAD(&info->unlink_list, fent, list);
 			break;
 		case ACCESS_VAR:
-			list_add(&fent->list, &info->var_list);
+			LIST_INSERT_HEAD(&info->var_list, fent, list);
 			break;
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
@@ -116,7 +108,7 @@ int handle_open_file(enum access_type at, const char *filename,
 int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		int *warnings, int check_only)
 {
-	struct list_head *entrylist;
+	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
 	int tmpdir_bork = 0;
 	int rc1 = 0, rc2;
@@ -125,7 +117,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 	handle_unlink(info);
 
 	if(!check_only) {
-		list_for_each_entry(tmpdir, &info->tmpdir_list, list) {
+		LIST_FOREACH(tmpdir, &info->tmpdir_list, list) {
 			fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
 			tmpdir_bork = 1;
 		}
@@ -163,27 +155,27 @@ static int add_parser_files_locked(struct file_info *finfo,
 {
 	struct file_entry *r;
 	struct mapping *map;
-	struct list_head *entrylist;
+	struct tup_entry_head *entrylist;
 	struct tup_entry *tent;
 	int map_bork = 0;
 
 	entrylist = tup_entry_get_list();
-	while(!list_empty(&finfo->read_list)) {
-		r = list_entry(finfo->read_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&finfo->read_list)) {
+		r = LIST_FIRST(&finfo->read_list);
 		if(r->dt > 0) {
 			if(add_node_to_list(r->dt, &r->pg, entrylist) < 0)
 				return -1;
 		}
 		del_entry(r);
 	}
-	while(!list_empty(&finfo->var_list)) {
-		r = list_entry(finfo->var_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&finfo->var_list)) {
+		r = LIST_FIRST(&finfo->var_list);
 
 		if(add_node_to_list(VAR_DT, &r->pg, entrylist) < 0)
 			return -1;
 		del_entry(r);
 	}
-	list_for_each_entry(tent, entrylist, list) {
+	LIST_FOREACH(tent, entrylist, list) {
 		if(strcmp(tent->name.s, ".gitignore") != 0)
 			if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
 				return -1;
@@ -191,13 +183,13 @@ static int add_parser_files_locked(struct file_info *finfo,
 	tup_entry_release_list();
 
 	/* TODO: write_list not needed here? */
-	while(!list_empty(&finfo->write_list)) {
-		r = list_entry(finfo->write_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&finfo->write_list)) {
+		r = LIST_FIRST(&finfo->write_list);
 		del_entry(r);
 	}
 
-	while(!list_empty(&finfo->mapping_list)) {
-		map = list_entry(finfo->mapping_list.next, struct mapping, list);
+	while(!LIST_EMPTY(&finfo->mapping_list)) {
+		map = LIST_FIRST(&finfo->mapping_list);
 
 		if(gimme_tent(map->realname, &tent) < 0)
 			return -1;
@@ -258,7 +250,7 @@ static struct file_entry *new_entry(const char *filename, tupid_t dt)
 
 static void del_entry(struct file_entry *fent)
 {
-	list_del(&fent->list);
+	LIST_REMOVE(fent, list);
 	del_pel_group(&fent->pg);
 	free(fent->filename);
 	free(fent);
@@ -275,7 +267,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 	if(get_path_elements(to, &pg_to) < 0)
 		return -1;
 
-	list_for_each_entry(fent, &info->write_list, list) {
+	LIST_FOREACH(fent, &info->write_list, list) {
 		if(pg_eq(&fent->pg, &pg_from)) {
 			del_pel_group(&fent->pg);
 			free(fent->filename);
@@ -289,7 +281,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 				return -1;
 		}
 	}
-	list_for_each_entry(fent, &info->read_list, list) {
+	LIST_FOREACH(fent, &info->read_list, list) {
 		if(pg_eq(&fent->pg, &pg_from)) {
 			del_pel_group(&fent->pg);
 			free(fent->filename);
@@ -312,17 +304,18 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 
 void del_map(struct mapping *map)
 {
-	list_del(&map->list);
+	LIST_REMOVE(map, list);
 	free(map->tmpname);
 	free(map->realname);
 	free(map);
 }
 
-static void check_unlink_list(const struct pel_group *pg, struct list_head *u_list)
+static void check_unlink_list(const struct pel_group *pg,
+			      struct file_entry_head *u_head)
 {
 	struct file_entry *fent, *tmp;
 
-	list_for_each_entry_safe(fent, tmp, u_list, list) {
+	LIST_FOREACH_SAFE(fent, u_head, list, tmp) {
 		if(pg_eq(&fent->pg, pg)) {
 			del_entry(fent);
 		}
@@ -333,15 +326,15 @@ static void handle_unlink(struct file_info *info)
 {
 	struct file_entry *u, *fent, *tmp;
 
-	while(!list_empty(&info->unlink_list)) {
-		u = list_entry(info->unlink_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&info->unlink_list)) {
+		u = LIST_FIRST(&info->unlink_list);
 
-		list_for_each_entry_safe(fent, tmp, &info->write_list, list) {
+		LIST_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
 			if(pg_eq(&fent->pg, &u->pg)) {
 				del_entry(fent);
 			}
 		}
-		list_for_each_entry_safe(fent, tmp, &info->read_list, list) {
+		LIST_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
 			if(pg_eq(&fent->pg, &u->pg)) {
 				del_entry(fent);
 			}
@@ -353,7 +346,7 @@ static void handle_unlink(struct file_info *info)
 
 static int update_write_info(tupid_t cmdid, const char *debug_name,
 			     struct file_info *info, int *warnings,
-			     struct list_head *entrylist)
+			     struct tup_entry_head *entryhead)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -361,17 +354,17 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 	struct tup_entry *tent;
 	int write_bork = 0;
 
-	while(!list_empty(&info->write_list)) {
+	while(!LIST_EMPTY(&info->write_list)) {
 		tupid_t newdt;
 		struct path_element *pel = NULL;
 
-		w = list_entry(info->write_list.next, struct file_entry, list);
+		w = LIST_FIRST(&info->write_list);
 		if(w->dt < 0) {
 			goto out_skip;
 		}
 
 		/* Remove duplicate write entries */
-		list_for_each_entry_safe(r, tmp, &info->write_list, list) {
+		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
 			if(r != w && pg_eq(&w->pg, &r->pg)) {
 				del_entry(r);
 			}
@@ -402,7 +395,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 		} else {
 			struct mapping *map;
 			int dfd;
-			tup_entry_list_add(tent, entrylist);
+			tup_entry_list_add(tent, entryhead);
 
 			/* Some files in Windows still set dt to not be
 			 * DOT_DT, so we need to make sure we are in the
@@ -417,7 +410,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 				dfd = tup_top_fd();
 			}
 
-			list_for_each_entry(map, &info->mapping_list, list) {
+			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
 					if(file_set_mtime(tent, dfd, map->tmpname) < 0)
 						return -1;
@@ -433,23 +426,23 @@ out_skip:
 	}
 
 	if(write_bork) {
-		while(!list_empty(&info->mapping_list)) {
+		while(!LIST_EMPTY(&info->mapping_list)) {
 			struct mapping *map;
 
-			map = list_entry(info->mapping_list.next, struct mapping, list);
+			map = LIST_FIRST(&info->mapping_list);
 			unlink(map->tmpname);
 			del_map(map);
 		}
 		return -1;
 	}
 
-	if(tup_db_check_actual_outputs(cmdid, entrylist) < 0)
+	if(tup_db_check_actual_outputs(cmdid, entryhead) < 0)
 		return -1;
 
-	while(!list_empty(&info->mapping_list)) {
+	while(!LIST_EMPTY(&info->mapping_list)) {
 		struct mapping *map;
 
-		map = list_entry(info->mapping_list.next, struct mapping, list);
+		map = LIST_FIRST(&info->mapping_list);
 
 		/* TODO: strcmp only here for win32 support */
 		if(strcmp(map->tmpname, map->realname) != 0) {
@@ -469,28 +462,28 @@ out_skip:
 }
 
 static int update_read_info(tupid_t cmdid, struct file_info *info,
-			    struct list_head *entrylist)
+			    struct tup_entry_head *entryhead)
 {
 	struct file_entry *r;
 
-	while(!list_empty(&info->read_list)) {
-		r = list_entry(info->read_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&info->read_list)) {
+		r = LIST_FIRST(&info->read_list);
 		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist) < 0)
+			if(add_node_to_list(r->dt, &r->pg, entryhead) < 0)
 				return -1;
 		}
 		del_entry(r);
 	}
 
-	while(!list_empty(&info->var_list)) {
-		r = list_entry(info->var_list.next, struct file_entry, list);
+	while(!LIST_EMPTY(&info->var_list)) {
+		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(VAR_DT, &r->pg, entrylist) < 0)
+		if(add_node_to_list(VAR_DT, &r->pg, entryhead) < 0)
 			return -1;
 		del_entry(r);
 	}
 
-	if(tup_db_check_actual_inputs(cmdid, entrylist) < 0)
+	if(tup_db_check_actual_inputs(cmdid, entryhead) < 0)
 		return -1;
 	return 0;
 }

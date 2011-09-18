@@ -10,6 +10,7 @@
 #include "fslurp.h"
 #include "array_size.h"
 #include "config.h"
+#include "container.h"
 #include "monitor.h"
 #include "path.h"
 #include "colors.h"
@@ -77,8 +78,10 @@ static const char *signal_err[] = {
  * the fin_list and signal the list_cond so that execute_graph() knows this
  * work is done.
  */
+struct worker_thread;
+LIST_HEAD(worker_thread_head, worker_thread);
 struct worker_thread {
-	struct list_head list;
+	LIST_ENTRY(worker_thread) list;
 	pthread_t pid;
 	struct graph *g; /* This should only be used in create_work() and todo_work */
 
@@ -87,7 +90,7 @@ struct worker_thread {
 
 	pthread_mutex_t *list_mutex;
 	pthread_cond_t *list_cond;
-	struct list_head *fin_list;
+	struct worker_thread_head *fin_list;
 	struct node *n;
 	struct node *retn;
 	int rc;
@@ -249,7 +252,7 @@ static int delete_files(struct graph *g)
 	int num_deleted = 0;
 	struct tupid_tree *tt;
 	struct tup_entry *tent;
-	struct list_head *entrylist;
+	struct tup_entry_head *entrylist;
 	int rc = -1;
 
 	if(g->delete_count) {
@@ -292,10 +295,10 @@ static int delete_files(struct graph *g)
 		tupid_tree_rm(&g->delete_root, tt);
 		free(te);
 	}
-	if(!list_empty(entrylist)) {
+	if(!LIST_EMPTY(entrylist)) {
 		tup_show_message("Converting generated files to normal files...\n");
 	}
-	list_for_each_entry(tent, entrylist, list) {
+	LIST_FOREACH(tent, entrylist, list) {
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
 		show_progress(num_deleted, g->delete_count, tent);
@@ -511,8 +514,8 @@ static int build_graph(struct graph *g)
 {
 	struct node *cur;
 
-	while(!list_empty(&g->plist)) {
-		cur = list_entry(g->plist.next, struct node, list);
+	while(!TAILQ_EMPTY(&g->plist)) {
+		cur = TAILQ_FIRST(&g->plist);
 		if(cur->state == STATE_INITIALIZED) {
 			DEBUGP("find deps for node: %lli\n", cur->tnode.tupid);
 			g->cur = cur;
@@ -521,8 +524,8 @@ static int build_graph(struct graph *g)
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
 			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
-			list_del(&cur->list);
-			list_add_tail(&cur->list, &g->node_list);
+			TAILQ_REMOVE(&g->plist, cur, list);
+			TAILQ_INSERT_TAIL(&g->node_list, cur, list);
 			cur->state = STATE_FINISHED;
 		} else if(cur->state == STATE_FINISHED) {
 			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", cur->tnode.tupid);
@@ -560,7 +563,8 @@ edge_create:
 		if(n->tent->type == g->count_flags)
 			g->num_nodes++;
 		n->expanded = 1;
-		list_move(&n->list, &g->plist);
+		TAILQ_REMOVE(&g->node_list, n, list);
+		TAILQ_INSERT_HEAD(&g->plist, n, list);
 	}
 
 	if(create_edge(g->cur, n, style) < 0)
@@ -570,14 +574,15 @@ edge_create:
 
 static void pop_node(struct graph *g, struct node *n)
 {
-	while(!list_empty(&n->edges)) {
+	while(!LIST_EMPTY(&n->edges)) {
 		struct edge *e;
-		e = list_entry(n->edges.next, struct edge, list);
+		e = LIST_FIRST(&n->edges);
 		if(e->dest->state != STATE_PROCESSING) {
 			/* Put the node back on the plist, and mark it as such
 			 * by changing the state to STATE_PROCESSING.
 			 */
-			list_move(&e->dest->list, &g->plist);
+			TAILQ_REMOVE(&g->node_list, e->dest, list);
+			TAILQ_INSERT_HEAD(&g->plist, e->dest, list);
 			e->dest->state = STATE_PROCESSING;
 		}
 
@@ -601,10 +606,13 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int active = 0;
 	pthread_mutex_t list_mutex;
 	pthread_cond_t list_cond;
-	LIST_HEAD(active_list);
-	LIST_HEAD(fin_list);
-	LIST_HEAD(free_list);
+	struct worker_thread_head active_list;
+	struct worker_thread_head fin_list;
+	struct worker_thread_head free_list;
 
+	LIST_INIT(&active_list);
+	LIST_INIT(&fin_list);
+	LIST_INIT(&free_list);
 	if(pthread_mutex_init(&list_mutex, NULL) != 0) {
 		perror("pthread_mutex_init");
 		return -2;
@@ -638,7 +646,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		workers[x].retn = NULL;
 		workers[x].rc = -1;
 		workers[x].quit = 0;
-		list_add(&workers[x].list, &free_list);
+		LIST_INSERT_HEAD(&free_list, &workers[x], list);
 
 		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
 			perror("pthread_create");
@@ -646,28 +654,29 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		}
 	}
 
-	root = list_entry(g->node_list.next, struct node, list);
+	root = TAILQ_FIRST(&g->node_list);
 	DEBUGP("root node: %lli\n", root->tnode.tupid);
-	list_del(&root->list);
+	TAILQ_REMOVE(&g->node_list, root, list);
 	pop_node(g, root);
 	remove_node(g, root);
 
-	while(!list_empty(&g->plist) && !server_is_dead()) {
+	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead()) {
 		struct node *n;
 		struct worker_thread *wt;
-		n = list_entry(g->plist.next, struct node, list);
+		n = TAILQ_FIRST(&g->plist);
 		DEBUGP("cur node: %lli\n", n->tnode.tupid);
-		if(!list_empty(&n->incoming)) {
+		if(!LIST_EMPTY(&n->incoming)) {
 			/* Here STATE_FINISHED means we're on the node_list,
 			 * therefore not ready for processing.
 			 */
-			list_move(&n->list, &g->node_list);
+			TAILQ_REMOVE(&g->plist, n, list);
+			TAILQ_INSERT_HEAD(&g->node_list, n, list);
 			n->state = STATE_FINISHED;
 			goto check_empties;
 		}
 
 		if(!n->expanded) {
-			list_del(&n->list);
+			TAILQ_REMOVE(&g->plist, n, list);
 			pop_node(g, n);
 			remove_node(g, n);
 			goto check_empties;
@@ -677,12 +686,13 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			show_progress(num_processed, g->num_nodes, n->tent);
 			num_processed++;
 		}
-		list_del(&n->list);
+		TAILQ_REMOVE(&g->plist, n, list);
 		active++;
 
-		wt = list_entry(free_list.next, struct worker_thread, list);
+		wt = LIST_FIRST(&free_list);
 		pthread_mutex_lock(&list_mutex);
-		list_move(&wt->list, &active_list);
+		LIST_REMOVE(wt, list);
+		LIST_INSERT_HEAD(&active_list, wt, list);
 		pthread_mutex_unlock(&list_mutex);
 
 		pthread_mutex_lock(&wt->lock);
@@ -697,16 +707,17 @@ check_empties:
 		 *  2) There is no work to do (plist is empty or the server is
 		 *     dead) and some people are active.
 		 */
-		while(list_empty(&free_list) ||
-		      ((list_empty(&g->plist) || server_is_dead()) && active)) {
+		while(LIST_EMPTY(&free_list) ||
+		      ((TAILQ_EMPTY(&g->plist) || server_is_dead()) && active)) {
 			pthread_mutex_lock(&list_mutex);
-			while(list_empty(&fin_list)) {
+			while(LIST_EMPTY(&fin_list)) {
 				pthread_cond_wait(&list_cond, &list_mutex);
 			}
-			wt = list_entry(fin_list.next, struct worker_thread, list);
+			wt = LIST_FIRST(&fin_list);
 			n = wt->retn;
 			wt->retn = NULL;
-			list_move(&wt->list, &free_list);
+			LIST_REMOVE(wt, list);
+			LIST_INSERT_HEAD(&free_list, wt, list);
 			pthread_mutex_unlock(&list_mutex);
 			active--;
 
@@ -721,7 +732,7 @@ keep_going:
 			remove_node(g, n);
 		}
 	}
-	if(!list_empty(&g->node_list) || !list_empty(&g->plist)) {
+	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist)) {
 		printf("\n");
 		if(keep_going) {
 			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
@@ -732,11 +743,11 @@ keep_going:
 				struct node *n;
 				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
 				fprintf(stderr, "Node list:\n");
-				list_for_each_entry(n, &g->node_list, list) {
+				TAILQ_FOREACH(n, &g->node_list, list) {
 					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 				}
 				fprintf(stderr, "plist:\n");
-				list_for_each_entry(n, &g->plist, list) {
+				TAILQ_FOREACH(n, &g->plist, list) {
 					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 				}
 			}
@@ -785,7 +796,8 @@ static void worker_ret(struct worker_thread *wt, int rc)
 	wt->n = NULL;
 
 	pthread_mutex_lock(wt->list_mutex);
-	list_move(&wt->list, wt->fin_list);
+	LIST_REMOVE(wt, list);
+	LIST_INSERT_HEAD(wt->fin_list, wt, list);
 	pthread_cond_signal(wt->list_cond);
 	pthread_mutex_unlock(wt->list_mutex);
 }
@@ -853,10 +865,10 @@ static void *update_work(void *arg)
 			 */
 			if(rc == 0) {
 				pthread_mutex_lock(&db_mutex);
-				list_for_each_entry(e, &n->edges, list) {
+				LIST_FOREACH(e, &n->edges, list) {
 					struct edge *f;
 
-					list_for_each_entry(f, &e->dest->edges, list) {
+					LIST_FOREACH(f, &e->dest->edges, list) {
 						if(f->style & TUP_LINK_NORMAL) {
 							if(tup_db_add_modify_list(f->dest->tnode.tupid) < 0)
 								rc = -1;
@@ -872,7 +884,7 @@ static void *update_work(void *arg)
 			/* Mark the next nodes as modify in case we hit
 			 * an error - we'll need to pick up there (t6006).
 			 */
-			list_for_each_entry(e, &n->edges, list) {
+			LIST_FOREACH(e, &n->edges, list) {
 				if(e->style & TUP_LINK_NORMAL) {
 					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
 						rc = -1;
@@ -911,7 +923,7 @@ static int unlink_outputs(int dfd, struct node *n)
 {
 	struct edge *e;
 	struct node *output;
-	list_for_each_entry(e, &n->edges, list) {
+	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {

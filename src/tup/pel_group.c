@@ -18,7 +18,7 @@ static int add_pel(const char *path, int len, struct pel_group *pg)
 	}
 	pel->path = path;
 	pel->len = len;
-	list_add_tail(&pel->list, &pg->path_list);
+	TAILQ_INSERT_TAIL(&pg->path_list, pel, list);
 	return 0;
 }
 
@@ -26,7 +26,7 @@ void init_pel_group(struct pel_group *pg)
 {
 	pg->pg_flags = 0;
 	pg->num_elements = 0;
-	INIT_LIST_HEAD(&pg->path_list);
+	TAILQ_INIT(&pg->path_list);
 }
 
 int split_path_elements(const char *dir, struct pel_group *pg)
@@ -64,7 +64,7 @@ int split_path_elements(const char *dir, struct pel_group *pg)
 				 * path.
 				 */
 				if(pg->num_elements) {
-					pel = list_entry(pg->path_list.prev, struct path_element, list);
+					pel = TAILQ_LAST(&pg->path_list, path_element_head);
 					del_pel(pel, pg);
 					continue;
 				}
@@ -98,7 +98,7 @@ int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 	const char *top = get_tup_top();
 
 	if(pg->pg_flags & PG_ROOT) {
-		list_for_each_entry(pel, &pg->path_list, list) {
+		TAILQ_FOREACH(pel, &pg->path_list, list) {
 			if(is_path_sep(top)) {
 				while(*top && is_path_sep(top))
 					top++;
@@ -150,13 +150,13 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 			/* Returns are 0 here to indicate file is outside of
 			 * .tup
 			 */
-			if(list_empty(&pg->path_list) || !is_path_sep(top)) {
+			if(TAILQ_EMPTY(&pg->path_list) || !is_path_sep(top)) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
 				return 0;
 			}
 			while(*top && is_path_sep(top))
 				top++;
-			pel = list_entry(pg->path_list.next, struct path_element, list);
+			pel = TAILQ_FIRST(&pg->path_list);
 			if(name_cmp_n(top, pel->path, pel->len) != 0) {
 				pg->pg_flags |= PG_OUTSIDE_TUP;
 				del_pel_group(pg);
@@ -196,31 +196,27 @@ int append_path_elements(struct pel_group *pg, tupid_t dt)
 
 int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
 {
-	const struct list_head *la, *lb;
 	struct path_element *pela, *pelb;
 
-	la = &pga->path_list;
-	lb = &pgb->path_list;
-	while(la->next != &pga->path_list && lb->next != &pgb->path_list) {
-		pela = list_entry(la->next, struct path_element, list);
-		pelb = list_entry(lb->next, struct path_element, list);
-
+	pela = TAILQ_FIRST(&pga->path_list);
+	pelb = TAILQ_FIRST(&pgb->path_list);
+	while(pela != NULL && pelb != NULL) {
 		if(pela->len != pelb->len)
 			return 0;
 		if(name_cmp_n(pela->path, pelb->path, pela->len) != 0)
 			return 0;
 
-		la = la->next;
-		lb = lb->next;
+		pela = TAILQ_NEXT(pela, list);
+		pelb = TAILQ_NEXT(pelb, list);
 	}
-	if(la->next != &pga->path_list || lb->next != &pgb->path_list)
+	if(pela != NULL || pelb != NULL)
 		return 0;
 	return 1;
 }
 
 void del_pel(struct path_element *pel, struct pel_group *pg)
 {
-	list_del(&pel->list);
+	TAILQ_REMOVE(&pg->path_list, pel, list);
 	free(pel);
 	pg->num_elements--;
 }
@@ -229,8 +225,8 @@ void del_pel_group(struct pel_group *pg)
 {
 	struct path_element *pel;
 
-	while(!list_empty(&pg->path_list)) {
-		pel = list_entry(pg->path_list.prev, struct path_element, list);
+	while(!TAILQ_EMPTY(&pg->path_list)) {
+		pel = TAILQ_LAST(&pg->path_list, path_element_head);
 		del_pel(pel, pg);
 	}
 }
@@ -242,7 +238,7 @@ void print_pel_group(struct pel_group *pg)
 	if(pg->pg_flags & PG_ROOT) {
 		printf("/");
 	}
-	list_for_each_entry(pel, &pg->path_list, list) {
+	TAILQ_FOREACH(pel, &pg->path_list, list) {
 		printf("%.*s/", pel->len, pel->path);
 	}
 	printf("\n");

@@ -285,7 +285,8 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 edge_create:
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
 		n->expanded = 1;
-		list_move(&n->list, &g->plist);
+		TAILQ_REMOVE(&g->node_list, n, list);
+		TAILQ_INSERT_HEAD(&g->plist, n, list);
 	}
 	if(g->cur)
 		if(create_edge(g->cur, n, style) < 0)
@@ -340,15 +341,17 @@ static int graph(int argc, char **argv)
 			if(!n)
 				return -1;
 			n->expanded = 1;
-			list_move(&n->list, &g.plist);
+			TAILQ_REMOVE(&g.node_list, n, list);
+			TAILQ_INSERT_HEAD(&g.plist, n, list);
 		}
 	}
 
-	while(!list_empty(&g.plist)) {
-		g.cur = list_entry(g.plist.next, struct node, list);
+	while(!TAILQ_EMPTY(&g.plist)) {
+		g.cur = TAILQ_FIRST(&g.plist);
 		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tnode.tupid) < 0)
 			return -1;
-		list_move(&g.cur->list, &g.node_list);
+		TAILQ_REMOVE(&g.plist, g.cur, list);
+		TAILQ_INSERT_HEAD(&g.node_list, g.cur, list);
 
 		tupid = g.cur->tnode.tupid;
 		g.cur = NULL;
@@ -357,7 +360,7 @@ static int graph(int argc, char **argv)
 	}
 
 	printf("digraph G {\n");
-	list_for_each_entry(n, &g.node_list, list) {
+	TAILQ_FOREACH(n, &g.node_list, list) {
 		int color;
 		int fontcolor;
 		const char *shape;
@@ -447,7 +450,7 @@ static int graph(int argc, char **argv)
 				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
 		}
 
-		list_for_each_entry(e, &n->edges, list) {
+		LIST_FOREACH(e, &n->edges, list) {
 			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
 		}
 	}

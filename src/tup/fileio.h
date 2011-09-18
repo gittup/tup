@@ -2,12 +2,13 @@
 #define tup_fileio_h
 
 #include "tupid.h"
-#include "linux/list.h"
+#include "bsd/queue.h"
 #include <time.h>
 
 #define TUP_CONFIG "tup.config"
 
 struct tup_entry;
+struct tup_entry_head;
 struct path_element;
 struct pel_group;
 
@@ -28,7 +29,7 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, int sotgv);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv);
-int add_node_to_list(tupid_t dt, struct pel_group *pg, struct list_head *list);
+int add_node_to_list(tupid_t dt, struct pel_group *pg, struct tup_entry_head *head);
 int gimme_tent(const char *name, struct tup_entry **entry);
 int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 			     struct tup_entry **entry);
