@@ -199,6 +199,8 @@ get_output_tree called for both tup_db_check_actual_inputs and tup_db_check_actu
 
 checksum - calculate as file is written out in fuse fs wrapper (can be used to skip future parts of the build if checksums match)
 
+verbose mode - print actual command strings instead of the ^^ short version.
+
 html:
   proof: no clean target
   graphs
