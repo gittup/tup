@@ -147,8 +147,8 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *order_only_inputs,
 			       struct bin_list *bl, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl);
-static int __execute_rule(struct tupfile *tf, struct rule *r,
-			  struct name_list *output_nl);
+static int execute_rule_internal(struct tupfile *tf, struct rule *r,
+				 struct name_list *output_nl);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 				struct bin_list *bl);
 static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
@@ -1151,8 +1151,8 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 	return 0;
 }
 
-static int __parse_bang_rule(struct tupfile *tf, struct rule *r,
-			     struct string_tree *st, struct name_list *nl)
+static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
+				    struct string_tree *st, struct name_list *nl)
 {
 	struct bang_rule *br;
 	char *tinput;
@@ -1198,7 +1198,7 @@ static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r)
 				 ".EMPTY");
 	if(!st)
 		return 1;
-	return __parse_bang_rule(tf, r, st, NULL);
+	return parse_bang_rule_internal(tf, r, st, NULL);
 }
 
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
@@ -1219,7 +1219,7 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			return -1;
 		}
 	}
-	return __parse_bang_rule(tf, r, st, nl);
+	return parse_bang_rule_internal(tf, r, st, nl);
 }
 
 static void free_bang_tree(struct rb_root *root)
@@ -1495,7 +1495,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 			r->command = bal->br->st.s;
 			r->command_len = bal->br->st.len;
 
-			if(__execute_rule(tf, r, &output_nl) < 0)
+			if(execute_rule_internal(tf, r, &output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -1503,7 +1503,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 		}
 		delete_name_list(&r->inputs);
 	} else {
-		if(__execute_rule(tf, r, &output_nl) < 0)
+		if(execute_rule_internal(tf, r, &output_nl) < 0)
 			return -1;
 		delete_name_list(&output_nl);
 	}
@@ -1511,8 +1511,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_list *bl)
 	return 0;
 }
 
-static int __execute_rule(struct tupfile *tf, struct rule *r,
-			  struct name_list *output_nl)
+static int execute_rule_internal(struct tupfile *tf, struct rule *r,
+				 struct name_list *output_nl)
 {
 	struct name_list_entry *nle;
 	int is_bang = 0;

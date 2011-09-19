@@ -47,7 +47,7 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	return n;
 }
 
-static void __remove_node(struct graph *g, struct node *n)
+static void remove_node_internal(struct graph *g, struct node *n)
 {
 	list_del(&n->list);
 	while(!list_empty(&n->edges)) {
@@ -127,10 +127,10 @@ int create_graph(struct graph *g, int count_flags)
 int destroy_graph(struct graph *g)
 {
 	while(!list_empty(&g->plist)) {
-		__remove_node(g, list_entry(g->plist.next, struct node, list));
+		remove_node_internal(g, list_entry(g->plist.next, struct node, list));
 	}
 	while(!list_empty(&g->node_list)) {
-		__remove_node(g, list_entry(g->node_list.next, struct node, list));
+		remove_node_internal(g, list_entry(g->node_list.next, struct node, list));
 	}
 	return 0;
 }
@@ -292,7 +292,7 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 		if(tup_db_add_modify_list(n->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	__remove_node(g, n);
+	remove_node_internal(g, n);
 	return 0;
 }
 

@@ -178,12 +178,12 @@ void tup_entry_set_verbose(int verbose)
 /* Returns 0 in case if a root tup entry has been passed and thus nothing has
  * been printed, otherwise 1 is returned.
  */
-static int __print_tup_entry(FILE *f, struct tup_entry *tent)
+static int print_tup_entry_internal(FILE *f, struct tup_entry *tent)
 {
 	/* Skip empty entries, and skip '.' here (tent->parent == NULL) */
 	if(!tent || !tent->parent)
 		return 0;
-	if (__print_tup_entry(f, tent->parent))
+	if (print_tup_entry_internal(f, tent->parent))
 		fprintf(f, "%s", PATH_SEP_STR);
 	fprintf(f, "%s", tent->name.s);
 	return 1;
@@ -196,7 +196,7 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 
 	if(!tent)
 		return;
-	if (__print_tup_entry(f, tent->parent)) {
+	if (print_tup_entry_internal(f, tent->parent)) {
 		const char *sep = tent->type == TUP_NODE_CMD ? ": " : PATH_SEP_STR;
 		fprintf(f, "%s", sep);
 	}
