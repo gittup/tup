@@ -35,6 +35,9 @@ Updates the set of outputs based on the dependency graph and the current state o
 .B -jN
 Temporarily override the num_jobs configuration option to 'N'. This will run up to N jobs in parallel, subject to the constraints of the DAG. Eg: 'tup upd -j2' will run up to two jobs in parallel, whereas 'tup upd' will run up to num_jobs in parallel. See the config secondary command below.
 .TP
+.B --verbose
+Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
+.TP
 .B -k
 .PD 0
 .TP
@@ -199,7 +202,7 @@ The command string that will be passed to the system(3) call by tup. This comman
 .IP
 When executed, the command's file accesses are monitored by tup to ensure that they conform to these rules. Any files opened for reading that were generated from another command but not specfied as inputs are reported as errors. Similarly, any files opened for writing that are not specified as outputs are reported as errors. All files opened for reading are recorded as dependencies to the command. If any of these files change, tup will re-execute the command during the next update. Note that if an input listed in the Tupfile changes, it does not necessarily cause the command to re-execute, unless the command actually read from that input during the prior execution. Inputs listed in the Tupfile only enforce ordering among the commands, while file accesses during execution determine when commands are re-executed.
 .IP
-A command string can begin with the special sequence ^\ TEXT^, which will tell tup to only print "TEXT" instead of the whole command string when the command is being executed. This saves the effort of using echo to pretty-print a long command. The space after the first '^' is significant. In the future there may be additional flags to control a command, which will be put after the first '^'. No such flags exist yet, however. For example, this command will print "CC foo.c" when executing system(gcc -c foo.c -o foo.o) :
+A command string can begin with the special sequence ^\ TEXT^, which will tell tup to only print "TEXT" instead of the whole command string when the command is being executed. This saves the effort of using echo to pretty-print a long command. The short-display behavior can be overridden by passing the --verbose flag to tup, which will cause tup to display the actual command string instead of "TEXT". The space after the first '^' is significant. In the future there may be additional flags to control a command, which will be put after the first '^'. No such flags exist yet, however. For example, this command will print "CC foo.c" when executing system(gcc -c foo.c -o foo.o) :
 .nf
 
 : foo.c |> ^ CC %f^ gcc -c %f -o %o |> foo.o

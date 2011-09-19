@@ -13,6 +13,7 @@
 static struct rb_root tup_tree = RB_ROOT;
 static int list_out = 0;
 static struct list_head entry_list;
+static int do_verbose = 0;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
@@ -169,6 +170,11 @@ struct tup_entry *tup_entry_find(tupid_t tupid)
 	return container_of(tnode, struct tup_entry, tnode);
 }
 
+void tup_entry_set_verbose(int verbose)
+{
+	do_verbose = verbose;
+}
+
 /* Returns 0 in case if a root tup entry has been passed and thus nothing has
  * been printed, otherwise 1 is returned.
  */
@@ -196,7 +202,7 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	}
 	name = tent->name.s;
 	name_sz = tent->name.len;
-	if(name[0] == '^') {
+	if(!do_verbose && name[0] == '^') {
 		name++;
 		while(*name && *name != ' ') name++;
 		name++;
