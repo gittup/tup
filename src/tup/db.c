@@ -4543,6 +4543,10 @@ static int get_db_var_tree(struct vardb *vdb)
 		return -1;
 	}
 
+	/* t7042 - make sure we have the VAR_DT entry */
+	if(tup_entry_add(VAR_DT, NULL) < 0)
+		return -1;
+
 	do {
 		tupid_t tupid;
 		const char *var;
