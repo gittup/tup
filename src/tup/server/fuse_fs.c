@@ -71,27 +71,23 @@ void tup_fuse_set_parser_mode(int mode, struct tupid_entries *delete_root)
 	server_delete_root = delete_root;
 }
 
-#define TUP_JOB "@tupjob-"
 static struct file_info *get_finfo(const char *path)
 {
 	struct thread_tree *tt;
 	int jobnum;
 
-	if(strncmp(path, get_tup_top(), get_tup_top_len()) != 0) {
+	if(!path)
 		return NULL;
-	}
-
-	path += get_tup_top_len();
-	if(!path[0]) {
+	if(path[0] != '/')
 		return NULL;
-	}
 	path++;
+
 	if(strncmp(path, TUP_JOB, sizeof(TUP_JOB)-1) != 0) {
 		return NULL;
 	}
-
 	path += sizeof(TUP_JOB)-1;
 	jobnum = strtol(path, NULL, 0);
+
 	tt = thread_tree_search(&troot, jobnum);
 	if(tt) {
 		struct file_info *finfo;
@@ -110,23 +106,24 @@ static void put_finfo(struct file_info *finfo)
 
 static const char *peel(const char *path)
 {
-	if(strncmp(path, get_tup_top(), get_tup_top_len()) == 0) {
-		path += get_tup_top_len();
-		if(path[0]) {
-			path++;
-			if(strncmp(path, TUP_JOB, sizeof(TUP_JOB-1)) == 0) {
-				char *slash;
-				slash = strchr(path, '/');
-				if(slash) {
-					path = slash + 1;
-				} else {
-					path = ".";
-				}
-			}
+	if(!path)
+		return NULL;
+	if(path[0] != '/')
+		return NULL;
+
+	if(strncmp(path + 1, TUP_JOB, sizeof(TUP_JOB-1)) == 0) {
+		char *slash;
+
+		path += sizeof(TUP_JOB); /* +1 and -1 cancel */
+		slash = strchr(path, '/');
+		if(slash) {
+			path = slash;
 		} else {
 			path = ".";
 		}
+
 	}
+
 	return path;
 }
 
@@ -301,8 +298,10 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 * track of the variable and return failure because we're not actually
 	 * going to open anything.
 	 */
-	if(strncmp(peeled, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
-		const char *var = peeled + TUP_VAR_VIRTUAL_DIR_LEN;
+	if(strncmp(peeled, get_tup_top(), get_tup_top_len()) == 0 &&
+	   peeled[get_tup_top_len()] == '/' &&
+	   strncmp(peeled + get_tup_top_len() + 1, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
+		const char *var = peeled + get_tup_top_len() + 1 + TUP_VAR_VIRTUAL_DIR_LEN;
 		if(var[0] == 0) {
 			stbuf->st_mode = S_IFDIR | 0755;
 			stbuf->st_nlink = 2;
@@ -355,8 +354,10 @@ static int tup_fs_access(const char *path, int mask)
 	/* OSX will call access() on the virtual directory before calling
 	 * getattr() on the variable name, so we check for that here.
 	 */
-	if(strncmp(peeled, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
-		const char *var = peeled + TUP_VAR_VIRTUAL_DIR_LEN;
+	if(strncmp(peeled, get_tup_top(), get_tup_top_len()) == 0 &&
+	   peeled[get_tup_top_len()] == '/' &&
+	   strncmp(peeled + get_tup_top_len() + 1, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
+		const char *var = peeled + get_tup_top_len() + 1 + TUP_VAR_VIRTUAL_DIR_LEN;
 		if(var[0] == 0) {
 			return 0;
 		}

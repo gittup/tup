@@ -10,6 +10,6 @@ cat > Tupfile << HERE
 HERE
 touch foo.c
 tup touch foo.c Tupfile
-update_fail_msg "File 'bar' was written to"
+update_fail_msg "File '.*bar' was written to"
 
 eotup

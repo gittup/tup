@@ -10,7 +10,7 @@ if ! which python > /dev/null 2>&1; then
 	eotup
 fi
 
-export PYTHONPATH=../../..:$PYTHONPATH
+export PYTHONPATH=../..:$PYTHONPATH
 
 cat > foo.py << HERE
 import tup_client
@@ -21,7 +21,7 @@ else:
 	print ": |> echo foo", var, "|>"
 HERE
 cat > Tupfile << HERE
-run python foo.py
+run python -B foo.py
 HERE
 tup touch Tupfile foo.py
 update

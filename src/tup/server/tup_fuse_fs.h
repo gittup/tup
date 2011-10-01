@@ -27,6 +27,7 @@
 #include "tup/tupid.h"
 
 #define TUP_TMP ".tup/tmp"
+#define TUP_JOB "@tupjob-"
 
 struct file_info;
 struct tupid_entries;

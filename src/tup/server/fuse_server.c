@@ -305,16 +305,18 @@ static int virt_tup_open(struct server *s)
 		perror(TUP_MNT);
 		return -1;
 	}
-	/* +1: Skip past top-level '/' to do a relative chdir into our fake fs. */
-	fd = re_openat(fd, get_tup_top() + 1);
+
+	snprintf(virtdir, sizeof(virtdir), TUP_JOB "%i", s->id);
+	virtdir[sizeof(virtdir)-1] = 0;
+	fd = re_openat(fd, virtdir);
 	if(fd < 0) {
+		fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 		return -1;
 	}
-	snprintf(virtdir, sizeof(virtdir), "@tupjob-%i", s->id);
-	virtdir[sizeof(virtdir)-1] = 0;
-	s->root_fd = re_openat(fd, virtdir);
+
+	/* +1: Skip past top-level '/' to do a relative chdir into our fake fs. */
+	s->root_fd = re_openat(fd, get_tup_top() + 1);
 	if(s->root_fd < 0) {
-		fprintf(stderr, "tup error: Unable to chdir to virtual job directory.\n");
 		return -1;
 	}
 
@@ -347,7 +349,7 @@ static int exec_internal(struct server *s, const char *cmd,
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
 	 * adjusting.
 	 */
-	em.dirlen = snprintf(dir, PATH_MAX - 1, TUP_MNT "/%s/@tupjob-%i", get_tup_top()+1, s->id);
+	em.dirlen = snprintf(dir, PATH_MAX - 1, TUP_MNT "/" TUP_JOB "%i/%s", s->id, get_tup_top()+1);
 	em.dirlen += snprint_tup_entry(dir + em.dirlen,
 				       sizeof(dir) - em.dirlen - 1,
 				       dtent) + 1;
