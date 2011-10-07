@@ -140,6 +140,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			   struct name_list *nl,const char *ext, int extlen);
+static void free_bang_rule(struct string_entries *root, struct bang_rule *br);
 static void free_bang_tree(struct string_entries *root);
 static void free_chain_tree(struct string_entries *root);
 static void free_banglist(struct bang_list_head *head);
@@ -920,6 +921,12 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		/* Alias one macro as another */
 		struct bang_rule *cur_br;
 
+		st = string_tree_search(&tf->bang_root, p, strlen(p));
+		if(st) {
+			free_bang_rule(&tf->bang_root,
+				       container_of(st, struct bang_rule, st));
+		}
+
 		st = string_tree_search(&tf->bang_root, value, strlen(value));
 		if(!st) {
 			fprintf(stderr, "Error: Unable to find !-macro '%s'\n", value);
@@ -1234,26 +1241,29 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 	return parse_bang_rule_internal(tf, r, st, nl);
 }
 
+static void free_bang_rule(struct string_entries *root, struct bang_rule *br)
+{
+	string_tree_free(root, &br->st);
+
+	if(br->value) {
+		/* For regular macros */
+		free(br->value);
+	} else {
+		/* For aliased macros */
+		free(br->input);
+		free(br->command);
+		free(br->output_pattern);
+	}
+	free(br->extra_outputs);
+	free(br);
+}
+
 static void free_bang_tree(struct string_entries *root)
 {
 	struct string_tree *st;
 
 	while((st = RB_ROOT(root)) != NULL) {
-		struct bang_rule *br = container_of(st, struct bang_rule, st);
-
-		string_tree_free(root, st);
-
-		if(br->value) {
-			/* For regular macros */
-			free(br->value);
-		} else {
-			/* For aliased macros */
-			free(br->input);
-			free(br->command);
-			free(br->output_pattern);
-		}
-		free(br->extra_outputs);
-		free(br);
+		free_bang_rule(root, container_of(st, struct bang_rule, st));
 	}
 }
 
