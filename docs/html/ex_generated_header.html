@@ -10,12 +10,12 @@
 </pre>
 
 <span class="fileheader">Tupfile</span>
-<code>: foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
+<pre class="code">: foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
 : *.o |&gt; gcc %f -o %o |&gt; hello 
-</code>
+</pre>
 
 <span class="fileheader">hello.c</span>
-<code>#include &lt;stdio.h&gt;
+<pre class="code">#include &lt;stdio.h&gt;
 #include "square.h"
 
 int main(void)
@@ -24,20 +24,20 @@ int main(void)
 	printf("Five squared is: %i\n", square(5));
 	return 0;
 } 
-</code>
+</pre>
 
 <span class="fileheader">square.c</span>
-<code>#include "square.h"
+<pre class="code">#include "square.h"
 
 int square(int x)
 {
 	return x * x;
 } 
-</code>
+</pre>
 
 <span class="fileheader">square.h</span>
-<code>int square(int x);
-</code>
+<pre class="code">int square(int x);
+</pre>
 
 <p>Now we can run our code and get the original output:</p>
 <pre>
@@ -62,15 +62,15 @@ Five squared is: 25
 <p>Suppose we want to add a new interface, only for reasons beyond our control, we have to generate the header file from a shell script rather than write it by hand. This is not a problem - we just have to tell tup how to create the header file.</p>
 
 <span class="fileheader">gen_triangle.sh</span>
-<code>#! /bin/sh
+<pre class="code">#! /bin/sh
 echo '#define SIDES_OF_A_TRIANGLE 3'
-</code>
+</pre>
 
 <span class="modfileheader">Tupfile</span>
-<code><span class="added">: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h</span>
+<pre class="code"><span class="added">: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h</span>
 : foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
 : *.o |&gt; gcc %f -o %o |&gt; hello 
-</code>
+</pre>
 
 <pre>
 <span class="prompt">$</span> tup upd
@@ -90,7 +90,7 @@ echo '#define SIDES_OF_A_TRIANGLE 3'
 
 <p>It looks like our new header file was generated properly. Let's try to include it in our <span class="filename">hello.c</span> file:</p>
 <span class="modfileheader">hello.c</span>
-<code>#include &lt;stdio.h&gt;
+<pre class="code">#include &lt;stdio.h&gt;
 #include "square.h"
 <span class="added">#include "triangle.h"</span>
 
@@ -101,7 +101,7 @@ int main(void)
 <span class="added">	printf("A triangle has %i sides\n", SIDES_OF_A_TRIANGLE);</span>
 	return 0;
 } 
-</code>
+</pre>
 
 <pre>
 <span class="prompt">$</span> tup upd
@@ -123,16 +123,16 @@ possible this could randomly break in the future.
 </pre>
 
 <p>Oops, looks like we stumbled onto the missing input dependency error message again. Since <span class="filename">triangle.h</span> is an output of another command, we have to tell tup about it in the input section of the compilation rule. Right now the input section of our compilation rule (highlighted below) has 'foreach *.c':</p>
-<code>: <font style="background-color: #ffbbff">foreach *.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o 
-</code>
+<pre class="code">: <font style="background-color: #ffbbff">foreach *.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o 
+</pre>
 
 <p>Note that we can't simply list <span class="filename">triangle.h</span> as another input here, because the foreach keyword will try to iterate over it and generate a rule to compile the header file directly. Instead, we want to make use of the order-only inputs section, which is separated from the rest of the inputs by a single '|' (pipe) character. The difference between regular inputs and order-only inputs is that regular inputs are used in foreach and flags like <span class="keyword">%f</span>, while order-only inputs are not. All inputs also add dependency links from the file pointing to the commands.</p>
 
 <span class="modfileheader">Tupfile</span>
-<code>: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h
+<pre class="code">: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h
 : foreach *.c<span class="added"> | triangle.h</span> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
 : *.o |&gt; gcc %f -o %o |&gt; hello 
-</code>
+</pre>
 
 <p>Now we can finish the update and take a look at the dependency graph:</p>
 
