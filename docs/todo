@@ -198,6 +198,11 @@ checksum - calculate as file is written out in fuse fs wrapper (can be used to s
 
 do var replacing in read() in fuse instead of a 'tup preprocess' step? Maybe a ^-flag?
 
+recurse_delete_ghost_tree leaks memory?
+ - tup_db_change_node only used in monitor?
+
+bin should use string_tree instead of list
+
 html:
   proof: no clean target
   graphs
