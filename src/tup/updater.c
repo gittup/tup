@@ -43,7 +43,8 @@ static void *todo_work(void *arg);
 static int update(struct node *n);
 static void tup_show_message(const char *s);
 static void tup_main_progress(const char *s);
-static void show_progress(int sum, int total, struct tup_entry *tent);
+static void start_progress(int total);
+static void show_progress(struct tup_entry *tent);
 
 static int do_keep_going;
 static int num_jobs;
@@ -249,7 +250,6 @@ static int run_scan(void)
 
 static int delete_files(struct graph *g)
 {
-	int num_deleted = 0;
 	struct tupid_tree *tt;
 	struct tup_entry *tent;
 	struct tup_entry_head *entrylist;
@@ -260,6 +260,7 @@ static int delete_files(struct graph *g)
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
+	start_progress(g->delete_count);
 	entrylist = tup_entry_get_list();
 	while((tt = RB_ROOT(&g->delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -282,8 +283,7 @@ static int delete_files(struct graph *g)
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				show_progress(num_deleted, g->delete_count, tent);
-				num_deleted++;
+				show_progress(tent);
 				if(delete_file(tent->dt, tent->name.s) < 0)
 					goto out_err;
 			}
@@ -301,11 +301,10 @@ static int delete_files(struct graph *g)
 	LIST_FOREACH(tent, entrylist, list) {
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
-		show_progress(num_deleted, g->delete_count, tent);
-		num_deleted++;
+		show_progress(tent);
 	}
 	if(g->delete_count) {
-		show_progress(g->delete_count, g->delete_count, NULL);
+		show_progress(NULL);
 	}
 	rc = 0;
 out_err:
@@ -600,7 +599,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 {
 	struct node *root;
 	struct worker_thread *workers;
-	int num_processed = 0;
 	int rc = -1;
 	int x;
 	int active = 0;
@@ -661,6 +659,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
+	start_progress(g->num_nodes);
 	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead()) {
 		struct node *n;
 		struct worker_thread *wt;
@@ -683,10 +682,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			goto check_empties;
 		}
 
-		if(n->tent->type == g->count_flags) {
-			show_progress(num_processed, g->num_nodes, n->tent);
-			num_processed++;
-		}
 		TAILQ_REMOVE(&g->plist, n, list);
 		active++;
 
@@ -756,7 +751,7 @@ keep_going:
 		}
 		goto out;
 	}
-	show_progress(num_processed, g->num_nodes, NULL);
+	show_progress(NULL);
 	rc = 0;
 out:
 	/* First tell all the threads to quit */
@@ -818,6 +813,7 @@ static void *create_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_DIR) {
+			show_progress(n->tent);
 			if(n->already_used) {
 				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
 				rc = 0;
@@ -913,8 +909,10 @@ static void *todo_work(void *arg)
 		if(n == (void*)-1)
 			break;
 
-		if(n->tent->type == g->count_flags)
+		if(n->tent->type == g->count_flags) {
+			show_progress(n->tent);
 			tup_db_print(stdout, n->tnode.tupid);
+		}
 
 		worker_ret(wt, 0);
 	}
@@ -929,8 +927,11 @@ static int unlink_outputs(int dfd, struct node *n)
 		output = e->dest;
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
+				pthread_mutex_lock(&db_mutex);
+				show_progress(n->tent);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
+				pthread_mutex_unlock(&db_mutex);
 				return -1;
 			}
 		}
@@ -938,7 +939,7 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int process_output(struct server *s, tupid_t tupid, const char *name)
+static int process_output(struct server *s, struct tup_entry *tent, const char *name)
 {
 	if(display_output(s->output_fd, 0, name, num_jobs > 1) < 0)
 		return -1;
@@ -946,17 +947,17 @@ static int process_output(struct server *s, tupid_t tupid, const char *name)
 		return -1;
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(tupid, name, &s->finfo, &warnings, 0) < 0) {
-				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", tupid, name);
+			if(write_files(tent->tnode.tupid, name, &s->finfo, &warnings, 0) < 0) {
+				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", tent->tnode.tupid, name);
 				return -1;
 			}
 
 			/* Hooray! */
 			return 0;
 		} else {
-			fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", tupid, s->exit_status, name);
-			if(write_files(tupid, name, &s->finfo, &warnings, 1) < 0) {
-				fprintf(stderr, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tupid);
+			fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", tent->tnode.tupid, s->exit_status, name);
+			if(write_files(tent->tnode.tupid, name, &s->finfo, &warnings, 1) < 0) {
+				fprintf(stderr, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 			return -1;
 		}
@@ -966,10 +967,10 @@ static int process_output(struct server *s, tupid_t tupid, const char *name)
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
-		fprintf(stderr, " *** Command %lli killed by signal %i (%s): %s\n", tupid, sig, errmsg, name);
+		fprintf(stderr, " *** Command %lli killed by signal %i (%s): %s\n", tent->tnode.tupid, sig, errmsg, name);
 		return -1;
 	} else {
-		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli: %s", tupid, name);
+		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli: %s", tent->tnode.tupid, name);
 		return -1;
 	}
 }
@@ -987,13 +988,19 @@ static int update(struct node *n)
 			/* This space reserved for flags for something. I dunno
 			 * what yet.
 			 */
+			pthread_mutex_lock(&db_mutex);
+			show_progress(n->tent);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
+			pthread_mutex_unlock(&db_mutex);
 			name++;
 			return -1;
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
+			pthread_mutex_lock(&db_mutex);
+			show_progress(n->tent);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
+			pthread_mutex_unlock(&db_mutex);
 			return -1;
 		}
 		name++;
@@ -1002,8 +1009,11 @@ static int update(struct node *n)
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
+		pthread_mutex_lock(&db_mutex);
+		show_progress(n->tent);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
+		pthread_mutex_unlock(&db_mutex);
 		goto err_out;
 	}
 
@@ -1025,7 +1035,8 @@ static int update(struct node *n)
 	close(dfd);
 
 	pthread_mutex_lock(&db_mutex);
-	rc = process_output(&s, n->tnode.tupid, name);
+	show_progress(n->tent);
+	rc = process_output(&s, n->tent, name);
 	pthread_mutex_unlock(&db_mutex);
 	return rc;
 
@@ -1048,7 +1059,16 @@ static void tup_main_progress(const char *s)
 	tup_show_message(s);
 }
 
-static void show_progress(int sum, int total, struct tup_entry *tent)
+static int sum;
+static int total;
+
+static void start_progress(int new_total)
+{
+	sum = 0;
+	total = new_total;
+}
+
+static void show_progress(struct tup_entry *tent)
 {
 	if(total) {
 		const int max = 11;
@@ -1074,5 +1094,6 @@ static void show_progress(int sum, int total, struct tup_entry *tent)
 		} else {
 			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
 		}
+		sum++;
 	}
 }
