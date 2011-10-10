@@ -217,7 +217,7 @@ static int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 		perror(file);
 		return -1;
 	}
-	if(tup_db_set_mtime(tent, buf.st_mtime) < 0)
+	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
 		return -1;
 	return 0;
 }
@@ -394,30 +394,12 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			write_bork = 1;
 		} else {
 			struct mapping *map;
-			int dfd;
 			tup_entry_list_add(tent, entryhead);
-
-			/* Some files in Windows still set dt to not be
-			 * DOT_DT, so we need to make sure we are in the
-			 * right path for fstatat() to work. The fuse
-			 * server always sets dt to DOT_DT, so we can just
-			 * use the existing tup_top_fd() descriptor in that
-			 * case.
-			 */
-			if(w->dt != DOT_DT) {
-				dfd = tup_entry_open_tupid(w->dt);
-			} else {
-				dfd = tup_top_fd();
-			}
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
-					if(file_set_mtime(tent, dfd, map->tmpname) < 0)
-						return -1;
+					map->tent = tent;
 				}
-			}
-			if(w->dt != DOT_DT) {
-				close(dfd);
 			}
 		}
 
@@ -451,6 +433,11 @@ out_skip:
 				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
 				write_bork = 1;
 			}
+		}
+		if(map->tent) {
+			/* tent may not be set (in the case of hidden files) */
+			if(file_set_mtime(map->tent, tup_top_fd(), map->realname) < 0)
+				return -1;
 		}
 		del_map(map);
 	}

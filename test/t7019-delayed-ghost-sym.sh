@@ -25,7 +25,8 @@ echo foo | diff - output.txt
 
 rm ghost
 ln -s baz ghost
-symtouch -t 202005080000 ghost
+sleep 1
+symtouch ghost
 tup monitor
 update
 stop_monitor

@@ -65,7 +65,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 		return -1;
 	}
 	close(fd);
-	return tup_file_mod_mtime(dt, file, buf.st_mtime, 1);
+	return tup_file_mod_mtime(dt, file, buf.MTIME, 1);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,

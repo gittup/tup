@@ -72,6 +72,7 @@ make colors a config option, rather than a compile time thing
 
 create 'a' and 'b' with the same timestamps. move 'b' -> 'c', 'a' -> 'b', and 'b' is not rebuilt - timestamp problem
  - add inode to node table?
+ - http://www-cs-students.stanford.edu/~blynn/gg/race.html
 
 output files to a directory other than the current one?
 

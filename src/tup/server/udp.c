@@ -369,6 +369,7 @@ static void *message_thread(void *arg)
 				perror("strdup");
 				return (void*)-1;
 			}
+			map->tent = NULL; /* This is used when saving deps */
 			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
 		}
 		if(handle_file(event->at, event1, event2, &s->finfo, s->dt) < 0) {

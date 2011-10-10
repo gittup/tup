@@ -148,6 +148,8 @@ static struct mapping *add_mapping(const char *path)
 			perror("malloc");
 			return NULL;
 		}
+		map->tent = NULL; /* This is used when saving dependencies */
+
 		pthread_mutex_lock(&lock);
 		myfile = filenum;
 		filenum++;

@@ -18,6 +18,8 @@ void compat_lock_disable(void);
 #define SQL_NAME_COLLATION " collate nocase"
 #define name_cmp stricmp
 #define name_cmp_n strnicmp
+/* Windows uses mtime, since ctime there is the creation time, not change time */
+#define MTIME st_mtime
 #else
 #define is_path_sep(ch) ((ch)[0] == '/')
 #define PATH_SEP '/'
@@ -25,6 +27,10 @@ void compat_lock_disable(void);
 #define SQL_NAME_COLLATION ""
 #define name_cmp strcmp
 #define name_cmp_n strncmp
+/* Use ctime on other platforms, since chmod will affect ctime, but not mtime.
+ * Also on Linux, ctime will be updated when a file is renamed (t6058).
+ */
+#define MTIME st_ctime
 #endif
 
 #endif

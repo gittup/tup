@@ -8,10 +8,14 @@
 #include "pel_group.h"
 #include <pthread.h>
 
+struct tup_entry;
+struct tupid_entries;
+
 struct mapping {
 	LIST_ENTRY(mapping) list;
 	char *realname;
 	char *tmpname;
+	struct tup_entry *tent;
 };
 LIST_HEAD(mapping_head, mapping);
 
@@ -40,9 +44,6 @@ struct file_info {
 	struct tmpdir_head tmpdir_list;
 	int server_fail;
 };
-
-struct tup_entry;
-struct tupid_entries;
 
 int init_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);

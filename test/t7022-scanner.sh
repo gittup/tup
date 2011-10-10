@@ -22,8 +22,8 @@ sym_check prog bar
 
 # Modify file
 echo "void bar2(void) {}" >> bar.c
-# Same excuse as in t7004
-touch -t 202005080000 bar.c
+sleep 1
+touch bar.c
 tup upd
 sym_check prog bar bar2
 

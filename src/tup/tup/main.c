@@ -634,7 +634,7 @@ static int touch(int argc, char **argv)
 			if(create_dir_file(dt, pel->path) < 0)
 				return -1;
 		} else if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
-			if(tup_file_mod_mtime(dt, pel->path, buf.st_mtime, 1) < 0)
+			if(tup_file_mod_mtime(dt, pel->path, buf.MTIME, 1) < 0)
 				return -1;
 		}
 		free(pel);

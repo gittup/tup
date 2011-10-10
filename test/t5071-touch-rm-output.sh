@@ -11,7 +11,8 @@ HERE
 tup touch ok.c Tupfile
 update
 
-touch -t 202005080000 ok.o
+sleep 1
+touch ok.o
 tup touch ok.o
 rm ok.c ok.o
 update

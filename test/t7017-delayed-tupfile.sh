@@ -16,8 +16,8 @@ tup_object_exist . 'echo hey'
 cat > Tupfile << HERE
 : |> echo yo |>
 HERE
-# Same excuse as in t7004
-touch -t 202005080000 Tupfile
+sleep 1
+touch Tupfile
 tup monitor
 update
 stop_monitor
