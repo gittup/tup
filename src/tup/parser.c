@@ -1598,7 +1598,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
-				if(parse_bang_rule(tf, r, &tmp_nl, ext, strlen(ext)) < 0)
+				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
 			}
 			/* The extension in do_rule() does not include the
@@ -1767,7 +1767,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 	struct path_list_head inp_list;
 	char *inp;
 	struct path_list *pl;
-	int extlen = strlen(ext);;
+	int extlen = ext ? strlen(ext) : 0;
 
 	inp = strdup(input_pattern);
 	if(!inp) {
