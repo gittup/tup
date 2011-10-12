@@ -126,7 +126,7 @@ build variants
  - allow variants to interact? Or would this force users to have certain variants installed? eg: Rule that has debug/foo.exe and release/foo.exe as inputs is allowed or not?
  - can variants have configs checked in?
  - in tree build - disable via config option? Out of tree build uses tup.config for variant?
- - variants: Make a mingw variant, and a linux-uses-compat-libs variant, and a debug variant (-g -O)
+ - variants: Make a mingw variant, and a linux-uses-compat-libs variant, and a debug variant (-g -O -DQUEUE_MACRO_DEBUG)
 
 [    1/2    ] ./do_stuff.sh b.out
 -- write files
