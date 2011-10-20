@@ -23,8 +23,7 @@ static void del_entry(struct file_entry *fent);
 static void check_unlink_list(const struct pel_group *pg,
 			      struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
-static int update_write_info(tupid_t cmdid, const char *debug_name,
-			     struct file_info *info, int *warnings,
+static int update_write_info(tupid_t cmdid, struct file_info *info, int *warnings,
 			     struct tup_entry_head *entryhead);
 static int update_read_info(tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead);
@@ -105,8 +104,8 @@ int handle_open_file(enum access_type at, const char *filename,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
-		int *warnings, int check_only)
+int write_files(tupid_t cmdid, struct file_info *info, int *warnings,
+		int check_only)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -118,7 +117,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 
 	if(!check_only) {
 		LIST_FOREACH(tmpdir, &info->tmpdir_list, list) {
-			fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
+			fprintf(stderr, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
 			tmpdir_bork = 1;
 		}
 		if(tmpdir_bork) {
@@ -127,7 +126,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		}
 
 		entrylist = tup_entry_get_list();
-		rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
+		rc1 = update_write_info(cmdid, info, warnings, entrylist);
 		tup_entry_release_list();
 	}
 
@@ -344,8 +343,7 @@ static void handle_unlink(struct file_info *info)
 	}
 }
 
-static int update_write_info(tupid_t cmdid, const char *debug_name,
-			     struct file_info *info, int *warnings,
+static int update_write_info(tupid_t cmdid, struct file_info *info, int *warnings,
 			     struct tup_entry_head *entryhead)
 {
 	struct file_entry *w;
@@ -371,14 +369,14 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 		}
 
 		if(w->pg.pg_flags & PG_HIDDEN) {
-			fprintf(stderr, "tup warning: Writing to hidden file '%s' from command '%s'\n", w->filename, debug_name);
+			fprintf(stderr, "tup warning: Writing to hidden file '%s'\n", w->filename);
 			(*warnings)++;
 			goto out_skip;
 		}
 
 		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, 0);
 		if(newdt <= 0) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
+			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			return -1;
 		}
 		if(!pel) {
@@ -390,7 +388,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			return -1;
 		free(pel);
 		if(!tent) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
+			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
 		} else {
 			struct mapping *map;

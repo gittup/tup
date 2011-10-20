@@ -952,24 +952,24 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int process_output(struct server *s, struct tup_entry *tent, const char *name)
+static int process_output(struct server *s, struct tup_entry *tent)
 {
-	if(display_output(s->output_fd, 0, name, num_jobs > 1) < 0)
+	if(display_output(s->output_fd, 0, tent->name.s, 0) < 0)
 		return -1;
-	if(display_output(s->error_fd, 1, name, num_jobs > 1) < 0)
+	if(display_output(s->error_fd, 1, tent->name.s, 0) < 0)
 		return -1;
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(tent->tnode.tupid, name, &s->finfo, &warnings, 0) < 0) {
-				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies: %s\n", tent->tnode.tupid, name);
+			if(write_files(tent->tnode.tupid, &s->finfo, &warnings, 0) < 0) {
+				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 				return -1;
 			}
 
 			/* Hooray! */
 			return 0;
 		} else {
-			fprintf(stderr, " *** Command %lli failed with return value %i: %s\n", tent->tnode.tupid, s->exit_status, name);
-			if(write_files(tent->tnode.tupid, name, &s->finfo, &warnings, 1) < 0) {
+			fprintf(stderr, " *** Command %lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
+			if(write_files(tent->tnode.tupid, &s->finfo, &warnings, 1) < 0) {
 				fprintf(stderr, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 			return -1;
@@ -980,10 +980,10 @@ static int process_output(struct server *s, struct tup_entry *tent, const char *
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
-		fprintf(stderr, " *** Command %lli killed by signal %i (%s): %s\n", tent->tnode.tupid, sig, errmsg, name);
+		fprintf(stderr, " *** Command %lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
 		return -1;
 	} else {
-		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli: %s", tent->tnode.tupid, name);
+		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli", tent->tnode.tupid);
 		return -1;
 	}
 }
@@ -1049,7 +1049,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	show_progress(n->tent);
-	rc = process_output(&s, n->tent, name);
+	rc = process_output(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	return rc;
 

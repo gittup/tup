@@ -8,7 +8,7 @@ cat > Tupfile << HERE
 : |> mkdir %o |> outdir
 HERE
 tup touch Tupfile
-update_fail_msg "tup error.*mkdir"
+update_fail_msg "tup error.*outdir"
 
 tmkdir outdir
 
