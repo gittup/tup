@@ -45,6 +45,7 @@ static void tup_show_message(const char *s);
 static void tup_main_progress(const char *s);
 static void start_progress(int total);
 static void show_progress(struct tup_entry *tent);
+static void show_active(int active);
 
 static int do_keep_going;
 static int num_jobs;
@@ -841,6 +842,7 @@ static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct node *n;
+	static int active = 0;
 
 	while(1) {
 		struct edge *e;
@@ -851,7 +853,18 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
+			pthread_mutex_lock(&db_mutex);
+			active++;
+			show_active(active);
+			pthread_mutex_unlock(&db_mutex);
+
 			rc = update(n);
+
+			pthread_mutex_lock(&db_mutex);
+			active--;
+			if(active)
+				show_active(active);
+			pthread_mutex_unlock(&db_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
 			 * our output files' output links) as modify in case we
@@ -1061,6 +1074,7 @@ static void tup_main_progress(const char *s)
 
 static int sum;
 static int total;
+static int is_active = 0;
 
 static void start_progress(int new_total)
 {
@@ -1068,12 +1082,17 @@ static void start_progress(int new_total)
 	total = new_total;
 }
 
-static void show_progress(struct tup_entry *tent)
+static void show_bar(int node_type)
 {
 	if(total) {
 		const int max = 11;
 		int fill;
 		char buf[12];
+
+		if(is_active) {
+			printf("\r                             \r");
+			is_active = 0;
+		}
 
 		/* If it's a good enough limit for Final Fantasy VII, it's good
 		 * enough for me.
@@ -1085,15 +1104,32 @@ static void show_progress(struct tup_entry *tent)
 		}
 		fill = max * sum / total;
 
-		if(tent) {
-			printf("[%s%s%.*s%s%.*s] ", color_type(tent->type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-			if(tent) {
-				print_tup_entry(stdout, tent);
-			}
-			printf("\n");
-		} else {
+		if(node_type < 0) {
 			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
+		} else {
+			printf("[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 		}
+	}
+}
+
+static void show_progress(struct tup_entry *tent)
+{
+	if(tent) {
+		show_bar(tent->type);
+		print_tup_entry(stdout, tent);
+		printf("\n");
 		sum++;
+	} else {
+		show_bar(-1);
+	}
+}
+
+static void show_active(int active)
+{
+	if(total) {
+		show_bar(TUP_NODE_CMD);
+		printf("Active: %i", active);
+		fflush(stdout);
+		is_active = 1;
 	}
 }
