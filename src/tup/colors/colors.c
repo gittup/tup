@@ -16,6 +16,12 @@ const char *color_type(int type)
 		return "";
 
 	switch(type) {
+		case TUP_NODE_ROOT:
+			/* Overloaded to mean a node in error (can be re-used
+			 * since TUP_NODE_ROOT is never displayed).
+			 */
+			color = "[31";
+			break;
 		case TUP_NODE_DIR:
 			color = "[33";
 			break;

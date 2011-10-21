@@ -162,13 +162,16 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 				break;
 			if(!displayed) {
 				displayed = 1;
-				if(iserr) {
+				if(iserr == 2) {
+					fprintf(stderr, " *** tup errors ***\n");
+				}
+				if(iserr == 1) {
 					if(display_name) {
 						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
 					} else {
 						fprintf(stderr, " *** tup: stderr ***\n");
 					}
-				} else {
+				} else if(iserr == 0) {
 					if(display_name) {
 						printf(" -- tup: stdout from command '%s%s%s%s' --\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
 					} else {

@@ -44,7 +44,7 @@ static int update(struct node *n);
 static void tup_show_message(const char *s);
 static void tup_main_progress(const char *s);
 static void start_progress(int total);
-static void show_progress(struct tup_entry *tent);
+static void show_progress(struct tup_entry *tent, int is_error);
 static void show_active(int active);
 
 static int do_keep_going;
@@ -285,7 +285,7 @@ static int delete_files(struct graph *g)
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				show_progress(tent);
+				show_progress(tent, 0);
 				if(delete_file(tent->dt, tent->name.s) < 0)
 					goto out_err;
 			}
@@ -303,10 +303,10 @@ static int delete_files(struct graph *g)
 	LIST_FOREACH(tent, entrylist, list) {
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
-		show_progress(tent);
+		show_progress(tent, 0);
 	}
 	if(g->delete_count) {
-		show_progress(NULL);
+		show_progress(NULL, 0);
 	}
 	rc = 0;
 out_err:
@@ -758,7 +758,7 @@ keep_going:
 		}
 		goto out;
 	}
-	show_progress(NULL);
+	show_progress(NULL, 0);
 	rc = 0;
 out:
 	/* First tell all the threads to quit */
@@ -820,7 +820,7 @@ static void *create_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_DIR) {
-			show_progress(n->tent);
+			show_progress(n->tent, 0);
 			if(n->already_used) {
 				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
 				rc = 0;
@@ -929,7 +929,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->tent->type == g->count_flags) {
-			show_progress(n->tent);
+			show_progress(n->tent, 0);
 			tup_db_print(stdout, n->tnode.tupid);
 		}
 
@@ -947,7 +947,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				pthread_mutex_lock(&display_mutex);
-				show_progress(n->tent);
+				show_progress(n->tent, 1);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				pthread_mutex_unlock(&display_mutex);
@@ -960,25 +960,29 @@ static int unlink_outputs(int dfd, struct node *n)
 
 static int process_output(struct server *s, struct tup_entry *tent)
 {
-	if(display_output(s->output_fd, 0, tent->name.s, 0) < 0)
+	FILE *f;
+	int is_err = 1;
+
+	f = tmpfile();
+	if(!f) {
+		show_progress(tent, 1);
+		perror("tmpfile");
+		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
-	if(display_output(s->error_fd, 1, tent->name.s, 0) < 0)
-		return -1;
+	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(tent->tnode.tupid, &s->finfo, &warnings, 0) < 0) {
-				fprintf(stderr, " *** Command %lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
-				return -1;
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0) < 0) {
+				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
+			} else {
+				/* Hooray! */
+				is_err = 0;
 			}
-
-			/* Hooray! */
-			return 0;
 		} else {
-			fprintf(stderr, " *** Command %lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(tent->tnode.tupid, &s->finfo, &warnings, 1) < 0) {
-				fprintf(stderr, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
+			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1) < 0) {
+				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
-			return -1;
 		}
 	} else if(s->signalled) {
 		int sig = s->exit_sig;
@@ -986,12 +990,25 @@ static int process_output(struct server *s, struct tup_entry *tent)
 
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
-		fprintf(stderr, " *** Command %lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
-		return -1;
+		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
 	} else {
-		fprintf(stderr, "tup internal error: Expected s->exited or s->signalled to be set for command %lli", tent->tnode.tupid);
-		return -1;
+		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
+
+	fflush(f);
+	rewind(f);
+
+	show_progress(tent, is_err);
+	if(display_output(s->output_fd, 0, tent->name.s, 0) < 0)
+		return -1;
+	if(display_output(s->error_fd, 1, tent->name.s, 0) < 0)
+		return -1;
+	if(display_output(fileno(f), 2, tent->name.s, 0) < 0)
+		return -1;
+	fclose(f);
+	if(is_err)
+		return -1;
+	return 0;
 }
 
 static int update(struct node *n)
@@ -1008,7 +1025,7 @@ static int update(struct node *n)
 			 * what yet.
 			 */
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent);
+			show_progress(n->tent, 1);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
 			pthread_mutex_unlock(&display_mutex);
 			name++;
@@ -1017,7 +1034,7 @@ static int update(struct node *n)
 		while(*name && *name != '^') name++;
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent);
+			show_progress(n->tent, 1);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
@@ -1029,7 +1046,7 @@ static int update(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
-		show_progress(n->tent);
+		show_progress(n->tent, 1);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);
@@ -1048,14 +1065,13 @@ static int update(struct node *n)
 	s.error_fd = -1;
 	init_file_info(&s.finfo);
 	if(server_exec(&s, dfd, name, n->tent->parent) < 0) {
-		fprintf(stderr, " *** Command %lli failed: %s\n", n->tnode.tupid, name);
+		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
 	close(dfd);
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	show_progress(n->tent);
 	rc = process_output(&s, n->tent);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
@@ -1090,7 +1106,7 @@ static void start_progress(int new_total)
 	total = new_total;
 }
 
-static void show_bar(int node_type)
+static void show_bar(FILE *f, int node_type)
 {
 	if(total) {
 		const int max = 11;
@@ -1100,6 +1116,8 @@ static void show_bar(int node_type)
 		if(is_active) {
 			printf("\r                             \r");
 			is_active = 0;
+			if(f == stderr)
+				fflush(stdout);
 		}
 
 		/* If it's a good enough limit for Final Fantasy VII, it's good
@@ -1110,32 +1128,45 @@ static void show_bar(int node_type)
 		} else {
 			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
 		}
-		fill = max * sum / total;
+		/* TUP_NODE_ROOT means an error - fill the whole bar so it's
+		 * obvious.
+		 */
+		if(node_type == TUP_NODE_ROOT)
+			fill = max;
+		else
+			fill = max * sum / total;
 
 		if(node_type < 0) {
 			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
 		} else {
-			printf("[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+			fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 		}
 	}
 }
 
-static void show_progress(struct tup_entry *tent)
+static void show_progress(struct tup_entry *tent, int is_error)
 {
 	if(tent) {
-		show_bar(tent->type);
-		print_tup_entry(stdout, tent);
-		printf("\n");
+		FILE *f;
+		if(is_error) {
+			f = stderr;
+			show_bar(f, TUP_NODE_ROOT);
+		} else {
+			f = stdout;
+			show_bar(f, tent->type);
+		}
+		print_tup_entry(f, tent);
+		fprintf(f, "\n");
 		sum++;
 	} else {
-		show_bar(-1);
+		show_bar(stdout, -1);
 	}
 }
 
 static void show_active(int active)
 {
 	if(total) {
-		show_bar(TUP_NODE_CMD);
+		show_bar(stdout, TUP_NODE_CMD);
 		printf("Active: %i", active);
 		fflush(stdout);
 		is_active = 1;

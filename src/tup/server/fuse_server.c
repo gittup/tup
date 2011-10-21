@@ -347,7 +347,7 @@ static int exec_internal(struct server *s, const char *cmd,
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
 	buf[sizeof(buf)-1] = 0;
-	s->error_fd = openat(tup_top_fd(), buf, O_RDONLY);
+	s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
 	if(s->error_fd < 0) {
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");

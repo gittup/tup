@@ -135,7 +135,9 @@ int tup_db_scan_begin(struct tupid_entries *root);
 int tup_db_scan_end(struct tupid_entries *root);
 
 /* updater operations */
-int tup_db_check_actual_outputs(tupid_t cmdid, struct tup_entry_head *writehead);
-int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead);
+int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
+				struct tup_entry_head *writehead);
+int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
+			       struct tup_entry_head *readhead);
 
 #endif

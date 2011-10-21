@@ -21,7 +21,7 @@ HERE
 tup touch Tupfile foo.c zap.c
 update_fail -k
 
-if tup upd -k 2>/dev/null | grep gcc | wc -l | grep 1 > /dev/null; then
+if tup upd -k 2>&1 | grep gcc | wc -l | grep 1 > /dev/null; then
 	:
 else
 	echo "Error: Only one file should have been compiled." 1>&2
