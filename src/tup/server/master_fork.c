@@ -75,7 +75,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0};
 	if(write(msd[1], &em, sizeof(em)) != sizeof(em)) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write to the master fork socket. This process may not shutdown properly.\n");
@@ -267,13 +267,17 @@ static int master_fork_loop(void)
 			return -1;
 		}
 
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", em.sid);
-		buf[sizeof(buf)-1] = 0;
-		efd = creat(buf, 0600);
-		if(efd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			return -1;
+		if(em.single_output) {
+			efd = ofd;
+		} else {
+			snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", em.sid);
+			buf[sizeof(buf)-1] = 0;
+			efd = creat(buf, 0600);
+			if(efd < 0) {
+				perror(buf);
+				fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+				return -1;
+			}
 		}
 
 		pid = fork();
@@ -304,13 +308,15 @@ static int master_fork_loop(void)
 				exit(1);
 			}
 			close(ofd);
-			close(efd);
+			if(!em.single_output)
+				close(efd);
 			execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 			perror("execl");
 			exit(1);
 		}
 		close(ofd);
-		close(efd);
+		if(!em.single_output)
+			close(efd);
 		waiter = malloc(sizeof *waiter);
 		if(!waiter) {
 			perror("malloc");

@@ -8,6 +8,7 @@ struct execmsg {
 	tupid_t sid;
 	int dirlen;
 	int cmdlen;
+	int single_output;
 };
 
 int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,

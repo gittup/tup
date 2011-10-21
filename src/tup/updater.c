@@ -999,9 +999,7 @@ static int process_output(struct server *s, struct tup_entry *tent)
 	rewind(f);
 
 	show_progress(tent, is_err);
-	if(display_output(s->output_fd, 0, tent->name.s, 0) < 0)
-		return -1;
-	if(display_output(s->error_fd, 1, tent->name.s, 0) < 0)
+	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(display_output(fileno(f), 2, tent->name.s, 0) < 0)
 		return -1;
