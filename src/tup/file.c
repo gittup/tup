@@ -149,6 +149,39 @@ int add_parser_files(struct file_info *finfo, struct tupid_entries *root)
 	return rc;
 }
 
+static int add_node_to_list(tupid_t dt, struct pel_group *pg,
+			    struct tup_entry_head *head)
+{
+	tupid_t new_dt;
+	struct path_element *pel = NULL;
+	struct tup_entry *tent;
+
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, 1);
+	if(new_dt < 0)
+		return -1;
+	if(new_dt == 0) {
+		return 0;
+	}
+	if(pel == NULL) {
+		/* This can happen for the '.' entry */
+		return 0;
+	}
+
+	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, &tent) < 0)
+		return -1;
+	if(!tent) {
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
+			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+			return -1;
+		}
+	}
+	free(pel);
+
+	tup_entry_list_add(tent, head);
+
+	return 0;
+}
+
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root)
 {
