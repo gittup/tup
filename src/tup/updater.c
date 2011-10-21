@@ -604,6 +604,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int rc = -1;
 	int x;
 	int active = 0;
+	int failed = 0;
 	pthread_mutex_t list_mutex;
 	pthread_cond_t list_cond;
 	struct worker_thread_head active_list;
@@ -722,6 +723,7 @@ check_empties:
 			active--;
 
 			if(wt->rc < 0) {
+				failed = 1;
 				if(keep_going)
 					goto keep_going;
 				goto out;
@@ -732,13 +734,13 @@ keep_going:
 			remove_node(g, n);
 		}
 	}
-	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist)) {
+	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist) || failed) {
 		printf("\n");
 		if(keep_going) {
-			fprintf(stderr, "Remaining nodes skipped due to errors in command execution.\n");
+			fprintf(stderr, "tup: Remaining nodes skipped due to errors in command execution.\n");
 		} else {
 			if(server_is_dead()) {
-				fprintf(stderr, "Remaining nodes skipped due to caught signal.\n");
+				fprintf(stderr, "tup: Remaining nodes skipped due to caught signal.\n");
 			} else {
 				struct node *n;
 				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
