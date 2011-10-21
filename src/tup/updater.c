@@ -52,6 +52,7 @@ static int num_jobs;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
+static pthread_mutex_t display_mutex;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -421,6 +422,10 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		perror("pthread_mutex_init");
 		return -1;
 	}
+	if(pthread_mutex_init(&display_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
+	}
 	tup_db_begin();
 	warnings = 0;
 	if(server_init(SERVER_UPDATER_MODE, NULL) < 0) {
@@ -435,6 +440,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		return -1;
 	}
 	tup_db_commit();
+	pthread_mutex_destroy(&display_mutex);
 	pthread_mutex_destroy(&db_mutex);
 	if(rc < 0)
 		return -1;
@@ -853,18 +859,18 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
-			pthread_mutex_lock(&db_mutex);
+			pthread_mutex_lock(&display_mutex);
 			active++;
 			show_active(active);
-			pthread_mutex_unlock(&db_mutex);
+			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
-			pthread_mutex_lock(&db_mutex);
+			pthread_mutex_lock(&display_mutex);
 			active--;
 			if(active)
 				show_active(active);
-			pthread_mutex_unlock(&db_mutex);
+			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
 			 * our output files' output links) as modify in case we
@@ -940,11 +946,11 @@ static int unlink_outputs(int dfd, struct node *n)
 		output = e->dest;
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
-				pthread_mutex_lock(&db_mutex);
+				pthread_mutex_lock(&display_mutex);
 				show_progress(n->tent);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
-				pthread_mutex_unlock(&db_mutex);
+				pthread_mutex_unlock(&display_mutex);
 				return -1;
 			}
 		}
@@ -1001,19 +1007,19 @@ static int update(struct node *n)
 			/* This space reserved for flags for something. I dunno
 			 * what yet.
 			 */
-			pthread_mutex_lock(&db_mutex);
+			pthread_mutex_lock(&display_mutex);
 			show_progress(n->tent);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
-			pthread_mutex_unlock(&db_mutex);
+			pthread_mutex_unlock(&display_mutex);
 			name++;
 			return -1;
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
-			pthread_mutex_lock(&db_mutex);
+			pthread_mutex_lock(&display_mutex);
 			show_progress(n->tent);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
-			pthread_mutex_unlock(&db_mutex);
+			pthread_mutex_unlock(&display_mutex);
 			return -1;
 		}
 		name++;
@@ -1022,11 +1028,11 @@ static int update(struct node *n)
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
-		pthread_mutex_lock(&db_mutex);
+		pthread_mutex_lock(&display_mutex);
 		show_progress(n->tent);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
-		pthread_mutex_unlock(&db_mutex);
+		pthread_mutex_unlock(&display_mutex);
 		goto err_out;
 	}
 
@@ -1048,8 +1054,10 @@ static int update(struct node *n)
 	close(dfd);
 
 	pthread_mutex_lock(&db_mutex);
+	pthread_mutex_lock(&display_mutex);
 	show_progress(n->tent);
 	rc = process_output(&s, n->tent);
+	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	return rc;
 
