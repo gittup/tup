@@ -58,10 +58,9 @@ static void *fuse_thread(void *arg)
 }
 
 #if defined(__linux__)
-static int os_unmount(int force)
+static int os_unmount(void)
 {
 	int rc;
-	if(force) {}
 	rc = system("fusermount -u -z " TUP_MNT);
 	if(rc == -1) {
 		perror("system");
@@ -69,22 +68,11 @@ static int os_unmount(int force)
 	return rc;
 }
 #elif defined(__APPLE__)
-static int os_unmount(int force)
+static int os_unmount(void)
 {
-	if(force) {
-		/* TODO: This seems to cause OSX to occasionally hang - race in fuse4x? */
-		if(unmount(TUP_MNT, MNT_FORCE) < 0) {
-			perror("unmount");
-			return -1;
-		}
-	} else {
-		int fd;
-		fuse_exit(fs.fuse);
-		fd = openat(tup_top_fd(), TUP_MNT, O_RDONLY);
-		if(fd >= 0) {
-			fprintf(stderr, "tup internal error: Expected open(%s) to fail on FUSE filesystem\n", TUP_MNT);
-			return -1;
-		}
+	if(unmount(TUP_MNT, MNT_FORCE) < 0) {
+		perror("unmount");
+		return -1;
 	}
 	return 0;
 }
@@ -92,7 +80,7 @@ static int os_unmount(int force)
 #error Unsupported platform. Please add unmounting code to fuse_server.c
 #endif
 
-static int tup_unmount(int force)
+static int tup_unmount(void)
 {
 	int rc;
 
@@ -100,7 +88,7 @@ static int tup_unmount(int force)
 		perror("fchdir");
 		rc = -2;
 	} else {
-		rc = os_unmount(force);
+		rc = os_unmount();
 	}
 	if(rc != 0) {
 		fprintf(stderr, "tup error: Unable to unmount the fuse file-system on .tup/mnt (return code = %i). You may have to unmount this manually as root: umount -f .tup/mnt\n", rc);
@@ -160,7 +148,7 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 				/* This directory is still mounted, let's try
 				 * to umount it
 				 */
-				if(tup_unmount(1) < 0)
+				if(tup_unmount() < 0)
 					return -1;
 			}
 		} else {
@@ -259,7 +247,7 @@ int server_quit(void)
 		return 0;
 	close(null_fd);
 
-	if(tup_unmount(0) < 0)
+	if(tup_unmount() < 0)
 		return -1;
 	pthread_join(fs.pid, NULL);
 	fs.fuse = NULL;
