@@ -14,6 +14,7 @@
 #include "monitor.h"
 #include "compat.h"
 #include "container.h"
+#include "option.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -154,8 +155,7 @@ int tup_db_open(void)
 		stmts[x] = NULL;
 	}
 
-	if(tup_db_config_get_int("db_sync", 1, &db_sync) < 0)
-		return -1;
+	db_sync = tup_option_get_flag("db.sync");
 	if(db_sync == 0)
 		if(no_sync() < 0)
 			return -1;
@@ -182,12 +182,7 @@ int tup_db_create(int db_sync)
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
 		"create index link_index2 on link(to_id)",
-		"insert into config values('keep_going', 0)",
-		"insert into config values('db_sync', 1)",
 		"insert into config values('db_version', 0)",
-		"insert into config values('autoupdate', 0)",
-		"insert into config values('num_jobs', 1)",
-		"insert into config values('monitor_foreground', 0)",
 		"insert into node values(1, 0, 2, -1, '.')",
 		"insert into node values(2, 1, 2, -1, '@')",
 	};
@@ -216,10 +211,6 @@ int tup_db_create(int db_sync)
 		}
 	}
 
-	if(db_sync == 0) {
-		if(tup_db_config_set_int("db_sync", 0) < 0)
-			return -1;
-	}
 	if(tup_db_config_set_int("db_version", DB_VERSION) < 0)
 		return -1;
 	if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
@@ -790,82 +781,6 @@ int tup_db_debug_add_all_ghosts(void)
 		return -1;
 
 	return 0;
-}
-
-int process_tup_config(void)
-{
-	struct buf b;
-	int fd;
-	int dfd;
-	char *p;
-	int remaining;
-	char *home;
-	int rc = -1;
-
-	home = getenv("HOME");
-	if(!home)
-		return 0;
-	dfd = open(home, O_RDONLY);
-	if(dfd < 0) {
-		perror(home);
-		goto out_err;
-	}
-	fd = openat(dfd, ".tupconfig", O_RDONLY);
-	if(fd < 0) {
-		if(errno == ENOENT) {
-			/* No .tupconfig is ok */
-			rc = 0;
-		} else {
-			perror(".tupconfig");
-		}
-		goto out_close_dfd;
-	}
-	if(fslurp(fd, &b) < 0) {
-		fprintf(stderr, "tup error: Unable to read .tupconfig file\n");
-		goto out_close_fd;
-	}
-	p = b.s;
-	remaining = b.len;
-	while(p < b.s + b.len) {
-		char *end;
-		char *eq;
-		char *value;
-		end = memchr(p, '\n', remaining);
-		if(!end) {
-			fprintf(stderr, "tup: Error parsing .tupconfig line: %s\n", p);
-			goto out_free_buf;
-		}
-		*end = 0;
-		eq = strchr(p, '=');
-		if(!eq) {
-			fprintf(stderr, "tup: Error parsing .tupconfig line: %s\n", eq);
-			goto out_free_buf;
-		}
-		value = eq+1;
-		while(*value && isspace(*value)) {
-			value++;
-		}
-		eq--;
-		while(eq > p && isspace(*eq)) {
-			eq--;
-		}
-		eq[1] = 0;
-		if(tup_db_config_set_string(p, value) < 0)
-			goto out_free_buf;
-		p = end + 1;
-	}
-	rc = 0;
-
-out_free_buf:
-	free(b.s);
-out_close_fd:
-	close(fd);
-out_close_dfd:
-	close(dfd);
-out_err:
-	if(rc < 0)
-		fprintf(stderr, "tup error: Unable to read tup config\n");
-	return rc;
 }
 
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)

@@ -20,12 +20,10 @@ You can do all of your development with just 'tup init' and 'tup upd', along wit
 .TP
 .B init
 Creates a '.tup' directory in the current directory and initializes the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
-
-If a ~/.tupconfig file exists, it is read and used to initialize config variables. The file is expected to contain one variable definition per line. See the 'config' command for more information about the variables.
 .RS
 .TP
 .B --no-sync
-Sets the 'db_sync' configuration option of the project to '0'. By default the 'db_sync' option will be set to '1'. This is mostly used for test cases, but you could also use this in any environment where you want to script tup and use no synchronization by default.
+Sets the 'db.sync' option of the project to '0'. By default the 'db.sync' option will be set to '1'. This flag is mostly used for test cases, but you could also use this in any environment where you want to script tup and use no synchronization by default.
 .RE
 .TP
 .B upd [<output_1> ... <output_n>]
@@ -33,7 +31,7 @@ Updates the set of outputs based on the dependency graph and the current state o
 .RS
 .TP
 .B -jN
-Temporarily override the num_jobs configuration option to 'N'. This will run up to N jobs in parallel, subject to the constraints of the DAG. Eg: 'tup upd -j2' will run up to two jobs in parallel, whereas 'tup upd' will run up to num_jobs in parallel. See the config secondary command below.
+Temporarily override the updater.num_jobs option to 'N'. This will run up to N jobs in parallel, subject to the constraints of the DAG. Eg: 'tup upd -j2' will run up to two jobs in parallel, whereas 'tup upd' will run up to updater.num_jobs in parallel. See the option secondary command below.
 .TP
 .B --verbose
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
@@ -43,10 +41,10 @@ Causes tup to display the full command string instead of just the pretty-printed
 .TP
 .B --keep-going
 .PD
-Temporarily override the keep_going configuration option to '1'. See the config secondary command below.
+Temporarily override the updater.keep_going option to '1'. See the option secondary command below.
 .TP
 .B --no-keep-going
-Temporarily override the keep_going configuration option to '0'. See the config secondary command below.
+Temporarily override the updater.keep_going option to '0'. See the option secondary command below.
 .TP
 .B --no-scan
 Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
@@ -58,7 +56,7 @@ Output debug log to screen.
 These commands are used to modify the behavior of tup or look at its internals. You probably won't need these very often.
 .TP
 .B monitor
-Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor. The following arguments can be given on the command line. Any additional arguments not handled by the monitor will be passed along to the updater if autoupdate is enabled. For example, you could run the monitor as 'tup monitor -f -a -j2' to run the monitor in the foreground, and automatically update with 2 jobs when changes are detected. See also the config secondary command below.
+Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor. The following arguments can be given on the command line. Any additional arguments not handled by the monitor will be passed along to the updater if monitor.autoupdate is enabled. For example, you could run the monitor as 'tup monitor -f -a -j2' to run the monitor in the foreground, and automatically update with 2 jobs when changes are detected. See also the option secondary command below.
 .RS
 .TP
 .B -d
@@ -69,62 +67,76 @@ Enable debugging of the monitor process.
 .TP
 .B --foreground
 .PD
-Temporarily override the monitor_foreground config option to 1. The monitor will run in the foreground (don't daemonize).
+Temporarily override the monitor.foreground option to 1. The monitor will run in the foreground (don't daemonize).
 .TP
 .B -b
 .PD 0
 .TP
 .B --background
 .PD
-Temporarily override the monitor_foreground config option to 0. The monitor will run in the background (daemonize).
+Temporarily override the monitor.foreground option to 0. The monitor will run in the background (daemonize).
 .TP
 .B -a
 .PD 0
 .TP
 .B --autoupdate
 .PD
-Temporarily override the autoupdate config option to 1. This will automatically run an update when file changes are detected.
+Temporarily override the monitor.autoupdate option to 1. This will automatically run an update when file changes are detected.
 .TP
 .B -n
 .PD 0
 .TP
 .B --no-autoupdate
 .PD
-Temporarily override the autoupdate config option to 0. This will prevent the monitor from automatically running an update when file changes are detected.
+Temporarily override the monitor.autoupdate option to 0. This will prevent the monitor from automatically running an update when file changes are detected.
 .RE
 .TP
 .B stop
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
 .TP
-.B config [option value]
-Displays or sets the current tup options. With no further arguments, all of the options are displayed. The options can be set by specifying the option name and a new value. For example, 'tup config db_sync 0' would turn off the database disk synchronization. The configuration options are stored in the database in the 'config' table, so accessing these options cannot be done at the same time as an update. The defaults listed here are the compiled-in defaults. They can be overridden by specifying them in a ~/.tupconfig file, one on each line. For example, if you have a .tupconfig file that contains:
-
+.B config
+Displays the current tup database configuration. These are internal values used by tup.
+.TP
+.B options
+Displays all of the current tup options, as well as where they originated. The options are read in the following precedence order:
 .nf
-num_jobs = 2
-keep_going = 1
+command-line overrides (eg: -j flag passed to 'tup upd')
+\.tup/options file
+~/.tupoptions file
+/etc/tup/options file
+tup's compiled in defaults
+.fi
+All three files use the same .ini-style syntax. A section header is enclosed in square brackets, like so:
+.nf
+[updater]
 .fi
 
-Then 'tup init' will default to 2 jobs, and have the keep_going flag set.
+The section header is followed by one or more variable definitions, of the form 'variable = value'. Comments start with a semi-colon and continue to the end of the line.  The variable definitions can all be set to integers. For boolean flags, "true"/"yes" and "false"/"no" are synonyms for 1 and 0, respectively. For example, if you have a .tup/options file that contains:
+
+.nf
+[updater]
+	num_jobs = 2
+	keep_going = true
+.fi
+
+Then 'tup upd' will default to 2 jobs, and have the updater.keep_going flag set. The options listed below are of the form 'section.variable', so to set 'db.sync' you would need a '[db]' section followed by 'sync = 0', for example. The defaults listed here are the compiled-in defaults.
 
 .RS
 .TP
-.B db_sync (default '1')
+.B db.sync (default '1')
 Set to '1' if the SQLite synchronous feature is enabled. When enabled, the database is properly synchronized to the disk in a way that it is always consistent. When disabled, it will run faster since writes are left in the disk cache for a time before being written out. However, if your computer crashes before everything is written out, the tup database may become corrupted. See http://www.sqlite.org/pragma.html for more information.
 .TP
-.B autoupdate (default '0')
-Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
-.TP
-.B monitor_foreground (default '0')
-Set to '1' to run the monitor in the foreground, so control will not return to the terminal until the monitor is stopped (either by ctrl-C in the controlling terminal, or running 'tup stop' in another terminal). The default is '0', which means the monitor will run in the background.
-.TP
-.B num_jobs (default '1')
+.B updater.num_jobs (default '1')
 Set to the maximum number of commands tup will run simultaneously. The default is '1', which means commands will be executed serially. If this number is greater than 1, commands will be run in parallel only if they are independent. See also the -j option.
 .TP
-.B keep_going (default '0')
+.B updater.keep_going (default '0')
 Set to '1' to keep building as much as possible even if errors are encountered. Anything dependent on a failed command will not be executed, but other independent commands will be. The default is '0', which will cause tup to stop after the first failed command. See also the -k option.
 .TP
-.B db_version (internal use only!)
-This is used internally to update the database in case the schema changes. If a newer version of tup is used on an old database, the schema will be automatically updated and db_version will be set to the new version. If an older version of tup is used with a newer database, you will get an error message.
+.B monitor.autoupdate (default '0')
+Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
+.TP
+.B monitor.foreground (default '0')
+Set to '1' to run the monitor in the foreground, so control will not return to the terminal until the monitor is stopped (either by ctrl-C in the controlling terminal, or running 'tup stop' in another terminal). The default is '0', which means the monitor will run in the background.
 .RE
 .TP
 .B graph [--no-dirs] [--no-ghosts] [<output_1> ... <output_n>]

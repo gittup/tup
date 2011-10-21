@@ -9,7 +9,7 @@
 # foreach works (it now processes files in order, instead of in reverse), and
 # it needs to go first.
 . ./tup.sh
-tup config num_jobs 1
+single_threaded
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE

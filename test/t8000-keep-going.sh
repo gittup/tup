@@ -7,7 +7,7 @@ cp ../testTupfile.tup Tupfile
 # order, these files should be built in the order (bar.c, foo.c, zap.c). Then
 # we make the middle file break in order to test the keep-going logic.
 
-tup config num_jobs 1
+single_threaded
 echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
 echo "void zap(void) {}" > zap.c

@@ -44,6 +44,7 @@
 #include "tup/fslurp.h"
 #include "tup/server.h"
 #include "tup/container.h"
+#include "tup/option.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -112,8 +113,8 @@ int monitor(int argc, char **argv)
 	/* Close down the fork process, since we don't need it. */
 	if(server_post_exit() < 0)
 		return -1;
-	if(tup_db_config_get_int("monitor_foreground", 0, &foreground) < 0)
-		return -1;
+	foreground = tup_option_get_flag("monitor.foreground");
+
 	/* Arguments are cleared to "-" if they are used by the monitor. These
 	 * args are also passed on to the autoupdate process if that feature is
 	 * enabled, but we don't want the updater getting any args that are
@@ -626,8 +627,7 @@ static int autoupdate_enabled(void)
 	int autoupdate_config;
 	if(autoupdate_flag == 1)
 		return 1;
-	if(tup_db_config_get_int("autoupdate", 0, &autoupdate_config) < 0)
-		exit(1);
+	autoupdate_config = tup_option_get_flag("monitor.autoupdate");
 	if(autoupdate_flag == -1 && autoupdate_config == 1)
 		return 1;
 	return 0;

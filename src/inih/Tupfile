@@ -1,0 +1,10 @@
+include_rules
+
+# Has some warnings about casting away const
+CFLAGS += -Wno-cast-qual
+
+# Don't need multiline support - we just set some ints.
+CFLAGS += -DINI_ALLOW_MULTILINE=0
+
+: foreach *.c |> !cc |>
+: foreach *.c |> !mingwcc |>

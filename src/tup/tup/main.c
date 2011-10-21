@@ -21,6 +21,7 @@
 #include "tup/colors.h"
 #include "tup/varsed.h"
 #include "tup/access_event.h"
+#include "tup/option.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -38,6 +39,7 @@ static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
 static int config(int argc, char **argv);
+static int options(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int fake_parser_version(int argc, char **argv);
 static int flush(void);
@@ -162,6 +164,8 @@ int main(int argc, char **argv)
 		rc = varshow(argc, argv);
 	} else if(strcmp(cmd, "config") == 0) {
 		rc = config(argc, argv);
+	} else if(strcmp(cmd, "options") == 0) {
+		rc = options(argc, argv);
 	} else if(strcmp(cmd, "fake_mtime") == 0) {
 		rc = fake_mtime(argc, argv);
 	} else if(strcmp(cmd, "fake_parser_version") == 0) {
@@ -261,8 +265,15 @@ static int init(int argc, char **argv)
 		perror(TUP_VARDICT_FILE);
 		return -1;
 	}
-	if(process_tup_config() < 0)
-		return -1;
+	if(!db_sync) {
+		FILE *f = fopen(TUP_OPTIONS_FILE, "w");
+		if(!f) {
+			perror(TUP_OPTIONS_FILE);
+			return -1;
+		}
+		fprintf(f, "[db]\n");
+		fprintf(f, "\tsync = false\n");
+	}
 	return 0;
 
 err_close:
@@ -752,14 +763,25 @@ static int varshow(int argc, char **argv)
 
 static int config(int argc, char **argv)
 {
+	if(argv) {}
 	if(argc == 1) {
 		if(tup_db_show_config() < 0)
 			return -1;
-	} else if(argc == 3) {
-		if(tup_db_config_set_string(argv[1], argv[2]) < 0)
+	} else {
+		fprintf(stderr, "Error: 'config' doesn't take arguments.\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int options(int argc, char **argv)
+{
+	if(argv) {}
+	if(argc == 1) {
+		if(tup_option_show() < 0)
 			return -1;
 	} else {
-		fprintf(stderr, "Error: config requires either 0 or 2 arguments.\n");
+		fprintf(stderr, "Error: 'options' doesn't take arguments.\n");
 		return -1;
 	}
 	return 0;

@@ -419,6 +419,16 @@ check_no_windows()
 	esac
 }
 
+single_threaded()
+{
+	(echo "[updater]"; echo "num_jobs=1") >> .tup/options
+}
+
+set_autoupdate()
+{
+	(echo "[monitor]"; echo "autoupdate=1") >> .tup/options
+}
+
 eotup()
 {
 	tup stop || true

@@ -10,6 +10,7 @@
 #include "fslurp.h"
 #include "array_size.h"
 #include "config.h"
+#include "option.h"
 #include "container.h"
 #include "monitor.h"
 #include "path.h"
@@ -104,10 +105,8 @@ int updater(int argc, char **argv, int phase)
 	int num_pruned = 0;
 	int rc = -1;
 
-	if(tup_db_config_get_int("keep_going", 0, &do_keep_going) < 0)
-		return -1;
-	if(tup_db_config_get_int("num_jobs", 1, &num_jobs) < 0)
-		return -1;
+	do_keep_going = tup_option_get_flag("updater.keep_going");
+	num_jobs = tup_option_get_int("updater.num_jobs");
 
 	argc--;
 	argv++;
