@@ -407,14 +407,16 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b)
 			/* Skip the false part of an if block */
 		} else if(strncmp(line, "include ", 8) == 0) {
 			char *file;
+			int rc;
 
 			file = line + 8;
 			file = eval(tf, file);
 			if(!file)
 				return -1;
-			if(include_file(tf, file) < 0)
-				return -1;
+			rc = include_file(tf, file);
 			free(file);
+			if(rc < 0)
+				return -1;
 		} else if(strcmp(line, "include_rules") == 0) {
 			if(include_rules(tf) < 0)
 				return -1;
@@ -749,7 +751,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	int fd;
 	int rc = -1;
 	struct pel_group pg;
-	struct path_element *pel;
+	struct path_element *pel = NULL;
 	struct tup_entry *tent = NULL;
 	tupid_t newdt;
 	struct tup_entry *oldtent = tf->curtent;
@@ -758,28 +760,29 @@ static int include_file(struct tupfile *tf, const char *file)
 		goto out_err;
 	if(pg.pg_flags & PG_HIDDEN) {
 		fprintf(stderr, "tup error: Unable to include file with hidden path element.\n");
-		goto out_err;
+		goto out_del_pg;
 	}
 	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0);
 	if(newdt <= 0) {
 		fprintf(stderr, "tup error: Unable to find directory for include file relative to '");
 		tup_db_print(stderr, tf->curtent->tnode.tupid);
 		fprintf(stderr, "'\n");
-		goto out_err;
+		goto out_del_pg;
+	}
+	if(!pel) {
+		fprintf(stderr, "tup error: Invalid include filename: '%s'\n", file);
+		goto out_del_pg;
 	}
 	if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0 || !tent) {
 		fprintf(stderr, "tup error: Unable to find tup entry for file '%s'\n", file);
-		free(pel);
-		goto out_err;
+		goto out_free_pel;
 	}
-	free(pel);
-	del_pel_group(&pg);
 	tf->curtent = tup_entry_get(newdt);
 
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
 		perror(file);
-		goto out_err;
+		goto out_free_pel;
 	}
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
@@ -791,6 +794,10 @@ out_free:
 	free(incb.s);
 out_close:
 	close(fd);
+out_free_pel:
+	free(pel);
+out_del_pg:
+	del_pel_group(&pg);
 
 out_err:
 	tf->curtent = oldtent;
