@@ -84,9 +84,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
 		return -1;
 	}
-	if(!isatty(STDOUT_FILENO)) {
-		color_disable();
-	}
 
 	argc = argc - cmd_arg;
 	argv = &argv[cmd_arg];
@@ -116,6 +113,10 @@ int main(int argc, char **argv)
 
 	if(tup_init() < 0)
 		return 1;
+
+	if(!isatty(STDOUT_FILENO) || !tup_option_get_flag("display.color")) {
+		color_disable();
+	}
 
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
