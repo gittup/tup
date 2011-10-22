@@ -305,9 +305,6 @@ static int delete_files(struct graph *g)
 			goto out_err;
 		show_progress(tent, 0);
 	}
-	if(g->delete_count) {
-		show_progress(NULL, 0);
-	}
 	rc = 0;
 out_err:
 	tup_entry_release_list();
@@ -737,12 +734,11 @@ keep_going:
 		}
 	}
 	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist) || failed) {
-		printf("\n");
 		if(keep_going) {
-			fprintf(stderr, "tup: Remaining nodes skipped due to errors in command execution.\n");
+			fprintf(stderr, " *** tup: Remaining nodes skipped due to errors in command execution.\n");
 		} else {
 			if(server_is_dead()) {
-				fprintf(stderr, "tup: Remaining nodes skipped due to caught signal.\n");
+				fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
 			} else {
 				struct node *n;
 				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
@@ -758,7 +754,6 @@ keep_going:
 		}
 		goto out;
 	}
-	show_progress(NULL, 0);
 	rc = 0;
 out:
 	/* First tell all the threads to quit */
@@ -1085,7 +1080,11 @@ static int cur_phase = -1;
 static void tup_show_message(const char *s)
 {
 	const char *tup = " tup ";
-	printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
+	/* If we get to the end, show a green bar instead of grey. */
+	if(cur_phase == 5)
+		printf("[%s%s%s] %s", color_final(), tup, color_end(), s);
+	else
+		printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
 }
 
 static void tup_main_progress(const char *s)
@@ -1104,7 +1103,7 @@ static void start_progress(int new_total)
 	total = new_total;
 }
 
-static void show_bar(FILE *f, int node_type)
+static void show_bar(FILE *f, int node_type, int show_percent)
 {
 	if(total) {
 		const int max = 11;
@@ -1121,7 +1120,7 @@ static void show_bar(FILE *f, int node_type)
 		/* If it's a good enough limit for Final Fantasy VII, it's good
 		 * enough for me.
 		 */
-		if(total > 9999) {
+		if(total > 9999 || show_percent) {
 			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/total);
 		} else {
 			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
@@ -1134,37 +1133,35 @@ static void show_bar(FILE *f, int node_type)
 		else
 			fill = max * sum / total;
 
-		if(node_type < 0) {
-			printf("[%s%.*s%s]\n", color_final(), (int)sizeof(buf), buf, color_end());
-		} else {
-			fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-		}
+		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 	}
 }
 
 static void show_progress(struct tup_entry *tent, int is_error)
 {
-	if(tent) {
-		FILE *f;
-		if(is_error) {
-			f = stderr;
-			show_bar(f, TUP_NODE_ROOT);
-		} else {
-			f = stdout;
-			show_bar(f, tent->type);
-		}
-		print_tup_entry(f, tent);
-		fprintf(f, "\n");
-		sum++;
+	FILE *f;
+
+	sum++;
+	if(is_error) {
+		f = stderr;
+		show_bar(f, TUP_NODE_ROOT, 0);
 	} else {
-		show_bar(stdout, -1);
+		f = stdout;
+		show_bar(f, tent->type, 0);
 	}
+	print_tup_entry(f, tent);
+	fprintf(f, "\n");
 }
 
 static void show_active(int active)
 {
 	if(total) {
-		show_bar(stdout, TUP_NODE_CMD);
+		/* First time through we should 0/N for the progress bar, then
+		 * after that we just show the percentage complete, since the
+		 * previous line will have a 1/N line for the last completed
+		 * job.
+		 */
+		show_bar(stdout, TUP_NODE_CMD, sum != 0);
 		printf("Active: %i", active);
 		fflush(stdout);
 		is_active = 1;
