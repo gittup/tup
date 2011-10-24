@@ -135,8 +135,8 @@ Set to the maximum number of commands tup will run simultaneously. The default i
 .B updater.keep_going (default '0')
 Set to '1' to keep building as much as possible even if errors are encountered. Anything dependent on a failed command will not be executed, but other independent commands will be. The default is '0', which will cause tup to stop after the first failed command. See also the -k option.
 .TP
-.B display.color (default '1')
-Set to '0' to disable ANSI escape codes for colored output. The default is '1', which displays the progress bars in color.
+.B display.color (default 'auto')
+Set to 'never' to disable ANSI escape codes for colored output, or 'always' to always use ANSI escape codes for colored output. The default is 'auto', which displays uses colored output if stdout is connected to a tty, and uses no colors otherwise (ie: if stdout is redirected to a file).
 .TP
 .B monitor.autoupdate (default '0')
 Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.

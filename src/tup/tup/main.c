@@ -55,6 +55,7 @@ int main(int argc, char **argv)
 	int x;
 	int cmd_arg = 0;
 	const char *cmd = NULL;
+	const char *colors;
 
 	for(x=1; x<argc; x++) {
 		if(!cmd && argv[x][0] != '-') {
@@ -114,7 +115,9 @@ int main(int argc, char **argv)
 	if(tup_init() < 0)
 		return 1;
 
-	if(!isatty(STDOUT_FILENO) || !tup_option_get_flag("display.color")) {
+	colors = tup_option_get_string("display.color");
+	if(strcmp(colors, "never") == 0 ||
+	   (strcmp(colors, "auto") == 0 && !isatty(STDOUT_FILENO))) {
 		color_disable();
 	}
 

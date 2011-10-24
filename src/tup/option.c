@@ -21,7 +21,7 @@ static struct option {
 } options[] = {
 	{"updater.num_jobs", "1"},
 	{"updater.keep_going", "0"},
-	{"display.color", "1"},
+	{"display.color", "auto"},
 	{"monitor.autoupdate", "0"},
 	{"monitor.foreground", "0"},
 	{"db.sync", "1"},
