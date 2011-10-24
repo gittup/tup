@@ -29,7 +29,6 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, int sotgv);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv);
-int add_node_to_list(tupid_t dt, struct pel_group *pg, struct tup_entry_head *head);
 int gimme_tent(const char *name, struct tup_entry **entry);
 int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 			     struct tup_entry **entry);

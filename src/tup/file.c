@@ -23,10 +23,9 @@ static void del_entry(struct file_entry *fent);
 static void check_unlink_list(const struct pel_group *pg,
 			      struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
-static int update_write_info(tupid_t cmdid, const char *debug_name,
-			     struct file_info *info, int *warnings,
-			     struct tup_entry_head *entryhead);
-static int update_read_info(tupid_t cmdid, struct file_info *info,
+static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
+			     int *warnings, struct tup_entry_head *entryhead);
+static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead);
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root);
@@ -105,8 +104,8 @@ int handle_open_file(enum access_type at, const char *filename,
 	return rc;
 }
 
-int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
-		int *warnings, int check_only)
+int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
+		int check_only)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -118,7 +117,7 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 
 	if(!check_only) {
 		LIST_FOREACH(tmpdir, &info->tmpdir_list, list) {
-			fprintf(stderr, "tup error: Directory '%s' was created by command '%s', but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname, debug_name);
+			fprintf(f, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
 			tmpdir_bork = 1;
 		}
 		if(tmpdir_bork) {
@@ -127,12 +126,12 @@ int write_files(tupid_t cmdid, const char *debug_name, struct file_info *info,
 		}
 
 		entrylist = tup_entry_get_list();
-		rc1 = update_write_info(cmdid, debug_name, info, warnings, entrylist);
+		rc1 = update_write_info(f, cmdid, info, warnings, entrylist);
 		tup_entry_release_list();
 	}
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(cmdid, info, entrylist);
+	rc2 = update_read_info(f, cmdid, info, entrylist);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -148,6 +147,39 @@ int add_parser_files(struct file_info *finfo, struct tupid_entries *root)
 	rc = add_parser_files_locked(finfo, root);
 	finfo_unlock(finfo);
 	return rc;
+}
+
+static int add_node_to_list(tupid_t dt, struct pel_group *pg,
+			    struct tup_entry_head *head)
+{
+	tupid_t new_dt;
+	struct path_element *pel = NULL;
+	struct tup_entry *tent;
+
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, 1);
+	if(new_dt < 0)
+		return -1;
+	if(new_dt == 0) {
+		return 0;
+	}
+	if(pel == NULL) {
+		/* This can happen for the '.' entry */
+		return 0;
+	}
+
+	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, &tent) < 0)
+		return -1;
+	if(!tent) {
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0) {
+			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+			return -1;
+		}
+	}
+	free(pel);
+
+	tup_entry_list_add(tent, head);
+
+	return 0;
 }
 
 static int add_parser_files_locked(struct file_info *finfo,
@@ -344,9 +376,8 @@ static void handle_unlink(struct file_info *info)
 	}
 }
 
-static int update_write_info(tupid_t cmdid, const char *debug_name,
-			     struct file_info *info, int *warnings,
-			     struct tup_entry_head *entryhead)
+static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
+			     int *warnings, struct tup_entry_head *entryhead)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -371,18 +402,18 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 		}
 
 		if(w->pg.pg_flags & PG_HIDDEN) {
-			fprintf(stderr, "tup warning: Writing to hidden file '%s' from command '%s'\n", w->filename, debug_name);
+			fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
 			(*warnings)++;
 			goto out_skip;
 		}
 
 		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, 0);
 		if(newdt <= 0) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
+			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			return -1;
 		}
 		if(!pel) {
-			fprintf(stderr, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
+			fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
 			return -1;
 		}
 
@@ -390,7 +421,7 @@ static int update_write_info(tupid_t cmdid, const char *debug_name,
 			return -1;
 		free(pel);
 		if(!tent) {
-			fprintf(stderr, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output for the command '%s'\n", w->filename, debug_name);
+			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
 		} else {
 			struct mapping *map;
@@ -418,7 +449,7 @@ out_skip:
 		return -1;
 	}
 
-	if(tup_db_check_actual_outputs(cmdid, entryhead) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {
@@ -430,7 +461,7 @@ out_skip:
 		if(strcmp(map->tmpname, map->realname) != 0) {
 			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
 				perror(map->realname);
-				fprintf(stderr, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+				fprintf(f, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
 				write_bork = 1;
 			}
 		}
@@ -448,7 +479,7 @@ out_skip:
 	return 0;
 }
 
-static int update_read_info(tupid_t cmdid, struct file_info *info,
+static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead)
 {
 	struct file_entry *r;
@@ -470,7 +501,7 @@ static int update_read_info(tupid_t cmdid, struct file_info *info,
 		del_entry(r);
 	}
 
-	if(tup_db_check_actual_inputs(cmdid, entryhead) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead) < 0)
 		return -1;
 	return 0;
 }

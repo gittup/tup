@@ -305,7 +305,7 @@ static int virt_tup_close(struct server *s)
 }
 
 static int exec_internal(struct server *s, const char *cmd,
-			 struct tup_entry *dtent)
+			 struct tup_entry *dtent, int single_output)
 {
 	int status;
 	char buf[64];
@@ -313,6 +313,7 @@ static int exec_internal(struct server *s, const char *cmd,
 	struct execmsg em;
 
 	em.sid = s->id;
+	em.single_output = single_output;
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
 	 * adjusting.
 	 */
@@ -345,18 +346,20 @@ static int exec_internal(struct server *s, const char *cmd,
 		return -1;
 	}
 
-	snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
-	buf[sizeof(buf)-1] = 0;
-	s->error_fd = openat(tup_top_fd(), buf, O_RDONLY);
-	if(s->error_fd < 0) {
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
-		return -1;
-	}
-	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
-		return -1;
+	if(!single_output) {
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
+		buf[sizeof(buf)-1] = 0;
+		s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
+		if(s->error_fd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+			return -1;
+		}
+		if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
+			return -1;
+		}
 	}
 
 	if(WIFEXITED(status)) {
@@ -382,7 +385,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
 
-	rc = exec_internal(s, cmd, dtent);
+	rc = exec_internal(s, cmd, dtent, 1);
 
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		return -1;
@@ -402,7 +405,7 @@ int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 	s.exit_status = 0;
 	s.signalled = 0;
 	tent = tup_entry_get(tupid);
-	if(exec_internal(&s, cmdline, tent) < 0)
+	if(exec_internal(&s, cmdline, tent, 0) < 0)
 		return -1;
 
 	if(display_output(s.error_fd, 1, cmdline, 1) < 0)

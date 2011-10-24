@@ -431,7 +431,7 @@ set_autoupdate()
 
 eotup()
 {
-	tup stop || true
+	tup stop > /dev/null || true
 	cd $tupcurdir
 	rm -rf $tuptestdir
 	exit 0

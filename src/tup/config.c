@@ -141,6 +141,12 @@ void tup_vardict_close(void)
 	vardict_fd = -1;
 }
 
+/* Notes:
+ * iserr=0 means stdout, for sub-processes that succeed
+ * iserr=1 means stderr, for run-scripts
+ * iserr=2 means stderr, for tup errors (eg: missing deps)
+ * iserr=3 means stderr, for sub-processes that fail
+ */
 int display_output(int fd, int iserr, const char *name, int display_name)
 {
 	if(fd != -1) {
@@ -162,17 +168,14 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 				break;
 			if(!displayed) {
 				displayed = 1;
-				if(iserr) {
+				if(iserr == 2) {
+					/* For tup errors (eg: missing deps) */
+					fprintf(stderr, " *** tup errors ***\n");
+				}
+				if(iserr == 1) {
+					/* This is for run-scripts */
 					if(display_name) {
 						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
-					} else {
-						fprintf(stderr, " *** tup: stderr ***\n");
-					}
-				} else {
-					if(display_name) {
-						printf(" -- tup: stdout from command '%s%s%s%s' --\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
-					} else {
-						printf(" -- tup: stdout --\n");
 					}
 				}
 			}

@@ -3584,6 +3584,7 @@ static int compare_trees(struct tupid_entries *a, struct tupid_entries *b,
 }
 
 struct actual_output_data {
+	FILE *f;
 	tupid_t cmdid;
 	int output_error;
 };
@@ -3598,21 +3599,20 @@ static int extra_output(tupid_t tupid, void *data)
 
 	if(!(aod->output_error & 1)) {
 		aod->output_error |= 1;
-		fprintf(stderr, "tup error: Unspecified output files - A command is writing to files that you didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
-		fprintf(stderr, " -- Command ID: %lli\n", aod->cmdid);
+		fprintf(aod->f, "tup error: Unspecified output files - A command is writing to files that you didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
 		/* Return success here so we can display all errant outputs.
 		 * Actual check is in tup_db_check_actual_outputs().
 		 */
 #ifdef _WIN32
 		/* TODO: This can be removed once win32 supports tmp files */
 		tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-		fprintf(stderr, "[35m -- Delete: %s at dir %lli[0m\n",
+		fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
 			tent->name.s, tent->dt);
 		delete_file(tent->dt, tent->name.s);
 #endif
 	}
 
-	fprintf(stderr, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
+	fprintf(aod->f, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
 	return 0;
 }
 
@@ -3624,7 +3624,7 @@ static int missing_output(tupid_t tupid, void *data)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
-	fprintf(stderr, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
+	fprintf(aod->f, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
 
 	if(!(aod->output_error & 2)) {
 		aod->output_error |= 2;
@@ -3635,10 +3635,12 @@ static int missing_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_check_actual_outputs(tupid_t cmdid, struct tup_entry_head *writehead)
+int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
+				struct tup_entry_head *writehead)
 {
 	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
+		.f = f,
 		.cmdid = cmdid,
 		.output_error = 0,
 	};
@@ -3795,7 +3797,7 @@ static int del_normal_link(tupid_t tupid, void *data)
 	return 0;
 }
 
-static int check_generated_inputs(struct tupid_entries *missing_input_root,
+static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
 				  struct tupid_entries *valid_input_root)
 {
 	int found_error = 0;
@@ -3824,17 +3826,18 @@ static int check_generated_inputs(struct tupid_entries *missing_input_root,
 	/* Anything we couldn't connect is an error. */
 	RB_FOREACH(tt, tupid_entries, missing_input_root) {
 		if(!found_error) {
-			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
+			fprintf(f, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
 			found_error = 1;
 		}
-		tup_db_print(stderr, tt->tupid);
+		tup_db_print(f, tt->tupid);
 	}
 	if(found_error)
 		return -1;
 	return 0;
 }
 
-int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
+int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
+			       struct tup_entry_head *readhead)
 {
 	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries sticky_copy = {NULL};
@@ -3859,7 +3862,7 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(&aid.missing_input_root, &aid.sticky_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, &aid.sticky_root);
 
 	if(compare_list_tree(readhead, &normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
