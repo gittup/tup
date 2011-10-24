@@ -190,7 +190,7 @@ edge_create:
 	return 0;
 }
 
-int nodes_are_connected(struct tup_entry *src, struct tup_entry_head *dest_head,
+int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
 			int *connected)
 {
 	struct graph g;
@@ -209,16 +209,12 @@ int nodes_are_connected(struct tup_entry *src, struct tup_entry_head *dest_head,
 
 	*connected = 0;
 	while(!TAILQ_EMPTY(&g.plist)) {
-		struct tup_entry *tent;
 		n = TAILQ_FIRST(&g.plist);
 
-		LIST_FOREACH(tent, dest_head, list) {
-			if(tent == src)
-				continue;
-			if(tent == n->tent) {
-				*connected = 1;
-				goto out_cleanup;
-			}
+		if(src != n->tent &&
+		   tupid_tree_search(valid_root, n->tent->tnode.tupid) != NULL) {
+			*connected = 1;
+			goto out_cleanup;
 		}
 
 		if(n->state == STATE_INITIALIZED) {

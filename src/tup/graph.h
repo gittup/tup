@@ -14,7 +14,7 @@ struct edge {
 LIST_HEAD(edge_head, edge);
 
 struct tup_entry;
-struct tup_entry_head;
+struct tupid_entries;
 
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
@@ -56,7 +56,7 @@ void remove_edge(struct edge *e);
 int create_graph(struct graph *g, int count_flags);
 int destroy_graph(struct graph *g);
 int graph_empty(struct graph *g);
-int nodes_are_connected(struct tup_entry *src, struct tup_entry_head *dest_head,
+int nodes_are_connected(struct tup_entry *src, struct tupid_entries *dest_head,
 			int *connected);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
 void dump_graph(const struct graph *g, const char *filename);

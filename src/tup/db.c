@@ -3814,11 +3814,9 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 
 struct actual_input_data {
 	tupid_t cmdid;
-	int input_error;
 	struct tupid_entries sticky_root;
 	struct tupid_entries output_root;
 	struct tupid_entries missing_input_root;
-	struct tup_entry_head *readhead;
 };
 
 static int new_input(tupid_t tupid, void *data)
@@ -3833,26 +3831,8 @@ static int new_input(tupid_t tupid, void *data)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
-		int connected;
-
-		if(nodes_are_connected(tent, aid->readhead, &connected) < 0)
-			return -1;
-
-		if(connected) {
-			return 0;
-		}
-
-		if(!aid->input_error) {
-			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
-			fprintf(stderr, " -- Command ID: %lli\n", aid->cmdid);
-		}
 		if(tupid_tree_add(&aid->missing_input_root, tent->tnode.tupid) < 0)
 			return -1;
-		tup_db_print(stderr, tupid);
-		aid->input_error = 1;
-		/* Return success here so we can display all errant inputs.
-		 * Actual check is in tup_db_check_actual_inputs().
-		 */
 		return 0;
 	}
 	return 0;
@@ -3900,18 +3880,56 @@ static int del_normal_link(tupid_t tupid, void *data)
 	return 0;
 }
 
+static int check_generated_inputs(struct tupid_entries *missing_input_root,
+				  struct tupid_entries *valid_input_root)
+{
+	int found_error = 0;
+	struct tupid_tree *tt;
+	struct tupid_tree *tmp;
+
+	/* First, repeatedly go through the list of missing inputs (ie:
+	 * generated files that we read from, but didn't specify in the Tupfile)
+	 * to see if we can reach them from another generated file that we
+	 * *did* specify in the Tupfile.
+	 */
+	RB_FOREACH_SAFE(tt, tupid_entries, missing_input_root, tmp) {
+		struct tup_entry *tent;
+		int connected;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
+			return -1;
+
+		if(connected) {
+			tupid_tree_rm(missing_input_root, tt);
+			free(tt);
+		}
+	}
+
+	/* Anything we couldn't connect is an error. */
+	RB_FOREACH(tt, tupid_entries, missing_input_root) {
+		if(!found_error) {
+			fprintf(stderr, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
+			found_error = 1;
+		}
+		tup_db_print(stderr, tt->tupid);
+	}
+	if(found_error)
+		return -1;
+	return 0;
+}
+
 int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
 {
 	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
 		.cmdid = cmdid,
-		.input_error = 0,
 		.sticky_root = {NULL},
 		.output_root = {NULL},
 		.missing_input_root = {NULL},
-		.readhead = readhead,
 	};
+	int rc;
 
 	if(get_output_tree(cmdid, &aid.output_root) < 0)
 		return -1;
@@ -3926,6 +3944,8 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
 			     new_input, NULL) < 0)
 		return -1;
 
+	rc = check_generated_inputs(&aid.missing_input_root, &aid.sticky_root);
+
 	if(compare_list_tree(readhead, &normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
 		return -1;
@@ -3934,9 +3954,7 @@ int tup_db_check_actual_inputs(tupid_t cmdid, struct tup_entry_head *readhead)
 	free_tupid_tree(&sticky_copy);
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
-	if(aid.input_error)
-		return -1;
-	return 0;
+	return rc;
 }
 
 struct parse_output_data {
