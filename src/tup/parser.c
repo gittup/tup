@@ -194,6 +194,13 @@ static char *tup_printf(const char *cmd, int cmd_len, struct name_list *nl,
 			int is_command);
 static char *eval(struct tupfile *tf, const char *string);
 
+static int debug_run = 0;
+
+void parser_debug_run(void)
+{
+	debug_run = 1;
+}
+
 int parse(struct node *n, struct graph *g)
 {
 	struct tupfile tf;
@@ -639,6 +646,8 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		return -1;
 	}
 
+	if(debug_run)
+		printf(" --- run script output from '%s'\n", eval_cmdline);
 	rc = server_run_script(tf->tupid, eval_cmdline, &rules);
 	free(eval_cmdline);
 	if(rc < 0)
@@ -657,6 +666,8 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 			fprintf(stderr, "tup error: Missing newline from :-rule in run script: '%s'\n", p);
 		}
 		*newline = 0;
+		if(debug_run)
+			printf("%s\n", p);
 		if(parse_rule(tf, p+1, lno, bl) < 0) {
 			fprintf(stderr, "tup error: Unable to parse :-rule from run script: '%s'\n", p);
 			goto out_err;

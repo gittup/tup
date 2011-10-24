@@ -124,6 +124,8 @@ int updater(int argc, char **argv, int phase)
 			do_keep_going = 0;
 		} else if(strcmp(argv[x], "--verbose") == 0) {
 			tup_entry_set_verbose(1);
+		} else if(strcmp(argv[x], "--debug-run") == 0) {
+			parser_debug_run();
 		} else if(strcmp(argv[x], "--no-scan") == 0) {
 			do_scan = 0;
 		} else if(strncmp(argv[x], "-j", 2) == 0) {
