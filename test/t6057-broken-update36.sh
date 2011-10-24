@@ -15,7 +15,7 @@
 . ./tup.sh
 
 # Can't run in parallel, otherwise both scripts will miss each other.
-tup config num_jobs 1
+single_threaded
 cat > Tupfile << HERE
 : |> ./do_stuff.sh a.out |> a.out
 : |> ./do_stuff.sh b.out |> b.out

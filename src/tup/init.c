@@ -4,6 +4,7 @@
 #include "lock.h"
 #include "entry.h"
 #include "server.h"
+#include "option.h"
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -17,16 +18,24 @@ int tup_init(void)
 		return -1;
 	}
 	if(open_tup_top() < 0) {
-		return -1;
+		goto out_err;
 	}
 	if(tup_lock_init() < 0) {
-		return -1;
+		goto out_err;
+	}
+	if(tup_option_init() < 0) {
+		goto out_unlock;
 	}
 	if(tup_db_open() != 0) {
-		tup_lock_exit();
-		return -1;
+		goto out_unlock;
 	}
 	return 0;
+
+out_unlock:
+	tup_lock_exit();
+out_err:
+	server_post_exit();
+	return -1;
 }
 
 int tup_cleanup(void)
@@ -43,6 +52,7 @@ int tup_cleanup(void)
 	}
 	tup_vardict_close();
 	tup_db_close();
+	tup_option_exit();
 	tup_lock_exit();
 	close(tup_top_fd());
 	if(server_post_exit() < 0)

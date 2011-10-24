@@ -11,8 +11,8 @@ srcs += src/tup/access_event/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
-srcs += src/tup/colors/*.o
 srcs += src/sqlite3/*.o
+srcs += src/inih/*.o
 srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
@@ -29,7 +29,7 @@ mingwsrcs += src/tup/monitor/*.omingw
 mingwsrcs += src/tup/tup/*.omingw
 mingwsrcs += src/tup/flock/*.omingw
 mingwsrcs += src/tup/server/*.omingw
-mingwsrcs += src/tup/colors/*.omingw
+mingwsrcs += src/inih/*.omingw
 mingwsrcs += src/sqlite3/*.omingw
 mingwsrcs += src/compat/*.omingw
 mingwsrcs += src/compat/win32/*.omingw

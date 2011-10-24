@@ -9,7 +9,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup config autoupdate 1
+set_autoupdate
 
 echo "int main(void) {return 0;}" > ok.c
 touch open.c

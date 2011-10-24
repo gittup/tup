@@ -6,7 +6,7 @@
 # was still included in the C file the compiler would whine about it since we
 # have to run the command again anyway).
 . ./tup.sh
-tup config num_jobs 1
+single_threaded
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o

@@ -5,8 +5,8 @@
 
 . ./tup.sh
 check_monitor_supported
+set_autoupdate
 tup monitor
-tup config autoupdate 1
 cat > foo.c << HERE
 int main(void) {return 3;}
 HERE
