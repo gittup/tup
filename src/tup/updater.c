@@ -51,6 +51,7 @@ static void show_active(int active);
 static int do_keep_going;
 static int num_jobs;
 static int warnings;
+static int stdout_isatty;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -110,6 +111,7 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
+	stdout_isatty = isatty(STDOUT_FILENO);
 
 	argc--;
 	argv++;
@@ -1156,7 +1158,7 @@ static void show_progress(struct tup_entry *tent, int is_error)
 
 static void show_active(int active)
 {
-	if(total) {
+	if(total && stdout_isatty) {
 		/* First time through we should 0/N for the progress bar, then
 		 * after that we just show the percentage complete, since the
 		 * previous line will have a 1/N line for the last completed
