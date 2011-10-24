@@ -43,6 +43,7 @@ static void *child_waiter(void *arg);
 static void *child_wait_notifier(void *arg);
 static int wait_for_my_sid(struct status_tree *st);
 static void sighandler(int sig);
+static int inited = 0;
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
@@ -69,6 +70,7 @@ int server_pre_init(void)
 		perror("pthread_create");
 		return -1;
 	}
+	inited = 1;
 	return 0;
 }
 
@@ -76,6 +78,8 @@ int server_post_exit(void)
 {
 	int status;
 	struct execmsg em = {-1, 0, 0, 0};
+	if(!inited)
+		return 0;
 	if(write(msd[1], &em, sizeof(em)) != sizeof(em)) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write to the master fork socket. This process may not shutdown properly.\n");
@@ -94,6 +98,7 @@ int server_post_exit(void)
 	 * joined, since that thread needs to read from it.
 	 */
 	close(msd[1]);
+	inited = 0;
 	return 0;
 }
 
