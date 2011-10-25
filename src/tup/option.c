@@ -31,6 +31,7 @@ static struct option {
 static struct vardb roots[NUM_OPTION_LOCATIONS];
 
 static int parse_option_file(const char *file, struct vardb *vdb);
+static int inited = 0;
 
 int tup_option_init(void)
 {
@@ -55,6 +56,7 @@ int tup_option_init(void)
 	}
 	if(parse_option_file("/etc/tup/options", &roots[2]) < 0)
 		return -1;
+	inited = 1;
 	return 0;
 }
 
@@ -90,6 +92,10 @@ const char *tup_option_get_string(const char *opt)
 {
 	unsigned int x;
 	int len = strlen(opt);
+	if(!inited) {
+		fprintf(stderr, "tup internal error: Called tup_option_get_string(%s) before the options were initialized.\n", opt);
+		exit(1);
+	}
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		struct var_entry *ve;
 		ve = vardb_get(&roots[x], opt, len);
