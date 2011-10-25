@@ -1,18 +1,52 @@
-#include "tup/colors.h"
-#include "tup/db.h"
+#include "colors.h"
+#include "db.h"
+#include "option.h"
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-static int disabled = 0;
+static int enabled[2];
+static int active = 0;
 
-void color_disable(void)
+void color_init(void)
 {
-	disabled = 1;
+	const char *colors;
+	colors = tup_option_get_string("display.color");
+	if(strcmp(colors, "never") == 0) {
+		enabled[0] = 0;
+		enabled[1] = 0;
+	} else if(strcmp(colors, "always") == 0) {
+		enabled[0] = 1;
+		enabled[1] = 1;
+	} else {
+		if(isatty(STDOUT_FILENO))
+			enabled[0] = 1;
+		else
+			enabled[0] = 0;
+		if(isatty(STDERR_FILENO))
+			enabled[1] = 1;
+		else
+			enabled[1] = 0;
+	}
+}
+
+void color_set(FILE *f)
+{
+	if(f == stdout)
+		active = 0;
+	else if(f == stderr)
+		active = 1;
+	else {
+		fprintf(stderr, "tup internal error: color_set() must be called with stdout or stderr.\n");
+		exit(1);
+	}
 }
 
 const char *color_type(int type)
 {
 	const char *color = "";
 
-	if(disabled)
+	if(!enabled[active])
 		return "";
 
 	switch(type) {
@@ -41,35 +75,35 @@ const char *color_type(int type)
 
 const char *color_append_normal(void)
 {
-	if(disabled)
+	if(!enabled[active])
 		return "";
 	return "m";
 }
 
 const char *color_append_reverse(void)
 {
-	if(disabled)
+	if(!enabled[active])
 		return "";
 	return ";07m";
 }
 
 const char *color_reverse(void)
 {
-	if(disabled)
+	if(!enabled[active])
 		return "";
 	return "[07m";
 }
 
 const char *color_end(void)
 {
-	if(disabled)
+	if(!enabled[active])
 		return "";
 	return "[0m";
 }
 
 const char *color_final(void)
 {
-	if(disabled)
+	if(!enabled[active])
 		return "";
 	return "[07;32m";
 }

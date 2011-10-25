@@ -175,6 +175,7 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 				if(iserr == 1) {
 					/* This is for run-scripts */
 					if(display_name) {
+						color_set(stderr);
 						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
 					}
 				}

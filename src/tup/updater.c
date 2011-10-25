@@ -1083,6 +1083,7 @@ static int cur_phase = -1;
 static void tup_show_message(const char *s)
 {
 	const char *tup = " tup ";
+	color_set(stdout);
 	/* If we get to the end, show a green bar instead of grey. */
 	if(cur_phase == 5)
 		printf("[%s%s%s] %s", color_final(), tup, color_end(), s);
@@ -1136,6 +1137,7 @@ static void show_bar(FILE *f, int node_type, int show_percent)
 		else
 			fill = max * sum / total;
 
+		color_set(f);
 		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
 	}
 }

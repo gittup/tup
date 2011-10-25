@@ -212,6 +212,7 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 			name_sz++;
 	}
 
+	color_set(f);
 	fprintf(f, "%s%s%.*s%s", color_type(tent->type), color_append_normal(), name_sz, name, color_end());
 }
 

@@ -5,6 +5,7 @@
 #include "entry.h"
 #include "server.h"
 #include "option.h"
+#include "colors.h"
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -26,6 +27,7 @@ int tup_init(void)
 	if(tup_option_init() < 0) {
 		goto out_unlock;
 	}
+	color_init();
 	if(tup_db_open() != 0) {
 		goto out_unlock;
 	}
