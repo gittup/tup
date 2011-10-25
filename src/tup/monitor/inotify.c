@@ -439,10 +439,15 @@ static int monitor_loop(void)
 			 * again.
 			 */
 			if(e->wd == tup_wd) {
-				if(e->len && strncmp(e->name, "db-", 3) == 0)
-					continue;
-				printf("tup monitor: .tup file '%s' deleted - shutting down.\n", e->len ? e->name : "");
-				return 0;
+				/* If we 'rm -rf' a project with the monitor
+				 * running, we will know when the db file is
+				 * removed and can automatically quit the
+				 * monitor.
+				 */
+				if(e->len && strcmp(e->name, "db") == 0) {
+					printf("tup monitor: .tup file '%s' deleted - shutting down.\n", e->len ? e->name : "");
+					return 0;
+				}
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
 					rc = flush_queue(locked);
