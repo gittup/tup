@@ -37,7 +37,7 @@ static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
-static int config(int argc, char **argv);
+static int dbconfig(int argc, char **argv);
 static int options(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int fake_parser_version(int argc, char **argv);
@@ -158,8 +158,8 @@ int main(int argc, char **argv)
 		rc = rm(argc, argv);
 	} else if(strcmp(cmd, "varshow") == 0) {
 		rc = varshow(argc, argv);
-	} else if(strcmp(cmd, "config") == 0) {
-		rc = config(argc, argv);
+	} else if(strcmp(cmd, "dbconfig") == 0) {
+		rc = dbconfig(argc, argv);
 	} else if(strcmp(cmd, "options") == 0) {
 		rc = options(argc, argv);
 	} else if(strcmp(cmd, "fake_mtime") == 0) {
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
 	if(getenv("TUP_VALGRIND")) {
 		/* Also close out the standard file descriptors, so valgrind
 		 * doesn't complain about those as well. The outputs need to be
-		 * flushed, otherwise 'tup config | grep foo' will not see the
+		 * flushed, otherwise 'tup options | grep foo' will not see the
 		 * output from tup. This is done here rather than tup_cleanup()
 		 * because other parts of tup (such as flush()) will call
 		 * cleanup and then init again. We only want to close the
@@ -757,14 +757,14 @@ static int varshow(int argc, char **argv)
 	return 0;
 }
 
-static int config(int argc, char **argv)
+static int dbconfig(int argc, char **argv)
 {
 	if(argv) {}
 	if(argc == 1) {
 		if(tup_db_show_config() < 0)
 			return -1;
 	} else {
-		fprintf(stderr, "Error: 'config' doesn't take arguments.\n");
+		fprintf(stderr, "Error: 'dbconfig' doesn't take arguments.\n");
 		return -1;
 	}
 	return 0;
