@@ -189,6 +189,8 @@ int todo(int argc, char **argv)
 	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "--no-scan") == 0) {
 			do_scan = 0;
+		} else if(strcmp(argv[x], "--verbose") == 0) {
+			tup_entry_set_verbose(1);
 		} else if(strcmp(argv[x], "--") == 0) {
 			break;
 		}
@@ -928,7 +930,6 @@ static void *todo_work(void *arg)
 
 		if(n->tent->type == g->count_flags) {
 			show_progress(n->tent, 0);
-			tup_db_print(stdout, n->tnode.tupid);
 		}
 
 		worker_ret(wt, 0);
