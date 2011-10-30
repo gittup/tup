@@ -7,6 +7,7 @@ pages += examples.html
 pages += tips_and_tricks.html
 pages += make_vs_tup.html
 pages += tup_vs_mordor.html
+pages += license.html
 
 examples += ex_a_first_tupfile.html
 examples += ex_dependencies.html
