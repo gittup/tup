@@ -149,9 +149,10 @@ int main(int argc, char **argv)
 		pid = monitor_get_pid(0);
 		if(pid > 0) {
 			fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
-			return -1;
+			rc = 1;
+		} else {
+			rc = tup_scan();
 		}
-		rc = tup_scan();
 	} else if(strcmp(cmd, "link") == 0) {
 		rc = mlink(argc, argv);
 	} else if(strcmp(cmd, "read") == 0) {
