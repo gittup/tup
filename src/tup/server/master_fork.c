@@ -85,7 +85,10 @@ int server_pre_init(void)
 		close(msd[1]);
 		exit(master_fork_loop());
 	}
-	close(msd[0]);
+	if(close(msd[0]) < 0) {
+		perror("close(msd[0])");
+		return -1;
+	}
 	if(pthread_create(&cw_tid, NULL, child_wait_notifier, NULL) < 0) {
 		perror("pthread_create");
 		return -1;
@@ -117,7 +120,10 @@ int server_post_exit(void)
 	/* Only close our side of the socket once the child_wait_notifier has
 	 * joined, since that thread needs to read from it.
 	 */
-	close(msd[1]);
+	if(close(msd[1]) < 0) {
+		perror("close(msd[1])");
+		return -1;
+	}
 	inited = 0;
 	return 0;
 }
@@ -231,7 +237,10 @@ static int master_fork_loop(void)
 		fprintf(stderr, "tup error: Unable to dup stdin for child processes.\n");
 		return -1;
 	}
-	close(null_fd);
+	if(close(null_fd) < 0) {
+		perror("close(null_fd)");
+		exit(1);
+	}
 
 	if(pthread_attr_init(&attr) != 0) {
 		perror("pthread_attr_init");
@@ -313,7 +322,10 @@ static int master_fork_loop(void)
 		if(pid == 0) {
 			char fd_name[32];
 
-			close(msd[0]);
+			if(close(msd[0]) < 0) {
+				perror("close(msd[0])");
+				exit(1);
+			}
 			snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
 			fd_name[31] = 0;
 			setenv(TUP_VARDICT_NAME, fd_name, 1);
@@ -332,16 +344,30 @@ static int master_fork_loop(void)
 				fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
 				exit(1);
 			}
-			close(ofd);
-			if(!em.single_output)
-				close(efd);
+			if(close(ofd) < 0) {
+				perror("close(ofd)");
+				exit(1);
+			}
+			if(!em.single_output) {
+				if(close(efd) < 0) {
+					perror("close(efd)");
+					exit(1);
+				}
+			}
 			execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 			perror("execl");
 			exit(1);
 		}
-		close(ofd);
-		if(!em.single_output)
-			close(efd);
+		if(close(ofd) < 0) {
+			perror("close(ofd)");
+			exit(1);
+		}
+		if(!em.single_output) {
+			if(close(efd) < 0) {
+				perror("close(efd)");
+				exit(1);
+			}
+		}
 		waiter = malloc(sizeof *waiter);
 		if(!waiter) {
 			perror("malloc");
@@ -359,15 +385,22 @@ static int master_fork_loop(void)
 			fprintf(stderr, "tup error: Unable to send notification to shutdown the child wait thread. This process may not shutdown cleanly.\n");
 			return -1;
 		}
-		close(msd[0]);
+		if(close(msd[0]) < 0) {
+			perror("close(msd[0])");
+			exit(1);
+		}
 	}
 
 	if(vardict_fd != -2)
-		close(vardict_fd);
+		if(close(vardict_fd) < 0)
+			perror("close(vardict_fd)");
 	if(getenv("TUP_VALGRIND")) {
-		close(0);
-		close(1);
-		close(2);
+		if(close(0) < 0)
+			perror("close(0)");
+		if(close(1) < 0)
+			perror("close(1)");
+		if(close(2) < 0)
+			perror("close(2)");
 	}
 	free(cmd);
 	return 0;

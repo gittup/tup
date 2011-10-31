@@ -277,8 +277,14 @@ static int db_backup(int version)
 			goto err_fail;
 		}
 	}
-	close(ifd);
-	close(fd);
+	if(close(ifd) < 0) {
+		perror("close(ifd)");
+		return -1;
+	}
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 	printf("Old tup database backed up as '%s'\n", backup);
 	return 0;
 
@@ -1400,7 +1406,10 @@ int tup_db_open_tupid(tupid_t tupid)
 		else
 			perror(path);
 	}
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		rc = -1;
+	}
 	free(path);
 
 	return rc;
@@ -3170,9 +3179,12 @@ static int save_vardict_file(struct vardb *vdb)
 		return -1;
 	}
 	fd = openat(dfd, TUP_VARDICT_FILE, O_CREAT|O_WRONLY|O_TRUNC, 0666);
-	close(dfd);
 	if(fd < 0) {
 		perror("openat");
+		return -1;
+	}
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
 		return -1;
 	}
 	if(write(fd, &vdb->count, sizeof(vdb->count)) != sizeof(vdb->count)) {
@@ -3220,7 +3232,10 @@ static int save_vardict_file(struct vardb *vdb)
 	rc = 0;
 	tup_db_var_changed = 0;
 out_err:
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		rc = -1;
+	}
 	return rc;
 }
 
@@ -3305,9 +3320,15 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 		 * ghost nodes and such.
 		 */
 		rc = get_file_var_tree(&file_tree, fd);
-		close(fd);
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			return -1;
+		}
 	}
-	close(dfd);
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
 	if(rc < 0)
 		return -1;
 

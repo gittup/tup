@@ -84,7 +84,10 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 		perror(file);
 		return -1;
 	}
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1);
 }
 

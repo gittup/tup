@@ -190,7 +190,9 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 		 */
 		int neverindex_fd = open(TUP_MNT "/.metadata_never_index", O_WRONLY|O_CREAT, 0644);
 		if (neverindex_fd >= 0) {
-			close(neverindex_fd);
+			if(close(neverindex_fd) < 0) {
+				perror("close(neverindex_fd)");
+			}
 		} else {
 			perror("create(metadata_never_index):");
 		}
@@ -265,7 +267,9 @@ int server_quit(void)
 {
 	if(!server_inited)
 		return 0;
-	close(null_fd);
+	if(close(null_fd) < 0) {
+		perror("close(null_fd)");
+	}
 
 	if(tup_unmount() < 0)
 		return -1;
@@ -280,7 +284,10 @@ static int re_openat(int fd, const char *path)
 	int newfd;
 
 	newfd = openat(fd, path, O_RDONLY);
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 	if(newfd < 0) {
 		perror(path);
 		return -1;
@@ -320,7 +327,10 @@ static int virt_tup_close(struct server *s)
 		perror("fchdir");
 		return -1;
 	}
-	close(s->root_fd);
+	if(close(s->root_fd) < 0) {
+		perror("close(s->root_fd)");
+		return -1;
+	}
 	return 0;
 }
 
@@ -430,14 +440,20 @@ int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 
 	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
 		return -1;
-	close(s.error_fd);
+	if(close(s.error_fd) < 0) {
+		perror("close(s.error_fd)");
+		return -1;
+	}
 
 	if(s.exited) {
 		if(s.exit_status == 0) {
 			struct buf b;
 			if(fslurp_null(s.output_fd, &b) < 0)
 				return -1;
-			close(s.output_fd);
+			if(close(s.output_fd) < 0) {
+				perror("close(s.output_fd)");
+				return -1;
+			}
 			*rules = b.s;
 			return 0;
 		}

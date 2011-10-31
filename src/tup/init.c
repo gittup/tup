@@ -76,7 +76,8 @@ int tup_cleanup(void)
 	tup_db_close();
 	tup_option_exit();
 	tup_lock_exit();
-	close(tup_top_fd());
+	if(close(tup_top_fd()) < 0)
+		perror("close(tup_top_fd())");
 	if(server_post_exit() < 0)
 		return -1;
 	return 0;

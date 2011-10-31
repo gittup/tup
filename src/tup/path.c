@@ -103,7 +103,10 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 				      callback) < 0)
 				return -1;
 		}
-		close(newfd);
+		if(close(newfd) < 0) {
+			perror("close(newfd)");
+			return -1;
+		}
 
 		/* If we should have a .gitignore file but it was removed for
 		 * some reason, re-parse the current Tupfile so it gets

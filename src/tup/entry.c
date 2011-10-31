@@ -332,7 +332,10 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 		return dfd;
 
 	newdfd = openat(dfd, tent->name.s, O_RDONLY);
-	close(dfd);
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
 	if(newdfd < 0) {
 		if(errno == ENOENT)
 			return -ENOENT;

@@ -295,7 +295,10 @@ int monitor(int argc, char **argv)
 	monitor_set_pid(-1);
 
 close_inot:
-	close(inot_fd);
+	if(close(inot_fd) < 0) {
+		perror("close(inot_fd)");
+		rc = -1;
+	}
 	return rc;
 }
 
@@ -338,7 +341,10 @@ static int monitor_set_pid(int pid)
 	if(tup_unflock(fd) < 0) {
 		return -1;
 	}
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd");
+		return -1;
+	}
 	return 0;
 }
 
@@ -376,7 +382,10 @@ out:
 	if(tup_unflock(fd) < 0) {
 		return -1;
 	}
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd");
+		return -1;
+	}
 
 	if(rc > 0) {
 		/* Just using getpriority() to see if the monitor process is
@@ -984,7 +993,10 @@ static int handle_event(struct monitor_event *m)
 			 * dircache already handles this case.
 			 */
 			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
-			close(fd);
+			if(close(fd) < 0) {
+				perror("close(fd)");
+				return -1;
+			}
 			if(rc < 0) {
 				return -1;
 			}
@@ -1009,7 +1021,10 @@ static int handle_event(struct monitor_event *m)
 		if(fd < 0)
 			return -1;
 		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
-		close(fd);
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			return -1;
+		}
 		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&

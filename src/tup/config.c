@@ -157,7 +157,11 @@ int tup_vardict_open(void)
 
 void tup_vardict_close(void)
 {
-	close(vardict_fd);
+	if(vardict_fd != -1) {
+		if(close(vardict_fd) < 0) {
+			perror("close2(vardict_fd)");
+		}
+	}
 	vardict_fd = -1;
 }
 

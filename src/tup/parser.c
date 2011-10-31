@@ -304,9 +304,15 @@ int parse(struct node *n, struct graph *g)
 out_free_bs:
 	free(b.s);
 out_close_file:
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		rc = -1;
+	}
 out_close_dfd:
-	close(tf.dfd);
+	if(close(tf.dfd) < 0) {
+		perror("close(tf.dfd)");
+		rc = -1;
+	}
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
@@ -327,10 +333,16 @@ out_server_stop:
 	free_tupid_tree(&tf.input_root);
 
 	show_progress(n->tent, rc != 0);
-	fflush(tf.f);
+	if(fflush(tf.f) != 0) {
+		perror("fflush");
+		rc = -1;
+	}
 	rewind(tf.f);
 	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0);
-	fclose(tf.f);
+	if(fclose(tf.f) != 0) {
+		perror("fclose");
+		rc = -1;
+	}
 
 	return rc;
 }
@@ -686,7 +698,10 @@ static int gitignore(struct tupfile *tf)
 				goto err_close;
 			}
 		}
-		close(fd);
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			return -1;
+		}
 	}
 	if(s) {
 		free(s); /* Freeze gopher! */
@@ -711,7 +726,10 @@ static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent)
 			return -1;
 		}
 	}
-	close(dfd);
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
 	return 0;
 }
 
@@ -763,7 +781,10 @@ static int include_file(struct tupfile *tf, const char *file)
 out_free:
 	free(incb.s);
 out_close:
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		rc = -1;
+	}
 out_free_pel:
 	free(pel);
 out_del_pg:

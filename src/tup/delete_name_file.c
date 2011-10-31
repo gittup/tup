@@ -69,6 +69,9 @@ int delete_file(tupid_t dt, const char *name)
 	}
 
 out:
-	close(dirfd);
+	if(close(dirfd) < 0) {
+		perror("close(dirfd)");
+		return -1;
+	}
 	return rc;
 }

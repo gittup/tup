@@ -255,7 +255,10 @@ static int init(int argc, char **argv)
 		perror("fchdir");
 		goto err_close;
 	}
-	close(fd);
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 
 	if(mkdir(TUP_DIR, 0777) != 0) {
 		perror(TUP_DIR);

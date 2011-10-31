@@ -1012,10 +1012,16 @@ static int process_output(struct server *s, struct tup_entry *tent)
 	show_progress(tent, is_err);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
-	close(s->output_fd);
+	if(close(s->output_fd) < 0) {
+		perror("close(s->output_fd)");
+		return -1;
+	}
 	if(display_output(fileno(f), 2, tent->name.s, 0) < 0)
 		return -1;
-	fclose(f);
+	if(fclose(f) != 0) {
+		perror("fclose");
+		return -1;
+	}
 	if(is_err)
 		return -1;
 	return 0;
@@ -1078,7 +1084,10 @@ static int update(struct node *n)
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
-	close(dfd);
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
@@ -1088,7 +1097,9 @@ static int update(struct node *n)
 	return rc;
 
 err_close_dfd:
-	close(dfd);
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+	}
 err_out:
 	return -1;
 }

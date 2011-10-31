@@ -110,20 +110,26 @@ int tup_lock_init(void)
 void tup_lock_exit(void)
 {
 	tup_unflock(obj_lock);
-	close(obj_lock);
+	if(close(obj_lock) < 0)
+		perror("close(obj_lock)");
 	/* Wait for the monitor to pick up the object lock */
 	tup_flock(tri_lock);
 	tup_unflock(tri_lock);
-	close(tri_lock);
+	if(close(tri_lock) < 0)
+		perror("close(tri_lock)");
 	tup_unflock(sh_lock);
-	close(sh_lock);
+	if(close(sh_lock) < 0)
+		perror("close(sh_lock)");
 }
 
 void tup_lock_close(void)
 {
-	close(obj_lock);
-	close(tri_lock);
-	close(sh_lock);
+	if(close(obj_lock) < 0)
+		perror("close(obj_lock)");
+	if(close(tri_lock) < 0)
+		perror("close(tri_lock)");
+	if(close(sh_lock) < 0)
+		perror("close(sh_lock)");
 }
 
 int tup_sh_lock(void)

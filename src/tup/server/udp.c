@@ -311,8 +311,14 @@ static int stop_server(struct server *s)
 		return -1;
 	}
 	pthread_join(s->tid, &retval);
-	close(s->sd[0]);
-	close(s->sd[1]);
+	if(close(s->sd[0]) < 0) {
+		perror("close(s->sd[0])");
+		return -1;
+	}
+	if(close(s->sd[1]) < 0) {
+		perror("close(s->sd[1])");
+		return -1;
+	}
 	s->sd[0] = INVALID_SOCKET;
 	s->sd[1] = INVALID_SOCKET;
 

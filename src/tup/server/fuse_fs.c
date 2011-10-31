@@ -600,7 +600,8 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 			rc = openat(tup_top_fd(), map->tmpname, flags, mode);
 			if(rc < 0)
 				return -errno;
-			close(rc);
+			if(close(rc) < 0)
+				return -errno;
 		}
 	} else {
 		/* Other things (eg: fifos, actual device nodes) are not
@@ -845,7 +846,8 @@ static int tup_fs_truncate(const char *path, off_t size)
 			}
 			if(ftruncate(fd, size) < 0)
 				rc = -errno;
-			close(fd);
+			if(close(fd) < 0)
+				rc = -errno;
 			put_finfo(finfo);
 			return rc;
 		}
@@ -982,7 +984,8 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 
 	if(fstatvfs(fd, stbuf) < 0)
 		rc = -errno;
-	close(fd);
+	if(close(fd) < 0)
+		rc = -errno;
 	return rc;
 }
 
@@ -991,7 +994,8 @@ static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 	if(path) {}
 	if(context_check() < 0)
 		return -EPERM;
-	close(fi->fh);
+	if(close(fi->fh) < 0)
+		return -errno;
 	return 0;
 }
 
