@@ -147,7 +147,7 @@ struct tupfile {
 	int ign;
 };
 
-static int parse_tupfile(struct tupfile *tf, struct buf *b);
+static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
@@ -290,7 +290,7 @@ int parse(struct node *n, struct graph *g)
 
 	if(fslurp_null(fd, &b) < 0)
 		goto out_close_file;
-	if(parse_tupfile(&tf, &b) < 0)
+	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 		goto out_free_bs;
 	if(tf.ign) {
 		if(rm_existing_gitignore(&tf, n->tent) < 0)
@@ -335,7 +335,7 @@ out_server_stop:
 	return rc;
 }
 
-static int parse_tupfile(struct tupfile *tf, struct buf *b)
+static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename)
 {
 	char *p, *e;
 	char *line;
@@ -462,16 +462,16 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b)
 		}
 
 		if(rc == SYNTAX_ERROR) {
-			fprintf(tf->f, "Syntax error parsing Tupfile line %i\n  Line was: '%s'\n", lno, line_debug);
+			fprintf(tf->f, "Syntax error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
 			return -1;
 		}
 		if(rc < 0) {
-			fprintf(tf->f, "Error parsing Tupfile line %i\n  Line was: '%s'\n", lno, line_debug);
+			fprintf(tf->f, "Error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
 			return -1;
 		}
 	}
 	if(if_check(&ifs) < 0) {
-		fprintf(tf->f, "Error parsing Tupfile: missing endif before EOF.\n");
+		fprintf(tf->f, "Error parsing %s: missing endif before EOF.\n", filename);
 		return -1;
 	}
 
@@ -757,7 +757,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_tupfile(tf, &incb) < 0)
+	if(parse_tupfile(tf, &incb, file) < 0)
 		goto out_free;
 	rc = 0;
 out_free:
