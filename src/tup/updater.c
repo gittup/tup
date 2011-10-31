@@ -26,6 +26,7 @@
 #include "db.h"
 #include "entry.h"
 #include "parser.h"
+#include "progress.h"
 #include "server.h"
 #include "fslurp.h"
 #include "array_size.h"
@@ -34,7 +35,6 @@
 #include "container.h"
 #include "monitor.h"
 #include "path.h"
-#include "colors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,15 +62,10 @@ static void *create_work(void *arg);
 static void *update_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
-static void tup_show_message(const char *s);
-static void tup_main_progress(const char *s);
-static void start_progress(int total);
-static void show_active(int active);
 
 static int do_keep_going;
 static int num_jobs;
 static int warnings;
-static int stdout_isatty;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -130,7 +125,7 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
-	stdout_isatty = isatty(STDOUT_FILENO);
+	progress_init();
 
 	argc--;
 	argv++;
@@ -1095,98 +1090,4 @@ err_close_dfd:
 	close(dfd);
 err_out:
 	return -1;
-}
-
-static int cur_phase = -1;
-static void tup_show_message(const char *s)
-{
-	const char *tup = " tup ";
-	color_set(stdout);
-	/* If we get to the end, show a green bar instead of grey. */
-	if(cur_phase == 5)
-		printf("[%s%s%s] %s", color_final(), tup, color_end(), s);
-	else
-		printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
-}
-
-static void tup_main_progress(const char *s)
-{
-	cur_phase++;
-	tup_show_message(s);
-}
-
-static int sum;
-static int total;
-static int is_active = 0;
-
-static void start_progress(int new_total)
-{
-	sum = 0;
-	total = new_total;
-}
-
-static void show_bar(FILE *f, int node_type, int show_percent)
-{
-	if(total) {
-		const int max = 11;
-		int fill;
-		char buf[12];
-
-		if(is_active) {
-			printf("\r                             \r");
-			is_active = 0;
-			if(f == stderr)
-				fflush(stdout);
-		}
-
-		/* If it's a good enough limit for Final Fantasy VII, it's good
-		 * enough for me.
-		 */
-		if(total > 9999 || show_percent) {
-			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/total);
-		} else {
-			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
-		}
-		/* TUP_NODE_ROOT means an error - fill the whole bar so it's
-		 * obvious.
-		 */
-		if(node_type == TUP_NODE_ROOT)
-			fill = max;
-		else
-			fill = max * sum / total;
-
-		color_set(f);
-		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-	}
-}
-
-void show_progress(struct tup_entry *tent, int is_error)
-{
-	FILE *f;
-
-	sum++;
-	if(is_error) {
-		f = stderr;
-		show_bar(f, TUP_NODE_ROOT, 0);
-	} else {
-		f = stdout;
-		show_bar(f, tent->type, 0);
-	}
-	print_tup_entry(f, tent);
-	fprintf(f, "\n");
-}
-
-static void show_active(int active)
-{
-	if(total && stdout_isatty) {
-		/* First time through we should 0/N for the progress bar, then
-		 * after that we just show the percentage complete, since the
-		 * previous line will have a 1/N line for the last completed
-		 * job.
-		 */
-		show_bar(stdout, TUP_NODE_CMD, sum != 0);
-		printf("Active: %i", active);
-		fflush(stdout);
-		is_active = 1;
-	}
 }

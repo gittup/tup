@@ -21,7 +21,7 @@
 /* _ATFILE_SOURCE needed at least on linux x86_64 */
 #define _ATFILE_SOURCE
 #include "parser.h"
-#include "updater.h"
+#include "progress.h"
 #include "flist.h"
 #include "fileio.h"
 #include "pel_group.h"
