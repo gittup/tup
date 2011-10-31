@@ -430,6 +430,7 @@ int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 
 	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
 		return -1;
+	close(s.error_fd);
 
 	if(s.exited) {
 		if(s.exit_status == 0) {

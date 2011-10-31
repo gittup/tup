@@ -202,7 +202,6 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 			}
 			fprintf(out, "%.*s", rc, buf);
 		}
-		close(fd);
 	}
 	return 0;
 }

@@ -1012,6 +1012,7 @@ static int process_output(struct server *s, struct tup_entry *tent)
 	show_progress(tent, is_err);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
+	close(s->output_fd);
 	if(display_output(fileno(f), 2, tent->name.s, 0) < 0)
 		return -1;
 	fclose(f);
