@@ -21,7 +21,10 @@
 #ifndef tup_updater_h
 #define tup_updater_h
 
+struct tup_entry;
+
 int updater(int argc, char **argv, int phase);
 int todo(int argc, char **argv);
+void show_progress(struct tup_entry *tent, int is_error);
 
 #endif

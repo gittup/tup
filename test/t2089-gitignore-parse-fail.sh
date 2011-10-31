@@ -19,7 +19,7 @@ cat > Tupfile << HERE
 borkbork
 HERE
 tup touch Tupfile
-update_fail_msg "Failed to parse Tupfile in directory"
+update_fail_msg "Syntax error parsing Tupfile line 3"
 
 gitignore_good foo .gitignore
 

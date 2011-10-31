@@ -461,12 +461,15 @@ int server_parser_start(struct server *s)
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
 	if(virt_tup_open(s) < 0) {
-		tup_fuse_rm_group(&s->finfo);
-		return -1;
+		goto err_rm_group;
 	}
 	s->oldid = curid;
 	curid = s->id;
 	return 0;
+
+err_rm_group:
+	tup_fuse_rm_group(&s->finfo);
+	return -1;
 }
 
 int server_parser_stop(struct server *s)

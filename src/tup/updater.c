@@ -65,7 +65,6 @@ static int update(struct node *n);
 static void tup_show_message(const char *s);
 static void tup_main_progress(const char *s);
 static void start_progress(int total);
-static void show_progress(struct tup_entry *tent, int is_error);
 static void show_active(int active);
 
 static int do_keep_going;
@@ -840,9 +839,7 @@ static void *create_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_DIR) {
-			show_progress(n->tent, 0);
 			if(n->already_used) {
-				printf("Already parsed[%lli]: '%s'\n", n->tnode.tupid, n->tent->name.s);
 				rc = 0;
 			} else {
 				rc = parse(n, g);
@@ -1163,7 +1160,7 @@ static void show_bar(FILE *f, int node_type, int show_percent)
 	}
 }
 
-static void show_progress(struct tup_entry *tent, int is_error)
+void show_progress(struct tup_entry *tent, int is_error)
 {
 	FILE *f;
 

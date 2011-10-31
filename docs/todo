@@ -49,8 +49,6 @@ replace 'tup monitor' with a tup.sh function and wrap it with valgrind
 
 monitor should move deleted files to use dir=-1 instead of actually doing the full node deletion. The full deletion is done at next tup upd. file should be renamed to avoid unique constraint violation (name=tupid?)
 
-get rid of 'Already parsed' messages - indent instead
-
 rm file, re-create as dir without monitor running
 
 look at gcov, gperf

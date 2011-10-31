@@ -48,7 +48,7 @@ int if_else(struct if_stmt *ifs)
 {
 	if(ifs->level == 0) {
 		fprintf(stderr, "Parse error: else statement outside of an if block\n");
-		return -1;
+		return -2;
 	}
 	ifs->ifness ^= ifs->level;
 	return 0;
@@ -58,7 +58,7 @@ int if_endif(struct if_stmt *ifs)
 {
 	if(ifs->level == 0) {
 		fprintf(stderr, "Parse error: endif statement outside of an if block\n");
-		return -1;
+		return -2;
 	}
 	ifs->ifness &= ~ifs->level;
 	ifs->level >>= 1;

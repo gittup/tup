@@ -54,12 +54,8 @@ void color_set(FILE *f)
 {
 	if(f == stdout)
 		active = 0;
-	else if(f == stderr)
+	else
 		active = 1;
-	else {
-		fprintf(stderr, "tup internal error: color_set() must be called with stdout or stderr.\n");
-		exit(1);
-	}
 }
 
 const char *color_type(int type)
