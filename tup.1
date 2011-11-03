@@ -129,8 +129,8 @@ Then 'tup upd' will default to 2 jobs, and have the updater.keep_going flag set.
 .B db.sync (default '1')
 Set to '1' if the SQLite synchronous feature is enabled. When enabled, the database is properly synchronized to the disk in a way that it is always consistent. When disabled, it will run faster since writes are left in the disk cache for a time before being written out. However, if your computer crashes before everything is written out, the tup database may become corrupted. See http://www.sqlite.org/pragma.html for more information.
 .TP
-.B updater.num_jobs (default '1')
-Set to the maximum number of commands tup will run simultaneously. The default is '1', which means commands will be executed serially. If this number is greater than 1, commands will be run in parallel only if they are independent. See also the -j option.
+.B updater.num_jobs (defaults to the number of processors on the system )
+Set to the maximum number of commands tup will run simultaneously. The default is dynamically determined to be the number of processors on the system. If updater.num_jobs is greater than 1, commands will be run in parallel only if they are independent. See also the -j option.
 .TP
 .B updater.keep_going (default '0')
 Set to '1' to keep building as much as possible even if errors are encountered. Anything dependent on a failed command will not be executed, but other independent commands will be. The default is '0', which will cause tup to stop after the first failed command. See also the -k option.
