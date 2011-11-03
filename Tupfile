@@ -11,7 +11,11 @@ srcs += src/tup/access_event/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
+ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
+LDFLAGS += -lsqlite3
+else
 srcs += src/sqlite3/*.o
+endif
 srcs += src/inih/*.o
 srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
