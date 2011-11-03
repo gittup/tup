@@ -18,6 +18,15 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/sysctl.h>
+#elif defined(_WIN32)
+/* _WIN32_IE needed for SHGetSpecialFolderPath() */
+#define _WIN32_IE 0x0400
+#include <windows.h>
+#include <shlobj.h>
+#endif
+
 #include "option.h"
 #include "vardb.h"
 #include "compat.h"
@@ -26,23 +35,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#if defined(__APPLE__) || defined(__FreeBSD__)
-#include <sys/sysctl.h>
-#elif defined(_WIN32)
-#include <windows.h>
-#endif
 
 #define OPT_MAX 256
 
-static const char *locations[] = {
-	"project settings",
-	"user settings",
-	"system settings",
+static char home_loc[PATH_MAX];
+
+static struct {
+	const char *file;
+	struct vardb root;
+	int exists;
+} locations[] = {
+	{ .file = TUP_OPTIONS_FILE },
+	{ .file = home_loc },
+#ifndef _WIN32
+	{ .file = "/etc/tup/options" },
+#endif
 };
 #define NUM_OPTION_LOCATIONS (sizeof(locations) / sizeof(locations[0]))
 
+static int parse_option_file(int x);
 static const char *cpu_number(void);
-static int parse_option_file(const char *file, struct vardb *vdb);
+static int init_home_loc(void);
 
 static struct option {
 	const char *name;
@@ -59,37 +72,26 @@ static struct option {
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
-static struct vardb roots[NUM_OPTION_LOCATIONS];
 static int inited = 0;
 
 int tup_option_init(void)
 {
 	unsigned int x;
-	char homefile[PATH_MAX];
-	const char *home;
 
 	for(x=0; x<NUM_OPTIONS; x++) {
 		if(options[x].generator)
 			options[x].default_value = options[x].generator();
 	}
 
+	if(init_home_loc() < 0)
+		return -1;
+
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		if(vardb_init(&roots[x]) < 0)
+		if(vardb_init(&locations[x].root) < 0)
+			return -1;
+		if(parse_option_file(x) < 0)
 			return -1;
 	}
-	if(parse_option_file(TUP_OPTIONS_FILE, &roots[0]) < 0)
-		return -1;
-	home = getenv("HOME");
-	if(home) {
-		if(snprintf(homefile, sizeof(homefile), "%s/%s", home, ".tupoptions") >= (signed)sizeof(homefile)) {
-			fprintf(stderr, "tup internal error: user-level options file string is too small.\n");
-			return -1;
-		}
-		if(parse_option_file(homefile, &roots[1]) < 0)
-			return -1;
-	}
-	if(parse_option_file("/etc/tup/options", &roots[2]) < 0)
-		return -1;
 	inited = 1;
 	return 0;
 }
@@ -98,7 +100,7 @@ void tup_option_exit(void)
 {
 	unsigned int x;
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		vardb_close(&roots[x]);
+		vardb_close(&locations[x].root);
 	}
 }
 
@@ -132,7 +134,7 @@ const char *tup_option_get_string(const char *opt)
 	}
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		struct var_entry *ve;
-		ve = vardb_get(&roots[x], opt, len);
+		ve = vardb_get(&locations[x].root, opt, len);
 		if(ve) {
 			return ve->value;
 		}
@@ -149,6 +151,15 @@ const char *tup_option_get_string(const char *opt)
 int tup_option_show(void)
 {
 	unsigned int x;
+	printf(" --- Option files:\n");
+	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+		if(locations[x].exists) {
+			printf("Parsed option file: %s\n", locations[x].file);
+		} else {
+			printf("Option file does not exist: %s\n", locations[x].file);
+		}
+	}
+	printf(" --- Option settings:\n");
 	for(x=0; x<NUM_OPTIONS; x++) {
 		unsigned int y;
 		const char *value = options[x].default_value;
@@ -157,9 +168,9 @@ int tup_option_show(void)
 
 		for(y=0; y<NUM_OPTION_LOCATIONS; y++) {
 			struct var_entry *ve;
-			ve = vardb_get(&roots[y], options[x].name, len);
+			ve = vardb_get(&locations[y].root, options[x].name, len);
 			if(ve) {
-				location = locations[y];
+				location = locations[y].file;
 				value = ve->value;
 				break;
 			}
@@ -195,17 +206,19 @@ set_var:
 	return 1; /* inih success */
 }
 
-static int parse_option_file(const char *file, struct vardb *vdb)
+static int parse_option_file(int x)
 {
 	FILE *f;
 	int rc;
 
-	f = fopen(file, "r");
+	f = fopen(locations[x].file, "r");
 	if(!f) {
 		/* Don't care if the file's not there or we can't read it */
+		locations[x].exists = 0;
 		return 0;
 	}
-	rc = ini_parse_file(f, parse_callback, vdb);
+	locations[x].exists = 1;
+	rc = ini_parse_file(f, parse_callback, &locations[x].root);
 	fclose(f);
 	if(rc == 0)
 		return 0;
@@ -241,5 +254,33 @@ static const char *cpu_number(void)
 		count = 1;
 
 	snprintf(buf, sizeof(buf), "%d", count);
+	buf[sizeof(buf) - 1] = 0;
 	return buf;
+}
+
+static int init_home_loc(void)
+{
+#if defined(_WIN32)
+	char folderpath[MAX_PATH];
+	if(!SHGetSpecialFolderPath(NULL, folderpath, CSIDL_COMMON_APPDATA, 0)) {
+		fprintf(stderr, "tup error: Unable to get Application Data path.\n");
+		return -1;
+	}
+	if(snprintf(home_loc, sizeof(home_loc), "%s\\tup\\tup.ini", folderpath) >= (signed)sizeof(home_loc)) {
+			fprintf(stderr, "tup internal error: user-level options file string is too small.\n");
+			return -1;
+	}
+	return 0;
+#else
+	const char *home;
+
+	home = getenv("HOME");
+	if(home) {
+		if(snprintf(home_loc, sizeof(home_loc), "%s/.tupoptions", home) >= (signed)sizeof(home_loc)) {
+			fprintf(stderr, "tup internal error: user-level options file string is too small.\n");
+			return -1;
+		}
+	}
+	return 0;
+#endif
 }
