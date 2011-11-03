@@ -339,7 +339,28 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			fprintf(stderr, "tup: Unable to find tupid for '%s'\n", argv[x]);
 			goto out_err;
 		}
-		tup_entry_list_add(tent, prune_list);
+		if(tent->type == TUP_NODE_DIR) {
+			/* For a directory, we add all generated files in that
+			 * directory, since updating the directory itself
+			 * doesn't make sense for tup.
+			 */
+			struct tupid_entries dir_entries;
+			struct tupid_tree *tt;
+
+			RB_INIT(&dir_entries);
+			if(tup_db_dirtype_to_tree(tent->tnode.tupid, &dir_entries, NULL, TUP_NODE_GENERATED) < 0)
+				goto out_err;
+			while((tt = RB_ROOT(&dir_entries)) != NULL) {
+				struct tup_entry *subtent;
+				if(tup_entry_add(tt->tupid, &subtent) < 0)
+					goto out_err;
+				tupid_tree_rm(&dir_entries, tt);
+				free(tt);
+				tup_entry_list_add(subtent, prune_list);
+			}
+		} else {
+			tup_entry_list_add(tent, prune_list);
+		}
 	}
 
 	if(!LIST_EMPTY(prune_list)) {
@@ -351,8 +372,6 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			n = find_node(g, tent->tnode.tupid);
 			if(n) {
 				mark_nodes(n);
-			} else {
-				printf("Node '%s' does not need to be updated.\n", tent->name.s);
 			}
 		}
 
