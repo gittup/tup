@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 	}
 
 	if(compat_init() < 0) {
-		fprintf(stderr, "tup error: Unable to initialize compatability lib\n");
+		fprintf(stderr, "tup error: Unable to initialize compatibility lib\n");
 		return -1;
 	}
 
