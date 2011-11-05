@@ -102,6 +102,7 @@ Displays the current tup database configuration. These are internal values used 
 .TP
 .B options
 Displays all of the current tup options, as well as where they originated. The options are read in the following precedence order:
+
 .nf
 command-line overrides (eg: -j flag passed to 'tup upd')
 \&.tup/options file
@@ -109,6 +110,7 @@ command-line overrides (eg: -j flag passed to 'tup upd')
 /etc/tup/options file
 tup's compiled in defaults
 .fi
+
 All three files use the same .ini-style syntax. A section header is enclosed in square brackets, like so:
 .nf
 [updater]
