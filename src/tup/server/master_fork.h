@@ -26,12 +26,13 @@
 
 struct execmsg {
 	tupid_t sid;
+	int joblen;
 	int dirlen;
 	int cmdlen;
 	int single_output;
 };
 
-int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
-		     int *status);
+int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
+		     const char *cmd, int *status);
 
 #endif

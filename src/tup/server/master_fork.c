@@ -100,9 +100,11 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0};
+
 	if(!inited)
 		return 0;
+
 	if(write(msd[1], &em, sizeof(em)) != sizeof(em)) {
 		perror("write");
 		fprintf(stderr, "tup error: Unable to write to the master fork socket. This process may not shutdown properly.\n");
@@ -138,8 +140,8 @@ static int write_all(const void *data, int size)
 	return 0;
 }
 
-int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
-		     int *status)
+int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
+		     const char *cmd, int *status)
 {
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	struct status_tree st;
@@ -166,6 +168,8 @@ int master_fork_exec(struct execmsg *em, const char *dir, const char *cmd,
 
 	pthread_mutex_lock(&lock);
 	if(write_all(em, sizeof(*em)) < 0)
+		goto err_out;
+	if(write_all(job, em->joblen) < 0)
 		goto err_out;
 	if(write_all(dir, em->dirlen) < 0)
 		goto err_out;
@@ -203,12 +207,79 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 	return 0;
 }
 
+static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
+			    int vardict_fd, int single_output)
+{
+	int ofd, efd;
+	char fd_name[32];
+	char buf[64];
+
+	snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
+	fd_name[31] = 0;
+	setenv(TUP_VARDICT_NAME, fd_name, 1);
+
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", sid);
+	buf[sizeof(buf)-1] = 0;
+	ofd = creat(buf, 0600);
+	if(ofd < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+		return -1;
+	}
+
+	if(single_output) {
+		efd = ofd;
+	} else {
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", sid);
+		buf[sizeof(buf)-1] = 0;
+		efd = creat(buf, 0600);
+		if(efd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+			return -1;
+		}
+	}
+	if(dup2(ofd, STDOUT_FILENO) < 0) {
+		perror("dup2");
+		fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+		return -1;
+	}
+	if(dup2(efd, STDERR_FILENO) < 0) {
+		perror("dup2");
+		fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+		return -1;
+	}
+	if(close(ofd) < 0) {
+		perror("close(ofd)");
+		return -1;
+	}
+	if(!single_output) {
+		if(close(efd) < 0) {
+			perror("close(efd)");
+			return -1;
+		}
+	}
+
+	if(chdir(job) < 0) {
+		perror("chdir");
+		fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
+		return -1;
+	}
+	if(chdir(dir) < 0) {
+		perror("chdir");
+		fprintf(stderr, "tup error: Unable to chdir to '%s'\n", dir);
+		return -1;
+	}
+	return 0;
+}
+
 static int master_fork_loop(void)
 {
 	struct execmsg em;
 	pthread_attr_t attr;
 	int null_fd;
 	int vardict_fd = -2;
+	char job[PATH_MAX];
 	char dir[PATH_MAX];
 	char *cmd;
 	int cmdsize = 4096;
@@ -251,9 +322,7 @@ static int master_fork_loop(void)
 		exit(1);
 	}
 	while(1) {
-		int ofd, efd;
 		struct child_waiter *waiter;
-		char buf[64];
 		pid_t pid;
 		pthread_t pt;
 
@@ -264,6 +333,8 @@ static int master_fork_loop(void)
 		if(em.sid == -1)
 			break;
 
+		if(read_all(msd[0], job, em.joblen) < 0)
+			return -1;
 		if(read_all(msd[0], dir, em.dirlen) < 0)
 			return -1;
 		if(em.cmdlen > cmdsize) {
@@ -292,81 +363,22 @@ static int master_fork_loop(void)
 			}
 		}
 
-		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", em.sid);
-		buf[sizeof(buf)-1] = 0;
-		ofd = creat(buf, 0600);
-		if(ofd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-			return -1;
-		}
-
-		if(em.single_output) {
-			efd = ofd;
-		} else {
-			snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", em.sid);
-			buf[sizeof(buf)-1] = 0;
-			efd = creat(buf, 0600);
-			if(efd < 0) {
-				perror(buf);
-				fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-				return -1;
-			}
-		}
-
 		pid = fork();
 		if(pid < 0) {
 			perror("fork");
 			exit(1);
 		}
 		if(pid == 0) {
-			char fd_name[32];
-
 			if(close(msd[0]) < 0) {
 				perror("close(msd[0])");
 				exit(1);
 			}
-			snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
-			fd_name[31] = 0;
-			setenv(TUP_VARDICT_NAME, fd_name, 1);
-			if(chdir(dir) < 0) {
-				perror("chdir");
-				fprintf(stderr, "tup error: Unable to chdir to '%s'\n", dir);
+
+			if(setup_subprocess(em.sid, job, dir, vardict_fd, em.single_output) < 0)
 				exit(1);
-			}
-			if(dup2(ofd, STDOUT_FILENO) < 0) {
-				perror("dup2");
-				fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
-				exit(1);
-			}
-			if(dup2(efd, STDERR_FILENO) < 0) {
-				perror("dup2");
-				fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
-				exit(1);
-			}
-			if(close(ofd) < 0) {
-				perror("close(ofd)");
-				exit(1);
-			}
-			if(!em.single_output) {
-				if(close(efd) < 0) {
-					perror("close(efd)");
-					exit(1);
-				}
-			}
 			execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
 			perror("execl");
 			exit(1);
-		}
-		if(close(ofd) < 0) {
-			perror("close(ofd)");
-			exit(1);
-		}
-		if(!em.single_output) {
-			if(close(efd) < 0) {
-				perror("close(efd)");
-				exit(1);
-			}
 		}
 		waiter = malloc(sizeof *waiter);
 		if(!waiter) {
