@@ -441,15 +441,50 @@ static int readdir_parser_cb(void *arg, struct tup_entry *tent)
 	return 0;
 }
 
+static int fill_actual_directory(const char *path, void *buf,
+				 fuse_fill_dir_t filler, int ignore_dot_tup)
+{
+	DIR *dp;
+	struct dirent *de;
+	int fd;
+
+	fd = openat(tup_top_fd(), path, O_RDONLY);
+	if(fd < 0) {
+		perror(path);
+		fprintf(stderr, "tup error: Unable to open directory for reading entries in readdir().\n");
+		return -1;
+	}
+	dp = fdopendir(fd);
+	if (dp == NULL)
+		return -errno;
+
+	while ((de = readdir(dp)) != NULL) {
+		struct stat st;
+		memset(&st, 0, sizeof(st));
+		st.st_ino = de->d_ino;
+		st.st_mode = de->d_type << 12;
+
+		if(!ignore_dot_tup || strcmp(de->d_name, ".tup") != 0)
+			if (filler(buf, de->d_name, &st, 0))
+				break;
+	}
+	closedir(dp);
+	return 0;
+}
+
 static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
 {
 	struct tup_entry *dtent;
 	struct readdir_parser_params rpp = {buf, filler};
 
-	if(gimme_tent(path, &dtent) < 0)
+	if(gimme_tent(path, &dtent) < 0) {
+		printf("Gimme tent fail\n");
 		return -EIO;
-	if(!dtent)
-		return -EIO;
+	}
+	if(!dtent) {
+		printf("Call fill actuald ir\n");
+		return fill_actual_directory(path, buf, filler, 0);
+	}
 	if(dtent->tnode.tupid != tup_fuse_server_get_curid()) {
 		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
 		return -EPERM;
@@ -463,12 +498,9 @@ static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
 static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			  off_t offset, struct fuse_file_info *fi)
 {
-	DIR *dp;
-	struct dirent *de;
 	const char *peeled;
 	struct file_info *finfo;
 	int is_tmpdir = 0;
-	int fd;
 
 	(void) offset;
 	(void) fi;
@@ -550,32 +582,11 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		return 0;
 
 	tup_fuse_handle_file(path, ACCESS_READ);
-	fd = openat(tup_top_fd(), peeled, O_RDONLY);
-	if(fd < 0) {
-		perror(peeled);
-		fprintf(stderr, "tup error: Unable to open directory for reading entries in readdir().\n");
-		return -1;
-	}
-	dp = fdopendir(fd);
-	if (dp == NULL)
-		return -errno;
 
-	while ((de = readdir(dp)) != NULL) {
-		struct stat st;
-		memset(&st, 0, sizeof(st));
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
-
-		/* If we have finfo (we're in the .tup hierarchy) and we see
-		 * the .tup directory, just pretend it's not there by not
-		 * calling filler().
-		 */
-		if(!finfo || strcmp(de->d_name, ".tup") != 0)
-			if (filler(buf, de->d_name, &st, 0))
-				break;
-	}
-	closedir(dp);
-	return 0;
+	/* If finfo is NULL, we're outside of tup, so we don't need to ignore
+	 * any files called '.tup' in that case.
+	 */
+	return fill_actual_directory(peeled, buf, filler, finfo != NULL);
 }
 
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
