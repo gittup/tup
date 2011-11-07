@@ -174,6 +174,11 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	sec.lpSecurityDescriptor = NULL;
 	sec.bInheritHandle = TRUE;
 
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to change working directory to the project root.\n");
+		return -1;
+	}
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
 	buf[sizeof(buf)-1] = 0;
 	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -247,6 +252,11 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 
 	CloseHandle(sa.hStdOutput);
 	sa.hStdOutput = NULL;
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to change working directory back to the project root.\n");
+		return -1;
+	}
 	s->output_fd = open(buf, O_RDONLY);
 	if(s->output_fd < 0) {
 		perror(buf);
