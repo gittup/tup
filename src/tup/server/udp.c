@@ -27,6 +27,7 @@
 #include "tup/graph.h"
 #include "tup/entry.h"
 #include "tup/config.h"
+#include "tup/flist.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
@@ -34,7 +35,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <winsock2.h>
+#include <io.h>
+
+#define TUP_TMP ".tup/tmp"
 
 static int start_server(struct server *s);
 static int stop_server(struct server *s);
@@ -55,6 +60,7 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
+	struct flist f = {0, 0, 0};
 
 	if(mode || delete_root) {/* unused */}
 
@@ -72,6 +78,36 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 
 	tup_inject_setexecdir(mycwd);
 	server_inited = 1;
+
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	if(mkdir(TUP_TMP) < 0) {
+		if(errno != EEXIST) {
+			perror(TUP_TMP);
+			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
+			return -1;
+		}
+	}
+
+	/* Go into the tmp directory and remove any files that may have been
+	 * left over from a previous tup invocation.
+	 */
+	if(chdir(TUP_TMP) < 0) {
+		perror(TUP_TMP);
+		fprintf(stderr, "tup error: Unable to chdir to the tmp directory.\n");
+		return -1;
+	}
+	flist_foreach(&f, ".") {
+		if(f.filename[0] != '.') {
+			unlink(f.filename);
+		}
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
 
 	return 0;
 }
@@ -91,9 +127,11 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	BOOL ret;
 	PROCESS_INFORMATION pi;
 	STARTUPINFOA sa;
+	SECURITY_ATTRIBUTES sec;
 	size_t namesz = strlen(cmd);
 	size_t cmdsz = sizeof(CMDSTR) - 1;
 	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
+	char buf[64];
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
 		|| strncmp(cmd, "cmd ", 4) == 0;
@@ -131,6 +169,22 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	memset(&sa, 0, sizeof(sa));
 	sa.cb = sizeof(STARTUPINFOW);
 
+	memset(&sec, 0, sizeof(sec));
+	sec.nLength = sizeof(sec);
+	sec.lpSecurityDescriptor = NULL;
+	sec.bInheritHandle = TRUE;
+
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
+		return -1;
+	}
+	sa.hStdError = sa.hStdOutput;
+	sa.dwFlags = STARTF_USESTDHANDLES;
+
 	pi.hProcess = INVALID_HANDLE_VALUE;
 	pi.hThread = INVALID_HANDLE_VALUE;
 
@@ -153,7 +207,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		cmdline,
 		NULL,
 		NULL,
-		FALSE,
+		TRUE,
 		CREATE_SUSPENDED,
 		NULL,
 		NULL,
@@ -191,11 +245,22 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		goto end;
 	}
 
+	CloseHandle(sa.hStdOutput);
+	sa.hStdOutput = NULL;
+	s->output_fd = open(buf, O_RDONLY);
+	if(s->output_fd < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to open sub-process output file after the process completed.\n");
+		goto end;
+	}
+
 	s->exited = 1;
 	s->exit_status = return_code;
 	rc = 0;
 
 end:
+	if(sa.hStdOutput != NULL)
+		CloseHandle(sa.hStdOutput);
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 
