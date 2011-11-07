@@ -1,0 +1,365 @@
+<h3>Tupfiles in Multiple Directories</h3>
+<p>Now our program grows beyond the confines of a single directory. Here we'll see how Tupfiles can share variables and :-rules.</p>
+<pre>
+<span class="prompt">$</span> mkdir tup_test4
+<span class="prompt">$</span> cd tup_test4
+<span class="prompt">$</span> tup init
+<span class="prompt">$</span> mkdir newmath
+</pre>
+
+<p>We'll start out with the same program as in the <a href="ex_a_first_tupfile.html">first Tupfile</a> example, but this time we want to put the squaring function in a separate directory so it can be bundled into a library with other related files.</p>
+
+<span class="fileheader">hello.c</span>
+<pre class="code">#include &lt;stdio.h&gt;
+#include "square.h"
+
+int main(void)
+{
+	printf("Hi, everybody!\n");
+	printf("Five squared is: %i\n", square(5));
+	return 0;
+}
+</pre>
+
+<span class="fileheader">newmath/square.c</span>
+<pre class="code">#include "square.h"
+
+int square(int x)
+{
+	return x * x;
+}
+</pre>
+
+<span class="fileheader">newmath/square.h</span>
+<pre class="code">int square(int x);
+</pre>
+
+<p>Now we have to create some Tupfiles in order to build our math library and main program. With multiple directories to deal with, it may seem overwhelming when trying to figure out where you put the Tupfiles, and how they should be written. The basic idea that tup uses is that each directory contains a Tupfile, and each Tupfile is independent. You do not need to have a top-level Tupfile call or otherwise include subdirectories -- just create a Tupfile in each directory.</p>
+<p>Still, figuring out what to put in each Tupfile may not be immediately obvious, especially if you don't want to repeat yourself in every Tupfile that needs to compile C files. A good approach is to start at a base level, and build your way up. You don't have to write all the Tupfiles at once and get it right on the first try! Just follow these steps:</p>
+<ol>
+  <li><b>Build</b>: Create a Tupfile in a single directory, and get it to produce the output you want for that directory.</li>
+  <li><b>Refactor</b>: Clean up the new Tupfile so that it looks nice, and maybe pull variables out into common files so that repetition is mostly avoided.</li>
+  <li><b>Repeat</b>: Continue this process until your program is fully built.</li>
+</ol>
+<p>Once all the Tupfiles have been created, it is a good time to commit them to your version control and take a break!</p>
+
+<hr>
+<h3>Build the library</h3>
+<p>To walk through the process with our example, let's start with a quick look at what we have so far:</p>
+<pre>
+<span class="prompt">$</span> ls
+hello.c  <font color="#0000ff"><b>newmath</b></font>
+<span class="prompt">$</span> ls newmath/
+square.c  square.h
+</pre>
+
+<p>We have two directories with files that we need to build, so we'll end up with a Tupfile in each one. (Note if we had another directory with some documents or something that doesn't require tup to build, we simply would not put a Tupfile there). Since we know the main program will eventually need to link our newmath library, it is probably easiest to start with just building the library itself. We'll create square/Tupfile and get our newmath library:</p>
+
+<span class="fileheader">newmath/Tupfile</span>
+<pre class="code">: foreach *.c |&gt; gcc -Wall -O -c %f -o %o |&gt; %B.o
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.006s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/2    ] .
+[    2/2    ] newmath
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    1/2    ] newmath: gcc -Wall -O -c square.c -o square.o
+[    2/2    ] newmath: ar crs libnewmath.a square.o
+[ tup ] Updated.
+<span class="prompt">$</span> nm newmath/libnewmath.a
+square.o:
+00000000 T square
+</pre>
+
+<p>Ok, looks like we got our library built. Now we may want to clean up the Tupfile a bit. For example, it may make sense to pull some of the gcc flags out into a CFLAGS variable. This can be especially helpful if we have a bunch of warning options turned on, or lots of -I flags or the like.</p>
+
+<hr>
+<h3>Refactoring the library Tupfile</h3>
+<p>When making changes to a Tupfile, tup will re-execute any commands that have changed. If none of the command-lines have changed, tup will simply re-parse the Tupfile and then quit (assuming no other files have changed). We can use this behavior as a way to check that the refactoring isn't actually changing our output. Let's give it a shot:</p>
+
+<span class="modfileheader">newmath/Tupfile</span>
+<pre class="code"><span class="added">CFLAGS += -Wall
+CFLAGS += -O</span>
+: foreach *.c |&gt; gcc <span class="added">$(CFLAGS)</span><span class="removed">-Wall -O</span> -c %f -o %o |&gt; %B.o
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<p>When we tell tup to update, you can see it will parse the changed Tupfile and then report that it has "No files to delete" and "No commands to execute" -- this is our key that the refactoring had no unintended side effects.</p>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.007s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] newmath
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+</pre>
+
+<p>If we had made some meaningful change, for example by changing -O to -O2, then tup will re-execute the command:</p>
+
+<span class="modfileheader">newmath/Tupfile</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O<span class="added">2</span>
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.008s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] newmath
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    1/2    ] newmath: gcc -Wall -O2 -c square.c -o square.o
+[    2/2    ] newmath: ar crs libnewmath.a square.o
+[ tup ] Updated.
+</pre>
+
+<p>If we didn't intend for the Tupfile refactoring to change anything, the "Executing Commands..." line would indicate that we goofed. You would want to go back to the original Tupfile and 'tup upd' to get back to where you were before you tried to refactor. In this example we'll just keep the -O2 as it is, though.</p>
+
+<hr>
+<h3>Build the program</h3>
+<p>With the library ready to go, we can now build our main program. Since each Tupfile is independent, we'll create a whole new Tupfile from scratch in the top-level directory. Of course being a typical programmer, we'll be lazy and just copy the existing Tupfile and touch it up a bit. Don't worry about the mess of redundant information for now - we'll clean it up later.</p>
+
+<span class="fileheader">Tupfile</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.007s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] .
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    1/2    ] gcc -Wall -O2 -c hello.c -o hello.o
+hello.c:2:20: fatal error: square.h: No such file or directory
+compilation terminated.
+ *** tup errors ***
+  *** Command ID=24 failed with return value 1
+</pre>
+
+<p>Oh right, forgot about that header. No problem - we can just add an extra parameter to CFLAGS.</p>
+
+<span class="modfileheader">Tupfile</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+<span class="added">CFLAGS += -Inewmath</span>
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.007s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] .
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    1/2    ] gcc -Wall -O2 -Inewmath -c hello.c -o hello.o
+[    2/2    ] gcc hello.o -o hello
+hello.o: In function `main':
+hello.c:(.text+0x1d): undefined reference to `square'
+collect2: ld returned 1 exit status
+ *** tup errors ***
+ *** Command ID=26 failed with return value 1
+</pre>
+
+<p>Getting closer... I guess we should actually link in that library. We have two options here - we can use gcc's -l and -L flags, like '-lnewmath -Lnewmath' to tell it what and where to link it in. Alternatively, we can just add the library as an input. It's up to you how you want your program structured. Just note that for shared libraries, the method that you use to link can affect that paths searched for libraries at run-time. In our case we have a static library, so it doesn't matter.</p>
+
+<span class="modfileheader">Tupfile</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+CFLAGS += -Inewmath
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o<span class="added"> newmath/libnewmath.a</span> |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.007s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] .
+[ tup ] No files to delete.
+[ tup ] Executing Commands...
+[    1/1    ] gcc hello.o newmath/libnewmath.a -o hello
+[ tup ] Updated.
+<span class="prompt">$</span> ./hello
+Hi, everybody!
+Five squared is: 25
+</pre>
+
+<p>Finally, the program builds and runs! Now we can go about cleaning everything up to make it more maintainable.</p>
+
+<hr>
+<h3>Refactor CFLAGS</h3>
+<p>Let's take a look at our Tupfiles and see what we have so far:</p>
+
+<span class="samefileheader">Tupfile</span>
+<pre class="code"><font style="background-color: #ffffbb">CFLAGS += -Wall
+CFLAGS += -O2</font>
+CFLAGS += -Inewmath
+<font style="background-color: #ffbbff">: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o</font>
+: *.o newmath/libnewmath.a |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<span class="samefileheader">newmath/Tupfile</span>
+<pre class="code"><font style="background-color: #ffffbb">CFLAGS += -Wall
+CFLAGS += -O2</font>
+<font style="background-color: #ffbbff">: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o</font>
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<p>Ouch, we have a lot of redundant information here. Obviously we want to separate that out and have one place where we set warning flags and the like for our program. The way this information can be shared in tup is by using the <span class="keyword">include</span> directive. In this example, we will actually use its cousin, <span class="keyword">include_rules</span>.</p>
+
+<p>The usage pattern for <span class="keyword">include_rules</span> is as follows: in each Tupfile that wants to make use of shared variables and rule definitions, write <span class="keyword">include_rules</span> at the top of the Tupfile (it can technically go anywhere in the file, but usually putting it at the top is easiest). Then, create a <span class="filename">Tuprules.tup</span> at the highest level in the directory hierarchy for where it applies. In this example, we want to create some shared definitions for the whole program, so we'll create Tuprules.tup at the top of our project. If there is a sub-directory that requires extra flags, you could create a Tuprules.tup file in that sub-directory as well. Each Tuprules.tup file only affects the current directory and any below it that use <span class="keyword">include_rules</span>. For variables that are only intended to affect the current directory, you can just leave them in the Tupfile rather than create a separate Tuprules.tup file. Let's start by moving out the CFLAGS:</p>
+
+<span class="fileheader">Tuprules.tup</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+</pre>
+
+<span class="modfileheader">Tupfile</span>
+<pre class="code"><span class="added">include_rules</span>
+<span class="removed">CFLAGS += -Wall
+CFLAGS += -O2</span>
+CFLAGS += -Inewmath
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o newmath/libnewmath.a |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<span class="modfileheader">newmath/Tupfile</span>
+<pre class="code"><span class="added">include_rules</span>
+<span class="removed">CFLAGS += -Wall
+CFLAGS += -O2</span>
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.009s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/2    ] newmath
+[    2/2    ] .
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+</pre>
+
+<p>Again we know that our refactoring didn't mess anything up because there are no commands to execute.</p>
+<p>A quick note about the <span class="keyword">include_rules</span> directive: in this case, this is effectively equivalent to the following Tupfiles:</p>
+
+<span class="samefileheader">Tupfile (example)</span>
+<pre class="code">include Tuprules.tup
+CFLAGS += -Inewmath
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o newmath/libnewmath.a |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<span class="samefileheader">newmath/Tupfile (example)</span>
+<pre class="code">include ../Tuprules.tup
+include Tuprules.tup
+: foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<p>The difference is that <span class="keyword">include_rules</span> doesn't care if there is a Tuprules.tup missing somewhere along the hierarchy. Also, if you are several levels deep, you don't have to have a bunch of lines like 'include ../../../../Tuprules.tup' at the top of every Tupfile. The idea here is that the top-level Tuprules.tup file can set up project-wide settings. If necessary, sub-level Tuprules.tup files can override or add settings. Finally, the Tupfile has the settings that apply only to that directory.</p>
+
+<hr>
+<h3>Refactor :-rules</h3>
+<p>For our last refactoring we will try to put the redundant :-rule that compiles all the C files in a common location. We could put the :-rule directly into Tuprules.tup, but that would not give us a chance to override or add new CFLAGS settings in the Tupfile itself (as we would like to add '-Inewmath' in the top-level Tupfile). One way to re-use :-rules is to create !-macros. This is due to the way tup parses Tupfiles line-by-line. The man page has some more info on how to use them, so this will just serve as an example. We add the macro definition to Tuprules.tup, and then we can use it in the Tupfile to make the :-rule much shorter. There is still some redundant information among the Tupfiles, but less than before.</p>
+
+<span class="modfileheader">Tuprules.tup</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+<span class="added">
+!cc = |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o</span>
+</pre>
+
+<span class="modfileheader">Tupfile</span>
+<pre class="code">include_rules
+CFLAGS += -Inewmath
+: foreach *.c <span class="added">|&gt; !cc |&gt;</span><span class="removed">|&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o</span>
+: *.o newmath/libnewmath.a |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<span class="modfileheader">newmath/Tupfile</span>
+<pre class="code">include_rules
+: foreach *.c <span class="added">|&gt; !cc |&gt;</span><span class="removed">|&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o</span>
+: *.o |&gt; ar crs %o %f |&gt; libnewmath.a
+</pre>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] Scanning filesystem...0.006s
+[ tup ] No tup.config changes.
+[ tup ] Parsing Tupfiles...
+[    1/2    ] newmath
+[    2/2    ] .
+[ tup ] No files to delete.
+[ tup ] No commands to execute.
+[ tup ] Updated.
+</pre>
+
+<p>Note that even though we have $(CFLAGS) when we initialize the !cc macro, it does not actually expand until we use the !cc macro in the :-rule in the Tupfile. This allows us to add the -Inewmath flag in the main Tupfile.</p>
+
+<p>Let's try to make the 'ar' command a !-macro too.</p>
+
+<span class="modfileheader">Tuprules.tup</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+
+!cc = |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+<span class="added">!ar = |&gt; ar crs %o %f |&gt;</span>
+</pre>
+
+<span class="modfileheader">newmath/Tupfile</span>
+<pre class="code">include_rules
+: foreach *.c |&gt; !cc |&gt;
+: *.o |&gt; <span class="added">!</span>ar<span class="removed"> crs %o %f</span> |&gt; libnewmath.a
+</pre>
+
+<p>Notice how the !cc macro specifies the output in the macro, since it is the same for all C files. However, the library can be named anything, so we specify the output in the actual :-rule that uses the !ar macro rather than in the macro definition itself.</p>
+
+<p>Let's take a final look at the Tupfiles we ended up with:</p>
+
+<span class="samefileheader">Tuprules.tup</span>
+<pre class="code">CFLAGS += -Wall
+CFLAGS += -O2
+
+!cc = |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+!ar = |&gt; ar crs %o %f |&gt;
+</pre>
+
+<span class="samefileheader">Tupfile</span>
+<pre class="code">include_rules
+CFLAGS += -Inewmath
+: foreach *.c |&gt; !cc |&gt;
+: *.o newmath/libnewmath.a |&gt; gcc %f -o %o |&gt; hello
+</pre>
+
+<span class="samefileheader">newmath/Tupfile</span>
+<pre class="code">include_rules
+: foreach *.c |&gt; !cc |&gt;
+: *.o |&gt; !ar |&gt; libnewmath.a
+</pre>
+
+<p>The syntax may take a while to get used to, but it should be pretty easy for you to add a new flag to CFLAGS, or create another subdirectory to make a new library. You may even find better approaches -- perhaps you will find it easier to set all the variables at the top and put <span class="keyword">include_rules</span> at the bottom!</p>

@@ -12,6 +12,7 @@ pages += license.html
 examples += ex_a_first_tupfile.html
 examples += ex_dependencies.html
 examples += ex_generated_header.html
+examples += ex_multiple_directories.html
 
 : |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
 : |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
