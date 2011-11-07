@@ -143,8 +143,8 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		|| strncmp(cmd, "./", 2) == 0;
 
 	int need_sh = strncmp(cmd, "./", 2) == 0;
+	if(dtent) {}
 
-	s->dt = dtent->tnode.tupid;
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		return -1;
@@ -474,7 +474,7 @@ static void *message_thread(void *arg)
 			map->tent = NULL; /* This is used when saving deps */
 			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
 		}
-		if(handle_file(event->at, event1, event2, &s->finfo, s->dt) < 0) {
+		if(handle_file(event->at, event1, event2, &s->finfo) < 0) {
 			fprintf(stderr, "message_thread end\n");
 			return (void*)-1;
 		}

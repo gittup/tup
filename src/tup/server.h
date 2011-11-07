@@ -49,7 +49,6 @@ struct server {
 	int udp_port;
 	int sd[2];
 	pthread_t tid;
-	tupid_t dt;
 #endif
 };
 

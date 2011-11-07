@@ -33,12 +33,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-struct dfd_info {
-	tupid_t dt;
-	int dfd;
-};
-
-static struct file_entry *new_entry(const char *filename, tupid_t dt);
+static struct file_entry *new_entry(const char *filename);
 static void del_entry(struct file_entry *fent);
 static void check_unlink_list(const struct pel_group *pg,
 			      struct file_entry_head *u_head);
@@ -74,7 +69,7 @@ void finfo_unlock(struct file_info *info)
 }
 
 int handle_file(enum access_type at, const char *filename, const char *file2,
-		struct file_info *info, tupid_t dt)
+		struct file_info *info)
 {
 	DEBUGP("received file '%s' in mode %i\n", filename, at);
 	int rc;
@@ -83,7 +78,7 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 	if(at == ACCESS_RENAME) {
 		rc = handle_rename(filename, file2, info);
 	} else {
-		rc = handle_open_file(at, filename, info, dt);
+		rc = handle_open_file(at, filename, info);
 	}
 	finfo_unlock(info);
 
@@ -91,12 +86,12 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 }
 
 int handle_open_file(enum access_type at, const char *filename,
-		     struct file_info *info, tupid_t dt)
+		     struct file_info *info)
 {
 	struct file_entry *fent;
 	int rc = 0;
 
-	fent = new_entry(filename, dt);
+	fent = new_entry(filename);
 	if(!fent) {
 		return -1;
 	}
@@ -214,10 +209,8 @@ static int add_parser_files_locked(struct file_info *finfo,
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
 		r = LIST_FIRST(&finfo->read_list);
-		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entrylist) < 0)
-				return -1;
-		}
+		if(add_node_to_list(DOT_DT, &r->pg, entrylist) < 0)
+			return -1;
 		del_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
@@ -274,7 +267,7 @@ static int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
 	return 0;
 }
 
-static struct file_entry *new_entry(const char *filename, tupid_t dt)
+static struct file_entry *new_entry(const char *filename)
 {
 	struct file_entry *fent;
 
@@ -296,7 +289,6 @@ static struct file_entry *new_entry(const char *filename, tupid_t dt)
 		free(fent);
 		return NULL;
 	}
-	fent->dt = dt;
 	return fent;
 }
 
@@ -410,9 +402,6 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		struct path_element *pel = NULL;
 
 		w = LIST_FIRST(&info->write_list);
-		if(w->dt < 0) {
-			goto out_skip;
-		}
 
 		/* Remove duplicate write entries */
 		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
@@ -427,7 +416,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(w->dt, &w->pg, &pel, 0);
+		newdt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, 0);
 		if(newdt <= 0) {
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			return -1;
@@ -506,10 +495,8 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 	while(!LIST_EMPTY(&info->read_list)) {
 		r = LIST_FIRST(&info->read_list);
-		if(r->dt > 0) {
-			if(add_node_to_list(r->dt, &r->pg, entryhead) < 0)
-				return -1;
-		}
+		if(add_node_to_list(DOT_DT, &r->pg, entryhead) < 0)
+			return -1;
 		del_entry(r);
 	}
 

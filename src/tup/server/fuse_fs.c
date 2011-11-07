@@ -142,8 +142,7 @@ static struct mapping *add_mapping(const char *path)
 
 		peeled = peel(path);
 
-		/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
-		if(handle_open_file(ACCESS_WRITE, peeled, finfo, 1) < 0) {
+		if(handle_open_file(ACCESS_WRITE, peeled, finfo) < 0) {
 			/* TODO: Set failure on internal server? */
 			fprintf(stderr, "tup internal error: handle open file failed\n");
 			return NULL;
@@ -239,8 +238,7 @@ static void tup_fuse_handle_file(const char *path, enum access_type at)
 
 	finfo = get_finfo(path);
 	if(finfo) {
-		/* TODO: Remove 1 (DOT_DT)? All fuse paths are full */
-		if(handle_open_file(at, peel(path), finfo, 1) < 0) {
+		if(handle_open_file(at, peel(path), finfo) < 0) {
 			/* TODO: Set failure on internal server? */
 			fprintf(stderr, "tup internal error: handle open file failed\n");
 		}
@@ -312,8 +310,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 
 			if(finfo) {
 				finfo_lock(finfo);
-				/* TODO: 1 is always top */
-				if(handle_open_file(ACCESS_VAR, var, finfo, 1) < 0) {
+				if(handle_open_file(ACCESS_VAR, var, finfo) < 0) {
 					fprintf(stderr, "tup error: Unable to save dependency on @-%s\n", var);
 					return 1;
 				}

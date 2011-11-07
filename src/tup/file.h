@@ -48,7 +48,6 @@ LIST_HEAD(tmpdir_head, tmpdir);
 
 struct file_entry {
 	LIST_ENTRY(file_entry) list;
-	tupid_t dt;
 	char *filename;
 	struct pel_group pg;
 };
@@ -70,9 +69,9 @@ int init_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
-		struct file_info *info, tupid_t dt);
+		struct file_info *info);
 int handle_open_file(enum access_type at, const char *filename,
-		     struct file_info *info, tupid_t dt);
+		     struct file_info *info);
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only);

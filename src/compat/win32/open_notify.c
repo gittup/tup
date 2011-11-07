@@ -100,7 +100,7 @@ int open_notify(enum access_type at, const char *pathname)
 		 */
 		if(__real_stat(pathname, &buf) < 0 || !S_ISDIR(buf.st_mode)) {
 			flist = LIST_FIRST(&finfo_list_head);
-			if(handle_open_file(at, fullpath, flist->finfo, DOT_DT) < 0)
+			if(handle_open_file(at, fullpath, flist->finfo) < 0)
 				return -1;
 		}
 	}
