@@ -3641,19 +3641,20 @@ static int extra_output(tupid_t tupid, void *data)
 	if(!(aod->output_error & 1)) {
 		aod->output_error |= 1;
 		fprintf(aod->f, "tup error: Unspecified output files - A command is writing to files that you didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
-		/* Return success here so we can display all errant outputs.
-		 * Actual check is in tup_db_check_actual_outputs().
-		 */
-#ifdef _WIN32
-		/* TODO: This can be removed once win32 supports tmp files */
-		tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-		fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
-			tent->name.s, tent->dt);
-		delete_file(tent->dt, tent->name.s);
-#endif
 	}
 
+#ifdef _WIN32
+	/* TODO: This can be removed once win32 supports tmp files */
+	tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+	fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
+		tent->name.s, tent->dt);
+	delete_file(tent->dt, tent->name.s);
+#else
 	fprintf(aod->f, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
+#endif
+	/* Return success here so we can display all errant outputs.  Actual
+	 * check is in tup_db_check_actual_outputs().
+	 */
 	return 0;
 }
 
