@@ -158,8 +158,6 @@ touch "cat foo"
 
 tup klee
 
-win path canonicalization
-
 html: add tup.config example
 
 run script share site/wiki?
