@@ -31,6 +31,7 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <shlwapi.h>
 
 #ifndef __in
 #define __in
@@ -417,7 +418,8 @@ static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
 
-static void handle_file(const char* file, const char* file2, enum access_type at);
+#define handle_file(a, b, c) mhandle_file(a, b, c, __LINE__)
+static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
 
 static unsigned short s_udp_port;
@@ -1582,28 +1584,57 @@ static int ignore_file_w(const wchar_t* file)
 	return 0;
 }
 
-static void handle_file(const char* file, const char* file2, enum access_type at)
+static int canon_path(const char *file, char *dest)
+{
+	if(!file)
+		return 0;
+	if(is_path_sep(file)) {
+		/* Full path */
+		PathCanonicalize(dest, file);
+	} else {
+		/* Relative path */
+		char tmp[PATH_MAX];
+		int cwdlen;
+		int filelen = strlen(file);
+
+		tmp[0] = 0;
+		if(GetCurrentDirectory(sizeof(tmp), tmp) == 0) {
+			/* TODO: Error handle? */
+			return 0;
+		}
+		cwdlen = strlen(tmp);
+		if(cwdlen + filelen + 2 >= (signed)sizeof(tmp)) {
+			/* TODO: Error handle? */
+			return 0;
+		}
+		tmp[cwdlen] = '\\';
+		memcpy(tmp + cwdlen + 1, file, filelen + 1);
+		PathCanonicalize(dest, tmp);
+	}
+	return strlen(dest);
+}
+
+static void mhandle_file(const char* file, const char* file2, enum access_type at, int line)
 {
 	char buf[ACCESS_EVENT_MAX_SIZE];
-	size_t fsz = file ? strlen(file) : 0;
-	size_t f2sz = file2 ? strlen(file2) : 0;
 	struct access_event* e = (struct access_event*) buf;
 	char* dest = (char*) (e + 1);
 	int ret;
+	if(line) {}
 
 	if (ignore_file(file) || ignore_file(file2) || sock == INVALID_SOCKET)
 		return;
 
 	e->at = at;
-	e->len = fsz;
-	e->len2 = f2sz;
 
-	memcpy(dest, file, fsz);
-	dest += fsz;
+	e->len = canon_path(file, dest);
+	DEBUG_HOOK("Canonicalize1 [%i]: '%s' -> '%s'\n", line, file, dest);
+	dest += e->len;
 	*(dest++) = '\0';
 
-	memcpy(dest, file2, f2sz);
-	dest += f2sz;
+	e->len2 = canon_path(file2, dest);
+	DEBUG_HOOK("Canonicalize2: '%s' -> '%s'\n", file2, file2 ? dest : NULL);
+	dest += e->len2;
 	*(dest++) = '\0';
 
 	DEBUG_HOOK("%s: '%s' '%s'\n", access_type_name[at], file, file2);
@@ -1614,6 +1645,8 @@ static void handle_file(const char* file, const char* file2, enum access_type at
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at)
 {
 	char buf[ACCESS_EVENT_MAX_SIZE];
+	char afile[PATH_MAX];
+	char afile2[PATH_MAX];
 	size_t fsz = file ? wcslen(file) : 0;
 	size_t f2sz = file2 ? wcslen(file2) : 0;
 	struct access_event* e = (struct access_event*) buf;
@@ -1625,13 +1658,16 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 
 	e->at = at;
 
-	e->len = WideCharToMultiByte(CP_ACP, 0, file, fsz, dest, fsz, NULL, NULL);
-	dest += e->len;
-	*(dest++) = L'\0';
+	WideCharToMultiByte(CP_ACP, 0, file, fsz, afile, fsz, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, file2, f2sz, afile2, f2sz, NULL, NULL);
 
-	e->len2 = WideCharToMultiByte(CP_ACP, 0, file2, f2sz, dest, f2sz, NULL, NULL);
+	e->len = canon_path(afile, dest);
+	dest += e->len;
+	*(dest++) = '\0';
+
+	e->len2 = canon_path(afile2, dest);
 	dest += e->len2;
-	*(dest++) = L'\0';
+	*(dest++) = '\0';
 
 	DEBUG_HOOK("%s: '%S', '%S'\n", access_type_name[at], file, file2);
 	ret = send(sock, (char*) e, dest - (char*) e, 0);
