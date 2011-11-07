@@ -20,15 +20,13 @@ echo "Output from test.sh"
 <pre>
 <span class="prompt">$</span> chmod +x test.sh
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] ./test.sh &gt; output.txt
-[    1/1    ]
+[    1/1    ] ./test.sh &gt; output.txt
 [ tup ] Updated.
 <span class="prompt">$</span> cat output.txt
 Output from test.sh
@@ -51,8 +49,7 @@ Output from test.sh
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] ./test.sh &gt; output.txt
-[    1/1    ]
+[    1/1    ] ./test.sh &gt; output.txt
 [ tup ] Updated.
 </pre>
 
@@ -69,15 +66,13 @@ echo "Output from test.sh"
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.005s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] ./test.sh &gt; output.txt
-[    1/1    ]
+[    1/1    ] ./test.sh &gt; output.txt
 [ tup ] Updated.
 <span class="prompt">$</span> cat output.txt
 This is the file header
@@ -92,13 +87,12 @@ Output from test.sh
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.005s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] ./test.sh &gt; output.txt
-[    1/1    ]
+[    1/1    ] ./test.sh &gt; output.txt
 [ tup ] Updated.
 <span class="prompt">$</span> cat output.txt
 This is the *new* file header
@@ -130,22 +124,22 @@ echo "Output from test.sh"
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.000s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
-[ tup ] No Tupfiles to parse.
+[ tup ] Parsing Tupfiles...
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/2    ] echo "generated text" &gt; generated.txt
-[    1/2    ] ./test.sh &gt; output.txt
+[    1/2    ] echo "generated text" &gt; generated.txt
+[    2/2    ] ./test.sh &gt; output.txt
+ *** tup errors ***
 tup error: Missing input dependency - a file was read from, and was not
 specified as an input link for the command. This is an issue because the file
 was created from another command, and without the input link the commands may
 execute out of order. You should add this file as an input, since it is
 possible this could randomly break in the future.
- -- Command ID: 13
-  - [15] generated.txt
-   *** Command 13 ran successfully, but tup failed to save the dependencies:
-   ./test.sh &gt; output.txt
+ - [8] generated.txt
+ *** Command ID=6 ran successfully, but tup failed to save the dependencies.
 </pre>
 
 <p>Oops, it seems tup didn't like that. The issue here is that tup has no way of knowing that the command to create <span class="filename">generated.txt</span> must run before the <span class="filename">test.sh</span> script. Therefore, it is possible that tup will schedule them in the wrong order (so that <span class="filename">generated.txt</span> isn't created by the time the script runs), or it may even schedule them in parallel.</p>
@@ -157,15 +151,13 @@ possible this could randomly break in the future.
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] ./test.sh &gt; output.txt
-[    1/1    ]
+[    1/1    ] ./test.sh &gt; output.txt
 [ tup ] Updated.
 <span class="prompt">$</span> cat output.txt
 This is the *new* file header
@@ -183,16 +175,13 @@ Output from test.sh
 
 <pre>
 <span class="prompt">$</span> tup upd
-$ tup upd
-[ tup ] Scanning filesystem...0.005s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] echo "unused text" &gt; unused.txt
-[    1/1    ]
+[    1/1    ] echo "unused text" &gt; unused.txt
 [ tup ] Updated.
 </pre>
 

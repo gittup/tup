@@ -35,15 +35,13 @@ int main(void)
 <p>Now that you have a Tupfile to tell tup what to do, you can run <span class="cmd">tup upd</span> to start the build process. If all goes well, you should see something like the following, only with more colors and cool progress bars:</p>
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] gcc hello.c -o hello
-[    1/1    ]
+[    1/1    ] gcc hello.c -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> ls
 Tupfile  hello  hello.c
@@ -75,13 +73,12 @@ int main(void)
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] gcc hello.c -o hello
-[    1/1    ]
+[    1/1    ] gcc hello.c -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> ./hello
 Hi, everybody!
@@ -95,15 +92,13 @@ Hi, everybody!
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] gcc -Wall hello.c -o hello
-[    1/1    ]
+[    1/1    ] gcc -Wall hello.c -o hello
 [ tup ] Updated.
 </pre>
 
@@ -145,18 +140,18 @@ int main(void)
 <p>Now we can try to build the new program:</p>
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] gcc -Wall hello.c -o hello
-/tmp/ccYlogLJ.o: In function `main':
-hello.c:(.text+0x25): undefined reference to `square'
+[    1/1    ] gcc -Wall hello.c -o hello
+/tmp/ccClookD.o: In function `main':
+hello.c:(.text+0x1d): undefined reference to `square'
 collect2: ld returned 1 exit status
- *** Command 6 failed with return value 1: gcc -Wall hello.c -o hello
+ *** tup errors ***
+ *** Command ID=6 failed with return value 1
 </pre>
 
 <p>Oops, that obviously didn't work, since we forgot to actually compile and link the new C file. Let's do that now.</p>
@@ -169,23 +164,20 @@ collect2: ld returned 1 exit status
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] Deleting files...
-[    0/1    ] hello
-[    1/1    ]
+[    1/1    ] hello
 [ tup ] Executing Commands...
-[    0/2    ] gcc -Wall -c hello.c -o hello.o
 [    1/2    ] gcc -Wall -c square.c -o square.o
-[    2/2    ]
+[    2/2    ] gcc -Wall -c hello.c -o hello.o
 [ tup ] Updated.
 <span class="prompt">$</span> ls
 Tupfile  hello.c  hello.o  square.c  square.h  square.o
 <span class="prompt">$</span> ./hello
--bash: ./hello: No such file or directory
+bash: ./hello: No such file or directory
 </pre>
 
 <p>Since we changed the first rule to compile <span class="filename">hello.o</span> instead of <span class="filename">hello</span>, the main executable is no longer generated. Tup sees this, and removes <span class="filename">hello</span> from the filesystem. In this way, tup always keeps your build as if you had just built everything from scratch. This is why you don't ever have to write or manually invoke a "clean" target, like you do in most other build systems.</p>
@@ -200,15 +192,13 @@ Tupfile  hello.c  hello.o  square.c  square.h  square.o
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] gcc hello.o square.o -o hello
-[    1/1    ]
+[    1/1    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> ./hello
 Hi, everybody!
@@ -224,15 +214,14 @@ Five squared is: 25
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/3    ] gcc -Wall -c hello.c -o hello.o
 [    1/3    ] gcc -Wall -c square.c -o square.o
-[    2/3    ] gcc hello.o square.o -o hello
-[    3/3    ]
+[    2/3    ] gcc -Wall -c hello.c -o hello.o
+[    3/3    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 </pre>
 
@@ -268,11 +257,10 @@ Five squared is: 25
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.002s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] No commands to execute.
 [ tup ] Updated.

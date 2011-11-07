@@ -11,7 +11,7 @@
 
 <span class="fileheader">Tupfile</span>
 <pre class="code">: foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
-: *.o |&gt; gcc %f -o %o |&gt; hello 
+: *.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
 <span class="fileheader">hello.c</span>
@@ -23,7 +23,7 @@ int main(void)
 	printf("Hi, everybody!\n");
 	printf("Five squared is: %i\n", square(5));
 	return 0;
-} 
+}
 </pre>
 
 <span class="fileheader">square.c</span>
@@ -32,7 +32,7 @@ int main(void)
 int square(int x)
 {
 	return x * x;
-} 
+}
 </pre>
 
 <span class="fileheader">square.h</span>
@@ -42,19 +42,17 @@ int square(int x)
 <p>Now we can run our code and get the original output:</p>
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.017s
+[ tup ] Scanning filesystem...0.005s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/3    ] gcc -Wall -c hello.c -o hello.o
 [    1/3    ] gcc -Wall -c square.c -o square.o
-[    2/3    ] gcc hello.o square.o -o hello
-[    3/3    ]
+[    2/3    ] gcc -Wall -c hello.c -o hello.o
+[    3/3    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
-<span class="prompt">$</span> ./hello 
+<span class="prompt">$</span> ./hello
 Hi, everybody!
 Five squared is: 25
 </pre>
@@ -69,22 +67,20 @@ echo '#define SIDES_OF_A_TRIANGLE 3'
 <span class="modfileheader">Tupfile</span>
 <pre class="code"><span class="added">: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h</span>
 : foreach *.c |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
-: *.o |&gt; gcc %f -o %o |&gt; hello 
+: *.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.009s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/1    ] sh gen_triangle.sh &gt; triangle.h
-[    1/1    ]
+[    1/1    ] sh gen_triangle.sh &gt; triangle.h
 [ tup ] Updated.
-<span class="prompt">$</span> cat triangle.h 
+<span class="prompt">$</span> cat triangle.h
 #define SIDES_OF_A_TRIANGLE 3
 </pre>
 
@@ -100,30 +96,29 @@ int main(void)
 	printf("Five squared is: %i\n", square(5));
 <span class="added">	printf("A triangle has %i sides\n", SIDES_OF_A_TRIANGLE);</span>
 	return 0;
-} 
+}
 </pre>
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/2    ] gcc -Wall -c hello.c -o hello.o
+[    1/2    ] gcc -Wall -c hello.c -o hello.o
+ *** tup errors ***
 tup error: Missing input dependency - a file was read from, and was not
 specified as an input link for the command. This is an issue because the file
 was created from another command, and without the input link the commands may
 execute out of order. You should add this file as an input, since it is
 possible this could randomly break in the future.
- -- Command ID: 8
-  - [17] triangle.h
-   *** Command 8 ran successfully, but tup failed to save the dependencies:
-   gcc -Wall -c hello.c -o hello.o
+ - [17] triangle.h
+ *** Command ID=8 ran successfully, but tup failed to save the dependencies.
 </pre>
 
 <p>Oops, looks like we stumbled onto the missing input dependency error message again. Since <span class="filename">triangle.h</span> is an output of another command, we have to tell tup about it in the input section of the compilation rule. Right now the input section of our compilation rule (highlighted below) has 'foreach *.c':</p>
-<pre class="code">: <font style="background-color: #ffbbff">foreach *.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o 
+<pre class="code">: <font style="background-color: #ffbbff">foreach *.c</font> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
 </pre>
 
 <p>Note that we can't simply list <span class="filename">triangle.h</span> as another input here, because the foreach keyword will try to iterate over it and generate a rule to compile the header file directly. Instead, we want to make use of the order-only inputs section, which is separated from the rest of the inputs by a single '|' (pipe) character. The difference between regular inputs and order-only inputs is that regular inputs are used in foreach and flags like <span class="keyword">%f</span>, while order-only inputs are not. All inputs also add dependency links from the file pointing to the commands.</p>
@@ -131,23 +126,21 @@ possible this could randomly break in the future.
 <span class="modfileheader">Tupfile</span>
 <pre class="code">: |&gt; sh gen_triangle.sh &gt; %o |&gt; triangle.h
 : foreach *.c<span class="added"> | triangle.h</span> |&gt; gcc -Wall -c %f -o %o |&gt; %B.o
-: *.o |&gt; gcc %f -o %o |&gt; hello 
+: *.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
 <p>Now we can finish the update and take a look at the dependency graph:</p>
 
 <pre>
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.005s
+[ tup ] Scanning filesystem...0.008s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
-[    0/1    ] .
-[    1/1    ]
+[    1/1    ] .
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/2    ] gcc -Wall -c hello.c -o hello.o
-[    1/2    ] gcc hello.o square.o -o hello
-[    2/2    ]
+[    1/2    ] gcc -Wall -c hello.c -o hello.o
+[    2/2    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> tup graph --no-dirs --no-ghosts . | dot -Tpng &gt; ~/ex_autogen_1.png
 </pre>
@@ -159,27 +152,25 @@ possible this could randomly break in the future.
 <pre>
 <span class="prompt">$</span> touch gen_triangle.sh
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-[    0/3    ] sh gen_triangle.sh &gt; triangle.h
-<font style="background-color: #ffbbff">[    1/3    ] gcc -Wall -c hello.c -o hello.o</font>
-[    2/3    ] gcc hello.o square.o -o hello
-[    3/3    ]
+[    1/3    ] sh gen_triangle.sh &gt; triangle.h
+<font style="background-color: #ffbbff">[    2/3    ] gcc -Wall -c hello.c -o hello.o</font>
+[    3/3    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> touch square.h
 <span class="prompt">$</span> tup upd
-[ tup ] Scanning filesystem...0.004s
+[ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
 [ tup ] No files to delete.
 [ tup ] Executing Commands...
-<font style="background-color: #ffbbff">[    0/3    ] gcc -Wall -c hello.c -o hello.o
-[    1/3    ] gcc -Wall -c square.c -o square.o</font>
-[    2/3    ] gcc hello.o square.o -o hello
-[    3/3    ]
+<font style="background-color: #ffbbff">[    1/3    ] gcc -Wall -c square.c -o square.o
+[    2/3    ] gcc -Wall -c hello.c -o hello.o</font>
+[    3/3    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 </pre>
 
