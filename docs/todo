@@ -106,10 +106,6 @@ use 'cmdid' field instead of a link to point to outputs?
 
 should TUP_PLATFORM be a $-variable instead of an @-variable? ie: Does it make sense to be able to override it in tup.config, or should it always be static?
 
-use _root for tree roots, and _tree for the structures in the tree
-
-buffered output (anatol/buff*)
-
 use lemon to generate a parser?
  - could also use grammar file to generate syntax file per http://code.google.com/p/autohighlight/
 
@@ -210,7 +206,6 @@ html:
    - hidden files can be written to for testing (result in warnings)
    - hidden files cannot be read from
   how files are deleted
-  how dependencies are described/discovered
   man pages: tup command line, tup_api
   error messages (eg: you get this error message if...)
   document !macro.c !macro.o
