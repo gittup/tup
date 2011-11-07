@@ -254,10 +254,10 @@ static int add_parser_files_locked(struct file_info *finfo,
 	return 0;
 }
 
-static int file_set_mtime(struct tup_entry *tent, int dfd, const char *file)
+static int file_set_mtime(struct tup_entry *tent, const char *file)
 {
 	struct stat buf;
-	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
 		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
 		perror(file);
 		return -1;
@@ -476,7 +476,7 @@ out_skip:
 		}
 		if(map->tent) {
 			/* tent may not be set (in the case of hidden files) */
-			if(file_set_mtime(map->tent, tup_top_fd(), map->realname) < 0)
+			if(file_set_mtime(map->tent, map->realname) < 0)
 				return -1;
 		}
 		del_map(map);
