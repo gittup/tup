@@ -27,6 +27,7 @@
 #include "tup/flist.h"
 #include "tup/debug.h"
 #include "tup/fslurp.h"
+#include "tup/privs.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -230,6 +231,10 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 		return -1;
 	if(server_debug_enabled()) {
 		if(fuse_opt_add_arg(&args, "-d") < 0)
+			return -1;
+	}
+	if(tup_privileged()) {
+		if(fuse_opt_add_arg(&args, "-oallow_root") < 0)
 			return -1;
 	}
 #ifdef __APPLE__
