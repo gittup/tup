@@ -194,7 +194,7 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 				perror("close(neverindex_fd)");
 			}
 		} else {
-			perror("create(metadata_never_index):");
+			perror("create(neverindex_fd)");
 		}
 #endif
 	}
