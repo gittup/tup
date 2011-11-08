@@ -117,6 +117,79 @@ int server_quit(void)
 	return 0;
 }
 
+/* This runs with the dir_mutex taken. We need to make sure that we:
+ * 1) Create the output file with the inherit flag set
+ * 2) We start the new process to inherit that file
+ * 3) We close down the file so that no other process inherits it (ie: if we
+ *    are running in parallel - we don't want anyone else to get our output file
+ *    handle)
+ */
+static int create_process(struct server *s, int dfd, char *cmdline,
+			  PROCESS_INFORMATION *pi)
+{
+	STARTUPINFOA sa;
+	SECURITY_ATTRIBUTES sec;
+	BOOL ret;
+	char buf[64];
+
+	memset(&sa, 0, sizeof(sa));
+	sa.cb = sizeof(STARTUPINFOW);
+
+	memset(&sec, 0, sizeof(sec));
+	sec.nLength = sizeof(sec);
+	sec.lpSecurityDescriptor = NULL;
+	sec.bInheritHandle = TRUE;
+
+	if(chdir(win32_get_dirpath(tup_top_fd())) < 0) {
+		perror("chdir");
+		fprintf(stderr, "tup error: Unable to chdir to the project root directory to create a temporary output file.\n");
+		return -1;
+	}
+	snprintf(buf, sizeof(buf), ".tup\\tmp\\output-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
+		pthread_mutex_unlock(&dir_mutex);
+		return -1;
+	}
+	sa.hStdError = sa.hStdOutput;
+	sa.dwFlags = STARTF_USESTDHANDLES;
+
+	pi->hProcess = INVALID_HANDLE_VALUE;
+	pi->hThread = INVALID_HANDLE_VALUE;
+
+	/* Passing in the directory to lpCurrentDirectory is insufficient
+	 * because the command may run as './foo.exe', so we need to change to
+	 * the correct directory before calling CreateProcessA. This may just
+	 * happen to work in most cases because the unlinkat() called to remove
+	 * the outputs will usually change to the correct directory anyway.
+	 * This isn't necessarily the case if the command has no outputs, and
+	 * also wouldn't be synchronized.
+	 */
+	if(chdir(win32_get_dirpath(dfd))) {
+		fprintf(stderr, "tup error: Unable to change working directory to '%s'\n", win32_get_dirpath(dfd));
+		return -1;
+	}
+	ret = CreateProcessA(
+		NULL,
+		cmdline,
+		NULL,
+		NULL,
+		TRUE,
+		CREATE_SUSPENDED,
+		NULL,
+		NULL,
+		&sa,
+		pi);
+	CloseHandle(sa.hStdOutput);
+
+	if(!ret)
+		return -1;
+	return 0;
+}
+
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
 int server_exec(struct server *s, int dfd, const char *cmd,
@@ -124,10 +197,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 {
 	int rc = -1;
 	DWORD return_code = 1;
-	BOOL ret;
 	PROCESS_INFORMATION pi;
-	STARTUPINFOA sa;
-	SECURITY_ATTRIBUTES sec;
 	size_t namesz = strlen(cmd);
 	size_t cmdsz = sizeof(CMDSTR) - 1;
 	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
@@ -166,61 +236,11 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		strcat(cmdline, "'");
 	}
 
-	memset(&sa, 0, sizeof(sa));
-	sa.cb = sizeof(STARTUPINFOW);
-
-	memset(&sec, 0, sizeof(sec));
-	sec.nLength = sizeof(sec);
-	sec.lpSecurityDescriptor = NULL;
-	sec.bInheritHandle = TRUE;
-
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		fprintf(stderr, "tup error: Unable to change working directory to the project root.\n");
-		return -1;
-	}
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
-	buf[sizeof(buf)-1] = 0;
-	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
-		return -1;
-	}
-	sa.hStdError = sa.hStdOutput;
-	sa.dwFlags = STARTF_USESTDHANDLES;
-
-	pi.hProcess = INVALID_HANDLE_VALUE;
-	pi.hThread = INVALID_HANDLE_VALUE;
-
 	pthread_mutex_lock(&dir_mutex);
-	/* Passing in the directory to lpCurrentDirectory is insufficient
-	 * because the command may run as './foo.exe', so we need to change to
-	 * the correct directory before calling CreateProcessA. This may just
-	 * happen to work in most cases because the unlinkat() called to remove
-	 * the outputs will usually change to the correct directory anyway.
-	 * This isn't necessarily the case if the command has no outputs, and
-	 * also wouldn't be synchronized.
-	 */
-	if(chdir(win32_get_dirpath(dfd))) {
-		fprintf(stderr, "tup error: Unable to change working directory to '%s'\n", win32_get_dirpath(dfd));
-		pthread_mutex_unlock(&dir_mutex);
-		goto end;
-	}
-	ret = CreateProcessA(
-		NULL,
-		cmdline,
-		NULL,
-		NULL,
-		TRUE,
-		CREATE_SUSPENDED,
-		NULL,
-		NULL,
-		&sa,
-		&pi);
+	rc = create_process(s, dfd, cmdline, &pi);
 	pthread_mutex_unlock(&dir_mutex);
 
-	if(!ret) {
+	if(rc < 0) {
 		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
 		goto end;
 	}
@@ -250,14 +270,9 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 		goto end;
 	}
 
-	CloseHandle(sa.hStdOutput);
-	sa.hStdOutput = NULL;
-	if(fchdir(tup_top_fd()) < 0) {
-		perror("fchdir");
-		fprintf(stderr, "tup error: Unable to change working directory back to the project root.\n");
-		return -1;
-	}
-	s->output_fd = open(buf, O_RDONLY);
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
 	if(s->output_fd < 0) {
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process output file after the process completed.\n");
@@ -269,8 +284,6 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	rc = 0;
 
 end:
-	if(sa.hStdOutput != NULL)
-		CloseHandle(sa.hStdOutput);
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 
@@ -278,6 +291,19 @@ end:
 		return -1;
 	}
 	return rc;
+}
+
+int server_postexec(struct server *s)
+{
+	char buf[64];
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+	buf[sizeof(buf)-1] = 0;
+	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+		perror(buf);
+		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
+		return -1;
+	}
+	return 0;
 }
 
 int server_is_dead(void)

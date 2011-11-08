@@ -429,6 +429,12 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	return rc;
 }
 
+int server_postexec(struct server *s)
+{
+	if(s) {}
+	return 0;
+}
+
 int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 {
 	struct tup_entry *tent;

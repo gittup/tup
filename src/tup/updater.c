@@ -1094,6 +1094,8 @@ static int update(struct node *n)
 	rc = process_output(&s, n->tent);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
+	if(server_postexec(&s) < 0)
+		return -1;
 	return rc;
 
 err_close_dfd:
