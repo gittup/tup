@@ -1628,12 +1628,12 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	e->at = at;
 
 	e->len = canon_path(file, dest);
-	DEBUG_HOOK("Canonicalize1 [%i]: '%s' -> '%s'\n", line, file, dest);
+	DEBUG_HOOK("Canonicalize1 [%i]: '%s' -> '%s', len=%i\n", line, file, dest, e->len);
 	dest += e->len;
 	*(dest++) = '\0';
 
 	e->len2 = canon_path(file2, dest);
-	DEBUG_HOOK("Canonicalize2: '%s' -> '%s'\n", file2, file2 ? dest : NULL);
+	DEBUG_HOOK("Canonicalize2: '%s' -> '%s' len2=%i\n", file2, file2 ? dest : NULL, e->len2);
 	dest += e->len2;
 	*(dest++) = '\0';
 
@@ -1660,6 +1660,8 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 
 	WideCharToMultiByte(CP_ACP, 0, file, fsz, afile, fsz, NULL, NULL);
 	WideCharToMultiByte(CP_ACP, 0, file2, f2sz, afile2, f2sz, NULL, NULL);
+	afile[fsz] = 0;
+	afile2[f2sz] = 0;
 
 	e->len = canon_path(afile, dest);
 	dest += e->len;
@@ -1669,9 +1671,9 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	dest += e->len2;
 	*(dest++) = '\0';
 
-	DEBUG_HOOK("%s: '%S', '%S'\n", access_type_name[at], file, file2);
+	DEBUG_HOOK("%s [wide, %i, %i]: '%S', '%S'\n", access_type_name[at], e->len, e->len2, file, file2);
 	ret = send(sock, (char*) e, dest - (char*) e, 0);
-	DEBUG_HOOK("send %d\n", ret);
+	DEBUG_HOOK("send [wide] %d\n", ret);
 }
 
 static int connect_udp(unsigned short udp_port)
