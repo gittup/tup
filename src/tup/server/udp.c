@@ -151,7 +151,6 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
-		pthread_mutex_unlock(&dir_mutex);
 		return -1;
 	}
 	sa.hStdError = sa.hStdOutput;
