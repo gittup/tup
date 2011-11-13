@@ -9,8 +9,6 @@ will cp -Rp olddir newdir break everything if olddir already has a bunch of stuf
 
 instead of keeping both files and commands in delete list, put them in separate lists. Make the command thing just a progress bar.
 
-autoupdate doesn't autoupdate when first starting the monitor if files have changed while tup wasn't watching
-
 put dirtree in a list for things like tup_db_select_node_by_flags to avoid callback?
 
 don't continue down re-parse tree unless outputs of the dir have changed.

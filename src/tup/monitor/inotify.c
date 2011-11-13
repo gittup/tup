@@ -409,6 +409,25 @@ out:
 	return rc;
 }
 
+static int autoupdate_enabled(void)
+{
+	int autoupdate_config;
+	if(autoupdate_flag == 1)
+		return 1;
+	autoupdate_config = tup_option_get_flag("monitor.autoupdate");
+	if(autoupdate_flag == -1 && autoupdate_config == 1)
+		return 1;
+	return 0;
+}
+
+static int mod_cb(void *arg, struct tup_entry *tent, int style)
+{
+	if(tent) {}
+	if(style) {}
+	*(int*)arg = 1;
+	return 0;
+}
+
 static int monitor_loop(void)
 {
 	int x;
@@ -426,6 +445,22 @@ static int monitor_loop(void)
 		return -1;
 	if(tup_db_scan_end(&scan_root) < 0)
 		return -1;
+
+	/* If we are running in autoupdate mode, we should check to see if any
+	 * files were modified while the monitor wasn't running. If so, we
+	 * should run an update right away.
+	 */
+	if(autoupdate_enabled()) {
+		int modified = 0;
+		if(tup_db_select_node_by_flags(mod_cb, &modified, TUP_FLAGS_CREATE) < 0)
+			return -1;
+		if(tup_db_select_node_by_flags(mod_cb, &modified, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+		if(modified) {
+			if(autoupdate() < 0)
+				return -1;
+		}
+	}
 
 	gettimeofday(&t2, NULL);
 	fprintf(stderr, "Initialized in %f seconds.\n",
@@ -653,17 +688,6 @@ static int queue_event(struct inotify_event *e, int locked)
 	}
 
 	queue_end += sizeof(*m) + e->len;
-	return 0;
-}
-
-static int autoupdate_enabled(void)
-{
-	int autoupdate_config;
-	if(autoupdate_flag == 1)
-		return 1;
-	autoupdate_config = tup_option_get_flag("monitor.autoupdate");
-	if(autoupdate_flag == -1 && autoupdate_config == 1)
-		return 1;
 	return 0;
 }
 
