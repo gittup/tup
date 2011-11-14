@@ -342,24 +342,12 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			goto out_err;
 		}
 		if(tent->type == TUP_NODE_DIR) {
-			/* For a directory, we add all generated files in that
-			 * directory, since updating the directory itself
-			 * doesn't make sense for tup.
+			/* For a directory, we recursively add all generated
+			 * files in that directory, since updating the
+			 * directory itself doesn't make sense for tup.
 			 */
-			struct tupid_entries dir_entries;
-			struct tupid_tree *tt;
-
-			RB_INIT(&dir_entries);
-			if(tup_db_dirtype_to_tree(tent->tnode.tupid, &dir_entries, NULL, TUP_NODE_GENERATED) < 0)
+			if(tup_db_get_generated_tup_entries(tent->tnode.tupid, prune_list) < 0)
 				goto out_err;
-			while((tt = RB_ROOT(&dir_entries)) != NULL) {
-				struct tup_entry *subtent;
-				if(tup_entry_add(tt->tupid, &subtent) < 0)
-					goto out_err;
-				tupid_tree_rm(&dir_entries, tt);
-				free(tt);
-				tup_entry_list_add(subtent, prune_list);
-			}
 		} else {
 			tup_entry_list_add(tent, prune_list);
 		}

@@ -1338,6 +1338,37 @@ int tup_db_modify_dir(tupid_t dt)
 	return 0;
 }
 
+int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head)
+{
+	struct tupid_entries dir_entries;
+	struct id_entry_head subdir_list;
+	struct tupid_tree *tt;
+
+	RB_INIT(&dir_entries);
+	if(tup_db_dirtype_to_tree(dt, &dir_entries, NULL, TUP_NODE_GENERATED) < 0)
+		return -1;
+	while((tt = RB_ROOT(&dir_entries)) != NULL) {
+		struct tup_entry *subtent;
+		if(tup_entry_add(tt->tupid, &subtent) < 0)
+			return -1;
+		tupid_tree_rm(&dir_entries, tt);
+		free(tt);
+		tup_entry_list_add(subtent, head);
+	}
+
+	LIST_INIT(&subdir_list);
+	if(get_recurse_dirs(dt, &subdir_list) < 0)
+		return -1;
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct id_entry *ide = LIST_FIRST(&subdir_list);
+		if(tup_db_get_generated_tup_entries(ide->tupid, head) < 0)
+			return -1;
+		LIST_REMOVE(ide, list);
+		free(ide);
+	}
+	return 0;
+}
+
 int tup_db_open_tupid(tupid_t tupid)
 {
 	int rc;
