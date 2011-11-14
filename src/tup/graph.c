@@ -320,6 +320,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 	struct tup_entry_head *prune_list;
 	int x;
 	int dashdash = 0;
+	int do_prune = 0;
 
 	*num_pruned = 0;
 
@@ -334,6 +335,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			if(argv[x][0] == '-')
 				continue;
 		}
+		do_prune = 1;
 		tent = get_tent_dt(get_sub_dir_dt(), argv[x]);
 		if(!tent) {
 			fprintf(stderr, "tup: Unable to find tupid for '%s'\n", argv[x]);
@@ -363,7 +365,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		}
 	}
 
-	if(!LIST_EMPTY(prune_list)) {
+	if(do_prune) {
 		struct tup_entry *tent;
 		struct node *n;
 		struct node *tmp;
