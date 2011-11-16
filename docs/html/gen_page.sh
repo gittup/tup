@@ -13,15 +13,14 @@ cat << HERE
 	<link rel="stylesheet" type="text/css" href="tup.css"/>
 </head>
 <body>
-<table>
-<tr><td valign="top">
+
+<div id="header">
+  <!-- logo here --> <!-- fork me on github logo? -->
+</div>
+<div id="content">
 HERE
 
 cat menu.inc
-
-cat << HERE
-</td><td valign="top">
-HERE
 
 if [ $example = "1" ]; then
 cat examples.inc
@@ -32,7 +31,9 @@ fi
 cat $1
 
 cat << HERE
-</td></tr></table>
+<div style="clear:both;"></div>
+</div>
+<div id="footer">&copy; 2011 Mike Shal. All Rights Reserved.</div>
 </body>
 </html>
 HERE

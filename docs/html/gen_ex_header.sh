@@ -1,18 +1,14 @@
 #! /bin/sh -e
 
 cat << HERE
-<div id="menu">
-<ul>
-	<li><h2>examples</h2></li>
-	<ul>
+<ul id="menu">
+  <li class="menu-header">examples</li>
 HERE
 for i in $@; do
 	title=`echo "$i" | sed 's/\.html//; s/_/ /g; s/^ex //'`
-	echo "		<li><a href=\"$i\">$title</a></li>"
+	echo "  <li class=\"menu-item\"><a href=\"$i\">$title</a></li>"
 done
 
 cat << HERE
-	</ul>
 </ul>
-</div>
 HERE

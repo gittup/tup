@@ -339,9 +339,7 @@ Five squared is: 25
 <span class="prompt">$</span> tup graph --no-dirs --no-ghosts . | dot -Tpng &gt; ~/hello.png
 </pre>
 
-<p>If you take a look at the image, you should see something like this:</p>
-
-<img src="hello.png">
+<p><div class="img"><div class="desc">Program Dependencies</div><img src="hello.png"></div></p>
 <p>If you were to make a <a href="http://en.wikipedia.org/wiki/Topological_ordering">topological sort (Wikipedia)</a> of the graph, keeping only the rectangle shaped nodes, you would have your shell script again. When <span class="cmd">tup upd</span> gets to the final stage of its processing and actually goes to execute commands, it will start with the files you changed (like <span class="filename">hello.c</span>) and follow the arrows upward until there are no more arrows to follow. Try starting at each of the three base files and see which commands will be executed. It also works for any combination of inputs. In this way, you can think of the tup database as a collection of <span class="keyword">2^n</span> shell scripts, where <span class="keyword">n</span> is the number of input files (since each file can be either "modified" or "unmodified", you get an exponential number of possible fileset changes). Depending on which files you modified, tup will pick out the smallest shell script that updates everything quickly and correctly. Of course, the shell script is generated on the fly using the graph - storing an exponential number of shell scripts would be crazy.</p>
 
 <p>This is merely scratching the surface of how tup works - there is much more than just picking out the correct rectangles! After all, those dots and lines have to get in the graph in the first place...</p>

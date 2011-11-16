@@ -3,9 +3,10 @@ pre {
 	border-style: dashed;
 	border-width: 1;
 	margin-left: 2em;
-	margin-right: 20em;
+	margin-right: 2em;
 	padding: 5px 10px 5px 10px;
 	background-color: #ffffdd;
+	overflow: auto;
 }
 
 span.prompt {
@@ -74,9 +75,10 @@ pre.code {
 	border-style: dashed;
 	border-width: 1;
 	margin-left: 2em;
-	margin-right: 20em;
+	margin-right: 2em;
 	padding: 5px 10px 5px 10px;
 	background-color: #eeeeee;
+	overflow: auto;
 }
 
 div.img {
@@ -108,41 +110,60 @@ sup {
 	color: #0000ff;
 }
 
-/* Thanks http://ago.tanfa.co.uk/css/examples/menu/vs1.html */
-#menu a, #menu h2 {
-	font: bold 12px/16px arial, helvetica, sans-serif;
-	display: block;
-	border-width: 1px;
-	border-style: solid;
-	border-color: #ccc #888 #555 #bbb;
-	margin: 0;
-	padding: 2px 3px;
-	width: 98px;
-}
-
-#menu h2 {
-	color: #fff;
-	background: #000;
-	text-transform: uppercase;
-}
-
-#menu img {
-	border-style: none;
-}
-
-#menu a {
-	color: #000;
-	background: #efefef;
-	text-decoration: none;
-}
-
-#menu a:hover {
-	color: #0aa;
-	background: #fff;
-}
-
-#menu ul {
-	list-style: none;
+body {
+	text-align: center;
+	font-family: Verdana, serif;
+	font-size: 10pt;
+	line-height: 1.4;
+	color: #484848;
 	margin: 0;
 	padding: 0;
+}
+
+div#header {
+	background-color: #fafafa;
+	border-bottom: 3px dotted #dfdfdf;
+	height: 91px;
+}
+
+div#content {
+	background: white;
+	border: 2px solid silver;
+	margin: -15px 5% 0 5%;
+	padding: 0 10px 0 10px;
+	text-align: justify;
+	border-radius: 1ex;
+	-moz-border-radius: 1ex;
+}
+
+div#footer {
+	margin-top: 1.6ex;
+	font-size: 8.5pt;
+	color: gray;
+	text-align: center;
+}
+
+#menu {
+	float: right;
+	margin: 11px -11px 2ex 3ex;
+	border: 1px solid silver;
+	list-style-type: none;
+	border-radius: 1ex 0 0 1ex;
+	-moz-border-radius: 1ex 0 0 1ex;
+	padding: 0 1ex 0.5ex 2ex;
+}
+
+.menu-header {
+	padding: 1ex;
+	font-weight: bold;
+}
+
+.menu-item {
+	padding: 0.5ex;
+}
+
+a:link, a:visited {
+	text-decoration: none;
+	border-bottom: 1px solid;
+	color: #0b78b2;
 }
