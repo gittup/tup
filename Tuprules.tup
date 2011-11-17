@@ -2,7 +2,12 @@
 
 CC = gcc
 
+ifeq (@(TUP_DEBUG),y)
+CFLAGS += -g
+else
 CFLAGS += -Os
+endif
+
 CFLAGS += -W
 CFLAGS += -Wall
 ifeq (@(TUP_WERROR),y)
