@@ -391,7 +391,10 @@ static int master_fork_loop(void)
 	}
 
 	{
-		struct rcmsg rcm = {-1, 0};
+		struct rcmsg rcm;
+		memset(&rcm, 0, sizeof(rcm));
+		rcm.sid = -1;
+		rcm.status = 0;
 		if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
 			perror("write");
 			fprintf(stderr, "tup error: Unable to send notification to shutdown the child wait thread. This process may not shutdown cleanly.\n");
@@ -424,6 +427,7 @@ static void *child_waiter(void *arg)
 	struct rcmsg rcm;
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
+	memset(&rcm, 0, sizeof(rcm));
 	rcm.sid = waiter->sid;
 	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
 		perror("waitpid");
