@@ -535,10 +535,6 @@ static int monitor_loop(void)
 					}
 					if(flush_queue(locked) < 0)
 						return -1;
-					if(tup_db_config_set_int(AUTOUPDATE_PID, -1) < 0) {
-						fprintf(stderr, "tup monitor error: Unable to clear the autoupdate pid.\n");
-						return -1;
-					}
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
@@ -772,7 +768,7 @@ static int autoupdate(void)
 			perror("strdup");
 			exit(1);
 		}
-		args[1] = strdup("upd");
+		args[1] = strdup("autoupdate");
 		if(!args[1]) {
 			perror("strdup");
 			exit(1);

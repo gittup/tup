@@ -161,6 +161,12 @@ int main(int argc, char **argv)
 		rc = updater(argc, argv, 2);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv, 0);
+	} else if(strcmp(cmd, "autoupdate") == 0) {
+		rc = updater(argc, argv, 0);
+		if(tup_db_config_set_int(AUTOUPDATE_PID, -1) < 0) {
+			fprintf(stderr, "tup error: Unable to clear the autoupdate pid.\n");
+			rc = 1;
+		}
 	} else if(strcmp(cmd, "todo") == 0) {
 		rc = todo(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
