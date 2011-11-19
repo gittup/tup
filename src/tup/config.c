@@ -45,6 +45,7 @@ int find_tup_dir(void)
 
 	if(getcwd(tup_wd, sizeof(tup_wd)) == NULL) {
 		perror("getcwd");
+		fprintf(stderr, "tup error: Unable to get the current directory during tup initialization.\n");
 		exit(1);
 	}
 

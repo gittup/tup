@@ -758,6 +758,12 @@ static int autoupdate(void)
 		char **args;
 		int x;
 
+		/* Make sure we start at a valid working directory (t7046) */
+		if(fchdir(tup_top_fd()) < 0) {
+			perror("fchdir");
+			exit(1);
+		}
+
 		args = malloc((sizeof *args) * (update_argc + 2));
 		if(!args) {
 			perror("malloc");
