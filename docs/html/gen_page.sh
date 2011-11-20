@@ -15,7 +15,8 @@ cat << HERE
 <body>
 
 <div id="header">
-  <!-- logo here --> <!-- fork me on github logo? -->
+  <img src="logo.png">
+  <!-- fork me on github logo? -->
 </div>
 <div id="content">
 HERE
