@@ -14,10 +14,13 @@ examples += ex_dependencies.html
 examples += ex_generated_header.html
 examples += ex_multiple_directories.html
 
+# Use the 'examples' sub-menu rather than a header for the examples page.
+flags_examples += -x
+
 : |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
 : |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
 : |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
-: foreach $(pages) | menu.inc |> ^ GEN %o^ ./gen_page.sh %f > %o |> %f.gen
+: foreach $(pages) | menu.inc examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags_%B) %f > %o |> %f.gen
 : foreach $(examples) | menu.inc examples.inc |> ^ GEN %o^ ./gen_page.sh -x %f > %o |> %f.gen
 
 endif
