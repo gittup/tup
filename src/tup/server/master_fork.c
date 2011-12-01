@@ -285,6 +285,13 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		memcpy(dev, job, joblen);
 		memcpy(dev+joblen, slashdev, sizeof(slashdev));
 
+#ifdef __APPLE__
+		if(mount("devfs", dev, 0, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
+			return -1;
+		}
+#else
 		/* The "tmpfs" argument is ignored since we use MS_BIND, but
 		 * valgrind complains about it if we use NULL.
 		 */
@@ -293,6 +300,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
 			return -1;
 		}
+#endif
 		free(dev);
 		if(chroot(job) < 0) {
 			perror("chroot");
