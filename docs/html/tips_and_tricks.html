@@ -27,4 +27,3 @@ being compatible with make. It can be put in an .emacs (place the cursor at the 
 <p>Tup uses a temporary fuse filesystem to watch the files accessed by sub-programs. The GNOME virtual filesystem, gvfs, may see this filesystem and attempt to access it to display an icon on the desktop. If you want to remove this icon, you may try disabling this feature by setting the following Nautilus property:</p>
 <pre><span class="prompt">$</span> gconftool-2 --type bool --set /apps/nautilus/desktop/volumes_visible 'false'</pre>
 <p>This will disable all "mounted folders". Unfortunately this is all-or-nothing solution. You'll not see any mounted folders (including ones from /media).</p>
-<p>Sent in by Anatol Pomozov.</p>
