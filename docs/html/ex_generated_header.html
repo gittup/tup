@@ -145,7 +145,8 @@ possible this could randomly break in the future.
 <span class="prompt">$</span> tup graph --no-dirs --no-ghosts . | dot -Tpng &gt; ~/ex_autogen_1.png
 </pre>
 
-<img src="ex_autogen_1.png">
+<div class="img"><img src="ex_autogen_1.png"></div>
+<div style="clear:both"></div>
 
 <p>Even though we specified <span class="filename">triangle.h</span> as an input dependency for both compilation rules, you can see that changing the <span class="filename">gen_triangle.sh</span> script only re-compiles the one file that actually includes the header. In contrast, changing <span class="filename">square.h</span> re-compiles both files, since they both include that header. The compilation commands are highlighted below:</p>
 

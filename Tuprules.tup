@@ -42,7 +42,7 @@ MINGWCFLAGS += -Dlstat=stat
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
 !ar = |> ^ AR %o^ ar crs %o %f |>
-!dot = |> ^ DOT %f^ dot -Efontname="Luxi Sans" -Nfontname="Luxi Sans" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
+!dot = |> ^ DOT %f^ dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
 !cp = |> ^ CP %f -> %o^ cp %f %o |>
 ifeq (@(TUP_MINGW),)
 !mingwcc = |> |>

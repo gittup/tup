@@ -1,9 +1,9 @@
 digraph g {
 	rankdir=LR;
-	bgcolor="#efefef";
-	tup [style="filled" fillcolor="#ffffff"];
-	build [shape="rectangle" style="filled" fillcolor="#ffffff"];
-	system [style="filled" fillcolor="#ffffff"];
-	tup -> build;
-	build -> system;
+	bgcolor="#fafafa";
+	Tup [style="filled" fillcolor="#ffffff"];
+	Build [shape="rectangle" style="filled" fillcolor="#ffffff"];
+	System [style="filled" fillcolor="#ffffff"];
+	Tup -> Build;
+	Build -> System;
 };

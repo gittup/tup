@@ -82,19 +82,15 @@ pre.code {
 }
 
 div.img {
-	margin:5px;
-	border-style: double;
+	display:inline;
+	margin:3px;
+	border: 1px solid silver;
+	border-radius: 0.25em;
 	height:auto;
 	width:auto;
 	float:right;
 	text-align:center;
 	clear:right;
-}
-
-div.img img {
-	display:inline;
-	margin:3px;
-	border:1px solid #ffffff;
 }
 
 div.desc {
@@ -103,9 +99,6 @@ div.desc {
 	margin:2px;
 }
 
-img {
-	border-style: double;
-}
 sup {
 	color: #0000ff;
 }
