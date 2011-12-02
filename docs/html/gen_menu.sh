@@ -6,7 +6,6 @@ cat << HERE
 HERE
 for i in $@; do
 	text=`./gen_text.sh $i`
-	echo "Text is: $text" 1>&2
 	echo "    <li class=\"menu-item\"><a href=\"$i\">$text</a></li>"
 done
 
