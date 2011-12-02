@@ -5,7 +5,8 @@ cat << HERE
     <li class="menu-header">Site Map</li>
 HERE
 for i in $@; do
-	text=`echo $i | sed 's/\.html//; s/_/\&nbsp;/g; s/index/home/'`
+	text=`./gen_text.sh $i`
+	echo "Text is: $text" 1>&2
 	echo "    <li class=\"menu-item\"><a href=\"$i\">$text</a></li>"
 done
 

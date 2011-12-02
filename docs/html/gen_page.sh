@@ -5,7 +5,7 @@ if [ $1 = "-x" ]; then
 	example=1
 	shift
 fi
-text=`echo $1 | sed 's/\.html//; s/_/ /g; s/index/home/; s/^ex //'`
+text=`./gen_text.sh $1`
 cat << HERE
 <html>
 <head>
