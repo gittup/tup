@@ -17,13 +17,12 @@
 </ul>
 
 <h4>Ubuntu Package</h4>
-<p>If you don't want to install tup from the git tree, you can use the tup Ubuntu package maintained by Anatol Pomozov.</p>
-<ol>
-  <li>Add the following to /etc/apt/sources.list:
-  <pre>deb http://ppa.launchpad.net/anatol/tup/ubuntu lucid main</pre>
-  </li>
-  <li>sudo apt-get update &amp;&amp; sudo apt-get install tup</li>
-</ol>
+<p>If you don't want to install tup from the git tree, you can use the unofficial tup Ubuntu repository maintained by Anatol Pomozov.</p>
+<pre>
+sudo apt-add-repository 'deb http://ppa.launchpad.net/anatol/tup/ubuntu lucid main'
+sudo apt-get update
+sudo apt-get install tup
+</pre>
 
 <h4>OSX Homebrew</h4>
 <p>If you use <a href="http://mxcl.github.com/homebrew/">Homebrew</a>, you can install tup as follows:</p>
