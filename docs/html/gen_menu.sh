@@ -1,5 +1,11 @@
 #! /bin/sh -e
 
+example=0
+if [ $1 = "-x" ]; then
+	example=1
+	shift
+fi
+
 cat << HERE
   <ul id="menu">
     <li class="menu-header">Site Map</li>
@@ -7,6 +13,11 @@ HERE
 for i in $@; do
 	text=`./gen_text.sh $i`
 	echo "    <li class=\"menu-item\"><a href=\"$i\">$text</a></li>"
+	if [ "$i" = "examples.html" ]; then
+		if [ $example = "1" ]; then
+			cat examples.inc
+		fi
+	fi
 done
 
 cat << HERE

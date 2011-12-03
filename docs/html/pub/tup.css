@@ -155,6 +155,11 @@ div#footer {
 	padding: 0.5ex;
 }
 
+.submenu {
+	padding-left: 2em;
+	list-style: circle;
+}
+
 a:link, a:visited {
 	text-decoration: none;
 	border-bottom: 1px solid;

@@ -21,11 +21,10 @@ cat << HERE
 <div id="content">
 HERE
 
-cat menu.inc
-
 if [ $example = "1" ]; then
-cat examples.inc
+cat menu-examples.inc
 else
+cat menu.inc
 echo "<h1>$text</h1>"
 fi
 
