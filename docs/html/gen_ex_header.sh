@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 cat << HERE
-<ul id="submenu">
+<ul class="submenu">
 HERE
 for i in $@; do
 	title=`./gen_text.sh $i`
