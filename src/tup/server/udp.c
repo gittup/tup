@@ -126,6 +126,7 @@ int server_quit(void)
  *    handle)
  */
 static int create_process(struct server *s, int dfd, char *cmdline,
+			  struct tup_env *newenv,
 			  PROCESS_INFORMATION *pi)
 {
 	STARTUPINFOA sa;
@@ -179,7 +180,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 		NULL,
 		TRUE,
 		CREATE_SUSPENDED,
-		NULL,
+		newenv->envblock,
 		NULL,
 		&sa,
 		pi);
@@ -214,7 +215,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 
 	int need_sh = strncmp(cmd, "./", 2) == 0;
 	if(dtent) {}
-	if(newenv) {/* TODO */}
 
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
@@ -238,7 +238,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 
 	pthread_mutex_lock(&dir_mutex);
-	rc = create_process(s, dfd, cmdline, &pi);
+	rc = create_process(s, dfd, cmdline, newenv, &pi);
 	pthread_mutex_unlock(&dir_mutex);
 
 	if(rc < 0) {
