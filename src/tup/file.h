@@ -74,7 +74,8 @@ int handle_open_file(enum access_type at, const char *filename,
 		     struct file_info *info);
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
-		int check_only);
+		int check_only, struct tupid_entries *sticky_root,
+		struct tupid_entries *normal_root);
 int add_parser_files(struct file_info *info, struct tupid_entries *root);
 void del_map(struct mapping *map);
 

@@ -41,7 +41,9 @@ static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, struct tup_entry_head *entryhead);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			    struct tup_entry_head *entryhead);
+			    struct tup_entry_head *entryhead,
+			    struct tupid_entries *sticky_root,
+			    struct tupid_entries *normal_root);
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root);
 
@@ -120,7 +122,8 @@ int handle_open_file(enum access_type at, const char *filename,
 }
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
-		int check_only)
+		int check_only, struct tupid_entries *sticky_root,
+		struct tupid_entries *normal_root)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -146,7 +149,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	}
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -489,7 +492,9 @@ out_skip:
 }
 
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			    struct tup_entry_head *entryhead)
+			    struct tup_entry_head *entryhead,
+			    struct tupid_entries *sticky_root,
+			    struct tupid_entries *normal_root)
 {
 	struct file_entry *r;
 
@@ -508,7 +513,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		del_entry(r);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root) < 0)
 		return -1;
 	return 0;
 }

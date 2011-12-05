@@ -35,6 +35,7 @@
 #include "container.h"
 #include "monitor.h"
 #include "path.h"
+#include "environ.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -334,29 +335,31 @@ static int update_tup_config(void)
 {
 	int rc;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	rc = tup_db_in_create_list(VAR_DT);
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
-		if(tup_db_begin() < 0)
-			return -1;
 		if(tup_db_unflag_create(VAR_DT) < 0)
 			return -1;
-		tup_main_progress("Reading in new configuration variables...\n");
-		rc = tup_db_read_vars(DOT_DT, TUP_CONFIG);
-		if(rc == 0) {
-			tup_db_commit();
-		} else {
-			tup_db_rollback();
-			return -1;
-		}
+		tup_main_progress("Reading in new configuration/environment variables...\n");
+		if(tup_db_read_vars(DOT_DT, TUP_CONFIG) < 0)
+			goto err_rollback;
 	} else {
-		tup_main_progress("No tup.config changes.\n");
+		tup_main_progress("Reading in new environment variables...\n");
 	}
+	if(tup_db_check_env() < 0)
+		goto err_rollback;
+	tup_db_commit();
 	if(tup_vardict_open() < 0)
 		return -1;
 
 	return 0;
+
+err_rollback:
+	tup_db_rollback();
+	return -1;
 }
 
 static int process_create_nodes(void)
@@ -921,6 +924,19 @@ static void *update_work(void *arg)
 			}
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
+
+			/* For environment variables, if there are no more
+			 * out-going edges, then this variable is no longer
+			 * needed and we can remove it. Note this is a lazy
+			 * removal, since this is triggered only if an
+			 * environment variable has been modified.
+			 */
+			if(n->tent->type == TUP_NODE_VAR &&
+			   n->tent->dt == env_dt() &&
+			   LIST_EMPTY(&n->edges) &&
+			   rc == 0) {
+				rc = delete_name_file(n->tent->tnode.tupid);
+			}
 			pthread_mutex_unlock(&db_mutex);
 		}
 
@@ -969,7 +985,9 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int process_output(struct server *s, struct tup_entry *tent)
+static int process_output(struct server *s, struct tup_entry *tent,
+			  struct tupid_entries *sticky_root,
+			  struct tupid_entries *normal_root)
 {
 	FILE *f;
 	int is_err = 1;
@@ -983,7 +1001,7 @@ static int process_output(struct server *s, struct tup_entry *tent)
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				/* Hooray! */
@@ -991,7 +1009,7 @@ static int process_output(struct server *s, struct tup_entry *tent)
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -1033,6 +1051,9 @@ static int update(struct node *n)
 	const char *name = n->tent->name.s;
 	struct server s;
 	int rc;
+	struct tupid_entries sticky_root = {NULL};
+	struct tupid_entries normal_root = {NULL};
+	struct tup_env newenv;
 
 	if(name[0] == '^') {
 		name++;
@@ -1072,6 +1093,14 @@ static int update(struct node *n)
 	if(unlink_outputs(dfd, n) < 0)
 		goto err_close_dfd;
 
+	pthread_mutex_lock(&db_mutex);
+	rc = tup_db_get_links(n->tent->tnode.tupid, &sticky_root, &normal_root);
+	if(rc == 0)
+		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
+	pthread_mutex_unlock(&db_mutex);
+	if(rc < 0)
+		goto err_close_dfd;
+
 	s.id = n->tnode.tupid;
 	s.exited = 0;
 	s.signalled = 0;
@@ -1080,10 +1109,11 @@ static int update(struct node *n)
 	s.output_fd = -1;
 	s.error_fd = -1;
 	init_file_info(&s.finfo);
-	if(server_exec(&s, dfd, name, n->tent->parent) < 0) {
+	if(server_exec(&s, dfd, name, &newenv, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		goto err_close_dfd;
 	}
+	environ_free(&newenv);
 	if(close(dfd) < 0) {
 		perror("close(dfd)");
 		return -1;
@@ -1091,9 +1121,11 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
+	free_tupid_tree(&sticky_root);
+	free_tupid_tree(&normal_root);
 	if(server_postexec(&s) < 0)
 		return -1;
 	return rc;

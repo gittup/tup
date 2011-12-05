@@ -10,8 +10,6 @@ if ! which python > /dev/null 2>&1; then
 	eotup
 fi
 
-export PYTHONPATH=../..:$PYTHONPATH
-
 cat > foo.py << HERE
 import tup_client
 if tup_client.config_var('FOO') is not None:
@@ -22,7 +20,7 @@ if tup_client.config_var('BAZ') is not None:
 	raise Exception("No: BAZ")
 HERE
 cat > Tupfile << HERE
-: |> python -B foo.py |>
+: |> PYTHONPATH=../.. python -B foo.py |>
 HERE
 tup touch Tupfile
 update

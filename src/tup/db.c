@@ -35,6 +35,7 @@
 #include "compat.h"
 #include "container.h"
 #include "option.h"
+#include "environ.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -45,7 +46,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 13
-#define PARSER_VERSION 2
+#define PARSER_VERSION 3
 
 enum {
 	DB_BEGIN,
@@ -132,6 +133,7 @@ static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
 static struct vardb atvardb = { {NULL}, 0};
+static struct vardb envdb = { {NULL}, 0};
 
 static int version_check(void);
 static int node_select(tupid_t dt, const char *name, int len,
@@ -648,6 +650,8 @@ static int version_check(void)
 				errmsg, sql_1b);
 			return -1;
 		}
+		if(tup_db_unflag_create(env_dt()) < 0)
+			return -1;
 		if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
 			return -1;
 		if(tup_db_commit() < 0)
@@ -3139,14 +3143,14 @@ int tup_db_get_varlen(const char *var, int varlen)
 	return ve->vallen;
 }
 
-int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value, int type), void *arg)
+int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg)
 {
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_VAR_FOREACH];
-	static char s[] = "select name, value, type from var, node where node.dir=? and node.id=var.id order by name" SQL_NAME_COLLATION;
+	static char s[] = "select node.id, name, value, type from var, node where node.dir=? and node.id=var.id order by name" SQL_NAME_COLLATION;
 
-	if(sql_debug) fprintf(stderr, "%s [37m[%i][0m\n", s, VAR_DT);
+	if(sql_debug) fprintf(stderr, "%s [37m[%lli][0m\n", s, dt);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\nStatement was: %s\n",
@@ -3155,7 +3159,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 		}
 	}
 
-	if(sqlite3_bind_int(*stmt, 1, VAR_DT) != 0) {
+	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
@@ -3164,6 +3168,7 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 		const char *var;
 		const char *value;
 		int type;
+		tupid_t tupid;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -3176,11 +3181,12 @@ int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *valu
 			goto out_reset;
 		}
 
-		var = (const char *)sqlite3_column_text(*stmt, 0);
-		value = (const char *)sqlite3_column_text(*stmt, 1);
-		type = sqlite3_column_int(*stmt, 2);
+		tupid = sqlite3_column_int64(*stmt, 0);
+		var = (const char *)sqlite3_column_text(*stmt, 1);
+		value = (const char *)sqlite3_column_text(*stmt, 2);
+		type = sqlite3_column_int(*stmt, 3);
 
-		if((rc = callback(arg, var, value, type)) < 0) {
+		if((rc = callback(arg, tupid, var, value, type)) < 0) {
 			goto out_reset;
 		}
 	}
@@ -3376,6 +3382,166 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 	return 0;
 }
 
+static struct var_entry *envdb_set(const char *var, int varlen, const char *newenv,
+				   int envlen, struct tup_entry *tent,
+				   const char *expected_value)
+{
+	struct var_entry *ve;
+	char fullenv[varlen + 1 + envlen + 1];
+
+	memcpy(fullenv, var, varlen);
+	fullenv[varlen] = '=';
+	memcpy(fullenv + varlen + 1, newenv, envlen);
+	fullenv[varlen + 1 + envlen] = 0;
+
+	ve = vardb_set2(&envdb, var, varlen, fullenv, tent);
+	if(!ve)
+		return NULL;
+
+	if(!expected_value || strcmp(fullenv, expected_value) != 0) {
+		if(expected_value) {
+			printf("Environment variable changed: %s\n", var);
+			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+				return NULL;
+			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+				return NULL;
+		}
+		if(tup_db_set_var(tent->tnode.tupid, fullenv) < 0)
+			return NULL;
+	}
+	return ve;
+}
+
+static int env_cb(void *arg, tupid_t tupid, const char *var, const char *value, int type)
+{
+	const char *env;
+	struct tup_entry *tent;
+	if(arg) {}
+	if(type) {}
+
+	env = getenv(var);
+	if(!env)
+		env = "";
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	if(envdb_set(var, strlen(var), env, strlen(env), tent, value) == NULL)
+		return -1;
+	return 0;
+}
+
+int tup_db_check_env(void)
+{
+	if(tup_db_var_foreach(env_dt(), env_cb, NULL) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_db_findenv(const char *var, struct tup_entry **tent)
+{
+	struct var_entry *ve;
+	int varlen = strlen(var);
+
+	ve = vardb_get(&envdb, var, varlen);
+	if(!ve) {
+		struct tup_entry *newtent;
+		const char *newenv;
+
+		newtent = tup_db_node_insert(env_dt(), var, varlen, TUP_NODE_VAR, -1);
+		if(!newtent)
+			return -1;
+		newenv = getenv(var);
+		if(!newenv)
+			newenv = "";
+		ve = envdb_set(var, varlen, newenv, strlen(newenv), newtent, NULL);
+	}
+	*tent = ve->tent;
+	return 0;
+}
+
+int tup_db_get_environ(struct tupid_entries *root,
+		       struct tupid_entries *normal_root, struct tup_env *te)
+{
+	struct var_entry *ve;
+	struct tupid_tree *tt;
+	struct tup_entry *tent;
+	char *cur;
+
+	te->block_size = 1;
+	te->num_entries = 0;
+	RB_FOREACH(tt, tupid_entries, root) {
+		tent = tup_entry_find(tt->tupid);
+		/* If we don't find the tent, that means it can't be an
+		 * environment variable, since all environment variables are
+		 * added during the env_cb or during export from the parser.
+		 */
+		if(tent && tent->dt == env_dt()) {
+			ve = vardb_get(&envdb, tent->name.s, tent->name.len);
+			if(!ve) {
+				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
+				return -1;
+			}
+			te->block_size += strlen(ve->value) + 1;
+			te->num_entries++;
+
+			/* Remove the environment variable from the normal
+			 * tree to make sure that it doesn't get culled after
+			 * the command completes. We do this here because we
+			 * know we need all environment variables, and they
+			 * won't get a corresponding read request during
+			 * execution.
+			 */
+			if(normal_root)
+				tupid_tree_remove(normal_root, tt->tupid);
+		}
+	}
+	te->envblock = malloc(te->block_size);
+	if(!te->envblock) {
+		perror("malloc");
+		return -1;
+	}
+	cur = te->envblock;
+	RB_FOREACH(tt, tupid_entries, root) {
+		tent = tup_entry_find(tt->tupid);
+		if(tent && tent->dt == env_dt()) {
+			ve = vardb_get(&envdb, tent->name.s, tent->name.len);
+			if(!ve) {
+				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
+				return -1;
+			}
+			memcpy(cur, ve->value, ve->vallen);
+			cur[ve->vallen] = 0;
+			cur += ve->vallen + 1;
+		}
+	}
+	*cur = 0;
+	return 0;
+}
+
+tupid_t env_dt(void)
+{
+	static tupid_t local_env_dt = -1;
+	struct tup_entry *envtent;
+
+	if(local_env_dt != -1)
+		return local_env_dt;
+
+	if(tup_entry_add(DOT_DT, NULL) < 0)
+		return -1;
+	if(tup_db_select_tent(DOT_DT, "$", &envtent) < 0) {
+		return -1;
+	}
+	if(!envtent) {
+		envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
+		if(!envtent) {
+			fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
+			return -1;
+		}
+	}
+	local_env_dt = envtent->tnode.tupid;
+	return local_env_dt;
+}
+
 int tup_db_scan_begin(struct tupid_entries *root)
 {
 	if(tup_db_begin() < 0)
@@ -3383,6 +3549,7 @@ int tup_db_scan_begin(struct tupid_entries *root)
 	if(files_to_tree(root) < 0)
 		return -1;
 	tupid_tree_remove(root, VAR_DT);
+	tupid_tree_remove(root, env_dt());
 	return 0;
 }
 
@@ -3440,6 +3607,11 @@ static int files_to_tree(struct tupid_entries *root)
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		return -1;
 	}
+
+	/* Some things may add entrys before we get here (eg: env_dt()), but
+	 * the entry table needs to be clear before we use tup_entry_add_all()
+	 */
+	tup_entry_clear();
 
 	while(1) {
 		tupid_t tupid;
@@ -3530,7 +3702,7 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 	return rc;
 }
 
-static int get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
+int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 		     struct tupid_entries *normal_root)
 {
 	int rc = 0;
@@ -3576,7 +3748,7 @@ static int get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 		}
 
 		if(rc < 0) {
-			fprintf(stderr, "tup error: get_links() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
+			fprintf(stderr, "tup error: tup_db_get_links() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
 			break;
 		}
 	}
@@ -3733,6 +3905,7 @@ struct write_input_data {
 	tupid_t cmdid;
 	struct tupid_entries *normal_root;
 	struct tupid_entries *delete_root;
+	struct tupid_entries *env_root;
 };
 
 static int add_sticky(tupid_t tupid, void *data)
@@ -3742,7 +3915,20 @@ static int add_sticky(tupid_t tupid, void *data)
 
 	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
 		/* Not a normal link, insert it */
-		rc = link_insert(tupid, wid->cmdid, TUP_LINK_STICKY);
+		int style = TUP_LINK_STICKY;
+		if(tupid_tree_search(wid->env_root, tupid) != NULL) {
+			/* Environment links have to be normal so we can
+			 * build the graph properly when they are modified.
+			 */
+			style |= TUP_LINK_NORMAL;
+
+			/* Also need to make sure we run the command in case this
+			 * is a new environment variable.
+			 */
+			if(tup_db_add_modify_list(wid->cmdid) < 0)
+				return -1;
+		}
+		rc = link_insert(tupid, wid->cmdid, style);
 	} else {
 		/* Currently just a normal link, update it */
 		rc = link_update(tupid, wid->cmdid, TUP_LINK_NORMAL | TUP_LINK_STICKY);
@@ -3782,6 +3968,7 @@ static int rm_sticky(tupid_t tupid, void *data)
 }
 
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
+			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root)
 {
 	struct tupid_entries sticky_root = {NULL};
@@ -3790,9 +3977,10 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		.cmdid = cmdid,
 		.normal_root = &normal_root,
 		.delete_root = delete_root,
+		.env_root = env_root,
 	};
 
-	if(get_links(cmdid, &sticky_root, &normal_root) < 0)
+	if(tup_db_get_links(cmdid, &sticky_root, &normal_root) < 0)
 		return -1;
 	if(compare_trees(input_root, &sticky_root, &wid,
 			 add_sticky, rm_sticky) < 0)
@@ -3804,7 +3992,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 
 struct actual_input_data {
 	tupid_t cmdid;
-	struct tupid_entries sticky_root;
+	struct tupid_entries *sticky_root;
 	struct tupid_entries output_root;
 	struct tupid_entries missing_input_root;
 };
@@ -3840,7 +4028,7 @@ static int new_normal_link(tupid_t tupid, void *data)
 	if(tupid_tree_search(&aid->missing_input_root, tupid) != NULL)
 		return 0;
 
-	if(tupid_tree_search(&aid->sticky_root, tupid) == NULL) {
+	if(tupid_tree_search(aid->sticky_root, tupid) == NULL) {
 		/* Not a sticky link, insert it */
 		rc = link_insert(tupid, aid->cmdid, TUP_LINK_NORMAL);
 	} else {
@@ -3854,7 +4042,7 @@ static int del_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
 
-	if(tupid_tree_search(&aid->sticky_root, tupid) == NULL) {
+	if(tupid_tree_search(aid->sticky_root, tupid) == NULL) {
 		/* Not a sticky link, kill it. Also check if it was a ghost
 		 * (t5054).
 		 */
@@ -3910,13 +4098,14 @@ static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_r
 }
 
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
-			       struct tup_entry_head *readhead)
+			       struct tup_entry_head *readhead,
+			       struct tupid_entries *sticky_root,
+			       struct tupid_entries *normal_root)
 {
-	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
 		.cmdid = cmdid,
-		.sticky_root = {NULL},
+		.sticky_root = sticky_root,
 		.output_root = {NULL},
 		.missing_input_root = {NULL},
 	};
@@ -3924,9 +4113,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 
 	if(get_output_tree(cmdid, &aid.output_root) < 0)
 		return -1;
-	if(get_links(cmdid, &aid.sticky_root, &normal_root) < 0)
-		return -1;
-	if(tupid_tree_copy(&sticky_copy, &aid.sticky_root) < 0)
+	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
 		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
@@ -3935,13 +4122,11 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(f, &aid.missing_input_root, &aid.sticky_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root);
 
-	if(compare_list_tree(readhead, &normal_root, &aid,
+	if(compare_list_tree(readhead, normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
 		return -1;
-	free_tupid_tree(&aid.sticky_root);
-	free_tupid_tree(&normal_root);
 	free_tupid_tree(&sticky_copy);
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
@@ -4034,7 +4219,7 @@ int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
 		.dt = dt,
 	};
 
-	if(get_links(dt, &sticky_root, &normal_root) < 0)
+	if(tup_db_get_links(dt, &sticky_root, &normal_root) < 0)
 		return -1;
 	if(!RB_EMPTY(&sticky_root)) {
 		/* All links to directories should be TUP_LINK_NORMAL */

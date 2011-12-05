@@ -28,6 +28,7 @@
 #include "tup/entry.h"
 #include "tup/config.h"
 #include "tup/flist.h"
+#include "tup/environ.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
@@ -191,7 +192,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
-int server_exec(struct server *s, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent)
 {
 	int rc = -1;
@@ -213,6 +214,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 
 	int need_sh = strncmp(cmd, "./", 2) == 0;
 	if(dtent) {}
+	if(newenv) {/* TODO */}
 
 	if(start_server(s) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
@@ -326,9 +328,10 @@ int server_parser_stop(struct server *s)
 	return 0;
 }
 
-int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
+int server_run_script(tupid_t tupid, const char *cmdline,
+		      struct tupid_entries *env_root, char **rules)
 {
-	if(tupid || cmdline || rules) {/* unsupported */}
+	if(tupid || cmdline || env_root || rules) {/* unsupported */}
 	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
 	return -1;
 }

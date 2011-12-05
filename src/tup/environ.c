@@ -18,25 +18,24 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_master_fork_h
-#define tup_master_fork_h
+#include "environ.h"
+#include "tupid_tree.h"
+#include "entry.h"
+#include "db.h"
 
-#include "tup/compat.h"
-#include "tup/tupid.h"
-
-struct tup_env;
-
-struct execmsg {
-	tupid_t sid;
-	int joblen;
-	int dirlen;
-	int cmdlen;
-	int envlen;
-	int num_env_entries;
-	int single_output;
+static const char *default_env[] = {
+	"PATH",
 };
 
-int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, const char *newenv, int *status);
-
-#endif
+int environ_add_defaults(struct tupid_entries *root)
+{
+	unsigned int x;
+	struct tup_entry *tent;
+	for(x=0; x<sizeof(default_env) / sizeof(default_env[0]); x++) {
+		if(tup_db_findenv(default_env[x], &tent) < 0)
+			return -1;
+		if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
+			return -1;
+	}
+	return 0;
+}

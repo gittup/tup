@@ -27,6 +27,8 @@
 #include "tup/flist.h"
 #include "tup/debug.h"
 #include "tup/fslurp.h"
+#include "tup/environ.h"
+#include "tup/db.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -336,7 +338,7 @@ static int virt_tup_close(struct server *s)
 	return 0;
 }
 
-static int exec_internal(struct server *s, const char *cmd,
+static int exec_internal(struct server *s, const char *cmd, struct tup_env *newenv,
 			 struct tup_entry *dtent, int single_output)
 {
 	int status;
@@ -347,6 +349,8 @@ static int exec_internal(struct server *s, const char *cmd,
 
 	em.sid = s->id;
 	em.single_output = single_output;
+	em.envlen = newenv->block_size;
+	em.num_env_entries = newenv->num_entries;
 	em.joblen = snprintf(job, PATH_MAX, TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
 
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
@@ -363,7 +367,7 @@ static int exec_internal(struct server *s, const char *cmd,
 		return -1;
 	}
 	em.cmdlen = strlen(cmd) + 1;
-	if(master_fork_exec(&em, job, dir, cmd, &status) < 0) {
+	if(master_fork_exec(&em, job, dir, cmd, newenv->envblock, &status) < 0) {
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
 		return -1;
 	}
@@ -411,7 +415,7 @@ static int exec_internal(struct server *s, const char *cmd,
 	return 0;
 }
 
-int server_exec(struct server *s, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent)
 {
 	int rc;
@@ -421,7 +425,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
 
-	rc = exec_internal(s, cmd, dtent, 1);
+	rc = exec_internal(s, cmd, newenv, dtent, 1);
 
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		return -1;
@@ -435,10 +439,15 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
-int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
+int server_run_script(tupid_t tupid, const char *cmdline,
+		      struct tupid_entries *env_root, char **rules)
 {
 	struct tup_entry *tent;
 	struct server s;
+	struct tup_env te;
+
+	if(tup_db_get_environ(env_root, NULL, &te) < 0)
+		return -1;
 
 	s.id = curid;
 	s.output_fd = -1;
@@ -447,8 +456,9 @@ int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
 	s.exit_status = 0;
 	s.signalled = 0;
 	tent = tup_entry_get(tupid);
-	if(exec_internal(&s, cmdline, tent, 0) < 0)
+	if(exec_internal(&s, cmdline, &te, tent, 0) < 0)
 		return -1;
+	environ_free(&te);
 
 	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
 		return -1;
