@@ -47,8 +47,19 @@ void tup_show_message(const char *s)
 		printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
 }
 
+static void clear_active(FILE *f)
+{
+	if(is_active) {
+		printf("\r                             \r");
+		is_active = 0;
+		if(f == stderr)
+			fflush(stdout);
+	}
+}
+
 void tup_main_progress(const char *s)
 {
+	clear_active(stdout);
 	cur_phase++;
 	tup_show_message(s);
 }
@@ -66,12 +77,7 @@ static void show_bar(FILE *f, int node_type, int show_percent)
 		int fill;
 		char buf[12];
 
-		if(is_active) {
-			printf("\r                             \r");
-			is_active = 0;
-			if(f == stderr)
-				fflush(stdout);
-		}
+		clear_active(f);
 
 		/* If it's a good enough limit for Final Fantasy VII, it's good
 		 * enough for me.
