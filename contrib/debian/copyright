@@ -1,0 +1,24 @@
+This package was debianized by Anatol Pomozov <anatol.pomozov@gmail.com> on
+Thu, 3 Nov 2011 14:47:44 -0700.
+
+It was downloaded from http://gittup.org/tup/
+
+Upstream Author:
+
+    Mike Shal <marfey@gmail.com>
+
+Copyright:
+
+    Copyright 2011, Mike Shal
+
+License: GPL-2
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 2 as
+    published by the Free Software Foundation.
+
+    On Debian systems, the complete text of the GNU General Public License
+    can be found in the /usr/share/common-licenses/GPL-2 file.
+
+The Debian packaging is copyright 2011, Mike Shal and
+is licensed under the GPL, see `/usr/share/common-licenses/GPL-2'.
