@@ -3,6 +3,7 @@ include_rules
 # Changes here need to be reflected in the bootstrap.sh file
 ifeq (@(TUP_PLATFORM),linux)
 ifeq (@(TUP_DEBUG_LINUX_USE_COMPAT),y)
+	srcs += clearenv.c
 	srcs += dir_mutex.c
 
 	srcs += faccessat.c
@@ -22,6 +23,7 @@ endif
 endif
 
 ifeq (@(TUP_PLATFORM),macosx)
+srcs += clearenv.c
 srcs += dir_mutex.c
 
 srcs += faccessat.c

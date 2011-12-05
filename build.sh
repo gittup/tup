@@ -18,6 +18,7 @@ case "$os" in
 	plat_cflags="$plat_cflags -D_REENTRANT"
 	;;
 	Darwin)
+	plat_files="$plat_files ../src/compat/clearenv.c "
 	plat_files="$plat_files ../src/compat/dir_mutex.c "
 	plat_files="$plat_files ../src/compat/faccessat.c"
 	plat_files="$plat_files ../src/compat/fchmodat.c"
