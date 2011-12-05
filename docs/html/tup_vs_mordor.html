@@ -1,14 +1,15 @@
 <p>Similar to the <a href="make_vs_tup.html">make vs tup</a> page, this page compares tup to the All-Seeing Eye of Mordor. Most people cannot harness the unfathomable power of the All-Seeing Eye of Mordor for their everyday build system, so you cannot expect to get the same build times that he achieves. Fortunately he was kind enough to stop looking for The Ring for a second and unleash his fury on my test cases to show how inferior tup is.</p>
-<p><div class="img">
-	<div class="desc">1) Single C file changed</div>
-	<img src="tup_vs_eye-c_file.png">
-</div></p>
-<p><div class="img">
-	<div class="desc">2) Single H file changed</div>
-	<img src="tup_vs_eye-h_file.png">
-</div></p>
 <p>These tests use the same setup as with the make comparison - project sizes from 1 to 100,000. The tup times are the same as before. The All-Seeing Eye of Mordor does not need dependencies to operate. He just compiles the things he needs to compile and links the things that need linking and doesn't even think twice about it. Also he tries to compile things several times to see which run is fastest, and then goes back in time and uses the fastest time as his measurement. In comparison, tup's times are averaged. You may wonder why he cares about build times at all if he can time travel, or why he would even need to build software to begin with as opposed to just doing <span class="cmd">cat &gt; hello_world</span> and write the machine code correctly the first time. Or why he wouldn't just get a troll to do it. Unfortunately, being human, you and I cannot comprehend the genius that is the Eye, so we have to take it for what it is.</p>
 <p>Actually, I just wrote a C program that forks and runs the commands necessary to do an update. I figured that would remove any shell overhead, but I didn't really check. It's in the git repository as eye-of-mordor.c. The commands are hard-coded for these specific testcases, so it's not very useful aside from generating the info for this page. Obviously if there was any real program that could outperform tup I would just use that. But there isn't.</p>
 <p>As you can see, tup is approximately a constant factor increase in time over an impossible to achieve perfect solution. In all cases here, tup adds about 13-22% overhead in order to do dependency management. This number is wildly inaccurate for any real purposes, since normally you will be compiling C files with more than 2 lines in them. In those cases, the compile time will dwarf the amount of time that tup uses to lookup and handle dependencies.</p>
 <p>I suppose I could compare tup to the Eye for an initial build too, but it already took me long enough to setup these two cases. Hobbits have made the journey to Mordor in less time[1] than it takes me to code up a crappy oracle machine.</p>
 <p>[1] Maximum respect to team foosball co-champion Andy B. for that gem.</p>
+
+<p><div class="img">
+  <div class="desc">1) Single C file changed</div>
+  <img src="tup_vs_eye-c_file.png">
+</div></p>
+<p><div class="img">
+  <div class="desc">2) Single H file changed</div>
+  <img src="tup_vs_eye-h_file.png">
+</div></p>

@@ -2,8 +2,8 @@
 pre {
 	border: 1px solid silver;
 	border-radius: 0.25em;
+	-moz-border-radius: 0.25em;
 	margin-left: 2em;
-	margin-right: 2em;
 	padding: 5px 10px 5px 10px;
 	background-color: #ffffdd;
 	overflow: auto;
@@ -16,7 +16,7 @@ span.prompt {
 
 span.fileheader {
 	border-style: solid;
-	border-width: 1;
+	border-width: 1px;
 	margin-left: 0em;
 	margin-right: 0em;
 	padding: 0px 10px 0px 10px;
@@ -26,7 +26,7 @@ span.fileheader {
 
 span.modfileheader {
 	border-style: solid;
-	border-width: 1;
+	border-width: 1px;
 	margin-left: 0em;
 	margin-right: 0em;
 	padding: 0px 10px 0px 10px;
@@ -36,7 +36,7 @@ span.modfileheader {
 
 span.samefileheader {
 	border-style: solid;
-	border-width: 1;
+	border-width: 1px;
 	margin-left: 0em;
 	margin-right: 0em;
 	padding: 0px 10px 0px 10px;
@@ -62,7 +62,7 @@ span.removed {
 	text-decoration: line-through;
 }
 span.added {
-	background-color:#00ffff;
+	background-color: #00ffff;
 }
 
 span.cmd {
@@ -73,30 +73,38 @@ span.cmd {
 pre.code {
 	display: block;
 	border-style: solid;
-	border-width: 1;
+	border-width: 1px;
 	margin-left: 2em;
-	margin-right: 2em;
 	padding: 5px 10px 5px 10px;
 	background-color: #eeeeee;
 	overflow: auto;
 }
 
 div.img {
-	display:inline;
-	margin:3px;
+	display: inline;
+	margin-right: 1em;
+	margin-bottom: 1em;
 	border: 1px solid silver;
 	border-radius: 0.25em;
-	height:auto;
-	width:auto;
-	float:right;
-	text-align:center;
-	clear:right;
+	-moz-border-radius: 0.25em;
+	float: left;
+	text-align: center;
+	overflow: hidden;
+}
+
+div.img img {
+	float: left;
 }
 
 div.desc {
-	text-align:center;
-	font-weight:normal;
-	margin:2px;
+	text-align: center;
+	font-weight: normal;
+	margin: 2px;
+}
+
+hr {
+	border-style: solid;
+	color: silver;
 }
 
 sup {
@@ -132,7 +140,7 @@ div#content {
 div#footer {
 	margin-top: 1.6ex;
 	font-size: 8.5pt;
-	color: gray;
+	color: silver;
 	text-align: center;
 }
 
@@ -156,8 +164,9 @@ div#footer {
 }
 
 .submenu {
-	padding-left: 2em;
-	list-style: circle;
+	padding-left: 1em;
+	list-style: none;
+	font-size: smaller;
 }
 
 a:link, a:visited {
