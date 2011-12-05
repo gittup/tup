@@ -191,7 +191,5 @@ Output from test.sh
 <span class="prompt">$</span> tup graph --no-dirs . | dot -Tpng &gt; ~/ex_deps_2.png
 </pre>
 <div class="img"><img src="ex_deps_2.png"></div>
-<div style="clear:both"></div>
-
 <p>Here we can see that not all of the input dependency arrows are the same. There are solid lines and dotted lines, as well as filled in arrows and empty arrows. The actual details of how tup handles these are beyond the scope of this example. The important thing to see here is that tup still keeps track of the fact that the shell script has a dependency on the <span class="filename">unused.txt</span> file, but because the file was never actually read from by the script, it cannot possibly have an effect on the output file (this fact is represented by the dotted line). Therefore, tup knows that if <span class="filename">unused.txt</span> changes, the script does not need to run again.</p>
 <p>However, the presence of the dotted-line dependency means that if <span class="filename">unused.txt</span> is changed and at the same time <span class="filename">test.sh</span> is changed to read from that file, tup is guaranteed to execute them in the correct order. In this sense, inputs in Tupfiles are only for ordering, and dependencies determined automatically during program execution are used for re-executing commands. For more insight into why this is useful, see the <a href="ex_generated_header.html">generated header example</a>.</p>
