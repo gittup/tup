@@ -297,29 +297,31 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 * going to open anything.
 	 */
 	if(strncmp(peeled, get_tup_top(), get_tup_top_len()) == 0 &&
-	   peeled[get_tup_top_len()] == '/' &&
-	   strncmp(peeled + get_tup_top_len() + 1, TUP_VAR_VIRTUAL_DIR, TUP_VAR_VIRTUAL_DIR_LEN) == 0) {
-		const char *var = peeled + get_tup_top_len() + 1 + TUP_VAR_VIRTUAL_DIR_LEN;
-		if(var[0] == 0) {
-			stbuf->st_mode = S_IFDIR | 0755;
-			stbuf->st_nlink = 2;
-			return 0;
-		} else {
-			/* skip '/' */
-			var++;
+	   peeled[get_tup_top_len()] == '/') {
+		const char *var = strstr(peeled + get_tup_top_len() + 1, TUP_VAR_VIRTUAL_DIR);
+		if(var) {
+			var += TUP_VAR_VIRTUAL_DIR_LEN;
+			if(var[0] == 0) {
+				stbuf->st_mode = S_IFDIR | 0755;
+				stbuf->st_nlink = 2;
+				return 0;
+			} else {
+				/* skip '/' */
+				var++;
 
-			if(finfo) {
-				finfo_lock(finfo);
-				if(handle_open_file(ACCESS_VAR, var, finfo) < 0) {
-					fprintf(stderr, "tup error: Unable to save dependency on @-%s\n", var);
-					return 1;
+				if(finfo) {
+					finfo_lock(finfo);
+					if(handle_open_file(ACCESS_VAR, var, finfo) < 0) {
+						fprintf(stderr, "tup error: Unable to save dependency on @-%s\n", var);
+						return 1;
+					}
+					finfo_unlock(finfo);
 				}
-				finfo_unlock(finfo);
+				/* Always return error, since we can't actually open
+				 * an @-variable.
+				 */
+				return -1;
 			}
-			/* Always return error, since we can't actually open
-			 * an @-variable.
-			 */
-			return -1;
 		}
 	}
 
