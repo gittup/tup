@@ -113,10 +113,10 @@ static void show_bar(FILE *f, int node_type, int show_percent)
 		/* TUP_NODE_ROOT means an error - fill the whole bar so it's
 		 * obvious.
 		 */
-		if(node_type == TUP_NODE_ROOT)
+		if(node_type == TUP_NODE_ROOT || sum == total)
 			fill = bar_width;
 		else
-			fill = bar_width * sum / total;
+			fill = (bar_width + 1) * sum / total;
 
 		color_set(f);
 		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), bar_width-fill, buf+fill);
