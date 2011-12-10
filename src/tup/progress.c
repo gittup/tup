@@ -30,6 +30,8 @@ static int sum;
 static int total;
 static int is_active = 0;
 static int stdout_isatty;
+static int bar_width;
+static const char *bar_fmt, *bar_fmt_percent;
 
 void progress_init(void)
 {
@@ -68,35 +70,56 @@ void start_progress(int new_total)
 {
 	sum = 0;
 	total = new_total;
+
+	if (total > 9999) {
+		/* If it's a good enough limit for Final Fantasy VII, it's good
+		 * enough for me.
+		 */
+		bar_width = 7;
+		bar_fmt_percent = " %3i%%  ";
+		bar_fmt = NULL; // not used
+	} else if (total > 999) {
+		bar_width = 11;
+		bar_fmt_percent = "   %3i%%    ";
+		bar_fmt = " %4i/%-4i ";
+	} else if (total > 99) {
+		bar_width = 9;
+		bar_fmt_percent = "  %3i%%   ";
+		bar_fmt = " %3i/%-3i ";
+	} else if (total > 9) {
+		bar_width = 7;
+		bar_fmt_percent = " %3i%%  ";
+		bar_fmt = " %2i/%-2i ";
+	} else {
+		bar_width = 5;
+		bar_fmt_percent = "%3i%% ";
+		bar_fmt = " %1i/%-1i ";
+	}
 }
 
 static void show_bar(FILE *f, int node_type, int show_percent)
 {
 	if(total) {
-		const int max = 11;
 		int fill;
 		char buf[12];
 
 		clear_active(f);
 
-		/* If it's a good enough limit for Final Fantasy VII, it's good
-		 * enough for me.
-		 */
 		if(total > 9999 || show_percent) {
-			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/total);
+			snprintf(buf, sizeof(buf), bar_fmt_percent, sum*100/total);
 		} else {
-			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
+			snprintf(buf, sizeof(buf), bar_fmt, sum, total);
 		}
 		/* TUP_NODE_ROOT means an error - fill the whole bar so it's
 		 * obvious.
 		 */
 		if(node_type == TUP_NODE_ROOT)
-			fill = max;
+			fill = bar_width;
 		else
-			fill = max * sum / total;
+			fill = bar_width * sum / total;
 
 		color_set(f);
-		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
+		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), bar_width-fill, buf+fill);
 	}
 }
 
