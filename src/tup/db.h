@@ -35,6 +35,7 @@
 
 struct tup_entry;
 struct tup_entry_head;
+struct tup_env;
 
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
@@ -122,8 +123,11 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root);
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
+			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root);
 int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root);
+int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
+		     struct tupid_entries *normal_root);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -144,8 +148,15 @@ int tup_db_set_var(tupid_t tupid, const char *value);
 struct tup_entry *tup_db_get_var(const char *var, int varlen, char **dest);
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(const char *var, int varlen);
-int tup_db_var_foreach(int (*callback)(void *, const char *var, const char *value, int type), void *arg);
+int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
 int tup_db_read_vars(tupid_t dt, const char *file);
+
+/* Environment operations */
+int tup_db_check_env(void);
+int tup_db_findenv(const char *var, struct tup_entry **tent);
+int tup_db_get_environ(struct tupid_entries *root,
+		       struct tupid_entries *normal_root, struct tup_env *te);
+tupid_t env_dt(void);
 
 /* Tree operations */
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type);
@@ -158,6 +169,8 @@ int tup_db_scan_end(struct tupid_entries *root);
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead);
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
-			       struct tup_entry_head *readhead);
+			       struct tup_entry_head *readhead,
+			       struct tupid_entries *sticky_root,
+			       struct tupid_entries *normal_root);
 
 #endif

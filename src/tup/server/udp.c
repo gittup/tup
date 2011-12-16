@@ -28,6 +28,7 @@
 #include "tup/entry.h"
 #include "tup/config.h"
 #include "tup/flist.h"
+#include "tup/environ.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
@@ -125,6 +126,7 @@ int server_quit(void)
  *    handle)
  */
 static int create_process(struct server *s, int dfd, char *cmdline,
+			  struct tup_env *newenv,
 			  PROCESS_INFORMATION *pi)
 {
 	STARTUPINFOA sa;
@@ -178,7 +180,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 		NULL,
 		TRUE,
 		CREATE_SUSPENDED,
-		NULL,
+		newenv->envblock,
 		NULL,
 		&sa,
 		pi);
@@ -191,7 +193,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
-int server_exec(struct server *s, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent)
 {
 	int rc = -1;
@@ -236,7 +238,7 @@ int server_exec(struct server *s, int dfd, const char *cmd,
 	}
 
 	pthread_mutex_lock(&dir_mutex);
-	rc = create_process(s, dfd, cmdline, &pi);
+	rc = create_process(s, dfd, cmdline, newenv, &pi);
 	pthread_mutex_unlock(&dir_mutex);
 
 	if(rc < 0) {
@@ -326,9 +328,10 @@ int server_parser_stop(struct server *s)
 	return 0;
 }
 
-int server_run_script(tupid_t tupid, const char *cmdline, char **rules)
+int server_run_script(tupid_t tupid, const char *cmdline,
+		      struct tupid_entries *env_root, char **rules)
 {
-	if(tupid || cmdline || rules) {/* unsupported */}
+	if(tupid || cmdline || env_root || rules) {/* unsupported */}
 	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
 	return -1;
 }

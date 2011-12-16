@@ -100,7 +100,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0};
 
 	if(!inited)
 		return 0;
@@ -141,7 +141,7 @@ static int write_all(const void *data, int size)
 }
 
 int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, int *status)
+		     const char *cmd, const char *envstring, int *status)
 {
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	struct status_tree st;
@@ -174,6 +174,8 @@ int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
 	if(write_all(dir, em->dirlen) < 0)
 		goto err_out;
 	if(write_all(cmd, em->cmdlen) < 0)
+		goto err_out;
+	if(write_all(envstring, em->envlen) < 0)
 		goto err_out;
 	pthread_mutex_unlock(&lock);
 	*status = wait_for_my_sid(&st);
@@ -208,15 +210,10 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 }
 
 static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
-			    int vardict_fd, int single_output)
+			    int single_output)
 {
 	int ofd, efd;
-	char fd_name[32];
 	char buf[64];
-
-	snprintf(fd_name, sizeof(fd_name), "%i", vardict_fd);
-	fd_name[31] = 0;
-	setenv(TUP_VARDICT_NAME, fd_name, 1);
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", sid);
 	buf[sizeof(buf)-1] = 0;
@@ -282,7 +279,10 @@ static int master_fork_loop(void)
 	char job[PATH_MAX];
 	char dir[PATH_MAX];
 	char *cmd;
+	char *env;
 	int cmdsize = 4096;
+	int envsize = 4096;
+	int in_valgrind = 0;
 
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
@@ -294,6 +294,19 @@ static int master_fork_loop(void)
 	cmd = malloc(cmdsize);
 	if(!cmd) {
 		perror("malloc");
+		return -1;
+	}
+	env = malloc(envsize);
+	if(!env) {
+		perror("malloc");
+		return -1;
+	}
+
+	if(getenv("TUP_VALGRIND")) {
+		in_valgrind = 1;
+	}
+	if(clearenv() < 0) {
+		perror("clearenv");
 		return -1;
 	}
 
@@ -348,6 +361,17 @@ static int master_fork_loop(void)
 		}
 		if(read_all(msd[0], cmd, em.cmdlen) < 0)
 			return -1;
+		if(em.envlen > envsize) {
+			free(env);
+			envsize = em.envlen;
+			env = malloc(envsize);
+			if(!env) {
+				perror("malloc");
+				return -1;
+			}
+		}
+		if(read_all(msd[0], env, em.envlen) < 0)
+			return -1;
 
 		/* Only open vardict_fd the first time we get an event (this
 		 * avoids annoying synchronization between us and tup, since
@@ -369,14 +393,44 @@ static int master_fork_loop(void)
 			exit(1);
 		}
 		if(pid == 0) {
+			char **envp;
+			char **curp;
+			char *curenv;
+			char fd_name[64];
+
 			if(close(msd[0]) < 0) {
 				perror("close(msd[0])");
 				exit(1);
 			}
 
-			if(setup_subprocess(em.sid, job, dir, vardict_fd, em.single_output) < 0)
+			snprintf(fd_name, sizeof(fd_name), TUP_VARDICT_NAME "=%i", vardict_fd);
+			fd_name[63] = 0;
+
+			/* +1 for the vardict variable, and +1 for the terminating
+			 * NULL pointer.
+			 */
+			envp = malloc((em.num_env_entries + 2) * sizeof(*envp));
+			if(!envp) {
+				perror("malloc");
 				exit(1);
-			execl("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL);
+			}
+			/* Convert from Windows-style environment to
+			 * Linux-style.
+			 */
+			curp = envp;
+			curenv = env;
+			while(*curenv) {
+				*curp = curenv;
+				curp++;
+				curenv += strlen(curenv) + 1;
+			}
+			*curp = fd_name;
+			curp++;
+			*curp = NULL;
+
+			if(setup_subprocess(em.sid, job, dir, em.single_output) < 0)
+				exit(1);
+			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
 			exit(1);
 		}
@@ -409,7 +463,7 @@ static int master_fork_loop(void)
 	if(vardict_fd != -2)
 		if(close(vardict_fd) < 0)
 			perror("close(vardict_fd)");
-	if(getenv("TUP_VALGRIND")) {
+	if(in_valgrind) {
 		if(close(0) < 0)
 			perror("close(0)");
 		if(close(1) < 0)
@@ -418,6 +472,7 @@ static int master_fork_loop(void)
 			perror("close(2)");
 	}
 	free(cmd);
+	free(env);
 	return 0;
 }
 

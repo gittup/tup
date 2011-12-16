@@ -29,6 +29,7 @@
 
 struct tupid_entries;
 struct tup_entry;
+struct tup_env;
 
 struct server {
 	struct file_info finfo;
@@ -61,13 +62,14 @@ int server_pre_init(void);
 int server_post_exit(void);
 int server_init(enum server_mode mode, struct tupid_entries *delete_root);
 int server_quit(void);
-int server_exec(struct server *s, int dfd, const char *cmd,
+int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent);
 int server_postexec(struct server *s);
 int server_is_dead(void);
 int server_parser_start(struct server *s);
 int server_parser_stop(struct server *s);
 
-int server_run_script(tupid_t tupid, const char *cmdline, char **rules);
+int server_run_script(tupid_t tupid, const char *cmdline,
+		      struct tupid_entries *env_root, char **rules);
 
 #endif

@@ -28,6 +28,7 @@
 #include "fslurp.h"
 #include "db.h"
 #include "vardb.h"
+#include "environ.h"
 #include "graph.h"
 #include "config.h"
 #include "bin.h"
@@ -140,6 +141,7 @@ struct tupfile {
 	struct graph *g;
 	struct vardb vdb;
 	struct tupid_entries cmd_root;
+	struct tupid_entries env_root;
 	struct string_entries bang_root;
 	struct tupid_entries input_root;
 	struct string_entries chain_root;
@@ -153,6 +155,7 @@ static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
+static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
@@ -254,11 +257,14 @@ int parse(struct node *n, struct graph *g)
 	tf.root_fd = s.root_fd;
 	tf.g = g;
 	RB_INIT(&tf.cmd_root);
+	RB_INIT(&tf.env_root);
 	RB_INIT(&tf.bang_root);
 	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	if(vardb_init(&tf.vdb) < 0)
+		goto out_server_stop;
+	if(environ_add_defaults(&tf.env_root) < 0)
 		goto out_server_stop;
 
 	/* Keep track of the commands and generated files that we had created
@@ -328,6 +334,7 @@ out_server_stop:
 	}
 
 	free_chain_tree(&tf.chain_root);
+	free_tupid_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
 	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_root);
@@ -461,6 +468,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			rc = include_rules(tf);
 		} else if(strncmp(line, "run ", 4) == 0) {
 			rc = run_script(tf, line+4, lno, &bl);
+		} else if(strncmp(line, "export ", 7) == 0) {
+			rc = export(tf, line+7);
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(line[0] == ':') {
@@ -611,6 +620,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	char *p;
 	int rslno = 0;
 	int rc;
+	struct tupid_tree *tt;
 
 	eval_cmdline = eval(tf, cmdline);
 	if(!eval_cmdline) {
@@ -619,7 +629,15 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 
 	if(debug_run)
 		fprintf(tf->f, " --- run script output from '%s'\n", eval_cmdline);
-	rc = server_run_script(tf->tupid, eval_cmdline, &rules);
+
+	/* Make sure we have a dependency on each environment variable, since
+	 * these are passed to the run script.
+	 */
+	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
+		if(tupid_tree_add_dup(&tf->input_root, tt->tupid) < 0)
+			return -1;
+	}
+	rc = server_run_script(tf->tupid, eval_cmdline, &tf->env_root, &rules);
 	free(eval_cmdline);
 	if(rc < 0)
 		return -1;
@@ -652,6 +670,25 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 out_err:
 	free(rules);
 	return -1;
+}
+
+static int export(struct tupfile *tf, char *cmdline)
+{
+	struct tup_entry *tent = NULL;
+
+	if(!cmdline[0]) {
+		fprintf(stderr, "tup error: Expected environment variable to export.\n");
+		return SYNTAX_ERROR;
+	}
+
+	/* Pull from tup's environment */
+	if(!tup_db_findenv(cmdline, &tent) < 0) {
+		fprintf(stderr, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
+		return -1;
+	}
+	if(tupid_tree_add_dup(&tf->env_root, tent->tnode.tupid) < 0)
+		return -1;
+	return 0;
 }
 
 static int gitignore(struct tupfile *tf)
@@ -2301,6 +2338,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
+	struct tupid_tree *tt;
 	struct tupid_tree *cmd_tt;
 	tupid_t cmdid = -1;
 	struct path_list_head oplist;
@@ -2504,7 +2542,11 @@ out_pl:
 		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &root, &tf->g->delete_root) < 0)
+	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
+		if(tupid_tree_add_dup(&root, tt->tupid) < 0)
+			return -1;
+	}
+	if(tup_db_write_inputs(cmdid, &root, &tf->env_root, &tf->g->delete_root) < 0)
 		return -1;
 	free_tupid_tree(&root);
 	return 0;

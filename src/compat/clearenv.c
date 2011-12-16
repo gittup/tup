@@ -18,25 +18,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_master_fork_h
-#define tup_master_fork_h
+#include <stdio.h>
 
-#include "tup/compat.h"
-#include "tup/tupid.h"
+extern char **environ;
 
-struct tup_env;
-
-struct execmsg {
-	tupid_t sid;
-	int joblen;
-	int dirlen;
-	int cmdlen;
-	int envlen;
-	int num_env_entries;
-	int single_output;
-};
-
-int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, const char *newenv, int *status);
-
-#endif
+int clearenv(void)
+{
+	environ = NULL;
+	return 0;
+}

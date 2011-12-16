@@ -18,25 +18,31 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_master_fork_h
-#define tup_master_fork_h
+#ifndef tup_environ_h
+#define tup_environ_h
 
-#include "tup/compat.h"
-#include "tup/tupid.h"
+struct tupid_entries;
 
-struct tup_env;
+int environ_add_defaults(struct tupid_entries *root);
 
-struct execmsg {
-	tupid_t sid;
-	int joblen;
-	int dirlen;
-	int cmdlen;
-	int envlen;
-	int num_env_entries;
-	int single_output;
+/* This returns the environment in the Windows-style format, where it is one
+ * long string with a "\0\0" to terminate the array. Each individual environment
+ * variable is nul-terminated. Eg:
+ *
+ * PATH=/bin\0FOO=fooval\0\0
+ *
+ * This way Windows can use it directly, and it is easier to serialize to the
+ * master_fork server than a char**.
+ *
+ * The total size of the envblock is block_size bytes, and it contains num_entries
+ * nul-terminated strings.
+ */
+struct tup_env {
+	char *envblock;
+	int block_size;
+	int num_entries;
 };
 
-int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, const char *newenv, int *status);
+#define environ_free(te) free((te)->envblock)
 
 #endif

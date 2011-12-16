@@ -74,6 +74,7 @@ int main(int argc, char **argv)
 	int x;
 	int cmd_arg = 0;
 	const char *cmd = NULL;
+	int in_valgrind = 0;
 
 	for(x=1; x<argc; x++) {
 		if(!cmd && argv[x][0] != '-') {
@@ -102,6 +103,10 @@ int main(int argc, char **argv)
 	if(compat_init() < 0) {
 		fprintf(stderr, "tup error: Unable to initialize compatibility lib\n");
 		return -1;
+	}
+
+	if(getenv("TUP_VALGRIND")) {
+		in_valgrind = 1;
 	}
 
 	argc = argc - cmd_arg;
@@ -206,7 +211,7 @@ int main(int argc, char **argv)
 
 	if(tup_cleanup() < 0)
 		rc = 1;
-	if(getenv("TUP_VALGRIND")) {
+	if(in_valgrind) {
 		/* Also close out the standard file descriptors, so valgrind
 		 * doesn't complain about those as well. The outputs need to be
 		 * flushed, otherwise 'tup options | grep foo' will not see the
@@ -741,11 +746,12 @@ static int rm(int argc, char **argv)
 	return 0;
 }
 
-static int varshow_cb(void *arg, const char *var, const char *value, int type)
+static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, int type)
 {
 	const char *color1 = "";
 	const char *color2 = "";
 	if(arg) {}
+	if(tupid) {}
 	if(type == TUP_NODE_GHOST) {
 		color1 = "[47;30m";
 		color2 = "[0m";
@@ -759,7 +765,7 @@ static int varshow(int argc, char **argv)
 	if(tup_entry_add(VAR_DT, NULL) < 0)
 		return -1;
 	if(argc == 1) {
-		if(tup_db_var_foreach(varshow_cb, NULL) < 0)
+		if(tup_db_var_foreach(VAR_DT, varshow_cb, NULL) < 0)
 			return -1;
 	} else {
 		int x;
