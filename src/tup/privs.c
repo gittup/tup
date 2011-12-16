@@ -49,10 +49,6 @@ int tup_drop_privs(void)
 			perror("setuid");
 			return -1;
 		}
-		if(setuid(0) != -1) {
-			fprintf(stderr, "tup error: Expected setuid(0) to fail.\n");
-			return -1;
-		}
 		privileges_dropped = 1;
 	}
 	return 0;
