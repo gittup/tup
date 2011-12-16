@@ -29,6 +29,7 @@
 #include "tup/fslurp.h"
 #include "tup/environ.h"
 #include "tup/db.h"
+#include "tup/privs.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -233,6 +234,18 @@ int server_init(enum server_mode mode, struct tupid_entries *delete_root)
 	if(server_debug_enabled()) {
 		if(fuse_opt_add_arg(&args, "-d") < 0)
 			return -1;
+	}
+	if(tup_privileged()) {
+#ifdef __APPLE__
+		/* allow_root seems to not work in OSX. The option parses
+		 * correctly, but chroot() fails with 'Operation not permitted'.
+		 */
+		if(fuse_opt_add_arg(&args, "-oallow_other") < 0)
+			return -1;
+#else
+		if(fuse_opt_add_arg(&args, "-oallow_root") < 0)
+			return -1;
+#endif
 	}
 #ifdef __APPLE__
 	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)

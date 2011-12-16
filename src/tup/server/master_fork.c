@@ -24,6 +24,7 @@
 #include "tup/db.h"
 #include "tup/tupid_tree.h"
 #include "tup/container.h"
+#include "tup/privs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/mount.h>
 #include <signal.h>
 
 struct rcmsg {
@@ -223,6 +225,11 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
 		return -1;
 	}
+	if(fchown(ofd, getuid(), getgid()) < 0) {
+		perror("fchown");
+		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+		return -1;
+	}
 
 	if(single_output) {
 		efd = ofd;
@@ -232,6 +239,11 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		efd = creat(buf, 0600);
 		if(efd < 0) {
 			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+			return -1;
+		}
+		if(fchown(efd, getuid(), getgid()) < 0) {
+			perror("fchown");
 			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
 			return -1;
 		}
@@ -257,10 +269,54 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		}
 	}
 
-	if(chdir(job) < 0) {
-		perror("chdir");
-		fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
-		return -1;
+	if(tup_privileged()) {
+		char *dev;
+		char slashdev[] = "/dev";
+		int joblen = strlen(job);
+
+		dev = malloc(joblen + sizeof(slashdev));
+		if(!dev) {
+			perror("malloc");
+			return -1;
+		}
+		memcpy(dev, job, joblen);
+		memcpy(dev+joblen, slashdev, sizeof(slashdev));
+
+#ifdef __APPLE__
+		if(mount("devfs", dev, 0, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
+			return -1;
+		}
+#else
+		/* The "tmpfs" argument is ignored since we use MS_BIND, but
+		 * valgrind complains about it if we use NULL.
+		 */
+		if(mount(slashdev, dev, "tmpfs", MS_BIND, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
+			return -1;
+		}
+#endif
+		free(dev);
+		if(chroot(job) < 0) {
+			perror("chroot");
+			return -1;
+		}
+		if(chdir("/") < 0) {
+			perror("chdir");
+			fprintf(stderr, "tup error: Unable to chdir to root directory.\n");
+			return -1;
+		}
+		if(tup_drop_privs() < 0) {
+			return -1;
+		}
+	} else {
+		if(chdir(job) < 0) {
+			perror("chdir");
+			fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
+			return -1;
+		}
 	}
 	if(chdir(dir) < 0) {
 		perror("chdir");

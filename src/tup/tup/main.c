@@ -41,6 +41,7 @@
 #include "tup/varsed.h"
 #include "tup/access_event.h"
 #include "tup/option.h"
+#include "tup/privs.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -114,6 +115,8 @@ int main(int argc, char **argv)
 
 	/* Commands that can run as a sub-process to tup (eg: in a :-rule) */
 	if(strcmp(cmd, "varsed") == 0) {
+		if(tup_drop_privs() < 0)
+			return 1;
 		return varsed(argc, argv);
 	}
 
@@ -127,11 +130,17 @@ int main(int argc, char **argv)
 
 	/* Commands that don't use a normal tup_init() */
 	if(strcmp(cmd, "init") == 0) {
+		if(tup_drop_privs() < 0)
+			return 1;
 		return init(argc, argv);
 	} else if(strcmp(cmd, "version") == 0) {
+		if(tup_drop_privs() < 0)
+			return 1;
 		version();
 		return 0;
 	} else if(strcmp(cmd, "stop") == 0) {
+		if(tup_drop_privs() < 0)
+			return 1;
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
 	}
 

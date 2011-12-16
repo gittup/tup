@@ -26,6 +26,7 @@
 #include "server.h"
 #include "option.h"
 #include "colors.h"
+#include "privs.h"
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -37,6 +38,9 @@ int tup_init(void)
 	}
 	if(server_pre_init() < 0) {
 		return -1;
+	}
+	if(tup_drop_privs() < 0) {
+		goto out_err;
 	}
 	if(open_tup_top() < 0) {
 		goto out_err;

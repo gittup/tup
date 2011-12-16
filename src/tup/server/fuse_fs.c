@@ -36,6 +36,7 @@
 #include "tup/server.h"
 #include "tup/container.h"
 #include "tup/db.h"
+#include "tup/privs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
