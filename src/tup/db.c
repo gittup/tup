@@ -20,7 +20,6 @@
 
 #define _ATFILE_SOURCE
 #include "db.h"
-#include "db_util.h"
 #include "array_size.h"
 #include "tupid_tree.h"
 #include "fileio.h"
@@ -188,7 +187,19 @@ int tup_db_open(void)
 
 int tup_db_close(void)
 {
-	return db_close(tup_db, stmts, ARRAY_SIZE(stmts));
+	int x;
+
+	for(x=0; x<ARRAY_SIZE(stmts); x++) {
+		if(stmts[x])
+			sqlite3_finalize(stmts[x]);
+	}
+
+	if(sqlite3_close(tup_db) != 0) {
+		fprintf(stderr, "Unable to close database: %s\n",
+			sqlite3_errmsg(tup_db));
+		return -1;
+	}
+	return 0;
 }
 
 int tup_db_create(int db_sync)
