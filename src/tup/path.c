@@ -23,10 +23,8 @@
 #include "path.h"
 #include "flist.h"
 #include "fileio.h"
-#include "monitor.h"
 #include "db.h"
 #include "config.h"
-#include "entry.h"
 #include "compat.h"
 #include <stdio.h>
 #include <string.h>

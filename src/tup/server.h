@@ -21,10 +21,7 @@
 #ifndef server_h
 #define server_h
 
-#include "access_event.h"
-#include "compat.h"
 #include "file.h"
-#include "pel_group.h"
 #include <pthread.h>
 
 struct tupid_entries;

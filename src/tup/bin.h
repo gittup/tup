@@ -22,7 +22,6 @@
 #define tup_bin_h
 
 #include "bsd/queue.h"
-#include "tupid.h"
 
 struct tup_entry;
 

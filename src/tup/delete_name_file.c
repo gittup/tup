@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 int delete_name_file(tupid_t tupid)
 {

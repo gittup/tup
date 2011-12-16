@@ -18,38 +18,34 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "environ.h"
-#include "entry.h"
-#include "db.h"
+#ifndef tup_db_types_h
+#define tup_db_types_h
 
-static const char *default_env[] = {
-/* NOTE: Please increment PARSER_VERSION if these are modified */
-	"PATH",
-#ifdef _WIN32
-	/* Basic Windows variables */
-	"SYSTEMROOT",
-	/* Visual Studio variables */
-	"DevEnvDir",
-	"INCLUDE",
-	"LIB",
-	"LIBPATH",
-	"VCINSTALLDIR",
-	"VS100COMNTOOLS",
-	"VS90COMNTOOLS",
-	"VSINSTALLDIR",
-#endif
-/* NOTE: Please increment PARSER_VERSION if these are modified */
+#define TUP_DIR ".tup"
+#define TUP_DB_FILE ".tup/db"
+#define TUP_VARDICT_FILE ".tup/vardict"
+#define DOT_DT 1
+#define VAR_DT 2
+
+enum TUP_NODE_TYPE {
+	TUP_NODE_FILE,
+	TUP_NODE_CMD,
+	TUP_NODE_DIR,
+	TUP_NODE_VAR,
+	TUP_NODE_GENERATED,
+	TUP_NODE_GHOST,
+	TUP_NODE_ROOT,
 };
 
-int environ_add_defaults(struct tupid_entries *root)
-{
-	unsigned int x;
-	struct tup_entry *tent;
-	for(x=0; x<sizeof(default_env) / sizeof(default_env[0]); x++) {
-		if(tup_db_findenv(default_env[x], &tent) < 0)
-			return -1;
-		if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
-			return -1;
-	}
-	return 0;
-}
+enum TUP_FLAGS_TYPE {
+	TUP_FLAGS_NONE=0,
+	TUP_FLAGS_MODIFY=1,
+	TUP_FLAGS_CREATE=2,
+};
+
+enum TUP_LINK_TYPE {
+	TUP_LINK_NORMAL=1,
+	TUP_LINK_STICKY=2,
+};
+
+#endif

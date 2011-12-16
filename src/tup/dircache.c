@@ -22,7 +22,6 @@
 #include "container.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 void dircache_init(struct dircache_root *droot)
 {

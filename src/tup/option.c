@@ -29,7 +29,6 @@
 
 #include "option.h"
 #include "vardb.h"
-#include "compat.h"
 #include "inih/ini.h"
 #include <stdio.h>
 #include <stdlib.h>

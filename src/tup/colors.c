@@ -19,10 +19,9 @@
  */
 
 #include "colors.h"
-#include "db.h"
+#include "db_types.h"
 #include "option.h"
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 static int enabled[2];

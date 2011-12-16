@@ -32,7 +32,6 @@
 #include "version.h"
 #include "platform.h"
 #include "monitor.h"
-#include "compat.h"
 #include "container.h"
 #include "option.h"
 #include "environ.h"

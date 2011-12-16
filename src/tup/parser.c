@@ -22,9 +22,7 @@
 #define _ATFILE_SOURCE
 #include "parser.h"
 #include "progress.h"
-#include "flist.h"
 #include "fileio.h"
-#include "pel_group.h"
 #include "fslurp.h"
 #include "db.h"
 #include "vardb.h"
@@ -34,7 +32,6 @@
 #include "bin.h"
 #include "entry.h"
 #include "string_tree.h"
-#include "compat.h"
 #include "container.h"
 #include "if_stmt.h"
 #include "server.h"

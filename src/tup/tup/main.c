@@ -33,6 +33,7 @@
 #include "tup/updater.h"
 #include "tup/debug.h"
 #include "tup/graph.h"
+#include "tup/db.h"
 #include "tup/init.h"
 #include "tup/compat.h"
 #include "tup/version.h"

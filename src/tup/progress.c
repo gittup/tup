@@ -20,7 +20,7 @@
 
 #include "progress.h"
 #include "colors.h"
-#include "db.h"
+#include "db_types.h"
 #include "entry.h"
 #include <stdio.h>
 #include <unistd.h>

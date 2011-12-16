@@ -21,7 +21,7 @@
 #ifndef tup_graph_h
 #define tup_graph_h
 
-#include "db.h"
+#include "bsd/queue.h"
 #include "tupid_tree.h"
 
 struct edge {

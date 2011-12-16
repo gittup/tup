@@ -28,7 +28,6 @@
 #include "parser.h"
 #include "progress.h"
 #include "server.h"
-#include "fslurp.h"
 #include "array_size.h"
 #include "config.h"
 #include "option.h"
@@ -41,9 +40,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
-#include <fcntl.h>
 #include <pthread.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 
 #define MAX_JOBS 65535

@@ -21,7 +21,7 @@
 #include "config.h"
 #include "compat.h"
 #include "colors.h"
-#include "db.h"
+#include "db_types.h"
 #include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -22,7 +22,6 @@
 #define tup_fileio_h
 
 #include "tupid.h"
-#include "bsd/queue.h"
 #include <time.h>
 
 #define TUP_CONFIG "tup.config"

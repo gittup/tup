@@ -20,7 +20,6 @@
 
 #define _ATFILE_SOURCE
 #include "file.h"
-#include "access_event.h"
 #include "debug.h"
 #include "db.h"
 #include "fileio.h"
@@ -31,7 +30,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 static struct file_entry *new_entry(const char *filename);
 static void del_entry(struct file_entry *fent);

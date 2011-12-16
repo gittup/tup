@@ -21,7 +21,6 @@
 #include "privs.h"
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/types.h>
 
 #ifdef _WIN32
 int tup_drop_privs(void)

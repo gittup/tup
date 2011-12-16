@@ -21,42 +21,16 @@
 #ifndef tup_db_h
 #define tup_db_h
 
+#include "db_types.h"
 #include "tupid.h"
 #include "tupid_tree.h"
 #include "bsd/queue.h"
 #include <stdio.h>
 #include <time.h>
 
-#define TUP_DIR ".tup"
-#define TUP_DB_FILE ".tup/db"
-#define TUP_VARDICT_FILE ".tup/vardict"
-#define DOT_DT 1
-#define VAR_DT 2
-
 struct tup_entry;
 struct tup_entry_head;
 struct tup_env;
-
-enum TUP_NODE_TYPE {
-	TUP_NODE_FILE,
-	TUP_NODE_CMD,
-	TUP_NODE_DIR,
-	TUP_NODE_VAR,
-	TUP_NODE_GENERATED,
-	TUP_NODE_GHOST,
-	TUP_NODE_ROOT,
-};
-
-enum TUP_FLAGS_TYPE {
-	TUP_FLAGS_NONE=0,
-	TUP_FLAGS_MODIFY=1,
-	TUP_FLAGS_CREATE=2,
-};
-
-enum TUP_LINK_TYPE {
-	TUP_LINK_NORMAL=1,
-	TUP_LINK_STICKY=2,
-};
 
 /* General operations */
 int tup_db_open(void);

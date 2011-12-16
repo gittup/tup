@@ -24,7 +24,6 @@
 #include "db.h"
 #include "compat.h"
 #include "pel_group.h"
-#include "config.h"
 #include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>
