@@ -48,6 +48,7 @@
 #include <sys/stat.h>
 
 #define SYNTAX_ERROR -2
+#define CIRCULAR_DEPENDENCY_ERROR -3
 
 struct name_list_entry {
 	TAILQ_ENTRY(name_list_entry) list;
@@ -146,7 +147,8 @@ struct tupfile {
 	struct tupid_entries input_root;
 	struct string_entries chain_root;
 	FILE *f;
-	int ign;
+	char ign;
+	char circular_dep_error;
 };
 
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
@@ -236,8 +238,10 @@ int parse(struct node *n, struct graph *g)
 	struct server s;
 
 	if(n->parsing) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles (last dir ID %lli  = '%s').\nThis is madness!\n", n->tnode.tupid, n->tent->name.s);
-		return -1;
+		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
+		print_tup_entry(stderr, n->tent);
+		fprintf(stderr, "\n");
+		return CIRCULAR_DEPENDENCY_ERROR;
 	}
 	n->parsing = 1;
 
@@ -262,6 +266,7 @@ int parse(struct node *n, struct graph *g)
 	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
+	tf.circular_dep_error = 0;
 	if(vardb_init(&tf.vdb) < 0)
 		goto out_server_stop;
 	if(environ_add_defaults(&tf.env_root) < 0)
@@ -350,6 +355,8 @@ out_server_stop:
 		perror("fclose");
 		rc = -1;
 	}
+	if(tf.circular_dep_error)
+		rc = CIRCULAR_DEPENDENCY_ERROR;
 
 	return rc;
 }
@@ -2095,9 +2102,16 @@ static int parse_dependent_tupfiles(struct path_list_head *plist,
 
 			n = find_node(g, pl->dt);
 			if(n != NULL && !n->already_used) {
+				int rc;
 				n->already_used = 1;
-				if(parse(n, g) < 0) {
-					fprintf(tf->f, "tup error: Unable to parse dependent Tupfile: ");
+				rc = parse(n, g);
+				if(rc < 0) {
+					if(rc == CIRCULAR_DEPENDENCY_ERROR) {
+						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");
+						tf->circular_dep_error = 1;
+					} else {
+						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile: ");
+					}
 					print_tup_entry(tf->f, n->tent);
 					fprintf(tf->f, "\n");
 					return -1;
