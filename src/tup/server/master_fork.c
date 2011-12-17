@@ -19,9 +19,8 @@
  */
 
 #include "master_fork.h"
-#include "tup/updater.h"
 #include "tup/server.h"
-#include "tup/db.h"
+#include "tup/db_types.h"
 #include "tup/tupid_tree.h"
 #include "tup/container.h"
 #include "tup/privs.h"
@@ -30,7 +29,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/mount.h>

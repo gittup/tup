@@ -23,7 +23,6 @@
 #include "tup/server.h"
 #include "tup/entry.h"
 #include "tup/config.h"
-#include "tup/lock.h"
 #include "tup/flist.h"
 #include "tup/debug.h"
 #include "tup/fslurp.h"
@@ -35,10 +34,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
-#include <pthread.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
 

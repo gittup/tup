@@ -23,8 +23,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/monitor.h"
@@ -35,7 +33,6 @@
 #include "tup/graph.h"
 #include "tup/db.h"
 #include "tup/init.h"
-#include "tup/compat.h"
 #include "tup/version.h"
 #include "tup/path.h"
 #include "tup/entry.h"

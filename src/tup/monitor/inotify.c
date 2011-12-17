@@ -47,10 +47,7 @@
 #include <sys/inotify.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <signal.h>
-#include <sys/resource.h>
 #include <sys/wait.h>
-#include <pthread.h>
 #include "tup/dircache.h"
 #include "tup/debug.h"
 #include "tup/fileio.h"
@@ -58,7 +55,6 @@
 #include "tup/db.h"
 #include "tup/lock.h"
 #include "tup/flock.h"
-#include "tup/updater.h"
 #include "tup/path.h"
 #include "tup/entry.h"
 #include "tup/fslurp.h"

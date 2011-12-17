@@ -20,12 +20,6 @@
  */
 
 #include "tup/server.h"
-#include "tup/file.h"
-#include "tup/debug.h"
-#include "tup/fileio.h"
-#include "tup/db.h"
-#include "tup/graph.h"
-#include "tup/entry.h"
 #include "tup/config.h"
 #include "tup/flist.h"
 #include "tup/environ.h"
@@ -34,11 +28,7 @@
 #include "compat/win32/open_notify.h"
 #include "compat/dir_mutex.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <errno.h>
-#include <winsock2.h>
-#include <io.h>
 
 #define TUP_TMP ".tup/tmp"
 

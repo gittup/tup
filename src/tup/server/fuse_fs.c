@@ -26,25 +26,18 @@
 #endif
 
 #include "tup_fuse_fs.h"
-#include "tup/access_event.h"
 #include "tup/config.h"
-#include "tup/file.h"
 #include "tup/fileio.h"
-#include "tup/thread_tree.h"
 #include "tup/debug.h"
 #include "tup/entry.h"
 #include "tup/server.h"
 #include "tup/container.h"
 #include "tup/db.h"
-#include "tup/privs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
-#include <sys/time.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
