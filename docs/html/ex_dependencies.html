@@ -102,7 +102,7 @@ Output from test.sh
 <p>Similar to the <a href="ex_a_first_tupfile.html">first Tupfile example</a>, tup has executed the script in such a way that it can track file accesses. Tup sees that the script read from <span class="filename">header.txt</span> and automatically adds the dependency. We can see this from the dependency graph:</p>
 
 <pre>
-<span class="prompt">$</span> tup graph --no-dirs . | dot -Tpng &gt; ~/ex_deps_1.png
+<span class="prompt">$</span> tup graph . | dot -Tpng &gt; ~/ex_deps_1.png
 </pre>
 <div class="img"><img src="ex_deps_1.png"></div>
 
@@ -188,7 +188,7 @@ Output from test.sh
 
 <p>Curiously, the <span class="filename">test.sh</span> script did not execute even though <span class="filename">unused.txt</span> is listed as an input. How then were we able to bypass the earlier error message by adding an input in the Tupfile, if those inputs don't actually cause the commands to execute? Let's take a look at our new graph:</p>
 <pre>
-<span class="prompt">$</span> tup graph --no-dirs . | dot -Tpng &gt; ~/ex_deps_2.png
+<span class="prompt">$</span> tup graph . | dot -Tpng &gt; ~/ex_deps_2.png
 </pre>
 <div class="img"><img src="ex_deps_2.png"></div>
 <p>Here we can see that not all of the input dependency arrows are the same. There are solid lines and dotted lines, as well as filled in arrows and empty arrows. The actual details of how tup handles these are beyond the scope of this example. The important thing to see here is that tup still keeps track of the fact that the shell script has a dependency on the <span class="filename">unused.txt</span> file, but because the file was never actually read from by the script, it cannot possibly have an effect on the output file (this fact is represented by the dotted line). Therefore, tup knows that if <span class="filename">unused.txt</span> changes, the script does not need to run again.</p>

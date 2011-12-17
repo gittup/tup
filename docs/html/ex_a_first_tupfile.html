@@ -336,7 +336,7 @@ Five squared is: 25
 <p>It doesn't look too much like a shell script anymore. Fret not, for the script is still in tup! However, it is not a true shell script, but rather a graph of commands connected by their inputs and outputs. If you have <a href="http://www.graphviz.org/">Graphviz</a> installed (which gives you the <span class="cmd">dot</span> program), you can generate a graph like so:</p>
 
 <pre>
-<span class="prompt">$</span> tup graph --no-dirs --no-ghosts . | dot -Tpng &gt; ~/hello.png
+<span class="prompt">$</span> tup graph . | dot -Tpng &gt; ~/hello.png
 </pre>
 
 <p><div class="img"><div class="desc">Program Dependencies</div><img src="hello.png"></div></p>

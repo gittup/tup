@@ -348,10 +348,15 @@ static int graph(int argc, char **argv)
 	int x;
 	struct graph g;
 	struct node *n;
-	int show_dirs = 1;
-	int show_ghosts = 1;
+	int show_dirs;
+	int show_ghosts;
+	int show_env;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
+
+	show_dirs = tup_option_get_int("graph.dirs");
+	show_ghosts = tup_option_get_int("graph.ghosts");
+	show_env = tup_option_get_int("graph.environment");
 
 	if(create_graph(&g, 0) < 0)
 		return -1;
@@ -369,12 +374,16 @@ static int graph(int argc, char **argv)
 	for(x=1; x<argc; x++) {
 		struct tup_entry *tent;
 
-		if(strcmp(argv[x], "--no-dirs") == 0) {
-			show_dirs = 0;
+		if(strcmp(argv[x], "--dirs") == 0) {
+			show_dirs = 1;
 			continue;
 		}
-		if(strcmp(argv[x], "--no-ghosts") == 0) {
-			show_ghosts = 0;
+		if(strcmp(argv[x], "--ghosts") == 0) {
+			show_ghosts = 1;
+			continue;
+		}
+		if(strcmp(argv[x], "--env") == 0) {
+			show_env = 1;
 			continue;
 		}
 
@@ -420,6 +429,12 @@ static int graph(int argc, char **argv)
 
 		if(n == g.root)
 			continue;
+
+		if(!show_env) {
+			if(n->tent->tnode.tupid == env_dt() ||
+			   n->tent->dt == env_dt())
+				continue;
+		}
 
 		style = "solid";
 		color = 0;

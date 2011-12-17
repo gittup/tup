@@ -145,17 +145,29 @@ Set to '1' to automatically rebuild if a file change is detected. This only has 
 .TP
 .B monitor.foreground (default '0')
 Set to '1' to run the monitor in the foreground, so control will not return to the terminal until the monitor is stopped (either by ctrl-C in the controlling terminal, or running 'tup stop' in another terminal). The default is '0', which means the monitor will run in the background.
+.TP
+.B graph.dirs (default '0')
+Set to '1' and the 'tup graph' command will show the directory nodes and their ownership links. Tupfiles are also displayed, since they point to directory nodes. By default directories and Tupfiles are not shown since they can clutter the graph in some cases, and are not always useful.
+.TP
+.B graph.ghosts (default '0')
+Set to '1' to show ghost nodes. Some commands may try to read from many files that don't exist, causing ghost nodes to be created. By default, ghosts are not shown to make the graph easier to understand.
+.TP
+.B graph.environment (default '0')
+Set to '1' to show the environment nodes (such as PATH) and their dependencies. By default the environment variables are not shown since nearly everything will depend on PATH.
 .RE
 .TP
-.B graph [--no-dirs] [--no-ghosts] [<output_1> ... <output_n>]
-Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. I only really use this for debugging tup -- you probably won't find it all that useful for trying to look at the structure of your program.
+.B graph [--dirs] [--ghosts] [--env] [<output_1> ... <output_n>]
+Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. This is generally used for debugging tup -- you may or may not find it helpful for trying to look at the structure of your program.
 .RS
 .TP
-.B --no-dirs
-Add this flag to the 'tup graph' command and tup will avoid showing the directory nodes and their ownership links. Tupfiles are also not displayed, since they point to directory nodes. This can help unclutter the graph in some cases to make it easier to see how the program is structured.
+.B --dirs
+Temporarily override the graph.dirs option to '1'. This will show the directory nodes and Tupfiles.
 .TP
-.B --no-ghosts
-Similar to --no-dirs, but all ghost nodes are pruned. Some commands may try to read from many files that don't exist, causing ghost nodes to be created. In these cases, specifying --no-ghosts can produce a simpler graph.
+.B --ghosts
+Temporarily override the graph.ghosts option to '1'. This will show ghost nodes (files that a command tried to access, but don't actually exist).
+.TP
+.B --environment
+Temporarily override the graph.environment option to '1'. This will show the environment variables, such as PATH.
 .RE
 .TP
 .B todo [<output_1> ... <output_n>]

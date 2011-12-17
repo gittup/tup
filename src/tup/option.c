@@ -68,6 +68,9 @@ static struct option {
 	{"monitor.autoupdate", "0", NULL},
 	{"monitor.foreground", "0", NULL},
 	{"db.sync", "1", NULL},
+	{"graph.dirs", "0", NULL},
+	{"graph.ghosts", "0", NULL},
+	{"graph.environment", "0", NULL},
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
