@@ -32,11 +32,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-struct id_flags {
-	tupid_t tupid;
-	int flags;
-};
-
 static int tup_del_id_type(tupid_t tupid, int type, int force);
 static int ghost_to_file(struct tup_entry *tent);
 
