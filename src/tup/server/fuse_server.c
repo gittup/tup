@@ -58,6 +58,7 @@ static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
 static struct parser_server *curps;
+static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void *fuse_thread(void *arg)
 {
@@ -507,24 +508,30 @@ int server_is_dead(void)
 
 int server_parser_start(struct parser_server *ps)
 {
+	pthread_mutex_lock(&curps_lock);
 	if(tup_fuse_add_group(ps->s.id, &ps->s.finfo) < 0)
-		return -1;
+		goto err_unlock;
 	if(virt_tup_open(ps) < 0) {
 		goto err_rm_group;
 	}
 	ps->oldps = curps;
 	curps = ps;
+	pthread_mutex_unlock(&curps_lock);
 	return 0;
 
 err_rm_group:
 	tup_fuse_rm_group(&ps->s.finfo);
+err_unlock:
+	pthread_mutex_unlock(&curps_lock);
 	return -1;
 }
 
 int server_parser_stop(struct parser_server *ps)
 {
 	int rc = 0;
+	pthread_mutex_lock(&curps_lock);
 	curps = ps->oldps;
+	pthread_mutex_unlock(&curps_lock);
 	if(virt_tup_close(ps) < 0)
 		rc = -1;
 	if(tup_fuse_rm_group(&ps->s.finfo) < 0)
@@ -546,19 +553,28 @@ int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 				    fuse_fill_dir_t filler)
 {
 	struct parser_entry *pe;
+	int rc = -1;
+
+	pthread_mutex_lock(&curps_lock);
 	if(!curps) {
 		fprintf(stderr, "tup internal error: 'curps' is not set in fuse_server.c\n");
-		return -1;
+		goto out_err;
 	}
+	pthread_mutex_lock(&curps->lock);
 	if(strcmp(path, curps->path) != 0) {
 		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
-		return -1;
+		goto out_unps;
 	}
 	LIST_FOREACH(pe, &curps->file_list, list) {
 		if(filler(buf, pe->name, NULL, 0))
-			return -1;
+			goto out_unps;
 	}
-	return 0;
+	rc = 0;
+out_unps:
+	pthread_mutex_unlock(&curps->lock);
+out_err:
+	pthread_mutex_unlock(&curps_lock);
+	return rc;
 }
 
 static void sighandler(int sig)

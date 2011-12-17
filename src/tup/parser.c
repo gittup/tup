@@ -252,6 +252,7 @@ int parse(struct node *n, struct graph *g)
 
 	init_file_info(&ps.s.finfo);
 	ps.s.id = n->tnode.tupid;
+	pthread_mutex_init(&ps.lock, NULL);
 	memset(ps.path, 0, sizeof(ps.path));
 	if(snprint_tup_entry(ps.path, sizeof(ps.path), n->tent) >= (signed)sizeof(ps.path)) {
 		fprintf(stderr, "tup internal error: ps.path is sized incorrectly in parse()\n");
@@ -685,7 +686,10 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		return -1;
 	}
 
-	if(gen_dir_list(tf) < 0)
+	pthread_mutex_lock(&tf->ps->lock);
+	rc = gen_dir_list(tf);
+	pthread_mutex_unlock(&tf->ps->lock);
+	if(rc < 0)
 		return -1;
 
 	if(debug_run)
@@ -726,7 +730,9 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	}
 
 	free(rules);
+	pthread_mutex_lock(&tf->ps->lock);
 	free_dir_list(tf->ps);
+	pthread_mutex_unlock(&tf->ps->lock);
 
 	return 0;
 

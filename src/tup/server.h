@@ -59,6 +59,7 @@ struct parser_server {
 	struct parser_server *oldps;
 	char path[PATH_MAX];
 	struct parser_entry_head file_list;
+	pthread_mutex_t lock;
 };
 
 enum server_mode {
