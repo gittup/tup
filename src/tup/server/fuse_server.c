@@ -57,7 +57,7 @@ static struct sigaction sigact = {
 static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
-static tupid_t curid = -1;
+static struct parser_server *curps;
 
 static void *fuse_thread(void *arg)
 {
@@ -117,12 +117,12 @@ static int tup_unmount(void)
 	return 0;
 }
 
-int server_init(enum server_mode mode, struct tupid_entries *delete_root)
+int server_init(enum server_mode mode)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	struct flist f = {0, 0, 0};
 
-	tup_fuse_set_parser_mode(mode, delete_root);
+	tup_fuse_set_parser_mode(mode);
 
 	if(server_inited)
 		return 0;
@@ -307,7 +307,7 @@ static int re_openat(int fd, const char *path)
 	return newfd;
 }
 
-static int virt_tup_open(struct server *s)
+static int virt_tup_open(struct parser_server *ps)
 {
 	char virtdir[100];
 	int fd;
@@ -318,7 +318,7 @@ static int virt_tup_open(struct server *s)
 		return -1;
 	}
 
-	snprintf(virtdir, sizeof(virtdir), TUP_JOB "%i", s->id);
+	snprintf(virtdir, sizeof(virtdir), TUP_JOB "%i", ps->s.id);
 	virtdir[sizeof(virtdir)-1] = 0;
 	fd = re_openat(fd, virtdir);
 	if(fd < 0) {
@@ -327,21 +327,21 @@ static int virt_tup_open(struct server *s)
 	}
 
 	/* +1: Skip past top-level '/' to do a relative chdir into our fake fs. */
-	s->root_fd = re_openat(fd, get_tup_top() + 1);
-	if(s->root_fd < 0) {
+	ps->root_fd = re_openat(fd, get_tup_top() + 1);
+	if(ps->root_fd < 0) {
 		return -1;
 	}
 
 	return 0;
 }
 
-static int virt_tup_close(struct server *s)
+static int virt_tup_close(struct parser_server *ps)
 {
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
 		return -1;
 	}
-	if(close(s->root_fd) < 0) {
+	if(close(ps->root_fd) < 0) {
 		perror("close(s->root_fd)");
 		return -1;
 	}
@@ -459,7 +459,7 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 	if(tup_db_get_environ(env_root, NULL, &te) < 0)
 		return -1;
 
-	s.id = curid;
+	s.id = tupid;
 	s.output_fd = -1;
 	s.error_fd = -1;
 	s.exited = 0;
@@ -505,29 +505,29 @@ int server_is_dead(void)
 	return sig_quit;
 }
 
-int server_parser_start(struct server *s)
+int server_parser_start(struct parser_server *ps)
 {
-	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
+	if(tup_fuse_add_group(ps->s.id, &ps->s.finfo) < 0)
 		return -1;
-	if(virt_tup_open(s) < 0) {
+	if(virt_tup_open(ps) < 0) {
 		goto err_rm_group;
 	}
-	s->oldid = curid;
-	curid = s->id;
+	ps->oldps = curps;
+	curps = ps;
 	return 0;
 
 err_rm_group:
-	tup_fuse_rm_group(&s->finfo);
+	tup_fuse_rm_group(&ps->s.finfo);
 	return -1;
 }
 
-int server_parser_stop(struct server *s)
+int server_parser_stop(struct parser_server *ps)
 {
 	int rc = 0;
-	curid = s->oldid;
-	if(virt_tup_close(s) < 0)
+	curps = ps->oldps;
+	if(virt_tup_close(ps) < 0)
 		rc = -1;
-	if(tup_fuse_rm_group(&s->finfo) < 0)
+	if(tup_fuse_rm_group(&ps->s.finfo) < 0)
 		rc = -1;
 	/* This is probably misplaced, but there is currently no easy way to
 	 * stop the server if it detects an error (in fuse_fs.c), so it just
@@ -535,16 +535,30 @@ int server_parser_stop(struct server *s)
 	 * fuse_fs has access to. We then check it afterward the server
 	 * is shutdown.
 	 */
-	if(s->finfo.server_fail) {
+	if(ps->s.finfo.server_fail) {
 		fprintf(stderr, "tup error: Fuse server reported an access violation.\n");
 		rc = -1;
 	}
 	return rc;
 }
 
-tupid_t tup_fuse_server_get_curid(void)
+int tup_fuse_server_get_dir_entries(const char *path, void *buf,
+				    fuse_fill_dir_t filler)
 {
-	return curid;
+	struct parser_entry *pe;
+	if(!curps) {
+		fprintf(stderr, "tup internal error: 'curps' is not set in fuse_server.c\n");
+		return -1;
+	}
+	if(strcmp(path, curps->path) != 0) {
+		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
+		return -1;
+	}
+	LIST_FOREACH(pe, &curps->file_list, list) {
+		if(filler(buf, pe->name, NULL, 0))
+			return -1;
+	}
+	return 0;
 }
 
 static void sighandler(int sig)

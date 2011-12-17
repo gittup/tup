@@ -47,13 +47,13 @@ int server_post_exit(void)
 	return 0;
 }
 
-int server_init(enum server_mode mode, struct tupid_entries *delete_root)
+int server_init(enum server_mode mode)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
 	struct flist f = {0, 0, 0};
 
-	if(mode || delete_root) {/* unused */}
+	if(mode) {/* unused */}
 
 	if(server_inited)
 		return 0;
@@ -303,17 +303,17 @@ int server_is_dead(void)
 	return 0;
 }
 
-int server_parser_start(struct server *s)
+int server_parser_start(struct parser_server *ps)
 {
-	s->root_fd = tup_top_fd();
-	if(open_notify_push(&s->finfo) < 0)
+	ps->root_fd = tup_top_fd();
+	if(open_notify_push(&ps->s.finfo) < 0)
 		return -1;
 	return 0;
 }
 
-int server_parser_stop(struct server *s)
+int server_parser_stop(struct parser_server *ps)
 {
-	if(open_notify_pop(&s->finfo) < 0)
+	if(open_notify_pop(&ps->s.finfo) < 0)
 		return -1;
 	return 0;
 }

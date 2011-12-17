@@ -144,6 +144,7 @@ struct tupfile {
 	struct tupid_entries input_root;
 	struct string_entries chain_root;
 	FILE *f;
+	struct parser_server *ps;
 	char ign;
 	char circular_dep_error;
 };
@@ -232,7 +233,7 @@ int parse(struct node *n, struct graph *g)
 	int fd;
 	int rc = -1;
 	struct buf b;
-	struct server s;
+	struct parser_server ps;
 
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
@@ -242,20 +243,26 @@ int parse(struct node *n, struct graph *g)
 	}
 	n->parsing = 1;
 
+	tf.ps = &ps;
 	tf.f = tmpfile();
 	if(!tf.f) {
 		perror("tmpfile");
 		return -1;
 	}
 
-	init_file_info(&s.finfo);
-	s.id = n->tnode.tupid;
-	if(server_parser_start(&s) < 0)
+	init_file_info(&ps.s.finfo);
+	ps.s.id = n->tnode.tupid;
+	memset(ps.path, 0, sizeof(ps.path));
+	if(snprint_tup_entry(ps.path, sizeof(ps.path), n->tent) >= (signed)sizeof(ps.path)) {
+		fprintf(stderr, "tup internal error: ps.path is sized incorrectly in parse()\n");
+		return -1;
+	}
+	if(server_parser_start(&ps) < 0)
 		return -1;
 
 	tf.tupid = n->tnode.tupid;
 	tf.curtent = tup_entry_get(tf.tupid);
-	tf.root_fd = s.root_fd;
+	tf.root_fd = ps.root_fd;
 	tf.g = g;
 	RB_INIT(&tf.cmd_root);
 	RB_INIT(&tf.env_root);
@@ -278,7 +285,7 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_root, &g->delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
-	tf.dfd = tup_entry_openat(s.root_fd, n->tent);
+	tf.dfd = tup_entry_openat(ps.root_fd, n->tent);
 	if(tf.dfd < 0) {
 		fprintf(tf.f, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;
@@ -325,11 +332,11 @@ out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
 out_server_stop:
-	if(server_parser_stop(&s) < 0)
+	if(server_parser_stop(&ps) < 0)
 		rc = -1;
 
 	if(rc == 0) {
-		if(add_parser_files(&s.finfo, &tf.input_root) < 0)
+		if(add_parser_files(&ps.s.finfo, &tf.input_root) < 0)
 			rc = -1;
 		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_root) < 0)
 			rc = -1;
@@ -616,6 +623,53 @@ out_free:
 	return rc;
 }
 
+struct readdir_parser_params {
+	struct parser_entry_head *head;
+};
+
+static int readdir_parser_cb(void *arg, struct tup_entry *tent)
+{
+	struct readdir_parser_params *rpp = arg;
+	struct parser_entry *pe;
+
+	pe = malloc(sizeof *pe);
+	if(!pe) {
+		perror("malloc");
+		return -1;
+	}
+	pe->name = strdup(tent->name.s);
+	if(!pe->name) {
+		perror("strdup");
+		return -1;
+	}
+	LIST_INSERT_HEAD(rpp->head, pe, list);
+	return 0;
+}
+
+static int gen_dir_list(struct tupfile *tf)
+{
+	struct parser_server *ps = tf->ps;
+	struct readdir_parser_params rpp = {
+		&ps->file_list,
+	};
+	LIST_INIT(&tf->ps->file_list);
+	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, tf->tupid,
+				       "*", -1, &tf->g->delete_root) < 0)
+		return -EIO;
+	return 0;
+}
+
+static void free_dir_list(struct parser_server *ps)
+{
+	struct parser_entry *pe;
+	while(!LIST_EMPTY(&ps->file_list)) {
+		pe = LIST_FIRST(&ps->file_list);
+		LIST_REMOVE(pe, list);
+		free(pe->name);
+		free(pe);
+	}
+}
+
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl)
 {
@@ -630,6 +684,9 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	if(!eval_cmdline) {
 		return -1;
 	}
+
+	if(gen_dir_list(tf) < 0)
+		return -1;
 
 	if(debug_run)
 		fprintf(tf->f, " --- run script output from '%s'\n", eval_cmdline);
@@ -669,6 +726,8 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	}
 
 	free(rules);
+	free_dir_list(tf->ps);
+
 	return 0;
 
 out_err:

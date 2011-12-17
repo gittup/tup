@@ -22,6 +22,7 @@
 #define server_h
 
 #include "file.h"
+#include "bsd/queue.h"
 #include <pthread.h>
 
 struct tupid_entries;
@@ -38,16 +39,26 @@ struct server {
 	int output_fd;
 	int error_fd;
 
-	/* For the parser */
-	int root_fd;
-	tupid_t oldid;
-
 #ifdef _WIN32
 	/* TODO: Unify servers */
 	int udp_port;
 	int sd[2];
 	pthread_t tid;
 #endif
+};
+
+struct parser_entry {
+	char *name;
+	LIST_ENTRY(parser_entry) list;
+};
+LIST_HEAD(parser_entry_head, parser_entry);
+
+struct parser_server {
+	struct server s;
+	int root_fd;
+	struct parser_server *oldps;
+	char path[PATH_MAX];
+	struct parser_entry_head file_list;
 };
 
 enum server_mode {
@@ -57,14 +68,14 @@ enum server_mode {
 
 int server_pre_init(void);
 int server_post_exit(void);
-int server_init(enum server_mode mode, struct tupid_entries *delete_root);
+int server_init(enum server_mode mode);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent);
 int server_postexec(struct server *s);
 int server_is_dead(void);
-int server_parser_start(struct server *s);
-int server_parser_stop(struct server *s);
+int server_parser_start(struct parser_server *ps);
+int server_parser_stop(struct parser_server *ps);
 
 int server_run_script(tupid_t tupid, const char *cmdline,
 		      struct tupid_entries *env_root, char **rules);

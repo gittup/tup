@@ -30,12 +30,12 @@
 #define TUP_JOB "@tupjob-"
 
 struct file_info;
-struct tupid_entries;
 
 int tup_fuse_add_group(int id, struct file_info *finfo);
 int tup_fuse_rm_group(struct file_info *finfo);
-void tup_fuse_set_parser_mode(int mode, struct tupid_entries *delete_root);
-tupid_t tup_fuse_server_get_curid(void);
+void tup_fuse_set_parser_mode(int mode);
+int tup_fuse_server_get_dir_entries(const char *path, void *buf,
+				    fuse_fill_dir_t filler);
 extern struct fuse_operations tup_fs_oper;
 
 #endif

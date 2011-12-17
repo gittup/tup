@@ -27,12 +27,9 @@
 
 #include "tup_fuse_fs.h"
 #include "tup/config.h"
-#include "tup/fileio.h"
 #include "tup/debug.h"
-#include "tup/entry.h"
 #include "tup/server.h"
 #include "tup/container.h"
-#include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +38,6 @@
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
-static struct tupid_entries *server_delete_root = NULL;
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
 {
@@ -59,10 +55,9 @@ int tup_fuse_rm_group(struct file_info *finfo)
 	return 0;
 }
 
-void tup_fuse_set_parser_mode(int mode, struct tupid_entries *delete_root)
+void tup_fuse_set_parser_mode(int mode)
 {
 	server_mode = mode;
-	server_delete_root = delete_root;
 }
 
 static struct file_info *get_finfo(const char *path)
@@ -430,19 +425,6 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
-struct readdir_parser_params {
-	void *buf;
-	fuse_fill_dir_t filler;
-};
-
-static int readdir_parser_cb(void *arg, struct tup_entry *tent)
-{
-	struct readdir_parser_params *rpp = arg;
-	if(rpp->filler(rpp->buf, tent->name.s, NULL, 0))
-		return -EIO;
-	return 0;
-}
-
 static int fill_actual_directory(const char *path, void *buf,
 				 fuse_fill_dir_t filler, int ignore_dot_tup)
 {
@@ -476,24 +458,14 @@ static int fill_actual_directory(const char *path, void *buf,
 
 static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
 {
-	struct tup_entry *dtent;
-	struct readdir_parser_params rpp = {buf, filler};
-
-	if(gimme_tent(path, &dtent) < 0) {
-		printf("Gimme tent fail\n");
-		return -EIO;
-	}
-	if(!dtent) {
-		printf("Call fill actuald ir\n");
+	if(strncmp(path, get_tup_top(), get_tup_top_len()) == 0) {
+		if(tup_fuse_server_get_dir_entries(path + get_tup_top_len(),
+						   buf, filler) < 0)
+			return -EPERM;
+	} else {
+		/* t4052 */
 		return fill_actual_directory(path, buf, filler, 0);
 	}
-	if(dtent->tnode.tupid != tup_fuse_server_get_curid()) {
-		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
-		return -EPERM;
-	}
-	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dtent->tnode.tupid,
-				       "*", -1,  server_delete_root) < 0)
-		return -EIO;
 	return 0;
 }
 
