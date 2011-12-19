@@ -26,6 +26,7 @@
 #include "db.h"
 #include "config.h"
 #include "compat.h"
+#include "entry.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -77,8 +78,16 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 				return -1;
 		}
 
-		if(tup_db_select_tent(newdt, ".gitignore", &gitignore_tent) < 0)
+		if(tup_entry_find_name_in_dir(newdt, ".gitignore", -1, &gitignore_tent) < 0)
 			return -1;
+		if(gitignore_tent) {
+			/* Gitignore's are never put in the modify list. We are
+			 * just checking here if we have the gitignore entry in
+			 * the database, meaning tup is supposed to generate the
+			 * .gitignore file.
+			 */
+			tupid_tree_remove(root, gitignore_tent->tnode.tupid);
+		}
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {

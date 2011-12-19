@@ -3594,7 +3594,7 @@ static int files_to_tree(struct tupid_entries *root)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TREE];
-	static char s[] = "select id, dir, type, mtime, name from node where type=? or type=? or type=? and name <> '.gitignore'";
+	static char s[] = "select id, dir, type, mtime, name from node where type=? or type=? or type=?";
 
 	if(sql_debug) fprintf(stderr, "%s [37m[%i, %i, %i][0m\n", s, TUP_NODE_FILE, TUP_NODE_DIR, TUP_NODE_GENERATED);
 	if(!*stmt) {
