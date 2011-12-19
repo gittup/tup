@@ -24,6 +24,7 @@
 #include "tup/tupid_tree.h"
 #include "tup/container.h"
 #include "tup/privs.h"
+#include "tup/debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -201,7 +202,7 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 			return -1;
 		}
 		if(rc == 0) {
-			fprintf(stderr, "tup error: Expected to read %i bytes, but the master fork socket closed after %i bytes (read_all called from line %i).\n", size, bytes_read, line);
+			DEBUGP("tup error: Expected to read %i bytes, but the master fork socket closed after %i bytes (read_all called from line %i).\n", size, bytes_read, line);
 			return -1;
 		}
 		bytes_read += rc;
