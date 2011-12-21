@@ -36,6 +36,8 @@ struct execmsg {
 	int single_output;
 };
 
+#define JOB_MAX 64
+
 int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
 		     const char *cmd, const char *newenv, int *status);
 

@@ -43,6 +43,7 @@ struct rcmsg {
 struct child_waiter {
 	pid_t pid;
 	tupid_t sid;
+	char dev[JOB_MAX];
 };
 
 struct status_tree {
@@ -211,7 +212,7 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 }
 
 static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
-			    int single_output)
+			    const char *dev, int single_output)
 {
 	int ofd, efd;
 	char buf[64];
@@ -269,35 +270,22 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 	}
 
 	if(tup_privileged()) {
-		char *dev;
-		char slashdev[] = "/dev";
-		int joblen = strlen(job);
-
-		dev = malloc(joblen + sizeof(slashdev));
-		if(!dev) {
-			perror("malloc");
-			return -1;
-		}
-		memcpy(dev, job, joblen);
-		memcpy(dev+joblen, slashdev, sizeof(slashdev));
-
 #ifdef __APPLE__
 		if(mount("devfs", dev, 0, NULL) < 0) {
 			perror("mount");
-			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
+			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");
 			return -1;
 		}
 #else
 		/* The "tmpfs" argument is ignored since we use MS_BIND, but
 		 * valgrind complains about it if we use NULL.
 		 */
-		if(mount(slashdev, dev, "tmpfs", MS_BIND, NULL) < 0) {
+		if(mount("/dev", dev, "tmpfs", MS_BIND, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
 			return -1;
 		}
 #endif
-		free(dev);
 		if(chroot(job) < 0) {
 			perror("chroot");
 			return -1;
@@ -442,6 +430,13 @@ static int master_fork_loop(void)
 			}
 		}
 
+		waiter = malloc(sizeof *waiter);
+		if(!waiter) {
+			perror("malloc");
+			exit(1);
+		}
+		snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job);
+
 		pid = fork();
 		if(pid < 0) {
 			perror("fork");
@@ -483,15 +478,10 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, em.single_output) < 0)
+			if(setup_subprocess(em.sid, job, dir, waiter->dev, em.single_output) < 0)
 				exit(1);
 			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
-			exit(1);
-		}
-		waiter = malloc(sizeof *waiter);
-		if(!waiter) {
-			perror("malloc");
 			exit(1);
 		}
 		waiter->pid = pid;
@@ -542,10 +532,22 @@ static void *child_waiter(void *arg)
 	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
 		perror("waitpid");
 	}
+	if(tup_privileged()) {
+		int rc;
+#ifdef __APPLE__
+		rc = unmount(waiter->dev, MNT_FORCE);
+#else
+		rc = umount2(waiter->dev, MNT_FORCE);
+#endif
+		if(rc < 0) {
+			perror("umount");
+			fprintf(stderr, "tup error: Unable to umount the /dev file-system in the chroot environment. Subprocess pid=%i may not exit properly.\n", waiter->pid);
+		}
+	}
 	pthread_mutex_lock(&lock);
 	if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
 		perror("write");
-		fprintf(stderr, "tup error: Unable to write return status value to the socket. Subprocess %i may not exit properly.\n", waiter->pid);
+		fprintf(stderr, "tup error: Unable to write return status value to the socket. Subprocess pid=%i may not exit properly.\n", waiter->pid);
 	}
 	pthread_mutex_unlock(&lock);
 	free(waiter);

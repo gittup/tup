@@ -354,7 +354,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 {
 	int status;
 	char buf[64];
-	char job[PATH_MAX];
+	char job[JOB_MAX];
 	char dir[PATH_MAX];
 	struct execmsg em;
 
@@ -362,7 +362,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	em.single_output = single_output;
 	em.envlen = newenv->block_size;
 	em.num_env_entries = newenv->num_entries;
-	em.joblen = snprintf(job, PATH_MAX, TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
+	em.joblen = snprintf(job, sizeof(job), TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
 
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
 	 * adjusting.
@@ -372,7 +372,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	em.dirlen += snprint_tup_entry(dir + em.dirlen,
 				       sizeof(dir) - em.dirlen - 1,
 				       dtent) + 1;
-	if(em.joblen >= PATH_MAX || em.dirlen >= PATH_MAX) {
+	if(em.joblen >= JOB_MAX || em.dirlen >= PATH_MAX) {
 		fprintf(stderr, "tup error: Directory for tup entry %lli is too long.\n", dtent->tnode.tupid);
 		print_tup_entry(stderr, dtent);
 		return -1;
