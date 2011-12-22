@@ -3393,49 +3393,80 @@ int tup_db_read_vars(tupid_t dt, const char *file)
 }
 
 static struct var_entry *envdb_set(const char *var, int varlen, const char *newenv,
-				   int envlen, struct tup_entry *tent,
-				   const char *expected_value)
+				   int envlen, struct tup_entry *tent, int write_db)
 {
 	struct var_entry *ve;
 	char fullenv[varlen + 1 + envlen + 1];
+	char *dbvalue = NULL;
 
-	memcpy(fullenv, var, varlen);
-	fullenv[varlen] = '=';
-	memcpy(fullenv + varlen + 1, newenv, envlen);
-	fullenv[varlen + 1 + envlen] = 0;
+	if(newenv) {
+		memcpy(fullenv, var, varlen);
+		fullenv[varlen] = '=';
+		memcpy(fullenv + varlen + 1, newenv, envlen);
+		fullenv[varlen + 1 + envlen] = 0;
 
-	ve = vardb_set2(&envdb, var, varlen, fullenv, tent);
-	if(!ve)
-		return NULL;
-
-	if(!expected_value || strcmp(fullenv, expected_value) != 0) {
-		if(expected_value) {
-			printf("Environment variable changed: %s\n", var);
-			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
-				return NULL;
-			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
-				return NULL;
-		}
-		if(tup_db_set_var(tent->tnode.tupid, fullenv) < 0)
+		ve = vardb_set2(&envdb, var, varlen, fullenv, tent);
+		dbvalue = fullenv;
+	} else {
+		ve = vardb_set2(&envdb, var, varlen, NULL, tent);
+	}
+	if(ve && write_db) {
+		if(tup_db_set_var(tent->tnode.tupid, dbvalue) < 0)
 			return NULL;
 	}
 	return ve;
 }
 
-static int env_cb(void *arg, tupid_t tupid, const char *var, const char *value, int type)
+static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, int type)
 {
 	const char *env;
 	struct tup_entry *tent;
+	int envlen = 0;
+	int match = 0;
+	struct var_entry *ve;
+	int varlen;
 	if(arg) {}
 	if(type) {}
 
 	env = getenv(var);
-	if(!env)
-		env = "";
+	if(env)
+		envlen = strlen(env);
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
-	if(envdb_set(var, strlen(var), env, strlen(env), tent, value) == NULL)
+	varlen = strlen(var);
+
+	if(env) {
+		if(stored_value) {
+			/* Here we are checking if the stored value of the
+			 * environment variable matches the value from getenv().
+			 * We store it as "FOO=bar", so we check that the length
+			 * of the variable + 1 (for =) + length of the getenv()
+			 * matches the length of the stored value. If that
+			 * matches, then make sure we match each part.
+			 */
+			if((signed)strlen(stored_value) == varlen + 1 + envlen &&
+			   memcmp(stored_value, var, varlen) == 0 &&
+			   stored_value[varlen] == '=' &&
+			   memcmp(&stored_value[varlen+1], env, envlen) == 0) {
+				match = 1;
+			}
+		}
+	} else {
+		/* Both NULL matches */
+		if(!stored_value) {
+			match = 1;
+		}
+	}
+	if(!match) {
+		printf("Environment variable changed: %s\n", var);
+		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+			return -1;
+		if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+			return -1;
+	}
+	ve = envdb_set(var, varlen, env, envlen, tent, !match);
+	if(!ve)
 		return -1;
 	return 0;
 }
@@ -3456,14 +3487,17 @@ int tup_db_findenv(const char *var, struct tup_entry **tent)
 	if(!ve) {
 		struct tup_entry *newtent;
 		const char *newenv;
+		int newenvlen = 0;
 
 		newtent = tup_db_node_insert(env_dt(), var, varlen, TUP_NODE_VAR, -1);
 		if(!newtent)
 			return -1;
 		newenv = getenv(var);
-		if(!newenv)
-			newenv = "";
-		ve = envdb_set(var, varlen, newenv, strlen(newenv), newtent, NULL);
+		if(newenv)
+			newenvlen = strlen(newenv);
+		ve = envdb_set(var, varlen, newenv, newenvlen, newtent, 1);
+		if(!ve)
+			return -1;
 	}
 	*tent = ve->tent;
 	return 0;
@@ -3491,8 +3525,10 @@ int tup_db_get_environ(struct tupid_entries *root,
 				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
 				return -1;
 			}
-			te->block_size += strlen(ve->value) + 1;
-			te->num_entries++;
+			if(ve->value) {
+				te->block_size += strlen(ve->value) + 1;
+				te->num_entries++;
+			}
 
 			/* Remove the environment variable from the normal
 			 * tree to make sure that it doesn't get culled after
@@ -3519,9 +3555,11 @@ int tup_db_get_environ(struct tupid_entries *root,
 				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
 				return -1;
 			}
-			memcpy(cur, ve->value, ve->vallen);
-			cur[ve->vallen] = 0;
-			cur += ve->vallen + 1;
+			if(ve->value) {
+				memcpy(cur, ve->value, ve->vallen);
+				cur[ve->vallen] = 0;
+				cur += ve->vallen + 1;
+			}
 		}
 	}
 	*cur = 0;

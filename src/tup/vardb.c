@@ -58,18 +58,26 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 {
 	struct string_tree *st;
 	struct var_entry *ve;
+	int vallen = 0;
+
+	if(value)
+		vallen = strlen(value);
 
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
 		free(ve->value);
-		ve->vallen = strlen(value);
-		ve->value = malloc(ve->vallen + 1);
-		if(!ve->value) {
-			perror("malloc");
-			return NULL;
+		ve->vallen = vallen;
+		if(value) {
+			ve->value = malloc(ve->vallen + 1);
+			if(!ve->value) {
+				perror("malloc");
+				return NULL;
+			}
+			strcpy(ve->value, value);
+		} else {
+			ve->value = NULL;
 		}
-		strcpy(ve->value, value);
 		ve->tent = tent;
 	} else {
 		ve = malloc(sizeof *ve);
@@ -89,15 +97,19 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 		}
 		memcpy(ve->var.s, var, varlen);
 		ve->var.s[varlen] = 0;
-		ve->vallen = strlen(value);
-		ve->value = malloc(ve->vallen + 1);
-		if(!ve->value) {
-			perror("malloc");
-			free(ve->var.s);
-			free(ve);
-			return NULL;
+		ve->vallen = vallen;
+		if(value) {
+			ve->value = malloc(ve->vallen + 1);
+			if(!ve->value) {
+				perror("malloc");
+				free(ve->var.s);
+				free(ve);
+				return NULL;
+			}
+			strcpy(ve->value, value);
+		} else {
+			ve->value = NULL;
 		}
-		strcpy(ve->value, value);
 		if(string_tree_insert(&v->root, &ve->var) < 0) {
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
 			free(ve->value);
