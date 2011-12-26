@@ -43,6 +43,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #define SYNTAX_ERROR -2
 #define CIRCULAR_DEPENDENCY_ERROR -3
@@ -234,7 +235,9 @@ int parse(struct node *n, struct graph *g)
 	int rc = -1;
 	struct buf b;
 	struct parser_server ps;
+	struct timeval start, end;
 
+	gettimeofday(&start, NULL);
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
 		print_tup_entry(stderr, n->tent);
@@ -349,7 +352,8 @@ out_server_stop:
 	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_root);
 
-	show_progress(n->tent, rc != 0);
+	gettimeofday(&end, NULL);
+	show_progress(n->tent, rc != 0, &start, &end);
 	if(fflush(tf.f) != 0) {
 		perror("fflush");
 		rc = -1;
