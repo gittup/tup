@@ -21,11 +21,11 @@
 #include "progress.h"
 #include "colors.h"
 #include "db_types.h"
+#include "option.h"
 #include "entry.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <sys/time.h>
 
 static int cur_phase = -1;
@@ -37,29 +37,10 @@ static int console_width;
 static int color_len;
 static int got_error = 0;
 
-static int get_console_width(void)
-{
-#ifdef TIOCGWINSZ
-	struct winsize wsz;
-
-	if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) < 0)
-		return 0;
-
-	return wsz.ws_col;
-#elif defined(WINDOWS)
-	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
-		return 0;
-	return csbi.dwSize.X;
-#else
-	return 0;
-#endif
-}
-
 void progress_init(void)
 {
 	stdout_isatty = isatty(STDOUT_FILENO);
-	console_width = get_console_width();
+	console_width = tup_option_get_int("display.width");
 	color_len = strlen(color_type(TUP_NODE_CMD)) +
 		strlen(color_append_reverse()) +
 		strlen(color_end());

@@ -34,6 +34,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifndef _WIN32
+#include <sys/ioctl.h>
+#endif
 
 #define OPT_MAX 256
 
@@ -60,6 +63,7 @@ static struct {
 
 static int parse_option_file(int x);
 static const char *cpu_number(void);
+static const char *get_console_width(void);
 static int init_home_loc(void);
 
 static struct option {
@@ -71,6 +75,7 @@ static struct option {
 	{"updater.num_jobs", NULL, cpu_number},
 	{"updater.keep_going", "0", NULL},
 	{"display.color", DEFAULT_COLOR, NULL},
+	{"display.width", NULL, get_console_width},
 	{"monitor.autoupdate", "0", NULL},
 	{"monitor.foreground", "0", NULL},
 	{"db.sync", "1", NULL},
@@ -262,6 +267,25 @@ static const char *cpu_number(void)
 		count = 1;
 
 	snprintf(buf, sizeof(buf), "%d", count);
+	buf[sizeof(buf) - 1] = 0;
+	return buf;
+}
+
+static const char *get_console_width(void)
+{
+	static char buf[10];
+	int width = 0;
+#ifdef TIOCGWINSZ
+	struct winsize wsz;
+
+	if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) == 0)
+		width = wsz.ws_col;
+#elif defined(_WIN32)
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+		width = csbi.dwSize.X;
+#endif
+	snprintf(buf, sizeof(buf), "%d", width);
 	buf[sizeof(buf) - 1] = 0;
 	return buf;
 }
