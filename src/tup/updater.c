@@ -839,6 +839,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
+			show_active(-1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -860,7 +861,7 @@ static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct node *n;
-	static int active = 0;
+	static int jobs_active = 0;
 
 	while(1) {
 		struct edge *e;
@@ -872,16 +873,15 @@ static void *update_work(void *arg)
 
 		if(n->tent->type == TUP_NODE_CMD) {
 			pthread_mutex_lock(&display_mutex);
-			active++;
-			show_active(active);
+			jobs_active++;
+			show_active(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
-			active--;
-			if(active)
-				show_active(active);
+			jobs_active--;
+			show_active(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:

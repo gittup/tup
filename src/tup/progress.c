@@ -23,17 +23,45 @@
 #include "db_types.h"
 #include "entry.h"
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 static int cur_phase = -1;
 static int sum;
 static int total;
 static int is_active = 0;
 static int stdout_isatty;
+static int console_width;
+static int color_len;
+static int got_error = 0;
+
+static int get_console_width(void)
+{
+#ifdef TIOCGWINSZ
+	struct winsize wsz;
+
+	if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) < 0)
+		return 0;
+
+	return wsz.ws_col;
+#elif defined(WINDOWS)
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+		return 0;
+	return csbi.dwSize.X;
+#else
+	return 0;
+#endif
+}
 
 void progress_init(void)
 {
 	stdout_isatty = isatty(STDOUT_FILENO);
+	console_width = get_console_width();
+	color_len = strlen(color_type(TUP_NODE_CMD)) +
+		strlen(color_append_reverse()) +
+		strlen(color_end());
 }
 
 void tup_show_message(const char *s)
@@ -47,10 +75,12 @@ void tup_show_message(const char *s)
 		printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
 }
 
-static void clear_active(FILE *f)
+void clear_active(FILE *f)
 {
 	if(is_active) {
-		printf("\r                             \r");
+		char spaces[console_width];
+		memset(spaces, ' ', console_width);
+		printf("\r%.*s\r", console_width, spaces);
 		is_active = 0;
 		if(f == stderr)
 			fflush(stdout);
@@ -70,63 +100,73 @@ void start_progress(int new_total)
 	total = new_total;
 }
 
-static void show_bar(FILE *f, int node_type, int show_percent)
-{
-	if(total) {
-		const int max = 11;
-		int fill;
-		char buf[12];
-
-		clear_active(f);
-
-		/* If it's a good enough limit for Final Fantasy VII, it's good
-		 * enough for me.
-		 */
-		if(total > 9999 || show_percent) {
-			snprintf(buf, sizeof(buf), "   %3i%%     ", sum*100/total);
-		} else {
-			snprintf(buf, sizeof(buf), " %4i/%-4i ", sum, total);
-		}
-		/* TUP_NODE_ROOT means an error - fill the whole bar so it's
-		 * obvious.
-		 */
-		if(node_type == TUP_NODE_ROOT)
-			fill = max;
-		else
-			fill = max * sum / total;
-
-		color_set(f);
-		fprintf(f, "[%s%s%.*s%s%.*s] ", color_type(node_type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill);
-	}
-}
-
 void show_progress(struct tup_entry *tent, int is_error)
 {
 	FILE *f;
+	int node_type = tent->type;
 
 	sum++;
 	if(is_error) {
+		got_error = 1;
 		f = stderr;
-		show_bar(f, TUP_NODE_ROOT, 0);
+		tent->type = TUP_NODE_ROOT;
 	} else {
 		f = stdout;
-		show_bar(f, tent->type, 0);
 	}
+	clear_active(f);
+	color_set(f);
+	if(is_error) {
+		fprintf(stderr, "* ");
+	} else {
+		printf(" ");
+	}
+	fprintf(f, "%i) ", sum);
 	print_tup_entry(f, tent);
 	fprintf(f, "\n");
+	tent->type = node_type;
 }
 
-void show_active(int active)
+void show_active(int active, int type)
 {
-	if(total && stdout_isatty) {
-		/* First time through we should 0/N for the progress bar, then
-		 * after that we just show the percentage complete, since the
-		 * previous line will have a 1/N line for the last completed
-		 * job.
+	if(total && stdout_isatty && console_width >= 10) {
+		/* -3 for the [] and leading space, and -6 for the " 100% " at
+		 * the end.
 		 */
-		show_bar(stdout, TUP_NODE_CMD, sum != 0);
-		printf("Active: %i", active);
+		const int max = console_width - 9;
+		int fill;
+		char buf[console_width + color_len];
+		char activebuf[32];
+		int activebuflen = 0;
+		char remainingbuf[32];
+		int remainingbuflen;
+		int offset;
+
+		if(got_error)
+			type = TUP_NODE_ROOT;
+
+		clear_active(stdout);
+
+		if(active != -1) {
+			activebuflen = snprintf(activebuf, sizeof(activebuf), "Active=%i", active);
+		}
+		remainingbuflen = snprintf(remainingbuf, sizeof(remainingbuf), "Remaining=%i", total-sum);
+		if(max > activebuflen + remainingbuflen) {
+			offset = (max - (activebuflen + remainingbuflen)) / 2;
+
+			memset(buf, ' ', offset);
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "%.*s %.*s", activebuflen, activebuf, remainingbuflen, remainingbuf);
+			memset(buf + offset, ' ', sizeof(buf) - offset);
+		} else {
+			memset(buf, ' ', sizeof(buf));
+		}
+
+		fill = max * sum / total;
+		color_set(stdout);
+		printf(" [%s%s%.*s%s%.*s] %3i%%", color_type(type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill, sum*100/total);
+		if(sum == total)
+			printf("\n");
+		else
+			is_active = 1;
 		fflush(stdout);
-		is_active = 1;
 	}
 }
