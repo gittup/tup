@@ -33,6 +33,8 @@ static const char *default_env[] = {
 	"INCLUDE",
 	"LIB",
 	"LIBPATH",
+	"TEMP",
+	"TMP",
 	"VCINSTALLDIR",
 	"VS100COMNTOOLS",
 	"VS90COMNTOOLS",
