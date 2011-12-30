@@ -23,6 +23,7 @@
 #include "db_types.h"
 #include "option.h"
 #include "entry.h"
+#include "timespan.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -89,16 +90,14 @@ void start_progress(int new_total)
 	total = new_total;
 }
 
-void show_result(struct tup_entry *tent, int is_error, struct timeval *start,
-		 struct timeval *end)
+void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 {
 	FILE *f;
 	int node_type = tent->type;
 	float tdiff = 0.0;
 
-	if(start && end) {
-		tdiff = (float)(end->tv_sec - start->tv_sec) +
-			(float)(end->tv_usec - start->tv_usec)/1e6;
+	if(ts) {
+		tdiff = timespan_seconds(ts);
 	}
 
 	sum++;
@@ -117,7 +116,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timeval *start,
 		printf(" ");
 	}
 	fprintf(f, "%i) ", sum);
-	if(start && end) {
+	if(ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
 	}
 	print_tup_entry(f, tent);

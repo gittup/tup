@@ -61,6 +61,7 @@
 #include "tup/server.h"
 #include "tup/container.h"
 #include "tup/option.h"
+#include "tup/timespan.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -428,12 +429,12 @@ static int monitor_loop(void)
 {
 	int x;
 	int rc;
-	struct timeval t1, t2;
+	struct timespan ts;
 	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
 	struct tupid_entries scan_root = {NULL};
 	int locked = 1;
 
-	gettimeofday(&t1, NULL);
+	timespan_start(&ts);
 
 	if(tup_db_scan_begin(&scan_root) < 0)
 		return -1;
@@ -458,10 +459,8 @@ static int monitor_loop(void)
 		}
 	}
 
-	gettimeofday(&t2, NULL);
-	fprintf(stderr, "Initialized in %f seconds.\n",
-		(double)(t2.tv_sec - t1.tv_sec) +
-		(double)(t2.tv_usec - t1.tv_usec)/1e6);
+	timespan_end(&ts);
+	fprintf(stderr, "Initialized in %f seconds.\n", timespan_seconds(&ts));
 
 	do {
 		struct inotify_event *e;

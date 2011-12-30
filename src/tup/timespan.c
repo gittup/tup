@@ -18,21 +18,28 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_progress_h
-#define tup_progress_h
-
 #include <stdio.h>
+#include "timespan.h"
 
-struct tup_entry;
-struct timespan;
+void timespan_start(struct timespan *ts)
+{
+	gettimeofday(&ts->start, NULL);
+}
 
-void progress_init(void);
-void tup_show_message(const char *s);
-void tup_main_progress(const char *s);
-void start_progress(int total);
-void show_result(struct tup_entry *tent, int is_error, struct timespan *ts);
-void show_progress(int active, int type);
-void clear_active(FILE *f);
-void clear_progress(void);
+void timespan_end(struct timespan *ts)
+{
+	gettimeofday(&ts->end, NULL);
+}
 
-#endif
+time_t timespan_milliseconds(struct timespan *ts)
+{
+	/* The +500 is to round to the nearest ms */
+	return (ts->end.tv_sec - ts->start.tv_sec) * 1000 +
+		(ts->end.tv_usec - ts->start.tv_usec + 500) / 1000;
+}
+
+float timespan_seconds(struct timespan *ts)
+{
+	return (float)(ts->end.tv_sec - ts->start.tv_sec) +
+		(float)(ts->end.tv_usec - ts->start.tv_usec)/1e6;
+}

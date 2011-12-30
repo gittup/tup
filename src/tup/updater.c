@@ -27,6 +27,7 @@
 #include "entry.h"
 #include "parser.h"
 #include "progress.h"
+#include "timespan.h"
 #include "server.h"
 #include "array_size.h"
 #include "config.h"
@@ -41,7 +42,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <pthread.h>
-#include <sys/time.h>
 
 #define MAX_JOBS 65535
 
@@ -251,16 +251,14 @@ static int run_scan(void)
 		return -1;
 	}
 	if(rc == 0) {
-		struct timeval t1, t2;
+		struct timespan ts;
 		tup_main_progress("Scanning filesystem...");
 		fflush(stdout);
-		gettimeofday(&t1, NULL);
+		timespan_start(&ts);
 		if(tup_scan() < 0)
 			return -1;
-		gettimeofday(&t2, NULL);
-		printf("%.3fs\n",
-		       (double)(t2.tv_sec - t1.tv_sec) +
-		       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+		timespan_end(&ts);
+		printf("%.3fs\n", timespan_seconds(&ts));
 	} else {
 		tup_main_progress("No filesystem scan - monitor is running.\n");
 	}
@@ -302,7 +300,7 @@ static int delete_files(struct graph *g)
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				show_result(tent, 0, NULL, NULL);
+				show_result(tent, 0, NULL);
 				if(delete_file(tent->dt, tent->name.s) < 0)
 					goto out_err;
 			}
@@ -320,7 +318,7 @@ static int delete_files(struct graph *g)
 	LIST_FOREACH(tent, entrylist, list) {
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
-		show_result(tent, 0, NULL, NULL);
+		show_result(tent, 0, NULL);
 	}
 	rc = 0;
 out_err:
@@ -962,7 +960,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->tent->type == g->count_flags) {
-			show_result(n->tent, 0, NULL, NULL);
+			show_result(n->tent, 0, NULL);
 		}
 
 		worker_ret(wt, 0);
@@ -979,7 +977,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				pthread_mutex_lock(&display_mutex);
-				show_result(n->tent, 1, NULL, NULL);
+				show_result(n->tent, 1, NULL);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				pthread_mutex_unlock(&display_mutex);
@@ -993,16 +991,15 @@ static int unlink_outputs(int dfd, struct node *n)
 static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *sticky_root,
 			  struct tupid_entries *normal_root,
-			  struct timeval *start)
+			  struct timespan *ts)
 {
 	FILE *f;
 	int is_err = 1;
-	struct timeval end;
-	struct timeval *show_end = NULL;
+	struct timespan *show_ts = NULL;
 
 	f = tmpfile();
 	if(!f) {
-		show_result(tent, 1, NULL, NULL);
+		show_result(tent, 1, NULL);
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
@@ -1014,10 +1011,10 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			} else {
 				time_t ms;
 
-				gettimeofday(&end, NULL);
-				show_end = &end;
-				/* The +500 is to round to the nearest ms */
-				ms = (end.tv_sec - start->tv_sec) * 1000 + (end.tv_usec - start->tv_usec + 500) / 1000;
+				timespan_end(ts);
+				show_ts = ts;
+				ms = timespan_milliseconds(ts);
+
 				/* Hooray! */
 				is_err = 0;
 				if(tent->mtime != ms)
@@ -1044,7 +1041,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	fflush(f);
 	rewind(f);
 
-	show_result(tent, is_err, start, show_end);
+	show_result(tent, is_err, show_ts);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1071,9 +1068,9 @@ static int update(struct node *n)
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct tup_env newenv;
-	struct timeval start;
+	struct timespan ts;
 
-	gettimeofday(&start, NULL);
+	timespan_start(&ts);
 	if(name[0] == '^') {
 		name++;
 		while(*name && *name != ' ') {
@@ -1081,7 +1078,7 @@ static int update(struct node *n)
 			 * what yet.
 			 */
 			pthread_mutex_lock(&display_mutex);
-			show_result(n->tent, 1, NULL, NULL);
+			show_result(n->tent, 1, NULL);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
 			pthread_mutex_unlock(&display_mutex);
 			name++;
@@ -1090,7 +1087,7 @@ static int update(struct node *n)
 		while(*name && *name != '^') name++;
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
-			show_result(n->tent, 1, NULL, NULL);
+			show_result(n->tent, 1, NULL);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
@@ -1102,7 +1099,7 @@ static int update(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
-		show_result(n->tent, 1, NULL, NULL);
+		show_result(n->tent, 1, NULL);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);
@@ -1140,7 +1137,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &start);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &ts);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free_tupid_tree(&sticky_root);
