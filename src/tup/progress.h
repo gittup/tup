@@ -30,9 +30,9 @@ void progress_init(void);
 void tup_show_message(const char *s);
 void tup_main_progress(const char *s);
 void start_progress(int total);
-void show_progress(struct tup_entry *tent, int is_error, struct timeval *start,
-		   struct timeval *end);
-void show_active(int active, int type);
+void show_result(struct tup_entry *tent, int is_error, struct timeval *start,
+		 struct timeval *end);
+void show_progress(int active, int type);
 void clear_active(FILE *f);
 
 #endif

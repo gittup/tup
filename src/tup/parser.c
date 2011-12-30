@@ -353,7 +353,7 @@ out_server_stop:
 	free_tupid_tree(&tf.input_root);
 
 	gettimeofday(&end, NULL);
-	show_progress(n->tent, rc != 0, &start, &end);
+	show_result(n->tent, rc != 0, &start, &end);
 	if(fflush(tf.f) != 0) {
 		perror("fflush");
 		rc = -1;

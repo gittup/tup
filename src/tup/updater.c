@@ -302,7 +302,7 @@ static int delete_files(struct graph *g)
 
 			/* Only delete if the file wasn't modified (t6031) */
 			if(do_delete) {
-				show_progress(tent, 0, NULL, NULL);
+				show_result(tent, 0, NULL, NULL);
 				if(delete_file(tent->dt, tent->name.s) < 0)
 					goto out_err;
 			}
@@ -320,7 +320,7 @@ static int delete_files(struct graph *g)
 	LIST_FOREACH(tent, entrylist, list) {
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
-		show_progress(tent, 0, NULL, NULL);
+		show_result(tent, 0, NULL, NULL);
 	}
 	rc = 0;
 out_err:
@@ -839,7 +839,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
-			show_active(-1, TUP_NODE_DIR);
+			show_progress(-1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -874,14 +874,14 @@ static void *update_work(void *arg)
 		if(n->tent->type == TUP_NODE_CMD) {
 			pthread_mutex_lock(&display_mutex);
 			jobs_active++;
-			show_active(jobs_active, TUP_NODE_CMD);
+			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
 			jobs_active--;
-			show_active(jobs_active, TUP_NODE_CMD);
+			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
@@ -954,7 +954,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->tent->type == g->count_flags) {
-			show_progress(n->tent, 0, NULL, NULL);
+			show_result(n->tent, 0, NULL, NULL);
 		}
 
 		worker_ret(wt, 0);
@@ -971,7 +971,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				pthread_mutex_lock(&display_mutex);
-				show_progress(n->tent, 1, NULL, NULL);
+				show_result(n->tent, 1, NULL, NULL);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				pthread_mutex_unlock(&display_mutex);
@@ -992,7 +992,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 
 	f = tmpfile();
 	if(!f) {
-		show_progress(tent, 1, start, end);
+		show_result(tent, 1, start, end);
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
@@ -1025,7 +1025,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	fflush(f);
 	rewind(f);
 
-	show_progress(tent, is_err, start, end);
+	show_result(tent, is_err, start, end);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1062,7 +1062,7 @@ static int update(struct node *n)
 			 * what yet.
 			 */
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent, 1, NULL, NULL);
+			show_result(n->tent, 1, NULL, NULL);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
 			pthread_mutex_unlock(&display_mutex);
 			name++;
@@ -1071,7 +1071,7 @@ static int update(struct node *n)
 		while(*name && *name != '^') name++;
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent, 1, NULL, NULL);
+			show_result(n->tent, 1, NULL, NULL);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
@@ -1083,7 +1083,7 @@ static int update(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
-		show_progress(n->tent, 1, NULL, NULL);
+		show_result(n->tent, 1, NULL, NULL);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);

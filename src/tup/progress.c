@@ -82,8 +82,8 @@ void start_progress(int new_total)
 	total = new_total;
 }
 
-void show_progress(struct tup_entry *tent, int is_error, struct timeval *start,
-		   struct timeval *end)
+void show_result(struct tup_entry *tent, int is_error, struct timeval *start,
+		 struct timeval *end)
 {
 	FILE *f;
 	int node_type = tent->type;
@@ -118,7 +118,7 @@ void show_progress(struct tup_entry *tent, int is_error, struct timeval *start,
 	tent->type = node_type;
 }
 
-void show_active(int active, int type)
+void show_progress(int active, int type)
 {
 	if(total && stdout_isatty && console_width >= 10) {
 		/* -3 for the [] and leading space, and -6 for the " 100% " at
