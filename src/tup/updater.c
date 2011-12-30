@@ -582,8 +582,15 @@ edge_create:
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->tent->type == g->count_flags)
+		if(n->tent->type == g->count_flags) {
 			g->num_nodes++;
+			if(g->total_mtime != -1) {
+				if(n->tent->mtime == -1)
+					g->total_mtime = -1;
+				else
+					g->total_mtime += n->tent->mtime;
+			}
+		}
 		n->expanded = 1;
 		TAILQ_REMOVE(&g->node_list, n, list);
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
@@ -985,14 +992,16 @@ static int unlink_outputs(int dfd, struct node *n)
 static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *sticky_root,
 			  struct tupid_entries *normal_root,
-			  struct timeval *start, struct timeval *end)
+			  struct timeval *start)
 {
 	FILE *f;
 	int is_err = 1;
+	struct timeval end;
+	struct timeval *show_end = NULL;
 
 	f = tmpfile();
 	if(!f) {
-		show_result(tent, 1, start, end);
+		show_result(tent, 1, NULL, NULL);
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
@@ -1002,8 +1011,17 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
+				time_t ms;
+
+				gettimeofday(&end, NULL);
+				show_end = &end;
+				/* The +500 is to round to the nearest ms */
+				ms = (end.tv_sec - start->tv_sec) * 1000 + (end.tv_usec - start->tv_usec + 500) / 1000;
 				/* Hooray! */
 				is_err = 0;
+				if(tent->mtime != ms)
+					if(tup_db_set_mtime(tent, ms) < 0)
+						is_err = 1; /* Un-Hooray :( */
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
@@ -1025,7 +1043,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	fflush(f);
 	rewind(f);
 
-	show_result(tent, is_err, start, end);
+	show_result(tent, is_err, start, show_end);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1052,7 +1070,7 @@ static int update(struct node *n)
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct tup_env newenv;
-	struct timeval start, end;
+	struct timeval start;
 
 	gettimeofday(&start, NULL);
 	if(name[0] == '^') {
@@ -1119,10 +1137,9 @@ static int update(struct node *n)
 		return -1;
 	}
 
-	gettimeofday(&end, NULL);
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &start, &end);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &start);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free_tupid_tree(&sticky_root);

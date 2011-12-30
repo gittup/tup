@@ -142,6 +142,7 @@ int create_graph(struct graph *g, int count_flags)
 		return -1;
 	g->num_nodes = 0;
 	g->count_flags = count_flags;
+	g->total_mtime = 0;
 	return 0;
 }
 
@@ -298,6 +299,10 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 {
 	if(n->tent->type == g->count_flags && n->expanded) {
 		g->num_nodes--;
+		if(g->total_mtime != -1) {
+			if(n->tent->mtime != -1)
+				g->total_mtime -= n->tent->mtime;
+		}
 		(*num_pruned)++;
 
 		if(n->tent->type != TUP_NODE_CMD) {

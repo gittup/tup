@@ -23,6 +23,7 @@
 
 #include "bsd/queue.h"
 #include "tupid_tree.h"
+#include <time.h>
 
 struct edge {
 	LIST_ENTRY(edge) list;
@@ -62,6 +63,7 @@ struct graph {
 	int num_nodes;
 	struct tupid_entries node_root;
 	int count_flags;
+	time_t total_mtime;
 	struct tupid_entries delete_root;
 	int delete_count;
 };
