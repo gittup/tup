@@ -147,6 +147,15 @@ void show_progress(int active, int type)
 
 		clear_active(stdout);
 
+		fill = max * sum / total;
+
+		if(color_len) {
+			memset(buf, ' ', sizeof(buf));
+		} else {
+			memset(buf, '.', fill);
+			memset(buf+fill, ' ', sizeof(buf) - fill);
+		}
+
 		if(active != -1) {
 			activebuflen = snprintf(activebuf, sizeof(activebuf), "Active=%i", active);
 		}
@@ -154,14 +163,13 @@ void show_progress(int active, int type)
 		if(max > activebuflen + remainingbuflen) {
 			offset = (max - (activebuflen + remainingbuflen)) / 2;
 
-			memset(buf, ' ', offset);
 			offset += snprintf(buf + offset, sizeof(buf) - offset, "%.*s %.*s", activebuflen, activebuf, remainingbuflen, remainingbuf);
-			memset(buf + offset, ' ', sizeof(buf) - offset);
-		} else {
-			memset(buf, ' ', sizeof(buf));
+			if(offset < fill && !color_len)
+				buf[offset] = '.';
+			else
+				buf[offset] = ' ';
 		}
 
-		fill = max * sum / total;
 		color_set(stdout);
 		printf(" [%s%s%.*s%s%.*s] %3i%%", color_type(type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill, sum*100/total);
 		if(sum == total)
