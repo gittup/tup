@@ -124,7 +124,7 @@ void show_active(int active, int type)
 		/* -3 for the [] and leading space, and -6 for the " 100% " at
 		 * the end.
 		 */
-		const int max = console_width - 9;
+		int max = console_width - 9;
 		int fill;
 		char buf[console_width + color_len];
 		char activebuf[32];
@@ -133,6 +133,8 @@ void show_active(int active, int type)
 		int remainingbuflen;
 		int offset;
 
+		if(max > total)
+			max = total;
 		if(got_error)
 			type = TUP_NODE_ROOT;
 
