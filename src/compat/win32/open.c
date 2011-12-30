@@ -57,5 +57,5 @@ int __wrap_open(const char *pathname, int flags, ...)
 			}
 		}
 	}
-	return __real_open(pathname, flags, mode);
+	return __real_open(pathname, flags | O_BINARY, mode);
 }
