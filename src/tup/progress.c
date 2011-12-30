@@ -69,6 +69,13 @@ void clear_active(FILE *f)
 	}
 }
 
+void clear_progress(void)
+{
+	if(is_active) {
+		printf("\n");
+	}
+}
+
 void tup_main_progress(const char *s)
 {
 	clear_active(stdout);

@@ -34,5 +34,6 @@ void show_result(struct tup_entry *tent, int is_error, struct timeval *start,
 		 struct timeval *end);
 void show_progress(int active, int type);
 void clear_active(FILE *f);
+void clear_progress(void);
 
 #endif

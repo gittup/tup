@@ -799,6 +799,7 @@ out:
 	free(workers); /* Viva la revolucion! */
 	pthread_mutex_destroy(&list_mutex);
 	pthread_cond_destroy(&list_cond);
+	clear_progress();
 	return rc;
 }
 
