@@ -24,6 +24,7 @@
 #include "option.h"
 #include "entry.h"
 #include "timespan.h"
+#include "array_size.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,6 +38,13 @@ static int stdout_isatty;
 static int console_width;
 static int color_len;
 static int got_error = 0;
+static struct timespan gts;
+
+struct {
+	char text[32];
+	int len;
+	int maxlen;
+} infos[3];
 
 void progress_init(void)
 {
@@ -86,8 +94,13 @@ void tup_main_progress(const char *s)
 
 void start_progress(int new_total)
 {
+	int x;
 	sum = 0;
 	total = new_total;
+	for(x=0; x<ARRAY_SIZE(infos); x++) {
+		infos[x].maxlen = 0;
+	}
+	timespan_start(&gts);
 }
 
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
@@ -124,7 +137,44 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	tent->type = node_type;
 }
 
-void show_progress(int active, int type)
+static int get_time_remaining(char *dest, int len, int job_time, int total_time)
+{
+	if(job_time != 0) {
+		time_t ms;
+		time_t total_runtime;
+		time_t time_left;
+
+		timespan_end(&gts);
+		ms = timespan_milliseconds(&gts);
+
+		/* This can easily overflow, so do the computation in float */
+		total_runtime = (time_t)((float)ms * (float)total_time / (float)job_time);
+		time_left = total_runtime - ms;
+
+		/* Try to find the best units. Note that we use +1 because the
+		 * division always rounds down, so eg 1.9s would become 1s.
+		 * With the +1 we always round up, so 1.0m-2.0m shows as '2m'. Once
+		 * we go down to 1m, we switch over to displaying in seconds (eg:
+		 * 60s).
+		 *
+		 * Also note that the length of each text field has a max size of
+		 * " ETA=???". This keeps the maxlen field in the info structure
+		 * to be monotonically decreasing over time.
+		 */
+		if(time_left < 1000) {
+			return snprintf(dest, len, " ETA=<1s");
+		} else if(time_left < 60000) {
+			return snprintf(dest, len, " ETA=%lis", time_left/1000 + 1);
+		} else if(time_left < 3600000) {
+			return snprintf(dest, len, " ETA=%lim", time_left/60000 + 1);
+		} else if(time_left < 356400000) {
+			return snprintf(dest, len, " ETA=%lih", time_left/3600000 + 1);
+		}
+	}
+	return snprintf(dest, len, " ETA=???");
+}
+
+void show_progress(int active, int job_time, int total_time, int type)
 {
 	if(total && stdout_isatty && console_width >= 10) {
 		/* -3 for the [] and leading space, and -6 for the " 100% " at
@@ -133,10 +183,10 @@ void show_progress(int active, int type)
 		int max = console_width - 9;
 		int fill;
 		char buf[console_width + color_len];
-		char activebuf[32];
-		int activebuflen = 0;
-		char remainingbuf[32];
-		int remainingbuflen;
+		int num_infos = 0;
+		int i = 0;
+		int x;
+		int tmpmax;
 		int offset;
 
 		if(max > total)
@@ -155,18 +205,46 @@ void show_progress(int active, int type)
 			memset(buf+fill, ' ', sizeof(buf) - fill);
 		}
 
-		if(active != -1) {
-			activebuflen = snprintf(activebuf, sizeof(activebuf), "Active=%i", active);
+		for(x=0; x<ARRAY_SIZE(infos); x++) {
+			infos[x].len = 0;
 		}
-		remainingbuflen = snprintf(remainingbuf, sizeof(remainingbuf), "Remaining=%i", total-sum);
-		if(max > activebuflen + remainingbuflen) {
-			offset = (max - (activebuflen + remainingbuflen)) / 2;
 
-			offset += snprintf(buf + offset, sizeof(buf) - offset, "%.*s %.*s", activebuflen, activebuf, remainingbuflen, remainingbuf);
+		if(total_time != -1) {
+			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), job_time, total_time);
+			i++;
+		}
+
+		infos[i].len = snprintf(infos[i].text, sizeof(infos[i].text), "Remaining=%i", total-sum);
+		i++;
+
+		if(active != -1) {
+			infos[i].len = snprintf(infos[i].text, sizeof(infos[i].text), "Active=%i", active);
+			i++;
+		}
+
+		tmpmax = max;
+		for(x=0; x<ARRAY_SIZE(infos); x++) {
+			/* Maxlen remains constant for the duration of the progress
+			 * bar. We expect the size of the text to decrease
+			 * during its lifetime as the numbers go down.
+			 */
+			if(infos[x].maxlen == 0)
+				infos[x].maxlen = infos[x].len;
+			if(tmpmax >= infos[x].maxlen + 1) {
+				tmpmax -= infos[x].maxlen + 1;
+				num_infos++;
+			} else {
+				break;
+			}
+		}
+		offset = tmpmax / 2;
+		for(x=0; x<num_infos; x++) {
+			offset += snprintf(buf + offset, sizeof(buf) - offset, "%.*s", infos[x].len, infos[x].text);
 			if(offset < fill && !color_len)
 				buf[offset] = '.';
 			else
 				buf[offset] = ' ';
+			offset++;
 		}
 
 		color_set(stdout);

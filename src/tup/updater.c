@@ -100,7 +100,7 @@ LIST_HEAD(worker_thread_head, worker_thread);
 struct worker_thread {
 	LIST_ENTRY(worker_thread) list;
 	pthread_t pid;
-	struct graph *g; /* This should only be used in create_work() and todo_work */
+	struct graph *g;
 
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
@@ -845,7 +845,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
-			show_progress(-1, TUP_NODE_DIR);
+			show_progress(-1, -1, -1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -868,6 +868,7 @@ static void *update_work(void *arg)
 	struct worker_thread *wt = arg;
 	struct node *n;
 	static int jobs_active = 0;
+	static time_t job_time = 0;
 
 	while(1) {
 		struct edge *e;
@@ -878,16 +879,18 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
+			time_t mtime = n->tent->mtime;
 			pthread_mutex_lock(&display_mutex);
 			jobs_active++;
-			show_progress(jobs_active, TUP_NODE_CMD);
+			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
 			jobs_active--;
-			show_progress(jobs_active, TUP_NODE_CMD);
+			job_time += mtime;
+			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
