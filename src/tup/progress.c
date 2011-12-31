@@ -234,7 +234,9 @@ void show_progress(int active, int job_time, int total_time, int type)
 		for(x=0; x<ARRAY_SIZE(infos); x++) {
 			/* Maxlen remains constant for the duration of the progress
 			 * bar. We expect the size of the text to decrease
-			 * during its lifetime as the numbers go down.
+			 * during its lifetime as the numbers go down. This
+			 * prevents the fields from moving within the progress
+			 * bar, or suddenly adding a field as the numbers change.
 			 */
 			if(infos[x].maxlen == 0)
 				infos[x].maxlen = infos[x].len;
