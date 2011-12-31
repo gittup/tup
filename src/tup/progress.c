@@ -137,8 +137,13 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	tent->type = node_type;
 }
 
-static int get_time_remaining(char *dest, int len, int job_time, int total_time)
+static int get_time_remaining(char *dest, int len, int job_time, int total_time,
+			      int approx)
 {
+	const char *eq = "=";
+
+	if(approx)
+		eq = "~=";
 	if(job_time != 0) {
 		time_t ms;
 		time_t total_runtime;
@@ -162,16 +167,16 @@ static int get_time_remaining(char *dest, int len, int job_time, int total_time)
 		 * to be monotonically decreasing over time.
 		 */
 		if(time_left < 1000) {
-			return snprintf(dest, len, " ETA=<1s");
+			return snprintf(dest, len, " ETA%s<1s", eq);
 		} else if(time_left < 60000) {
-			return snprintf(dest, len, " ETA=%lis", time_left/1000 + 1);
+			return snprintf(dest, len, " ETA%s%lis", eq, time_left/1000 + 1);
 		} else if(time_left < 3600000) {
-			return snprintf(dest, len, " ETA=%lim", time_left/60000 + 1);
+			return snprintf(dest, len, " ETA%s%lim", eq, time_left/60000 + 1);
 		} else if(time_left < 356400000) {
-			return snprintf(dest, len, " ETA=%lih", time_left/3600000 + 1);
+			return snprintf(dest, len, " ETA%s%lih", eq, time_left/3600000 + 1);
 		}
 	}
-	return snprintf(dest, len, " ETA=???");
+	return snprintf(dest, len, " ETA%s???", eq);
 }
 
 void show_progress(int active, int job_time, int total_time, int type)
@@ -210,7 +215,10 @@ void show_progress(int active, int job_time, int total_time, int type)
 		}
 
 		if(total_time != -1) {
-			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), job_time, total_time);
+			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), job_time, total_time, 0);
+			i++;
+		} else {
+			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), sum, total, 1);
 			i++;
 		}
 
