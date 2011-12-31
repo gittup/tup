@@ -163,20 +163,20 @@ static int get_time_remaining(char *dest, int len, int job_time, int total_time,
 		 * 60s).
 		 *
 		 * Also note that the length of each text field has a max size of
-		 * " ETA=???". This keeps the maxlen field in the info structure
+		 * "ETA=???". This keeps the maxlen field in the info structure
 		 * to be monotonically decreasing over time.
 		 */
 		if(time_left < 1000) {
-			return snprintf(dest, len, " ETA%s<1s", eq);
+			return snprintf(dest, len, "ETA%s<1s", eq);
 		} else if(time_left < 60000) {
-			return snprintf(dest, len, " ETA%s%lis", eq, time_left/1000 + 1);
+			return snprintf(dest, len, "ETA%s%lis", eq, time_left/1000 + 1);
 		} else if(time_left < 3600000) {
-			return snprintf(dest, len, " ETA%s%lim", eq, time_left/60000 + 1);
+			return snprintf(dest, len, "ETA%s%lim", eq, time_left/60000 + 1);
 		} else if(time_left < 356400000) {
-			return snprintf(dest, len, " ETA%s%lih", eq, time_left/3600000 + 1);
+			return snprintf(dest, len, "ETA%s%lih", eq, time_left/3600000 + 1);
 		}
 	}
-	return snprintf(dest, len, " ETA%s???", eq);
+	return snprintf(dest, len, "ETA%s???", eq);
 }
 
 void show_progress(int active, int job_time, int total_time, int type)
@@ -187,7 +187,7 @@ void show_progress(int active, int job_time, int total_time, int type)
 		 */
 		int max = console_width - 9;
 		int fill;
-		char buf[console_width + color_len];
+		char buf[console_width + color_len + 1];
 		int num_infos = 0;
 		int i = 0;
 		int x;
@@ -232,6 +232,9 @@ void show_progress(int active, int job_time, int total_time, int type)
 
 		tmpmax = max;
 		for(x=0; x<ARRAY_SIZE(infos); x++) {
+			int spacing = 0;
+			if(x)
+				spacing = 1;
 			/* Maxlen remains constant for the duration of the progress
 			 * bar. We expect the size of the text to decrease
 			 * during its lifetime as the numbers go down. This
@@ -240,8 +243,8 @@ void show_progress(int active, int job_time, int total_time, int type)
 			 */
 			if(infos[x].maxlen == 0)
 				infos[x].maxlen = infos[x].len;
-			if(tmpmax >= infos[x].maxlen + 1) {
-				tmpmax -= infos[x].maxlen + 1;
+			if(tmpmax >= infos[x].maxlen + spacing) {
+				tmpmax -= infos[x].maxlen + spacing;
 				num_infos++;
 			} else {
 				break;
@@ -249,12 +252,10 @@ void show_progress(int active, int job_time, int total_time, int type)
 		}
 		offset = tmpmax / 2;
 		for(x=0; x<num_infos; x++) {
-			offset += snprintf(buf + offset, sizeof(buf) - offset, "%.*s", infos[x].len, infos[x].text);
-			if(offset < fill && !color_len)
-				buf[offset] = '.';
-			else
-				buf[offset] = ' ';
-			offset++;
+			if(x)
+				offset++;
+			memcpy(buf + offset, infos[x].text, infos[x].len);
+			offset += infos[x].maxlen;
 		}
 
 		color_set(stdout);
