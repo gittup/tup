@@ -40,6 +40,7 @@ mingwsrcs += src/compat/win32/*.omingw
 MINGWLDFLAGS += -lws2_32
 MINGWLDFLAGS += -Wl,--wrap=open
 MINGWLDFLAGS += -Wl,--wrap=close
+MINGWLDFLAGS += -Wl,--wrap=tmpfile
 MINGWLDFLAGS += -Wl,--wrap=stat
 MINGWLDFLAGS += -Wl,--wrap=dup
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
