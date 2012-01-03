@@ -2,9 +2,9 @@
 
 TUP=$(pwd)/../../tup
 
-rm -rf .run_test
-mkdir .run_test
-cd .run_test
+rm -rf run_test_tmp
+mkdir run_test_tmp
+cd run_test_tmp
 niter=3
 ../gen-test-case.pl "$@" || exit 1
 sync
