@@ -29,6 +29,7 @@
 #include "tup/environ.h"
 #include "tup/db.h"
 #include "tup/privs.h"
+#include "tup/progress.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -572,6 +573,7 @@ out_err:
 static void sighandler(int sig)
 {
 	if(sig_quit == 0) {
+		clear_active(stderr);
 		fprintf(stderr, " *** tup: signal caught - waiting for jobs to finish.\n");
 		sig_quit = 1;
 		/* Signal the process group, in case tup was signalled
