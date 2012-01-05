@@ -1,7 +1,7 @@
 include_rules
 
 # Remove warnings from CFLAGS
-CFLAGS = -Os
+CFLAGS += -w
 
 # Use memory by default for temporary tables
 CFLAGS += -DSQLITE_TEMP_STORE=2
