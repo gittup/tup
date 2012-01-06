@@ -106,7 +106,6 @@ void start_progress(int new_total)
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 {
 	FILE *f;
-	int node_type = tent->type;
 	float tdiff = 0.0;
 
 	if(ts) {
@@ -117,14 +116,13 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	if(is_error) {
 		got_error = 1;
 		f = stderr;
-		tent->type = TUP_NODE_ROOT;
 	} else {
 		f = stdout;
 	}
 	clear_active(f);
 	color_set(f);
 	if(is_error) {
-		fprintf(stderr, "* ");
+		fprintf(stderr, "* %s", color_error_mode());
 	} else {
 		printf(" ");
 	}
@@ -134,7 +132,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	}
 	print_tup_entry(f, tent);
 	fprintf(f, "\n");
-	tent->type = node_type;
+	color_error_mode_clear();
 }
 
 static int get_time_remaining(char *dest, int len, int job_time, int total_time,
