@@ -171,9 +171,9 @@ tup_dep_no_exist()
 __update()
 {
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup upd"
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup upd"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --suppressions=$tupcurdir/helgrind.supp --sim-hints=fuse-compatible --tool=helgrind tup upd"
+		cmd="valgrind -q --error-exitcode=12 --suppressions=$tupcurdir/helgrind.supp --sim-hints=fuse-compatible --tool=helgrind tup upd"
 	else
 		cmd="tup upd"
 	fi
