@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -448,9 +448,13 @@ static int monitor_loop(void)
 	 */
 	if(autoupdate_enabled()) {
 		int modified = 0;
+		if(tup_db_begin() < 0)
+			return -1;
 		if(tup_db_select_node_by_flags(mod_cb, &modified, TUP_FLAGS_CREATE) < 0)
 			return -1;
 		if(tup_db_select_node_by_flags(mod_cb, &modified, TUP_FLAGS_MODIFY) < 0)
+			return -1;
+		if(tup_db_commit() < 0)
 			return -1;
 		if(modified) {
 			if(autoupdate() < 0)
@@ -804,7 +808,12 @@ static int autoupdate(void)
 			perror("pthread_detach");
 			return -1;
 		}
-		tup_db_config_set_int(AUTOUPDATE_PID, pid);
+		if(tup_db_begin() < 0)
+			return -1;
+		if(tup_db_config_set_int(AUTOUPDATE_PID, pid) < 0)
+			return -1;
+		if(tup_db_commit() < 0)
+			return -1;
 	}
 	return 0;
 }

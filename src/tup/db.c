@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -179,7 +179,11 @@ int tup_db_open(void)
 	if(db_sync == 0)
 		if(no_sync() < 0)
 			return -1;
+	if(tup_db_begin() < 0)
+		return -1;
 	if(version_check() < 0)
+		return -1;
+	if(tup_db_commit() < 0)
 		return -1;
 
 	return rc;
@@ -388,8 +392,6 @@ static int version_check(void)
 			fprintf(stderr, "tup error: Unable to backup the current database during the db version upgrade.\n");
 			return -1;
 		}
-		if(tup_db_begin() < 0)
-			return -1;
 	}
 	switch(version) {
 		case 1:
@@ -558,11 +560,7 @@ static int version_check(void)
 			 */
 			if(tup_db_debug_add_all_ghosts() < 0)
 				return -1;
-			if(tup_db_commit() < 0)
-				return -1;
 			if(tup_entry_clear() < 0)
-				return -1;
-			if(tup_db_begin() < 0)
 				return -1;
 			if(sqlite3_exec(tup_db, sql_11a, NULL, NULL, &errmsg) != 0) {
 				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
@@ -637,6 +635,8 @@ static int version_check(void)
 			/* Last case must fall through to here */
 			if(tup_db_commit() < 0)
 				return -1;
+			if(tup_db_begin() < 0)
+				return -1;
 			printf("Database update successful. You can remove the backup database file in the .tup/ directory if everything appears to be working.\n");
 		case DB_VERSION:
 			break;
@@ -653,8 +653,6 @@ static int version_check(void)
 	}
 	if(version != PARSER_VERSION) {
 		printf("Tup parser version has been updated to %i. All Tupfiles will be re-parsed to ensure that nothing broke.\n", PARSER_VERSION);
-		if(tup_db_begin() < 0)
-			return -1;
 		if(sqlite3_exec(tup_db, sql_1b, NULL, NULL, &errmsg) != 0) {
 			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 				errmsg, sql_1b);
@@ -663,8 +661,6 @@ static int version_check(void)
 		if(tup_db_unflag_create(env_dt()) < 0)
 			return -1;
 		if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
-			return -1;
-		if(tup_db_commit() < 0)
 			return -1;
 	}
 
