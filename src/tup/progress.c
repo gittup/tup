@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,7 +35,6 @@ static int sum;
 static int total;
 static int is_active = 0;
 static int stdout_isatty;
-static int console_width;
 static int color_len;
 static int got_error = 0;
 static struct timespan gts;
@@ -49,7 +48,6 @@ struct {
 void progress_init(void)
 {
 	stdout_isatty = isatty(STDOUT_FILENO);
-	console_width = tup_option_get_int("display.width");
 	color_len = strlen(color_type(TUP_NODE_CMD)) +
 		strlen(color_append_reverse()) +
 		strlen(color_end());
@@ -69,6 +67,7 @@ void tup_show_message(const char *s)
 void clear_active(FILE *f)
 {
 	if(is_active) {
+		int console_width = tup_option_get_int("display.width");
 		char spaces[console_width];
 		memset(spaces, ' ', console_width);
 		printf("\r%.*s\r", console_width, spaces);
@@ -179,6 +178,7 @@ static int get_time_remaining(char *dest, int len, int job_time, int total_time,
 
 void show_progress(int active, int job_time, int total_time, int type)
 {
+	int console_width = tup_option_get_int("display.width");
 	if(total && stdout_isatty && console_width >= 10) {
 		/* -3 for the [] and leading space, and -6 for the " 100% " at
 		 * the end.

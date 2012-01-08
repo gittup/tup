@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,6 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 #ifndef _WIN32
+#include <signal.h>
 #include <sys/ioctl.h>
 #endif
 
@@ -86,6 +87,15 @@ static struct option {
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
 static int inited = 0;
+static volatile int win_resize_requested = 0;
+
+#ifndef _WIN32
+static void win_resize_handler(int sig);
+static struct sigaction sigact = {
+	.sa_handler = win_resize_handler,
+	.sa_flags = SA_RESTART,
+};
+#endif
 
 int tup_option_init(void)
 {
@@ -105,6 +115,10 @@ int tup_option_init(void)
 		if(parse_option_file(x) < 0)
 			return -1;
 	}
+#ifndef _WIN32
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGWINCH, &sigact, NULL);
+#endif
 	inited = 1;
 	return 0;
 }
@@ -154,8 +168,13 @@ const char *tup_option_get_string(const char *opt)
 	}
 
 	for(x=0; x<NUM_OPTIONS; x++) {
-		if(strcmp(opt, options[x].name) == 0)
+		if(strcmp(opt, options[x].name) == 0) {
+			if(win_resize_requested &&
+			   strcmp(opt, "display.width") == 0) {
+				options[x].default_value = get_console_width();
+			}
 			return options[x].default_value;
+		}
 	}
 	fprintf(stderr, "tup internal error: Option '%s' does not have a default value\n", opt);
 	exit(1);
@@ -316,3 +335,11 @@ static int init_home_loc(void)
 	return 0;
 #endif
 }
+
+#ifndef _WIN32
+static void win_resize_handler(int sig)
+{
+	if(sig) {}
+	win_resize_requested = 1;
+}
+#endif
