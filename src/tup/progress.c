@@ -221,6 +221,10 @@ void show_progress(int active, int job_time, int total_time, int type)
 			i++;
 		} else {
 			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), sum, total, 1);
+			/* Override maxlen since the parser doesn't display an
+			 * initial ETA=~??? message.
+			 */
+			infos[i].maxlen = 8; /* Length of "ETA=~???" */
 			i++;
 		}
 
