@@ -285,6 +285,9 @@ static int delete_files(struct graph *g)
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int do_delete;
 
+		if(server_is_dead())
+			goto out_err;
+
 		do_delete = 1;
 		if(te->type == TUP_NODE_GENERATED) {
 			int tmp;
@@ -318,6 +321,8 @@ static int delete_files(struct graph *g)
 		tup_show_message("Converting generated files to normal files...\n");
 	}
 	LIST_FOREACH(tent, entrylist, list) {
+		if(server_is_dead())
+			goto out_err;
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
 		show_progress(tent, 0);
