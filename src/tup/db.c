@@ -172,8 +172,9 @@ static void transaction_check(const char *format, ...)
 		vfprintf(stderr, format, ap);
 		va_end(ap);
 		if(!transaction) {
-			fprintf(stderr, "[0m\n");
+			fprintf(stderr, "[0m");
 		}
+		fprintf(stderr, "\n");
 	}
 	if(!transaction) {
 		fprintf(stderr, "tup internal error: Database query must be in a transaction.\n");
