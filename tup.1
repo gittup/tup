@@ -146,6 +146,9 @@ Set to any number 10 or larger to force a fixed width for the progress bar. This
 .B display.job_numbers (default '1')
 Set to '0' to avoid displaying the "N) " string before the results of a job. The default is to display this number.
 .TP
+.B display.job_time (default '1')
+Set to '0' to avoid displaying the runtime of a job along with the results. The default is to display the runtime. Note that the runtime displayed includes the time that tup takes to save the dependencies. Therefore, this runtime will likely be larger than the runtime when executing the same job manually in the shell.
+.TP
 .B monitor.autoupdate (default '0')
 Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
 .TP

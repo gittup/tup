@@ -38,6 +38,7 @@ static int stdout_isatty;
 static int color_len;
 static int got_error = 0;
 static int display_job_numbers;
+static int display_job_time;
 static struct timespan gts;
 
 struct {
@@ -53,6 +54,7 @@ void progress_init(void)
 		strlen(color_append_reverse()) +
 		strlen(color_end());
 	display_job_numbers = tup_option_get_int("display.job_numbers");
+	display_job_time = tup_option_get_int("display.job_time");
 }
 
 void tup_show_message(const char *s)
@@ -128,7 +130,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 		printf(" ");
 	}
 	if(display_job_numbers) fprintf(f, "%i) ", sum);
-	if(ts) {
+	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
 	}
 	print_tup_entry(f, tent);

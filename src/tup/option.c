@@ -78,6 +78,7 @@ static struct option {
 	{"display.color", DEFAULT_COLOR, NULL},
 	{"display.width", NULL, get_console_width},
 	{"display.job_numbers", "1", NULL},
+	{"display.job_time", "1", NULL},
 	{"monitor.autoupdate", "0", NULL},
 	{"monitor.foreground", "0", NULL},
 	{"db.sync", "1", NULL},
