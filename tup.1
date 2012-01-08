@@ -143,6 +143,9 @@ Set to 'never' to disable ANSI escape codes for colored output, or 'always' to a
 .B display.width (defaults to the terminal width)
 Set to any number 10 or larger to force a fixed width for the progress bar. This is assumed to be the total width, some of which is used for spacing, brackets, and the percentage complete. If this value is less than 10, the progress bar is disabled.
 .TP
+.B display.job_numbers (default '1')
+Set to '0' to avoid displaying the "N) " string before the results of a job. The default is to display this number.
+.TP
 .B monitor.autoupdate (default '0')
 Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup upd' when you are ready to update.
 .TP
