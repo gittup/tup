@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -175,10 +175,14 @@ int main(int argc, char **argv)
 		rc = updater(argc, argv, 0);
 	} else if(strcmp(cmd, "autoupdate") == 0) {
 		rc = updater(argc, argv, 0);
+		if(tup_db_begin() < 0)
+			return -1;
 		if(tup_db_config_set_int(AUTOUPDATE_PID, -1) < 0) {
 			fprintf(stderr, "tup error: Unable to clear the autoupdate pid.\n");
 			rc = 1;
 		}
+		if(tup_db_commit() < 0)
+			return -1;
 	} else if(strcmp(cmd, "todo") == 0) {
 		rc = todo(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
@@ -354,6 +358,8 @@ static int graph(int argc, char **argv)
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	show_dirs = tup_option_get_int("graph.dirs");
 	show_ghosts = tup_option_get_int("graph.ghosts");
 	show_env = tup_option_get_int("graph.environment");
@@ -520,6 +526,8 @@ static int graph(int argc, char **argv)
 	}
 	printf("}\n");
 	destroy_graph(&g);
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
@@ -591,6 +599,8 @@ static int node_exists(int argc, char **argv)
 	struct tup_entry *tent;
 	tupid_t dt;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	if(argc < 3) {
 		fprintf(stderr, "Usage: node_exists dir [n1] [n2...]\n");
 		return -1;
@@ -619,6 +629,8 @@ static int node_exists(int argc, char **argv)
 		if(!tent)
 			return -1;
 	}
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
@@ -626,8 +638,11 @@ static int link_exists(int argc, char **argv)
 {
 	struct tup_entry *tenta;
 	struct tup_entry *tentb;
+	int rc;
 	tupid_t dta, dtb;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	if(argc != 5) {
 		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
 		return -1;
@@ -657,7 +672,11 @@ static int link_exists(int argc, char **argv)
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
 		return -1;
 	}
-	return tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid);
+	rc = tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid);
+	if(tup_db_commit() < 0)
+		return -1;
+
+	return rc;
 }
 
 static int touch(int argc, char **argv)
@@ -742,12 +761,13 @@ static int rm(int argc, char **argv)
 {
 	int x;
 	tupid_t sub_dir_dt;
+
+	if(tup_db_begin() < 0)
+		return -1;
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
 
-	if(tup_db_begin() < 0)
-		return -1;
 	for(x=1; x<argc; x++) {
 		struct path_element *pel = NULL;
 		tupid_t dt;
@@ -784,6 +804,8 @@ static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *val
 
 static int varshow(int argc, char **argv)
 {
+	if(tup_db_begin() < 0)
+		return -1;
 	if(tup_entry_add(VAR_DT, NULL) < 0)
 		return -1;
 	if(argc == 1) {
@@ -812,6 +834,8 @@ static int varshow(int argc, char **argv)
 			}
 		}
 	}
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
@@ -853,6 +877,8 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "Error: fake_mtime requires a file and an mtime.\n");
 		return -1;
 	}
+	if(tup_db_begin() < 0)
+		return -1;
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
@@ -869,13 +895,19 @@ static int fake_mtime(int argc, char **argv)
 	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
 	free(pel);
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
 static int fake_parser_version(int argc, char **argv)
 {
 	if(argc || argv) {}
+	if(tup_db_begin() < 0)
+		return -1;
 	if(tup_db_config_set_int("parser_version", 0) < 0)
+		return -1;
+	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
 }
@@ -885,7 +917,11 @@ static int flush(void)
 	int autoupdate_pid;
 	printf("Flush\n");
 	while(1) {
+		if(tup_db_begin() < 0)
+			return -1;
 		if(tup_db_config_get_int(AUTOUPDATE_PID, -1, &autoupdate_pid) < 0)
+			return -1;
+		if(tup_db_commit() < 0)
 			return -1;
 		if(autoupdate_pid < 0)
 			break;

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -283,6 +283,9 @@ static int delete_files(struct graph *g)
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int do_delete;
 
+		if(server_is_dead())
+			goto out_err;
+
 		do_delete = 1;
 		if(te->type == TUP_NODE_GENERATED) {
 			int tmp;
@@ -316,6 +319,8 @@ static int delete_files(struct graph *g)
 		tup_show_message("Converting generated files to normal files...\n");
 	}
 	LIST_FOREACH(tent, entrylist, list) {
+		if(server_is_dead())
+			goto out_err;
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
 		show_result(tent, 0, NULL);
@@ -362,6 +367,7 @@ static int process_create_nodes(void)
 	struct graph g;
 	int rc;
 
+	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
@@ -378,7 +384,6 @@ static int process_create_nodes(void)
 		goto out_destroy;
 	}
 
-	tup_db_begin();
 	if(server_init(SERVER_PARSER_MODE) < 0) {
 		return -1;
 	}
@@ -388,27 +393,26 @@ static int process_create_nodes(void)
 	compat_lock_enable();
 	if(rc == 0)
 		rc = delete_files(&g);
-	if(rc == 0) {
-		tup_db_commit();
-	} else if(rc == -1) {
+	if(rc < 0) {
 		tup_db_rollback();
-		return -1;
-	} else {
-		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		if(rc != -1)
+			fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
 
 out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
+	tup_db_commit();
 	return 0;
 }
 
 static int process_update_nodes(int argc, char **argv, int *num_pruned)
 {
 	struct graph g;
-	int rc;
+	int rc = 0;
 
+	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
@@ -440,7 +444,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		perror("pthread_mutex_init");
 		return -1;
 	}
-	tup_db_begin();
 	warnings = 0;
 	if(server_init(SERVER_UPDATER_MODE) < 0) {
 		return -1;
@@ -453,15 +456,13 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
-	tup_db_commit();
 	pthread_mutex_destroy(&display_mutex);
 	pthread_mutex_destroy(&db_mutex);
-	if(rc < 0)
-		return -1;
 out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
-	return 0;
+	tup_db_commit();
+	return rc;
 }
 
 static int check_create_todo(void)
