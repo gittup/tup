@@ -689,7 +689,12 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	remove_node(g, root);
 
 	start_progress(g->num_nodes);
-	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead()) {
+	/* Keep going as long as:
+	 * 1) There is work to do (plist is not empty)
+	 * 2) The server hasn't been killed
+	 * 3) No jobs have failed, or if jobs have failed we have keep_going set.
+	 */
+	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead() && (!failed || keep_going)) {
 		struct node *n;
 		struct worker_thread *wt;
 		n = TAILQ_FIRST(&g->plist);
@@ -730,10 +735,11 @@ check_empties:
 		/* Keep looking for dudes to return as long as:
 		 *  1) There are no more free workers
 		 *  2) There is no work to do (plist is empty or the server is
-		 *     dead) and some people are active.
+		 *     dead or we failed without keep-going) and some people
+		 *     are active.
 		 */
 		while(LIST_EMPTY(&free_list) ||
-		      ((TAILQ_EMPTY(&g->plist) || server_is_dead()) && active)) {
+		      ((TAILQ_EMPTY(&g->plist) || server_is_dead() || (failed && !keep_going)) && active)) {
 			pthread_mutex_lock(&list_mutex);
 			while(LIST_EMPTY(&fin_list)) {
 				pthread_cond_wait(&list_cond, &list_mutex);
@@ -746,41 +752,39 @@ check_empties:
 			pthread_mutex_unlock(&list_mutex);
 			active--;
 
-			if(wt->rc < 0) {
-				failed = 1;
-				if(keep_going)
-					goto keep_going;
-				goto out;
+			if(wt->rc == 0) {
+				pop_node(g, n);
+			} else {
+				failed++;
 			}
-			pop_node(g, n);
 
-keep_going:
 			remove_node(g, n);
 		}
 	}
-	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist) || failed) {
-		if(keep_going) {
+	clear_progress();
+	if(failed) {
+		fprintf(stderr, " *** tup: %i job%s failed.\n", failed, failed == 1 ? "" : "s");
+		if(keep_going)
 			fprintf(stderr, " *** tup: Remaining nodes skipped due to errors in command execution.\n");
+	} else if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist)) {
+		if(server_is_dead()) {
+			fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
 		} else {
-			if(server_is_dead()) {
-				fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
-			} else {
-				struct node *n;
-				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
-				fprintf(stderr, "Node list:\n");
-				TAILQ_FOREACH(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-				}
-				fprintf(stderr, "plist:\n");
-				TAILQ_FOREACH(n, &g->plist, list) {
-					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-				}
+			struct node *n;
+			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
+			fprintf(stderr, "Node list:\n");
+			TAILQ_FOREACH(n, &g->node_list, list) {
+				fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
+			}
+			fprintf(stderr, "plist:\n");
+			TAILQ_FOREACH(n, &g->plist, list) {
+				fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 			}
 		}
-		goto out;
+	} else {
+		rc = 0;
 	}
-	rc = 0;
-out:
+
 	/* First tell all the threads to quit */
 	for(x=0; x<jobs; x++) {
 		pthread_mutex_lock(&workers[x].lock);
@@ -798,7 +802,6 @@ out:
 	free(workers); /* Viva la revolucion! */
 	pthread_mutex_destroy(&list_mutex);
 	pthread_cond_destroy(&list_cond);
-	clear_progress();
 	return rc;
 }
 
