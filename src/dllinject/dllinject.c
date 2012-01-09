@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2010  James McKaskill
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -376,6 +376,10 @@ typedef NTSTATUS (WINAPI *NtCreateFile_t)(
     __in      PVOID EaBuffer,
     __in      ULONG EaLength);
 
+typedef FILE *(*fopen_t)(const char *path, const char *mode);
+typedef int (*rename_t)(const char *oldpath, const char *newpath);
+typedef int (*remove_t)(const char *pathname);
+
 static OpenFile_t			OpenFile_orig;
 static CreateFileA_t			CreateFileA_orig;
 static CreateFileW_t			CreateFileW_orig;
@@ -417,6 +421,9 @@ static CreateProcessWithLogonW_t	CreateProcessWithLogonW_orig;
 static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
+static fopen_t				fopen_orig;
+static rename_t				rename_orig;
+static remove_t				remove_orig;
 
 #define handle_file(a, b, c) mhandle_file(a, b, c, __LINE__)
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
@@ -1317,6 +1324,30 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	return ResumeThread(lpProcessInformation->hThread) != 0xFFFFFFFF;
 }
 
+FILE *fopen_hook(const char *path, const char *mode)
+{
+	if(strchr(mode, 'w') == NULL &&
+	   strchr(mode, 'a') == NULL &&
+	   strchr(mode, '+') == NULL) {
+		handle_file(path, NULL, ACCESS_READ);
+	} else {
+		handle_file(path, NULL, ACCESS_WRITE);
+	}
+	return fopen_orig(path, mode);
+}
+
+int rename_hook(const char *oldpath, const char *newpath)
+{
+	handle_file(oldpath, newpath, ACCESS_RENAME);
+	return rename_orig(oldpath, newpath);
+}
+
+int remove_hook(const char *pathname)
+{
+	handle_file(pathname, NULL, ACCESS_UNLINK);
+	return remove_orig(pathname);
+}
+
 /* -------------------------------------------------------------------------- */
 
 
@@ -1335,7 +1366,7 @@ struct remote_thread_t
 
 
 typedef void (*foreach_import_t)(HMODULE, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur);
-static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_t advapi32, foreach_import_t nt)
+static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_t advapi32, foreach_import_t nt, foreach_import_t msvcrt)
 {
 	IMAGE_DOS_HEADER* dos_header;
 	IMAGE_NT_HEADERS* nt_headers;
@@ -1372,6 +1403,12 @@ static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_
 			} else if (stricmp(dllname, "ntdll.dll") == 0) {
 				while (cur->u1.Function && orig->u1.Function) {
 					nt(h, orig, cur);
+					cur++;
+					orig++;
+				}
+			} else if(stricmp(dllname, "msvcrt.dll") == 0) {
+				while (cur->u1.Function && orig->u1.Function) {
+					msvcrt(h, orig, cur);
 					cur++;
 					orig++;
 				}
@@ -1465,6 +1502,13 @@ static void have_nt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* 
 {
 	HOOK(NtCreateFile);
 	HOOK(NtOpenFile);
+}
+
+static void have_msvcrt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
+{
+	HOOK(fopen);
+	HOOK(rename);
+	HOOK(remove);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1767,7 +1811,7 @@ DWORD tup_inject_init(remote_thread_t* r)
 		}
 		handle_file(filename, NULL, ACCESS_READ);
 
-		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import);
+		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import, &have_msvcrt_import);
 	}
 
 	return 0;
