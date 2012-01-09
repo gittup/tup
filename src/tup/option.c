@@ -89,7 +89,7 @@ static struct option {
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
 static int inited = 0;
-static volatile int win_resize_requested = 0;
+static volatile sig_atomic_t win_resize_requested = 0;
 
 #ifndef _WIN32
 static void win_resize_handler(int sig);
