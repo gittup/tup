@@ -28,7 +28,7 @@ cp ../testTupfile.tup a/b/Tupfile
 echo "int main(void) {}" > a/b/foo.c
 tup touch a/b/foo.c a/b/Tupfile
 update
-sym_check a/b/prog main
+sym_check a/b/prog.exe main
 
 tup touch a/b/foo.c
 cd a

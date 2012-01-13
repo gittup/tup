@@ -33,7 +33,7 @@ tmkdir tmp
 cat > tmp/Tupfile << HERE
 include Tupfile.vars
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc -o prog %f |> prog
+: *.o |> gcc -o %o %f |> prog.exe
 HERE
 
 cat > tmp/Tupfile.vars << HERE
@@ -47,12 +47,12 @@ update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "gcc -c foo.c -o foo.o"
 tup_object_exist tmp "gcc -c bar.c -o bar.o"
-tup_object_exist tmp "gcc -o prog bar.o foo.o"
+tup_object_exist tmp "gcc -o prog.exe bar.o foo.o"
 tup_dep_exist tmp Tupfile.vars . tmp
 
 cat > tmp/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc -o prog %f |> prog
+: *.o |> gcc -o %o %f |> prog.exe
 HERE
 tup touch tmp/Tupfile
 update

@@ -30,14 +30,14 @@ int main(void)
 	return 0;
 }
 HERE
-gcc prog.c -o prog
+gcc prog.c -o prog.exe
 
 cat > Tupfile << HERE
-: |> ./prog |> output
+: |> ./prog.exe |> output
 HERE
-tup touch prog Tupfile
+tup touch prog.exe Tupfile
 update
 
-tup_dep_exist . './prog' . output
+tup_dep_exist . './prog.exe' . output
 
 eotup

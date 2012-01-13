@@ -37,9 +37,9 @@ int main(void)
 }
 HERE
 cat > Tupfile << HERE
-: foo.c |> gcc %f -o %o |> foo
+: foo.c |> gcc %f -o %o |> foo.exe
 export TUP_TEST_FOO
-: foo |> ./%f > %o |> output.txt
+: foo.exe |> ./%f > %o |> output.txt
 HERE
 update
 

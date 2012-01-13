@@ -1,2 +1,2 @@
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc %f -o prog |> prog
+: *.o |> gcc %f -o %o |> prog.exe

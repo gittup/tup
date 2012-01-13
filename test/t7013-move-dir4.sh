@@ -30,6 +30,6 @@ update
 
 mv a/a2 .
 update
-check_exist a2/foo.o a2/prog
+check_exist a2/foo.o a2/prog.exe
 
 eotup

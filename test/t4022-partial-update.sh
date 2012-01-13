@@ -36,6 +36,6 @@ update_partial foo.o
 # Only bar.o should have the new symbol
 sym_check bar.o ^bar2
 sym_check foo.o main2
-sym_check prog main bar1
+sym_check prog.exe main bar1
 
 eotup

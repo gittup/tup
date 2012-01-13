@@ -20,25 +20,30 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach exec_test.c exe.c |> gcc %f -o %o |> %B
-: exec_test exe |> ./exec_test && touch %o |> test_passed
+: foreach exec_test.c prog.c |> gcc %f -o %o |> %B.exe
+: exec_test.exe prog.exe |> ./exec_test.exe && touch %o |> test_passed
 HERE
+const=""
+if [ "$in_windows" = "1" ]; then
+	const="const"
+fi
 cat > exec_test.c << HERE
+#include <stdio.h>
 #include <unistd.h>
 
 int main(void)
 {
-	char * const args[] = {"exe", NULL};
-	execvp("./exe", args);
+	$const char * const args[] = {"prog.exe", NULL};
+	execvp("./prog.exe", args);
 	return 1;
 }
 HERE
-cat > exe.c << HERE
+cat > prog.c << HERE
 int main(void) {return 0;}
 HERE
-tup touch Tupfile exec_test.c exe.c
+tup touch Tupfile exec_test.c prog.c
 update
 
-check_updates exe.c test_passed
+check_updates prog.c test_passed
 
 eotup

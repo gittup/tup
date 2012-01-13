@@ -25,7 +25,7 @@
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : lib.o |> ar cr %o %f |> lib.a
-: foo.o lib.a |> gcc %f -o %o |> prog
+: foo.o lib.a |> gcc %f -o %o |> prog.exe
 HERE
 
 echo "int foo(void) {return 3;}" > lib.c

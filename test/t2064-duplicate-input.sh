@@ -21,12 +21,12 @@
 . ./tup.sh
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o {objs}
-: {objs} foo.o |> gcc %f -o %o |> prog
+: {objs} foo.o |> gcc %f -o %o |> prog.exe
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 tup touch foo.c Tupfile
 update
 
-tup_object_exist . 'gcc foo.o -o prog'
+tup_object_exist . 'gcc foo.o -o prog.exe'
 
 eotup

@@ -25,7 +25,7 @@ HERE
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc %f -o %o |> prog
+: *.o |> gcc %f -o %o |> prog.exe
 include_rules
 HERE
 echo 'int main(void) {return 0;}' > foo.c
@@ -43,7 +43,7 @@ gitignore_bad bar.c .gitignore
 gitignore_bad Tupfile .gitignore
 gitignore_good foo.o .gitignore
 gitignore_good bar.o .gitignore
-gitignore_good prog .gitignore
+gitignore_good prog.exe .gitignore
 
 rm -f bar.c
 tup rm bar.c
@@ -54,6 +54,6 @@ gitignore_bad bar.c .gitignore
 gitignore_bad Tupfile .gitignore
 gitignore_good foo.o .gitignore
 gitignore_bad bar.o .gitignore
-gitignore_good prog .gitignore
+gitignore_good prog.exe .gitignore
 
 eotup

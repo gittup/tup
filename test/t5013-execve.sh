@@ -20,13 +20,13 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foo.c |> gcc %f -o %o |> foo
-: foo |> ./foo |>
+: foo.c |> gcc %f -o %o |> foo.exe
+: foo.exe |> ./%f |>
 HERE
 
 echo "int main(void) {return 0;}" > foo.c
 tup touch foo.c Tupfile
 update
-tup_dep_exist . foo . './foo'
+tup_dep_exist . foo.exe . './foo.exe'
 
 eotup

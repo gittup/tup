@@ -33,7 +33,7 @@
 cat > Tupfile << HERE
 : bar.c |> gcc -c bar.c -o bar.o |> bar.o
 : foo.c bar.o |> gcc -c foo.c -o foo.o |> foo.o
-: *.o |> gcc %f -o %o |> prog
+: *.o |> gcc %f -o %o |> prog.exe
 HERE
 
 tmkdir include
@@ -42,7 +42,7 @@ touch include/foo.h
 echo "int main(void) {}" > bar.c
 tup touch include/foo.h foo.c bar.c Tupfile
 update_fail
-check_not_exist foo.o prog
+check_not_exist foo.o prog.exe
 check_exist bar.o
 
 tup_object_exist . 'gcc -c foo.c -o foo.o'
@@ -50,18 +50,18 @@ tup_object_exist . 'gcc -c bar.c -o bar.o'
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o -Iinclude |> %B.o
-: *.o |> gcc %f -o %o |> prog
+: *.o |> gcc %f -o %o |> prog.exe
 HERE
 tup touch Tupfile
 update_fail
-check_not_exist foo.o prog
+check_not_exist foo.o prog.exe
 
 (echo "#include \"foo.h\""; echo "void foo(void) {}") > foo.c
 tup touch foo.c
 update
 sym_check foo.o foo
 sym_check bar.o main
-sym_check prog main
+sym_check prog.exe main
 
 tup_object_exist . 'gcc -c foo.c -o foo.o -Iinclude'
 tup_object_exist . 'gcc -c bar.c -o bar.o -Iinclude'

@@ -48,8 +48,8 @@ int main(void)
 	return 0;
 }
 HERE
-gcc ok.c -o ok
-./ok > Tupfile
+gcc ok.c -o ok.exe
+./ok.exe > Tupfile
 
 tup touch Tupfile
 parse_fail_msg "Missing newline character"

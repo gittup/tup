@@ -38,6 +38,7 @@ case $tupos in
 CYGWIN*)
        # Avoid problems with CR/LF vs LF
        alias diff='diff -b'
+       in_windows=1
 ;;
 esac
 

@@ -27,16 +27,16 @@ cat > Tupfile << HERE
 
 srcs += foo.c
 srcs += bar.c
-: \$(srcs) |> *chain |> prog
+: \$(srcs) |> *chain |> prog.exe
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 tup touch foo.c bar.c Tupfile
 update
 
-check_exist foo.o bar.o prog
+check_exist foo.o bar.o prog.exe
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . bar.c . 'gcc -c bar.c -o bar.o'
-tup_dep_exist . foo.o . 'gcc foo.o bar.o -o prog'
-tup_dep_exist . bar.o . 'gcc foo.o bar.o -o prog'
+tup_dep_exist . foo.o . 'gcc foo.o bar.o -o prog.exe'
+tup_dep_exist . bar.o . 'gcc foo.o bar.o -o prog.exe'
 
 eotup

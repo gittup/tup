@@ -26,7 +26,7 @@ tup touch foo.c bar.c foo.h
 update
 sym_check foo.o main marfx
 sym_check bar.o bar1 marfx
-sym_check prog main bar1
+sym_check prog.exe main bar1
 
 # If we re-compile bar.c without the header, foo.h will have a dangling ref
 # to bar.o

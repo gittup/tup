@@ -35,9 +35,9 @@ mv a b
 update
 tup_object_exist . b
 tup_object_exist b a2
-tup_object_exist b/a2 foo.c foo.o prog 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog'
+tup_object_exist b/a2 foo.c foo.o prog.exe 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog.exe'
 tup_object_no_exist . a
 tup_object_no_exist a a2
-tup_object_no_exist a/a2 foo.c foo.o prog 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog'
+tup_object_no_exist a/a2 foo.c foo.o prog.exe 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog.exe'
 
 eotup

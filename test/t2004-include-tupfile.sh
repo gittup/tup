@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 include Tupfile.vars
 : foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %B.o
-: *.o |> \$(CC) -o prog %f |> prog
+: *.o |> \$(CC) -o %o %f |> prog.exe
 HERE
 
 cat > Tupfile.vars << HERE
@@ -39,12 +39,12 @@ update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_exist . "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
-tup_object_exist . "gcc -o prog bar.o foo.o"
+tup_object_exist . "gcc -o prog.exe bar.o foo.o"
 
-# Now change the compiler to 'cc' and verify that we re-parse the parent
+# Now change the compiler to 'gcc -W' and verify that we re-parse the parent
 # Tupfile to generate new commands and get rid of the old ones.
 cat > Tupfile.vars << HERE
-CC = cc
+CC = gcc -W
 CCARGS := -DFOO=1
 CCARGS += -DBAR=1
 CC = \$(CC)
@@ -53,9 +53,9 @@ tup touch Tupfile.vars
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_no_exist . "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
-tup_object_no_exist . "gcc -o prog bar.o foo.o"
-tup_object_exist . "cc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
-tup_object_exist . "cc -c bar.c -o bar.o -DFOO=1 -DBAR=1"
-tup_object_exist . "cc -o prog bar.o foo.o"
+tup_object_no_exist . "gcc -o prog.exe bar.o foo.o"
+tup_object_exist . "gcc -W -c foo.c -o foo.o -DFOO=1 -DBAR=1"
+tup_object_exist . "gcc -W -c bar.c -o bar.o -DFOO=1 -DBAR=1"
+tup_object_exist . "gcc -W -o prog.exe bar.o foo.o"
 
 eotup

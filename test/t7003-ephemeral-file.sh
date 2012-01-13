@@ -23,7 +23,7 @@ cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {return 0;}" > foo.c
 update
-tup_object_exist . foo.o prog
+tup_object_exist . foo.o prog.exe
 
 # See if we can create and destroy a file almost immediately after and not have
 # the monitor put the directory in create.

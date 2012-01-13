@@ -30,8 +30,8 @@ tmkdir b
 echo "void foo(void); int main(void) {foo(); return 0;}" > main.c
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o | b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog
-: prog |> ./%f > %o |> output.txt
+: *.o | b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog.exe
+: prog.exe |> ./%f > %o |> output.txt
 HERE
 
 cat > b/foo.c << HERE
@@ -68,8 +68,8 @@ update_fail
 # successfully be linked against a/libfoo.a
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o | a/libfoo.a b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog
-: prog |> ./%f > %o |> output.txt
+: *.o | a/libfoo.a b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog.exe
+: prog.exe |> ./%f > %o |> output.txt
 HERE
 tup touch Tupfile
 update

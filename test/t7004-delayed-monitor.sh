@@ -31,21 +31,21 @@ echo "void bar(void) {}" > bar.c
 tup monitor
 update
 tup_object_exist . bar.c bar.o
-sym_check prog bar
+sym_check prog.exe bar
 stop_monitor
 
 sleep 1
 echo "void bar2(void) {}" >> bar.c
 tup monitor
 update
-sym_check prog bar bar2
+sym_check prog.exe bar bar2
 stop_monitor
 
 # Finally, delete a file outside of the monitor's control
 rm bar.c
 tup monitor
 update
-sym_check prog ^bar ^bar2
+sym_check prog.exe ^bar ^bar2
 stop_monitor
 
 eotup

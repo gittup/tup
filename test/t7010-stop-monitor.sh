@@ -28,9 +28,9 @@ cp ../testTupfile.tup Tupfile
 stop_monitor
 tup monitor
 update
-tup_object_exist . foo.c foo.o prog
+tup_object_exist . foo.c foo.o prog.exe
 sym_check foo.o main
-sym_check prog main
+sym_check prog.exe main
 
 # Set foo.c's modify flags, then secretly remove foo.o behind the monitor's
 # back (so we can see it gets re-created). When the monitor starts again, it
@@ -40,9 +40,9 @@ stop_monitor
 rm foo.o
 tup monitor
 update
-tup_object_exist . foo.c foo.o prog
+tup_object_exist . foo.c foo.o prog.exe
 sym_check foo.o main
-sym_check prog main
+sym_check prog.exe main
 
 # If we just stop and then start the monitor after an update, no flags should
 # be set.
