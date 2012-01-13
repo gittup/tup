@@ -19,6 +19,7 @@
 # Try chmod.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> touch %o; chmod 664 %o |> test1

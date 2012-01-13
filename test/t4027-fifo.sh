@@ -19,6 +19,7 @@
 # Fifos are currently not allowed.
 
 . ./tup.sh
+check_no_windows mkfifo
 
 cat > Tupfile << HERE
 : |> mkfifo %o |> testfifo

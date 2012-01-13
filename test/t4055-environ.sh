@@ -20,6 +20,7 @@
 
 export FOO="hey"
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> sh ok.sh > %o |> out.txt

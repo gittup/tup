@@ -19,6 +19,7 @@
 # Try to access a subdirectory from the run-script. This should cause a
 # directory-level dependency in the parser.
 . ./tup.sh
+check_no_windows run-script
 
 cat > gen.sh << HERE
 #! /bin/sh

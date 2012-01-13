@@ -16,9 +16,11 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# TODO
+# Test for a circular dependency fatal tup error. This is triggered due to the
+# transitive dependency detection, which originally circumvented other checks.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : pre_sexp.ml |> cat %f; touch %o |> pre_sexp.cmi

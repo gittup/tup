@@ -18,6 +18,7 @@
 
 # Try to run an external script to get :-rules.
 . ./tup.sh
+check_no_windows run-script
 
 cat > gen.sh << HERE
 #! /bin/sh

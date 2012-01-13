@@ -19,6 +19,7 @@
 # Try truncate.
 
 . ./tup.sh
+check_no_windows truncate
 
 cat > foo.c << HERE
 #include <unistd.h>

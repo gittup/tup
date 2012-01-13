@@ -20,6 +20,7 @@
 # a symlink.
 
 . ./tup.sh
+check_no_windows symlink
 
 mkdir foo
 ln -s foo boo

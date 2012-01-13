@@ -18,6 +18,7 @@
 
 # Try to readdir() from a run-script on a subdirectory.
 . ./tup.sh
+check_no_windows run-script
 
 cat > Tupfile << HERE
 run sh -e ok.sh

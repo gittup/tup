@@ -20,6 +20,7 @@
 # by readdir(). Otherwise, both the fuse thread and the parser thread
 # could be accessing the database at the same time.
 . ./tup.sh
+check_no_windows run-script
 
 cat > Tupfile << HERE
 run sh -e ok.sh

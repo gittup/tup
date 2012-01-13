@@ -19,6 +19,7 @@
 # Make sure an empty environment variable results in no export.
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 export FOO

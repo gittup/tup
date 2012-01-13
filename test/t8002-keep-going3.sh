@@ -19,6 +19,7 @@
 # Make sure keep-going will fail if we have a command with no outputs
 
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo foo |>

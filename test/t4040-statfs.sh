@@ -19,6 +19,7 @@
 # Try statfs
 
 . ./tup.sh
+check_no_windows statfs
 
 cat > ok.c << HERE
 #ifdef __linux__

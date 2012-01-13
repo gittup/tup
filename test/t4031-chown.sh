@@ -20,6 +20,7 @@
 # owner, or for running for people other than me.
 
 . ./tup.sh
+check_no_windows shell
 if ! whoami | grep marf > /dev/null; then
 	echo "[33mSkip t4031 - you're not marf.[0m"
 	eotup

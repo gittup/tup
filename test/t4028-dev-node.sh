@@ -19,6 +19,7 @@
 # Device nodes are currently not allowed.
 
 . ./tup.sh
+check_no_windows mknod
 
 cat > Tupfile << HERE
 : |> mknod %o c 1 3 |> nulltest

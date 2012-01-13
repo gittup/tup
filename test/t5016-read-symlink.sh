@@ -19,6 +19,8 @@
 # See if we can get a dependency on both the symlink and the file it points to.
 
 . ./tup.sh
+check_no_windows symlink
+
 echo "#define FOO 3" > foo-x86.h
 echo "#define FOO 4" > foo-ppc.h
 ln -s foo-x86.h foo.h

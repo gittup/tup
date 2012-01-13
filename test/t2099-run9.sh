@@ -18,6 +18,7 @@
 
 # Try to run an external script to get :-rules in a sub-directory.
 . ./tup.sh
+check_no_windows run-script
 
 tmkdir sub
 cat > sub/gen.sh << HERE

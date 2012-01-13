@@ -18,6 +18,7 @@
 
 # Execute a run-script from an included file.
 . ./tup.sh
+check_no_windows run-script
 
 tmkdir sub
 cat > sub/gen.sh << HERE

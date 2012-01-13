@@ -19,6 +19,10 @@
 # Try changing PATH - everything should be rebuilt.
 
 . ./tup.sh
+# Windows fails with:
+# gcc: fatal error: -fuse-linker-plugin, but liblto_plugin-0.dll not found
+# Seems there is a problem with putting gcc in the PATH?
+check_no_windows ???
 
 tmkdir sub
 cat > sub/gcc << HERE

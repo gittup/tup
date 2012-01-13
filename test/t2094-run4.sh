@@ -19,6 +19,7 @@
 # Make sure that we only get regular files and non-deleted generated
 # files when doing a readdir().
 . ./tup.sh
+check_no_windows run-script
 
 cat > Tupfile << HERE
 run sh ok.sh bad

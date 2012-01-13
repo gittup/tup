@@ -18,6 +18,7 @@
 
 # Try a big command string.
 . ./tup.sh
+check_no_windows command-line-too-long
 
 cat > Tupfile << HERE
 : *.txt |> ^ Misty cat^ cat %f > %o |> output.txt

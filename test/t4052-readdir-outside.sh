@@ -20,6 +20,7 @@
 # we are still inside the fuse filesystem.
 
 . ./tup.sh
+check_no_windows run-script
 
 touch foo.txt
 touch bar.txt

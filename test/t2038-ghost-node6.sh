@@ -21,6 +21,7 @@
 # use in a rule.
 
 . ./tup.sh
+check_no_windows symlink
 cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE

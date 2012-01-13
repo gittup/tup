@@ -19,7 +19,7 @@
 # Try to use a python client in a run script and use @-variables
 
 . ./tup.sh
-check_no_windows client
+check_no_windows client, run-script
 
 if ! which python > /dev/null 2>&1; then
 	echo "[33mNo python found - skipping test.[0m"

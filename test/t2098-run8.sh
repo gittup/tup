@@ -18,6 +18,7 @@
 
 # Try a run-script with PATH
 . ./tup.sh
+check_no_windows run-script
 
 export PATH=$PWD/a:$PATH
 
