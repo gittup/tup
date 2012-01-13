@@ -237,32 +237,44 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	pthread_mutex_unlock(&dir_mutex);
 
 	if(proc_rc < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
 	if(tup_inject_dll(&pi, s->udp_port)) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to inject dll: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
 	if(ResumeThread(pi.hThread) == (DWORD)~0) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to start thread: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
 	if(WaitForSingleObject(pi.hThread, INFINITE) != WAIT_OBJECT_0) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to wait for thread: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
 	if(WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to wait for process: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
 	if(!GetExitCodeProcess(pi.hProcess, &return_code)) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to get exit code: %s\n", strerror(errno));
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
@@ -270,8 +282,10 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	buf[sizeof(buf)-1] = 0;
 	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
 	if(s->output_fd < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process output file after the process completed.\n");
+		pthread_mutex_unlock(s->error_mutex);
 		goto end;
 	}
 
@@ -295,8 +309,10 @@ int server_postexec(struct server *s)
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
 	buf[sizeof(buf)-1] = 0;
 	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 	return 0;

@@ -1111,6 +1111,7 @@ static int update(struct node *n)
 	s.exit_sig = -1;
 	s.output_fd = -1;
 	s.error_fd = -1;
+	s.error_mutex = &display_mutex;
 	init_file_info(&s.finfo);
 	if(server_exec(&s, dfd, name, &newenv, n->tent->parent) < 0) {
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);

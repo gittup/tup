@@ -369,13 +369,17 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 				       sizeof(dir) - em.dirlen - 1,
 				       dtent) + 1;
 	if(em.joblen >= JOB_MAX || em.dirlen >= PATH_MAX) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: Directory for tup entry %lli is too long.\n", dtent->tnode.tupid);
 		print_tup_entry(stderr, dtent);
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 	em.cmdlen = strlen(cmd) + 1;
 	if(master_fork_exec(&em, job, dir, cmd, newenv->envblock, &status) < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 
@@ -383,13 +387,17 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	buf[sizeof(buf)-1] = 0;
 	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
 	if(s->output_fd < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+		pthread_mutex_lock(s->error_mutex);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 
@@ -398,13 +406,17 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		buf[sizeof(buf)-1] = 0;
 		s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
 		if(s->error_fd < 0) {
+			pthread_mutex_lock(s->error_mutex);
 			perror(buf);
 			fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+			pthread_mutex_unlock(s->error_mutex);
 			return -1;
 		}
 		if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+			pthread_mutex_lock(s->error_mutex);
 			perror(buf);
 			fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
+			pthread_mutex_unlock(s->error_mutex);
 			return -1;
 		}
 	}
@@ -416,7 +428,9 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		s->signalled = 1;
 		s->exit_sig = WTERMSIG(status);
 	} else {
+		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", status);
+		pthread_mutex_unlock(s->error_mutex);
 		return -1;
 	}
 	return 0;
