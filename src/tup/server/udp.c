@@ -191,7 +191,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		struct tup_entry *dtent)
 {
 	int rc = -1;
-	int proc_rc;
 	DWORD return_code = 1;
 	PROCESS_INFORMATION pi;
 	size_t namesz = strlen(cmd);
@@ -233,15 +232,18 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 
 	pthread_mutex_lock(&dir_mutex);
-	proc_rc = create_process(s, dfd, cmdline, newenv, &pi);
-	pthread_mutex_unlock(&dir_mutex);
-
-	if(proc_rc < 0) {
+	if(create_process(s, dfd, cmdline, newenv, &pi) < 0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
+		if(errno == ERANGE) {
+			fprintf(stderr, "tup error: This error may mean that Windows could not find the program in the PATH.\n");
+		}
 		pthread_mutex_unlock(s->error_mutex);
+
+		pthread_mutex_unlock(&dir_mutex);
 		goto end;
 	}
+	pthread_mutex_unlock(&dir_mutex);
 
 	if(tup_inject_dll(&pi, s->udp_port)) {
 		pthread_mutex_lock(s->error_mutex);
