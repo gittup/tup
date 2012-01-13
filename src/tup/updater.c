@@ -1114,7 +1114,9 @@ static int update(struct node *n)
 	s.error_mutex = &display_mutex;
 	init_file_info(&s.finfo);
 	if(server_exec(&s, dfd, name, &newenv, n->tent->parent) < 0) {
+		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
+		pthread_mutex_unlock(&display_mutex);
 		goto err_close_dfd;
 	}
 	environ_free(&newenv);
