@@ -315,6 +315,7 @@ static int init(int argc, char **argv)
 		}
 		fprintf(f, "[db]\n");
 		fprintf(f, "\tsync = false\n");
+		fclose(f);
 	}
 	return 0;
 
