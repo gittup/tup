@@ -28,6 +28,8 @@ check()
 }
 
 . ./tup.sh
+check_no_windows HOME environment variable
+
 # Override HOME so we can control ~/.tupoptions
 export HOME=`pwd`
 re_init
