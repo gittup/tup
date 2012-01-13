@@ -191,6 +191,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		struct tup_entry *dtent)
 {
 	int rc = -1;
+	int proc_rc;
 	DWORD return_code = 1;
 	PROCESS_INFORMATION pi;
 	size_t namesz = strlen(cmd);
@@ -232,10 +233,10 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 
 	pthread_mutex_lock(&dir_mutex);
-	rc = create_process(s, dfd, cmdline, newenv, &pi);
+	proc_rc = create_process(s, dfd, cmdline, newenv, &pi);
 	pthread_mutex_unlock(&dir_mutex);
 
-	if(rc < 0) {
+	if(proc_rc < 0) {
 		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
 		goto end;
 	}
