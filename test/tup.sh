@@ -434,6 +434,10 @@ check_no_windows()
 		echo "Not supported in Windows. Skipping test."
 		eotup
 		;;
+	MINGW*)
+		echo "Not supported in Windows. Skipping test."
+		eotup
+		;;
 	esac
 }
 

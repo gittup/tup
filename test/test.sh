@@ -44,6 +44,14 @@ fi
 
 export tupos=`uname -s`
 
+# Cygwin binaries don't seem to work with tup. They all get access violations.
+# If we detect a cygwin setup, try to setup the path to MinGW.
+case $tupos in
+CYGWIN*)
+	export PATH=/cygdrive/c/MinGW/bin:/cygdrive/c/MinGW/msys/1.0/bin:$PATH
+	;;
+esac
+
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
 	if ./$i; then
