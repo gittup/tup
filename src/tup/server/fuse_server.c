@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -218,7 +218,11 @@ int server_init(enum server_mode mode)
 	}
 	flist_foreach(&f, ".") {
 		if(f.filename[0] != '.') {
-			unlink(f.filename);
+			if(unlink(f.filename) != 0) {
+				perror(f.filename);
+				fprintf(stderr, "tup error: Unable to clean out a file in .tup/tmp directory. Please try cleaning this directory manually.\n");
+				return -1;
+			}
 		}
 	}
 	if(fchdir(tup_top_fd()) < 0) {
