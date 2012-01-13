@@ -22,9 +22,6 @@
 # Make sure that we don't lose ghost dependencies and that all works somehow.
 
 . ./tup.sh
-# Windows adds a dependency from 'secret' to the command - both are valid
-# options.
-check_no_windows
 cat > ok.sh << HERE
 cat secret/ghost 2>/dev/null || echo nofile
 HERE

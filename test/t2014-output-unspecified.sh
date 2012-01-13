@@ -20,7 +20,6 @@
 # it explodes. Things can't possibly work if the DAG is incomplete.
 
 . ./tup.sh
-check_no_windows shell
 cat > Tupfile << HERE
 : foo.c |> gcc -c foo.c -o foo.o && touch bar |> foo.o
 HERE

@@ -19,7 +19,6 @@
 # Make sure stale files in the tmp directory don't break tup.
 
 . ./tup.sh
-check_no_windows fuse
 
 cat > Tupfile << HERE
 : |> echo hey > %o |> out.txt
