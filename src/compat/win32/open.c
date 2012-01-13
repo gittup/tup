@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,12 +24,15 @@
 #include "open_notify.h"
 
 int __wrap_open(const char *pathname, int flags, ...);
-int __real_open(const char *pathname, int flags, ...);
 
 int __wrap_open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
 	enum access_type at = ACCESS_READ;
+	HANDLE h;
+	SECURITY_ATTRIBUTES sec;
+	DWORD desiredAccess;
+	DWORD creationDisposition;
 
 	if(flags & O_WRONLY || flags & O_RDWR)
 		at = ACCESS_WRITE;
@@ -48,7 +51,7 @@ int __wrap_open(const char *pathname, int flags, ...)
 
 		/* If there was an error getting the file attributes, or if we
 		 * are trying to open a normal file, we want to fall through to
-		 * the __real_open case. Only things that we know are
+		 * the CreateFile case. Only things that we know are
 		 * directories go through the special dirpath logic.
 		 */
 		if(attributes != INVALID_FILE_ATTRIBUTES) {
@@ -57,5 +60,30 @@ int __wrap_open(const char *pathname, int flags, ...)
 			}
 		}
 	}
-	return __real_open(pathname, flags | O_BINARY, mode);
+	if(flags & O_RDWR)
+		desiredAccess = GENERIC_WRITE | GENERIC_READ;
+	else if(flags & O_WRONLY)
+		desiredAccess = GENERIC_WRITE;
+	else
+		desiredAccess = GENERIC_READ;
+
+	if(flags & O_CREAT)
+		creationDisposition = CREATE_ALWAYS;
+	else
+		creationDisposition = OPEN_EXISTING;
+
+	memset(&sec, 0, sizeof(sec));
+	sec.nLength = sizeof(sec);
+	sec.lpSecurityDescriptor = NULL;
+	sec.bInheritHandle = FALSE;
+
+	/* Need to use CreateFile instead of __real_open so we can set the
+	 * default handle inheritance to false. This way we can set the
+	 * sub-process' stdout file to inheritable and set handle inheritance
+	 * on the process itself.
+	 */
+	h = CreateFile(pathname, desiredAccess, 0, &sec, creationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
+	if(h == INVALID_HANDLE_VALUE)
+		return -1;
+	return _open_osfhandle((intptr_t)h, 0);
 }
