@@ -622,7 +622,10 @@ static int node_exists(int argc, char **argv)
 		 * only test code will break.
 		 */
 		while((p = strchr(p, '/')) != NULL) {
-			*p = PATH_SEP;
+			/* Don't translate "./foo" to ".\foo" */
+			if(p == argv[x] || p[-1] != '.') {
+				*p = PATH_SEP;
+			}
 			p++;
 		}
 		if(tup_db_select_tent(dt, argv[x], &tent) < 0)
