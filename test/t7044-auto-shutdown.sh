@@ -23,9 +23,14 @@ check_monitor_supported
 tup monitor
 
 rm .tup/db
-if tup stop; then
-	echo "Error: tup stop should have failed." 1>&2
-	exit 1
-fi
+x=0
+while ! grep "\-1" .tup/monitor.pid > /dev/null; do
+	sleep 0.1
+	x=$((x+1))
+	if [ $x -gt 5 ]; then
+		echo "Error: monitor should have quit by now." 1>&2
+		exit 1
+	fi
+done
 
 eotup
