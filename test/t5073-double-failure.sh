@@ -57,10 +57,10 @@ int main(void)
 }
 HERE
 tup touch Tupfile main.c
-if [ "$tupos" = "Linux" ]; then
-	update_fail_msg "undefined reference.*bar" "Missing input dependency"
-else
+if [ "$tupos" = "Darwin" ]; then
 	update_fail_msg "bar.*referenced from" "Missing input dependency"
+else
+	update_fail_msg "undefined reference.*bar" "Missing input dependency"
 fi
 
 cat > sub/lib2.c << HERE
