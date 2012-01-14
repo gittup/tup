@@ -1781,6 +1781,12 @@ DWORD tup_inject_init(remote_thread_t* r)
 	if (initialised)
 		return 0;
 
+	/* Put TUP_VARDICT_NAME in the environment so if tup is running as the
+	 * sub-process it knows that certain commands are unavailable. Note
+	 * this isn't actually a valid file id, so varsed and all will fail.
+	 */
+	putenv(TUP_VARDICT_NAME "=-1");
+
 	initialised = 1;
 
 	if (!GetModuleFileNameA(NULL, filename, sizeof(filename))) {
