@@ -376,6 +376,7 @@ typedef NTSTATUS (WINAPI *NtCreateFile_t)(
     __in      PVOID EaBuffer,
     __in      ULONG EaLength);
 
+typedef int (*access_t)(const char *pathname, int mode);
 typedef FILE *(*fopen_t)(const char *path, const char *mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
 typedef int (*remove_t)(const char *pathname);
@@ -421,6 +422,7 @@ static CreateProcessWithLogonW_t	CreateProcessWithLogonW_orig;
 static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
+static access_t				_access_orig;
 static fopen_t				fopen_orig;
 static rename_t				rename_orig;
 static remove_t				remove_orig;
@@ -1324,6 +1326,12 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	return ResumeThread(lpProcessInformation->hThread) != 0xFFFFFFFF;
 }
 
+int _access_hook(const char *pathname, int mode)
+{
+	handle_file(pathname, NULL, ACCESS_READ);
+	return _access_orig(pathname, mode);
+}
+
 FILE *fopen_hook(const char *path, const char *mode)
 {
 	if(strchr(mode, 'w') == NULL &&
@@ -1506,6 +1514,7 @@ static void have_nt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* 
 
 static void have_msvcrt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
 {
+	HOOK(_access);
 	HOOK(fopen);
 	HOOK(rename);
 	HOOK(remove);
