@@ -30,6 +30,7 @@ cat > Tupfile << HERE
 : |> touch -t 202005080000 test2 |>
 HERE
 tup touch Tupfile test2
-update_fail_msg "tup error.*utimens"
+# Windows fails with 'Unspecified output files'
+update_fail_msg "\(tup error.*utimens\|Unspecified output files\)"
 
 eotup
