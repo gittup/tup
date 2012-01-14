@@ -83,7 +83,9 @@ int __wrap_open(const char *pathname, int flags, ...)
 	 * on the process itself.
 	 */
 	h = CreateFile(pathname, desiredAccess, 0, &sec, creationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(h == INVALID_HANDLE_VALUE)
+	if(h == INVALID_HANDLE_VALUE) {
+		errno = GetLastError();
 		return -1;
+	}
 	return _open_osfhandle((intptr_t)h, 0);
 }
