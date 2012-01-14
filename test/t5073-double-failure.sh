@@ -44,7 +44,7 @@ update
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: main.o |> gcc %f -o %o sub/libfoo.a |> prog
+: main.o |> gcc %f -o %o sub/libfoo.a |> prog.exe
 HERE
 cat > main.c << HERE
 int foo(void);
@@ -68,7 +68,7 @@ int bar(void) {return 2;}
 HERE
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: main.o | sub/libfoo.a |> gcc %f -o %o sub/libfoo.a |> prog
+: main.o | sub/libfoo.a |> gcc %f -o %o sub/libfoo.a |> prog.exe
 HERE
 tup touch sub/lib2.c Tupfile
 update
