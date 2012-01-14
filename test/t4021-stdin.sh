@@ -29,8 +29,8 @@ int main(void)
 	int i;
 	char c = 0;
 	i = read(0, &c, 1);
-	if(i != 0) {
-		fprintf(stderr, "Error: read test should return 0\n");
+	if(i > 0) {
+		fprintf(stderr, "Error: read test should return 0 or -1\n");
 		return 1;
 	}
 	if(c != 0) {
@@ -41,8 +41,8 @@ int main(void)
 }
 HERE
 cat > Tupfile << HERE
-: ok.c |> gcc %f -o %o |> read_test
-: read_test |> ./%f |>
+: ok.c |> gcc %f -o %o |> read_test.exe
+: read_test.exe |> ./%f |>
 HERE
 update
 
