@@ -23,7 +23,7 @@
 # should stick around somehow.
 . ./tup.sh
 cat > Tupfile << HERE
-: foo.h.in |> cp %f %o |> %B
+: foo.h.in |> $tupcp %f %o |> %B
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 

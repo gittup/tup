@@ -24,7 +24,7 @@
 # re-ordered later. So, that should be detected and return a failure.
 . ./tup.sh
 cat > Tupfile << HERE
-: foo.h.in |> cp %f %o |> %B
+: foo.h.in |> $tupcp %f %o |> %B
 HERE
 
 echo "#define FOO 3" > foo.h.in
@@ -36,7 +36,7 @@ cat > foo.c << HERE
 int main(void) {return FOO;}
 HERE
 cat > Tupfile << HERE
-: foo.h.in |> cp %f %o |> %B
+: foo.h.in |> $tupcp %f %o |> %B
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch foo.c Tupfile

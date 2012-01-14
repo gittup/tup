@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 headers = foo.h
 !cc = | foo.h |> gcc -c %f -o %o |>
-: foo.h.in |> cp %f %o |> foo.h
+: foo.h.in |> $tupcp %f %o |> foo.h
 : foreach *.c |> !cc |> %B.o
 HERE
 echo '#define FOO 3' > foo.h.in

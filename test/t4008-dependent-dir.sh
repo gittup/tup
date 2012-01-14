@@ -24,7 +24,7 @@ HERE
 
 tmkdir fs
 cat > fs/Tupfile << HERE
-: foreach input/*.o |> cp %f %o |> %b
+: foreach input/*.o |> $tupcp %f %o |> %b
 HERE
 
 tmkdir fs/input
