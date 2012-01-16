@@ -20,13 +20,17 @@
 # t5044, only we're checking to see that a file can still have ghost children.
 
 . ./tup.sh
+cat > ok.sh << HERE
+cat secret/ghost 2>/dev/null || echo nofile
+HERE
+chmod +x ok.sh
+
 cat > Tupfile << HERE
-: |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
+: |> ./ok.sh > %o |> output.txt
 HERE
 tup touch Tupfile
 update
 echo nofile | diff - output.txt
-
 
 touch secret
 tup touch secret

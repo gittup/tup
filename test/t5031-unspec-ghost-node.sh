@@ -21,8 +21,13 @@
 # yelled at that the input was unspecified.
 
 . ./tup.sh
+cat > ok.sh << HERE
+cat ghost 2>/dev/null || echo nofile
+HERE
+chmod +x ok.sh
+
 cat > Tupfile << HERE
-: |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
+: |> ./ok.sh > %o |> output.txt
 HERE
 tup touch Tupfile
 update
@@ -30,14 +35,14 @@ echo nofile | diff - output.txt
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
-: |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
+: |> ./ok.sh > %o |> output.txt
 HERE
 tup touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
-: ghost |> (cat ghost 2>/dev/null || echo nofile) > %o |> output.txt
+: ghost |> ./ok.sh > %o |> output.txt
 HERE
 tup touch Tupfile
 update

@@ -20,8 +20,13 @@
 # ENOTDIR as the error code).
 
 . ./tup.sh
+cat > ok.sh << HERE
+cat secret/ghost 2>/dev/null || echo nofile
+HERE
+chmod +x ok.sh
+
 cat > Tupfile << HERE
-: |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
+: |> ./ok.sh > %o |> output.txt
 HERE
 tup touch secret Tupfile
 update
