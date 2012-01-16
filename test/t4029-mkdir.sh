@@ -19,6 +19,7 @@
 # mkdir&rmdir are currently not supported in a rule.
 
 . ./tup.sh
+check_no_windows TODO - temporary directories
 
 cat > Tupfile << HERE
 : |> mkdir %o |> outdir

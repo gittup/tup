@@ -19,6 +19,12 @@
 # Make sure that changing attributes counts as being modified.
 
 . ./tup.sh
+# The stat.st_ctime field is the file creation time in Windows, so we use
+# st_mtime instead. However, st_mtime isn't modified when permissions are
+# changed. We should be able to get this information from FILE_BASIC_INFORMATION (
+# http://msdn.microsoft.com/en-us/library/windows/hardware/ff545762%28v=vs.85%29.aspx
+# ), but I don't know how to actually call a function to retrieve it.
+check_no_windows TODO - ctime
 
 cat > ok.sh << HERE
 echo foo

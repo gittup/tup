@@ -19,6 +19,9 @@
 # link(): It's dangerous to go alone! Take this.
 
 . ./tup.sh
+# For some reason the link call results in an NtCreateFile on the directory
+# instead of on 'outlink'.
+check_no_windows TODO - hard links
 
 cat > Tupfile << HERE
 : tmp |> link %f %o |> outlink

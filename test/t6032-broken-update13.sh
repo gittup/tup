@@ -19,6 +19,9 @@
 # Apparently reading from the full path in a subdirectory is broken.
 
 . ./tup.sh
+# MinGW throws off the paths here, so doing 'cat /home/marf/tup/...' becomes
+# 'cat C:\MinGW\msys\1.0\home\marf\tup\...' which doesn't exist
+check_no_windows mingw
 tmkdir atmp
 cat > atmp/Tupfile << HERE
 : |> cat $PWD/atmp/foo.txt |>
