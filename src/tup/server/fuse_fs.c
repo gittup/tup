@@ -843,28 +843,6 @@ static int tup_fs_truncate(const char *path, off_t size)
 	return -EPERM;
 }
 
-#ifdef linux
-#if !__GLIBC_PREREQ(2,6)
-#include <fcntl.h>
-struct timeval {
-	time_t tv_sec;
-	long tv_usec;
-};
-
-static int utimensat(int dfd, const char *pathname,
-		     const struct timespec times[2], int flags)
-{
-	struct timeval tvs[2];
-	if(flags) {}
-	tvs[0].tv_sec = times[0].tv_sec;
-	tvs[0].tv_usec = times[0].tv_nsec / 1000;
-	tvs[1].tv_sec = times[1].tv_sec;
-	tvs[1].tv_usec = times[1].tv_nsec / 1000;
-	return futimesat(dfd, pathname, tvs);
-}
-#endif
-#endif
-
 static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 {
 	int res;

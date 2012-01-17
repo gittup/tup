@@ -9,6 +9,7 @@ CC=gcc
 case "$os" in
 	Linux)
 	plat_files="$plat_files ../src/compat/dummy.c"
+	plat_files="$plat_files ../src/compat/utimensat_linux.c"
 	;;
 	SunOS)
 	plat_files="$plat_files ../src/compat/dir_mutex.c"

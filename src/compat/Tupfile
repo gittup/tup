@@ -16,8 +16,8 @@ ifeq (@(TUP_DEBUG_LINUX_USE_COMPAT),y)
 	srcs += renameat.c
 	srcs += symlinkat.c
 	srcs += unlinkat.c
-	srcs += utimensat.c
 else
+	srcs += utimensat_linux.c
 	srcs += dummy.c
 endif
 endif
