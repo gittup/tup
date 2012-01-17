@@ -1211,8 +1211,8 @@ int tup_db_delete_node(tupid_t tupid)
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
-		/* We're but a ghost now... make sure we don't point at
-		 * anybody (t5033). Ghosts don't have fingers, you know.
+		/* We're but a ghost now. This can happen if a directory is
+		 * removed that contains a ghost (t6061).
 		 */
 		struct tup_entry *tent;
 
@@ -1273,9 +1273,14 @@ int tup_db_delete_dir(tupid_t dt)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 
-		/* tup_del_id_force may call back to tup_db_delete_dir() */
-		if(tup_del_id_force(he->tupid, he->type) < 0)
-			return -1;
+		/* Don't want to delete ghosts, since they may still link to
+		 * somewhere useful (t6061)
+		 */
+		if(he->type != TUP_NODE_GHOST) {
+			/* tup_del_id_force may call back to tup_db_delete_dir() */
+			if(tup_del_id_force(he->tupid, he->type) < 0)
+				return -1;
+		}
 		LIST_REMOVE(he, list);
 		free(he);
 	}
