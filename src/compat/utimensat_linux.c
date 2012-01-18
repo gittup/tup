@@ -18,9 +18,10 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
-#include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
@@ -30,19 +31,20 @@
  */
 int utimensat(int dfd, const char *pathname, const struct timespec times[2], int flags)
 {
-#if __NR_utimensat
-	return syscall(__NR_utimensat, dfd, pathname, times, flags);
-#else
-	struct timeval {
-		time_t tv_sec;
-		long tv_usec;
-	} tvs[2];
+	struct timeval tvs[2];
 	if(flags) {}
+
+#if __NR_utimensat
+	if(syscall(__NR_utimensat, dfd, pathname, times, flags) == 0)
+		return 0;
+	/* If the syscall isn't supported, fallback to futimesat */
+	if(errno != ENOSYS)
+		return -1;
+#endif
 	tvs[0].tv_sec = times[0].tv_sec;
 	tvs[0].tv_usec = times[0].tv_nsec / 1000;
 	tvs[1].tv_sec = times[1].tv_sec;
 	tvs[1].tv_usec = times[1].tv_nsec / 1000;
 
 	return futimesat(dfd, pathname, tvs);
-#endif
 }
