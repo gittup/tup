@@ -60,6 +60,7 @@ void progress_init(void)
 void tup_show_message(const char *s)
 {
 	const char *tup = " tup ";
+	clear_progress();
 	color_set(stdout);
 	/* If we get to the end, show a green bar instead of grey. */
 	if(cur_phase == 5)
