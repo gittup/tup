@@ -299,10 +299,10 @@ static int delete_files(struct graph *g)
 			if(tmp == 1) {
 				tup_entry_list_add(tent, entrylist);
 				do_delete = 0;
-			}
-
-			/* Only delete if the file wasn't modified (t6031) */
-			if(do_delete) {
+			} else {
+				/* Only delete if the file wasn't modified
+				 * (t6031)
+				 */
 				show_result(tent, 0, NULL);
 				show_progress(-1, -1, -1, TUP_NODE_GENERATED);
 				if(delete_file(tent->dt, tent->name.s) < 0)
