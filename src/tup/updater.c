@@ -272,48 +272,38 @@ static int delete_files(struct graph *g)
 	struct tup_entry_head *entrylist;
 	int rc = -1;
 
-	if(g->delete_count) {
+	if(g->gen_delete_count) {
 		tup_main_progress("Deleting files...\n");
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
-	start_progress(g->delete_count);
+	start_progress(g->gen_delete_count);
 	entrylist = tup_entry_get_list();
-	while((tt = RB_ROOT(&g->delete_root)) != NULL) {
+	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
-		int do_delete;
+		int tmp;
 
 		if(server_is_dead())
 			goto out_err;
 
-		do_delete = 1;
-		if(te->type == TUP_NODE_GENERATED) {
-			int tmp;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			goto out_err;
 
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+		tmp = tup_db_in_modify_list(tt->tupid);
+		if(tmp < 0)
+			goto out_err;
+		if(tmp == 1) {
+			tup_entry_list_add(tent, entrylist);
+		} else {
+			/* Only delete if the file wasn't modified (t6031) */
+			show_result(tent, 0, NULL);
+			show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+			if(delete_file(tent->dt, tent->name.s) < 0)
 				goto out_err;
-
-			tmp = tup_db_in_modify_list(tt->tupid);
-			if(tmp < 0)
-				goto out_err;
-			if(tmp == 1) {
-				tup_entry_list_add(tent, entrylist);
-				do_delete = 0;
-			} else {
-				/* Only delete if the file wasn't modified
-				 * (t6031)
-				 */
-				show_result(tent, 0, NULL);
-				show_progress(-1, -1, -1, TUP_NODE_GENERATED);
-				if(delete_file(tent->dt, tent->name.s) < 0)
-					goto out_err;
-			}
-		}
-		if(do_delete) {
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				goto out_err;
 		}
-		tupid_tree_rm(&g->delete_root, tt);
+		tupid_tree_rm(&g->gen_delete_root, tt);
 		free(te);
 	}
 	if(!LIST_EMPTY(entrylist)) {
@@ -327,6 +317,27 @@ static int delete_files(struct graph *g)
 		show_result(tent, 0, NULL);
 		show_progress(-1, -1, -1, TUP_NODE_FILE);
 	}
+
+	if(g->cmd_delete_count) {
+		tup_show_message("Deleting commands...\n");
+		start_progress(g->cmd_delete_count);
+	}
+	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
+		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
+
+		if(server_is_dead())
+			goto out_err;
+		if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
+			goto out_err;
+		skip_result();
+		/* Use TUP_NODE_GENERATED to make the bar purple since
+		 * we are deleting (not executing) commands.
+		 */
+		show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+		tupid_tree_rm(&g->cmd_delete_root, tt);
+		free(te);
+	}
+
 	rc = 0;
 out_err:
 	tup_entry_release_list();

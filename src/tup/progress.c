@@ -107,6 +107,11 @@ void start_progress(int new_total)
 	timespan_start(&gts);
 }
 
+void skip_result(void)
+{
+	sum++;
+}
+
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 {
 	FILE *f;

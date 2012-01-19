@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -127,7 +127,7 @@ int tree_entry_add(struct tupid_entries *root, tupid_t tupid, int type, int *cou
 		free(te);
 		return -1;
 	} else {
-		if(type == TUP_NODE_GENERATED && count)
+		if(count)
 			(*count)++;
 	}
 	return 0;
@@ -143,7 +143,7 @@ void tree_entry_remove(struct tupid_entries *root, tupid_t tupid, int *count)
 		return;
 	tupid_tree_rm(root, tt);
 	te = container_of(tt, struct tree_entry, tnode);
-	if(te->type == TUP_NODE_GENERATED && count)
+	if(count)
 		(*count)--;
 	free(te);
 }

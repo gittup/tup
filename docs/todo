@@ -7,8 +7,6 @@ can we have the monitor kill the updater if a file modification is detected? or 
 
 will cp -Rp olddir newdir break everything if olddir already has a bunch of stuff compiled in it? - try --seriously-overwrite-outputfiles flag again? I forget why I didn't finish that.
 
-instead of keeping both files and commands in delete list, put them in separate lists. Make the command thing just a progress bar.
-
 put dirtree in a list for things like tup_db_select_node_by_flags to avoid callback?
 
 don't continue down re-parse tree unless outputs of the dir have changed.

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -132,8 +132,10 @@ int create_graph(struct graph *g, int count_flags)
 
 	TAILQ_INIT(&g->node_list);
 	TAILQ_INIT(&g->plist);
-	RB_INIT(&g->delete_root);
-	g->delete_count = 0;
+	RB_INIT(&g->gen_delete_root);
+	g->gen_delete_count = 0;
+	RB_INIT(&g->cmd_delete_root);
+	g->cmd_delete_count = 0;
 
 	RB_INIT(&g->node_root);
 
