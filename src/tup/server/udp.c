@@ -94,7 +94,7 @@ int server_init(enum server_mode mode)
 		if(f.filename[0] != '.') {
 			if(unlink(f.filename) != 0) {
 				perror(f.filename);
-				fprintf(stderr, "tup error: Unable to clean out a file in .tup/tmp directory. Please try cleaning this directory manually.\n");
+				fprintf(stderr, "tup error: Unable to clean out a file in .tup/tmp directory. Please try cleaning this directory manually. Note there may be a stuck sub-process that still has the file open (check the Task Manager).\n");
 				return -1;
 			}
 		}
