@@ -173,6 +173,12 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
 	}
+	/* Make file removals obvious */
+	if(tent->type == TUP_NODE_GENERATED)
+		fprintf(f, "rm ");
+	/* Make generated -> normal file obvious */
+	if(tent->type == TUP_NODE_FILE)
+		fprintf(f, "generated->normal ");
 	print_tup_entry(f, tent);
 	fprintf(f, "\n");
 	color_error_mode_clear();
