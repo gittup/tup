@@ -36,6 +36,8 @@ static int start_server(struct server *s);
 static int stop_server(struct server *s);
 static void *message_thread(void *arg);
 static int server_inited = 0;
+static BOOL WINAPI console_handler(DWORD cevent);
+static sig_atomic_t event_got = -1;
 
 int server_pre_init(void)
 {
@@ -101,6 +103,12 @@ int server_init(enum server_mode mode)
 	}
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
+		return -1;
+	}
+
+	if(SetConsoleCtrlHandler(console_handler, TRUE) == 0) {
+		perror("SetConsoleCtrlHandler");
+		fprintf(stderr, "tup error: Unable to set the CTRL-C handler.\n");
 		return -1;
 	}
 
@@ -328,8 +336,7 @@ int server_postexec(struct server *s)
 
 int server_is_dead(void)
 {
-	/* No signals in win32? */
-	return 0;
+	return (event_got != -1);
 }
 
 int server_parser_start(struct parser_server *ps)
@@ -527,4 +534,10 @@ static void *message_thread(void *arg)
 		}
 	}
 	return NULL;
+}
+
+static BOOL WINAPI console_handler(DWORD cevent)
+{
+	event_got = cevent;
+	return TRUE;
 }
