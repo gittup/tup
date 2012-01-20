@@ -165,6 +165,10 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	} else {
 		printf(" ");
 	}
+	/* If we aren't going to show a progress bar, then %-complete here is
+	 * helpful.
+	 */
+	if(total && !stdout_isatty) fprintf(f, "%3i%% ", sum*100/total);
 	if(display_job_numbers) fprintf(f, "%i) ", sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
