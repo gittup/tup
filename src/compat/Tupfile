@@ -2,24 +2,8 @@ include_rules
 
 # Changes here need to be reflected in the bootstrap.sh file
 ifeq (@(TUP_PLATFORM),linux)
-ifeq (@(TUP_DEBUG_LINUX_USE_COMPAT),y)
-	srcs += clearenv.c
-	srcs += dir_mutex.c
-
-	srcs += faccessat.c
-	srcs += fchmodat.c
-	srcs += fchownat.c
-	srcs += fstatat.c
-	srcs += mkdirat.c
-	srcs += openat.c
-	srcs += readlinkat.c
-	srcs += renameat.c
-	srcs += symlinkat.c
-	srcs += unlinkat.c
-else
 	srcs += utimensat_linux.c
 	srcs += dummy.c
-endif
 endif
 
 ifeq (@(TUP_PLATFORM),macosx)
