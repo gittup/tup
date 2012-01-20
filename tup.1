@@ -1,4 +1,4 @@
-.TH "tup" "1" "2011/02/24" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/01/20" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -142,6 +142,9 @@ Set to 'never' to disable ANSI escape codes for colored output, or 'always' to a
 .TP
 .B display.width (defaults to the terminal width)
 Set to any number 10 or larger to force a fixed width for the progress bar. This is assumed to be the total width, some of which is used for spacing, brackets, and the percentage complete. If this value is less than 10, the progress bar is disabled.
+.TP
+.B display.progress (defaults to '1' if stdout is a TTY)
+Set to '1' to enable the progress bar, or '0' to turn it off. By default it is enabled if stdout is a TTY, and disabled if stdout is not a TTY.
 .TP
 .B display.job_numbers (default '1')
 Set to '0' to avoid displaying the "N) " string before the results of a job. The default is to display this number.

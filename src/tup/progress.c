@@ -36,9 +36,9 @@ static int total;
 static int total_time;
 static int max_jobs;
 static int is_active = 0;
-static int stdout_isatty;
 static int color_len;
 static int got_error = 0;
+static int display_progress;
 static int display_job_numbers;
 static int display_job_time;
 static struct timespan gts;
@@ -60,10 +60,10 @@ struct {
 
 void progress_init(void)
 {
-	stdout_isatty = isatty(STDOUT_FILENO);
 	color_len = strlen(color_type(TUP_NODE_CMD)) +
 		strlen(color_append_reverse()) +
 		strlen(color_end());
+	display_progress = tup_option_get_int("display.progress");
 	display_job_numbers = tup_option_get_int("display.job_numbers");
 	display_job_time = tup_option_get_int("display.job_time");
 }
@@ -168,7 +168,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	/* If we aren't going to show a progress bar, then %-complete here is
 	 * helpful.
 	 */
-	if(total && !stdout_isatty) fprintf(f, "%3i%% ", sum*100/total);
+	if(total && !display_progress) fprintf(f, "%3i%% ", sum*100/total);
 	if(display_job_numbers) fprintf(f, "%i) ", sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
@@ -228,7 +228,7 @@ static int get_time_remaining(char *dest, int len, int part, int whole, int appr
 void show_progress(int active, int job_time, int type)
 {
 	int console_width = tup_option_get_int("display.width");
-	if(total && stdout_isatty && console_width >= 10) {
+	if(total && display_progress && console_width >= 10) {
 		/* -3 for the [] and leading space, and -6 for the " 100% " at
 		 * the end.
 		 */
