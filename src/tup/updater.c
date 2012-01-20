@@ -282,7 +282,7 @@ static int delete_files(struct graph *g)
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
-	start_progress(g->gen_delete_count, -1);
+	start_progress(g->gen_delete_count, -1, -1);
 	entrylist = tup_entry_get_list();
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -328,7 +328,7 @@ static int delete_files(struct graph *g)
 		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_count, g->cmd_delete_count == 1 ? "" : "s");
 		buf[sizeof(buf)-1] = 0;
 		tup_show_message(buf);
-		start_progress(g->cmd_delete_count, -1);
+		start_progress(g->cmd_delete_count, -1, -1);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -709,7 +709,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
-	start_progress(g->num_nodes, g->total_mtime);
+	start_progress(g->num_nodes, g->total_mtime, jobs);
 	/* Keep going as long as:
 	 * 1) There is work to do (plist is not empty)
 	 * 2) The server hasn't been killed

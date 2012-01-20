@@ -34,6 +34,7 @@ static int cur_phase = -1;
 static int sum;
 static int total;
 static int total_time;
+static int max_jobs;
 static int is_active = 0;
 static int stdout_isatty;
 static int color_len;
@@ -42,6 +43,15 @@ static int display_job_numbers;
 static int display_job_time;
 static struct timespan gts;
 
+static int get_time_remaining(char *dest, int len, int part, int whole, int approx);
+
+/* Each of these corresponds to one unit of info that can be displayed inside
+ * the progress bar (eg: ETA, Remaining, Active). Maxlen remains constant for
+ * the duration of the progress bar. We expect the size of the text to decrease
+ * during its lifetime as the numbers go down.  This prevents the fields from
+ * moving within the progress bar, or suddenly adding a field as the numbers
+ * change.
+ */
 struct {
 	char text[32];
 	int len;
@@ -97,15 +107,33 @@ void tup_main_progress(const char *s)
 	tup_show_message(s);
 }
 
-void start_progress(int new_total, int new_total_time)
+void start_progress(int new_total, int new_total_time, int new_max_jobs)
 {
-	int x;
+	int i;
+
 	sum = 0;
 	total = new_total;
 	total_time = new_total_time;
-	for(x=0; x<ARRAY_SIZE(infos); x++) {
-		infos[x].maxlen = 0;
+	max_jobs = new_max_jobs;
+
+	i = 0;
+
+	/* Use the time if we have that available, otherwise fallback to the
+	 * number of jobs.
+	 */
+	if(total_time != -1) {
+		infos[i].maxlen = get_time_remaining(infos[i].text, sizeof(infos[i].text), 0, total_time, 0);
+	} else {
+		infos[i].maxlen = get_time_remaining(infos[i].text, sizeof(infos[i].text), 0, total, 1);
 	}
+	i++;
+
+	infos[i].maxlen = snprintf(infos[i].text, sizeof(infos[i].text), "Remaining=%i", total);
+	i++;
+
+	infos[i].maxlen = snprintf(infos[i].text, sizeof(infos[i].text), "Active=%i", max_jobs);
+	i++;
+
 	timespan_start(&gts);
 }
 
@@ -171,7 +199,7 @@ static int get_time_remaining(char *dest, int len, int part, int whole, int appr
 		 * 60s).
 		 *
 		 * Also note that the length of each text field has a max size of
-		 * "ETA=???". This keeps the maxlen field in the info structure
+		 * "ETA=???". This keeps the len field in the info structure
 		 * to be monotonically decreasing over time.
 		 */
 		if(time_left < 1000) {
@@ -225,37 +253,27 @@ void show_progress(int active, int job_time, int type)
 
 		if(total_time != -1) {
 			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), job_time, total_time, 0);
-			i++;
 		} else {
 			infos[i].len = get_time_remaining(infos[i].text, sizeof(infos[i].text), sum, total, 1);
-			/* Override maxlen since the parser doesn't display an
-			 * initial ETA=~??? message.
-			 */
-			infos[i].maxlen = 8; /* Length of "ETA=~???" */
-			i++;
 		}
+		i++;
 
 		infos[i].len = snprintf(infos[i].text, sizeof(infos[i].text), "Remaining=%i", total-sum);
 		i++;
 
 		if(active != -1) {
 			infos[i].len = snprintf(infos[i].text, sizeof(infos[i].text), "Active=%i", active);
-			i++;
+		} else {
+			/* Override maxlen to disable "Active..." */
+			infos[i].maxlen = 0;
 		}
+		i++;
 
 		tmpmax = max;
 		for(x=0; x<ARRAY_SIZE(infos); x++) {
 			int spacing = 0;
 			if(x)
 				spacing = 1;
-			/* Maxlen remains constant for the duration of the progress
-			 * bar. We expect the size of the text to decrease
-			 * during its lifetime as the numbers go down. This
-			 * prevents the fields from moving within the progress
-			 * bar, or suddenly adding a field as the numbers change.
-			 */
-			if(infos[x].maxlen == 0)
-				infos[x].maxlen = infos[x].len;
 			if(tmpmax >= infos[x].maxlen + spacing) {
 				tmpmax -= infos[x].maxlen + spacing;
 				num_infos++;
