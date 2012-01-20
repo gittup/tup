@@ -29,10 +29,10 @@ struct timespan;
 void progress_init(void);
 void tup_show_message(const char *s);
 void tup_main_progress(const char *s);
-void start_progress(int total);
+void start_progress(int new_total, int new_total_time);
 void skip_result(void);
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts);
-void show_progress(int active, int job_time, int total_time, int type);
+void show_progress(int active, int job_time, int type);
 void clear_active(FILE *f);
 void clear_progress(void);
 

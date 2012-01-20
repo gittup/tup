@@ -33,6 +33,7 @@
 static int cur_phase = -1;
 static int sum;
 static int total;
+static int total_time;
 static int is_active = 0;
 static int stdout_isatty;
 static int color_len;
@@ -96,11 +97,12 @@ void tup_main_progress(const char *s)
 	tup_show_message(s);
 }
 
-void start_progress(int new_total)
+void start_progress(int new_total, int new_total_time)
 {
 	int x;
 	sum = 0;
 	total = new_total;
+	total_time = new_total_time;
 	for(x=0; x<ARRAY_SIZE(infos); x++) {
 		infos[x].maxlen = 0;
 	}
@@ -144,14 +146,13 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	color_error_mode_clear();
 }
 
-static int get_time_remaining(char *dest, int len, int job_time, int total_time,
-			      int approx)
+static int get_time_remaining(char *dest, int len, int part, int whole, int approx)
 {
 	const char *eq = "=";
 
 	if(approx)
 		eq = "~=";
-	if(job_time != 0) {
+	if(part != 0) {
 		time_t ms;
 		time_t total_runtime;
 		time_t time_left;
@@ -160,7 +161,7 @@ static int get_time_remaining(char *dest, int len, int job_time, int total_time,
 		ms = timespan_milliseconds(&gts);
 
 		/* This can easily overflow, so do the computation in float */
-		total_runtime = (time_t)((float)ms * (float)total_time / (float)job_time);
+		total_runtime = (time_t)((float)ms * (float)whole / (float)part);
 		time_left = total_runtime - ms;
 
 		/* Try to find the best units. Note that we use +1 because the
@@ -186,7 +187,7 @@ static int get_time_remaining(char *dest, int len, int job_time, int total_time,
 	return snprintf(dest, len, "ETA%s???", eq);
 }
 
-void show_progress(int active, int job_time, int total_time, int type)
+void show_progress(int active, int job_time, int type)
 {
 	int console_width = tup_option_get_int("display.width");
 	if(total && stdout_isatty && console_width >= 10) {

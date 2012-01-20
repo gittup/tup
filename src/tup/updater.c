@@ -100,7 +100,7 @@ LIST_HEAD(worker_thread_head, worker_thread);
 struct worker_thread {
 	LIST_ENTRY(worker_thread) list;
 	pthread_t pid;
-	struct graph *g;
+	struct graph *g; /* Not for update_work() since it isn't sync'd */
 
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
@@ -282,7 +282,7 @@ static int delete_files(struct graph *g)
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
-	start_progress(g->gen_delete_count);
+	start_progress(g->gen_delete_count, -1);
 	entrylist = tup_entry_get_list();
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -302,7 +302,7 @@ static int delete_files(struct graph *g)
 		} else {
 			/* Only delete if the file wasn't modified (t6031) */
 			show_result(tent, 0, NULL);
-			show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+			show_progress(-1, -1, TUP_NODE_GENERATED);
 			if(delete_file(tent->dt, tent->name.s) < 0)
 				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
@@ -320,7 +320,7 @@ static int delete_files(struct graph *g)
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
 		show_result(tent, 0, NULL);
-		show_progress(-1, -1, -1, TUP_NODE_FILE);
+		show_progress(-1, -1, TUP_NODE_FILE);
 	}
 
 	if(g->cmd_delete_count) {
@@ -328,7 +328,7 @@ static int delete_files(struct graph *g)
 		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_count, g->cmd_delete_count == 1 ? "" : "s");
 		buf[sizeof(buf)-1] = 0;
 		tup_show_message(buf);
-		start_progress(g->cmd_delete_count);
+		start_progress(g->cmd_delete_count, -1);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
@@ -341,7 +341,7 @@ static int delete_files(struct graph *g)
 		/* Use TUP_NODE_GENERATED to make the bar purple since
 		 * we are deleting (not executing) commands.
 		 */
-		show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+		show_progress(-1, -1, TUP_NODE_GENERATED);
 		tupid_tree_rm(&g->cmd_delete_root, tt);
 		free(te);
 	}
@@ -709,7 +709,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	pop_node(g, root);
 	remove_node(g, root);
 
-	start_progress(g->num_nodes);
+	start_progress(g->num_nodes, g->total_mtime);
 	/* Keep going as long as:
 	 * 1) There is work to do (plist is not empty)
 	 * 2) The server hasn't been killed
@@ -870,7 +870,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
-			show_progress(-1, -1, -1, TUP_NODE_DIR);
+			show_progress(-1, -1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -907,7 +907,7 @@ static void *update_work(void *arg)
 			time_t mtime = n->tent->mtime;
 			pthread_mutex_lock(&display_mutex);
 			jobs_active++;
-			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
+			show_progress(jobs_active, job_time, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
@@ -915,7 +915,7 @@ static void *update_work(void *arg)
 			pthread_mutex_lock(&display_mutex);
 			jobs_active--;
 			job_time += mtime;
-			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
+			show_progress(jobs_active, job_time, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
