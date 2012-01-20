@@ -249,35 +249,35 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to inject dll: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
-		goto end;
+		goto err_terminate;
 	}
 
 	if(ResumeThread(pi.hThread) == (DWORD)~0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to start thread: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
-		goto end;
+		goto err_terminate;
 	}
 
 	if(WaitForSingleObject(pi.hThread, INFINITE) != WAIT_OBJECT_0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to wait for thread: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
-		goto end;
+		goto err_terminate;
 	}
 
 	if(WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to wait for process: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
-		goto end;
+		goto err_terminate;
 	}
 
 	if(!GetExitCodeProcess(pi.hProcess, &return_code)) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to get exit code: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
-		goto end;
+		goto err_terminate;
 	}
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
@@ -303,6 +303,12 @@ end:
 		return -1;
 	}
 	return rc;
+
+err_terminate:
+	TerminateProcess(pi.hProcess, 10);
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+	return -1;
 }
 
 int server_postexec(struct server *s)
