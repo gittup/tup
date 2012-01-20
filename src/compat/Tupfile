@@ -1,6 +1,6 @@
 include_rules
 
-# Changes here need to be reflected in the bootstrap.sh file
+# Changes here need to be reflected in the build.sh file
 ifeq (@(TUP_PLATFORM),linux)
 	srcs += utimensat_linux.c
 	srcs += dummy.c
