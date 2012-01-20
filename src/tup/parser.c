@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,6 +35,7 @@
 #include "container.h"
 #include "if_stmt.h"
 #include "server.h"
+#include "timespan.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,7 +235,9 @@ int parse(struct node *n, struct graph *g)
 	int rc = -1;
 	struct buf b;
 	struct parser_server ps;
+	struct timespan ts;
 
+	timespan_start(&ts);
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
 		print_tup_entry(stderr, n->tent);
@@ -281,9 +284,9 @@ int parse(struct node *n, struct graph *g)
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_root, &g->delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->delete_root, &g->delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
 	tf.dfd = tup_entry_openat(ps.root_fd, n->tent);
@@ -349,7 +352,8 @@ out_server_stop:
 	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_root);
 
-	show_progress(n->tent, rc != 0);
+	timespan_end(&ts);
+	show_result(n->tent, rc != 0, &ts);
 	if(fflush(tf.f) != 0) {
 		perror("fflush");
 		rc = -1;
@@ -655,7 +659,7 @@ static int gen_dir_list(struct tupfile *tf)
 	};
 	LIST_INIT(&tf->ps->file_list);
 	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, tf->tupid,
-				       "*", -1, &tf->g->delete_root) < 0)
+				       "*", -1, &tf->g->gen_delete_root) < 0)
 		return -EIO;
 	return 0;
 }
@@ -766,7 +770,7 @@ static int gitignore(struct tupfile *tf)
 	int len;
 	int fd;
 
-	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->delete_root) < 0)
+	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->gen_delete_root) < 0)
 		return -1;
 	if((s && len) || tf->tupid == 1) {
 		struct tup_entry *tent;
@@ -777,9 +781,9 @@ static int gitignore(struct tupfile *tf)
 			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) == NULL)
 				return -1;
 		} else {
-			tree_entry_remove(&tf->g->delete_root,
+			tree_entry_remove(&tf->g->gen_delete_root,
 					  tent->tnode.tupid,
-					  &tf->g->delete_count);
+					  &tf->g->gen_delete_count);
 		}
 
 		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
@@ -2253,7 +2257,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			tup_db_print(tf->f, tent->tnode.tupid);
 			return -1;
 		}
-		if(tupid_tree_search(&tf->g->delete_root, tent->tnode.tupid) != NULL) {
+		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
 			if(!required)
 				return 0;
 			/* If the file is in the modify list, it is going to be
@@ -2268,7 +2272,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	} else {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->delete_root) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
 			return -1;
 	}
 	return 0;
@@ -2553,7 +2557,7 @@ out_pl:
 	if(tmptent) {
 		cmdid = tmptent->tnode.tupid;
 	} else {
-		if(find_existing_command(&onl, &tf->g->delete_root, &cmdid) < 0)
+		if(find_existing_command(&onl, &tf->g->cmd_delete_root, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
 			cmdid = create_command_file(tf->tupid, cmd);
@@ -2578,27 +2582,27 @@ out_pl:
 		tup_db_print(tf->f, cmdid);
 		return -1;
 	}
-	tree_entry_remove(&tf->g->delete_root, cmdid, &tf->g->delete_count);
+	tree_entry_remove(&tf->g->cmd_delete_root, cmdid, &tf->g->cmd_delete_count);
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		tree_entry_remove(&tf->g->delete_root, onle->tent->tnode.tupid,
-				  &tf->g->delete_count);
+		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
+				  &tf->g->gen_delete_count);
 		move_name_list_entry(output_nl, &onl, onle);
 	}
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
-		tree_entry_remove(&tf->g->delete_root, onle->tent->tnode.tupid,
-				  &tf->g->delete_count);
+		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
+				  &tf->g->gen_delete_count);
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
@@ -2622,7 +2626,7 @@ out_pl:
 		if(tupid_tree_add_dup(&root, tt->tupid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &root, &tf->env_root, &tf->g->delete_root) < 0)
+	if(tup_db_write_inputs(cmdid, &root, &tf->env_root, &tf->g->gen_delete_root) < 0)
 		return -1;
 	free_tupid_tree(&root);
 	return 0;

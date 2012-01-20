@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,7 @@
 
 #include "bsd/queue.h"
 #include "tupid_tree.h"
+#include <time.h>
 
 struct edge {
 	LIST_ENTRY(edge) list;
@@ -62,8 +63,11 @@ struct graph {
 	int num_nodes;
 	struct tupid_entries node_root;
 	int count_flags;
-	struct tupid_entries delete_root;
-	int delete_count;
+	time_t total_mtime;
+	struct tupid_entries gen_delete_root;
+	int gen_delete_count;
+	struct tupid_entries cmd_delete_root;
+	int cmd_delete_count;
 };
 
 struct node *find_node(struct graph *g, tupid_t tupid);

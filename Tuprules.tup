@@ -39,6 +39,9 @@ MINGWCFLAGS += -D_GNU_SOURCE
 MINGWCFLAGS += -D'S_ISLNK(a)=0'
 MINGWCFLAGS += -Dlstat=stat
 
+# No sig_atomic_t on windows
+MINGWCFLAGS += -Dsig_atomic_t=int
+
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
 !ar = |> ^ AR %o^ ar crs %o %f |>

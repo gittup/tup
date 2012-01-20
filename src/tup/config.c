@@ -22,6 +22,7 @@
 #include "compat.h"
 #include "colors.h"
 #include "db_types.h"
+#include "progress.h"
 #include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -193,6 +194,7 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 				break;
 			if(!displayed) {
 				displayed = 1;
+				clear_active(out);
 				if(iserr == 2) {
 					/* For tup errors (eg: missing deps) */
 					fprintf(stderr, " *** tup errors ***\n");

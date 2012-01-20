@@ -26,6 +26,10 @@
 
 static int enabled[2];
 static int active = 0;
+/* error_mode is set when we hightlight the whole line in red. In this case,
+ * we don't want to switch to a real color when printing tup entrys
+ */
+static int error_mode = 0;
 
 void color_init(void)
 {
@@ -61,7 +65,7 @@ const char *color_type(int type)
 {
 	const char *color = "";
 
-	if(!enabled[active])
+	if(!enabled[active] || error_mode)
 		return "";
 
 	switch(type) {
@@ -90,7 +94,7 @@ const char *color_type(int type)
 
 const char *color_append_normal(void)
 {
-	if(!enabled[active])
+	if(!enabled[active] || error_mode)
 		return "";
 	return "m";
 }
@@ -121,4 +125,17 @@ const char *color_final(void)
 	if(!enabled[active])
 		return "";
 	return "[07;32m";
+}
+
+const char *color_error_mode(void)
+{
+	if(!enabled[active])
+		return "";
+	error_mode = 1;
+	return "[41;37m";
+}
+
+void color_error_mode_clear(void)
+{
+	error_mode = 0;
 }

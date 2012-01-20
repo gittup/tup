@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,20 +18,28 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_colors_h
-#define tup_colors_h
-
 #include <stdio.h>
+#include "timespan.h"
 
-void color_init(void);
-void color_set(FILE *f);
-const char *color_type(int type);
-const char *color_append_normal(void);
-const char *color_append_reverse(void);
-const char *color_reverse(void);
-const char *color_end(void);
-const char *color_final(void);
-const char *color_error_mode(void);
-void color_error_mode_clear(void);
+void timespan_start(struct timespan *ts)
+{
+	gettimeofday(&ts->start, NULL);
+}
 
-#endif
+void timespan_end(struct timespan *ts)
+{
+	gettimeofday(&ts->end, NULL);
+}
+
+time_t timespan_milliseconds(struct timespan *ts)
+{
+	/* The +500 is to round to the nearest ms */
+	return (ts->end.tv_sec - ts->start.tv_sec) * 1000 +
+		(ts->end.tv_usec - ts->start.tv_usec + 500) / 1000;
+}
+
+float timespan_seconds(struct timespan *ts)
+{
+	return (float)(ts->end.tv_sec - ts->start.tv_sec) +
+		(float)(ts->end.tv_usec - ts->start.tv_usec)/1e6;
+}

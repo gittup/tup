@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -34,6 +34,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifndef _WIN32
+#include <signal.h>
+#include <sys/ioctl.h>
+#endif
 
 #define OPT_MAX 256
 
@@ -60,6 +64,7 @@ static struct {
 
 static int parse_option_file(int x);
 static const char *cpu_number(void);
+static const char *get_console_width(void);
 static int init_home_loc(void);
 
 static struct option {
@@ -71,6 +76,9 @@ static struct option {
 	{"updater.num_jobs", NULL, cpu_number},
 	{"updater.keep_going", "0", NULL},
 	{"display.color", DEFAULT_COLOR, NULL},
+	{"display.width", NULL, get_console_width},
+	{"display.job_numbers", "1", NULL},
+	{"display.job_time", "1", NULL},
 	{"monitor.autoupdate", "0", NULL},
 	{"monitor.foreground", "0", NULL},
 	{"db.sync", "1", NULL},
@@ -81,6 +89,15 @@ static struct option {
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
 static int inited = 0;
+static volatile sig_atomic_t win_resize_requested = 0;
+
+#ifndef _WIN32
+static void win_resize_handler(int sig);
+static struct sigaction sigact = {
+	.sa_handler = win_resize_handler,
+	.sa_flags = SA_RESTART,
+};
+#endif
 
 int tup_option_init(void)
 {
@@ -100,6 +117,10 @@ int tup_option_init(void)
 		if(parse_option_file(x) < 0)
 			return -1;
 	}
+#ifndef _WIN32
+	sigemptyset(&sigact.sa_mask);
+	sigaction(SIGWINCH, &sigact, NULL);
+#endif
 	inited = 1;
 	return 0;
 }
@@ -149,8 +170,13 @@ const char *tup_option_get_string(const char *opt)
 	}
 
 	for(x=0; x<NUM_OPTIONS; x++) {
-		if(strcmp(opt, options[x].name) == 0)
+		if(strcmp(opt, options[x].name) == 0) {
+			if(win_resize_requested &&
+			   strcmp(opt, "display.width") == 0) {
+				options[x].default_value = get_console_width();
+			}
 			return options[x].default_value;
+		}
 	}
 	fprintf(stderr, "tup internal error: Option '%s' does not have a default value\n", opt);
 	exit(1);
@@ -266,6 +292,25 @@ static const char *cpu_number(void)
 	return buf;
 }
 
+static const char *get_console_width(void)
+{
+	static char buf[10];
+	int width = 0;
+#ifdef TIOCGWINSZ
+	struct winsize wsz;
+
+	if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) == 0)
+		width = wsz.ws_col;
+#elif defined(_WIN32)
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+		width = csbi.dwSize.X;
+#endif
+	snprintf(buf, sizeof(buf), "%d", width);
+	buf[sizeof(buf) - 1] = 0;
+	return buf;
+}
+
 static int init_home_loc(void)
 {
 #if defined(_WIN32)
@@ -292,3 +337,11 @@ static int init_home_loc(void)
 	return 0;
 #endif
 }
+
+#ifndef _WIN32
+static void win_resize_handler(int sig)
+{
+	if(sig) {}
+	win_resize_requested = 1;
+}
+#endif

@@ -27,6 +27,7 @@
 #include "entry.h"
 #include "parser.h"
 #include "progress.h"
+#include "timespan.h"
 #include "server.h"
 #include "array_size.h"
 #include "config.h"
@@ -41,7 +42,6 @@
 #include <errno.h>
 #include <ctype.h>
 #include <pthread.h>
-#include <sys/time.h>
 
 #define MAX_JOBS 65535
 
@@ -100,7 +100,7 @@ LIST_HEAD(worker_thread_head, worker_thread);
 struct worker_thread {
 	LIST_ENTRY(worker_thread) list;
 	pthread_t pid;
-	struct graph *g; /* This should only be used in create_work() and todo_work */
+	struct graph *g;
 
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
@@ -256,16 +256,14 @@ static int run_scan(void)
 		return -1;
 	}
 	if(rc == 0) {
-		struct timeval t1, t2;
+		struct timespan ts;
 		tup_main_progress("Scanning filesystem...");
 		fflush(stdout);
-		gettimeofday(&t1, NULL);
+		timespan_start(&ts);
 		if(tup_scan() < 0)
 			return -1;
-		gettimeofday(&t2, NULL);
-		printf("%.3fs\n",
-		       (double)(t2.tv_sec - t1.tv_sec) +
-		       (double)(t2.tv_usec - t1.tv_usec)/1e6);
+		timespan_end(&ts);
+		printf("%.3fs\n", timespan_seconds(&ts));
 	} else {
 		tup_main_progress("No filesystem scan - monitor is running.\n");
 	}
@@ -279,47 +277,38 @@ static int delete_files(struct graph *g)
 	struct tup_entry_head *entrylist;
 	int rc = -1;
 
-	if(g->delete_count) {
+	if(g->gen_delete_count) {
 		tup_main_progress("Deleting files...\n");
 	} else {
 		tup_main_progress("No files to delete.\n");
 	}
-	start_progress(g->delete_count);
+	start_progress(g->gen_delete_count);
 	entrylist = tup_entry_get_list();
-	while((tt = RB_ROOT(&g->delete_root)) != NULL) {
+	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
-		int do_delete;
+		int tmp;
 
 		if(server_is_dead())
 			goto out_err;
 
-		do_delete = 1;
-		if(te->type == TUP_NODE_GENERATED) {
-			int tmp;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			goto out_err;
 
-			if(tup_entry_add(tt->tupid, &tent) < 0)
-				goto out_err;
-
-			tmp = tup_db_in_modify_list(tt->tupid);
-			if(tmp < 0)
-				goto out_err;
-			if(tmp == 1) {
-				tup_entry_list_add(tent, entrylist);
-				do_delete = 0;
-			}
-
+		tmp = tup_db_in_modify_list(tt->tupid);
+		if(tmp < 0)
+			goto out_err;
+		if(tmp == 1) {
+			tup_entry_list_add(tent, entrylist);
+		} else {
 			/* Only delete if the file wasn't modified (t6031) */
-			if(do_delete) {
-				show_progress(tent, 0);
-				if(delete_file(tent->dt, tent->name.s) < 0)
-					goto out_err;
-			}
-		}
-		if(do_delete) {
+			show_result(tent, 0, NULL);
+			show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+			if(delete_file(tent->dt, tent->name.s) < 0)
+				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				goto out_err;
 		}
-		tupid_tree_rm(&g->delete_root, tt);
+		tupid_tree_rm(&g->gen_delete_root, tt);
 		free(te);
 	}
 	if(!LIST_EMPTY(entrylist)) {
@@ -330,8 +319,30 @@ static int delete_files(struct graph *g)
 			goto out_err;
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
-		show_progress(tent, 0);
+		show_result(tent, 0, NULL);
+		show_progress(-1, -1, -1, TUP_NODE_FILE);
 	}
+
+	if(g->cmd_delete_count) {
+		tup_show_message("Deleting commands...\n");
+		start_progress(g->cmd_delete_count);
+	}
+	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
+		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
+
+		if(server_is_dead())
+			goto out_err;
+		if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
+			goto out_err;
+		skip_result();
+		/* Use TUP_NODE_GENERATED to make the bar purple since
+		 * we are deleting (not executing) commands.
+		 */
+		show_progress(-1, -1, -1, TUP_NODE_GENERATED);
+		tupid_tree_rm(&g->cmd_delete_root, tt);
+		free(te);
+	}
+
 	rc = 0;
 out_err:
 	tup_entry_release_list();
@@ -588,8 +599,15 @@ edge_create:
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->tent->type == g->count_flags)
+		if(n->tent->type == g->count_flags) {
 			g->num_nodes++;
+			if(g->total_mtime != -1) {
+				if(n->tent->mtime == -1)
+					g->total_mtime = -1;
+				else
+					g->total_mtime += n->tent->mtime;
+			}
+		}
 		n->expanded = 1;
 		TAILQ_REMOVE(&g->node_list, n, list);
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
@@ -689,7 +707,12 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	remove_node(g, root);
 
 	start_progress(g->num_nodes);
-	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead()) {
+	/* Keep going as long as:
+	 * 1) There is work to do (plist is not empty)
+	 * 2) The server hasn't been killed
+	 * 3) No jobs have failed, or if jobs have failed we have keep_going set.
+	 */
+	while(!TAILQ_EMPTY(&g->plist) && !server_is_dead() && (!failed || keep_going)) {
 		struct node *n;
 		struct worker_thread *wt;
 		n = TAILQ_FIRST(&g->plist);
@@ -730,10 +753,11 @@ check_empties:
 		/* Keep looking for dudes to return as long as:
 		 *  1) There are no more free workers
 		 *  2) There is no work to do (plist is empty or the server is
-		 *     dead) and some people are active.
+		 *     dead or we failed without keep-going) and some people
+		 *     are active.
 		 */
 		while(LIST_EMPTY(&free_list) ||
-		      ((TAILQ_EMPTY(&g->plist) || server_is_dead()) && active)) {
+		      ((TAILQ_EMPTY(&g->plist) || server_is_dead() || (failed && !keep_going)) && active)) {
 			pthread_mutex_lock(&list_mutex);
 			while(LIST_EMPTY(&fin_list)) {
 				pthread_cond_wait(&list_cond, &list_mutex);
@@ -746,41 +770,39 @@ check_empties:
 			pthread_mutex_unlock(&list_mutex);
 			active--;
 
-			if(wt->rc < 0) {
-				failed = 1;
-				if(keep_going)
-					goto keep_going;
-				goto out;
+			if(wt->rc == 0) {
+				pop_node(g, n);
+			} else {
+				failed++;
 			}
-			pop_node(g, n);
 
-keep_going:
 			remove_node(g, n);
 		}
 	}
-	if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist) || failed) {
-		if(keep_going) {
+	clear_progress();
+	if(failed) {
+		fprintf(stderr, " *** tup: %i job%s failed.\n", failed, failed == 1 ? "" : "s");
+		if(keep_going)
 			fprintf(stderr, " *** tup: Remaining nodes skipped due to errors in command execution.\n");
+	} else if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist)) {
+		if(server_is_dead()) {
+			fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
 		} else {
-			if(server_is_dead()) {
-				fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
-			} else {
-				struct node *n;
-				fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
-				fprintf(stderr, "Node list:\n");
-				TAILQ_FOREACH(n, &g->node_list, list) {
-					fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-				}
-				fprintf(stderr, "plist:\n");
-				TAILQ_FOREACH(n, &g->plist, list) {
-					fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-				}
+			struct node *n;
+			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
+			fprintf(stderr, "Node list:\n");
+			TAILQ_FOREACH(n, &g->node_list, list) {
+				fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
+			}
+			fprintf(stderr, "plist:\n");
+			TAILQ_FOREACH(n, &g->plist, list) {
+				fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
 			}
 		}
-		goto out;
+	} else {
+		rc = 0;
 	}
-	rc = 0;
-out:
+
 	/* First tell all the threads to quit */
 	for(x=0; x<jobs; x++) {
 		pthread_mutex_lock(&workers[x].lock);
@@ -845,6 +867,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
+			show_progress(-1, -1, -1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -866,7 +889,8 @@ static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct node *n;
-	static int active = 0;
+	static int jobs_active = 0;
+	static time_t job_time = 0;
 
 	while(1) {
 		struct edge *e;
@@ -877,17 +901,18 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
+			time_t mtime = n->tent->mtime;
 			pthread_mutex_lock(&display_mutex);
-			active++;
-			show_active(active);
+			jobs_active++;
+			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
-			active--;
-			if(active)
-				show_active(active);
+			jobs_active--;
+			job_time += mtime;
+			show_progress(jobs_active, job_time, wt->g->total_mtime, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:
@@ -960,7 +985,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->tent->type == g->count_flags) {
-			show_progress(n->tent, 0);
+			show_result(n->tent, 0, NULL);
 		}
 
 		worker_ret(wt, 0);
@@ -977,7 +1002,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				pthread_mutex_lock(&display_mutex);
-				show_progress(n->tent, 1);
+				show_result(n->tent, 1, NULL);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				pthread_mutex_unlock(&display_mutex);
@@ -990,14 +1015,16 @@ static int unlink_outputs(int dfd, struct node *n)
 
 static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *sticky_root,
-			  struct tupid_entries *normal_root)
+			  struct tupid_entries *normal_root,
+			  struct timespan *ts)
 {
 	FILE *f;
 	int is_err = 1;
+	struct timespan *show_ts = NULL;
 
 	f = tmpfile();
 	if(!f) {
-		show_progress(tent, 1);
+		show_result(tent, 1, NULL);
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
@@ -1007,8 +1034,17 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
+				time_t ms;
+
+				timespan_end(ts);
+				show_ts = ts;
+				ms = timespan_milliseconds(ts);
+
 				/* Hooray! */
 				is_err = 0;
+				if(tent->mtime != ms)
+					if(tup_db_set_mtime(tent, ms) < 0)
+						is_err = 1; /* Un-Hooray :( */
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
@@ -1030,7 +1066,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	fflush(f);
 	rewind(f);
 
-	show_progress(tent, is_err);
+	show_result(tent, is_err, show_ts);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1057,7 +1093,9 @@ static int update(struct node *n)
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct tup_env newenv;
+	struct timespan ts;
 
+	timespan_start(&ts);
 	if(name[0] == '^') {
 		name++;
 		while(*name && *name != ' ') {
@@ -1065,7 +1103,7 @@ static int update(struct node *n)
 			 * what yet.
 			 */
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent, 1);
+			show_result(n->tent, 1, NULL);
 			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
 			pthread_mutex_unlock(&display_mutex);
 			name++;
@@ -1074,7 +1112,7 @@ static int update(struct node *n)
 		while(*name && *name != '^') name++;
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
-			show_progress(n->tent, 1);
+			show_result(n->tent, 1, NULL);
 			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
@@ -1086,7 +1124,7 @@ static int update(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
-		show_progress(n->tent, 1);
+		show_result(n->tent, 1, NULL);
 		fprintf(stderr, "Error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);
@@ -1127,7 +1165,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &ts);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free_tupid_tree(&sticky_root);
