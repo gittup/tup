@@ -324,7 +324,10 @@ static int delete_files(struct graph *g)
 	}
 
 	if(g->cmd_delete_count) {
-		tup_show_message("Deleting commands...\n");
+		char buf[64];
+		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_count, g->cmd_delete_count == 1 ? "" : "s");
+		buf[sizeof(buf)-1] = 0;
+		tup_show_message(buf);
 		start_progress(g->cmd_delete_count);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
