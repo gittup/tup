@@ -998,19 +998,29 @@ BOOL WINAPI CopyFileTransactedW_hook(
 		hTransaction);
 }
 
+#define ATTRIB_FAIL 0xffffffff
 DWORD WINAPI GetFileAttributesA_hook(
     __in LPCSTR lpFileName)
 {
+	DWORD attributes = GetFileAttributesA_orig(lpFileName);
 	DEBUG_HOOK("GetFileAttributesA '%s'\n", lpFileName);
-	handle_file(lpFileName, NULL, ACCESS_READ);
-	return GetFileAttributesA_orig(lpFileName);
+
+	/* If it fails (attributes == -1), we need to handle the read since
+	 * it will be a ghost. If the file exists, we only care if it's a file
+	 * and not a directory.
+	 */
+	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
+		handle_file(lpFileName, NULL, ACCESS_READ);
+	return attributes;
 }
 
 DWORD WINAPI GetFileAttributesW_hook(
     __in LPCWSTR lpFileName)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_READ);
-	return GetFileAttributesW_orig(lpFileName);
+	DWORD attributes = GetFileAttributesW_orig(lpFileName);
+	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
+		handle_file_w(lpFileName, NULL, ACCESS_READ);
+	return attributes;
 }
 
 BOOL WINAPI GetFileAttributesExA_hook(
@@ -1018,11 +1028,13 @@ BOOL WINAPI GetFileAttributesExA_hook(
     __in  GET_FILEEX_INFO_LEVELS fInfoLevelId,
     __out LPVOID lpFileInformation)
 {
-	handle_file(lpFileName, NULL, ACCESS_READ);
-	return GetFileAttributesExA_orig(
+	DWORD attributes = GetFileAttributesExA_orig(
 		lpFileName,
 		fInfoLevelId,
 		lpFileInformation);
+	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
+		handle_file(lpFileName, NULL, ACCESS_READ);
+	return attributes;
 }
 
 BOOL WINAPI GetFileAttributesExW_hook(
@@ -1030,11 +1042,13 @@ BOOL WINAPI GetFileAttributesExW_hook(
     __in  GET_FILEEX_INFO_LEVELS fInfoLevelId,
     __out LPVOID lpFileInformation)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_READ);
-	return GetFileAttributesExW_orig(
+	DWORD attributes = GetFileAttributesExW_orig(
 		lpFileName,
 		fInfoLevelId,
 		lpFileInformation);
+	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
+		handle_file_w(lpFileName, NULL, ACCESS_READ);
+	return attributes;
 }
 
 __out HANDLE WINAPI FindFirstFileA_hook(
