@@ -301,10 +301,7 @@ void show_progress(int active, int job_time, int type)
 
 		color_set(stdout);
 		printf(" [%s%s%.*s%s%.*s] %3i%%", color_type(type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill, sum*100/total);
-		if(sum == total)
-			printf("\n");
-		else
-			is_active = 1;
+		is_active = 1;
 		fflush(stdout);
 	}
 }
