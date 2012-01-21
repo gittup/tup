@@ -356,6 +356,7 @@ static int graph(int argc, char **argv)
 	int show_dirs;
 	int show_ghosts;
 	int show_env;
+	int default_graph = 1;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -372,12 +373,6 @@ static int graph(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
-	if(argc == 1) {
-		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_CREATE) < 0)
-			return -1;
-		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
-			return -1;
-	}
 	for(x=1; x<argc; x++) {
 		struct tup_entry *tent;
 
@@ -409,6 +404,13 @@ static int graph(int argc, char **argv)
 			TAILQ_REMOVE(&g.node_list, n, list);
 			TAILQ_INSERT_HEAD(&g.plist, n, list);
 		}
+		default_graph = 0;
+	}
+	if(default_graph) {
+		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_CREATE) < 0)
+			return -1;
+		if(tup_db_select_node_by_flags(graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
+			return -1;
 	}
 
 	while(!TAILQ_EMPTY(&g.plist)) {
