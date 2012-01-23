@@ -509,12 +509,12 @@ static int master_fork_loop(void)
 		if(close(vardict_fd) < 0)
 			perror("close(vardict_fd)");
 	if(in_valgrind) {
-		if(close(0) < 0)
-			perror("close(0)");
-		if(close(1) < 0)
-			perror("close(1)");
-		if(close(2) < 0)
-			perror("close(2)");
+		if(close(STDIN_FILENO) < 0)
+			perror("close(STDIN_FILENO)");
+		if(close(STDOUT_FILENO) < 0)
+			perror("close(STDOUT_FILENO)");
+		if(close(STDERR_FILENO) < 0)
+			perror("close(STDERR_FILENO)");
 	}
 	free(cmd);
 	free(env);
