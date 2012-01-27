@@ -37,7 +37,6 @@ mingwsrcs += src/inih/*.omingw
 mingwsrcs += src/sqlite3/*.omingw
 mingwsrcs += src/compat/*.omingw
 mingwsrcs += src/compat/win32/*.omingw
-MINGWLDFLAGS += -lws2_32
 MINGWLDFLAGS += -Wl,--wrap=open
 MINGWLDFLAGS += -Wl,--wrap=close
 MINGWLDFLAGS += -Wl,--wrap=tmpfile

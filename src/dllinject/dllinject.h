@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2010  James McKaskill
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -36,14 +36,11 @@ extern "C" {
 DLLINJECT_API BOOL WINAPI DllMain(HANDLE HDllHandle, DWORD Reason, LPVOID Reserved);
 
 typedef struct remote_thread_t remote_thread_t;
-DLLINJECT_API DWORD tup_inject_init(remote_thread_t* r);
+DLLINJECT_API DWORD tup_inject_init(remote_thread_t *r);
 
-DLLINJECT_API void tup_inject_setexecdir(
-	const char* dir);
+DLLINJECT_API void tup_inject_setexecdir(const char *dir);
 
-DLLINJECT_API int tup_inject_dll(
-	LPPROCESS_INFORMATION process,
-	unsigned short udp_port);
+DLLINJECT_API int tup_inject_dll(LPPROCESS_INFORMATION process, const char *depfilename);
 
 #ifdef __cplusplus
 }

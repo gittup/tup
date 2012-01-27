@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -38,14 +38,10 @@ enum access_type {
 	ACCESS_RENAME,
 	ACCESS_UNLINK,
 	ACCESS_VAR,
-	ACCESS_STOP_SERVER,
 };
 
 /** Structure sent across the unix socket to notify the main wrapper of any
  * file accesses.
- *
- * Also note that the wrapper server relies on only being able to send the
- * access_type set to ACCESS_STOP_SERVER and no additional data.
  */
 struct access_event {
 	/** This field must always be set to one of the values in the

@@ -32,12 +32,13 @@
 
 #define TUP_TMP ".tup/tmp"
 
-static int start_server(struct server *s);
-static int stop_server(struct server *s);
-static void *message_thread(void *arg);
+static int initialize_depfile(struct server *s, char *depfile);
+static int process_depfile(struct server *s, const char *depfile);
 static int server_inited = 0;
 static BOOL WINAPI console_handler(DWORD cevent);
 static sig_atomic_t event_got = -1;
+
+static char tuptmpdir[PATH_MAX];
 
 int server_pre_init(void)
 {
@@ -54,6 +55,7 @@ int server_init(enum server_mode mode)
 	char *slash;
 	char mycwd[PATH_MAX];
 	struct flist f = {0, 0, 0};
+	int cwdlen;
 
 	if(mode) {/* unused */}
 
@@ -70,7 +72,19 @@ int server_init(enum server_mode mode)
 	}
 
 	tup_inject_setexecdir(mycwd);
-	server_inited = 1;
+
+	if(getcwd(tuptmpdir, sizeof(tuptmpdir)) == NULL) {
+		perror("getcwd");
+		return -1;
+	}
+	cwdlen = strlen(tuptmpdir);
+	/* 64 is generous room for the "\deps-%i" for depfiles */
+	if(cwdlen + 1 + sizeof(TUP_TMP) + 64 >= sizeof(tuptmpdir)) {
+		fprintf(stderr, "tup error: tuptmpdir[] is sized incorrectly for .tup/tmp\n");
+		return -1;
+	}
+	tuptmpdir[cwdlen] = '\\';
+	memcpy(tuptmpdir + cwdlen + 1, ".tup\\tmp", sizeof(TUP_TMP));
 
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
@@ -112,6 +126,7 @@ int server_init(enum server_mode mode)
 		return -1;
 	}
 
+	server_inited = 1;
 	return 0;
 }
 
@@ -205,6 +220,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	size_t cmdsz = sizeof(CMDSTR) - 1;
 	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
 	char buf[64];
+	char depfile[PATH_MAX];
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
 		|| strncmp(cmd, "cmd ", 4) == 0;
@@ -218,7 +234,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int need_sh = strncmp(cmd, "./", 2) == 0;
 	if(dtent) {}
 
-	if(start_server(s) < 0) {
+	if(initialize_depfile(s, depfile) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		return -1;
 	}
@@ -253,7 +269,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 	pthread_mutex_unlock(&dir_mutex);
 
-	if(tup_inject_dll(&pi, s->udp_port)) {
+	if(tup_inject_dll(&pi, depfile)) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to inject dll: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);
@@ -307,8 +323,12 @@ end:
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 
-	if(stop_server(s) < 0) {
+	if(process_depfile(s, depfile) < 0) {
 		return -1;
+	}
+	if(unlink(depfile) < 0) {
+		perror(depfile);
+		fprintf(stderr, "tup error: Unable to unlink depfile\n");
 	}
 	return rc;
 
@@ -362,178 +382,109 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
-static int connect_udp(int socks[2])
+static int initialize_depfile(struct server *s, char *depfile)
 {
-	int port;
-	int sasz;
-	struct sockaddr_in sa;
-	socks[0] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	socks[1] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	HANDLE h;
 
-	if(socks[0] < 0 || socks[1] < 0) {
+	snprintf(depfile, PATH_MAX, "%s\\deps-%i", tuptmpdir, s->id);
+	depfile[PATH_MAX-1] = 0;
+
+	h = CreateFile(depfile, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+	if(!h) {
+		perror(depfile);
+		fprintf(stderr, "tup error: Unable to create temporary file for dependency storage\n");
 		return -1;
 	}
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	sa.sin_port = 0;
-
-	if(bind(socks[0], (struct sockaddr*) &sa, sizeof(struct sockaddr_in))) {
-		goto err;
-	}
-
-	sasz = sizeof(struct sockaddr_in);
-	if(getsockname(socks[0], (struct sockaddr*) &sa, &sasz) || sasz != sizeof(struct sockaddr_in)) {
-		goto err;
-	}
-
-	port = ntohs(sa.sin_port);
-
-	if(connect(socks[1], (struct sockaddr*) &sa, sizeof(struct sockaddr_in))) {
-		goto err;
-	}
-
-	return port;
-
-err:
-	close(socks[1]);
-	close(socks[0]);
-	return -1;
-}
-
-static int start_server(struct server *s)
-{
-	WSADATA wsadata;
-	WSAStartup(MAKEWORD(2,2), &wsadata);
-
-	s->udp_port = connect_udp(s->sd);
-	if(s->udp_port < 0) {
-		fprintf(stderr, "Failed to open UDP port\n");
-		return -1;
-	}
-
-	init_file_info(&s->finfo);
-
-	if(pthread_create(&s->tid, NULL, &message_thread, s) < 0) {
-		perror("pthread_create");
-		close(s->sd[0]);
-		close(s->sd[1]);
-		return -1;
-	}
-
+	/* We just want the file to be created here since it's easier to display the error. The
+	 * file is re-opened in the dllinject code in append mode.
+	 */
+	CloseHandle(h);
 	return 0;
 }
 
-static int stop_server(struct server *s)
+static int process_depfile(struct server *s, const char *depfile)
 {
-	void *retval = NULL;
-	struct access_event e;
-	int rc;
+	char event1[PATH_MAX];
+	char event2[PATH_MAX];
+	FILE *f;
 
-	memset(&e, 0, sizeof(e));
-	e.at = ACCESS_STOP_SERVER;
-
-	rc = send(s->sd[1], (const char*) &e, sizeof(e), 0);
-	if(rc != sizeof(e)) {
-		perror("send");
+	f = fopen(depfile, "rb");
+	if(!f) {
+		perror(depfile);
+		fprintf(stderr, "tup error: Unable to open dependency file for post-processing.\n");
 		return -1;
 	}
-	pthread_join(s->tid, &retval);
-	if(close(s->sd[0]) < 0) {
-		perror("close(s->sd[0])");
-		return -1;
-	}
-	if(close(s->sd[1]) < 0) {
-		perror("close(s->sd[1])");
-		return -1;
-	}
-	s->sd[0] = INVALID_SOCKET;
-	s->sd[1] = INVALID_SOCKET;
-
-	WSACleanup();
-
-	if(retval == NULL)
-		return 0;
-	return -1;
-}
-
-static void *message_thread(void *arg)
-{
-	int recvd;
-	char buf[ACCESS_EVENT_MAX_SIZE];
-	struct server *s = arg;
-
 	while(1) {
-		struct access_event* event = (struct access_event*) buf;
-		char *event1, *event2;
+		struct access_event event;
 
-		recvd = recv(s->sd[0], buf, sizeof(buf), 0);
-		if(recvd < (int) sizeof(struct access_event)) {
-			perror("recv");
+		if(fread(&event, sizeof(event), 1, f) != 1) {
+			if(!feof(f)) {
+				perror("fread");
+				fprintf(stderr, "tup error: Unable to read the access_event structure from the dependency file.\n");
+				return -1;
+			}
 			break;
 		}
 
-		if(event->at == ACCESS_STOP_SERVER)
-			break;
-
-		if(event->at > ACCESS_STOP_SERVER) {
-			fprintf(stderr, "Error: Received unknown access_type %d\n", event->at);
-			return (void*)-1;
-		}
-
-		if(!event->len)
+		if(!event.len)
 			continue;
 
-		if(event->len >= PATH_MAX - 1) {
-			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event->len);
-			return (void*)-1;
+		if(event.len >= PATH_MAX - 1) {
+			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len);
+			return -1;
 		}
-		if(event->len2 >= PATH_MAX - 1) {
-			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event->len2);
-			return (void*)-1;
-		}
-
-		event1 = (char*) event + sizeof(struct access_event);
-		event2 = event1 + event->len + 1;
-
-		if(recvd != (int) sizeof(struct access_event) + event->len + event->len2 + 2) {
-			fprintf(stderr, "Error: Received weird size in access_event\n");
-			return (void*)-1;
+		if(event.len2 >= PATH_MAX - 1) {
+			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len2);
+			return -1;
 		}
 
-		if(event1[event->len] != '\0' || event2[event->len2] != '\0') {
+		if(fread(&event1, event.len + 1, 1, f) != 1) {
+			perror("fread");
+			fprintf(stderr, "tup error: Unable to read the first event from the dependency file.\n");
+			return -1;
+		}
+		if(fread(&event2, event.len2 + 1, 1, f) != 1) {
+			perror("fread");
+			fprintf(stderr, "tup error: Unable to read the second event from the dependency file.\n");
+			return -1;
+		}
+
+		if(event1[event.len] != '\0' || event2[event.len2] != '\0') {
 			fprintf(stderr, "Error: Missing null terminator in access_event\n");
-			return (void*)-1;
+			return -1;
 		}
 
-		if(event->at == ACCESS_WRITE) {
+		if(event.at == ACCESS_WRITE) {
 			struct mapping *map;
 
 			map = malloc(sizeof *map);
 			if(!map) {
 				perror("malloc");
-				return (void*)-1;
+				return -1;
 			}
 			map->realname = strdup(event1);
 			if(!map->realname) {
 				perror("strdup");
-				return (void*)-1;
+				return -1;
 			}
 			map->tmpname = strdup(event1);
 			if(!map->tmpname) {
 				perror("strdup");
-				return (void*)-1;
+				return -1;
 			}
 			map->tent = NULL; /* This is used when saving deps */
 			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
 		}
-		if(handle_file(event->at, event1, event2, &s->finfo) < 0) {
-			fprintf(stderr, "message_thread end\n");
-			return (void*)-1;
+		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
+			fprintf(stderr, "Error: Failed to call handle_file on event '%s'\n", event1);
+			return -1;
 		}
 	}
-	return NULL;
+	if(fclose(f) < 0) {
+		perror("fclose");
+		return -1;
+	}
+	return 0;
 }
 
 static BOOL WINAPI console_handler(DWORD cevent)

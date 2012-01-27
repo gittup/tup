@@ -39,13 +39,6 @@ struct server {
 	int output_fd;
 	int error_fd;
 	pthread_mutex_t *error_mutex;
-
-#ifdef _WIN32
-	/* TODO: Unify servers */
-	int udp_port;
-	int sd[2];
-	pthread_t tid;
-#endif
 };
 
 struct parser_entry {

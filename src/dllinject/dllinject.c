@@ -431,7 +431,38 @@ static remove_t				remove_orig;
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
 
-static unsigned short s_udp_port;
+static char s_depfilename[PATH_MAX];
+static FILE *depf;
+
+static int writef(const char *data, unsigned int len)
+{
+	long int tmp;
+	HANDLE h;
+	OVERLAPPED wtf;
+	int rc = 0;
+
+	memset(&wtf, 0, sizeof(wtf));
+
+	tmp = _get_osfhandle(_fileno(depf));
+	h = (HANDLE)tmp;
+	if(LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &wtf) == 0) {
+		DEBUG_HOOK("Lockfile failed\n");
+		return -1;
+	}
+	if(fseek(depf, 0, SEEK_END) < 0) {
+		DEBUG_HOOK("fseek failure\n");
+		return -1;
+	}
+	if(fwrite(data, 1, len, depf) != len) {
+		DEBUG_HOOK("failed to write %i bytes\n", len);
+		rc = -1;
+	}
+	if(UnlockFile(h, 0, 0, 1, 0) == 0) {
+		DEBUG_HOOK("UnlockFile failed\n");
+		return -1;
+	}
+	return rc;
+}
 
 /* -------------------------------------------------------------------------- */
 
@@ -1122,7 +1153,7 @@ BOOL WINAPI CreateProcessA_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1164,7 +1195,7 @@ BOOL WINAPI CreateProcessW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1207,7 +1238,7 @@ BOOL WINAPI CreateProcessAsUserA_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1250,7 +1281,7 @@ BOOL WINAPI CreateProcessAsUserW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1293,7 +1324,7 @@ BOOL WINAPI CreateProcessWithLogonW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1332,7 +1363,7 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_udp_port);
+	tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1380,7 +1411,7 @@ struct remote_thread_t
 {
 	LoadLibraryA_t load_library;
 	GetProcAddress_t get_proc_address;
-	unsigned short udp_port;
+	char depfilename[MAX_PATH];
 	char execdir[MAX_PATH];
 	char dll_name[MAX_PATH];
 	char func_name[256];
@@ -1547,8 +1578,6 @@ void tup_inject_setexecdir(const char* dir)
 
 /* -------------------------------------------------------------------------- */
 
-static SOCKET sock = INVALID_SOCKET;
-
 const char *strcasestr(const char *arg1, const char *arg2)
 {
 	const char *a, *b;
@@ -1689,7 +1718,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	int ret;
 	if(line) {}
 
-	if (ignore_file(file) || ignore_file(file2) || sock == INVALID_SOCKET)
+	if (ignore_file(file) || ignore_file(file2) || depf == NULL)
 		return;
 
 	e->at = at;
@@ -1705,8 +1734,8 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	*(dest++) = '\0';
 
 	DEBUG_HOOK("%s: '%s' '%s'\n", access_type_name[at], file, file2);
-	ret = send(sock, (char*) e, dest - (char*) e, 0);
-	DEBUG_HOOK("send %d\n", ret);
+	ret = writef((char*) e, dest - (char*) e);
+	DEBUG_HOOK("writef %d\n", ret);
 }
 
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at)
@@ -1720,7 +1749,7 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	char* dest = (char*) (e + 1);
 	int ret;
 
-	if (ignore_file_w(file) || ignore_file_w(file2) || sock == INVALID_SOCKET)
+	if (ignore_file_w(file) || ignore_file_w(file2) || depf == NULL)
 		return;
 
 	e->at = at;
@@ -1739,34 +1768,18 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	*(dest++) = '\0';
 
 	DEBUG_HOOK("%s [wide, %i, %i]: '%S', '%S'\n", access_type_name[at], e->len, e->len2, file, file2);
-	ret = send(sock, (char*) e, dest - (char*) e, 0);
-	DEBUG_HOOK("send [wide] %d\n", ret);
+	ret = writef((char*) e, dest - (char*) e);
+	DEBUG_HOOK("writef [wide] %d\n", ret);
 }
 
-static int connect_udp(unsigned short udp_port)
+static int open_file(const char *depfilename)
 {
-	struct sockaddr_in sa;
-	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-	if (sock == INVALID_SOCKET) {
+	depf = fopen(depfilename, "ab");
+	if(!depf) {
+		perror(depfilename);
 		return -1;
 	}
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	sa.sin_port = htons(udp_port);
-
-	DEBUG_HOOK("Connecting to udp localhost %d\n", udp_port);
-	if (connect(sock, (struct sockaddr*) &sa, sizeof(struct sockaddr_in))) {
-		goto err;
-	}
-
 	return 0;
-
-err:
-	closesocket(sock);
-	return -1;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1789,7 +1802,6 @@ DWORD tup_inject_init(remote_thread_t* r)
 	size_t i;
 	DWORD modnum;
 	HMODULE modules[256];
-	WSADATA wsa_data;
 	char filename[MAX_PATH];
 
 	if (initialised)
@@ -1807,12 +1819,12 @@ DWORD tup_inject_init(remote_thread_t* r)
 		return 1;
 	}
 
-	DEBUG_HOOK("Inside tup_dllinject_init '%s' '%s' '%s' '%s' %d\n",
+	DEBUG_HOOK("Inside tup_dllinject_init '%s' '%s' '%s' '%s' '%s'\n",
 		filename,
 		r->execdir,
 		r->dll_name,
 		r->func_name,
-		(int) r->udp_port);
+		r->depfilename);
 
 	DEBUG_HOOK("%d: %s\n", GetCurrentProcessId(), GetCommandLineA());
 
@@ -1824,13 +1836,10 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	tup_inject_setexecdir(r->execdir);
 
-	if (WSAStartup(MAKEWORD(2, 2), &wsa_data))
+	if (open_file(r->depfilename))
 		return 1;
 
-	if (connect_udp(r->udp_port))
-		return 1;
-
-	s_udp_port = r->udp_port;
+	strcpy(s_depfilename, r->depfilename);
 
 	handle_file(filename, NULL, ACCESS_READ);
 
@@ -1871,7 +1880,7 @@ static void remote_thread_end(void)
 
 int tup_inject_dll(
 	LPPROCESS_INFORMATION lpProcessInformation,
-	unsigned short udp_port)
+	const char *depfilename)
 {
 	remote_thread_t remote;
 	char* remote_data;
@@ -1886,18 +1895,18 @@ int tup_inject_dll(
 	kernel32 = LoadLibraryA("kernel32.dll");
 	remote.load_library = (LoadLibraryA_t) GetProcAddress(kernel32, "LoadLibraryA");
 	remote.get_proc_address = (GetProcAddress_t) GetProcAddress(kernel32, "GetProcAddress");
-	remote.udp_port = udp_port;
+	strcpy(remote.depfilename, depfilename);
 	strcat(remote.execdir, execdir);
 	strcat(remote.dll_name, execdir);
 	strcat(remote.dll_name, "\\");
 	strcat(remote.dll_name, "tup-dllinject.dll");
 	strcat(remote.func_name, "tup_inject_init");
 
-	DEBUG_HOOK("Injecting dll '%s' '%s' %s' %d\n",
+	DEBUG_HOOK("Injecting dll '%s' '%s' %s' '%s'\n",
 		remote.execdir,
 		remote.dll_name,
 		remote.func_name,
-		udp_port);
+		remote.depfilename);
 
 	process = lpProcessInformation->hProcess;
 
