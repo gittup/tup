@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,7 +48,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 			 */
 			return 0;
 		} else {
-			fprintf(stderr, "tup monitor error: fstatat failed\n");
+			fprintf(stderr, "tup error: fstatat failed\n");
 			perror(file);
 			return -1;
 		}
@@ -91,7 +91,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {
-			fprintf(stderr, "tup monitor error: Unable to openat() directory.\n");
+			fprintf(stderr, "tup error: Unable to openat() directory.\n");
 			perror(file);
 			return -1;
 		}
