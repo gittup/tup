@@ -20,8 +20,12 @@ srcs += src/inih/*.o
 srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
+ifeq (@(TUP_SUDO_SUID),y)
+suid = ; sudo chown root:root tup; sudo chmod u+s tup
+endif
+
 LDFLAGS += `pkg-config fuse --libs`
-: src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) |> tup tup-version.o
+: src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | gcc -x c -c - -o tup-version.o; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
 
 ifneq (@(TUP_MINGW),)
 : src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
