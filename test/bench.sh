@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # This script is used to see how various parts of tup scale, or how tup changes
 # between versions.
 #
