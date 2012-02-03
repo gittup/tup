@@ -7,7 +7,7 @@ echo "int main(void) {}" >> 1.c
 tup upd
 seq 1 $1 | sed 's/$/.c/' | xargs tup touch
 tup upd
-if nm prog | grep main > /dev/null; then
+if nm prog.exe | grep main > /dev/null; then
 	:
 else
 	echo "Main program not built!" 1>&2
