@@ -738,12 +738,13 @@ static int node(int argc, char **argv)
 {
 	int x;
 	tupid_t sub_dir_dt;
+
+	if(tup_db_begin() < 0)
+		return -1;
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
 
-	if(tup_db_begin() < 0)
-		return -1;
 	for(x=1; x<argc; x++) {
 		tupid_t dt;
 		struct path_element *pel = NULL;
