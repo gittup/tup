@@ -302,7 +302,7 @@ static int delete_files(struct graph *g)
 		} else {
 			/* Only delete if the file wasn't modified (t6031) */
 			show_result(tent, 0, NULL);
-			show_progress(-1, -1, TUP_NODE_GENERATED);
+			show_progress(-1, TUP_NODE_GENERATED);
 			if(delete_file(tent->dt, tent->name.s) < 0)
 				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
@@ -320,7 +320,7 @@ static int delete_files(struct graph *g)
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			goto out_err;
 		show_result(tent, 0, NULL);
-		show_progress(-1, -1, TUP_NODE_FILE);
+		show_progress(-1, TUP_NODE_FILE);
 	}
 
 	if(g->cmd_delete_count) {
@@ -341,7 +341,7 @@ static int delete_files(struct graph *g)
 		/* Use TUP_NODE_GENERATED to make the bar purple since
 		 * we are deleting (not executing) commands.
 		 */
-		show_progress(-1, -1, TUP_NODE_GENERATED);
+		show_progress(-1, TUP_NODE_GENERATED);
 		tupid_tree_rm(&g->cmd_delete_root, tt);
 		free(te);
 	}
@@ -870,7 +870,7 @@ static void *create_work(void *arg)
 			} else {
 				rc = parse(n, g);
 			}
-			show_progress(-1, -1, TUP_NODE_DIR);
+			show_progress(-1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
@@ -893,7 +893,6 @@ static void *update_work(void *arg)
 	struct worker_thread *wt = arg;
 	struct node *n;
 	static int jobs_active = 0;
-	static time_t job_time = 0;
 
 	while(1) {
 		struct edge *e;
@@ -904,18 +903,23 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
+			/* n->tent->mtime is updated in update(), so we need to
+			 * cache the old value here since we base progress
+			 * based on the previous values to accommodate things
+			 * like the current cpu load.
+			 */
 			time_t mtime = n->tent->mtime;
 			pthread_mutex_lock(&display_mutex);
 			jobs_active++;
-			show_progress(jobs_active, job_time, TUP_NODE_CMD);
+			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
+			add_progress_job_time(mtime);
 			jobs_active--;
-			job_time += mtime;
-			show_progress(jobs_active, job_time, TUP_NODE_CMD);
+			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
 
 			/* If the command succeeds, mark any next commands (ie:

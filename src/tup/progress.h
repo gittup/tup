@@ -32,7 +32,8 @@ void tup_main_progress(const char *s);
 void start_progress(int new_total, int new_total_time, int new_max_jobs);
 void skip_result(void);
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts);
-void show_progress(int active, int job_time, int type);
+void add_progress_job_time(int mtime);
+void show_progress(int active, int type);
 void clear_active(FILE *f);
 void clear_progress(void);
 

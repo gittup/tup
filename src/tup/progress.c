@@ -33,6 +33,7 @@
 static int cur_phase = -1;
 static int sum;
 static int total;
+static int job_time;
 static int total_time;
 static int max_jobs;
 static int is_active = 0;
@@ -113,6 +114,7 @@ void start_progress(int new_total, int new_total_time, int new_max_jobs)
 
 	sum = 0;
 	total = new_total;
+	job_time = 0;
 	total_time = new_total_time;
 	max_jobs = new_max_jobs;
 
@@ -142,6 +144,21 @@ void skip_result(void)
 	sum++;
 }
 
+static int percent_complete(void)
+{
+	if(!total)
+		return 0;
+	/* Use the job times if we have them available since it will report
+	 * a more accurate percentage complete than just the job count.
+	 */
+	if(total_time > 0) {
+		return (job_time*100)/total_time;
+	}
+
+	/* Default to job count if we can't use previous execution times. */
+	return (sum*100)/total;
+}
+
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 {
 	FILE *f;
@@ -168,7 +185,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	/* If we aren't going to show a progress bar, then %-complete here is
 	 * helpful.
 	 */
-	if(total && !display_progress) fprintf(f, "%3i%% ", sum*100/total);
+	if(total && !display_progress) fprintf(f, "%3i%% ", percent_complete());
 	if(display_job_numbers) fprintf(f, "%i) ", sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
@@ -225,7 +242,12 @@ static int get_time_remaining(char *dest, int len, int part, int whole, int appr
 	return snprintf(dest, len, "ETA%s???", eq);
 }
 
-void show_progress(int active, int job_time, int type)
+void add_progress_job_time(int mtime)
+{
+	job_time += mtime;
+}
+
+void show_progress(int active, int type)
 {
 	int console_width = tup_option_get_int("display.width");
 	if(total && display_progress && console_width >= 10) {
@@ -300,7 +322,7 @@ void show_progress(int active, int job_time, int type)
 		}
 
 		color_set(stdout);
-		printf(" [%s%s%.*s%s%.*s] %3i%%", color_type(type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill, sum*100/total);
+		printf(" [%s%s%.*s%s%.*s] %3i%%", color_type(type), color_append_reverse(), fill, buf, color_end(), max-fill, buf+fill, percent_complete());
 		is_active = 1;
 		fflush(stdout);
 	}
