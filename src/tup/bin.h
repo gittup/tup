@@ -35,7 +35,7 @@ TAILQ_HEAD(bin_entry_head, bin_entry);
 
 struct bin {
 	LIST_ENTRY(bin) list;
-	const char *name;
+	char *name;
 	struct bin_entry_head entries;
 };
 LIST_HEAD(bin_head, bin);

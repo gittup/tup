@@ -35,6 +35,7 @@ void bin_list_del(struct bin_head *head)
 			free(be);
 		}
 		LIST_REMOVE(b, list);
+		free(b->name);
 		free(b);
 	}
 }
@@ -42,6 +43,7 @@ void bin_list_del(struct bin_head *head)
 struct bin *bin_add(const char *name, struct bin_head *head)
 {
 	struct bin *b;
+	int name_len;
 
 	b = bin_find(name, head);
 	if(b)
@@ -52,9 +54,20 @@ struct bin *bin_add(const char *name, struct bin_head *head)
 		perror("malloc");
 		return NULL;
 	}
-	b->name = name;
+
+	name_len = strlen(name);
+	b->name = malloc(name_len + 1);
+	if (!b->name) {
+	    perror("malloc");
+	    free(b);
+	    return NULL;
+	}
+	memcpy(b->name, name, name_len);
+	b->name[name_len] = 0;
+
 	TAILQ_INIT(&b->entries);
 	LIST_INSERT_HEAD(head, b, list);
+
 	return b;
 }
 
