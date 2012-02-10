@@ -903,12 +903,6 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
-			/* n->tent->mtime is updated in update(), so we need to
-			 * cache the old value here since we base progress
-			 * based on the previous values to accommodate things
-			 * like the current cpu load.
-			 */
-			time_t mtime = n->tent->mtime;
 			pthread_mutex_lock(&display_mutex);
 			jobs_active++;
 			show_progress(jobs_active, TUP_NODE_CMD);
@@ -917,7 +911,6 @@ static void *update_work(void *arg)
 			rc = update(n);
 
 			pthread_mutex_lock(&display_mutex);
-			add_progress_job_time(mtime);
 			jobs_active--;
 			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
@@ -1028,6 +1021,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	FILE *f;
 	int is_err = 1;
 	struct timespan *show_ts = NULL;
+	time_t ms;
 
 	f = tmpfile();
 	if(!f) {
@@ -1041,17 +1035,12 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
-				time_t ms;
-
 				timespan_end(ts);
 				show_ts = ts;
 				ms = timespan_milliseconds(ts);
 
 				/* Hooray! */
 				is_err = 0;
-				if(tent->mtime != ms)
-					if(tup_db_set_mtime(tent, ms) < 0)
-						is_err = 1; /* Un-Hooray :( */
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
@@ -1086,8 +1075,12 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		perror("fclose");
 		return -1;
 	}
+
 	if(is_err)
 		return -1;
+	if(tent->mtime != ms)
+		if(tup_db_set_mtime(tent, ms) < 0)
+			return -1;
 	return 0;
 }
 

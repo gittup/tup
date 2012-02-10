@@ -164,6 +164,8 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts)
 	FILE *f;
 	float tdiff = 0.0;
 
+	job_time += tent->mtime;
+
 	if(ts) {
 		tdiff = timespan_seconds(ts);
 	}
@@ -240,11 +242,6 @@ static int get_time_remaining(char *dest, int len, int part, int whole, int appr
 		}
 	}
 	return snprintf(dest, len, "ETA%s???", eq);
-}
-
-void add_progress_job_time(int mtime)
-{
-	job_time += mtime;
 }
 
 void show_progress(int active, int type)
