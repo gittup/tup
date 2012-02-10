@@ -432,34 +432,20 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
 
 static char s_depfilename[PATH_MAX];
-static FILE *depf;
+static HANDLE deph = INVALID_HANDLE_VALUE;
 
 static int writef(const char *data, unsigned int len)
 {
-	long int tmp;
-	HANDLE h;
-	OVERLAPPED wtf;
 	int rc = 0;
+	DWORD num_written;
 
-	memset(&wtf, 0, sizeof(wtf));
-
-	tmp = _get_osfhandle(_fileno(depf));
-	h = (HANDLE)tmp;
-	if(LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &wtf) == 0) {
-		DEBUG_HOOK("Lockfile failed\n");
-		return -1;
-	}
-	if(fseek(depf, 0, SEEK_END) < 0) {
-		DEBUG_HOOK("fseek failure\n");
-		return -1;
-	}
-	if(fwrite(data, 1, len, depf) != len) {
+	if(!WriteFile(deph, data, len, &num_written, NULL)) {
 		DEBUG_HOOK("failed to write %i bytes\n", len);
 		rc = -1;
 	}
-	if(UnlockFile(h, 0, 0, 1, 0) == 0) {
-		DEBUG_HOOK("UnlockFile failed\n");
-		return -1;
+	if(num_written != len) {
+		DEBUG_HOOK("failed to write exactly %i bytes\n", len);
+		rc = -1;
 	}
 	return rc;
 }
@@ -1718,7 +1704,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	int ret;
 	if(line) {}
 
-	if (ignore_file(file) || ignore_file(file2) || depf == NULL)
+	if (ignore_file(file) || ignore_file(file2) || deph == INVALID_HANDLE_VALUE)
 		return;
 
 	e->at = at;
@@ -1749,7 +1735,7 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	char* dest = (char*) (e + 1);
 	int ret;
 
-	if (ignore_file_w(file) || ignore_file_w(file2) || depf == NULL)
+	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
 		return;
 
 	e->at = at;
@@ -1774,8 +1760,8 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 
 static int open_file(const char *depfilename)
 {
-	depf = fopen(depfilename, "ab");
-	if(!depf) {
+	deph = CreateFile(depfilename, FILE_APPEND_DATA, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	if(deph == INVALID_HANDLE_VALUE) {
 		perror(depfilename);
 		return -1;
 	}
