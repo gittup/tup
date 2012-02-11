@@ -20,11 +20,13 @@
 
 #define _POSIX_C_SOURCE 200809L
 #define _ATFILE_SOURCE
+#define _GNU_SOURCE
 #ifdef linux
 /* For pread()/pwrite() */
 #define _XOPEN_SOURCE 500
 #endif
 
+#include "compat/utimensat.h"
 #include "tup_fuse_fs.h"
 #include "tup/config.h"
 #include "tup/debug.h"
@@ -35,6 +37,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
+#include <sys/types.h>
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
