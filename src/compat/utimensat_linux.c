@@ -19,6 +19,7 @@
  */
 
 #define _GNU_SOURCE
+#include "compat/utimensat.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
