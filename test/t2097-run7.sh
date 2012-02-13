@@ -20,11 +20,7 @@
 
 . ./tup.sh
 check_no_windows client, run-script
-
-if ! which python > /dev/null 2>&1; then
-	echo "[33mNo python found - skipping test.[0m"
-	eotup
-fi
+check_python
 
 cat > foo.py << HERE
 import tup_client

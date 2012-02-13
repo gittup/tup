@@ -444,6 +444,25 @@ check_no_windows()
 	esac
 }
 
+check_python()
+{
+	if ! which python > /dev/null 2>&1; then
+		echo "[33mNo python found - skipping test.[0m"
+		eotup
+	fi
+	# Need 2.6 for the -B flag
+	cat > ok.py << HERE
+import sys
+if sys.version_info < (2, 6):
+    sys.exit(1)
+sys.exit(0)
+HERE
+	if ! python ok.py; then
+		echo "[33mPython < version 2.6 found - skipping test.[0m"
+		eotup
+	fi
+}
+
 single_threaded()
 {
 	(echo "[updater]"; echo "num_jobs=1") >> .tup/options
