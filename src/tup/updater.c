@@ -1021,7 +1021,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	FILE *f;
 	int is_err = 1;
 	struct timespan *show_ts = NULL;
-	time_t ms;
+	time_t ms = -1;
 
 	f = tmpfile();
 	if(!f) {
