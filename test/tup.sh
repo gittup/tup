@@ -451,16 +451,17 @@ check_python()
 		eotup
 	fi
 	# Need 2.6 for the -B flag
-	cat > ok.py << HERE
+	cat > tmpversioncheck.py << HERE
 import sys
 if sys.version_info < (2, 6):
     sys.exit(1)
 sys.exit(0)
 HERE
-	if ! python ok.py; then
+	if ! python tmpversioncheck.py; then
 		echo "[33mPython < version 2.6 found - skipping test.[0m"
 		eotup
 	fi
+	rm tmpversioncheck.py
 }
 
 single_threaded()
