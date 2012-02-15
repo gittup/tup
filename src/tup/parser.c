@@ -722,6 +722,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		newline = strchr(p, '\n');
 		if(!newline) {
 			fprintf(tf->f, "tup error: Missing newline from :-rule in run script: '%s'\n", p);
+			goto out_err;
 		}
 		*newline = 0;
 		if(debug_run)
