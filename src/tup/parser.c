@@ -2556,6 +2556,10 @@ out_pl:
 		return -1;
 	if(tmptent) {
 		cmdid = tmptent->tnode.tupid;
+		if(tmptent->type != TUP_NODE_CMD) {
+			fprintf(stderr, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
+			return -1;
+		}
 	} else {
 		if(find_existing_command(&onl, &tf->g->cmd_delete_root, &cmdid) < 0)
 			return -1;

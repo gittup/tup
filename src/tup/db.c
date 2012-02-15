@@ -851,6 +851,38 @@ int tup_db_debug_add_all_ghosts(void)
 	return 0;
 }
 
+const char *tup_db_type(int type)
+{
+	const char *str;
+	switch(type) {
+		case TUP_NODE_FILE:
+			str = "file";
+			break;
+		case TUP_NODE_CMD:
+			str = "command";
+			break;
+		case TUP_NODE_DIR:
+			str = "directory";
+			break;
+		case TUP_NODE_VAR:
+			str = "@-variable";
+			break;
+		case TUP_NODE_GENERATED:
+			str = "generated file";
+			break;
+		case TUP_NODE_GHOST:
+			str = "ghost";
+			break;
+		case TUP_NODE_ROOT:
+			str = "graph root";
+			break;
+		default:
+			str = "unknown";
+			break;
+	}
+	return str;
+}
+
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
 {
 	return tup_db_create_node_part(dt, name, -1, type);
