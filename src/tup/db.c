@@ -3668,6 +3668,9 @@ static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_
 	}
 	if(!match) {
 		printf("Environment variable changed: %s\n", var);
+		/* Skip past the 'FOO=' part of the stored value if we have an old value to print */
+		printf(" - Old: '%s'\n", stored_value ? stored_value + varlen + 1: NULL);
+		printf(" - New: '%s'\n", env);
 		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 			return -1;
 		if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
