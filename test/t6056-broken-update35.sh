@@ -23,7 +23,7 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: |> find . > %o |> files.txt
+: |> (ls .tup/mnt 2>/dev/null || true) > %o |> files.txt
 HERE
 tup touch Tupfile
 update

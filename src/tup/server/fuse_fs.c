@@ -274,7 +274,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 */
 	finfo = get_finfo(path);
 	if(finfo) {
-		if(strcmp(peeled, ".tup") == 0) {
+		if(strcmp(peeled, ".tup") == 0 || strstr(peeled, "/.tup") != NULL) {
 			/* t6056 - don't allow sub-processes to mess with our
 			 * data.
 			 */
