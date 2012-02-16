@@ -24,8 +24,8 @@
 # unique constraint.
 #
 # In the test below, we have a './ok.sh' command node, and the touch command
-# points to the file 'c'. Then we try to change the command that points to
-# 'c' to be './ok.sh', so the rename fails. That shouldn't happen and instead
+# points to the file 'cwin'. Then we try to change the command that points to
+# 'cwin' to be './ok.sh', so the rename fails. That shouldn't happen and instead
 # we can just keep using the existing './ok.sh' and update the links
 # appropriately.
 
@@ -38,17 +38,17 @@ HERE
 chmod +x ok.sh
 cat > Tupfile << HERE
 : a |> ./ok.sh |> b
-: |> touch %o |> c
+: |> touch %o |> cwin
 HERE
 tup touch a ok.sh Tupfile
 update
 
 cat > ok.sh << HERE
 cat a
-touch c
+touch cwin
 HERE
 cat > Tupfile << HERE
-: a |> ./ok.sh |> c
+: a |> ./ok.sh |> cwin
 HERE
 tup touch Tupfile
 update
