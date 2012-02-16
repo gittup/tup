@@ -4261,6 +4261,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 }
 
 struct actual_input_data {
+	FILE *f;
 	tupid_t cmdid;
 	struct tupid_entries *sticky_root;
 	struct tupid_entries output_root;
@@ -4299,6 +4300,16 @@ static int new_normal_link(tupid_t tupid, void *data)
 		return 0;
 
 	if(tupid_tree_search(aid->sticky_root, tupid) == NULL) {
+		struct tup_entry *tent;
+
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_CMD) {
+			fprintf(aid->f, "tup error: Attempted to read from a file with the same name as an existing command string. Existing command is: ");
+			print_tup_entry(aid->f, tent);
+			fprintf(aid->f, "\n");
+			return -1;
+		}
 		/* Not a sticky link, insert it */
 		rc = link_insert(tupid, aid->cmdid, TUP_LINK_NORMAL);
 	} else {
@@ -4374,6 +4385,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 {
 	struct tupid_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
+		.f = f,
 		.cmdid = cmdid,
 		.sticky_root = sticky_root,
 		.output_root = {NULL},
