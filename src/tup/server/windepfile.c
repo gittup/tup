@@ -223,6 +223,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	char depfile[PATH_MAX];
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
+		|| strncmp(cmd, "bash ", 5) == 0
 		|| strncmp(cmd, "cmd ", 4) == 0;
 
 	int need_shell = strchr(cmd, '&') != NULL
