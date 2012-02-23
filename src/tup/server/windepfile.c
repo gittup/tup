@@ -226,13 +226,10 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		|| strncmp(cmd, "bash ", 5) == 0
 		|| strncmp(cmd, "cmd ", 4) == 0;
 
-	int need_shell = strchr(cmd, '&') != NULL
-		|| strchr(cmd, '|') != NULL
-		|| strchr(cmd, '>') != NULL
-		|| strchr(cmd, '<') != NULL
-		|| strncmp(cmd, "./", 2) == 0;
+	int need_sh = 0;
 
-	int need_sh = strncmp(cmd, "./", 2) == 0;
+	int need_cmd = 0;
+
 	if(dtent) {}
 
 	if(initialize_depfile(s, depfile) < 0) {
@@ -241,15 +238,19 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 
 	cmdline[0] = '\0';
-	/* Only pull in cmd if really necessary */
-	if(!have_shell && need_shell) {
+	/* Only pull in cmd/sh if really necessary */
+	if(!have_shell) {
+		need_sh = strncmp(cmd, "./", 2) == 0 ||
+			strchr(cmd, '`') != NULL;
+		need_cmd = strchr(cmd, '&') != NULL ||
+			strchr(cmd, '|') != NULL ||
+			strchr(cmd, '>') != NULL ||
+			strchr(cmd, '<') != NULL;
 		if(need_sh) {
 			strcat(cmdline, SHSTR);
-		} else {
+		} else if(need_cmd) {
 			strcat(cmdline, CMDSTR);
 		}
-	} else {
-		need_sh = 0;
 	}
 	strcat(cmdline, cmd);
 	if(need_sh) {
