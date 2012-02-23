@@ -4,6 +4,7 @@ ifeq (@(TUP_WWW),y)
 pages += index.html
 pages += getting_started.html
 pages += examples.html
+pages += manual.html
 pages += tips_and_tricks.html
 pages += make_vs_tup.html
 pages += tup_vs_mordor.html
@@ -25,6 +26,7 @@ endif
 : |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
 : examples.inc |> ^ GEN %o^ ./gen_menu.sh -x $(pages) > %o |> menu-examples.inc
 : |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
+: ../../tup.1 |> ^ man2html %o^ man2html %f > %o |> manual.html
 : foreach $(pages) | menu.inc menu-examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) $(flags_%B) %f > %o |> %f.gen
 : foreach $(examples) | menu-examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) -x %f > %o |> %f.gen
 
