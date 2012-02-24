@@ -30,6 +30,7 @@
 #include "tup/db.h"
 #include "tup/privs.h"
 #include "tup/progress.h"
+#include "tup/option.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -58,6 +59,7 @@ static struct sigaction sigact = {
 static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
+static int full_deps = 0;
 static struct parser_server *curps;
 static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -128,6 +130,8 @@ int server_init(enum server_mode mode)
 
 	if(server_inited)
 		return 0;
+
+	full_deps = tup_option_get_int("updater.full_deps");
 
 	null_fd = open("/dev/null", O_RDONLY);
 	if(null_fd < 0) {
@@ -347,7 +351,7 @@ static int virt_tup_close(struct parser_server *ps)
 }
 
 static int exec_internal(struct server *s, const char *cmd, struct tup_env *newenv,
-			 struct tup_entry *dtent, int single_output)
+			 struct tup_entry *dtent, int single_output, int do_chroot)
 {
 	int status;
 	char buf[64];
@@ -355,8 +359,10 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	char dir[PATH_MAX];
 	struct execmsg em;
 
+	memset(&em, 0, sizeof(em));
 	em.sid = s->id;
 	em.single_output = single_output;
+	em.do_chroot = do_chroot;
 	em.envlen = newenv->block_size;
 	em.num_env_entries = newenv->num_entries;
 	em.joblen = snprintf(job, sizeof(job), TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
@@ -447,7 +453,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
 
-	rc = exec_internal(s, cmd, newenv, dtent, 1);
+	rc = exec_internal(s, cmd, newenv, dtent, 1, full_deps);
 
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		return -1;
@@ -478,7 +484,7 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 	s.exit_status = 0;
 	s.signalled = 0;
 	tent = tup_entry_get(tupid);
-	if(exec_internal(&s, cmdline, &te, tent, 0) < 0)
+	if(exec_internal(&s, cmdline, &te, tent, 0, full_deps) < 0)
 		return -1;
 	environ_free(&te);
 

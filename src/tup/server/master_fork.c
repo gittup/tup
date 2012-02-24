@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -43,6 +43,7 @@ struct rcmsg {
 struct child_waiter {
 	pid_t pid;
 	tupid_t sid;
+	int do_chroot;
 	char dev[JOB_MAX];
 };
 
@@ -102,7 +103,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0};
 
 	if(!inited)
 		return 0;
@@ -212,7 +213,7 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 }
 
 static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
-			    const char *dev, int single_output)
+			    const char *dev, int single_output, int do_chroot)
 {
 	int ofd, efd;
 	char buf[64];
@@ -269,7 +270,11 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		}
 	}
 
-	if(tup_privileged()) {
+	if(do_chroot) {
+		if(!tup_privileged()) {
+			fprintf(stderr, "tup error: Trying to run sub-process in a chroot, but tup does not have sufficient permissions to do so. Please set the tup executable to be suid root, or if that is not an option then disable updater.full_deps\n");
+			return -1;
+		}
 #ifdef __APPLE__
 		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
 			perror("mount");
@@ -299,6 +304,10 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			return -1;
 		}
 	} else {
+		if(tup_privileged()) {
+			if(tup_drop_privs() < 0)
+				return -1;
+		}
 		if(chdir(job) < 0) {
 			perror("chdir");
 			fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
@@ -478,7 +487,7 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, waiter->dev, em.single_output) < 0)
+			if(setup_subprocess(em.sid, job, dir, waiter->dev, em.single_output, em.do_chroot) < 0)
 				exit(1);
 			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
@@ -486,6 +495,7 @@ static int master_fork_loop(void)
 		}
 		waiter->pid = pid;
 		waiter->sid = em.sid;
+		waiter->do_chroot = em.do_chroot;
 		pthread_create(&pt, &attr, child_waiter, waiter);
 	}
 
@@ -532,7 +542,7 @@ static void *child_waiter(void *arg)
 	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
 		perror("waitpid");
 	}
-	if(tup_privileged()) {
+	if(waiter->do_chroot && tup_privileged()) {
 		int rc;
 #ifdef __APPLE__
 		rc = unmount(waiter->dev, MNT_FORCE);
