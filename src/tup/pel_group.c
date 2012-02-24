@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -165,27 +165,29 @@ int get_path_elements(const char *dir, struct pel_group *pg)
 
 	if(pg->pg_flags & PG_ROOT) {
 		const char *top = get_tup_top();
+		int num_pels = 0;
 
-		do {
-			/* Returns are 0 here to indicate file is outside of
-			 * .tup
-			 */
-			if(TAILQ_EMPTY(&pg->path_list) || !is_path_sep(top)) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				return 0;
-			}
+		TAILQ_FOREACH(pel, &pg->path_list, list) {
 			while(*top && is_path_sep(top))
 				top++;
-			pel = TAILQ_FIRST(&pg->path_list);
 			if(name_cmp_n(top, pel->path, pel->len) != 0) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				del_pel_group(pg);
-				return 0;
+				break;
 			}
 			top += pel->len;
-
-			del_pel(pel, pg);
-		} while(*top);
+			num_pels++;
+		}
+		if(*top) {
+			pg->pg_flags |= PG_OUTSIDE_TUP;
+		} else {
+			/* If we're inside tup, remove the part of the path up to where the
+			 * .tup hierarchy starts.
+			 */
+			int x;
+			for(x=0; x<num_pels; x++) {
+				pel = TAILQ_FIRST(&pg->path_list);
+				del_pel(pel, pg);
+			}
+		}
 	}
 	return 0;
 }
