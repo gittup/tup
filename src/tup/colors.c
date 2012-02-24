@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -87,6 +87,10 @@ const char *color_type(int type)
 		case TUP_NODE_FILE:
 			/* If a generated node becomes a normal file (t6031) */
 			color = "[37";
+			break;
+		case TUP_NODE_GHOST:
+			/* Used for reporting external file modifications */
+			color="[0";
 			break;
 	}
 	return color;

@@ -190,7 +190,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		time_t mtime = -1;
 		if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
 			struct stat buf;
-			if(stat(full_path, &buf) == 0)
+			if(lstat(full_path, &buf) == 0)
 				mtime = buf.MTIME;
 		}
 		/* Note that full-path entries are always ghosts since we don't scan them. They

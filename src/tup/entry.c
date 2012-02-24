@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -204,9 +204,11 @@ static int print_tup_entry_internal(FILE *f, struct tup_entry *tent)
 	/* Skip empty entries, and skip '.' here (tent->parent == NULL) */
 	if(!tent || !tent->parent)
 		return 0;
-	if (print_tup_entry_internal(f, tent->parent))
+	if(print_tup_entry_internal(f, tent->parent))
 		fprintf(f, "%s", PATH_SEP_STR);
-	fprintf(f, "%s", tent->name.s);
+	/* Don't print anything for the slash root entry */
+	if(tent->name.s[0] != '/')
+		fprintf(f, "%s", tent->name.s);
 	return 1;
 }
 
@@ -217,7 +219,7 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 
 	if(!tent)
 		return;
-	if (print_tup_entry_internal(f, tent->parent)) {
+	if(print_tup_entry_internal(f, tent->parent)) {
 		const char *sep = tent->type == TUP_NODE_CMD ? ": " : PATH_SEP_STR;
 		fprintf(f, "%s", sep);
 	}
