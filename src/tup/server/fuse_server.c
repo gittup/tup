@@ -59,7 +59,6 @@ static struct sigaction sigact = {
 static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
-static int full_deps = 0;
 static struct parser_server *curps;
 static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -130,8 +129,6 @@ int server_init(enum server_mode mode)
 
 	if(server_inited)
 		return 0;
-
-	full_deps = tup_option_get_int("updater.full_deps");
 
 	null_fd = open("/dev/null", O_RDONLY);
 	if(null_fd < 0) {
@@ -444,7 +441,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 }
 
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent)
+		struct tup_entry *dtent, int full_deps)
 {
 	int rc;
 
@@ -473,6 +470,7 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 	struct tup_entry *tent;
 	struct server s;
 	struct tup_env te;
+	int full_deps = tup_option_get_int("updater.full_deps");
 
 	if(tup_db_get_environ(env_root, NULL, &te) < 0)
 		return -1;

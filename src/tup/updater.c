@@ -63,6 +63,7 @@ static int update(struct node *n);
 
 static int do_keep_going;
 static int num_jobs;
+static int full_deps;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
@@ -123,6 +124,7 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
+	full_deps = tup_option_get_int("updater.full_deps");
 	progress_init();
 
 	argc--;
@@ -1032,7 +1034,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root, full_deps) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1044,7 +1046,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root, full_deps) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -1151,7 +1153,7 @@ static int update(struct node *n)
 	s.error_fd = -1;
 	s.error_mutex = &display_mutex;
 	init_file_info(&s.finfo);
-	if(server_exec(&s, dfd, name, &newenv, n->tent->parent) < 0) {
+	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, full_deps) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		pthread_mutex_unlock(&display_mutex);

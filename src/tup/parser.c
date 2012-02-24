@@ -861,7 +861,7 @@ static int include_file(struct tupfile *tf, const char *file)
 		fprintf(tf->f, "tup error: Unable to include file with hidden path element.\n");
 		goto out_del_pg;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0);
+	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
 	if(newdt <= 0) {
 		fprintf(tf->f, "tup error: Unable to find directory for include file relative to '");
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
@@ -2073,7 +2073,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				fprintf(tf->f, "Error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
-			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, 0);
+			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, 0, 0);
 			if(pl->dt <= 0) {
 				fprintf(tf->f, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;

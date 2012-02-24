@@ -715,7 +715,7 @@ static int touch(int argc, char **argv)
 			}
 		}
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", argv[x], sub_dir_dt);
 			return -1;
@@ -749,7 +749,7 @@ static int node(int argc, char **argv)
 		tupid_t dt;
 		struct path_element *pel = NULL;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
@@ -780,7 +780,7 @@ static int rm(int argc, char **argv)
 		struct path_element *pel = NULL;
 		tupid_t dt;
 
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0);
+		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0, 0);
 		if(dt < 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
@@ -890,7 +890,7 @@ static int fake_mtime(int argc, char **argv)
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
-	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &pel, 0);
+	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &pel, 0, 1);
 	if(dt < 0) {
 		fprintf(stderr, "Error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;

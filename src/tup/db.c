@@ -3801,6 +3801,30 @@ tupid_t env_dt(void)
 	return local_env_dt;
 }
 
+tupid_t slash_dt(void)
+{
+	static tupid_t local_slash_dt = -1;
+	struct tup_entry *slashtent;
+
+	if(local_slash_dt != -1)
+		return local_slash_dt;
+
+	if(tup_entry_add(DOT_DT, NULL) < 0)
+		return -1;
+	if(tup_db_select_tent(DOT_DT, "/", &slashtent) < 0) {
+		return -1;
+	}
+	if(!slashtent) {
+		slashtent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
+		if(!slashtent) {
+			fprintf(stderr, "tup error: Unable to create virtual '/' directory for paths outside the tup hierarchy.\n");
+			return -1;
+		}
+	}
+	local_slash_dt = slashtent->tnode.tupid;
+	return local_slash_dt;
+}
+
 int tup_db_scan_begin(struct tupid_entries *root)
 {
 	if(tup_db_begin() < 0)

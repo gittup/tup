@@ -77,6 +77,7 @@ int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_print(FILE *stream, tupid_t tupid);
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 				    struct tupid_entries *root);
+tupid_t slash_dt(void);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);

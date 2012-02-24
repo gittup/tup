@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -45,9 +45,9 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid));
 struct tup_entry *get_tent_dt(tupid_t dt, const char *path);
 tupid_t find_dir_tupid(const char *dir);
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
-			  struct path_element **last, int sotgv);
+			  struct path_element **last, int sotgv, int full_deps);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     struct path_element **last, int sotgv);
+			     struct path_element **last, int sotgv, int full_deps);
 int gimme_tent(const char *name, struct tup_entry **entry);
 int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
 			     struct tup_entry **entry);
