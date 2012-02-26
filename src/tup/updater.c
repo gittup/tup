@@ -46,6 +46,7 @@
 
 #define MAX_JOBS 65535
 
+static int check_full_deps_rebuild(void);
 static int run_scan(void);
 static int update_tup_config(void);
 static int process_create_nodes(void);
@@ -132,6 +133,9 @@ int updater(int argc, char **argv, int phase)
 		fprintf(stderr, "tup error: Unable to support full dependencies since the tup executable is not privileged. Please set the tup executable to be suid root, or if that is not possible then disable the 'updater.full_deps' option. (The option is currently enabled in the file %s)\n", tup_option_get_location("updater.full_deps"));
 		return -1;
 	}
+
+	if(check_full_deps_rebuild() < 0)
+		return -1;
 
 	argc--;
 	argv++;
@@ -249,6 +253,30 @@ int todo(int argc, char **argv)
 	}
 	printf("tup: Everything is up-to-date.\n");
 out_ok:
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+static int check_full_deps_rebuild(void)
+{
+	int old_full_deps;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_config_get_int("full_deps", -1, &old_full_deps) < 0)
+		return -1;
+	if(old_full_deps == 0 && full_deps == 1) {
+		printf("tup: Full dependency tracking enabled - rebuilding everything!\n");
+		if(tup_db_rebuild_all() < 0)
+			return -1;
+	} else if(old_full_deps == 1 && full_deps == 0) {
+		printf("tup: Full dependency tracking disabled - clearing out external dependencies.\n");
+		if(tup_db_delete_slash() < 0)
+			return -1;
+	}
+	if(tup_db_config_set_int("full_deps", full_deps) < 0)
+		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
