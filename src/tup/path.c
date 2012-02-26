@@ -163,14 +163,24 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 
 		if(dfd != -1) {
 			struct stat buf;
-			if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
-				if(S_ISDIR(buf.st_mode)) {
-					new_dfd = openat(dfd, tent->name.s, O_RDONLY);
-					/* If we fail to open, new_dfd is -1 which means any
-					 * future nodes are assumed to be un-openable as well.
-					 */
-				} else {
-					mtime = buf.MTIME;
+
+			if(is_full_path(tent->name.s)) {
+				/* This is for Windows, since we store the C:
+				 * or D: as the first path element. If it's one
+				 * of these we can't fstatat it or openat it,
+				 * so just open the new one and be on our way.
+				 */
+				new_dfd = open(tent->name.s, O_RDONLY);
+			} else {
+				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
+					if(S_ISDIR(buf.st_mode)) {
+						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
+						/* If we fail to open, new_dfd is -1 which means any
+						 * future nodes are assumed to be un-openable as well.
+						 */
+					} else {
+						mtime = buf.MTIME;
+					}
 				}
 			}
 		}

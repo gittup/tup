@@ -35,9 +35,18 @@ tup touch foo.c
 update
 sym_check foo.o main foo2
 
-tup_dep_exist /usr/bin gcc . 'gcc -c foo.c -o foo.o'
+path="/usr/bin/"
+filename="gcc"
+case $tupos in
+	CYGWIN*)
+		path="c:\\MinGW\\bin\\"
+		filename="gcc.exe"
+		;;
+esac
 
-tup fake_mtime /usr/bin/gcc 5
+tup_dep_exist $path $filename . 'gcc -c foo.c -o foo.o'
+
+tup fake_mtime $path$filename 5
 if tup upd | grep 'gcc -c' | wc -l | grep 1 > /dev/null; then
 	:
 else

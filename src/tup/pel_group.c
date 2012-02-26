@@ -49,13 +49,12 @@ void init_pel_group(struct pel_group *pg)
 	TAILQ_INIT(&pg->path_list);
 }
 
-int split_path_elements(const char *dir, struct pel_group *pg)
+static int split_path_elements(const char *dir, struct pel_group *pg)
 {
 	struct path_element *pel;
 	const char *p = dir;
 
-	if(is_path_sep(dir)) {
-		del_pel_group(pg);
+	if(is_full_path(dir)) {
 		pg->pg_flags = PG_ROOT;
 	}
 
@@ -155,12 +154,12 @@ int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 	return 0;
 }
 
-int get_path_elements(const char *dir, struct pel_group *pg)
+int get_path_elements(const char *path, struct pel_group *pg)
 {
 	struct path_element *pel;
 
 	init_pel_group(pg);
-	if(split_path_elements(dir, pg) < 0)
+	if(split_path_elements(path, pg) < 0)
 		return -1;
 
 	if(pg->pg_flags & PG_ROOT) {

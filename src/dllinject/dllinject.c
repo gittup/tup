@@ -1670,7 +1670,7 @@ static int canon_path(const char *file, char *dest)
 {
 	if(!file)
 		return 0;
-	if(is_path_sep(file)) {
+	if(is_full_path(file)) {
 		/* Full path */
 		PathCanonicalize(dest, file);
 	} else {

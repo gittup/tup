@@ -446,6 +446,11 @@ check_no_windows()
 
 check_tup_suid()
 {
+	case $tupos in
+	CYGWIN*)
+		return 0
+		;;
+	esac
 	if ! ls -l `which tup` | grep ^-rws > /dev/null; then
 		echo "Tup needs to have suid root for this test to run. Skipping test."
 		eotup

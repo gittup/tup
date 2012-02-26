@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,7 +41,6 @@ struct pel_group {
 };
 
 void init_pel_group(struct pel_group *pg);
-int split_path_elements(const char *dir, struct pel_group *pg);
 int get_path_tupid(struct pel_group *pg, tupid_t *tupid);
 int get_path_elements(const char *dir, struct pel_group *pg);
 int append_path_elements(struct pel_group *pg, tupid_t dt);
