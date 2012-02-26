@@ -185,6 +185,24 @@ const char *tup_option_get_string(const char *opt)
 	exit(1);
 }
 
+const char *tup_option_get_location(const char *opt)
+{
+	unsigned int x;
+	int len = strlen(opt);
+	if(!inited) {
+		fprintf(stderr, "tup internal error: Called tup_option_get_location(%s) before the options were initialized.\n", opt);
+		exit(1);
+	}
+	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+		struct var_entry *ve;
+		ve = vardb_get(&locations[x].root, opt, len);
+		if(ve) {
+			return locations[x].file;
+		}
+	}
+	return "compiled-in defaults";
+}
+
 int tup_option_show(void)
 {
 	unsigned int x;

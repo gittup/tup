@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -28,6 +28,7 @@ void tup_option_exit(void);
 int tup_option_get_int(const char *opt);
 int tup_option_get_flag(const char *opt);
 const char *tup_option_get_string(const char *opt);
+const char *tup_option_get_location(const char *opt);
 int tup_option_show(void);
 
 #define TUP_OPTIONS_FILE ".tup" PATH_SEP_STR "options"

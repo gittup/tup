@@ -272,7 +272,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 
 	if(do_chroot) {
 		if(!tup_privileged()) {
-			fprintf(stderr, "tup error: Trying to run sub-process in a chroot, but tup does not have sufficient permissions to do so. Please set the tup executable to be suid root, or if that is not an option then disable updater.full_deps\n");
+			fprintf(stderr, "tup internal error: Trying to run sub-process ina  chroot, but tup is not privileged.\n");
 			return -1;
 		}
 #ifdef __APPLE__
