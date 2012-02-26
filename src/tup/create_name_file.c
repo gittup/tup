@@ -452,38 +452,6 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 	return 0;
 }
 
-int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
-			     struct tup_entry **entry)
-{
-	tupid_t new_dt;
-	struct path_element *pel = NULL;
-
-	new_dt = find_dir_tupid_dt(dt, name, &pel, 1, 0);
-	if(new_dt < 0)
-		return -1;
-
-	if(new_dt == 0) {
-		*entry = NULL;
-		return 0;
-	}
-	if(pel == NULL) {
-		*entry = tup_entry_get(new_dt);
-		return 0;
-	}
-
-	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, entry) < 0)
-		return -1;
-	if(!*entry) {
-		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, entry) < 0) {
-			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
-			return -1;
-		}
-	}
-	free(pel);
-
-	return 0;
-}
-
 static int ghost_to_file(struct tup_entry *tent)
 {
 	if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
