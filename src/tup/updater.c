@@ -258,14 +258,9 @@ static int run_scan(void)
 		return -1;
 	}
 	if(rc == 0) {
-		struct timespan ts;
-		tup_main_progress("Scanning filesystem...");
-		fflush(stdout);
-		timespan_start(&ts);
+		tup_main_progress("Scanning filesystem...\n");
 		if(tup_scan() < 0)
 			return -1;
-		timespan_end(&ts);
-		printf("%.3fs\n", timespan_seconds(&ts));
 	} else {
 		tup_main_progress("No filesystem scan - monitor is running.\n");
 	}

@@ -76,8 +76,6 @@ after runscr: remove *-chain, <| rules
 use runscr to create a file during parsing stage - fail?
 use runscr to create a directory during parsing stage - fail?
 
-avoid Scanning filesystem... tup warning blah problem
-
 print times before each [ tup ] line?
 
 when doing 'touch foo' without '|> foo', why is it a different error message when 'foo' is already a node or not? (ie: if foo is a ghost, or something)
