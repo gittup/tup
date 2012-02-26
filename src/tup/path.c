@@ -151,7 +151,11 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 	 * a single level of the directory. We keep our dfd open until the whole subtree is
 	 * checked. If at any point we stop finding directories, dfd goes to -1 and we don't
 	 * stat anymore. All missing files, or those with dfd==-1 have mtime set to -1. If the
-	 * mtime differs from what we have saved, we flag that as a modification.
+	 * mtime differs from what we have saved, we flag that as a modification. Directories get
+	 * an mtime of 0, so we can distinguish between a real directory and a ghost node. If a
+	 * command tries to read from '/tmp/foo/bar', but the directory 'foo' doesn't exist yet
+	 * then we get a dependency on /tmp/foo. If the directory is later created we need to know
+	 * to re-execute since it may now have a 'bar' file.
 	 */
 	if(tup_db_select_node_dir(full_scan_cb, head, dt) < 0)
 		return -1;
@@ -171,9 +175,11 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				 * so just open the new one and be on our way.
 				 */
 				new_dfd = open(tent->name.s, O_RDONLY);
+				mtime = 0;
 			} else {
 				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
 					if(S_ISDIR(buf.st_mode)) {
+						mtime = 0;
 						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
 						/* If we fail to open, new_dfd is -1 which means any
 						 * future nodes are assumed to be un-openable as well.

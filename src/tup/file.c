@@ -166,6 +166,27 @@ int add_parser_files(struct file_info *finfo, struct tupid_entries *root)
 	return rc;
 }
 
+/* Ghost directories in the /-tree have mtimes set to zero if they exist. This way we can
+ * distinguish between a directory being created where there wasn't one previously (t4064).
+ */
+static int set_directories_to_zero(tupid_t dt, tupid_t slash)
+{
+	struct tup_entry *tent;
+
+	if(dt == slash)
+		return 0;
+	if(tup_entry_add(dt, &tent) < 0)
+		return -1;
+
+	/* Short circuit if we found a dir that is already set */
+	if(tent->mtime == 0)
+		return 0;
+
+	if(tup_db_set_mtime(tent, 0) < 0)
+		return -1;
+	return set_directories_to_zero(tent->dt, slash);
+}
+
 static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 			    struct tup_entry_head *head, int full_deps, const char *full_path)
 {
@@ -190,8 +211,11 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		time_t mtime = -1;
 		if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
 			struct stat buf;
-			if(lstat(full_path, &buf) == 0)
+			if(lstat(full_path, &buf) == 0) {
 				mtime = buf.MTIME;
+			}
+			if(set_directories_to_zero(new_dt, slash_dt()) < 0)
+				return -1;
 		}
 		/* Note that full-path entries are always ghosts since we don't scan them. They
 		 * can still have a valid mtime, though.
