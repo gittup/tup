@@ -262,7 +262,13 @@ static int run_scan(void)
 		if(tup_scan() < 0)
 			return -1;
 	} else {
-		tup_main_progress("No filesystem scan - monitor is running.\n");
+		if(tup_option_get_int("updater.full_deps")) {
+			tup_main_progress("Monitor is running - scanning external dependencies...\n");
+			if(tup_external_scan() < 0)
+				return -1;
+		} else {
+			tup_main_progress("No filesystem scan - monitor is running.\n");
+		}
 	}
 	return 0;
 }

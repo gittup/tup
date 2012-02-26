@@ -214,8 +214,9 @@ static int scan_full_deps(void)
 	int rc;
 	struct tup_entry_head *head;
 
-	if(!tup_option_get_int("updater.full_deps"))
+	if(!tup_option_get_int("updater.full_deps")) {
 		return 0;
+	}
 
 	dt = slash_dt();
 	dfd = open("/", O_RDONLY);
@@ -245,6 +246,17 @@ int tup_scan(void)
 	if(scan_full_deps() < 0)
 		return -1;
 	if(tup_db_scan_end(&scan_root) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_external_scan(void)
+{
+	if(tup_db_begin() < 0)
+		return -1;
+	if(scan_full_deps() < 0)
+		return -1;
+	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
 }

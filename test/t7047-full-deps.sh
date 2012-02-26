@@ -16,22 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# See if we can get a dependency on an external file like /usr/bin/gcc, and update when
-# that changes.
+# Same as t4062, but with the monitor
 . ./tup.sh
+check_monitor_supported
 check_tup_suid
 
 set_full_deps
 
+tup monitor
+
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-tup touch foo.c
 update
 sym_check foo.o main
 
 echo "void foo2(void) {}" >> foo.c
-tup touch foo.c
 update
 sym_check foo.o main foo2
 
