@@ -262,7 +262,7 @@ static int run_scan(void)
 		if(tup_scan() < 0)
 			return -1;
 	} else {
-		if(tup_option_get_int("updater.full_deps")) {
+		if(full_deps) {
 			tup_main_progress("Monitor is running - scanning external dependencies...\n");
 			if(tup_external_scan() < 0)
 				return -1;
