@@ -302,7 +302,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	dt = find_dir_tupid_dt(dt, path, &pel, 0, tup_option_get_int("updater.full_deps"));
+	dt = find_dir_tupid_dt(dt, path, &pel, 0, 1);
 	if(dt < 0)
 		return NULL;
 
@@ -331,9 +331,6 @@ tupid_t find_dir_tupid(const char *dir)
 	 */
 	if(strcmp(dir, "0") == 0)
 		return 0;
-	if(dir[0] == '/') {
-		dt = slash_dt();
-	}
 	tent = get_tent_dt(dt, dir);
 	if(!tent)
 		return -1;
