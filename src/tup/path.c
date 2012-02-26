@@ -189,7 +189,10 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 			printf("External file has changed: ");
 			print_tup_entry(stdout, tent);
 			printf("\n");
-			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+			/* Mark the commands as modify rather than the ghost node, since we don't
+			 * expect a ghost to have flags set.
+			 */
+			if(tup_db_modify_cmds_by_input(tent->tnode.tupid) < 0)
 				return -1;
 			if(tup_db_set_mtime(tent, mtime) < 0)
 				return -1;
