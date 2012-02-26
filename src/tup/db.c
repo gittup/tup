@@ -105,7 +105,6 @@ enum {
 	_DB_GHOST_RECLAIMABLE,
 	_DB_GET_DB_VAR_TREE,
 	_DB_VAR_FLAG_DIRS,
-	_DB_VAR_FLAG_CMDS,
 	_DB_DELETE_VAR_ENTRY,
 	DB_NUM_STATEMENTS
 };
@@ -150,7 +149,6 @@ static int ghost_reclaimable(tupid_t tupid);
 static int get_db_var_tree(struct vardb *vdb);
 static int get_file_var_tree(struct vardb *vdb, int fd);
 static int var_flag_dirs(tupid_t tupid);
-static int var_flag_cmds(tupid_t tupid);
 static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
@@ -3500,7 +3498,7 @@ static int remove_var(struct var_entry *ve)
 
 	if(var_flag_dirs(ve->tent->tnode.tupid) < 0)
 		return -1;
-	if(var_flag_cmds(ve->tent->tnode.tupid) < 0)
+	if(tup_db_modify_cmds_by_input(ve->tent->tnode.tupid) < 0)
 		return -1;
 	if(delete_var_entry(ve->tent->tnode.tupid) < 0)
 		return -1;
@@ -5223,48 +5221,6 @@ static int var_flag_dirs(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_flag_cmds(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_FLAG_CMDS];
-	static char s[] = "insert or ignore into modify_list select to_id from link, node where from_id=? and to_id=node.id and node.type=?";
-
-	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_CMD);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
