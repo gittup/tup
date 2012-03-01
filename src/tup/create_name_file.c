@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -72,9 +73,13 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 	struct stat buf;
 
 	fd = tup_db_open_tupid(dt);
+	if(fd == -ENOENT)
+		goto enoent;
 	if(fd < 0)
 		return -1;
 	if(fstatat(fd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
+		if(errno == ENOENT)
+			goto enoent;
 		fprintf(stderr, "tup error: tup_file_mod() fstatat failed.\n");
 		perror(file);
 		return -1;
@@ -84,6 +89,9 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 		return -1;
 	}
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1);
+
+enoent:
+	return tup_file_del(dt, file, -1);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
