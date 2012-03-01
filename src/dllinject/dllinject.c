@@ -1620,12 +1620,6 @@ static int ignore_file(const char* file)
 		return 1;
 	if (strncmp(file, "lpt", 3) == 0 && isdigit(file[3]) && file[4] == '\0')
 		return 1;
-	if (strcasestr(file, "\\temp\\") != NULL)
-		return 1;
-	if (strcasestr(file, "\\temp/") != NULL)
-		return 1;
-	if (strcasestr(file, "/temp\\") != NULL)
-		return 1;
 	if (strcasestr(file, "\\PIPE\\") != NULL)
 		return 1;
 	if (strnicmp(file, "PIPE\\", 5) == 0)
@@ -1652,12 +1646,6 @@ static int ignore_file_w(const wchar_t* file)
 	if (wcsncmp(file, L"com", 3) == 0 && isdigit(file[3]) && file[4] == L'\0')
 		return 1;
 	if (wcsncmp(file, L"lpt", 3) == 0 && isdigit(file[3]) && file[4] == L'\0')
-		return 1;
-	if (wcscasestr(file, L"\\temp\\") != NULL)
-		return 1;
-	if (wcscasestr(file, L"\\temp/") != NULL)
-		return 1;
-	if (wcscasestr(file, L"/temp\\") != NULL)
 		return 1;
 	if (wcscasestr(file, L"\\PIPE\\") != NULL)
 		return 1;
