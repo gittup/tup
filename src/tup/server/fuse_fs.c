@@ -552,6 +552,40 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			if(filler(buf, realname, &st, 0))
 				break;
 		}
+
+		/* Check any tmpdir subdirs, and add them to the list */
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			int peeled_len;
+			int tmpdir_len;
+
+			/* if this tmpdir is a subdir of the readdir() dir */
+			peeled_len = strlen(peeled);
+			tmpdir_len = strlen(tmpdir->dirname);
+			if (tmpdir_len > peeled_len
+			    && strncmp(peeled, tmpdir->dirname, peeled_len) == 0
+			    && tmpdir->dirname[peeled_len] == '/') {
+				const char *realname;
+
+				if(fstat(tup_top_fd(), &st) < 0) {
+					int rc = -errno;
+					fprintf(stderr, "tup error: Unable to stat .tup directory\n");
+					put_finfo(finfo);
+					return rc;
+				}
+
+				realname = &tmpdir->dirname[peeled_len+1];
+
+				/* Make sure we don't include "sub/dir/bar" if
+				* we are just doing readdir("sub").
+				*/
+				if(strchr(realname, '/') != NULL)
+					continue;
+
+				if (filler(buf, realname, &st, 0))
+					break;
+			}
+		}
+
 		put_finfo(finfo);
 	}
 
