@@ -3066,6 +3066,20 @@ static char *eval(struct tupfile *tf, const char *string)
 						return NULL;
 					}
 					len += clen;
+				} else if(rparen-var == 11 &&
+					  strncmp(var, "TUP_ABS_CWD", 11) == 0) {
+					int clen = 0;
+					int ps_path_len = strlen(tf->ps->path);
+					if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+						fprintf(tf->f, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
+					clen += get_tup_top_len();
+					clen += ps_path_len;
+					clen += 1;   /* '/' between ps->path and relative path */
+					len += clen;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
@@ -3152,6 +3166,27 @@ static char *eval(struct tupfile *tf, const char *string)
 						return NULL;
 					}
 					p += clen;
+				} else if(rparen-var == 11 &&
+					  strncmp(var, "TUP_ABS_CWD", 11) == 0) {
+					int ps_path_len = strlen(tf->ps->path);
+					int relative_dir_len = 0;
+
+					memcpy(p, get_tup_top(), get_tup_top_len());
+					p += get_tup_top_len();
+
+					memcpy(p, tf->ps->path, ps_path_len);
+					p += ps_path_len;
+
+					p[0] = '/';
+					p += 1;
+
+					if(get_relative_dir(p, tf->tupid, tf->curtent->tnode.tupid, &relative_dir_len) < 0) {
+						fprintf(tf->f, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
+					p += relative_dir_len;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
