@@ -83,8 +83,8 @@ static int monitor_set_pid(int pid);
 static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
-static int queue_event(struct inotify_event *e, int locked);
-static int flush_queue(int locked);
+static int queue_event(struct inotify_event *e);
+static int flush_queue(void);
 static int autoupdate(void);
 static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
@@ -95,7 +95,6 @@ static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void monitor_rmdir_cb(tupid_t dt);
 static int handle_event(struct monitor_event *m);
-static int handle_event_nolock(struct monitor_event *m);
 static void pinotify(void);
 static void sighandler(int sig);
 
@@ -513,7 +512,7 @@ static int monitor_loop(void)
 				}
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
-					rc = flush_queue(locked);
+					rc = flush_queue();
 					if(rc < 0)
 						return rc;
 					locked = 0;
@@ -532,15 +531,28 @@ static int monitor_loop(void)
 					if(tup_unflock(tup_tri_lock()) < 0) {
 						return -1;
 					}
-					if(flush_queue(locked) < 0)
+					/* During an update, generated nodes (t7038, t7039) and
+					 * ghost nodes (t7048) may be removed. The monitor
+					 * needs to invalidate those entries, but it doesn't
+					 * know from the updater which those will be. Instead
+					 * we just clear out the cache, and we'll rebuild it
+					 * from the database as necessary.
+					 *
+					 * Note that our dircache is still intact, and still
+					 * references tupids. These just don't have corresponding
+					 * entries until they are needed.
+					 */
+					if(tup_entry_clear() < 0)
 						return -1;
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
 			} else {
-				rc = queue_event(e, locked);
-				if(rc < 0)
-					return rc;
+				if(locked) {
+					rc = queue_event(e);
+					if(rc < 0)
+						return rc;
+				}
 			}
 		}
 
@@ -554,7 +566,7 @@ static int monitor_loop(void)
 			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
 			if(ret == 0) {
 				/* Timeout, flush queue */
-				rc = flush_queue(locked);
+				rc = flush_queue();
 				if(rc < 0)
 					return rc;
 			}
@@ -631,7 +643,7 @@ static int events_queued(void)
 	return queue_start != queue_end;
 }
 
-static int queue_event(struct inotify_event *e, int locked)
+static int queue_event(struct inotify_event *e)
 {
 	int new_start;
 	int new_end;
@@ -660,7 +672,7 @@ static int queue_event(struct inotify_event *e, int locked)
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
-		rc = flush_queue(locked);
+		rc = flush_queue();
 		if(rc < 0)
 			return rc;
 		new_start = queue_end;
@@ -686,13 +698,12 @@ static int queue_event(struct inotify_event *e, int locked)
 	return 0;
 }
 
-static int flush_queue(int locked)
+static int flush_queue(void)
 {
 	int events_handled = 0;
 	int overflow = 0;
 
-	if(locked)
-		tup_db_begin();
+	tup_db_begin();
 
 	while(queue_start < queue_end) {
 		struct monitor_event *m;
@@ -706,14 +717,9 @@ static int flush_queue(int locked)
 			overflow = 1;
 		} else {
 			if(e->mask != 0) {
-				if(locked) {
-					if(handle_event(m) < 0) {
-						tup_db_rollback();
-						return -1;
-					}
-				} else {
-					if(handle_event_nolock(m) < 0)
-						return -1;
+				if(handle_event(m) < 0) {
+					tup_db_rollback();
+					return -1;
 				}
 			}
 		}
@@ -730,12 +736,10 @@ static int flush_queue(int locked)
 		return MONITOR_LOOP_RETRY;
 	}
 
-	if(locked) {
-		tup_db_commit();
-		if(events_handled && autoupdate_enabled()) {
-			if(autoupdate() < 0)
-				return -1;
-		}
+	tup_db_commit();
+	if(events_handled && autoupdate_enabled()) {
+		if(autoupdate() < 0)
+			return -1;
 	}
 	return 0;
 }
@@ -1082,42 +1086,6 @@ static int handle_event(struct monitor_event *m)
 	return 0;
 }
 
-static int handle_event_nolock(struct monitor_event *m)
-{
-	struct dircache *dc;
-
-	if(m->e.mask & IN_IGNORED) {
-		/* Ignore IN_IGNORED events - we'll already have removed the
-		 * wd from the dircache in the callback function.
-		 */
-		return 0;
-	}
-
-	dc = dircache_lookup_wd(&droot, m->e.wd);
-	if(!dc) {
-		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
-			m->e.wd);
-		return -1;
-	}
-
-	if(m->e.mask & IN_DELETE || m->e.mask & IN_MOVED_FROM) {
-		struct tup_entry *tent;
-		if(tup_entry_find_name_in_dir(dc->dt_node.tupid, m->e.name, -1, &tent) == 0) {
-			if(tent) {
-				if(tup_entry_rm(tent->tnode.tupid) < 0) {
-					fprintf(stderr, "tup error: Unable to remove tup entry %lli\n", tent->tnode.tupid);
-					return -1;
-				}
-			}
-		}
-	}
-	if(m->e.mask & IN_MOVED_FROM) {
-		/* An IN_MOVED_FROM event points to itself */
-		LIST_REMOVE(m->from_event, list);
-	}
-	return 0;
-}
-
 static void pinotify(void)
 {
 	perror("inotify_add_watch");
@@ -1131,15 +1099,18 @@ static int dump_dircache(void)
 	struct tupid_tree *tt;
 	int rc = 0;
 
+	if(tup_db_begin() < 0)
+		return -1;
 	printf("Dircache:\n");
 	RB_FOREACH(tt, tupid_entries, &droot.wd_root) {
 		struct dircache *dc;
 		struct tup_entry *tent;
+		int tmp;
 
 		dc = container_of(tt, struct dircache, wd_node);
 
-		tent = tup_entry_find(dc->dt_node.tupid);
-		if(!tent) {
+		tmp = tup_entry_add(dc->dt_node.tupid, &tent);
+		if(tmp < 0 || !tent) {
 			printf("  [31mwd %lli: [%lli] not found[0m\n", dc->wd_node.tupid, dc->dt_node.tupid);
 			rc = -1;
 		} else {
@@ -1148,6 +1119,8 @@ static int dump_dircache(void)
 			printf("\n");
 		}
 	}
+	if(tup_db_commit() < 0)
+		return -1;
 	return rc;
 }
 

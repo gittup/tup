@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -112,8 +112,7 @@ int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 		return -1;
 	}
 
-	parent = tup_entry_find(dt);
-	if(!parent) {
+	if(tup_entry_add(dt, &parent) < 0) {
 		fprintf(stderr, "tup error: Unable to find parent entry [%lli] for node '%.*s'\n", dt, len, name);
 		return -1;
 	}
