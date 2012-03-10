@@ -1131,20 +1131,31 @@ static int update(struct node *n)
 	struct tupid_entries normal_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
+	int do_chroot = full_deps;
 
 	timespan_start(&ts);
 	if(name[0] == '^') {
 		name++;
-		while(*name && *name != ' ') {
-			/* This space reserved for flags for something. I dunno
-			 * what yet.
-			 */
-			pthread_mutex_lock(&display_mutex);
-			show_result(n->tent, 1, NULL);
-			fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
-			pthread_mutex_unlock(&display_mutex);
+		while(*name && *name != ' ' && *name != '^') {
+			switch(*name) {
+				case 'c':
+					if(!tup_privileged()) {
+						pthread_mutex_lock(&display_mutex);
+						show_result(n->tent, 1, NULL);
+						fprintf(stderr, "Error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
+						pthread_mutex_unlock(&display_mutex);
+						return -1;
+					}
+					do_chroot = 1;
+					break;
+				default:
+					pthread_mutex_lock(&display_mutex);
+					show_result(n->tent, 1, NULL);
+					fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
+					pthread_mutex_unlock(&display_mutex);
+					return -1;
+			}
 			name++;
-			return -1;
 		}
 		while(*name && *name != '^') name++;
 		if(!*name) {
@@ -1188,7 +1199,7 @@ static int update(struct node *n)
 	s.error_fd = -1;
 	s.error_mutex = &display_mutex;
 	init_file_info(&s.finfo);
-	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, full_deps) < 0) {
+	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		pthread_mutex_unlock(&display_mutex);

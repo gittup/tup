@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <ctype.h>
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
@@ -226,11 +227,21 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	name_sz = tent->name.len;
 	if(!do_verbose && name[0] == '^') {
 		name++;
-		while(*name && *name != ' ') name++;
-		name++;
-		name_sz = 0;
-		while(name[name_sz] && name[name_sz] != '^')
-			name_sz++;
+		while(*name && *name != ' ' && *name != '^') name++;
+		if(*name == '^') {
+			/* If we just have ^-flags but no TEXT, then print the rest of the
+			 * string verbatim.
+			 */
+			name++;
+			while(isspace(*name)) name++;
+			name_sz = strlen(name);
+		} else {
+			/* If we have ^ TEXT^, then just capture the TEXT part */
+			name++;
+			name_sz = 0;
+			while(name[name_sz] && name[name_sz] != '^')
+				name_sz++;
+		}
 	}
 
 	color_set(f);

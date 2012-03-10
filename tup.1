@@ -263,7 +263,7 @@ The command string that will be passed to the system(3) call by tup. This comman
 .IP
 When executed, the command's file accesses are monitored by tup to ensure that they conform to these rules. Any files opened for reading that were generated from another command but not specfied as inputs are reported as errors. Similarly, any files opened for writing that are not specified as outputs are reported as errors. All files opened for reading are recorded as dependencies to the command. If any of these files change, tup will re-execute the command during the next update. Note that if an input listed in the Tupfile changes, it does not necessarily cause the command to re-execute, unless the command actually read from that input during the prior execution. Inputs listed in the Tupfile only enforce ordering among the commands, while file accesses during execution determine when commands are re-executed.
 .IP
-A command string can begin with the special sequence ^\ TEXT^, which will tell tup to only print "TEXT" instead of the whole command string when the command is being executed. This saves the effort of using echo to pretty-print a long command. The short-display behavior can be overridden by passing the --verbose flag to tup, which will cause tup to display the actual command string instead of "TEXT". The space after the first '^' is significant. In the future there may be additional flags to control a command, which will be put after the first '^'. No such flags exist yet, however. For example, this command will print "CC foo.c" when executing system(gcc -c foo.c -o foo.o) :
+A command string can begin with the special sequence ^\ TEXT^, which will tell tup to only print "TEXT" instead of the whole command string when the command is being executed. This saves the effort of using echo to pretty-print a long command. The short-display behavior can be overridden by passing the --verbose flag to tup, which will cause tup to display the actual command string instead of "TEXT". The space after the first '^' is significant. Any characters immediately after the first '^' are treated as flags. See the ^-flags section below for details. For example, this command will print "CC foo.c" when executing system(gcc -c foo.c -o foo.o) :
 .nf
 
 : foo.c |> ^ CC %f^ gcc -c %f -o %o |> foo.o
@@ -289,6 +289,22 @@ Outputs can be grouped into a bin using the "{bin}" syntax. A later rule can use
 .IP
 In this case one could use *.o as the input instead, but sometimes it is useful to separate outputs into groups even though they have the same extension (such as if one directory creates multiple binaries, using *.o wouldn't be correct). If a {bin} is specified in the output section of multiple rules, the bin will be the union of all the outputs. You can't remove things from a bin, and the bin disappears after the current Tupfile is parsed.
 .RE
+.TP
+.B ^-flags
+In a command string that uses the ^\ TEXT^ sequence, flag characters can be placed immediately after the ^ until the first space character or closing carat. For example:
+.nf
+
+: foo.c |> ^c CC %f^ gcc --coverage %f -o %o |> foo | foo.gcno
+: bar.c |> ^c^ gcc --coverage %f -o %o |> bar | bar.gcno
+
+.fi
+In the foo.c case, the command is run in a chroot and will display "CC foo.c". In the bar.c case, the command is run in a chroot and the "gcc --coverage bar.c -o bar" string is displayed.  There is currently only one supported flag character:
+.RS
+.TP
+.B c
+The 'c' flag causes the command to run inside a chroot on Linux and OSX, so that the fake working directory that tup uses is not visible to the sub-process. This may be necessary for commands that read the current working directory and write that information in any output files. For example, gcc with the --coverage flag will use the current working directory as the location of where to put the .gcda file. Use the 'c' flag to always run this command in a chroot. This is only supported if the tup binary is suid root so that it can setup the chroot environment.
+.RE
+
 .TP
 .B %-flags
 Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs.
