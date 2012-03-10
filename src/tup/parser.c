@@ -148,6 +148,7 @@ struct tupfile {
 	struct string_entries chain_root;
 	FILE *f;
 	struct parser_server *ps;
+	struct timespan ts;
 	char ign;
 	char circular_dep_error;
 };
@@ -230,16 +231,17 @@ void parser_debug_run(void)
 	debug_run = 1;
 }
 
-int parse(struct node *n, struct graph *g)
+int parse(struct node *n, struct graph *g, struct timespan *retts)
 {
 	struct tupfile tf;
 	int fd;
 	int rc = -1;
 	struct buf b;
 	struct parser_server ps;
-	struct timespan ts;
+	struct timeval orig_start;
 
-	timespan_start(&ts);
+	timespan_start(&tf.ts);
+	memcpy(&orig_start, &tf.ts.start, sizeof(orig_start));
 	if(n->parsing) {
 		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
 		print_tup_entry(stderr, n->tent);
@@ -354,8 +356,17 @@ out_server_stop:
 	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_root);
 
-	timespan_end(&ts);
-	show_result(n->tent, rc != 0, &ts);
+	timespan_end(&tf.ts);
+	if(retts) {
+		/* Report back the original start time, and our real end time.
+		 * This accounts for the total time to parse us, plus any
+		 * dependent Tupfiles. If another Tupfile depends on us, they
+		 * can subtract this full time out from their reported time.
+		 */
+		memcpy(&retts->start, &orig_start, sizeof(retts->start));
+		memcpy(&retts->end, &tf.ts.end, sizeof(retts->end));
+	}
+	show_result(n->tent, rc != 0, &tf.ts);
 	if(fflush(tf.f) != 0) {
 		/* Use perror, since we're trying to flush the tf.f output */
 		perror("fflush");
@@ -2174,8 +2185,9 @@ static int parse_dependent_tupfiles(struct path_list_head *plist,
 			n = find_node(g, pl->dt);
 			if(n != NULL && !n->already_used) {
 				int rc;
+				struct timespan ts;
 				n->already_used = 1;
-				rc = parse(n, g);
+				rc = parse(n, g, &ts);
 				if(rc < 0) {
 					if(rc == CIRCULAR_DEPENDENCY_ERROR) {
 						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");
@@ -2187,6 +2199,10 @@ static int parse_dependent_tupfiles(struct path_list_head *plist,
 					fprintf(tf->f, "\n");
 					return -1;
 				}
+				/* Ignore any time the dependent Tupfile was parsing, so that
+				 * we don't account for it twice.
+				 */
+				timespan_add_delta(&tf->ts, &ts);
 			}
 			if(tupid_tree_add_dup(&tf->input_root, pl->dt) < 0)
 				return -1;

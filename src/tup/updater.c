@@ -905,7 +905,7 @@ static void *create_work(void *arg)
 			if(n->already_used) {
 				rc = 0;
 			} else {
-				rc = parse(n, g);
+				rc = parse(n, g, NULL);
 			}
 			show_progress(-1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||

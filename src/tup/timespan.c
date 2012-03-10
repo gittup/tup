@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,4 +42,17 @@ float timespan_seconds(struct timespan *ts)
 {
 	return (float)(ts->end.tv_sec - ts->start.tv_sec) +
 		(float)(ts->end.tv_usec - ts->start.tv_usec)/1e6;
+}
+
+void timespan_add_delta(struct timespan *ts, const struct timespan *delta)
+{
+	ts->start.tv_sec += delta->end.tv_sec - delta->start.tv_sec;
+	ts->start.tv_usec += delta->end.tv_usec - delta->start.tv_usec;
+	if(ts->start.tv_usec >= 1000000) {
+		ts->start.tv_usec -= 1000000;
+		ts->start.tv_sec++;
+	} else if(ts->start.tv_usec < 0) {
+		ts->start.tv_usec += 1000000;
+		ts->start.tv_sec--;
+	}
 }
