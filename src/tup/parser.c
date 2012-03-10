@@ -135,7 +135,7 @@ struct build_name_list_args {
 struct tupfile {
 	tupid_t tupid;
 	struct tup_entry *curtent;
-	int dfd;
+	int cur_dfd;
 	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
@@ -289,13 +289,13 @@ int parse(struct node *n, struct graph *g)
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
-	tf.dfd = tup_entry_openat(ps.root_fd, n->tent);
-	if(tf.dfd < 0) {
+	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
+	if(tf.cur_dfd < 0) {
 		fprintf(tf.f, "Error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;
 	}
 
-	fd = openat(tf.dfd, "Tupfile", O_RDONLY);
+	fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
 	if(fd < 0) {
 		if(errno == ENOENT) {
 			/* No Tupfile means we have nothing to do */
@@ -328,8 +328,8 @@ out_close_file:
 		rc = -1;
 	}
 out_close_dfd:
-	if(close(tf.dfd) < 0) {
-		perror("close(tf.dfd)");
+	if(close(tf.cur_dfd) < 0) {
+		perror("close(tf.cur_dfd)");
 		rc = -1;
 	}
 out_close_vdb:
@@ -616,7 +616,7 @@ static int include_rules(struct tupfile *tf)
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
-		if(fstatat(tf->dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
+		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
 			if(include_file(tf, p) < 0)
 				goto out_free;
 	}
@@ -787,7 +787,7 @@ static int gitignore(struct tupfile *tf)
 					  &tf->g->gen_delete_count);
 		}
 
-		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
+		fd = openat(tf->cur_dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
 		if(fd < 0) {
 			perror(".gitignore");
 			fprintf(tf->f, "tup error: Unable to create the .gitignore file.\n");
@@ -854,6 +854,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	struct tup_entry *tent = NULL;
 	tupid_t newdt;
 	struct tup_entry *oldtent = tf->curtent;
+	int old_dfd = tf->cur_dfd;
 
 	if(get_path_elements(file, &pg) < 0)
 		goto out_err;
@@ -878,10 +879,15 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 	tf->curtent = tup_entry_get(newdt);
 
+	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
+	if (tf->cur_dfd < 0) {
+	   perror(file);
+	   goto out_free_pel;
+	}
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
 		perror(file);
-		goto out_free_pel;
+		goto out_close_dfd;
 	}
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
@@ -896,6 +902,11 @@ out_close:
 		perror("close(fd)");
 		rc = -1;
 	}
+out_close_dfd:
+	if(close(tf->cur_dfd) < 0) {
+	   perror("close(tf->cur_dfd)");
+	   rc = -1;
+	}
 out_free_pel:
 	free(pel);
 out_del_pg:
@@ -903,6 +914,7 @@ out_del_pg:
 
 out_err:
 	tf->curtent = oldtent;
+	tf->cur_dfd = old_dfd;
 	if(rc < 0) {
 		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", file);
 		return -1;
@@ -3054,6 +3066,20 @@ static char *eval(struct tupfile *tf, const char *string)
 						return NULL;
 					}
 					len += clen;
+				} else if(rparen-var == 11 &&
+					  strncmp(var, "TUP_ABS_CWD", 11) == 0) {
+					int clen = 0;
+					int ps_path_len = strlen(tf->ps->path);
+					if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+						fprintf(tf->f, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
+					clen += get_tup_top_len();
+					clen += ps_path_len;
+					clen += 1;   /* '/' between ps->path and relative path */
+					len += clen;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
@@ -3140,6 +3166,27 @@ static char *eval(struct tupfile *tf, const char *string)
 						return NULL;
 					}
 					p += clen;
+				} else if(rparen-var == 11 &&
+					  strncmp(var, "TUP_ABS_CWD", 11) == 0) {
+					int ps_path_len = strlen(tf->ps->path);
+					int relative_dir_len = 0;
+
+					memcpy(p, get_tup_top(), get_tup_top_len());
+					p += get_tup_top_len();
+
+					memcpy(p, tf->ps->path, ps_path_len);
+					p += ps_path_len;
+
+					p[0] = '/';
+					p += 1;
+
+					if(get_relative_dir(p, tf->tupid, tf->curtent->tnode.tupid, &relative_dir_len) < 0) {
+						fprintf(tf->f, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
+					p += relative_dir_len;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
