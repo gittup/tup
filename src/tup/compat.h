@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,7 +32,8 @@ void compat_lock_enable(void);
 void compat_lock_disable(void);
 
 #ifdef _WIN32
-#define is_path_sep(str) ((str)[0] == '/' || (str)[0] == '\\' || (str)[0] == ':' || ((str)[0] != '\0' && (str)[1] == ':'))
+#define is_path_sep(str) ((str)[0] == '/' || (str)[0] == '\\')
+#define is_full_path(str) (is_path_sep(str) || ((str)[0] != '\0' && (str)[1] == ':'))
 #define PATH_SEP '\\'
 #define PATH_SEP_STR "\\"
 #define SQL_NAME_COLLATION " collate nocase"
@@ -42,6 +43,7 @@ void compat_lock_disable(void);
 #define MTIME st_mtime
 #else
 #define is_path_sep(ch) ((ch)[0] == '/')
+#define is_full_path is_path_sep
 #define PATH_SEP '/'
 #define PATH_SEP_STR "/"
 #define SQL_NAME_COLLATION ""

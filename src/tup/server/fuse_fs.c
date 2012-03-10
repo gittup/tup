@@ -224,9 +224,19 @@ static int context_check(void)
 	return 0;
 }
 
+static int ignore_file(const char *path)
+{
+	if(strncmp(path, "/proc/", 6) == 0)
+		return 1;
+	return 0;
+}
+
 static void tup_fuse_handle_file(const char *path, enum access_type at)
 {
 	struct file_info *finfo;
+
+	if(ignore_file(peel(path)))
+		return;
 
 	finfo = get_finfo(path);
 	if(finfo) {

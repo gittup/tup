@@ -25,6 +25,7 @@
 #include "compat.h"
 #include "pel_group.h"
 #include "entry.h"
+#include "option.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -309,7 +310,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	dt = find_dir_tupid_dt(dt, path, &pel, 0);
+	dt = find_dir_tupid_dt(dt, path, &pel, 0, 1);
 	if(dt < 0)
 		return NULL;
 
@@ -331,20 +332,21 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 tupid_t find_dir_tupid(const char *dir)
 {
 	struct tup_entry *tent;
+	tupid_t dt = DOT_DT;
 
 	/* This check is used for tests to get the parent tupid for the '.'
 	 * directory.
 	 */
 	if(strcmp(dir, "0") == 0)
 		return 0;
-	tent = get_tent_dt(DOT_DT, dir);
+	tent = get_tent_dt(dt, dir);
 	if(!tent)
 		return -1;
 	return tent->tnode.tupid;
 }
 
 tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
-			  struct path_element **last, int sotgv)
+			  struct path_element **last, int sotgv, int full_deps)
 {
 	struct pel_group pg;
 	tupid_t tupid;
@@ -352,19 +354,24 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, sotgv);
+	tupid = find_dir_tupid_dt_pg(dt, &pg, last, sotgv, full_deps);
 	return tupid;
 }
 
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
-			     struct path_element **last, int sotgv)
+			     struct path_element **last, int sotgv, int full_deps)
 {
 	struct path_element *pel;
 	struct tup_entry *tent;
 
-	/* Ignore if the file is hidden or outside of the tup hierarchy */
-	if((pg->pg_flags & PG_HIDDEN) || (pg->pg_flags & PG_OUTSIDE_TUP))
+	/* Ignore if the file is hidden */
+	if(pg->pg_flags & PG_HIDDEN)
 		return 0;
+
+	/* If we aren't in full deps mode and the file is outside tup, we ignore it */
+	if(!full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
+		return 0;
+	}
 
 	/* The list can be empty if dir is "." or something like "foo/..". In
 	 * this case just return dt (the start dir).
@@ -387,6 +394,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 
 	if(pg->pg_flags & PG_ROOT)
 		dt = 1;
+	if(pg->pg_flags & PG_OUTSIDE_TUP)
+		dt = slash_dt();
+
 	if(tup_entry_add(dt, &tent) < 0)
 		return -1;
 
@@ -433,7 +443,7 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 	tupid_t dt;
 	struct path_element *pel = NULL;
 
-	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0);
+	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0, 0);
 	if(dt < 0)
 		return -1;
 	if(dt == 0) {
@@ -447,38 +457,6 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 	if(tup_db_select_tent_part(dt, pel->path, pel->len, entry) < 0)
 		return -1;
 	free(pel);
-	return 0;
-}
-
-int gimme_tent_or_make_ghost(tupid_t dt, const char *name,
-			     struct tup_entry **entry)
-{
-	tupid_t new_dt;
-	struct path_element *pel = NULL;
-
-	new_dt = find_dir_tupid_dt(dt, name, &pel, 1);
-	if(new_dt < 0)
-		return -1;
-
-	if(new_dt == 0) {
-		*entry = NULL;
-		return 0;
-	}
-	if(pel == NULL) {
-		*entry = tup_entry_get(new_dt);
-		return 0;
-	}
-
-	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, entry) < 0)
-		return -1;
-	if(!*entry) {
-		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, -1, entry) < 0) {
-			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
-			return -1;
-		}
-	}
-	free(pel);
-
 	return 0;
 }
 

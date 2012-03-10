@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -19,8 +19,10 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include "dirpath.h"
+#include "tup/compat.h"
 
 int fchdir(int fd)
 {
@@ -28,6 +30,15 @@ int fchdir(int fd)
 
 	path = win32_get_dirpath(fd);
 	if(path) {
+		/* If we are changing to a dir like "C:", then we have to make sure we also
+		 * clear the path afterwards. Otherwise just cd'ing to C: will put is back
+		 * at whatever last directory we were at in C:, not necessarily at C:\
+		 */
+		if(is_full_path(path) && strlen(path) == 2) {
+			if(chdir(path) < 0)
+				return -1;
+			return chdir("\\");
+		}
 		return chdir(path);
 	}
 	errno = EBADF;

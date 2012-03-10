@@ -43,6 +43,7 @@ static int display_progress;
 static int display_job_numbers;
 static int display_job_time;
 static struct timespan gts;
+static struct timespan main_ts;
 
 static int get_time_remaining(char *dest, int len, int part, int whole, int approx);
 
@@ -67,6 +68,7 @@ void progress_init(void)
 	display_progress = tup_option_get_int("display.progress");
 	display_job_numbers = tup_option_get_int("display.job_numbers");
 	display_job_time = tup_option_get_int("display.job_time");
+	timespan_start(&main_ts);
 }
 
 void tup_show_message(const char *s)
@@ -76,9 +78,13 @@ void tup_show_message(const char *s)
 	color_set(stdout);
 	/* If we get to the end, show a green bar instead of grey. */
 	if(cur_phase == 5)
-		printf("[%s%s%s] %s", color_final(), tup, color_end(), s);
+		printf("[%s%s%s] ", color_final(), tup, color_end());
 	else
-		printf("[%s%.*s%s%.*s] %s", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase, s);
+		printf("[%s%.*s%s%.*s] ", color_reverse(), cur_phase, tup, color_end(), 5-cur_phase, tup+cur_phase);
+	timespan_end(&main_ts);
+	if(display_job_time)
+		printf("[%.3fs] ", timespan_seconds(&main_ts));
+	printf("%s", s);
 }
 
 void clear_active(FILE *f)

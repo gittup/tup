@@ -76,6 +76,7 @@ static struct option {
 } options[] = {
 	{"updater.num_jobs", NULL, cpu_number},
 	{"updater.keep_going", "0", NULL},
+	{"updater.full_deps", "0", NULL},
 	{"display.color", DEFAULT_COLOR, NULL},
 	{"display.width", NULL, get_console_width},
 	{"display.progress", NULL, stdout_isatty},
@@ -183,6 +184,24 @@ const char *tup_option_get_string(const char *opt)
 	}
 	fprintf(stderr, "tup internal error: Option '%s' does not have a default value\n", opt);
 	exit(1);
+}
+
+const char *tup_option_get_location(const char *opt)
+{
+	unsigned int x;
+	int len = strlen(opt);
+	if(!inited) {
+		fprintf(stderr, "tup internal error: Called tup_option_get_location(%s) before the options were initialized.\n", opt);
+		exit(1);
+	}
+	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+		struct var_entry *ve;
+		ve = vardb_get(&locations[x].root, opt, len);
+		if(ve) {
+			return locations[x].file;
+		}
+	}
+	return "compiled-in defaults";
 }
 
 int tup_option_show(void)

@@ -36,6 +36,7 @@
 #include "monitor.h"
 #include "path.h"
 #include "environ.h"
+#include "privs.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,6 +46,7 @@
 
 #define MAX_JOBS 65535
 
+static int check_full_deps_rebuild(void);
 static int run_scan(void);
 static int update_tup_config(void);
 static int process_create_nodes(void);
@@ -63,6 +65,7 @@ static int update(struct node *n);
 
 static int do_keep_going;
 static int num_jobs;
+static int full_deps;
 static int warnings;
 
 static pthread_mutex_t db_mutex;
@@ -123,7 +126,16 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
+	full_deps = tup_option_get_int("updater.full_deps");
 	progress_init();
+
+	if(full_deps && !tup_privileged()) {
+		fprintf(stderr, "tup error: Unable to support full dependencies since the tup executable is not privileged. Please set the tup executable to be suid root, or if that is not possible then disable the 'updater.full_deps' option. (The option is currently enabled in the file %s)\n", tup_option_get_location("updater.full_deps"));
+		return -1;
+	}
+
+	if(check_full_deps_rebuild() < 0)
+		return -1;
 
 	argc--;
 	argv++;
@@ -246,6 +258,30 @@ out_ok:
 	return 0;
 }
 
+static int check_full_deps_rebuild(void)
+{
+	int old_full_deps;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_config_get_int("full_deps", -1, &old_full_deps) < 0)
+		return -1;
+	if(old_full_deps == 0 && full_deps == 1) {
+		printf("tup: Full dependency tracking enabled - rebuilding everything!\n");
+		if(tup_db_rebuild_all() < 0)
+			return -1;
+	} else if(old_full_deps == 1 && full_deps == 0) {
+		printf("tup: Full dependency tracking disabled - clearing out external dependencies.\n");
+		if(tup_db_delete_slash() < 0)
+			return -1;
+	}
+	if(tup_db_config_set_int("full_deps", full_deps) < 0)
+		return -1;
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
 static int run_scan(void)
 {
 	int rc;
@@ -256,16 +292,17 @@ static int run_scan(void)
 		return -1;
 	}
 	if(rc == 0) {
-		struct timespan ts;
-		tup_main_progress("Scanning filesystem...");
-		fflush(stdout);
-		timespan_start(&ts);
+		tup_main_progress("Scanning filesystem...\n");
 		if(tup_scan() < 0)
 			return -1;
-		timespan_end(&ts);
-		printf("%.3fs\n", timespan_seconds(&ts));
 	} else {
-		tup_main_progress("No filesystem scan - monitor is running.\n");
+		if(full_deps) {
+			tup_main_progress("Monitor is running - scanning external dependencies...\n");
+			if(tup_external_scan() < 0)
+				return -1;
+		} else {
+			tup_main_progress("No filesystem scan - monitor is running.\n");
+		}
 	}
 	return 0;
 }
@@ -1032,7 +1069,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root, full_deps) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1044,7 +1081,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root, full_deps) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -1151,7 +1188,7 @@ static int update(struct node *n)
 	s.error_fd = -1;
 	s.error_mutex = &display_mutex;
 	init_file_info(&s.finfo);
-	if(server_exec(&s, dfd, name, &newenv, n->tent->parent) < 0) {
+	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, full_deps) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
 		pthread_mutex_unlock(&display_mutex);

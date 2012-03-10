@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,15 @@
 #include <unistd.h>
 
 #ifdef _WIN32
+int tup_privileged(void)
+{
+	/* Windows doesn't need to have tup be privileged in order to get full dependencies since
+	 * it uses a different dependency mechanism. Therefore we can always report '1' here
+	 * since we support that mode.
+	 */
+	return 1;
+}
+
 int tup_drop_privs(void)
 {
 	return 0;

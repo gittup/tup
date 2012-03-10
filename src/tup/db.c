@@ -65,6 +65,7 @@ enum {
 	DB_SET_TYPE,
 	DB_SET_MTIME,
 	DB_PRINT,
+	DB_REBUILD_ALL,
 	_DB_NODELIST_LEN,
 	_DB_GET_NODELIST,
 	DB_ADD_DIR_CREATE_LIST,
@@ -107,7 +108,6 @@ enum {
 	_DB_GHOST_RECLAIMABLE2,
 	_DB_GET_DB_VAR_TREE,
 	_DB_VAR_FLAG_DIRS,
-	_DB_VAR_FLAG_CMDS,
 	_DB_DELETE_VAR_ENTRY,
 	DB_NUM_STATEMENTS
 };
@@ -135,6 +135,7 @@ static int reclaim_ghost_debug = 0;
 static struct vardb atvardb = { {NULL}, 0};
 static struct vardb envdb = { {NULL}, 0};
 static int transaction = 0;
+static tupid_t local_slash_dt = -1;
 
 static int version_check(void);
 static int node_select(tupid_t dt, const char *name, int len,
@@ -154,7 +155,6 @@ static int ghost_reclaimable2(tupid_t tupid);
 static int get_db_var_tree(struct vardb *vdb);
 static int get_file_var_tree(struct vardb *vdb, int fd);
 static int var_flag_dirs(tupid_t tupid);
-static int var_flag_cmds(tupid_t tupid);
 static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
@@ -1354,7 +1354,7 @@ int tup_db_delete_dir(tupid_t dt)
 	return 0;
 }
 
-static int recurse_delete_ghost_tree(tupid_t tupid)
+static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 {
 	struct half_entry *he;
 	struct half_entry_head subdir_list;
@@ -1377,8 +1377,9 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 	 * can't have an existing Tupfile that is a subdirectory to a ghost
 	 * directory.
 	 */
-	if(tup_db_modify_cmds_by_input(tupid) < 0)
-		return -1;
+	if(modify)
+		if(tup_db_modify_cmds_by_input(tupid) < 0)
+			return -1;
 	if(tup_db_delete_links(tupid) < 0)
 		return -1;
 
@@ -1388,7 +1389,7 @@ static int recurse_delete_ghost_tree(tupid_t tupid)
 			tup_db_print(stderr, he->tupid);
 			return -1;
 		}
-		if(recurse_delete_ghost_tree(he->tupid) < 0)
+		if(recurse_delete_ghost_tree(he->tupid, modify) < 0)
 			return -1;
 	}
 	if(delete_node(tupid) < 0)
@@ -1635,7 +1636,7 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	}
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST) {
-			if(recurse_delete_ghost_tree(tent->tnode.tupid) < 0)
+			if(recurse_delete_ghost_tree(tent->tnode.tupid, 1) < 0)
 				return -1;
 		} else {
 			fprintf(stderr, "Error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
@@ -1859,6 +1860,51 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 	}
 	if(get_generated_nodelist(*s, dt, root, len) < 0)
 		return -1;
+	return 0;
+}
+
+int tup_db_rebuild_all(void)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_REBUILD_ALL];
+	static char s[] = "insert or ignore into modify_list select id from node where type=?";
+
+	transaction_check("%s [37m[%i][0m", s, TUP_NODE_CMD);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, TUP_NODE_CMD) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_delete_slash(void)
+{
+	tupid_t dt = slash_dt();
+	if(recurse_delete_ghost_tree(dt, 0) < 0)
+		return -1;
+	local_slash_dt = -1;
 	return 0;
 }
 
@@ -3513,7 +3559,7 @@ static int remove_var(struct var_entry *ve)
 
 	if(var_flag_dirs(ve->tent->tnode.tupid) < 0)
 		return -1;
-	if(var_flag_cmds(ve->tent->tnode.tupid) < 0)
+	if(tup_db_modify_cmds_by_input(ve->tent->tnode.tupid) < 0)
 		return -1;
 	if(delete_var_entry(ve->tent->tnode.tupid) < 0)
 		return -1;
@@ -3812,6 +3858,29 @@ tupid_t env_dt(void)
 	}
 	local_env_dt = envtent->tnode.tupid;
 	return local_env_dt;
+}
+
+tupid_t slash_dt(void)
+{
+	struct tup_entry *slashtent;
+
+	if(local_slash_dt != -1)
+		return local_slash_dt;
+
+	if(tup_entry_add(DOT_DT, NULL) < 0)
+		return -1;
+	if(tup_db_select_tent(DOT_DT, "/", &slashtent) < 0) {
+		return -1;
+	}
+	if(!slashtent) {
+		slashtent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
+		if(!slashtent) {
+			fprintf(stderr, "tup error: Unable to create virtual '/' directory for paths outside the tup hierarchy.\n");
+			return -1;
+		}
+	}
+	local_slash_dt = slashtent->tnode.tupid;
+	return local_slash_dt;
 }
 
 int tup_db_scan_begin(struct tupid_entries *root)
@@ -5287,48 +5356,6 @@ static int var_flag_dirs(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return 0;
-}
-
-static int var_flag_cmds(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[_DB_VAR_FLAG_CMDS];
-	static char s[] = "insert or ignore into modify_list select to_id from link, node where from_id=? and to_id=node.id and node.type=?";
-
-	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_CMD);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;

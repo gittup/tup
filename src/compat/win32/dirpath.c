@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -63,7 +63,7 @@ int win32_add_dirpath(const char *path)
 		perror("malloc");
 		return -1;
 	}
-	if(!is_path_sep(path)) {
+	if(!is_full_path(path)) {
 		/* Relative paths get prefixed with getcwd */
 		if(getcwd(buf, sizeof(buf)) == NULL) {
 			perror("getcwd");
@@ -77,7 +77,7 @@ int win32_add_dirpath(const char *path)
 		perror("malloc");
 		return -1;
 	}
-	if(!is_path_sep(path)) {
+	if(!is_full_path(path)) {
 		/* Relative paths */
 		memcpy(dp->path, buf, len1);
 		dp->path[len1] = '\\';

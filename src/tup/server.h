@@ -66,7 +66,7 @@ int server_post_exit(void);
 int server_init(enum server_mode mode);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent);
+		struct tup_entry *dtent, int full_deps);
 int server_postexec(struct server *s);
 int server_is_dead(void);
 int server_parser_start(struct parser_server *ps);

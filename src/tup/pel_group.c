@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -49,13 +49,12 @@ void init_pel_group(struct pel_group *pg)
 	TAILQ_INIT(&pg->path_list);
 }
 
-int split_path_elements(const char *dir, struct pel_group *pg)
+static int split_path_elements(const char *dir, struct pel_group *pg)
 {
 	struct path_element *pel;
 	const char *p = dir;
 
-	if(is_path_sep(dir)) {
-		del_pel_group(pg);
+	if(is_full_path(dir)) {
 		pg->pg_flags = PG_ROOT;
 	}
 
@@ -155,37 +154,40 @@ int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 	return 0;
 }
 
-int get_path_elements(const char *dir, struct pel_group *pg)
+int get_path_elements(const char *path, struct pel_group *pg)
 {
 	struct path_element *pel;
 
 	init_pel_group(pg);
-	if(split_path_elements(dir, pg) < 0)
+	if(split_path_elements(path, pg) < 0)
 		return -1;
 
 	if(pg->pg_flags & PG_ROOT) {
 		const char *top = get_tup_top();
+		int num_pels = 0;
 
-		do {
-			/* Returns are 0 here to indicate file is outside of
-			 * .tup
-			 */
-			if(TAILQ_EMPTY(&pg->path_list) || !is_path_sep(top)) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				return 0;
-			}
+		TAILQ_FOREACH(pel, &pg->path_list, list) {
 			while(*top && is_path_sep(top))
 				top++;
-			pel = TAILQ_FIRST(&pg->path_list);
 			if(name_cmp_n(top, pel->path, pel->len) != 0) {
-				pg->pg_flags |= PG_OUTSIDE_TUP;
-				del_pel_group(pg);
-				return 0;
+				break;
 			}
 			top += pel->len;
-
-			del_pel(pel, pg);
-		} while(*top);
+			num_pels++;
+		}
+		if(*top) {
+			pg->pg_flags |= PG_OUTSIDE_TUP;
+		} else {
+			/* If we're inside tup, remove the part of the path up to where the
+			 * .tup hierarchy starts.
+			 */
+			int x;
+			for(x=0; x<num_pels; x++) {
+				pel = TAILQ_FIRST(&pg->path_list);
+				del_pel(pel, pg);
+			}
+			pg->pg_flags &= ~PG_ROOT;
+		}
 	}
 	return 0;
 }
@@ -254,12 +256,16 @@ void del_pel_group(struct pel_group *pg)
 void print_pel_group(struct pel_group *pg)
 {
 	struct path_element *pel;
+	int slash = 0;
 	printf("Pel[%i, %08x]: ", pg->num_elements, pg->pg_flags);
 	if(pg->pg_flags & PG_ROOT) {
-		printf("/");
+		slash = 1;
 	}
 	TAILQ_FOREACH(pel, &pg->path_list, list) {
-		printf("%.*s/", pel->len, pel->path);
+		if(slash)
+			printf("/");
+		slash = 1;
+		printf("%.*s", pel->len, pel->path);
 	}
 	printf("\n");
 }
