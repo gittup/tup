@@ -85,7 +85,7 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
 static int queue_event(struct inotify_event *e);
 static int flush_queue(void);
-static int autoupdate(void);
+static int autoupdate(const char *cmd);
 static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2);
@@ -113,6 +113,7 @@ static struct monitor_event *queue_last_e = NULL;
 static char **update_argv;
 static int update_argc;
 static int autoupdate_flag = -1;
+static int autoparse_flag = -1;
 static struct moved_from_event_head moved_from_list = LIST_HEAD_INITIALIZER(&moved_from_list);
 
 int monitor_supported(void)
@@ -157,6 +158,12 @@ int monitor(int argc, char **argv)
 			  strcmp(argv[x], "--no-autoupdate") == 0) {
 			argv[x][1] = 0;
 			autoupdate_flag = 0;
+		} else if(strcmp(argv[x], "--autoparse") == 0) {
+			argv[x][1] = 0;
+			autoparse_flag = 1;
+		} else if(strcmp(argv[x], "--no-autoparse") == 0) {
+			argv[x][1] = 0;
+			autoparse_flag = 0;
 		}
 	}
 	update_argc = argc;
@@ -416,6 +423,17 @@ static int autoupdate_enabled(void)
 	return 0;
 }
 
+static int autoparse_enabled(void)
+{
+	int autoparse_config;
+	if(autoparse_flag == 1)
+		return 1;
+	autoparse_config = tup_option_get_flag("monitor.autoparse");
+	if(autoparse_flag == -1 && autoparse_config == 1)
+		return 1;
+	return 0;
+}
+
 static int mod_cb(void *arg, struct tup_entry *tent, int style)
 {
 	if(tent) {}
@@ -457,7 +475,19 @@ static int monitor_loop(void)
 		if(tup_db_commit() < 0)
 			return -1;
 		if(modified) {
-			if(autoupdate() < 0)
+			if(autoupdate("autoupdate") < 0)
+				return -1;
+		}
+	} else if(autoparse_enabled()) {
+		int modified = 0;
+		if(tup_db_begin() < 0)
+			return -1;
+		if(tup_db_select_node_by_flags(mod_cb, &modified, TUP_FLAGS_CREATE) < 0)
+			return -1;
+		if(tup_db_commit() < 0)
+			return -1;
+		if(modified) {
+			if(autoupdate("autoparse") < 0)
 				return -1;
 		}
 	}
@@ -737,14 +767,19 @@ static int flush_queue(void)
 	}
 
 	tup_db_commit();
-	if(events_handled && autoupdate_enabled()) {
-		if(autoupdate() < 0)
-			return -1;
+	if(events_handled) {
+		if(autoupdate_enabled()) {
+			if(autoupdate("autoupdate") < 0)
+				return -1;
+		} else if(autoparse_enabled()) {
+			if(autoupdate("autoparse") < 0)
+				return -1;
+		}
 	}
 	return 0;
 }
 
-static int autoupdate(void)
+static int autoupdate(const char *cmd)
 {
 	/* This runs in a separate process (as opposed to just calling
 	 * updater() directly) so it can properly get the lock from us (the
@@ -777,7 +812,7 @@ static int autoupdate(void)
 			perror("strdup");
 			exit(1);
 		}
-		args[1] = strdup("autoupdate");
+		args[1] = strdup(cmd);
 		if(!args[1]) {
 			perror("strdup");
 			exit(1);

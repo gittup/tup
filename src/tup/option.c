@@ -82,6 +82,7 @@ static struct option {
 	{"display.job_numbers", "1", NULL},
 	{"display.job_time", "1", NULL},
 	{"monitor.autoupdate", "0", NULL},
+	{"monitor.autoparse", "0", NULL},
 	{"monitor.foreground", "0", NULL},
 	{"db.sync", "1", NULL},
 	{"graph.dirs", "0", NULL},
