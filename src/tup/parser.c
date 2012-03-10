@@ -48,6 +48,8 @@
 #define SYNTAX_ERROR -2
 #define CIRCULAR_DEPENDENCY_ERROR -3
 
+#define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
+
 struct name_list_entry {
 	TAILQ_ENTRY(name_list_entry) list;
 	char *path;
@@ -302,7 +304,7 @@ int parse(struct node *n, struct graph *g)
 			rc = 0;
 			goto out_close_dfd;
 		} else {
-			perror("Tupfile");
+			parser_error(&tf, "Tupfile");
 			goto out_close_dfd;
 		}
 	}
@@ -324,12 +326,12 @@ out_free_bs:
 	free(b.s);
 out_close_file:
 	if(close(fd) < 0) {
-		perror("close(fd)");
+		parser_error(&tf, "close(fd)");
 		rc = -1;
 	}
 out_close_dfd:
 	if(close(tf.dfd) < 0) {
-		perror("close(tf.dfd)");
+		parser_error(&tf, "close(tf.dfd)");
 		rc = -1;
 	}
 out_close_vdb:
@@ -355,12 +357,14 @@ out_server_stop:
 	timespan_end(&ts);
 	show_result(n->tent, rc != 0, &ts);
 	if(fflush(tf.f) != 0) {
+		/* Use perror, since we're trying to flush the tf.f output */
 		perror("fflush");
 		rc = -1;
 	}
 	rewind(tf.f);
 	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0);
 	if(fclose(tf.f) != 0) {
+		/* Use perror, since we're trying to close the tf.f output */
 		perror("fclose");
 		rc = -1;
 	}
@@ -604,7 +608,7 @@ static int include_rules(struct tupfile *tf)
 	}
 	path = malloc(num_dotdots * 3 + trlen + 1);
 	if(!path) {
-		perror("malloc");
+		parser_error(tf, "malloc");
 		return -1;
 	}
 
@@ -789,28 +793,28 @@ static int gitignore(struct tupfile *tf)
 
 		fd = openat(tf->dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
 		if(fd < 0) {
-			perror(".gitignore");
+			parser_error(tf, ".gitignore");
 			fprintf(tf->f, "tup error: Unable to create the .gitignore file.\n");
 			return -1;
 		}
 		if(tf->tupid == 1) {
 			if(write(fd, ".tup\n", 5) < 0) {
-				perror("write");
+				parser_error(tf, "write");
 				goto err_close;
 			}
 		}
 		if(write(fd, "/.gitignore\n", 12) < 0) {
-			perror("write");
+			parser_error(tf, "write");
 			goto err_close;
 		}
 		if(s && len) {
 			if(write(fd, s, len) < 0) {
-				perror("write");
+				parser_error(tf, "write");
 				goto err_close;
 			}
 		}
 		if(close(fd) < 0) {
-			perror("close(fd)");
+			parser_error(tf, "close(fd)");
 			return -1;
 		}
 	}
@@ -832,13 +836,13 @@ static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent)
 		return -1;
 	if(unlinkat(dfd, ".gitignore", 0) < 0) {
 		if(errno != ENOENT) {
-			perror("unlinkat");
+			parser_error(tf, "unlinkat");
 			fprintf(tf->f, "tup error: Unable to unlink the .gitignore file.\n");
 			return -1;
 		}
 	}
 	if(close(dfd) < 0) {
-		perror("close(dfd)");
+		parser_error(tf, "close(dfd)");
 		return -1;
 	}
 	return 0;
@@ -880,7 +884,7 @@ static int include_file(struct tupfile *tf, const char *file)
 
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
-		perror(file);
+		parser_error(tf, file);
 		goto out_free_pel;
 	}
 	if(fslurp_null(fd, &incb) < 0)
@@ -893,7 +897,7 @@ out_free:
 	free(incb.s);
 out_close:
 	if(close(fd) < 0) {
-		perror("close(fd)");
+		parser_error(tf, "close(fd)");
 		rc = -1;
 	}
 out_free_pel:
@@ -1052,7 +1056,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		if(cur_br->input) {
 			br->input = strdup(cur_br->input);
 			if(!br->input) {
-				perror("strdup");
+				parser_error(tf, "strdup");
 				goto err_cleanup_br;
 			}
 		} else {
@@ -1060,18 +1064,18 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		}
 		br->command = strdup(cur_br->command);
 		if(!br->command) {
-			perror("strdup");
+			parser_error(tf, "strdup");
 			goto err_cleanup_br;
 		}
 		br->output_pattern = strdup(cur_br->output_pattern);
 		if(!br->output_pattern) {
-			perror("strdup");
+			parser_error(tf, "strdup");
 			goto err_cleanup_br;
 		}
 		if(cur_br->extra_outputs) {
 			br->extra_outputs = strdup(cur_br->extra_outputs);
 			if(!br->extra_outputs) {
-				perror("strdup");
+				parser_error(tf, "strdup");
 				goto err_cleanup_br;
 			}
 		} else {
@@ -1089,7 +1093,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 	alloc_value = strdup(value);
 	if(!alloc_value) {
-		perror("strdup");
+		parser_error(tf, "strdup");
 		return -1;
 	}
 
@@ -1199,7 +1203,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		/* Create new *-chain */
 		ch = malloc(sizeof *ch);
 		if(!ch) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 		TAILQ_INIT(&ch->src_chain_list);
@@ -1216,12 +1220,12 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		struct src_chain *sc;
 		sc = malloc(sizeof *sc);
 		if(!sc) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 		sc->input_pattern = strdup(input_pattern);
 		if(!sc->input_pattern) {
-			perror("strdup");
+			parser_error(tf, "strdup");
 			free(sc);
 			return -1;
 		}
@@ -1258,7 +1262,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 
 		bal = malloc(sizeof *bal);
 		if(!bal) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 		bal->br = br;
@@ -1891,7 +1895,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		init_name_list(&tmp_nl);
 		tmp_nle.path = malloc(pl->pel->len + 1);
 		if(!tmp_nle.path) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 		memcpy(tmp_nle.path, pl->pel->path, pl->pel->len);
@@ -1950,7 +1954,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 
 	inp = strdup(input_pattern);
 	if(!inp) {
-		perror("strdup");
+		parser_error(tf, "strdup");
 		return -1;
 	}
 
@@ -1970,7 +1974,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 
 				tinput = malloc(pl->pel->len + 1);
 				if(!tinput) {
-					perror("malloc");
+					parser_error(tf, "malloc");
 					return -1;
 				}
 				memcpy(tinput, pl->pel->path, pl->pel->len);
@@ -2034,7 +2038,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 
 		pl = malloc(sizeof *pl);
 		if(!pl) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 		pl->path = NULL;
@@ -2475,7 +2479,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 		onle = malloc(sizeof *onle);
 		if(!onle) {
-			perror("malloc");
+			parser_error(tf, "malloc");
 			return -1;
 		}
 
@@ -2578,7 +2582,7 @@ out_pl:
 
 	cmd_tt = malloc(sizeof *cmd_tt);
 	if(!cmd_tt) {
-		perror("malloc");
+		parser_error(tf, "malloc");
 		return -1;
 	}
 	cmd_tt->tupid = cmdid;
@@ -2827,7 +2831,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 
 	s = malloc(clen + 1);
 	if(!s) {
-		perror("malloc");
+		parser_error(tf, "malloc");
 		return NULL;
 	}
 
@@ -3101,7 +3105,7 @@ static char *eval(struct tupfile *tf, const char *string)
 
 	ret = malloc(len+1);
 	if(!ret) {
-		perror("malloc");
+		parser_error(tf, "malloc");
 		return NULL;
 	}
 
