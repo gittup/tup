@@ -446,34 +446,17 @@ check_no_windows()
 
 check_tup_no_suid()
 {
-	case $tupos in
-	CYGWIN*)
-		echo "This platform does not require suid. Skipping test."
-		eotup
-		;;
-	esac
-	if [ "`whoami`" = "root" ]; then
-		echo "Tup is running as root, but this test requires that it is not. Skipping test."
-		eotup
-	fi
-	if ls -l `which tup` | grep ^-rws > /dev/null; then
-		echo "Tup has suid, but this test requires that it does not. Skipping test."
+	if ! tup privileged; then
+		echo "Tup is privileged, but this test requires that it does not. Skipping test."
 		eotup
 	fi
 }
 
 check_tup_suid()
 {
-	case $tupos in
-	CYGWIN*)
-		return 0
-		;;
-	esac
-	if ! ls -l `which tup` | grep ^-rws > /dev/null; then
-		if [ "`whoami`" != "root" ]; then
-			echo "Tup needs to have suid root for this test to run. Skipping test."
-			eotup
-		fi
+	if tup privileged; then
+		echo "Tup needs to be privileged for this test to run. Skipping test."
+		eotup
 	fi
 }
 

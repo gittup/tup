@@ -212,6 +212,8 @@ int main(int argc, char **argv)
 		rc = ghost_check();
 	} else if(strcmp(cmd, "monitor_supported") == 0) {
 		rc = monitor_supported();
+	} else if(strcmp(cmd, "privileged") == 0) {
+		rc = tup_privileged();
 	} else {
 		fprintf(stderr, "Unknown tup command: %s\n", cmd);
 		rc = 1;
