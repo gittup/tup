@@ -431,6 +431,9 @@ static remove_t				remove_orig;
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
 
+static const char *strcasestr(const char *arg1, const char *arg2);
+static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2);
+
 static char s_depfilename[PATH_MAX];
 static HANDLE deph = INVALID_HANDLE_VALUE;
 
@@ -1139,7 +1142,9 @@ BOOL WINAPI CreateProcessA_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1181,7 +1186,9 @@ BOOL WINAPI CreateProcessW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1224,7 +1231,9 @@ BOOL WINAPI CreateProcessAsUserA_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1267,7 +1276,9 @@ BOOL WINAPI CreateProcessAsUserW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1310,7 +1321,9 @@ BOOL WINAPI CreateProcessWithLogonW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1349,7 +1362,9 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 		return 0;
 	}
 
-	tup_inject_dll(lpProcessInformation, s_depfilename);
+	/* Ignore mspdbsrv.exe, since it continues to run in the background */
+	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1564,7 +1579,7 @@ void tup_inject_setexecdir(const char* dir)
 
 /* -------------------------------------------------------------------------- */
 
-const char *strcasestr(const char *arg1, const char *arg2)
+static const char *strcasestr(const char *arg1, const char *arg2)
 {
 	const char *a, *b;
 
@@ -1584,7 +1599,7 @@ const char *strcasestr(const char *arg1, const char *arg2)
 	return(NULL);
 }
 
-const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2)
+static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2)
 {
 	const wchar_t *a, *b;
 
