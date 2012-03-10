@@ -34,6 +34,7 @@
 #include "container.h"
 #include "option.h"
 #include "environ.h"
+#include "timespan.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -164,25 +165,34 @@ static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head);
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
 
+static char transaction_buf[1024];
+static struct timespan transaction_ts;
+
 static void transaction_check(const char *format, ...)
 {
 	if(sql_debug || !transaction) {
 		va_list ap;
 		va_start(ap, format);
-		if(!transaction) {
-			fprintf(stderr, "[41m");
-		}
-		vfprintf(stderr, format, ap);
+
+		timespan_start(&transaction_ts);
+		vsnprintf(transaction_buf, sizeof(transaction_buf), format, ap);
+		transaction_buf[sizeof(transaction_buf)-1] = 0;
 		va_end(ap);
 		if(!transaction) {
-			fprintf(stderr, "[0m");
+			fprintf(stderr, "[41m%s[0m\n", transaction_buf);
+			fprintf(stderr, "tup internal error: Database query must be in a transaction.\n");
+			exit(1);
 		}
-		fprintf(stderr, "\n");
 	}
-	if(!transaction) {
-		fprintf(stderr, "tup internal error: Database query must be in a transaction.\n");
-		exit(1);
+}
+
+static int msqlite3_reset(sqlite3_stmt *stmt)
+{
+	if(sql_debug) {
+		timespan_end(&transaction_ts);
+		fprintf(stderr, "[%fs] %s\n", timespan_seconds(&transaction_ts), transaction_buf);
 	}
+	return sqlite3_reset(stmt);
 }
 
 int tup_db_open(void)
@@ -709,7 +719,7 @@ int tup_db_begin(void)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -741,7 +751,7 @@ int tup_db_commit(void)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -771,7 +781,7 @@ int tup_db_rollback(void)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1011,7 +1021,7 @@ int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
 	rc = 0;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1095,7 +1105,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", sql);
 		return -1;
@@ -1158,7 +1168,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1247,7 +1257,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1305,7 +1315,7 @@ int delete_node(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1416,7 +1426,7 @@ int tup_db_modify_dir(tupid_t dt)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1523,7 +1533,7 @@ int tup_db_open_tupid(tupid_t tupid)
 		rc = -1;
 		goto out_reset;
 	}
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		free(path);
@@ -1552,7 +1562,7 @@ int tup_db_open_tupid(tupid_t tupid)
 	return rc;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1604,7 +1614,7 @@ int tup_db_is_root_node(tupid_t tupid)
 		rc = 1;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1660,7 +1670,7 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1712,7 +1722,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1760,7 +1770,7 @@ int tup_db_set_type(struct tup_entry *tent, int type)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1802,7 +1812,7 @@ int tup_db_set_mtime(struct tup_entry *tent, time_t mtime)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1894,7 +1904,7 @@ static int generated_nodelist_len(tupid_t dt)
 	rc = sqlite3_column_int(*stmt, 0);
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1960,7 +1970,7 @@ static int get_generated_nodelist(char *dest, tupid_t dt,
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2021,7 +2031,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 		rc = -1;
 		goto out_reset;
 	}
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		free(path);
@@ -2058,7 +2068,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 	return 0;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2109,7 +2119,7 @@ int tup_db_add_dir_create_list(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2146,7 +2156,7 @@ int tup_db_add_create_list(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2183,7 +2193,7 @@ int tup_db_add_modify_list(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2235,7 +2245,7 @@ int tup_db_in_create_list(tupid_t tupid)
 	rc = 1;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2281,7 +2291,7 @@ int tup_db_in_modify_list(tupid_t tupid)
 	rc = 1;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2312,7 +2322,7 @@ int tup_db_unflag_create(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2349,7 +2359,7 @@ int tup_db_unflag_modify(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2417,7 +2427,7 @@ static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head)
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2476,7 +2486,7 @@ static int get_dir_entries(tupid_t dt, struct half_entry_head *head)
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2559,7 +2569,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2618,7 +2628,7 @@ int tup_db_link_style(tupid_t a, tupid_t b, int *style)
 	rc = 0;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2677,7 +2687,7 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2716,7 +2726,7 @@ int tup_db_delete_links(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2779,7 +2789,7 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, i
 		}
 	}
 
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2810,7 +2820,7 @@ int tup_db_modify_cmds_by_output(tupid_t output, int *modified)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2855,7 +2865,7 @@ int tup_db_modify_cmds_by_input(tupid_t input)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2897,7 +2907,7 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2965,7 +2975,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3032,7 +3042,7 @@ int tup_db_config_set_int(const char *lval, int x)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3087,7 +3097,7 @@ int tup_db_config_get_int(const char *lval, int def, int *result)
 	rc = 0;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3128,7 +3138,7 @@ int tup_db_config_set_string(const char *lval, const char *rval)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3170,7 +3180,7 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3233,7 +3243,7 @@ static struct var_entry *get_var_id(struct tup_entry *tent,
 	ve = vardb_set2(&atvardb, var, varlen, value, tent);
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return NULL;
@@ -3342,7 +3352,7 @@ int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
 	rc = 0;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3412,7 +3422,7 @@ int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const 
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3906,7 +3916,7 @@ static int files_to_tree(struct tupid_entries *root)
 			break;
 	}
 
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -3963,7 +3973,7 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 		}
 	}
 
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4025,7 +4035,7 @@ int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 		}
 	}
 
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4567,7 +4577,7 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4655,7 +4665,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4709,7 +4719,7 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4756,7 +4766,7 @@ static int link_update(tupid_t a, tupid_t b, int style)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4798,7 +4808,7 @@ static int link_remove(tupid_t a, tupid_t b)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4854,7 +4864,7 @@ static int node_has_ghosts(tupid_t tupid)
 	rc = 1;
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -4922,7 +4932,7 @@ static int add_ghost_links(tupid_t tupid)
 	} while(1);
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5047,7 +5057,7 @@ static int ghost_reclaimable1(tupid_t tupid)
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5101,7 +5111,7 @@ static int ghost_reclaimable2(tupid_t tupid)
 	}
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5172,7 +5182,7 @@ static int get_db_var_tree(struct vardb *vdb)
 	} while(1);
 
 out_reset:
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5283,7 +5293,7 @@ static int var_flag_dirs(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5325,7 +5335,7 @@ static int var_flag_cmds(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5362,7 +5372,7 @@ static int delete_var_entry(tupid_t tupid)
 	}
 
 	rc = sqlite3_step(*stmt);
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
