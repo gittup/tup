@@ -102,7 +102,8 @@ enum {
 	_DB_LINK_REMOVE,
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST_LINKS,
-	_DB_GHOST_RECLAIMABLE,
+	_DB_GHOST_RECLAIMABLE1,
+	_DB_GHOST_RECLAIMABLE2,
 	_DB_GET_DB_VAR_TREE,
 	_DB_VAR_FLAG_DIRS,
 	_DB_VAR_FLAG_CMDS,
@@ -147,6 +148,8 @@ static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int reclaim_ghosts(void);
 static int ghost_reclaimable(tupid_t tupid);
+static int ghost_reclaimable1(tupid_t tupid);
+static int ghost_reclaimable2(tupid_t tupid);
 static int get_db_var_tree(struct vardb *vdb);
 static int get_file_var_tree(struct vardb *vdb, int fd);
 static int var_flag_dirs(tupid_t tupid);
@@ -4984,9 +4987,27 @@ static int reclaim_ghosts(void)
 
 static int ghost_reclaimable(tupid_t tupid)
 {
+	int rc1, rc2;
+
+	rc1 = ghost_reclaimable1(tupid);
+	rc2 = ghost_reclaimable2(tupid);
+
+	/* If either sub-query fails, we fail */
+	if(rc1 < 0 || rc2 < 0)
+		return -1;
+	/* If both checks say it is reclaimable, then it is reclaimable */
+	if(rc1 == 1 && rc2 == 1)
+		return 1;
+	/* Otherwise, it is not reclaimable */
+	return 0;
+}
+
+static int ghost_reclaimable1(tupid_t tupid)
+{
 	int rc = -1;
-	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE];
-	static char s[] = "select id from node where dir=? union select from_id from link where from_id=?";
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE1];
+	static char s[] = "select exists(select 1 from node where dir=?)";
 
 	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
@@ -5002,7 +5023,56 @@ static int ghost_reclaimable(tupid_t tupid)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+
+	rc = sqlite3_step(*stmt);
+
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected ghost_reclaimable1() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are reclaimable, otherwise we aren't */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected ghost_reclaimable1() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
+	if(sqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+static int ghost_reclaimable2(tupid_t tupid)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE2];
+	static char s[] = "select exists(select 1 from link where from_id=?)";
+
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -5011,8 +5081,7 @@ static int ghost_reclaimable(tupid_t tupid)
 	rc = sqlite3_step(*stmt);
 
 	if(rc == SQLITE_DONE) {
-		/* Ghost is unused, so it is reclaimable */
-		rc = 1;
+		fprintf(stderr, "tup error: Expected ghost_reclaimable2() to get an SQLite row returned.\n");
 		goto out_reset;
 	}
 	if(rc != SQLITE_ROW) {
@@ -5020,7 +5089,16 @@ static int ghost_reclaimable(tupid_t tupid)
 		fprintf(stderr, "Statement was: %s\n", s);
 		goto out_reset;
 	}
-	rc = 0;
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are reclaimable, otherwise we aren't */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected ghost_reclaimable2() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
 
 out_reset:
 	if(sqlite3_reset(*stmt) != 0) {
