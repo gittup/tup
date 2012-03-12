@@ -26,6 +26,8 @@ CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wwrite-strings
 CFLAGS += -fno-common
 CFLAGS += -I$(TUP_CWD)/src
+
+export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse --cflags`
 
 # Compatibility function prototypes and include path for wrapper functions
