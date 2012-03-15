@@ -57,7 +57,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
-		tupid = tup_file_mod_mtime(dt, file, buf.MTIME, 0);
+		tupid = tup_file_mod_mtime(dt, file, buf.MTIME, 0, 0, NULL);
 		if(tupid < 0)
 			return -1;
 		if(root) {

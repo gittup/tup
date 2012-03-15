@@ -67,7 +67,7 @@ tupid_t create_dir_file(tupid_t dt, const char *path)
 	return -1;
 }
 
-tupid_t tup_file_mod(tupid_t dt, const char *file)
+tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 {
 	int fd;
 	struct stat buf;
@@ -88,18 +88,18 @@ tupid_t tup_file_mod(tupid_t dt, const char *file)
 		perror("close(fd)");
 		return -1;
 	}
-	return tup_file_mod_mtime(dt, file, buf.MTIME, 1);
+	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
 
 enoent:
-	return tup_file_del(dt, file, -1);
+	return tup_file_del(dt, file, -1, modified);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
-			   int force)
+			   int force, int ignore_generated, int *modified)
 {
 	struct tup_entry *tent;
 	int new = 0;
-	int modified = 0;
+	int changed = 0;
 
 	if(tup_db_select_tent(dt, file, &tent) < 0)
 		return -1;
@@ -109,8 +109,15 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			return -1;
 		new = 1;
 	} else {
+		/* If we are ignoring generated files (ie: from the monitor when it catches
+		 * an event from the updater creating output files), then disable force.
+		 * In this case we only want to mark the generated files again if the user
+		 * is actually changing them, which would trigger the mtime logic.
+		 */
+		if(ignore_generated && tent->type == TUP_NODE_GENERATED)
+			force = 0;
 		if(tent->mtime != mtime || force)
-			modified = 1;
+			changed = 1;
 
 		if(tent->type == TUP_NODE_GHOST) {
 			if(ghost_to_file(tent) < 0)
@@ -123,7 +130,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				return -1;
 			new = 1;
 		}
-		if(modified) {
+		if(changed) {
 			if(tent->type == TUP_NODE_GENERATED) {
 				int tmp = 0;
 				if(tup_db_modify_cmds_by_output(tent->tnode.tupid, &tmp) < 0)
@@ -149,7 +156,8 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		}
 	}
 
-	if(new || modified) {
+	if(new || changed) {
+		if(modified) *modified = 1;
 		if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
 			/* If tup.config was modified, put the @-directory in
 			 * the create list so we can import any variables that
@@ -175,7 +183,7 @@ static int check_rm_tup_config(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_file_del(tupid_t dt, const char *file, int len)
+int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 {
 	struct tup_entry *tent;
 
@@ -192,6 +200,8 @@ int tup_file_del(tupid_t dt, const char *file, int len)
 		 */
 		return 0;
 	}
+	if(modified) *modified = 1;
+
 	if(check_rm_tup_config(tent) < 0)
 		return -1;
 

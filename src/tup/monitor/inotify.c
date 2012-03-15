@@ -70,6 +70,7 @@ struct monitor_event {
 	/* from_event is valid if mask is IN_MOVED_TO or IN_MOVED_FROM */
 	TAILQ_ENTRY(monitor_event) list;
 	struct moved_from_event *from_event;
+	int mem;
 	struct inotify_event e;
 };
 TAILQ_HEAD(monitor_event_head, monitor_event);
@@ -95,7 +96,7 @@ static int ephemeral_event(struct inotify_event *e);
 static struct moved_from_event *add_from_event(struct monitor_event *m);
 static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void monitor_rmdir_cb(tupid_t dt);
-static int handle_event(struct monitor_event *m);
+static int handle_event(struct monitor_event *m, int *modified);
 static void pinotify(void);
 static void sighandler(int sig);
 
@@ -534,7 +535,21 @@ static int monitor_loop(void)
 				}
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
-					rc = flush_queue(1);
+					int pid;
+					/* An autoupdate process will get the lock, so the
+					 * monitor will end up here. We don't want to try
+					 * to start another autoupdate in this case. However,
+					 * if another tup process (such as 'tup flush') is
+					 * executed, we do want to trigger an autoupdate if
+					 * necessary.
+					 */
+					if(tup_db_begin() < 0)
+						return -1;
+					if(tup_db_config_get_int(AUTOUPDATE_PID, -1, &pid) < 0)
+						return -1;
+					if(tup_db_commit() < 0)
+						return -1;
+					rc = flush_queue(pid == -1);
 					if(rc < 0)
 						return rc;
 					locked = 0;
@@ -570,11 +585,9 @@ static int monitor_loop(void)
 					DEBUGP("monitor ON\n");
 				}
 			} else {
-				if(locked) {
-					rc = queue_event(e);
-					if(rc < 0)
-						return rc;
-				}
+				rc = queue_event(e);
+				if(rc < 0)
+					return rc;
 			}
 		}
 
@@ -587,10 +600,12 @@ static int monitor_loop(void)
 			FD_SET(inot_fd, &rfds);
 			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
 			if(ret == 0) {
-				/* Timeout, flush queue */
-				rc = flush_queue(1);
-				if(rc < 0)
-					return rc;
+				if(locked) {
+					/* Timeout, flush queue */
+					rc = flush_queue(1);
+					if(rc < 0)
+						return rc;
+				}
 			}
 		}
 	} while(1);
@@ -665,6 +680,7 @@ static int events_queued(void)
 	return !TAILQ_EMPTY(&event_list);
 }
 
+static int total_mem = 0;
 static int queue_event(struct inotify_event *e)
 {
 	struct moved_from_event *mfe = NULL;
@@ -693,6 +709,8 @@ static int queue_event(struct inotify_event *e)
 		perror("malloc");
 		return -1;
 	}
+	m->mem = sizeof(*m) + e->len;
+	total_mem += m->mem;
 
 	queue_last_e = m;
 
@@ -716,8 +734,10 @@ static int flush_queue(int do_autoupdate)
 
 	tup_db_begin();
 
+	DEBUGP("[36mFlush[%i]: mem=%i events_handled=%i[0m\n", do_autoupdate, total_mem, events_handled);
 	while(!TAILQ_EMPTY(&event_list)) {
 		struct inotify_event *e;
+		int modified = 0;
 		m = TAILQ_FIRST(&event_list);
 
 		e = &m->e;
@@ -727,14 +747,17 @@ static int flush_queue(int do_autoupdate)
 			overflow = 1;
 		} else {
 			if(e->mask != 0) {
-				if(handle_event(m) < 0) {
+				if(handle_event(m, &modified) < 0) {
 					tup_db_rollback();
 					return -1;
 				}
 			}
 		}
-		events_handled = 1;
+		if(modified) {
+			events_handled = 1;
+		}
 		TAILQ_REMOVE(&event_list, m, list);
+		total_mem -= m->mem;
 		free(m);
 	}
 
@@ -989,7 +1012,7 @@ static void monitor_rmdir_cb(tupid_t dt)
 	}
 }
 
-static int handle_event(struct monitor_event *m)
+static int handle_event(struct monitor_event *m, int *modified)
 {
 	struct dircache *dc;
 
@@ -1046,12 +1069,13 @@ static int handle_event(struct monitor_event *m)
 				return -1;
 			}
 		} else {
-			if(tup_file_mod(dc->dt_node.tupid, m->e.name) < 0)
+			if(tup_file_mod(dc->dt_node.tupid, m->e.name, NULL) < 0)
 				return -1;
-			if(tup_file_del(from_dc->dt_node.tupid, mfe->m->e.name, -1) < 0)
+			if(tup_file_del(from_dc->dt_node.tupid, mfe->m->e.name, -1, NULL) < 0)
 				return -1;
 		}
 		free(mfe);
+		*modified = 1;
 		return 0;
 	}
 
@@ -1070,15 +1094,16 @@ static int handle_event(struct monitor_event *m)
 			perror("close(fd)");
 			return -1;
 		}
+		*modified = 1;
 		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
-		if(tup_file_mod(dc->dt_node.tupid, m->e.name) < 0)
+		if(tup_file_mod(dc->dt_node.tupid, m->e.name, modified) < 0)
 			return -1;
 	}
 	if(m->e.mask & IN_DELETE) {
-		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1) < 0)
+		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1, modified) < 0)
 			return -1;
 	}
 	if(m->e.mask & IN_MOVED_FROM) {
@@ -1088,7 +1113,7 @@ static int handle_event(struct monitor_event *m)
 		 * jurisdiction, or if the event is simply unloved and dies
 		 * alone.
 		 */
-		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1) < 0)
+		if(tup_file_del(dc->dt_node.tupid, m->e.name, -1, modified) < 0)
 			return -1;
 
 		/* An IN_MOVED_FROM event points to itself */

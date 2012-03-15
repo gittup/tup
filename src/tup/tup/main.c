@@ -734,7 +734,7 @@ static int touch(int argc, char **argv)
 			if(create_dir_file(dt, pel->path) < 0)
 				return -1;
 		} else if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
-			if(tup_file_mod_mtime(dt, pel->path, buf.MTIME, 1) < 0)
+			if(tup_file_mod_mtime(dt, pel->path, buf.MTIME, 1, 0, NULL) < 0)
 				return -1;
 		}
 		free(pel);
@@ -796,7 +796,7 @@ static int rm(int argc, char **argv)
 			return -1;
 		}
 		if(pel) {
-			if(tup_file_del(dt, pel->path, pel->len) < 0)
+			if(tup_file_del(dt, pel->path, pel->len, NULL) < 0)
 				return -1;
 			free(pel);
 		}

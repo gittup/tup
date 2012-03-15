@@ -232,6 +232,19 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 	return 0;
 }
 
+static int file_set_mtime(struct tup_entry *tent, const char *file)
+{
+	struct stat buf;
+	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
+		perror(file);
+		return -1;
+	}
+	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
+		return -1;
+	return 0;
+}
+
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root)
 {
@@ -282,23 +295,12 @@ static int add_parser_files_locked(struct file_info *finfo,
 				perror("renameat");
 				return -1;
 			}
+			if(file_set_mtime(tent, map->realname) < 0)
+				return -1;
 		}
 		del_map(map);
 	}
 	if(map_bork)
-		return -1;
-	return 0;
-}
-
-static int file_set_mtime(struct tup_entry *tent, const char *file)
-{
-	struct stat buf;
-	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
-		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
-		perror(file);
-		return -1;
-	}
-	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
 		return -1;
 	return 0;
 }

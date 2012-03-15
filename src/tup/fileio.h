@@ -35,10 +35,10 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
 tupid_t create_command_file(tupid_t dt, const char *cmd);
 tupid_t create_dir_file(tupid_t dt, const char *path);
-tupid_t tup_file_mod(tupid_t dt, const char *file);
+tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
-			   int force);
-int tup_file_del(tupid_t dt, const char *file, int len);
+			   int force, int ignore_generated, int *modified);
+int tup_file_del(tupid_t dt, const char *file, int len, int *modified);
 int tup_file_missing(struct tup_entry *tent);
 int tup_del_id_force(tupid_t tupid, int type);
 void tup_register_rmdir_callback(void (*callback)(tupid_t tupid));

@@ -794,7 +794,7 @@ static int gitignore(struct tupfile *tf)
 		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 			return -1;
 		if(!tent) {
-			if(tup_db_node_insert(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1) == NULL)
+			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, &tent) < 0)
 				return -1;
 		} else {
 			tree_entry_remove(&tf->g->gen_delete_root,
