@@ -84,7 +84,7 @@ static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
 static int events_queued(void);
 static int queue_event(struct inotify_event *e);
-static int flush_queue(void);
+static int flush_queue(int do_autoupdate);
 static int autoupdate(const char *cmd);
 static void *wait_thread(void *arg);
 static int skip_event(struct inotify_event *e);
@@ -542,7 +542,7 @@ static int monitor_loop(void)
 				}
 			} else if(e->wd == obj_wd) {
 				if((e->mask & IN_OPEN) && locked) {
-					rc = flush_queue();
+					rc = flush_queue(1);
 					if(rc < 0)
 						return rc;
 					locked = 0;
@@ -596,7 +596,7 @@ static int monitor_loop(void)
 			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
 			if(ret == 0) {
 				/* Timeout, flush queue */
-				rc = flush_queue();
+				rc = flush_queue(1);
 				if(rc < 0)
 					return rc;
 			}
@@ -702,7 +702,7 @@ static int queue_event(struct inotify_event *e)
 	new_start = queue_end;
 	new_end = new_start + sizeof(*m) + e->len;
 	if(new_end >= (signed)sizeof(queue_buf)) {
-		rc = flush_queue();
+		rc = flush_queue(0);
 		if(rc < 0)
 			return rc;
 		new_start = queue_end;
@@ -728,9 +728,9 @@ static int queue_event(struct inotify_event *e)
 	return 0;
 }
 
-static int flush_queue(void)
+static int flush_queue(int do_autoupdate)
 {
-	int events_handled = 0;
+	static int events_handled = 0;
 	int overflow = 0;
 
 	tup_db_begin();
@@ -767,7 +767,8 @@ static int flush_queue(void)
 	}
 
 	tup_db_commit();
-	if(events_handled) {
+	if(events_handled && do_autoupdate) {
+		events_handled = 0;
 		if(autoupdate_enabled()) {
 			if(autoupdate("autoupdate") < 0)
 				return -1;
