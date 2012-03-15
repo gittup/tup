@@ -761,12 +761,12 @@ static int flush_queue(int do_autoupdate)
 	queue_end = 0;
 	queue_last_e = NULL;
 
+	tup_db_commit();
 	if(overflow) {
 		fprintf(stderr, "Received overflow event - restarting monitor.\n");
 		return MONITOR_LOOP_RETRY;
 	}
 
-	tup_db_commit();
 	if(events_handled && do_autoupdate) {
 		events_handled = 0;
 		if(autoupdate_enabled()) {
