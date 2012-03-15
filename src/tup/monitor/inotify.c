@@ -68,9 +68,11 @@
 struct moved_from_event;
 struct monitor_event {
 	/* from_event is valid if mask is IN_MOVED_TO or IN_MOVED_FROM */
+	TAILQ_ENTRY(monitor_event) list;
 	struct moved_from_event *from_event;
 	struct inotify_event e;
 };
+TAILQ_HEAD(monitor_event_head, monitor_event);
 
 struct moved_from_event {
 	LIST_ENTRY(moved_from_event) list;
@@ -78,7 +80,6 @@ struct moved_from_event {
 };
 LIST_HEAD(moved_from_event_head, moved_from_event);
 
-static struct monitor_event *get_monitor_event(int pos);
 static int monitor_set_pid(int pid);
 static int monitor_loop(void);
 static int wp_callback(tupid_t newdt, int dfd, const char *file);
@@ -106,9 +107,7 @@ static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = 0,
 };
-static char queue_buf[(sizeof(struct inotify_event) + 16) * 1024];
-static int queue_start = 0;
-static int queue_end = 0;
+static struct monitor_event_head event_list;
 static struct monitor_event *queue_last_e = NULL;
 static char **update_argv;
 static int update_argc;
@@ -131,6 +130,8 @@ int monitor(int argc, char **argv)
 	if(server_post_exit() < 0)
 		return -1;
 	foreground = tup_option_get_flag("monitor.foreground");
+
+	TAILQ_INIT(&event_list);
 
 	/* Arguments are cleared to "-" if they are used by the monitor. These
 	 * args are also passed on to the autoupdate process if that feature is
@@ -303,15 +304,6 @@ close_inot:
 		rc = -1;
 	}
 	return rc;
-}
-
-static struct monitor_event *get_monitor_event(int pos)
-{
-	/* This is a helper function to avoid the cast warning about
-	 * increasing alignment in clang.
-	 */
-	void *p = &queue_buf[pos];
-	return p;
 }
 
 static int monitor_set_pid(int pid)
@@ -670,16 +662,13 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 
 static int events_queued(void)
 {
-	return queue_start != queue_end;
+	return !TAILQ_EMPTY(&event_list);
 }
 
 static int queue_event(struct inotify_event *e)
 {
-	int new_start;
-	int new_end;
 	struct moved_from_event *mfe = NULL;
 	struct monitor_event *m;
-	int rc;
 
 	if(skip_event(e))
 		return 0;
@@ -699,22 +688,13 @@ static int queue_event(struct inotify_event *e)
 	DEBUGP("[33mQueue[%li]: %i, '%s' %08x[0m\n",
 	       (long)sizeof(*e)+e->len, e->wd, e->len ? e->name : "", e->mask);
 
-	new_start = queue_end;
-	new_end = new_start + sizeof(*m) + e->len;
-	if(new_end >= (signed)sizeof(queue_buf)) {
-		rc = flush_queue(0);
-		if(rc < 0)
-			return rc;
-		new_start = queue_end;
-		new_end = new_start + sizeof(*m) + e->len;
-		if(new_end >= (signed)sizeof(queue_buf)) {
-			fprintf(stderr, "Error: Event dropped\n");
-			return MONITOR_LOOP_RETRY;
-		}
+	m = malloc(sizeof(*m) + e->len);
+	if(!m) {
+		perror("malloc");
+		return -1;
 	}
 
-	queue_last_e = get_monitor_event(new_start);
-	m = queue_last_e;
+	queue_last_e = m;
 
 	memcpy(&m->e, e, sizeof(*e));
 	memcpy(m->e.name, e->name, e->len);
@@ -723,23 +703,23 @@ static int queue_event(struct inotify_event *e)
 	if(e->mask & IN_MOVED_FROM) {
 		m->from_event = add_from_event(m);
 	}
+	TAILQ_INSERT_TAIL(&event_list, m, list);
 
-	queue_end += sizeof(*m) + e->len;
 	return 0;
 }
 
 static int flush_queue(int do_autoupdate)
 {
 	static int events_handled = 0;
+	struct monitor_event *m;
 	int overflow = 0;
 
 	tup_db_begin();
 
-	while(queue_start < queue_end) {
-		struct monitor_event *m;
+	while(!TAILQ_EMPTY(&event_list)) {
 		struct inotify_event *e;
+		m = TAILQ_FIRST(&event_list);
 
-		m = get_monitor_event(queue_start);
 		e = &m->e;
 		DEBUGP("Handle[%li]: '%s' %08x\n",
 		       (long)sizeof(*m) + e->len, e->len ? e->name : "", e->mask);
@@ -753,12 +733,11 @@ static int flush_queue(int do_autoupdate)
 				}
 			}
 		}
-		queue_start += sizeof(*m) + e->len;
 		events_handled = 1;
+		TAILQ_REMOVE(&event_list, m, list);
+		free(m);
 	}
 
-	queue_start = 0;
-	queue_end = 0;
 	queue_last_e = NULL;
 
 	tup_db_commit();
@@ -910,7 +889,6 @@ static int same_event(struct inotify_event *e1, struct inotify_event *e2)
 
 static int ephemeral_event(struct inotify_event *e)
 {
-	int x;
 	struct monitor_event *m;
 	struct inotify_event *qe;
 	int create_and_delete = 0;
@@ -930,8 +908,7 @@ static int ephemeral_event(struct inotify_event *e)
 		return -1;
 	}
 
-	for(x=queue_start; x<queue_end;) {
-		m = get_monitor_event(x);
+	TAILQ_FOREACH(m, &event_list, list) {
 		qe = &m->e;
 
 		if(same_event(qe, e) == 0) {
@@ -964,8 +941,6 @@ static int ephemeral_event(struct inotify_event *e)
 				qe->mask = 0;
 			}
 		}
-
-		x += sizeof(*m) + qe->len;
 	}
 
 	return rc;
