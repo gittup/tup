@@ -34,7 +34,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-static int tup_del_id_type(tupid_t tupid, int type, int force);
+static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified);
 static int ghost_to_file(struct tup_entry *tent);
 
 static void (*rmdir_callback)(tupid_t tupid);
@@ -124,7 +124,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 				return -1;
 		} else if(tent->type != TUP_NODE_FILE &&
 			  tent->type != TUP_NODE_GENERATED) {
-			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1) < 0)
+			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1, NULL) < 0)
 				return -1;
 			if(create_name_file(dt, file, mtime, &tent) < 0)
 				return -1;
@@ -200,7 +200,6 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 		 */
 		return 0;
 	}
-	if(modified) *modified = 1;
 
 	if(check_rm_tup_config(tent) < 0)
 		return -1;
@@ -212,19 +211,19 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 		if(tup_db_add_create_list(dt) < 0)
 			return -1;
 	}
-	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
+	return tup_del_id_type(tent->tnode.tupid, tent->type, 0, modified);
 }
 
 int tup_file_missing(struct tup_entry *tent)
 {
 	if(check_rm_tup_config(tent) < 0)
 		return -1;
-	return tup_del_id_type(tent->tnode.tupid, tent->type, 0);
+	return tup_del_id_type(tent->tnode.tupid, tent->type, 0, NULL);
 }
 
 int tup_del_id_force(tupid_t tupid, int type)
 {
-	return tup_del_id_type(tupid, type, 1);
+	return tup_del_id_type(tupid, type, 1, NULL);
 }
 
 void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
@@ -232,7 +231,7 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 	rmdir_callback = callback;
 }
 
-static int tup_del_id_type(tupid_t tupid, int type, int force)
+static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 {
 	if(type == TUP_NODE_DIR) {
 		/* Recurse and kill anything below this dir. Note that
@@ -250,9 +249,9 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 	 * only happens if a file was deleted outside of the parser (!force).
 	 */
 	if(type == TUP_NODE_GENERATED && !force) {
-		int modified = 0;
+		int changed = 0;
 
-		if(tup_db_modify_cmds_by_output(tupid, &modified) < 0)
+		if(tup_db_modify_cmds_by_output(tupid, &changed) < 0)
 			return -1;
 
 		/* Since the file has been removed, make sure it is no longer
@@ -265,7 +264,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.
 		 */
-		if(modified == 1) {
+		if(changed == 1) {
 			struct tup_entry *tent;
 
 			tent = tup_entry_find(tupid);
@@ -276,6 +275,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 				print_tup_entry(stderr, tent);
 				fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
 			}
+			if(modified) *modified = 1;
 		}
 
 		/* If we're not forcing the deletion, just return here (the
@@ -285,6 +285,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int force)
 		 */
 		return 0;
 	}
+	if(modified) *modified = 1;
 
 	if(type == TUP_NODE_FILE || type == TUP_NODE_DIR) {
 		/* It's possible this is a file that was included by a Tupfile.
