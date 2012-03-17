@@ -1085,6 +1085,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
 		int fd;
 		int rc;
+		struct tup_entry *tent;
 
 		fd = tup_db_open_tupid(dc->dt_node.tupid);
 		if(fd < 0)
@@ -1094,7 +1095,16 @@ static int handle_event(struct monitor_event *m, int *modified)
 			perror("close(fd)");
 			return -1;
 		}
-		*modified = 1;
+		/* Only new files (not generated files) should set the modified flag.
+		 * The first time we run a command, we will get IN_MOVED_TO events
+		 * for new files, but we don't want an autoupdate to trigger in
+		 * this case (t7052). Note we may not get a tent if the file was
+		 * already removed.
+		 */
+		if(tup_db_select_tent(dc->dt_node.tupid, m->e.name, &tent) < 0)
+			return -1;
+		if(tent && tent->type != TUP_NODE_GENERATED)
+			*modified = 1;
 		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
