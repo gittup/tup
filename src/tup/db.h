@@ -130,7 +130,7 @@ int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const 
 int tup_db_read_vars(tupid_t dt, const char *file);
 
 /* Environment operations */
-int tup_db_check_env(void);
+int tup_db_check_env(int environ_check);
 int tup_db_findenv(const char *var, struct tup_entry **tent);
 int tup_db_get_environ(struct tupid_entries *root,
 		       struct tupid_entries *normal_root, struct tup_env *te);

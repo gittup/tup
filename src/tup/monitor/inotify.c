@@ -805,7 +805,7 @@ static int autoupdate(const char *cmd)
 			exit(1);
 		}
 
-		args = malloc((sizeof *args) * (update_argc + 2));
+		args = malloc((sizeof *args) * (update_argc + 3));
 		if(!args) {
 			perror("malloc");
 			exit(1);
@@ -820,14 +820,19 @@ static int autoupdate(const char *cmd)
 			perror("strdup");
 			exit(1);
 		}
+		args[2] = strdup("--no-environ-check");
+		if(!args[2]) {
+			perror("strdup");
+			exit(1);
+		}
 		for(x=1; x<update_argc; x++) {
-			args[x+1] = strdup(update_argv[x]);
-			if(!args[x+1]) {
+			args[x+2] = strdup(update_argv[x]);
+			if(!args[x+2]) {
 				perror("strdup");
 				exit(1);
 			}
 		}
-		args[update_argc+1] = NULL;
+		args[update_argc+2] = NULL;
 		execvp("tup", args);
 		perror("execvp");
 		exit(1);

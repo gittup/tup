@@ -48,7 +48,7 @@
 
 static int check_full_deps_rebuild(void);
 static int run_scan(void);
-static int update_tup_config(void);
+static int update_tup_config(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
 static int check_create_todo(void);
@@ -123,6 +123,7 @@ int updater(int argc, char **argv, int phase)
 	int do_scan = 1;
 	int num_pruned = 0;
 	int rc = -1;
+	int environ_check = 1;
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
@@ -156,6 +157,8 @@ int updater(int argc, char **argv, int phase)
 			do_scan = 0;
 		} else if(strncmp(argv[x], "-j", 2) == 0) {
 			num_jobs = strtol(argv[x]+2, NULL, 0);
+		} else if(strcmp(argv[x], "--no-environ-check") == 0) {
+			environ_check = 0;
 		} else if(strcmp(argv[x], "--") == 0) {
 			break;
 		}
@@ -174,7 +177,7 @@ int updater(int argc, char **argv, int phase)
 		if(run_scan() < 0)
 			return -1;
 	}
-	if(update_tup_config() < 0)
+	if(update_tup_config(environ_check) < 0)
 		goto out;
 	if(phase == 1) { /* Collect underpants */
 		rc = 0;
@@ -389,7 +392,7 @@ out_err:
 	return rc;
 }
 
-static int update_tup_config(void)
+static int update_tup_config(int environ_check)
 {
 	int rc;
 
@@ -401,13 +404,19 @@ static int update_tup_config(void)
 	if(rc == 1) {
 		if(tup_db_unflag_create(VAR_DT) < 0)
 			return -1;
-		tup_main_progress("Reading in new configuration/environment variables...\n");
+		if(environ_check)
+			tup_main_progress("Reading in new configuration/environment variables...\n");
+		else
+			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
 		if(tup_db_read_vars(DOT_DT, TUP_CONFIG) < 0)
 			goto err_rollback;
 	} else {
-		tup_main_progress("Reading in new environment variables...\n");
+		if(environ_check)
+			tup_main_progress("Reading in new environment variables...\n");
+		else
+			tup_main_progress("No tup.config changes (environment check disabled).\n");
 	}
-	if(tup_db_check_env() < 0)
+	if(tup_db_check_env(environ_check) < 0)
 		goto err_rollback;
 	tup_db_commit();
 	if(tup_vardict_open() < 0)

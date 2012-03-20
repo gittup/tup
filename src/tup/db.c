@@ -3692,39 +3692,54 @@ static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_
 	int match = 0;
 	struct var_entry *ve;
 	int varlen;
-	if(arg) {}
+	int environ_check = *(int*)arg;
 	if(type) {}
 
-	env = getenv(var);
-	if(env)
-		envlen = strlen(env);
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
 	varlen = strlen(var);
 
-	if(env) {
-		if(stored_value) {
-			/* Here we are checking if the stored value of the
-			 * environment variable matches the value from getenv().
-			 * We store it as "FOO=bar", so we check that the length
-			 * of the variable + 1 (for =) + length of the getenv()
-			 * matches the length of the stored value. If that
-			 * matches, then make sure we match each part.
-			 */
-			if((signed)strlen(stored_value) == varlen + 1 + envlen &&
-			   memcmp(stored_value, var, varlen) == 0 &&
-			   stored_value[varlen] == '=' &&
-			   memcmp(&stored_value[varlen+1], env, envlen) == 0) {
+	if(environ_check) {
+		env = getenv(var);
+
+		if(env) {
+			envlen = strlen(env);
+			if(stored_value) {
+				/* Here we are checking if the stored value of the
+				 * environment variable matches the value from getenv().
+				 * We store it as "FOO=bar", so we check that the length
+				 * of the variable + 1 (for =) + length of the getenv()
+				 * matches the length of the stored value. If that
+				 * matches, then make sure we match each part.
+				 */
+				if((signed)strlen(stored_value) == varlen + 1 + envlen &&
+				   memcmp(stored_value, var, varlen) == 0 &&
+				   stored_value[varlen] == '=' &&
+				   memcmp(&stored_value[varlen+1], env, envlen) == 0) {
+					match = 1;
+				}
+			}
+		} else {
+			/* Both NULL matches */
+			if(!stored_value) {
 				match = 1;
 			}
 		}
 	} else {
-		/* Both NULL matches */
-		if(!stored_value) {
-			match = 1;
+		/* If we aren't checking the environment, just force the match so we don't rebuild
+		 * or save the new value. We also want to set our cached value in envdb as
+		 * the one that was stored.
+		 */
+		if(stored_value) {
+			env = stored_value + varlen + 1;
+			envlen = strlen(env);
+		} else {
+			env = NULL;
 		}
+		match = 1;
 	}
+
 	if(!match) {
 		printf("Environment variable changed: %s\n", var);
 		/* Skip past the 'FOO=' part of the stored value if we have an old value to print */
@@ -3741,9 +3756,9 @@ static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_
 	return 0;
 }
 
-int tup_db_check_env(void)
+int tup_db_check_env(int environ_check)
 {
-	if(tup_db_var_foreach(env_dt(), env_cb, NULL) < 0)
+	if(tup_db_var_foreach(env_dt(), env_cb, &environ_check) < 0)
 		return -1;
 	return 0;
 }

@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/03/10" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/03/19" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -48,6 +48,9 @@ Temporarily override the updater.keep_going option to '0'. See the option second
 .TP
 .B --no-scan
 Do not scan the project for changed files. This is for internal tup testing only, and should not be used during normal development.
+.TP
+.B --no-environ-check
+Do not check for updates to the environment variables exported to sub-processes. Instead, the environment variables will be used from the database. This is used by the monitor in autoupdate/autoparse mode so that the most recent environment variables are used, rather than the settings when the monitor was initialized.
 .TP
 .B -d
 Output debug log to screen.
