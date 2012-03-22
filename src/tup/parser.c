@@ -766,13 +766,13 @@ static int export(struct tupfile *tf, char *cmdline)
 	struct tup_entry *tent = NULL;
 
 	if(!cmdline[0]) {
-		fprintf(stderr, "tup error: Expected environment variable to export.\n");
+		fprintf(tf->f, "tup error: Expected environment variable to export.\n");
 		return SYNTAX_ERROR;
 	}
 
 	/* Pull from tup's environment */
 	if(!tup_db_findenv(cmdline, &tent) < 0) {
-		fprintf(stderr, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
+		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
 		return -1;
 	}
 	if(tupid_tree_add_dup(&tf->env_root, tent->tnode.tupid) < 0)
@@ -2590,7 +2590,7 @@ out_pl:
 	if(tmptent) {
 		cmdid = tmptent->tnode.tupid;
 		if(tmptent->type != TUP_NODE_CMD) {
-			fprintf(stderr, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
+			fprintf(tf->f, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
 			return -1;
 		}
 	} else {
