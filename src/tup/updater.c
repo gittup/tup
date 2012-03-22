@@ -278,8 +278,9 @@ static int check_full_deps_rebuild(void)
 		if(tup_db_delete_slash() < 0)
 			return -1;
 	}
-	if(tup_db_config_set_int("full_deps", full_deps) < 0)
-		return -1;
+	if(old_full_deps != full_deps)
+		if(tup_db_config_set_int("full_deps", full_deps) < 0)
+			return -1;
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
