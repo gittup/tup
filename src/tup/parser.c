@@ -163,6 +163,7 @@ static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
+static int include_tupid(struct tupfile *tf, struct tup_entry *tent);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
@@ -494,6 +495,21 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			} else {
 				rc = include_file(tf, file);
 				free(file);
+			}
+		} else if(strncmp(line, "include_tupid ", 14) == 0) {
+			char *var;
+			struct var_entry *ve;
+
+			var = line + 14;
+			ve = vardb_get(&tf->vdb, var, strlen(var));
+			if(!ve) {
+				fprintf(tf->f, "tup error: Variable '%s' not defined for include_tupid.\n", var);
+				rc = -1;
+			} else if(!ve->tent) {
+				fprintf(tf->f, "tup error: Variable '%s' is defined, but not set with '@='\n", var);
+				rc = -1;
+			} else {
+				rc = include_tupid(tf, ve->tent);
 			}
 		} else if(strcmp(line, "include_rules") == 0) {
 			rc = include_rules(tf);
@@ -938,6 +954,44 @@ out_err:
 	return 0;
 }
 
+static int include_tupid(struct tupfile *tf, struct tup_entry *tent)
+{
+	struct buf incb;
+	int fd;
+	int rc = -1;
+	struct tup_entry *oldtent = tf->curtent;
+
+	tf->curtent = tent->parent;
+
+	fd = tup_entry_openat(tf->root_fd, tent);
+	if(fd < 0) {
+		parser_error(tf, tent->name.s);
+		goto out_err;
+	}
+	if(fslurp_null(fd, &incb) < 0)
+		goto out_close;
+
+	if(parse_tupfile(tf, &incb, tent->name.s) < 0)
+		goto out_free;
+	rc = 0;
+out_free:
+	free(incb.s);
+out_close:
+	if(close(fd) < 0) {
+		parser_error(tf, "close(fd)");
+		rc = -1;
+	}
+
+out_err:
+	tf->curtent = oldtent;
+	if(rc < 0) {
+		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", tent->name.s);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 {
 	char *input, *cmd, *output, *bin;
@@ -1303,6 +1357,7 @@ static int set_variable(struct tupfile *tf, char *line)
 	char *var;
 	char *value;
 	int append;
+	struct tup_entry *tent = NULL;
 	int rc = 0;
 
 	/* Find the += or = sign, and point value to the start
@@ -1318,11 +1373,23 @@ static int set_variable(struct tupfile *tf, char *line)
 			value = eq + 2;
 			append = 0;
 		} else {
-			eq = strchr(line, '=');
-			if(!eq)
-				return SYNTAX_ERROR;
-			value = eq + 1;
-			append = 0;
+			eq = strstr(line, "@=");
+			if(eq) {
+				value = eq + 2;
+				while(isspace(*value)) value++;
+				append = 0;
+				tent = get_tent_dt(tf->curtent->tnode.tupid, value);
+				if(!tent) {
+					fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in @= declaration.\n", value);
+					return -1;
+				}
+			} else {
+				eq = strchr(line, '=');
+				if(!eq)
+					return SYNTAX_ERROR;
+				value = eq + 1;
+				append = 0;
+			}
 		}
 	}
 
@@ -1353,7 +1420,7 @@ static int set_variable(struct tupfile *tf, char *line)
 	if(append)
 		rc = vardb_append(&tf->vdb, var, value);
 	else
-		rc = vardb_set(&tf->vdb, var, value, NULL);
+		rc = vardb_set(&tf->vdb, var, value, tent);
 	if(rc < 0) {
 		fprintf(tf->f, "Error setting variable '%s'\n", var);
 		return -1;

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -147,6 +147,7 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		free(ve->value);
 		ve->value = new;
 		ve->vallen += vallen + 1;
+		ve->tent = NULL;
 		return 0;
 	} else {
 		return vardb_set(v, var, value, NULL);
