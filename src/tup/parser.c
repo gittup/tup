@@ -912,7 +912,7 @@ static int include_file(struct tupfile *tf, const char *file)
 
 	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
 	if (tf->cur_dfd < 0) {
-	   perror(file);
+	   parser_error(tf, file);
 	   goto out_free_pel;
 	}
 	fd = tup_entry_openat(tf->root_fd, tent);
@@ -935,7 +935,7 @@ out_close:
 	}
 out_close_dfd:
 	if(close(tf->cur_dfd) < 0) {
-	   perror("close(tf->cur_dfd)");
+	   parser_error(tf, "close(tf->cur_dfd)");
 	   rc = -1;
 	}
 out_free_pel:
@@ -960,13 +960,19 @@ static int include_tupid(struct tupfile *tf, struct tup_entry *tent)
 	int fd;
 	int rc = -1;
 	struct tup_entry *oldtent = tf->curtent;
+	int old_dfd = tf->cur_dfd;
 
 	tf->curtent = tent->parent;
 
+	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
+	if (tf->cur_dfd < 0) {
+	   parser_error(tf, tent->parent->name.s);
+	   goto out_err;
+	}
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
 		parser_error(tf, tent->name.s);
-		goto out_err;
+		goto out_close_dfd;
 	}
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
@@ -981,9 +987,15 @@ out_close:
 		parser_error(tf, "close(fd)");
 		rc = -1;
 	}
+out_close_dfd:
+   if(close(tf->cur_dfd) < 0) {
+      parser_error(tf, "close(tf->cur_dfd)");
+      rc = -1;
+   }
 
 out_err:
 	tf->curtent = oldtent;
+	tf->cur_dfd = old_dfd;
 	if(rc < 0) {
 		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", tent->name.s);
 		return -1;
