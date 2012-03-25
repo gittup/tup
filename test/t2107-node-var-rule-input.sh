@@ -16,7 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test including a file through a node-variable
+# Test using a node-variable as a rule input
 
 . ./tup.sh
 
@@ -25,26 +25,19 @@ tmkdir sw/toolkit
 tmkdir sw/app
 
 cat > sw/Tuprules.tup << HERE
-LIB %= toolkit/lib.tup
-HERE
-
-cat > sw/toolkit/lib.tup << HERE
-STATIC_LIBS += \$(TUP_CWD)/toolkit.a
+toolkit_lib %= toolkit/toolkit.a
 HERE
 
 cat > sw/app/Tupfile << HERE
 include_rules
-STATIC_LIBS += app.a
-include %(LIB)
-: |> echo \$(STATIC_LIBS) > %o |> libs.txt
+: %(toolkit_lib) |> cp %f %o |> %B.copy
 HERE
 
 tup touch sw/Tuprules.tup
-tup touch sw/toolkit/lib.tup
+tup touch sw/toolkit/toolkit.a
 tup touch sw/app/Tupfile
 update
 
-tup_dep_exist sw/app 'echo app.a ../toolkit/toolkit.a > libs.txt' sw/app libs.txt
-tup_dep_exist sw/toolkit lib.tup sw app
+tup_dep_exist sw/toolkit toolkit.a sw/app 'cp ../toolkit/toolkit.a toolkit.copy'
 
 eotup

@@ -1612,7 +1612,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	if(!input_pattern)
 		return 0;
 
-	eval_pattern = eval(tf, input_pattern, DISALLOW_NODES);
+	eval_pattern = eval(tf, input_pattern, ALLOW_NODES);
 	if(!eval_pattern)
 		return -1;
 	oosep = strchr(eval_pattern, '|');
@@ -3153,7 +3153,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 				
 				if(allow_nodes != ALLOW_NODES) {
-					expected = "%%-variables not allowed here";
+					expected = "%-variables not allowed here";
 					goto syntax_error;
 				}
 
