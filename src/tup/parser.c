@@ -50,6 +50,9 @@
 
 #define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
 
+#define DISALLOW_NODES 0
+#define ALLOW_NODES 1
+
 struct name_list_entry {
 	TAILQ_ENTRY(name_list_entry) list;
 	char *path;
@@ -163,7 +166,6 @@ static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
-static int include_tupid(struct tupfile *tf, struct tup_entry *tent);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
@@ -223,7 +225,7 @@ static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen, int is_command);
-static char *eval(struct tupfile *tf, const char *string);
+static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 static int debug_run = 0;
 
@@ -489,27 +491,12 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			char *file;
 
 			file = line + 8;
-			file = eval(tf, file);
+			file = eval(tf, file, ALLOW_NODES);
 			if(!file) {
 				rc = -1;
 			} else {
 				rc = include_file(tf, file);
 				free(file);
-			}
-		} else if(strncmp(line, "include_tupid ", 14) == 0) {
-			char *var;
-			struct var_entry *ve;
-
-			var = line + 14;
-			ve = vardb_get(&tf->vdb, var, strlen(var));
-			if(!ve) {
-				fprintf(tf->f, "tup error: Variable '%s' not defined for include_tupid.\n", var);
-				rc = -1;
-			} else if(!ve->tent) {
-				fprintf(tf->f, "tup error: Variable '%s' is defined, but not set with '@='\n", var);
-				rc = -1;
-			} else {
-				rc = include_tupid(tf, ve->tent);
 			}
 		} else if(strcmp(line, "include_rules") == 0) {
 			rc = include_rules(tf);
@@ -576,10 +563,10 @@ found_paren:
 	*comma = 0;
 	*paren = 0;
 
-	lval = eval(tf, lval);
+	lval = eval(tf, lval, DISALLOW_NODES);
 	if(!lval)
 		return -1;
-	rval = eval(tf, rval);
+	rval = eval(tf, rval, DISALLOW_NODES);
 	if(!rval) {
 		free(lval);
 		return -1;
@@ -716,7 +703,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	int rc;
 	struct tupid_tree *tt;
 
-	eval_cmdline = eval(tf, cmdline);
+	eval_cmdline = eval(tf, cmdline, DISALLOW_NODES);
 	if(!eval_cmdline) {
 		return -1;
 	}
@@ -948,56 +935,6 @@ out_err:
 	tf->cur_dfd = old_dfd;
 	if(rc < 0) {
 		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", file);
-		return -1;
-	}
-
-	return 0;
-}
-
-static int include_tupid(struct tupfile *tf, struct tup_entry *tent)
-{
-	struct buf incb;
-	int fd;
-	int rc = -1;
-	struct tup_entry *oldtent = tf->curtent;
-	int old_dfd = tf->cur_dfd;
-
-	tf->curtent = tent->parent;
-
-	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
-	if (tf->cur_dfd < 0) {
-	   parser_error(tf, tent->parent->name.s);
-	   goto out_err;
-	}
-	fd = tup_entry_openat(tf->root_fd, tent);
-	if(fd < 0) {
-		parser_error(tf, tent->name.s);
-		goto out_close_dfd;
-	}
-	if(fslurp_null(fd, &incb) < 0)
-		goto out_close;
-
-	if(parse_tupfile(tf, &incb, tent->name.s) < 0)
-		goto out_free;
-	rc = 0;
-out_free:
-	free(incb.s);
-out_close:
-	if(close(fd) < 0) {
-		parser_error(tf, "close(fd)");
-		rc = -1;
-	}
-out_close_dfd:
-   if(close(tf->cur_dfd) < 0) {
-      parser_error(tf, "close(tf->cur_dfd)");
-      rc = -1;
-   }
-
-out_err:
-	tf->curtent = oldtent;
-	tf->cur_dfd = old_dfd;
-	if(rc < 0) {
-		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", tent->name.s);
 		return -1;
 	}
 
@@ -1385,14 +1322,14 @@ static int set_variable(struct tupfile *tf, char *line)
 			value = eq + 2;
 			append = 0;
 		} else {
-			eq = strstr(line, "@=");
+			eq = strstr(line, "%=");
 			if(eq) {
 				value = eq + 2;
 				while(isspace(*value)) value++;
 				append = 0;
 				tent = get_tent_dt(tf->curtent->tnode.tupid, value);
 				if(!tent) {
-					fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in @= declaration.\n", value);
+					fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in %%= declaration.\n", value);
 					return -1;
 				}
 			} else {
@@ -1417,10 +1354,10 @@ static int set_variable(struct tupfile *tf, char *line)
 		eq--;
 	}
 
-	var = eval(tf, line);
+	var = eval(tf, line, DISALLOW_NODES);
 	if(!var)
 		return -1;
-	value = eval(tf, value);
+	value = eval(tf, value, DISALLOW_NODES);
 	if(!value)
 		return -1;
 
@@ -1675,7 +1612,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	if(!input_pattern)
 		return 0;
 
-	eval_pattern = eval(tf, input_pattern);
+	eval_pattern = eval(tf, input_pattern, DISALLOW_NODES);
 	if(!eval_pattern)
 		return -1;
 	oosep = strchr(eval_pattern, '|');
@@ -1763,7 +1700,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, 0);
 				if(!tinput)
 					return -1;
-				input_pattern = eval(tf, tinput);
+				input_pattern = eval(tf, tinput, DISALLOW_NODES);
 				free(tinput);
 				if(!input_pattern)
 					return -1;
@@ -1971,7 +1908,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		fprintf(tf->f, "Error: reverse rule must have input list\n");
 		return -1;
 	}
-	eval_pattern = eval(tf, r->input_pattern);
+	eval_pattern = eval(tf, r->input_pattern, DISALLOW_NODES);
 	if(!eval_pattern)
 		return -1;
 
@@ -2017,7 +1954,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, 0);
 		if(!tinput)
 			return -1;
-		input_pattern = eval(tf, tinput);
+		input_pattern = eval(tf, tinput, DISALLOW_NODES);
 		free(tinput);
 		if(!input_pattern)
 			return -1;
@@ -2556,7 +2493,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&extra_onl);
 	TAILQ_INIT(&oplist);
 
-	output_pattern = eval(tf, r->output_pattern);
+	output_pattern = eval(tf, r->output_pattern, DISALLOW_NODES);
 	if(!output_pattern)
 		return -1;
 	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL) < 0)
@@ -2565,7 +2502,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		/* Insert a fake separator in case the rule doesn't have one */
 		if(get_path_list(tf, sep, &oplist, tf->tupid, NULL) < 0)
 			return -1;
-		extra_pattern = eval(tf, r->bang_extra_outputs);
+		extra_pattern = eval(tf, r->bang_extra_outputs, DISALLOW_NODES);
 		if(!extra_pattern)
 			return -1;
 		if(get_path_list(tf, extra_pattern, &oplist, tf->tupid, NULL) < 0)
@@ -2653,7 +2590,7 @@ out_pl:
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, 1);
 	if(!tcmd)
 		return -1;
-	cmd = eval(tf, tcmd);
+	cmd = eval(tf, tcmd, DISALLOW_NODES);
 	if(!cmd)
 		return -1;
 	free(tcmd);
@@ -3122,7 +3059,7 @@ static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 	return 0;
 }
 
-static char *eval(struct tupfile *tf, const char *string)
+static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 {
 	int len = 0;
 	char *ret;
@@ -3135,9 +3072,10 @@ static char *eval(struct tupfile *tf, const char *string)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
+			if((s[1] == '$' || s[1] == '@' || s[1] == '%') && s[2] == '(') {
 				/* \$( becomes $( */
 				/* \@( becomes @( */
+				/* \%( becomes %( */
 				len++;
 				s += 2;
 			} else {
@@ -3204,6 +3142,39 @@ static char *eval(struct tupfile *tf, const char *string)
 				s++;
 				len++;
 			}
+		} else if(*s == '%') {
+			const char *rparen;
+			
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
+				
+				if(allow_nodes != ALLOW_NODES) {
+					expected = "%%-variables not allowed here";
+					goto syntax_error;
+				}
+
+				var = s + 2;
+				struct var_entry *varentry = vardb_get(&tf->vdb, var, rparen-var);
+				if (!varentry)
+					return NULL;
+				if (!varentry->tent)
+					return NULL;
+				
+				int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
+							  varentry->tent->tnode.tupid,
+							  &vlen);
+				if (rc < 0 || vlen < 0)
+					return NULL;
+				len += vlen;
+				s = rparen + 1;
+			} else {
+				s++;
+				len++;
+			}
 		} else {
 			s++;
 			len++;
@@ -3220,9 +3191,10 @@ static char *eval(struct tupfile *tf, const char *string)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
+			if((s[1] == '$' || s[1] == '@' || s[1] == '%') && s[2] == '(') {
 				/* \$( becomes $( */
 				/* \@( becomes @( */
+				/* \%( becomes %( */
 				*p = s[1];
 				s += 2;
 			} else {
@@ -3289,6 +3261,37 @@ static char *eval(struct tupfile *tf, const char *string)
 					return NULL;
 				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 					return NULL;
+				s = rparen + 1;
+			} else {
+				*p = *s;
+				p++;
+				s++;
+			}
+		} else if(*s == '%') {
+			const char *rparen;
+
+			if(s[1] == '(') {
+				rparen = strchr(s+1, ')');
+				if(!rparen) {
+					expected = "ending variable paren ')'";
+					goto syntax_error;
+				}
+
+				var = s + 2;
+				struct var_entry *varentry = vardb_get(&tf->vdb, var, rparen-var);
+				if (!varentry)
+					return NULL;
+				if (!varentry->tent)
+					return NULL;
+				
+				int clen = 0;
+				int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
+							  varentry->tent->tnode.tupid,
+							  &clen);
+				if (rc < 0 || clen < 0)
+					return NULL;
+				
+				p += clen;
 				s = rparen + 1;
 			} else {
 				*p = *s;

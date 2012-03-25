@@ -25,7 +25,7 @@ tmkdir sw/toolkit
 tmkdir sw/app
 
 cat > sw/Tuprules.tup << HERE
-LIB @= toolkit/lib.tup
+LIB %= toolkit/lib.tup
 HERE
 
 cat > sw/toolkit/lib.tup << HERE
@@ -35,7 +35,7 @@ HERE
 cat > sw/app/Tupfile << HERE
 include_rules
 STATIC_LIBS += app.a
-include_tupid LIB
+include %(LIB)
 : |> echo \$(STATIC_LIBS) > %o |> libs.txt
 HERE
 
