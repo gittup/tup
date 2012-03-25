@@ -213,7 +213,7 @@ node-variables:
      Tupfile (thus, node-variables are not a replacement for TUP_CWD)
       - places where it makes sense to string-ify a node-variable:
          * include
-         - :-rules
+         * :-rules
          * run scripts
    - if using a syntax like 'node LIB_toolkit = toolkit/lib.tup', will likely
      have to restrict normal variable symbols as well
