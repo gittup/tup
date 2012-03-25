@@ -703,7 +703,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	int rc;
 	struct tupid_tree *tt;
 
-	eval_cmdline = eval(tf, cmdline, DISALLOW_NODES);
+	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
 	if(!eval_cmdline) {
 		return -1;
 	}
