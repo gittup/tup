@@ -2590,7 +2590,7 @@ out_pl:
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, 1);
 	if(!tcmd)
 		return -1;
-	cmd = eval(tf, tcmd, DISALLOW_NODES);
+	cmd = eval(tf, tcmd, ALLOW_NODES);
 	if(!cmd)
 		return -1;
 	free(tcmd);
@@ -2867,6 +2867,9 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			clen += onl->extlessbasetotlen;
 		} else if(*next == '%') {
 			clen++;
+		} else if(*next == '(') {
+			/* skip over %-variables ('%(' gets replaced by '%(') */
+			clen += 2;
 		} else {
 			fprintf(tf->f, "Error: Unknown %%-flag: '%c'\n", *next);
 			return NULL;
@@ -2941,6 +2944,10 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 		} else if(*next == '%') {
 			s[x] = '%';
 			x++;
+		} else if(*next == '(') {
+			s[x] = '%';
+			s[x+1] = '(';
+			x += 2;
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
 			return NULL;
