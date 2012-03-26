@@ -66,6 +66,8 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
+		if(ve->tent && !tent)
+		   return NULL;
 		free(ve->value);
 		ve->vallen = vallen;
 		if(value) {
@@ -134,6 +136,8 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		char *new;
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 
+		if(ve->tent)
+		   return -1;
 		vallen = strlen(value);
 		new = malloc(ve->vallen + vallen + 2);
 		if(!new) {
