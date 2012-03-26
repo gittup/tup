@@ -66,8 +66,11 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
-		if(ve->tent && !tent)
+
+		/* prevent converting a normal variable to a node-variable, and vice versa */
+		if((ve->tent && !tent) || (!ve->tent && tent))
 		   return NULL;
+
 		free(ve->value);
 		ve->vallen = vallen;
 		if(value) {
