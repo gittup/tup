@@ -16,17 +16,17 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as a rule output fails - this doesn't
-# make any sense, since %-variables can only refer to existing files.
+# Test that using a node-variable as the lval in an if statement doesn't work.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-toolkit_lib %= tklib.a
-: lib.a |> cp lib.a %o |> %(toolkit_lib)
+node_var %= lib.a
+ifeq (%(node_var),)
+endif
 HERE
 
-tup touch lib.a tklib.a Tupfile
+tup touch lib.a Tupfile
 
 update_fail_msg "%-variables not allowed here"
 

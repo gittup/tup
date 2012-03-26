@@ -16,18 +16,16 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as a rule output fails - this doesn't
-# make any sense, since %-variables can only refer to existing files.
+# Test that a node-variable cannot refer to a non-existent file.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-toolkit_lib %= tklib.a
-: lib.a |> cp lib.a %o |> %(toolkit_lib)
+node_var %= lib.a
 HERE
 
-tup touch lib.a tklib.a Tupfile
+tup touch Tupfile
 
-update_fail_msg "%-variables not allowed here"
+update_fail_msg "Unable to find tup entry for file 'lib.a' in %= declaration"
 
 eotup

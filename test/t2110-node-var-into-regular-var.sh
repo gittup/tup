@@ -16,17 +16,21 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as a rule output fails - this doesn't
-# make any sense, since %-variables can only refer to existing files.
+# Test that using a node-variable as the value of a regular variable doesn't
+# work - converting a node-variable to a string only makes sense in places
+# where the string will be consumed immediately. Putting the string into a
+# variable is not one of these places (the variable could be used as an output
+# file, or it could be used in another Tupfile where the relative path is no
+# longer valid).
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-toolkit_lib %= tklib.a
-: lib.a |> cp lib.a %o |> %(toolkit_lib)
+node_var %= lib.a
+var = %(node_var)
 HERE
 
-tup touch lib.a tklib.a Tupfile
+tup touch lib.a Tupfile
 
 update_fail_msg "%-variables not allowed here"
 
