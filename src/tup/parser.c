@@ -3120,6 +3120,10 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					len += vlen;
 				} else {
 					vlen = vardb_len(&tf->vdb, var, rparen-var);
+					if (vlen == VARDB_LEN_NODE_VAR) {
+						expected = "unable to access %-variables using $() syntax";
+						goto syntax_error;
+					}
 					if(vlen < 0)
 						return NULL;
 					len += vlen;

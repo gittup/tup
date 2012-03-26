@@ -37,6 +37,8 @@ struct var_entry {
 	struct tup_entry *tent;
 };
 
+#define VARDB_LEN_NODE_VAR -155
+
 int vardb_init(struct vardb *v);
 int vardb_close(struct vardb *v);
 int vardb_set(struct vardb *v, const char *var, const char *value,
