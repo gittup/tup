@@ -161,6 +161,9 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
+		if(ve->tent) {
+		   return VARDB_LEN_NODE_VAR;
+		}
 		return ve->vallen;
 	}
 	/* Variable not found: length of "" == 0 */
