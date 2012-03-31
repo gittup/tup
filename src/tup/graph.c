@@ -184,7 +184,7 @@ edge_create:
 		/* A circular dependency is not guaranteed to trigger this,
 		 * but it is easy to check before going through the graph.
 		 */
-		fprintf(stderr, "Error: Circular dependency detected! "
+		fprintf(stderr, "tup error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
 			g->cur->tnode.tupid, tent->tnode.tupid);
 		return -1;

@@ -433,11 +433,11 @@ static int process_depfile(struct server *s, const char *depfile)
 			continue;
 
 		if(event.len >= PATH_MAX - 1) {
-			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len);
+			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len);
 			return -1;
 		}
 		if(event.len2 >= PATH_MAX - 1) {
-			fprintf(stderr, "Error: Size of %i bytes is longer than the max filesize\n", event.len2);
+			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len2);
 			return -1;
 		}
 
@@ -453,7 +453,7 @@ static int process_depfile(struct server *s, const char *depfile)
 		}
 
 		if(event1[event.len] != '\0' || event2[event.len2] != '\0') {
-			fprintf(stderr, "Error: Missing null terminator in access_event\n");
+			fprintf(stderr, "tup error: Missing null terminator in access_event\n");
 			return -1;
 		}
 
@@ -479,7 +479,7 @@ static int process_depfile(struct server *s, const char *depfile)
 			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
 		}
 		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
-			fprintf(stderr, "Error: Failed to call handle_file on event '%s'\n", event1);
+			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
 			return -1;
 		}
 	}

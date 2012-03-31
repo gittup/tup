@@ -50,7 +50,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	struct tup_entry *tent;
 
 	if(tupid <= 0) {
-		fprintf(stderr, "Error: Tupid is %lli in tup_entry_add()\n",
+		fprintf(stderr, "tup error: Tupid is %lli in tup_entry_add()\n",
 			tupid);
 		return -1;
 	}

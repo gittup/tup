@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -97,7 +97,7 @@ tupid_t get_sub_dir_dt(void)
 	if(tup_sub_dir_dt < 0) {
 		tup_sub_dir_dt = find_dir_tupid(get_sub_dir());
 		if(tup_sub_dir_dt < 0) {
-			fprintf(stderr, "Error: Unable to find tupid for working directory: '%s'\n", get_sub_dir());
+			fprintf(stderr, "tup error: Unable to find tupid for working directory: '%s'\n", get_sub_dir());
 		}
 	}
 	return tup_sub_dir_dt;

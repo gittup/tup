@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -71,7 +71,7 @@ int tup_vardict_init(void)
 
 	expected += sizeof(unsigned int);
 	if(tup_vars.len < expected) {
-		fprintf(stderr, "Error: var-tree should be at least sizeof(unsigned int) bytes, but got %i bytes\n", tup_vars.len);
+		fprintf(stderr, "tup error: var-tree should be at least sizeof(unsigned int) bytes, but got %i bytes\n", tup_vars.len);
 		return -1;
 	}
 	tup_vars.map = mmap(NULL, tup_vars.len, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -85,7 +85,7 @@ int tup_vardict_init(void)
 	expected += sizeof(unsigned int) * tup_vars.num_entries;
 	tup_vars.entries = (const char*)tup_vars.map + expected;
 	if(tup_vars.len < expected) {
-		fprintf(stderr, "Error: var-tree should have at least %i bytes to accommodate the index, but got %i bytes\n", expected, tup_vars.len);
+		fprintf(stderr, "tup error: var-tree should have at least %i bytes to accommodate the index, but got %i bytes\n", expected, tup_vars.len);
 		return -1;
 	}
 
@@ -114,7 +114,7 @@ const char *tup_config_var(const char *key, int keylen)
 			break;
 
 		if(tup_vars.offsets[cur] >= tup_vars.len) {
-			fprintf(stderr, "Error: Offset for element %i is out of bounds.\n", cur);
+			fprintf(stderr, "tup error: Offset for element %i is out of bounds.\n", cur);
 			break;
 		}
 		p = tup_vars.entries + tup_vars.offsets[cur];

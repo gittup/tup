@@ -404,7 +404,7 @@ static int version_check(void)
 	}
 
 	if(version > DB_VERSION) {
-		fprintf(stderr, "Error: tup database is version %i, but this version of tup (%s) can only handle up to %i.\n", version, tup_version(), DB_VERSION);
+		fprintf(stderr, "tup error: database is version %i, but this version of tup (%s) can only handle up to %i.\n", version, tup_version(), DB_VERSION);
 		return -1;
 	}
 	if(version != DB_VERSION) {
@@ -676,7 +676,7 @@ static int version_check(void)
 		case DB_VERSION:
 			break;
 		default:
-			fprintf(stderr, "Error: Unable to convert database version %i to version %i\n", version, DB_VERSION);
+			fprintf(stderr, "tup error: Unable to convert database version %i to version %i\n", version, DB_VERSION);
 			return -1;
 	}
 
@@ -951,7 +951,7 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			 * screwing up the Tupfile.
 			 */
 			if(type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "Error: Attempting to insert '%s' as a generated node when it already exists as a different type. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
+				fprintf(stderr, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
 				return NULL;
 			}
 
@@ -1062,7 +1062,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
 		sql = s2;
 		sqlsize = sizeof(s2);
 	} else {
-		fprintf(stderr, "Error: tup_db_select_node_by_flags() must specify exactly one of TUP_FLAGS_CREATE/TUP_FLAGS_MODIFY\n");
+		fprintf(stderr, "tup error: tup_db_select_node_by_flags() must specify exactly one of TUP_FLAGS_CREATE/TUP_FLAGS_MODIFY\n");
 		return -1;
 	}
 
@@ -1494,7 +1494,7 @@ int tup_db_open_tupid(tupid_t tupid)
 	int fd;
 
 	if(tupid == 0) {
-		fprintf(stderr, "Error: Trying to tup_db_open_tupid(0)\n");
+		fprintf(stderr, "tup error: Trying to tup_db_open_tupid(0)\n");
 		return -1;
 	}
 	if(tupid == 1) {
@@ -1639,7 +1639,7 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 			if(recurse_delete_ghost_tree(tent->tnode.tupid, 1) < 0)
 				return -1;
 		} else {
-			fprintf(stderr, "Error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
+			fprintf(stderr, "tup error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
 			tup_db_print(stderr, new_dt);
 			return -1;
 		}
@@ -2036,7 +2036,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 	char *path;
 
 	if(tupid == 0) {
-		fprintf(stderr, "Error: Trying to tup_db_print(0)\n");
+		fprintf(stderr, "tup error: Trying to tup_db_print(0)\n");
 		return -1;
 	}
 	if(tupid == 1) {
@@ -2582,7 +2582,7 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroo
 		return 0;
 	}
 	/* Otherwise, someone else got the girl. Err, output file. */
-	fprintf(stderr, "Error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
+	fprintf(stderr, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
 	tup_db_print(stderr, a);
 	tup_db_print(stderr, b);
 	return -1;
@@ -3268,7 +3268,7 @@ static struct var_entry *get_var_id(struct tup_entry *tent,
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tent->tnode.tupid);
+		fprintf(stderr,"tup error: Variable id %lli not found in .tup/db.\n", tent->tnode.tupid);
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -3371,7 +3371,7 @@ int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
 
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"Error: Variable id %lli not found in .tup/db.\n", tupid);
+		fprintf(stderr,"tup error: Variable id %lli not found in .tup/db.\n", tupid);
 		goto out_reset;
 	}
 	if(dbrc != SQLITE_ROW) {
@@ -4236,7 +4236,7 @@ static int missing_output(tupid_t tupid, void *data)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
-	fprintf(aod->f, "Error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
+	fprintf(aod->f, "tup error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
 
 	if(!(aod->output_error & 2)) {
 		aod->output_error |= 2;
@@ -5289,7 +5289,7 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 
 		nl = strchr(p, '\n');
 		if(!nl) {
-			fprintf(stderr, "Error: No newline found in tup config file\n");
+			fprintf(stderr, "tup error: No newline found in tup config file\n");
 			return -1;
 		}
 
@@ -5306,7 +5306,7 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 				char *space;
 				space = strchr(p+9, ' ');
 				if(!space) {
-					fprintf(stderr, "Error: No space found in tup config.\nLine was: '%s'\n", p);
+					fprintf(stderr, "tup error: No space found in tup config.\nLine was: '%s'\n", p);
 					return -1;
 				}
 				*space = 0;
@@ -5317,12 +5317,12 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 			char *eq;
 			char *value;
 			if(strncmp(p, "CONFIG_", 7) != 0) {
-				fprintf(stderr, "Error: Non-comment line in tup config doesn't begin with \"CONFIG_\"\nLine was: '%s'\n", p);
+				fprintf(stderr, "tup error: Non-comment line in tup config doesn't begin with \"CONFIG_\"\nLine was: '%s'\n", p);
 				return -1;
 			}
 			eq = strchr(p, '=');
 			if(!eq) {
-				fprintf(stderr, "Error: No equals sign found in tup config.\nLine was: '%s'\n", p);
+				fprintf(stderr, "tup error: No equals sign found in tup config.\nLine was: '%s'\n", p);
 				return -1;
 			}
 			if(eq[1] == '"') {
@@ -5330,7 +5330,7 @@ static int get_file_var_tree(struct vardb *vdb, int fd)
 				value = eq+2;
 				quote = strchr(value, '"');
 				if(!quote) {
-					fprintf(stderr, "Error: No end quote found in tup config.\nLine was: '%s'\n", p);
+					fprintf(stderr, "tup error: No end quote found in tup config.\nLine was: '%s'\n", p);
 					return -1;
 				}
 				*quote = 0;

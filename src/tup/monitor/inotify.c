@@ -177,7 +177,7 @@ int monitor(int argc, char **argv)
 	sigaction(SIGUSR1, &sigact, NULL);
 
 	if(stop_monitor(TUP_MONITOR_RESTARTING) < 0) {
-		fprintf(stderr, "Error: Unable to stop the current monitor process.\n");
+		fprintf(stderr, "tup error: Unable to stop the current monitor process.\n");
 		return -1;
 	}
 
@@ -1030,7 +1030,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 
 	dc = dircache_lookup_wd(&droot, m->e.wd);
 	if(!dc) {
-		fprintf(stderr, "Error: dircache entry not found for wd %i\n",
+		fprintf(stderr, "tup error: dircache entry not found for wd %i\n",
 			m->e.wd);
 		return -1;
 	}
@@ -1041,7 +1041,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 
 		from_dc = dircache_lookup_wd(&droot, mfe->m->e.wd);
 		if(!from_dc) {
-			fprintf(stderr, "Error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
+			fprintf(stderr, "tup error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
 			return -1;
 		}
 		if(m->e.mask & IN_ISDIR) {

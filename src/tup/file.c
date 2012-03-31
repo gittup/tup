@@ -221,7 +221,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		 * can still have a valid mtime, though.
 		 */
 		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, mtime, &tent) < 0) {
-			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+			fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
 	}
