@@ -22,12 +22,12 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-toolkit_lib %= tklib.a
-: lib.a |> cp lib.a %o |> %(toolkit_lib)
+&toolkit_lib = tklib.a
+: lib.a |> cp lib.a %o |> &(toolkit_lib)
 HERE
 
 tup touch lib.a tklib.a Tupfile
 
-update_fail_msg "%-variables not allowed here"
+update_fail_msg "&-variables not allowed here"
 
 eotup

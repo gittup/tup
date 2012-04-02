@@ -67,10 +67,6 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 	if(st) {
 		ve = container_of(st, struct var_entry, var);
 
-		/* prevent converting a normal variable to a node-variable, and vice versa */
-		if((ve->tent && !tent) || (!ve->tent && tent))
-		   return NULL;
-
 		free(ve->value);
 		ve->vallen = vallen;
 		if(value) {
@@ -139,8 +135,6 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		char *new;
 		struct var_entry *ve = container_of(st, struct var_entry, var);
 
-		if(ve->tent)
-		   return -1;
 		vallen = strlen(value);
 		new = malloc(ve->vallen + vallen + 2);
 		if(!new) {
@@ -154,7 +148,6 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		free(ve->value);
 		ve->value = new;
 		ve->vallen += vallen + 1;
-		ve->tent = NULL;
 		return 0;
 	} else {
 		return vardb_set(v, var, value, NULL);
@@ -168,9 +161,6 @@ int vardb_len(struct vardb *v, const char *var, int varlen)
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
-		if(ve->tent) {
-		   return VARDB_LEN_NODE_VAR;
-		}
 		return ve->vallen;
 	}
 	/* Variable not found: length of "" == 0 */

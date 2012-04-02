@@ -17,17 +17,19 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # Test that assigning a normal string value to an existing node-variable
-# doesn't work.
+# doesn't override the node-variable.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-node_var %= lib.a
+&node_var = lib.a
 node_var = new value
+: |> echo &(node_var) is \$(node_var) |>
 HERE
 
 tup touch lib.a Tupfile
+update
 
-update_fail_msg "Error setting variable 'node_var'"
+tup_object_exist . 'echo lib.a is new value'
 
 eotup

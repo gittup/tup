@@ -144,6 +144,7 @@ struct tupfile {
 	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
+	struct vardb node_db;
 	struct tupid_entries cmd_root;
 	struct tupid_entries env_root;
 	struct string_entries bang_root;
@@ -282,10 +283,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
+	if(vardb_init(&tf.node_db) < 0)
+		goto out_server_stop;
 	if(vardb_init(&tf.vdb) < 0)
-		goto out_server_stop;
+		goto out_close_node_db;
 	if(environ_add_defaults(&tf.env_root) < 0)
-		goto out_server_stop;
+		goto out_close_vdb;
 
 	/* Keep track of the commands and generated files that we had created
 	 * previously. We'll check these against the new ones in order to see
@@ -341,6 +344,9 @@ out_close_dfd:
 	}
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
+		rc = -1;
+out_close_node_db:
+	if(vardb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
 	if(server_parser_stop(&ps) < 0)
@@ -1306,7 +1312,6 @@ static int set_variable(struct tupfile *tf, char *line)
 	char *var;
 	char *value;
 	int append;
-	struct tup_entry *tent = NULL;
 	int rc = 0;
 
 	/* Find the += or = sign, and point value to the start
@@ -1322,23 +1327,11 @@ static int set_variable(struct tupfile *tf, char *line)
 			value = eq + 2;
 			append = 0;
 		} else {
-			eq = strstr(line, "%=");
-			if(eq) {
-				value = eq + 2;
-				while(isspace(*value)) value++;
-				append = 0;
-				tent = get_tent_dt(tf->curtent->tnode.tupid, value);
-				if(!tent) {
-					fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in %%= declaration.\n", value);
-					return -1;
-				}
-			} else {
-				eq = strchr(line, '=');
-				if(!eq)
-					return SYNTAX_ERROR;
-				value = eq + 1;
-				append = 0;
-			}
+			eq = strchr(line, '=');
+			if(!eq)
+				return SYNTAX_ERROR;
+			value = eq + 1;
+			append = 0;
 		}
 	}
 
@@ -1366,10 +1359,21 @@ static int set_variable(struct tupfile *tf, char *line)
 		return -1;
 	}
 
-	if(append)
-		rc = vardb_append(&tf->vdb, var, value);
-	else
-		rc = vardb_set(&tf->vdb, var, value, tent);
+	if(var[0] == '&') {
+		struct tup_entry *tent;
+		tent = get_tent_dt(tf->curtent->tnode.tupid, value);
+		if(!tent) {
+			fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", value);
+			return -1;
+		}
+		/* var+1 to skip the leading '&' */
+		rc = vardb_set(&tf->node_db, var+1, value, tent);
+	} else {
+		if(append)
+			rc = vardb_append(&tf->vdb, var, value);
+		else
+			rc = vardb_set(&tf->vdb, var, value, NULL);
+	}
 	if(rc < 0) {
 		fprintf(tf->f, "Error setting variable '%s'\n", var);
 		return -1;
@@ -2867,9 +2871,6 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			clen += onl->extlessbasetotlen;
 		} else if(*next == '%') {
 			clen++;
-		} else if(*next == '(') {
-			/* skip over %-variables ('%(' gets replaced by '%(') */
-			clen += 2;
 		} else {
 			fprintf(tf->f, "Error: Unknown %%-flag: '%c'\n", *next);
 			return NULL;
@@ -2944,10 +2945,6 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 		} else if(*next == '%') {
 			s[x] = '%';
 			x++;
-		} else if(*next == '(') {
-			s[x] = '%';
-			s[x+1] = '(';
-			x += 2;
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
 			return NULL;
@@ -3079,10 +3076,9 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' || s[1] == '@' || s[1] == '%') && s[2] == '(') {
+			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
 				/* \@( becomes @( */
-				/* \%( becomes %( */
 				len++;
 				s += 2;
 			} else {
@@ -3120,10 +3116,6 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					len += vlen;
 				} else {
 					vlen = vardb_len(&tf->vdb, var, rparen-var);
-					if (vlen == VARDB_LEN_NODE_VAR) {
-						expected = "unable to access %-variables using $() syntax";
-						goto syntax_error;
-					}
 					if(vlen < 0)
 						return NULL;
 					len += vlen;
@@ -3153,7 +3145,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				s++;
 				len++;
 			}
-		} else if(*s == '%') {
+		} else if(*s == '&') {
 			const char *rparen;
 			
 			if(s[1] == '(') {
@@ -3164,16 +3156,20 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 				
 				if(allow_nodes != ALLOW_NODES) {
-					expected = "%-variables not allowed here";
+					expected = "&-variables not allowed here";
 					goto syntax_error;
 				}
 
 				var = s + 2;
-				struct var_entry *varentry = vardb_get(&tf->vdb, var, rparen-var);
-				if (!varentry)
+				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
+				if (!varentry) {
+					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", (int)(rparen-var), var);
 					return NULL;
-				if (!varentry->tent)
+				}
+				if (!varentry->tent) {
+					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", (int)(rparen-var), var);
 					return NULL;
+				}
 				
 				int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
 							  varentry->tent->tnode.tupid,
@@ -3202,10 +3198,9 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
-			if((s[1] == '$' || s[1] == '@' || s[1] == '%') && s[2] == '(') {
+			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
 				/* \@( becomes @( */
-				/* \%( becomes %( */
 				*p = s[1];
 				s += 2;
 			} else {
@@ -3278,7 +3273,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				p++;
 				s++;
 			}
-		} else if(*s == '%') {
+		} else if(*s == '&') {
 			const char *rparen;
 
 			if(s[1] == '(') {
@@ -3289,11 +3284,15 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 
 				var = s + 2;
-				struct var_entry *varentry = vardb_get(&tf->vdb, var, rparen-var);
-				if (!varentry)
+				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
+				if (!varentry) {
+					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", (int)(rparen-var), var);
 					return NULL;
-				if (!varentry->tent)
+				}
+				if (!varentry->tent) {
+					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", (int)(rparen-var), var);
 					return NULL;
+				}
 				
 				int clen = 0;
 				int rc = get_relative_dir(p, tf->curtent->tnode.tupid,

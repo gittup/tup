@@ -22,8 +22,8 @@
 
 cat > Tupfile << HERE
 : |> touch %o |> a.txt
-node_var %= a.txt
-: %(node_var) |> cp %(node_var) %o |> out.txt
+&node_var = a.txt
+: &(node_var) |> cp &(node_var) %o |> out.txt
 HERE
 
 tup touch Tupfile
