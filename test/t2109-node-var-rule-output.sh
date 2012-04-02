@@ -17,7 +17,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # Test that using a node-variable as a rule output fails - this doesn't
-# make any sense, since %-variables can only refer to existing files.
+# make any sense, since node-variables can only refer to existing files.
 
 . ./tup.sh
 

@@ -3070,7 +3070,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	char *p;
 	const char *s;
 	const char *var;
-	const char *expected = "oops";
+	const char *syntax_msg = "oops";
 	int vlen;
 
 	s = string;
@@ -3091,7 +3091,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
 
@@ -3131,7 +3131,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
 
@@ -3147,16 +3147,16 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			}
 		} else if(*s == '&') {
 			const char *rparen;
-			
+
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
-				
+
 				if(allow_nodes != ALLOW_NODES) {
-					expected = "&-variables not allowed here";
+					syntax_msg = "&-variables not allowed here";
 					goto syntax_error;
 				}
 
@@ -3170,7 +3170,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", rparen-var, var);
 					return NULL;
 				}
-				
+
 				int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
 							  varentry->tent->tnode.tupid,
 							  &vlen);
@@ -3214,7 +3214,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
 
@@ -3257,7 +3257,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
 
@@ -3279,7 +3279,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 			if(s[1] == '(') {
 				rparen = strchr(s+1, ')');
 				if(!rparen) {
-					expected = "ending variable paren ')'";
+					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
 
@@ -3293,14 +3293,14 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", rparen-var, var);
 					return NULL;
 				}
-				
+
 				int clen = 0;
 				int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
 							  varentry->tent->tnode.tupid,
 							  &clen);
 				if (rc < 0 || clen < 0)
 					return NULL;
-				
+
 				p += clen;
 				s = rparen + 1;
 			} else {
@@ -3324,6 +3324,6 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	return ret;
 
 syntax_error:
-	fprintf(tf->f, "Syntax error: expected %s\n", expected);
+	fprintf(tf->f, "Syntax error: %s\n", syntax_msg);
 	return NULL;
 }
