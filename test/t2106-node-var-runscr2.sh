@@ -25,12 +25,12 @@ tmkdir tools
 
 cat > Tuprules.tup << HERE
 script = \$(TUP_CWD)/tools/script.sh
-data %= tools/data.csv
+&data = tools/data.csv
 HERE
 
 cat > sw/Tupfile << HERE
 include_rules
-run \$(script) %(data)
+run \$(script) &(data)
 HERE
 
 cat > tools/script.sh << HERE

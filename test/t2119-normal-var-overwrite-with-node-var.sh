@@ -16,17 +16,20 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that converting a normal var to a node var doesn't work.
+# Test that converting a normal var to a node var doesn't overwrite the
+# normal variable.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
 normal_var = some value
-normal_var %= lib.a
+&normal_var = lib.a
+: |> echo \$(normal_var) is &(normal_var) |>
 HERE
 
 tup touch lib.a Tupfile
+update
 
-update_fail_msg "Error setting variable 'normal_var'"
+tup_object_exist . 'echo some value is lib.a'
 
 eotup

@@ -24,12 +24,12 @@ tmkdir sw
 tmkdir tools
 
 cat > Tuprules.tup << HERE
-script %= tools/script.sh
+&script = tools/script.sh
 HERE
 
 cat > sw/Tupfile << HERE
 include_rules
-run %(script)
+run &(script)
 HERE
 
 cat > tools/script.sh << HERE

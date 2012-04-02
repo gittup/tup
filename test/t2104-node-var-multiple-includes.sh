@@ -28,8 +28,8 @@ tmkdir sw/app/core
 tmkdir sw/test
 
 cat > sw/Tuprules.tup << HERE
-lib_tupfile %= lib/Tupfile
-core_tupfile %= app/core/Tupfile
+&lib_tupfile = lib/Tupfile
+&core_tupfile = app/core/Tupfile
 vars += sw
 !vars = |> echo \$(vars) > %o |>
 HERE
@@ -49,7 +49,7 @@ HERE
 
 cat > sw/app/core/Tupfile << HERE
 include_rules
-include %(lib_tupfile)
+include &(lib_tupfile)
 vars += core
 
 ifeq (\$(TUP_CWD),.)
@@ -59,7 +59,7 @@ HERE
 
 cat > sw/test/Tupfile << HERE
 include_rules
-include %(core_tupfile)
+include &(core_tupfile)
 vars += test
 : |> !vars |> test.txt
 HERE

@@ -26,12 +26,12 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-node_var %= lib.a
-var = %(node_var)
+&node_var = lib.a
+var = &(node_var)
 HERE
 
 tup touch lib.a Tupfile
 
-update_fail_msg "%-variables not allowed here"
+update_fail_msg "&-variables not allowed here"
 
 eotup

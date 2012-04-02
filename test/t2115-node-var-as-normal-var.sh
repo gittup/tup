@@ -16,17 +16,19 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that trying to get the value of a node-variable using $() doesn't work
+# Test that trying to get the value of a node-variable using $() doesn't work.
+# Since the $-variable doesn't exist, it just returns an empty string.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-node_var %= lib.a
+&node_var = lib.a
 : |> echo \$(node_var) > %o |> out.txt
 HERE
 
 tup touch lib.a Tupfile
+update
 
-update_fail_msg "unable to access %-variables using \\$\(\) syntax"
+tup_dep_exist . 'echo  > out.txt' . out.txt
 
 eotup
