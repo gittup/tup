@@ -22,9 +22,18 @@
 
 check_tup_suid
 
+CC="gcc"
+if [ "$tupos" = "Darwin" ]; then
+	if ! which gcc-4.2 > /dev/null; then
+		echo "Skipping test - OSX needs gcc-4.2 for code coverage" 1>&2
+		eotup
+	fi
+	CC="gcc-4.2"
+fi
+
 cat > Tupfile << HERE
-: |> ^c^ gcc --coverage foo.c -o %o |> foo.exe | foo.gcno
-: |> ^c CC bar^ gcc --coverage bar.c -o %o |> bar.exe | bar.gcno
+: |> ^c^ $CC --coverage foo.c -o %o |> foo.exe | foo.gcno
+: |> ^c CC bar^ $CC --coverage bar.c -o %o |> bar.exe | bar.gcno
 HERE
 
 cat > foo.c << HERE
