@@ -869,7 +869,7 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 	const char *str;
 	switch(type) {
 		case TUP_NODE_FILE:
-			str = "file";
+			str = "normal file";
 			break;
 		case TUP_NODE_CMD:
 			str = "command";
@@ -951,7 +951,7 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			 * screwing up the Tupfile.
 			 */
 			if(type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name);
+				fprintf(stderr, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
 				return NULL;
 			}
 
