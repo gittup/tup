@@ -44,6 +44,10 @@ CYGWIN*)
 ;;
 esac
 
+# override any user settings for grep
+GREP_OPTIONS=""
+export GREP_OPTIONS
+
 tmkdir()
 {
 	mkdir $1
