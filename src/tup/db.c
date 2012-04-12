@@ -864,7 +864,7 @@ int tup_db_debug_add_all_ghosts(void)
 	return 0;
 }
 
-const char *tup_db_type(int type)
+const char *tup_db_type(enum TUP_NODE_TYPE type)
 {
 	const char *str;
 	switch(type) {

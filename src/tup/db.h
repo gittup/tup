@@ -42,7 +42,7 @@ int tup_db_rollback(void);
 int tup_db_check_flags(int flags);
 void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);
-const char *tup_db_type(int type);
+const char *tup_db_type(enum TUP_NODE_TYPE type);
 
 /* Node operations */
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);

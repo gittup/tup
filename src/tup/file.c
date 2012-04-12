@@ -111,6 +111,7 @@ int handle_open_file(enum access_type at, const char *filename,
 		case ACCESS_VAR:
 			LIST_INSERT_HEAD(&info->var_list, fent, list);
 			break;
+		case ACCESS_RENAME:
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
 			rc = -1;
