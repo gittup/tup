@@ -22,6 +22,7 @@
 . ./tup.sh
 check_monitor_supported
 tup monitor --autoupdate > .monitor.output 2>&1
+tup flush
 
 cat > main.c << HERE
 #include <stdio.h>
@@ -38,8 +39,13 @@ tup flush
 check_exist prog
 
 if ! cat .monitor.output | grep Updated | wc -l | grep 1 > /dev/null; then
-	echo "Error: tup should only update once" 1>&2
-	exit 1
+	sleep 0.5
+	if ! cat .monitor.output | grep Updated | wc -l | grep 1 > /dev/null; then
+		echo "Monitor output:" 1>&2
+		cat .monitor.output 1>&2
+		echo "Error: tup should only update once" 1>&2
+		exit 1
+	fi
 fi
 
 eotup
