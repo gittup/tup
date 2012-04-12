@@ -59,7 +59,6 @@ enum {
 	DB_DELETE_NODE,
 	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
-	DB_IS_ROOT_NODE,
 	DB_CHANGE_NODE_NAME,
 	DB_SET_NAME,
 	DB_SET_TYPE,
@@ -1561,58 +1560,6 @@ int tup_db_open_tupid(tupid_t tupid)
 	free(path);
 
 	return rc;
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return rc;
-}
-
-int tup_db_is_root_node(tupid_t tupid)
-{
-	int rc;
-	int dbrc;
-	int type;
-	sqlite3_stmt **stmt = &stmts[DB_IS_ROOT_NODE];
-	static char s[] = "select type from node where id=?";
-
-	transaction_check("%s [37m[%lli][0m", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr, "tup error: tup_db_is_root_node() called on node (%lli) that doesn't exist?\n", tupid);
-		rc = -1;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		rc = -1;
-		goto out_reset;
-	}
-
-	type = sqlite3_column_int(*stmt, 0);
-	if(type == TUP_NODE_GENERATED)
-		rc = 0;
-	else
-		rc = 1;
 
 out_reset:
 	if(msqlite3_reset(*stmt) != 0) {
