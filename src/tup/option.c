@@ -21,6 +21,9 @@
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/sysctl.h>
 #elif defined(_WIN32)
+/* Don't let Windows define SLIST_ENTRY and conflict with bsd/queue.h */
+#define _SLIST_HEADER_
+
 /* _WIN32_IE needed for SHGetSpecialFolderPath() */
 #define _WIN32_IE 0x0400
 #include <windows.h>

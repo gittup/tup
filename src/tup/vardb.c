@@ -24,6 +24,28 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "entry.h"
+
+static int add_tent(struct var_entry *ve, struct tup_entry *tent)
+{
+	struct var_tent_list_entry *tlist_entry = NULL;
+
+	/* not an error, just add nothing to the list */
+	if (!tent)
+		return 0;
+
+	tlist_entry = malloc(sizeof(struct var_tent_list_entry));
+	if(!tlist_entry) {
+		perror("malloc");
+		return -1;
+	}
+
+	tlist_entry->tent = tent;
+	TAILQ_INSERT_TAIL(&ve->tlist, tlist_entry, list);
+
+	return 0;
+}
+
 int vardb_init(struct vardb *v)
 {
 	RB_INIT(&v->root);
@@ -80,6 +102,16 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 			ve->value = NULL;
 		}
 		ve->tent = tent;
+
+		/* clear the list; we aren't appending here! */
+		struct var_tent_list_entry *tlist_entry = NULL;
+		while((tlist_entry = TAILQ_FIRST(&ve->tlist)) != NULL) {
+			TAILQ_REMOVE(&ve->tlist, tlist_entry, list);
+			free(tlist_entry);
+		}
+		if (add_tent(ve, tent) < 0) {
+			return NULL;
+		}
 	} else {
 		ve = malloc(sizeof *ve);
 		if(!ve) {
@@ -111,6 +143,16 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 		} else {
 			ve->value = NULL;
 		}
+
+		ve->tent = tent;
+		TAILQ_INIT(&ve->tlist);
+		if (add_tent(ve, tent) < 0) {
+			free(ve->value);
+			free(ve->var.s);
+			free(ve);
+			return NULL;
+		}
+
 		if(string_tree_insert(&v->root, &ve->var) < 0) {
 			fprintf(stderr, "vardb_set: Error inserting into tree\n");
 			free(ve->value);
@@ -118,14 +160,14 @@ struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 			free(ve);
 			return NULL;
 		}
-		ve->tent = tent;
 
 		v->count++;
 	}
 	return ve;
 }
 
-int vardb_append(struct vardb *v, const char *var, const char *value)
+int vardb_append(struct vardb *v, const char *var, const char *value,
+                 struct tup_entry *tent)
 {
 	struct string_tree *st;
 
@@ -148,6 +190,12 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 		free(ve->value);
 		ve->value = new;
 		ve->vallen += vallen + 1;
+
+		if (add_tent(ve, tent) < 0) {
+			free(new);
+			return -1;
+		}
+
 		return 0;
 	} else {
 		return vardb_set(v, var, value, NULL);
