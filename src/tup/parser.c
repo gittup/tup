@@ -1367,10 +1367,13 @@ static int set_variable(struct tupfile *tf, char *line)
 			return -1;
 		}
 		/* var+1 to skip the leading '&' */
-		rc = vardb_set(&tf->node_db, var+1, value, tent);
+		if(append)
+			rc = vardb_append(&tf->node_db, var+1, value, tent);
+		else
+			rc = vardb_set(&tf->node_db, var+1, value, tent);
 	} else {
 		if(append)
-			rc = vardb_append(&tf->vdb, var, value);
+			rc = vardb_append(&tf->vdb, var, value, NULL);
 		else
 			rc = vardb_set(&tf->vdb, var, value, NULL);
 	}
@@ -3166,17 +3169,22 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", rparen-var, var);
 					return NULL;
 				}
-				if (!varentry->tent) {
-					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", rparen-var, var);
-					return NULL;
-				}
 
-				int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
-							  varentry->tent->tnode.tupid,
-							  &vlen);
-				if (rc < 0 || vlen < 0)
-					return NULL;
-				len += vlen;
+				int first = 0;
+				struct var_tent_list_entry *tent_entry;
+				TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
+					int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
+								  tent_entry->tent->tnode.tupid,
+								  &vlen);
+					if (rc < 0 || vlen < 0)
+						return NULL;
+					len += vlen;
+					if(!first) {
+						first = 1;
+					} else {
+						len += 1;  /* space */
+					}
+				}
 				s = rparen + 1;
 			} else {
 				s++;
@@ -3289,19 +3297,24 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", rparen-var, var);
 					return NULL;
 				}
-				if (!varentry->tent) {
-					fprintf(tf->f, "tup internal error: tent is not set for &-reference '%.*s'\n", rparen-var, var);
-					return NULL;
-				}
 
 				int clen = 0;
-				int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
-							  varentry->tent->tnode.tupid,
-							  &clen);
-				if (rc < 0 || clen < 0)
-					return NULL;
-
-				p += clen;
+				int first = 0;
+				struct var_tent_list_entry *tent_entry;
+				TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
+					if(!first) {
+						first = 1;
+					} else {
+						p[0] = ' ';
+						p += 1;
+					}
+					int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
+								  tent_entry->tent->tnode.tupid,
+								  &clen);
+					if (rc < 0 || clen < 0)
+						return NULL;
+					p += clen;
+				}
 				s = rparen + 1;
 			} else {
 				*p = *s;

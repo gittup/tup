@@ -22,6 +22,7 @@
 #define tup_vardb_h
 
 #include "string_tree.h"
+#include "bsd/queue.h"
 
 struct tup_entry;
 
@@ -30,11 +31,18 @@ struct vardb {
 	int count;
 };
 
+struct var_tent_list_entry {
+	TAILQ_ENTRY(var_tent_list_entry) list;
+	struct tup_entry *tent;
+};
+TAILQ_HEAD(var_tent_list_head, var_tent_list_entry);
+
 struct var_entry {
 	struct string_tree var;
 	char *value;
 	int vallen;
-	struct tup_entry *tent;
+	struct tup_entry *tent;   /* only used in db.c */
+	struct var_tent_list_head tlist;   /* used for node variables */
 };
 
 int vardb_init(struct vardb *v);
@@ -43,7 +51,8 @@ int vardb_set(struct vardb *v, const char *var, const char *value,
 	      struct tup_entry *tent);
 struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
 			     const char *value, struct tup_entry *tent);
-int vardb_append(struct vardb *v, const char *var, const char *value);
+int vardb_append(struct vardb *v, const char *var, const char *value,
+                 struct tup_entry *tent);
 int vardb_len(struct vardb *v, const char *var, int varlen);
 int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest);
 struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen);
