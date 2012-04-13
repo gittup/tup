@@ -612,6 +612,8 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
+	int rc;
+	struct mapping *map;
 	if(rdev) {}
 
 	if(context_check() < 0)
@@ -620,8 +622,6 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
 	if (S_ISREG(mode)) {
-		int rc;
-		struct mapping *map;
 		int flags = O_CREAT | O_EXCL | O_WRONLY;
 		map = add_mapping(path);
 		if(!map) {
@@ -636,8 +636,17 @@ static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 			if(close(rc) < 0)
 				return -errno;
 		}
+	} else if S_ISFIFO(mode) {
+		map = add_mapping(path);
+		if(!map) {
+			return -ENOMEM;
+		} else {
+			rc = mkfifo(map->tmpname, mode);
+			if(rc < 0)
+				return -errno;
+		}
 	} else {
-		/* Other things (eg: fifos, actual device nodes) are not
+		/* Other things (eg: actual device nodes) are not
 		 * permitted.
 		 */
 		fprintf(stderr, "tup error: mknod() with mode 0x%x is not permitted.\n", mode);

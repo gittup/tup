@@ -241,6 +241,10 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 		perror(file);
 		return -1;
 	}
+	if(S_ISFIFO(buf.st_mode)) {
+		fprintf(stderr, "tup error: Unable to create a FIFO as an output file. They can only be used as temporary files.\n");
+		return -1;
+	}
 	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
 		return -1;
 	return 0;
