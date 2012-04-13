@@ -42,9 +42,9 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps);
+			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt);
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root);
+				   struct tupid_entries *root, tupid_t vardt);
 
 int init_file_info(struct file_info *info)
 {
@@ -123,7 +123,7 @@ int handle_open_file(enum access_type at, const char *filename,
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root, int full_deps)
+		struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -149,7 +149,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	}
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, full_deps);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, full_deps, vardt);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -158,11 +158,11 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	return -1;
 }
 
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root)
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt)
 {
 	int rc;
 	finfo_lock(finfo);
-	rc = add_parser_files_locked(finfo, root);
+	rc = add_parser_files_locked(finfo, root, vardt);
 	finfo_unlock(finfo);
 	return rc;
 }
@@ -221,7 +221,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		/* Note that full-path entries are always ghosts since we don't scan them. They
 		 * can still have a valid mtime, though.
 		 */
-		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, mtime, &tent) < 0) {
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
 			fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
@@ -251,7 +251,7 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 }
 
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root)
+				   struct tupid_entries *root, tupid_t vardt)
 {
 	struct file_entry *r;
 	struct mapping *map;
@@ -270,7 +270,7 @@ static int add_parser_files_locked(struct file_info *finfo,
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
-		if(add_node_to_list(VAR_DT, &r->pg, entrylist, 0, NULL) < 0)
+		if(add_node_to_list(vardt, &r->pg, entrylist, 0, NULL) < 0)
 			return -1;
 		del_entry(r);
 	}
@@ -534,7 +534,7 @@ out_skip:
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps)
+			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
 {
 	struct file_entry *r;
 
@@ -549,7 +549,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->var_list)) {
 		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(VAR_DT, &r->pg, entryhead, 0, NULL) < 0)
+		if(add_node_to_list(vardt, &r->pg, entryhead, 0, NULL) < 0)
 			return -1;
 		del_entry(r);
 	}

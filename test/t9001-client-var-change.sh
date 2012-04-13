@@ -31,7 +31,7 @@ update
 
 diff empty.txt ok.txt
 
-tup_object_exist @ defg
+tup_object_exist tup.config defg
 
 varsetall defg=hey
 update

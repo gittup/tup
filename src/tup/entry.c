@@ -39,7 +39,7 @@ static int do_verbose = 0;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
-				   time_t mtime);
+				   time_t mtime, tupid_t srcid);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
@@ -62,7 +62,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = new_entry(tupid, -1, NULL, 0, -1, -1);
+	tent = new_entry(tupid, -1, NULL, 0, -1, -1, -1);
 	if(!tent)
 		return -1;
 
@@ -257,12 +257,12 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 }
 
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, time_t mtime,
+			 int type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, len, type, mtime);
+	tent = new_entry(tupid, dt, name, len, type, mtime, srcid);
 	if(!tent)
 		return -1;
 	if(resolve_parent(tent) < 0)
@@ -273,11 +273,11 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
-		      time_t mtime, const char *name, struct tupid_entries *root)
+		      time_t mtime, tupid_t srcid, const char *name, struct tupid_entries *root)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, strlen(name), type, mtime);
+	tent = new_entry(tupid, dt, name, strlen(name), type, mtime, srcid);
 	if(!tent)
 		return -1;
 
@@ -345,9 +345,43 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 	return newdfd;
 }
 
+tupid_t tup_entry_vardt(struct tup_entry *tent)
+{
+	/* The vardt field isn't set when we initially create tup_entrys, since
+	 * if we are doing tup_entry_add_all, we may not have the tup.config
+	 * entry until the end. It also doesn't make sense to add that entry
+	 * until we have scanned for a real tup.config node. Instead we just
+	 * use this function to get the vardt field, since the tup_entry tree
+	 * will contain the necessary directory structure at this point. Then
+	 * each entry has the same vardt as its parent, until a tup.config node
+	 * is found.
+	 */
+	if(tent->vardt != -1)
+		return tent->vardt;
+	if(tent->parent) {
+		tent->vardt = tup_entry_vardt(tent->parent);
+	} else {
+		struct tup_entry *vartent;
+
+		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
+			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
+			exit(1);
+		}
+		if(!vartent) {
+			vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
+			if(!vartent) {
+				fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
+				exit(1);
+			}
+		}
+		tent->vardt = vartent->tnode.tupid;
+	}
+	return tent->vardt;
+}
+
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
-				   time_t mtime)
+				   time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
 
@@ -367,6 +401,8 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->parent = NULL;
 	tent->type = type;
 	tent->mtime = mtime;
+	tent->srcid = srcid;
+	tent->vardt = -1;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {

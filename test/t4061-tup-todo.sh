@@ -27,7 +27,7 @@ tup touch foo.c bar.c
 update
 
 tup touch Tupfile
-tup todo | grep 'Tup phase 1'
+tup todo | grep 'Tup phase 2'
 tup parse
 
 tup touch foo.c

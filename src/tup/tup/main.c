@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "link_exists") == 0) {
 		rc = link_exists(argc, argv);
 	} else if(strcmp(cmd, "flags_exists") == 0) {
-		rc = tup_db_check_flags(TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY);
+		rc = tup_db_check_flags(TUP_FLAGS_CONFIG | TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY);
 	} else if(strcmp(cmd, "create_flags_exists") == 0) {
 		rc = tup_db_check_flags(TUP_FLAGS_CREATE);
 	} else if(strcmp(cmd, "touch") == 0) {
@@ -822,33 +822,36 @@ static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *val
 
 static int varshow(int argc, char **argv)
 {
+	struct tup_entry *vartent;
 	if(tup_db_begin() < 0)
 		return -1;
-	if(tup_entry_add(VAR_DT, NULL) < 0)
+	if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0)
 		return -1;
-	if(argc == 1) {
-		if(tup_db_var_foreach(VAR_DT, varshow_cb, NULL) < 0)
-			return -1;
-	} else {
-		int x;
-		struct tup_entry *tent;
-		for(x=1; x<argc; x++) {
-			char *value;
-			if(tup_db_select_tent(VAR_DT, argv[x], &tent) < 0)
+	if(vartent) {
+		if(argc == 1) {
+			if(tup_db_var_foreach(vartent->tnode.tupid, varshow_cb, NULL) < 0)
 				return -1;
-			if(!tent) {
-				fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
-				continue;
-			}
-			if(tent->type == TUP_NODE_VAR) {
-				if(tup_db_get_var_id_alloc(tent->tnode.tupid, &value) < 0)
+		} else {
+			int x;
+			struct tup_entry *tent;
+			for(x=1; x<argc; x++) {
+				char *value;
+				if(tup_db_select_tent(vartent->tnode.tupid, argv[x], &tent) < 0)
 					return -1;
-				printf(" - Var[%s] = '%s'\n", argv[x], value);
-				free(value);
-			} else if(tent->type == TUP_NODE_GHOST) {
-				printf(" - Var[[47;30m%s[0m] is a ghost\n", argv[x]);
-			} else {
-				fprintf(stderr, "Variable '%s' has unknown type %i\n", argv[x], tent->type);
+				if(!tent) {
+					fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
+					continue;
+				}
+				if(tent->type == TUP_NODE_VAR) {
+					if(tup_db_get_var_id_alloc(tent->tnode.tupid, &value) < 0)
+						return -1;
+					printf(" - Var[%s] = '%s'\n", argv[x], value);
+					free(value);
+				} else if(tent->type == TUP_NODE_GHOST) {
+					printf(" - Var[[47;30m%s[0m] is a ghost\n", argv[x]);
+				} else {
+					fprintf(stderr, "Variable '%s' has unknown type %i\n", argv[x], tent->type);
+				}
 			}
 		}
 	}

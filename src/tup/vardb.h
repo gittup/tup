@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,6 +21,7 @@
 #ifndef tup_vardb_h
 #define tup_vardb_h
 
+#include "tupid.h"
 #include "string_tree.h"
 
 struct tup_entry;
@@ -48,9 +49,10 @@ int vardb_len(struct vardb *v, const char *var, int varlen);
 int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest);
 struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen);
 int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
-		  int (*extra_a)(struct var_entry *ve),
-		  int (*extra_b)(struct var_entry *ve),
-		  int (*same)(struct var_entry *vea, struct var_entry *veb));
+		  int (*extra_a)(struct var_entry *ve, tupid_t vardt),
+		  int (*extra_b)(struct var_entry *ve, tupid_t vardt),
+		  int (*same)(struct var_entry *vea, struct var_entry *veb),
+		  tupid_t vardt);
 void vardb_dump(struct vardb *v);
 
 #endif

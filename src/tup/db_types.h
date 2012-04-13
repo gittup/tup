@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,7 +25,6 @@
 #define TUP_DB_FILE ".tup/db"
 #define TUP_VARDICT_FILE ".tup/vardict"
 #define DOT_DT 1
-#define VAR_DT 2
 
 enum TUP_NODE_TYPE {
 	TUP_NODE_FILE,
@@ -41,6 +40,7 @@ enum TUP_FLAGS_TYPE {
 	TUP_FLAGS_NONE=0,
 	TUP_FLAGS_MODIFY=1,
 	TUP_FLAGS_CREATE=2,
+	TUP_FLAGS_CONFIG=4,
 };
 
 enum TUP_LINK_TYPE {

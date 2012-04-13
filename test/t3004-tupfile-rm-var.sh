@@ -34,7 +34,7 @@ update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"
 tup_object_exist tmp "cat bar.c > bar.o"
-tup_dep_exist @ BAR . tmp
+tup_dep_exist tup.config BAR . tmp
 
 cat > tmp/Tupfile << HERE
 file-y = foo.c
@@ -45,6 +45,6 @@ update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"
 tup_object_no_exist tmp "cat bar.c > bar.o"
-tup_dep_no_exist @ BAR . tmp
+tup_dep_no_exist tup.config BAR . tmp
 
 eotup

@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <time.h>
 
+#define TUP_CONFIG "tup.config"
+
 struct tup_entry;
 struct tup_entry_head;
 struct tup_env;
@@ -51,7 +53,7 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
 				     int len, int type, time_t mtime);
 int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
-			    time_t mtime, struct tup_entry **entry);
+			    time_t mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
@@ -83,12 +85,17 @@ tupid_t slash_dt(void);
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
 int tup_db_add_dir_create_list(tupid_t tupid);
+int tup_db_add_config_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
 int tup_db_add_modify_list(tupid_t tupid);
+int tup_db_add_variant_list(tupid_t tupid);
+int tup_db_in_config_list(tupid_t tupid);
 int tup_db_in_create_list(tupid_t tupid);
 int tup_db_in_modify_list(tupid_t tupid);
+int tup_db_unflag_config(tupid_t tupid);
 int tup_db_unflag_create(tupid_t tupid);
 int tup_db_unflag_modify(tupid_t tupid);
+int tup_db_unflag_variant(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
@@ -122,11 +129,11 @@ int tup_db_config_set_string(const char *lval, const char *rval);
 
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);
-struct tup_entry *tup_db_get_var(const char *var, int varlen, char **dest);
+struct tup_entry *tup_db_get_var(tupid_t vardt, const char *var, int varlen, char **dest);
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
-int tup_db_get_varlen(const char *var, int varlen);
+int tup_db_get_varlen(tupid_t vardt, const char *var, int varlen);
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
-int tup_db_read_vars(tupid_t dt, const char *file);
+int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt);
 
 /* Environment operations */
 int tup_db_check_env(int environ_check);

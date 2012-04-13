@@ -24,8 +24,6 @@
 #include "tupid.h"
 #include <time.h>
 
-#define TUP_CONFIG "tup.config"
-
 struct tup_entry;
 struct tup_entry_head;
 struct path_element;

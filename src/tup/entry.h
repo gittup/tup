@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -34,6 +34,8 @@ struct tup_entry {
 	struct tup_entry *parent;
 	int type;
 	time_t mtime;
+	tupid_t srcid;
+	tupid_t vardt;
 	struct string_tree name;
 	struct string_entries entries;
 	LIST_ENTRY(tup_entry) ghost_list;
@@ -51,16 +53,17 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 			       struct tup_entry **dest);
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, time_t mtime,
+			 int type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest);
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
-		      time_t mtime, const char *name, struct tupid_entries *root);
+		      time_t mtime, tupid_t srcid, const char *name, struct tupid_entries *root);
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name(tupid_t tupid, const char *new_name);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_open_tupid(tupid_t tupid);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
+tupid_t tup_entry_vardt(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);
 struct tup_entry *tup_entry_get(tupid_t tupid);
 struct tup_entry *tup_entry_find(tupid_t tupid);

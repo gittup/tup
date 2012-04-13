@@ -30,7 +30,7 @@ tup touch foo.c bar.c Tupfile
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
-tup_object_exist @ BAR
+tup_object_exist tup.config BAR
 
 cat > Tupfile << HERE
 file-y = foo.c
@@ -41,6 +41,6 @@ update
 
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
-tup_object_no_exist @ BAR
+tup_object_no_exist tup.config BAR
 
 eotup

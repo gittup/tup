@@ -42,7 +42,7 @@ static void (*rmdir_callback)(tupid_t tupid);
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry)
 {
-	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, entry) < 0)
+	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
@@ -158,12 +158,12 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 
 	if(new || changed) {
 		if(modified) *modified = 1;
-		if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
+		if(strcmp(file, TUP_CONFIG) == 0) {
 			/* If tup.config was modified, put the @-directory in
 			 * the create list so we can import any variables that
 			 * have changed.
 			 */
-			if(tup_db_add_create_list(VAR_DT) < 0)
+			if(tup_db_add_config_list(tent->tnode.tupid) < 0)
 				return -1;
 		}
 	}
@@ -173,11 +173,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 
 static int check_rm_tup_config(struct tup_entry *tent)
 {
-	if(tent->dt == DOT_DT && strcmp(tent->name.s, TUP_CONFIG) == 0) {
+	if(strcmp(tent->name.s, TUP_CONFIG) == 0) {
 		/* If tup.config was removed, also add the @-directory to the
 		 * create list.
 		 */
-		if(tup_db_add_create_list(VAR_DT) < 0)
+		if(tup_db_add_config_list(tent->tnode.tupid) < 0)
 			return -1;
 	}
 	return 0;
@@ -438,7 +438,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
 					return -1;
 				}
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, -1, &tent) < 0)
 					return -1;
 			}
 		}

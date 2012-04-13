@@ -136,6 +136,7 @@ struct build_name_list_args {
 
 struct tupfile {
 	tupid_t tupid;
+	tupid_t vardt;
 	struct tup_entry *curtent;
 	int cur_dfd;
 	int root_fd;
@@ -250,6 +251,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	}
 	n->parsing = 1;
 
+	tf.vardt = tup_entry_vardt(n->tent);
 	tf.ps = &ps;
 	tf.f = tmpfile();
 	if(!tf.f) {
@@ -344,7 +346,7 @@ out_server_stop:
 		rc = -1;
 
 	if(rc == 0) {
-		if(add_parser_files(&ps.s.finfo, &tf.input_root) < 0)
+		if(add_parser_files(&ps.s.finfo, &tf.input_root, tf.vardt) < 0)
 			rc = -1;
 		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_root) < 0)
 			rc = -1;
@@ -586,7 +588,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 
 	if(strncmp(var, "CONFIG_", 7) == 0)
 		var += 7;
-	tent = tup_db_get_var(var, strlen(var), NULL);
+	tent = tup_db_get_var(tf->vardt, var, strlen(var), NULL);
 	if(!tent)
 		return -1;
 	if(tent->type == TUP_NODE_VAR) {
@@ -794,7 +796,7 @@ static int gitignore(struct tupfile *tf)
 		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 			return -1;
 		if(!tent) {
-			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, &tent) < 0)
+			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, -1, &tent) < 0)
 				return -1;
 		} else {
 			tree_entry_remove(&tf->g->gen_delete_root,
@@ -3090,7 +3092,7 @@ static char *eval(struct tupfile *tf, const char *string)
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
 					atvar = var+7;
-					vlen = tup_db_get_varlen(atvar, rparen-atvar);
+					vlen = tup_db_get_varlen(tf->vardt, atvar, rparen-atvar);
 					if(vlen < 0)
 						return NULL;
 					len += vlen;
@@ -3116,7 +3118,7 @@ static char *eval(struct tupfile *tf, const char *string)
 				}
 
 				var = s + 2;
-				vlen = tup_db_get_varlen(var, rparen-var);
+				vlen = tup_db_get_varlen(tf->vardt, var, rparen-var);
 				if(vlen < 0)
 					return NULL;
 				len += vlen;
@@ -3178,7 +3180,7 @@ static char *eval(struct tupfile *tf, const char *string)
 					struct tup_entry *tent;
 					atvar = var+7;
 
-					tent = tup_db_get_var(atvar, rparen-atvar, &p);
+					tent = tup_db_get_var(tf->vardt, atvar, rparen-atvar, &p);
 					if(!tent)
 						return NULL;
 					if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
@@ -3205,7 +3207,7 @@ static char *eval(struct tupfile *tf, const char *string)
 				}
 
 				var = s + 2;
-				tent = tup_db_get_var(var, rparen-var, &p);
+				tent = tup_db_get_var(tf->vardt, var, rparen-var, &p);
 				if(!tent)
 					return NULL;
 				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)

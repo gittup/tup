@@ -48,9 +48,10 @@
 
 static int check_full_deps_rebuild(void);
 static int run_scan(void);
-static int update_tup_config(int environ_check);
+static int process_config_nodes(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
+static int check_config_todo(void);
 static int check_create_todo(void);
 static int check_update_todo(int argc, char **argv);
 static int build_graph(struct graph *g);
@@ -177,7 +178,7 @@ int updater(int argc, char **argv, int phase)
 		if(run_scan() < 0)
 			return -1;
 	}
-	if(update_tup_config(environ_check) < 0)
+	if(process_config_nodes(environ_check) < 0)
 		goto out;
 	if(phase == 1) { /* Collect underpants */
 		rc = 0;
@@ -230,12 +231,11 @@ int todo(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	rc = tup_db_in_create_list(VAR_DT);
+	rc = check_config_todo();
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
-		printf("The tup.config file has been modified and needs to be read.\n");
-		printf("Run 'tup read' to proceed to phase 1.\n");
+		printf("Run 'tup read' to proceed to phase 2.\n");
 		goto out_ok;
 	}
 
@@ -243,7 +243,7 @@ int todo(int argc, char **argv)
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
-		printf("Run 'tup parse' to proceed to phase 2.\n");
+		printf("Run 'tup parse' to proceed to phase 3.\n");
 		goto out_ok;
 	}
 
@@ -393,24 +393,28 @@ out_err:
 	return rc;
 }
 
-static int update_tup_config(int environ_check)
+static int process_config_nodes(int environ_check)
 {
-	int rc;
+	struct graph g;
 
 	if(tup_db_begin() < 0)
 		return -1;
-	rc = tup_db_in_create_list(VAR_DT);
-	if(rc < 0)
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
 		return -1;
-	if(rc == 1) {
-		if(tup_db_unflag_create(VAR_DT) < 0)
-			return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
+		return -1;
+	if(!TAILQ_EMPTY(&g.plist)) {
+		struct node *n;
 		if(environ_check)
 			tup_main_progress("Reading in new configuration/environment variables...\n");
 		else
 			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
-		if(tup_db_read_vars(DOT_DT, TUP_CONFIG) < 0)
-			goto err_rollback;
+		TAILQ_FOREACH(n, &g.plist, list) {
+			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid) < 0)
+				goto err_rollback;
+			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
+				goto err_rollback;
+		}
 	} else {
 		if(environ_check)
 			tup_main_progress("Reading in new environment variables...\n");
@@ -419,6 +423,8 @@ static int update_tup_config(int environ_check)
 	}
 	if(tup_db_check_env(environ_check) < 0)
 		goto err_rollback;
+	if(destroy_graph(&g) < 0)
+		return -1;
 	tup_db_commit();
 	if(tup_vardict_open() < 0)
 		return -1;
@@ -533,6 +539,30 @@ out_destroy:
 	return rc;
 }
 
+static int check_config_todo(void)
+{
+	struct graph g;
+	int stuff_todo = 0;
+	struct node *n;
+
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
+		return -1;
+	if(!TAILQ_EMPTY(&g.plist)) {
+		printf("Tup phase 1: The following tup.config files must be parsed:\n");
+		stuff_todo = 1;
+	}
+
+	TAILQ_FOREACH(n, &g.plist, list) {
+		print_tup_entry(stdout, n->tent);
+	}
+
+	if(destroy_graph(&g) < 0)
+		return -1;
+	return stuff_todo;
+}
+
 static int check_create_todo(void)
 {
 	struct graph g;
@@ -546,7 +576,7 @@ static int check_create_todo(void)
 	if(build_graph(&g) < 0)
 		return -1;
 	if(g.num_nodes) {
-		printf("Tup phase 1: The following directories must be parsed:\n");
+		printf("Tup phase 2: The following directories must be parsed:\n");
 		stuff_todo = 1;
 	}
 	rc = execute_graph(&g, 0, 1, todo_work);
@@ -1079,7 +1109,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root, full_deps) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1091,7 +1121,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root, full_deps) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
