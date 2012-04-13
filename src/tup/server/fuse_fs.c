@@ -429,9 +429,23 @@ static int tup_fs_readlink(const char *path, char *buf, size_t size)
 		put_finfo(finfo);
 	}
 
-	res = readlinkat(tup_top_fd(), peeled, buf, size - 1);
-	if (res == -1)
-		return -errno;
+	/* /proc/self gets special treatment, since we want the pid of the
+	 * process doing the readlink(). If we let the kernel handle it then we
+	 * get the pid of this fuse process, which is obviously incorrect.
+	 */
+	if(strcmp(peeled, "/proc/self") == 0) {
+		res = snprintf(buf, size - 1, "%i", fuse_get_context()->pid);
+		if(res >= (signed)size - 1) {
+			/* According to readlink(2), if the buffer is too small then the result
+			 * is truncated.
+			 */
+			res = size - 1;
+		}
+	} else {
+		res = readlinkat(tup_top_fd(), peeled, buf, size - 1);
+		if (res == -1)
+			return -errno;
+	}
 	tup_fuse_handle_file(path, ACCESS_READ);
 
 	buf[res] = '\0';
