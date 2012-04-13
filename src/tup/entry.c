@@ -62,24 +62,12 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = malloc(sizeof *tent);
-	if(!tent) {
-		perror("malloc");
+	tent = new_entry(tupid, -1, NULL, 0, -1, -1);
+	if(!tent)
 		return -1;
-	}
-	tent->tnode.tupid = tupid;
-	tent->list.le_prev = NULL;
-	tent->ghost_list.le_prev = NULL;
-	RB_INIT(&tent->entries);
-	tent->parent = NULL;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
 		return -1;
-
-	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree\n", tent->tnode.tupid);
-		return -1;
-	}
 
 	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
 		return -1;
@@ -379,15 +367,20 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->parent = NULL;
 	tent->type = type;
 	tent->mtime = mtime;
-	tent->name.s = malloc(len+1);
-	if(!tent->name.s) {
-		perror("malloc");
-		free(tent);
-		return NULL;
+	if(name) {
+		tent->name.s = malloc(len+1);
+		if(!tent->name.s) {
+			perror("malloc");
+			free(tent);
+			return NULL;
+		}
+		strncpy(tent->name.s, name, len);
+		tent->name.s[len] = 0;
+		tent->name.len = len;
+	} else {
+		tent->name.s = NULL;
+		tent->name.len = 0;
 	}
-	strncpy(tent->name.s, name, len);
-	tent->name.s[len] = 0;
-	tent->name.len = len;
 	RB_INIT(&tent->entries);
 
 	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
