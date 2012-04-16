@@ -111,6 +111,7 @@ int handle_open_file(enum access_type at, const char *filename,
 		case ACCESS_VAR:
 			LIST_INSERT_HEAD(&info->var_list, fent, list);
 			break;
+		case ACCESS_RENAME:
 		default:
 			fprintf(stderr, "Invalid event type: %i\n", at);
 			rc = -1;
@@ -221,7 +222,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		 * can still have a valid mtime, though.
 		 */
 		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, mtime, &tent) < 0) {
-			fprintf(stderr, "Error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
+			fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
 	}
@@ -238,6 +239,10 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 	if(fstatat(tup_top_fd(), file, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
 		fprintf(stderr, "tup error: file_set_mtime() fstatat failed.\n");
 		perror(file);
+		return -1;
+	}
+	if(S_ISFIFO(buf.st_mode)) {
+		fprintf(stderr, "tup error: Unable to create a FIFO as an output file. They can only be used as temporary files.\n");
 		return -1;
 	}
 	if(tup_db_set_mtime(tent, buf.MTIME) < 0)

@@ -16,32 +16,15 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure fifos work when used as temporary files.
+# Make sure we can't make a fifo as an output
 
 . ./tup.sh
 check_no_windows mkfifo
-if [ "$tupos" = "Darwin" ]; then
-	echo "[33mFIFOs currently unsupported in fuse4x. Skipping test.[0m"
-	eotup
-fi
-
-cat > ok.sh << HERE
-#! /bin/sh
-mkfifo fifotest
-
-grep 'hey there' fifotest > /dev/null &
-pid=\$!
-echo "hey there" > fifotest
-wait \$pid
-status=\$?
-rm fifotest
-exit \$status
-HERE
 
 cat > Tupfile << HERE
-: |> sh ok.sh |>
+: |> mkfifo %o |> tmpfifo
 HERE
 tup touch Tupfile
-update
+update_fail_msg "Unable to create a FIFO as an output file"
 
 eotup

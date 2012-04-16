@@ -247,7 +247,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	timespan_start(&tf.ts);
 	memcpy(&orig_start, &tf.ts.start, sizeof(orig_start));
 	if(n->parsing) {
-		fprintf(stderr, "Error: Circular dependency found among Tupfiles. Last directory: ");
+		fprintf(stderr, "tup error: Circular dependency found among Tupfiles. Last directory: ");
 		print_tup_entry(stderr, n->tent);
 		fprintf(stderr, "\n");
 		return CIRCULAR_DEPENDENCY_ERROR;
@@ -301,7 +301,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 
 	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
 	if(tf.cur_dfd < 0) {
-		fprintf(tf.f, "Error: Unable to open directory ID %lli\n", tf.tupid);
+		fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
 		goto out_close_vdb;
 	}
 
@@ -1074,7 +1074,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 		st = string_tree_search(&tf->bang_root, value, strlen(value));
 		if(!st) {
-			fprintf(tf->f, "Error: Unable to find !-macro '%s'\n", value);
+			fprintf(tf->f, "tup error: Unable to find !-macro '%s'\n", value);
 			return -1;
 		}
 		cur_br = container_of(st, struct bang_rule, st);
@@ -1133,11 +1133,11 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			       &output, &bin, &swapio) < 0)
 		return -1;
 	if(bin != NULL) {
-		fprintf(tf->f, "Error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
+		fprintf(tf->f, "tup error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
 		return -1;
 	}
 	if(swapio) {
-		fprintf(tf->f, "Error: !-macro must use '|>' separators\n");
+		fprintf(tf->f, "tup error: !-macro must use '|>' separators\n");
 		return SYNTAX_ERROR;
 	}
 
@@ -1282,12 +1282,12 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 				p++;
 		}
 		if(value[0] != '!') {
-			fprintf(tf->f, "Error: *-chain must be composed of !-macros, not '%s'\n", value);
+			fprintf(tf->f, "tup error: *-chain must be composed of !-macros, not '%s'\n", value);
 			return -1;
 		}
 		bst = string_tree_search(&tf->bang_root, value, strlen(value));
 		if(!bst) {
-			fprintf(tf->f, "Error: Unable to find !-macro: '%s'\n", value);
+			fprintf(tf->f, "tup error: Unable to find !-macro: '%s'\n", value);
 			return -1;
 		}
 		br = container_of(bst, struct bang_rule, st);
@@ -1355,7 +1355,7 @@ static int set_variable(struct tupfile *tf, char *line)
 		return -1;
 
 	if(strncmp(var, "CONFIG_", 7) == 0) {
-		fprintf(tf->f, "Error: Unable to override setting of variable '%s' because it begins with 'CONFIG_'. These variables can only be set in the tup.config file.\n", var);
+		fprintf(tf->f, "tup error: Unable to override setting of variable '%s' because it begins with 'CONFIG_'. These variables can only be set in the tup.config file.\n", var);
 		return -1;
 	}
 
@@ -1590,11 +1590,11 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 
 		brace = strchr(bin, '}');
 		if(!brace) {
-			fprintf(tf->f, "Error: Missing '}' to finish bin\n");
+			fprintf(tf->f, "tup error: Missing '}' to finish bin\n");
 			return -1;
 		}
 		if(brace[1]) {
-			fprintf(tf->f, "Error: bin must be at the end of the line\n");
+			fprintf(tf->f, "tup error: bin must be at the end of the line\n");
 			return -1;
 		}
 		*brace = 0;
@@ -1643,7 +1643,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			return -1;
 	} else {
 		if(eval_pattern[0]) {
-			fprintf(tf->f, "Error: bang rules can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
+			fprintf(tf->f, "tup error: bang rules can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
 			return -1;
 		}
 	}
@@ -1681,7 +1681,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 
 		st = string_tree_search(&tf->chain_root, r->command, r->command_len);
 		if(!st) {
-			fprintf(tf->f, "Error: Unable to find *-chain: '%s'\n", r->command);
+			fprintf(tf->f, "tup error: Unable to find *-chain: '%s'\n", r->command);
 			return -1;
 		}
 		ch = container_of(st, struct chain, st);
@@ -1723,7 +1723,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 					break;
 			}
 			if(!r->inputs.num_entries) {
-				fprintf(tf->f, "Error: Unable to find any inputs for the *-chain for output '%s' in rule at line %i\n", last_output_pattern, r->line_number);
+				fprintf(tf->f, "tup error: Unable to find any inputs for the *-chain for output '%s' in rule at line %i\n", last_output_pattern, r->line_number);
 				return -1;
 			}
 		}
@@ -1736,7 +1736,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 				r->output_pattern = last_output_pattern;
 			} else {
 				if(strcmp(bal->br->output_pattern, "") == 0) {
-					fprintf(tf->f, "Error: Intermediate !-macro '%s' in *-chain '%s' does not specify an output pattern.\n", bal->br->st.s, ch->st.s);
+					fprintf(tf->f, "tup error: Intermediate !-macro '%s' in *-chain '%s' does not specify an output pattern.\n", bal->br->st.s, ch->st.s);
 					return -1;
 				}
 			}
@@ -1908,11 +1908,11 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 	struct name_list_entry tmp_nle;
 
 	if(!r->foreach) {
-		fprintf(tf->f, "Error: reverse rule must use 'foreach'\n");
+		fprintf(tf->f, "tup error: reverse rule must use 'foreach'\n");
 		return -1;
 	}
 	if(!r->input_pattern) {
-		fprintf(tf->f, "Error: reverse rule must have input list\n");
+		fprintf(tf->f, "tup error: reverse rule must have input list\n");
 		return -1;
 	}
 	eval_pattern = eval(tf, r->input_pattern, DISALLOW_NODES);
@@ -2120,12 +2120,12 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			if(get_path_elements(p, &pg) < 0)
 				return -1;
 			if(pg.pg_flags & PG_HIDDEN) {
-				fprintf(tf->f, "Error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
+				fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
 			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, 0, 0);
 			if(pl->dt <= 0) {
-				fprintf(tf->f, "Error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
+				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
 			}
 			if(pl->path == pl->pel->path) {
@@ -2302,14 +2302,14 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(!tent) {
 			if(!required)
 				return 0;
-			fprintf(tf->f, "Error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(tf->f, pl->dt);
 			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {
 			if(!required)
 				return 0;
-			fprintf(tf->f, "Error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			tup_db_print(tf->f, tent->tnode.tupid);
 			return -1;
 		}
@@ -2320,7 +2320,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			 * resurrected, so it is still a valid input (t6053).
 			 */
 			if(!tup_db_in_modify_list(tent->tnode.tupid)) {
-				fprintf(tf->f, "Error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
+				fprintf(tf->f, "tup error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
 				tup_db_print(tf->f, pl->dt);
 				return -1;
 			}
@@ -2520,7 +2520,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		pl = TAILQ_FIRST(&oplist);
 
 		if(pl->path) {
-			fprintf(tf->f, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
+			fprintf(tf->f, "tup error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
 			return -1;
 		}
 		if(pl->pel->len == 1 && pl->pel->path[0] == '|') {
@@ -2549,7 +2549,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			/* Same error as above...uhh, I guess I should rework
 			 * this.
 			 */
-			fprintf(tf->f, "Error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
+			fprintf(tf->f, "tup error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
 			free(onle->path);
 			free(onle);
 			return -1;
@@ -2557,7 +2557,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(name_cmp(onle->path, "Tupfile") == 0 ||
 		   name_cmp(onle->path, "Tuprules.tup") == 0 ||
 		   name_cmp(onle->path, "tup.config") == 0) {
-			fprintf(tf->f, "Error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
+			fprintf(tf->f, "tup error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
 			free(onle->path);
 			free(onle);
 			return -1;
@@ -2638,7 +2638,7 @@ out_pl:
 	}
 	cmd_tt->tupid = cmdid;
 	if(tupid_tree_insert(&tf->cmd_root, cmd_tt) < 0) {
-		fprintf(tf->f, "Error: Attempted to add duplicate command ID %lli\n", cmdid);
+		fprintf(tf->f, "tup error: Attempted to add duplicate command ID %lli\n", cmdid);
 		tup_db_print(tf->f, cmdid);
 		return -1;
 	}
@@ -2816,7 +2816,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 
 		clen -= 2;
 		if(next == cmd+cmd_len-1) {
-			fprintf(tf->f, "Error: Unfinished %%-flag at the end of the string '%s'\n", cmd);
+			fprintf(tf->f, "tup error: Unfinished %%-flag at the end of the string '%s'\n", cmd);
 			return NULL;
 		}
 		next++;
@@ -2824,25 +2824,25 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 		space_chars = nl->num_entries - 1;
 		if(*next == 'f') {
 			if(nl->num_entries == 0) {
-				fprintf(tf->f, "Error: %%f used in rule pattern and no input files were specified.\n");
+				fprintf(tf->f, "tup error: %%f used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
 			clen += nl->totlen + space_chars;
 		} else if(*next == 'b') {
 			if(nl->num_entries == 0) {
-				fprintf(tf->f, "Error: %%b used in rule pattern and no input files were specified.\n");
+				fprintf(tf->f, "tup error: %%b used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
 			clen += nl->basetotlen + space_chars;
 		} else if(*next == 'B') {
 			if(nl->num_entries == 0) {
-				fprintf(tf->f, "Error: %%B used in rule pattern and no input files were specified.\n");
+				fprintf(tf->f, "tup error: %%B used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
 			clen += nl->extlessbasetotlen + space_chars;
 		} else if(*next == 'e') {
 			if(!ext) {
-				fprintf(tf->f, "Error: %%e is only valid with a foreach rule for files that have extensions.\n");
+				fprintf(tf->f, "tup error: %%e is only valid with a foreach rule for files that have extensions.\n");
 				if(nl->num_entries == 1) {
 					nle = TAILQ_FIRST(&nl->entries);
 					fprintf(tf->f, " -- Path: '%s'\n", nle->path);
@@ -2854,28 +2854,28 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			clen += extlen;
 		} else if(*next == 'o') {
 			if(!is_command) {
-				fprintf(tf->f, "Error: %%o can only be used in a command.\n");
+				fprintf(tf->f, "tup error: %%o can only be used in a command.\n");
 				return NULL;
 			}
 			if(onl->num_entries == 0) {
-				fprintf(tf->f, "Error: %%o used in rule pattern and no output files were specified.\n");
+				fprintf(tf->f, "tup error: %%o used in rule pattern and no output files were specified.\n");
 				return NULL;
 			}
 			clen += onl->totlen + (onl->num_entries-1);
 		} else if(*next == 'O') {
 			if(!onl) {
-				fprintf(tf->f, "Error: %%O can only be used in the extra outputs section.\n");
+				fprintf(tf->f, "tup error: %%O can only be used in the extra outputs section.\n");
 				return NULL;
 			}
 			if(onl->num_entries != 1) {
-				fprintf(tf->f, "Error: %%O can only be used if there is exactly one output specified.\n");
+				fprintf(tf->f, "tup error: %%O can only be used if there is exactly one output specified.\n");
 				return NULL;
 			}
 			clen += onl->extlessbasetotlen;
 		} else if(*next == '%') {
 			clen++;
 		} else {
-			fprintf(tf->f, "Error: Unknown %%-flag: '%c'\n", *next);
+			fprintf(tf->f, "tup error: Unknown %%-flag: '%c'\n", *next);
 			return NULL;
 		}
 	}
@@ -2955,7 +2955,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	}
 	memcpy(&s[x], p, cmd+cmd_len - p + 1);
 	if((signed)strlen(s) != clen) {
-		fprintf(tf->f, "Error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
+		fprintf(tf->f, "tup error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
 		return NULL;
 	}
 	return s;

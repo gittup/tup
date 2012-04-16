@@ -643,7 +643,7 @@ edge_create:
 		/* A circular dependency is not guaranteed to trigger this,
 		 * but it is easy to check before going through the graph.
 		 */
-		fprintf(stderr, "Error: Circular dependency detected! "
+		fprintf(stderr, "tup error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
 			g->cur->tnode.tupid, tent->tnode.tupid);
 		return -1;
@@ -924,7 +924,7 @@ static void *create_work(void *arg)
 			  n->tent->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
-			fprintf(stderr, "Error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
+			fprintf(stderr, "tup error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
 			rc = -1;
 		}
 		if(tup_db_unflag_create(n->tnode.tupid) < 0)
@@ -1152,7 +1152,7 @@ static int update(struct node *n)
 					if(!tup_privileged()) {
 						pthread_mutex_lock(&display_mutex);
 						show_result(n->tent, 1, NULL);
-						fprintf(stderr, "Error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
+						fprintf(stderr, "tup error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
 						pthread_mutex_unlock(&display_mutex);
 						return -1;
 					}
@@ -1161,7 +1161,7 @@ static int update(struct node *n)
 				default:
 					pthread_mutex_lock(&display_mutex);
 					show_result(n->tent, 1, NULL);
-					fprintf(stderr, "Error: Unknown ^ flag: '%c'\n", *name);
+					fprintf(stderr, "tup error: Unknown ^ flag: '%c'\n", *name);
 					pthread_mutex_unlock(&display_mutex);
 					return -1;
 			}
@@ -1171,7 +1171,7 @@ static int update(struct node *n)
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
 			show_result(n->tent, 1, NULL);
-			fprintf(stderr, "Error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
+			fprintf(stderr, "tup error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
 		}
@@ -1183,7 +1183,7 @@ static int update(struct node *n)
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
 		show_result(n->tent, 1, NULL);
-		fprintf(stderr, "Error: Unable to open directory for update work.\n");
+		fprintf(stderr, "tup error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);
 		goto err_out;

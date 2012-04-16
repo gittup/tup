@@ -16,48 +16,21 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure we can use gcc --coverage
+# Make sure that a .path before the tup hierarchy doesn't make every file
+# hidden.
 
 . ./tup.sh
 
-check_tup_suid
-
-CC="gcc"
-if [ "$tupos" = "Darwin" ]; then
-	if ! which gcc-4.2 > /dev/null; then
-		echo "Skipping test - OSX needs gcc-4.2 for code coverage" 1>&2
-		eotup
-	fi
-	CC="gcc-4.2"
-fi
+mkdir .tmp
+cd .tmp
+re_init
 
 cat > Tupfile << HERE
-: |> ^c^ $CC --coverage foo.c -o %o |> foo.exe | foo.gcno
-: |> ^c CC bar^ $CC --coverage bar.c -o %o |> bar.exe | bar.gcno
+: |> gcc -c foo.c |> foo.o
 HERE
-
-cat > foo.c << HERE
-#include <stdio.h>
-int main(int argc, char **argv)
-{
-	if(argc > 1) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-HERE
-
-cp foo.c bar.c
-tup touch foo.c bar.c Tupfile
+tup touch Tupfile foo.c
 update
 
-if strings foo.exe | grep '\.tup/mnt' > /dev/null; then
-	echo "Error: 'foo' executable shouldn't reference .tup/mnt directory" 1>&2
-	exit 1
-fi
-
-./foo.exe abcd
-check_exist foo.gcda
+check_exist foo.o
 
 eotup

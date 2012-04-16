@@ -91,12 +91,6 @@ static int split_path_elements(const char *dir, struct pel_group *pg)
 				 * can't be deleted by a subsequent ".."
 				 */
 				goto skip_num_elements;
-			} else if(len == sizeof(".gitignore") - 1 &&
-				  strncmp(path, ".gitignore", len) == 0) {
-				/* .gitignore files are not considered hidden */
-			} else {
-				/* Hidden paths have special treatment in tup */
-				pg->pg_flags |= PG_HIDDEN;
 			}
 		}
 
@@ -187,6 +181,21 @@ int get_path_elements(const char *path, struct pel_group *pg)
 				del_pel(pel, pg);
 			}
 			pg->pg_flags &= ~PG_ROOT;
+		}
+	}
+
+	TAILQ_FOREACH(pel, &pg->path_list, list) {
+		if(pel->path[0] == '.') {
+			if(pel->len == sizeof(".gitignore") - 1 &&
+			   strncmp(pel->path, ".gitignore", pel->len) == 0) {
+				/* .gitignore files are not considered hidden */
+			} else if(pel->len == 2 && strncmp(pel->path, "..", 2) == 0) {
+				/* .. paths are ignored */
+			} else {
+				/* Hidden paths have special treatment in tup */
+				pg->pg_flags |= PG_HIDDEN;
+				break;
+			}
 		}
 	}
 	return 0;

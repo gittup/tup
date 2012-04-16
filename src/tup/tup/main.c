@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 		int pid;
 		pid = monitor_get_pid(0);
 		if(pid > 0) {
-			fprintf(stderr, "Error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
+			fprintf(stderr, "tup error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
 			rc = 1;
 		} else {
 			rc = tup_scan();
@@ -277,9 +277,9 @@ static int init(int argc, char **argv)
 		char wd[PATH_MAX];
 		if(getcwd(wd, sizeof(wd)) == NULL) {
 			perror("getcwd");
-			fprintf(stderr, "Error: tup database already exists somewhere up the tree.\n");
+			fprintf(stderr, "tup error: database already exists somewhere up the tree.\n");
 		} else {
-			fprintf(stderr, "Error: tup database already exists in directory: %s\n", wd);
+			fprintf(stderr, "tup error: database already exists in directory: %s\n", wd);
 		}
 		goto err_close;
 	}
@@ -661,7 +661,7 @@ static int link_exists(int argc, char **argv)
 	if(tup_db_begin() < 0)
 		return -1;
 	if(argc != 5) {
-		fprintf(stderr, "Error: link_exists requires two dir/name pairs.\n");
+		fprintf(stderr, "tup error: link_exists requires two dir/name pairs.\n");
 		return -1;
 	}
 	dta = find_dir_tupid(argv[1]);
@@ -864,7 +864,7 @@ static int dbconfig(int argc, char **argv)
 		if(tup_db_show_config() < 0)
 			return -1;
 	} else {
-		fprintf(stderr, "Error: 'dbconfig' doesn't take arguments.\n");
+		fprintf(stderr, "tup error: 'dbconfig' doesn't take arguments.\n");
 		return -1;
 	}
 	return 0;
@@ -877,7 +877,7 @@ static int options(int argc, char **argv)
 		if(tup_option_show() < 0)
 			return -1;
 	} else {
-		fprintf(stderr, "Error: 'options' doesn't take arguments.\n");
+		fprintf(stderr, "tup error: 'options' doesn't take arguments.\n");
 		return -1;
 	}
 	return 0;
@@ -892,7 +892,7 @@ static int fake_mtime(int argc, char **argv)
 	struct path_element *pel = NULL;
 
 	if(argc != 3) {
-		fprintf(stderr, "Error: fake_mtime requires a file and an mtime.\n");
+		fprintf(stderr, "tup error: fake_mtime requires a file and an mtime.\n");
 		return -1;
 	}
 	if(tup_db_begin() < 0)
@@ -902,7 +902,7 @@ static int fake_mtime(int argc, char **argv)
 		return -1;
 	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &pel, 0, 1);
 	if(dt < 0) {
-		fprintf(stderr, "Error: Unable to find dt for node: %s\n", argv[1]);
+		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
 	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {

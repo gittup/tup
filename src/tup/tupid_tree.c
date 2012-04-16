@@ -57,7 +57,7 @@ int tupid_tree_add(struct tupid_entries *root, tupid_t tupid)
 	}
 	tt->tupid = tupid;
 	if(tupid_tree_insert(root, tt) < 0) {
-		fprintf(stderr, "Error: Unable to insert duplicate tupid %lli\n", tupid);
+		fprintf(stderr, "tup error: Unable to insert duplicate tupid %lli\n", tupid);
 		tup_db_print(stderr, tupid);
 		return -1;
 	}
