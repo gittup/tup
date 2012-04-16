@@ -3165,24 +3165,21 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 				var = s + 2;
 				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
-				if (!varentry) {
-					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", rparen-var, var);
-					return NULL;
-				}
-
-				int first = 0;
-				struct var_tent_list_entry *tent_entry;
-				TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
-					int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
-								  tent_entry->tent->tnode.tupid,
-								  &vlen);
-					if (rc < 0 || vlen < 0)
-						return NULL;
-					len += vlen;
-					if(!first) {
-						first = 1;
-					} else {
-						len += 1;  /* space */
+				if (varentry) {
+					int first = 0;
+					struct var_tent_list_entry *tent_entry;
+					TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
+						int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
+									  tent_entry->tent->tnode.tupid,
+									  &vlen);
+						if (rc < 0 || vlen < 0)
+							return NULL;
+						len += vlen;
+						if(!first) {
+							first = 1;
+						} else {
+							len += 1;  /* space */
+						}
 					}
 				}
 				s = rparen + 1;
@@ -3293,27 +3290,24 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 				var = s + 2;
 				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
-				if (!varentry) {
-					fprintf(tf->f, "tup error: Unable to find &-reference for '%.*s'\n", rparen-var, var);
-					return NULL;
-				}
-
-				int clen = 0;
-				int first = 0;
-				struct var_tent_list_entry *tent_entry;
-				TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
-					if(!first) {
-						first = 1;
-					} else {
-						p[0] = ' ';
-						p += 1;
+				if (varentry) {
+					int clen = 0;
+					int first = 0;
+					struct var_tent_list_entry *tent_entry;
+					TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
+						if(!first) {
+							first = 1;
+						} else {
+							p[0] = ' ';
+							p += 1;
+						}
+						int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
+									  tent_entry->tent->tnode.tupid,
+									  &clen);
+						if (rc < 0 || clen < 0)
+							return NULL;
+						p += clen;
 					}
-					int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
-								  tent_entry->tent->tnode.tupid,
-								  &clen);
-					if (rc < 0 || clen < 0)
-						return NULL;
-					p += clen;
 				}
 				s = rparen + 1;
 			} else {
