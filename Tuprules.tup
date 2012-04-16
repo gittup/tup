@@ -24,6 +24,7 @@ CFLAGS += -Wredundant-decls
 CFLAGS += -Wshadow
 CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wwrite-strings
+CFLAGS += -Wswitch-enum
 CFLAGS += -fno-common
 CFLAGS += -I$(TUP_CWD)/src
 

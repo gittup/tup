@@ -126,7 +126,7 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 		}
 		return 0;
 	} else {
-		fprintf(stderr, "Error: File '%s' is not regular nor a dir?\n",
+		fprintf(stderr, "tup error: File '%s' is not regular nor a dir?\n",
 			file);
 		return -1;
 	}

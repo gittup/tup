@@ -42,7 +42,7 @@ int tup_db_rollback(void);
 int tup_db_check_flags(int flags);
 void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);
-const char *tup_db_type(int type);
+const char *tup_db_type(enum TUP_NODE_TYPE type);
 
 /* Node operations */
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);
@@ -69,7 +69,6 @@ int tup_db_delete_dir(tupid_t dt);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head);
 int tup_db_open_tupid(tupid_t dt);
-int tup_db_is_root_node(tupid_t tupid);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name);
 int tup_db_set_type(struct tup_entry *tent, int type);
