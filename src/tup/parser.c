@@ -144,7 +144,7 @@ struct tupfile {
 	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
-	struct vardb node_db;
+	struct node_vardb node_db;
 	struct tupid_entries cmd_root;
 	struct tupid_entries env_root;
 	struct string_entries bang_root;
@@ -283,7 +283,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
-	if(vardb_init(&tf.node_db) < 0)
+	if(nodedb_init(&tf.node_db) < 0)
 		goto out_server_stop;
 	if(vardb_init(&tf.vdb) < 0)
 		goto out_close_node_db;
@@ -346,7 +346,7 @@ out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
 out_close_node_db:
-	if(vardb_close(&tf.node_db) < 0)
+	if(nodedb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
 	if(server_parser_stop(&ps) < 0)
@@ -1368,12 +1368,12 @@ static int set_variable(struct tupfile *tf, char *line)
 		}
 		/* var+1 to skip the leading '&' */
 		if(append)
-			rc = vardb_append(&tf->node_db, var+1, value, tent);
+			rc = nodedb_append(&tf->node_db, var+1, tent);
 		else
-			rc = vardb_set(&tf->node_db, var+1, value, tent);
+			rc = nodedb_set(&tf->node_db, var+1, tent);
 	} else {
 		if(append)
-			rc = vardb_append(&tf->vdb, var, value, NULL);
+			rc = vardb_append(&tf->vdb, var, value);
 		else
 			rc = vardb_set(&tf->vdb, var, value, NULL);
 	}
@@ -2961,111 +2961,6 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	return s;
 }
 
-struct tent_list {
-	LIST_ENTRY(tent_list) list;
-	struct tup_entry *tent;
-};
-LIST_HEAD(tent_list_head, tent_list);
-
-static int get_tent_list(tupid_t tupid, struct tent_list_head *head)
-{
-	struct tup_entry *tent;
-	struct tent_list *tlist;
-
-	tent = tup_entry_get(tupid);
-	while(tent) {
-		tlist = malloc(sizeof *tlist);
-		if(!tlist) {
-			perror("malloc");
-			return -1;
-		}
-		tlist->tent = tent;
-		LIST_INSERT_HEAD(head, tlist, list);
-
-		tent = tent->parent;
-	}
-	return 0;
-}
-
-static void del_tent_list_entry(struct tent_list *tlist)
-{
-	LIST_REMOVE(tlist, list);
-	free(tlist);
-}
-
-static void free_tent_list(struct tent_list_head *head)
-{
-	struct tent_list *tlist;
-	while(!LIST_EMPTY(head)) {
-		tlist = LIST_FIRST(head);
-		del_tent_list_entry(tlist);
-	}
-}
-
-static int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
-{
-	struct tent_list_head startlist;
-	struct tent_list_head endlist;
-	struct tent_list *startentry;
-	struct tent_list *endentry;
-	int first = 0;
-
-	*len = 0;
-
-	LIST_INIT(&startlist);
-	LIST_INIT(&endlist);
-	if(get_tent_list(start, &startlist) < 0)
-		return -1;
-	if(get_tent_list(end, &endlist) < 0)
-		return -1;
-
-	while(!LIST_EMPTY(&startlist) && !LIST_EMPTY(&endlist)) {
-		startentry = LIST_FIRST(&startlist);
-		endentry = LIST_FIRST(&endlist);
-
-		if(startentry->tent == endentry->tent) {
-			del_tent_list_entry(startentry);
-			del_tent_list_entry(endentry);
-		} else {
-			break;
-		}
-	}
-
-	LIST_FOREACH(startentry, &startlist, list) {
-		if(!first) {
-			first = 1;
-		} else {
-			if(dest)
-				sprintf(dest + *len, "/");
-			(*len)++;
-		}
-		if(dest)
-			sprintf(dest + *len, "..");
-		(*len) += 2;
-	}
-	LIST_FOREACH(endentry, &endlist, list) {
-		if(!first) {
-			first = 1;
-		} else {
-			if(dest)
-				sprintf(dest + *len, "/");
-			(*len)++;
-		}
-		if(dest)
-			sprintf(dest + *len, "%s", endentry->tent->name.s);
-		(*len) += endentry->tent->name.len;
-	}
-	if(!first) {
-		if(dest)
-			sprintf(dest + *len, ".");
-		(*len)++;
-	}
-
-	free_tent_list(&endlist);
-	free_tent_list(&startlist);
-	return 0;
-}
-
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 {
 	int len = 0;
@@ -3164,24 +3059,11 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 
 				var = s + 2;
-				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
-				if (varentry) {
-					int first = 0;
-					struct var_tent_list_entry *tent_entry;
-					TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
-						int rc = get_relative_dir(NULL, tf->curtent->tnode.tupid,
-									  tent_entry->tent->tnode.tupid,
-									  &vlen);
-						if (rc < 0 || vlen < 0)
-							return NULL;
-						len += vlen;
-						if(!first) {
-							first = 1;
-						} else {
-							len += 1;  /* space */
-						}
-					}
-				}
+				vlen = nodedb_len(&tf->node_db, var, rparen-var,
+				                  tf->curtent->tnode.tupid);
+				if (vlen < 0)
+					return NULL;
+				len += vlen;
 				s = rparen + 1;
 			} else {
 				s++;
@@ -3289,26 +3171,9 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 
 				var = s + 2;
-				struct var_entry *varentry = vardb_get(&tf->node_db, var, rparen-var);
-				if (varentry) {
-					int clen = 0;
-					int first = 0;
-					struct var_tent_list_entry *tent_entry;
-					TAILQ_FOREACH(tent_entry, &varentry->tlist, list) {
-						if(!first) {
-							first = 1;
-						} else {
-							p[0] = ' ';
-							p += 1;
-						}
-						int rc = get_relative_dir(p, tf->curtent->tnode.tupid,
-									  tent_entry->tent->tnode.tupid,
-									  &clen);
-						if (rc < 0 || clen < 0)
-							return NULL;
-						p += clen;
-					}
-				}
+				if (nodedb_copy(&tf->node_db, var, rparen-var, &p,
+				                tf->curtent->tnode.tupid) < 0)
+					return NULL;
 				s = rparen + 1;
 			} else {
 				*p = *s;
