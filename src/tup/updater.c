@@ -44,6 +44,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <sys/stat.h>
 
 #define MAX_JOBS 65535
 
@@ -540,12 +541,37 @@ err_rollback:
 static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *tent)
 {
 	struct tup_entry *new;
+	struct tup_entry *sub;
 	if(!tent->parent)
 		return base;
 	new = get_rel_tent(base, tent->parent);
-	if(tup_db_select_tent(new->tnode.tupid, tent->name.s, &new) < 0)
+	if(tup_db_select_tent(new->tnode.tupid, tent->name.s, &sub) < 0)
 		return NULL;
-	return new;
+	if(!sub) {
+		int fd;
+		fd = tup_entry_open(new);
+		if(fd < 0)
+			return NULL;
+		if(mkdirat(fd, tent->name.s, 0777) < 0) {
+			if(errno != EEXIST) {
+				perror(tent->name.s);
+				fprintf(stderr, "tup error: Unable to create sub-directory in variant tree.\n");
+				return NULL;
+			}
+		}
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			return NULL;
+		}
+		sub = tup_db_create_node_srcid(new->tnode.tupid, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid);
+		if(!sub) {
+			fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
+			print_tup_entry(stderr, base);
+			fprintf(stderr, "\n");
+			return NULL;
+		}
+	}
+	return sub;
 }
 
 static int process_create_nodes(void)
