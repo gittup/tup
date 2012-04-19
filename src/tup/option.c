@@ -77,6 +77,7 @@ static struct option {
 	{"updater.num_jobs", NULL, cpu_number},
 	{"updater.keep_going", "0", NULL},
 	{"updater.full_deps", "0", NULL},
+	{"updater.warnings", "1", NULL},
 	{"display.color", DEFAULT_COLOR, NULL},
 	{"display.width", NULL, get_console_width},
 	{"display.progress", NULL, stdout_isatty},

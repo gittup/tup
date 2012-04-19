@@ -21,6 +21,11 @@
 
 . ./tup.sh
 
+# In case the user disabled this, we make sure warnings are on here.
+cat >> .tup/options << HERE
+[updater]
+warnings = 1
+HERE
 cat > Tupfile << HERE
 : |> touch .foo; touch .bar |>
 HERE
