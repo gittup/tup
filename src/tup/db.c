@@ -1631,6 +1631,9 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 			return -1;
 		}
 
+		if(tup_db_add_create_list(subdest->tnode.tupid) < 0)
+			return -1;
+
 		newfd = openat(fd, subdest->name.s, O_RDONLY);
 		if(newfd < 0) {
 			perror(subdest->name.s);
