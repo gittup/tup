@@ -38,7 +38,6 @@ struct variant {
 LIST_HEAD(variant_head, variant);
 
 int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled);
-int variant_rm(tupid_t dt);
 struct variant *variant_search(tupid_t dt);
 
 #endif

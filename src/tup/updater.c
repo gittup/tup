@@ -444,19 +444,13 @@ static int process_config_nodes(int environ_check)
 
 		while(!TAILQ_EMPTY(&g.plist)) {
 			int variant_error = 0;
-			int empty = 0;
 			int rm_node = 1;
 
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
-			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, &empty) < 0)
+			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid) < 0)
 				goto err_rollback;
-			if(empty) {
-				if(variant_rm(n->tent->dt) < 0)
-					return -1;
-				if(tup_db_unflag_variant(n->tent->tnode.tupid) < 0)
-					return -1;
-			} else if(variant_search(n->tent->dt) == NULL) {
+			if(variant_search(n->tent->dt) == NULL) {
 				if(n->tent->dt == DOT_DT) {
 					if(!LIST_EMPTY(&variant_list)) {
 						variant_error = 1;

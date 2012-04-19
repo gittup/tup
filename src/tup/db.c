@@ -3924,21 +3924,26 @@ out_err:
 	return rc;
 }
 
+static int remove_var_tupid(tupid_t tupid)
+{
+	tup_db_var_changed++;
+
+	if(var_flag_dirs(tupid) < 0)
+		return -1;
+	if(tup_db_modify_cmds_by_input(tupid) < 0)
+		return -1;
+	if(delete_var_entry(tupid) < 0)
+		return -1;
+	if(delete_name_file(tupid) < 0)
+		return -1;
+	return 0;
+}
+
 static int remove_var(struct var_entry *ve, tupid_t vardt)
 {
 	if(vardt) {}
 
-	tup_db_var_changed++;
-
-	if(var_flag_dirs(ve->tent->tnode.tupid) < 0)
-		return -1;
-	if(tup_db_modify_cmds_by_input(ve->tent->tnode.tupid) < 0)
-		return -1;
-	if(delete_var_entry(ve->tent->tnode.tupid) < 0)
-		return -1;
-	if(delete_name_file(ve->tent->tnode.tupid) < 0)
-		return -1;
-	return 0;
+	return remove_var_tupid(ve->tent->tnode.tupid);
 }
 
 static int add_var(struct var_entry *ve, tupid_t vardt)
@@ -3974,7 +3979,7 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt, int *empty)
+int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
 {
 	struct vardb db_tree;
 	struct vardb file_tree;
@@ -3988,8 +3993,6 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt, int *empty)
 		return -1;
 	dfd = tup_db_open_tupid(dt);
 	if(dfd < 0) {
-		if(empty)
-			*empty = 1;
 		rc = 0;
 	} else {
 		fd = openat(dfd, file, O_RDONLY);
@@ -3999,12 +4002,8 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt, int *empty)
 				return -1;
 			}
 			/* No tup.config == empty file_tree */
-			if(empty)
-				*empty = 1;
 			rc = 0;
 		} else {
-			if(empty)
-				*empty = 0;
 			rc = get_file_var_tree(&file_tree, fd);
 			if(close(fd) < 0) {
 				perror("close(fd)");
@@ -4029,6 +4028,28 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt, int *empty)
 	vardb_close(&file_tree);
 	vardb_close(&db_tree);
 
+	return 0;
+}
+
+int tup_db_delete_tup_config(struct tup_entry *tent)
+{
+	struct half_entry_head subdir_list;
+	struct vardb empty_vdb;
+
+	LIST_INIT(&subdir_list);
+	if(get_dir_entries(tent->tnode.tupid, &subdir_list) < 0)
+		return -1;
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct half_entry *he = LIST_FIRST(&subdir_list);
+
+		if(remove_var_tupid(he->tupid) < 0)
+			return -1;
+		LIST_REMOVE(he, list);
+		free(he);
+	}
+	vardb_init(&empty_vdb);
+	if(save_vardict_file(&empty_vdb) < 0)
+		return -1;
 	return 0;
 }
 

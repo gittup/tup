@@ -159,12 +159,17 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(new || changed) {
 		if(modified) *modified = 1;
 		if(strcmp(file, TUP_CONFIG) == 0) {
-			/* If tup.config was modified, put the @-directory in
-			 * the create list so we can import any variables that
-			 * have changed.
+			/* tup.config only counts if it's at the project root, or if
+			 * it's in a top-level subdirectory for a variant.
 			 */
-			if(tup_db_add_config_list(tent->tnode.tupid) < 0)
-				return -1;
+			if(tent->dt == DOT_DT || tent->parent->dt == DOT_DT) {
+				/* If tup.config was modified, put the @-directory in
+				 * the create list so we can import any variables that
+				 * have changed.
+				 */
+				if(tup_db_add_config_list(tent->tnode.tupid) < 0)
+					return -1;
+			}
 		}
 	}
 
@@ -174,11 +179,11 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 static int check_rm_tup_config(struct tup_entry *tent)
 {
 	if(strcmp(tent->name.s, TUP_CONFIG) == 0) {
-		/* If tup.config was removed, also add the @-directory to the
-		 * create list.
-		 */
-		if(tup_db_add_config_list(tent->tnode.tupid) < 0)
-			return -1;
+		if(tent->dt == DOT_DT || tent->parent->dt == DOT_DT) {
+			/* If tup.config was removed, delete all of its variables. */
+			if(tup_db_delete_tup_config(tent) < 0)
+				return -1;
+		}
 	}
 	return 0;
 }
