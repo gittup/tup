@@ -258,6 +258,7 @@ void vardb_dump(struct vardb *v)
 	}
 }
 
+// todo - move this to entry.c ?
 static int add_tent(struct tent_list_head *head, struct tup_entry *tent)
 {
 	struct tent_list *tlist = NULL;
