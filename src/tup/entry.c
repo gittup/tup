@@ -571,8 +571,22 @@ void dump_tup_entry(void)
 	}
 }
 
-// todo - better name
-int get_tent_list(tupid_t tupid, struct tent_list_head *head)
+void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist)
+{
+	TAILQ_REMOVE(head, tlist, list);
+	free(tlist);
+}
+
+void free_tent_list(struct tent_list_head *head)
+{
+	struct tent_list *tlist;
+	while(!TAILQ_EMPTY(head)) {
+		tlist = TAILQ_FIRST(head);
+		del_tent_list_entry(head, tlist);
+	}
+}
+
+static int get_all_parent_tents(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
 	struct tent_list *tlist;
@@ -591,22 +605,6 @@ int get_tent_list(tupid_t tupid, struct tent_list_head *head)
 	}
 	return 0;
 }
-
-void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist)
-{
-	TAILQ_REMOVE(head, tlist, list);
-	free(tlist);
-}
-
-void free_tent_list(struct tent_list_head *head)
-{
-	struct tent_list *tlist;
-	while(!TAILQ_EMPTY(head)) {
-		tlist = TAILQ_FIRST(head);
-		del_tent_list_entry(head, tlist);
-	}
-}
-
 int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 {
 	struct tent_list_head startlist;
@@ -619,9 +617,9 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 
 	TAILQ_INIT(&startlist);
 	TAILQ_INIT(&endlist);
-	if(get_tent_list(start, &startlist) < 0)
+	if(get_all_parent_tents(start, &startlist) < 0)
 		return -1;
-	if(get_tent_list(end, &endlist) < 0)
+	if(get_all_parent_tents(end, &endlist) < 0)
 		return -1;
 
 	while(!TAILQ_EMPTY(&startlist) && !TAILQ_EMPTY(&endlist)) {
