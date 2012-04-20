@@ -536,12 +536,32 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 {
 	struct tup_entry *new;
 	struct tup_entry *sub;
+	int do_mkdir = 0;
+
 	if(!tent->parent)
 		return base;
 	new = get_rel_tent(base, tent->parent);
 	if(tup_db_select_tent(new->tnode.tupid, tent->name.s, &sub) < 0)
 		return NULL;
 	if(!sub) {
+		do_mkdir = 1;
+		sub = tup_db_create_node_srcid(new->tnode.tupid, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid);
+		if(!sub) {
+			fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
+			print_tup_entry(stderr, base);
+			fprintf(stderr, "\n");
+			return NULL;
+		}
+	} else {
+		if(sub->type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(sub, TUP_NODE_DIR) < 0)
+				return NULL;
+			if(tup_db_set_srcid(sub, tent->tnode.tupid) < 0)
+				return NULL;
+			do_mkdir = 1;
+		}
+	}
+	if(do_mkdir) {
 		int fd;
 		fd = tup_entry_open(new);
 		if(fd < 0)
@@ -555,13 +575,6 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 		}
 		if(close(fd) < 0) {
 			perror("close(fd)");
-			return NULL;
-		}
-		sub = tup_db_create_node_srcid(new->tnode.tupid, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid);
-		if(!sub) {
-			fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
-			print_tup_entry(stderr, base);
-			fprintf(stderr, "\n");
 			return NULL;
 		}
 	}
