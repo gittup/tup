@@ -2303,6 +2303,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct tup_entry *srctent = NULL;
+		struct variant *variant;
 
 		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
 			return -1;
@@ -2320,6 +2321,11 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				return 0;
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
 			tup_db_print(tf->f, pl->dt);
+			return -1;
+		}
+		variant = tup_entry_variant(tent);
+		if(!variant->root_variant && variant != tf->variant) {
+			fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
 			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {

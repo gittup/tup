@@ -4767,6 +4767,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 struct actual_input_data {
 	FILE *f;
 	tupid_t cmdid;
+	struct variant *cmd_variant;
 	struct tupid_entries *sticky_root;
 	struct tupid_entries output_root;
 	struct tupid_entries missing_input_root;
@@ -4776,6 +4777,7 @@ static int new_input(tupid_t tupid, void *data)
 {
 	struct tup_entry *tent;
 	struct actual_input_data *aid = data;
+	struct variant *file_variant;
 
 	/* Skip any files that are supposed to be used as outputs */
 	if(tupid_tree_search(&aid->output_root, tupid) != NULL)
@@ -4783,6 +4785,13 @@ static int new_input(tupid_t tupid, void *data)
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
+
+	file_variant = tup_entry_variant(tent);
+	if(!file_variant->root_variant && file_variant != aid->cmd_variant) {
+		fprintf(aid->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", file_variant->variant_dir, aid->cmd_variant->variant_dir);
+		return -1;
+	}
+
 	if(tent->type == TUP_NODE_GENERATED) {
 		if(tupid_tree_add(&aid->missing_input_root, tent->tnode.tupid) < 0)
 			return -1;
@@ -4896,6 +4905,11 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		.missing_input_root = {NULL},
 	};
 	int rc;
+	struct tup_entry *cmd_tent;
+
+	if(tup_entry_add(cmdid, &cmd_tent) < 0)
+		return -1;
+	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
 	if(get_output_tree(cmdid, &aid.output_root) < 0)
 		return -1;
