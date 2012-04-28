@@ -75,7 +75,6 @@ static int warnings;
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
 static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
-static int default_variant = 0;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -326,11 +325,6 @@ static int delete_files(struct graph *g)
 	struct tup_entry_head *entrylist;
 	int rc = -1;
 
-	if(g->gen_delete_count) {
-		tup_main_progress("Deleting files...\n");
-	} else {
-		tup_main_progress("No files to delete.\n");
-	}
 	start_progress(g->gen_delete_count, -1, -1);
 	entrylist = tup_entry_get_list();
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
@@ -412,8 +406,6 @@ static int load_variants(void)
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_VARIANT) < 0)
 		return -1;
 	TAILQ_FOREACH(n, &g.plist, list) {
-		if(n->tent->dt == DOT_DT)
-			default_variant = 1;
 		if(variant_add(&variant_list, n->tent, 1, NULL) < 0)
 			return -1;
 	}
@@ -421,6 +413,22 @@ static int load_variants(void)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	tup_db_commit();
+	return 0;
+}
+
+static int delete_in_tree(void)
+{
+	struct graph g;
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
+		return -1;
+	if(tup_db_type_to_tree(&g.cmd_delete_root, &g.cmd_delete_count, TUP_NODE_CMD) < 0)
+		return -1;
+	if(tup_db_type_to_tree(&g.gen_delete_root, &g.gen_delete_count, TUP_NODE_GENERATED) < 0)
+		return -1;
+	if(delete_files(&g) < 0)
+		return -1;
+	if(destroy_graph(&g) < 0)
+		return -1;
 	return 0;
 }
 
@@ -444,27 +452,12 @@ static int process_config_nodes(int environ_check)
 
 		while(!TAILQ_EMPTY(&g.plist)) {
 			struct variant *variant;
-			int variant_error = 0;
 			int rm_node = 1;
 
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
 			variant = variant_search(n->tent->dt);
 			if(variant == NULL) {
-				if(n->tent->dt == DOT_DT) {
-					if(!LIST_EMPTY(&variant_list)) {
-						variant_error = 1;
-					}
-					default_variant = 1;
-				} else {
-					if(default_variant) {
-						variant_error = 1;
-					}
-				}
-				if(variant_error) {
-					fprintf(stderr, "tup error: Unable to use an in-tree variant and out-of-tree variants at the same time. Please remove tup.config from the project root.\n");
-					return -1;
-				}
 				if(variant_add(&variant_list, n->tent, 1, &variant) < 0)
 					goto err_rollback;
 				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
@@ -493,7 +486,8 @@ static int process_config_nodes(int environ_check)
 			tup_main_progress("No tup.config changes (environment check disabled).\n");
 	}
 
-	if(!default_variant) {
+	if(!variant_search(DOT_DT)) {
+		int enabled = 0;
 		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
 			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
 			goto err_rollback;
@@ -505,11 +499,27 @@ static int process_config_nodes(int environ_check)
 				goto err_rollback;
 			}
 		}
-		/* The default in-tree variant is only enabled if there are no other
-		 * variants
-		 */
-		if(variant_add(&variant_list, vartent, LIST_EMPTY(&variant_list), NULL) < 0)
+
+		if(LIST_EMPTY(&variant_list)) {
+			if(tup_db_add_variant_list(vartent->tnode.tupid) < 0)
+				goto err_rollback;
+			enabled = 1;
+		}
+		if(variant_add(&variant_list, vartent, enabled, NULL) < 0)
 			goto err_rollback;
+	} else {
+		int external_variant = 0;
+		struct variant *variant;
+		LIST_FOREACH(variant, &variant_list, list) {
+			if(!variant->root_variant) {
+				external_variant = 1;
+				break;
+			}
+		}
+		if(external_variant) {
+			if(delete_in_tree() < 0)
+				goto err_rollback;
+		}
 	}
 
 	TAILQ_FOREACH(n, &g.node_list, list) {
@@ -631,8 +641,14 @@ static int process_create_nodes(void)
 	compat_lock_disable();
 	rc = execute_graph(&g, 0, 1, create_work);
 	compat_lock_enable();
-	if(rc == 0)
+	if(rc == 0) {
+		if(g.gen_delete_count) {
+			tup_main_progress("Deleting files...\n");
+		} else {
+			tup_main_progress("No files to delete.\n");
+		}
 		rc = delete_files(&g);
+	}
 	if(rc < 0) {
 		tup_db_rollback();
 		if(rc != -1)

@@ -91,6 +91,7 @@ enum {
 	DB_GET_INCOMING_LINK,
 	DB_DELETE_LINKS,
 	DB_DIRTYPE_TO_TREE,
+	DB_TYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -3182,6 +3183,59 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, i
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, type) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	while(1) {
+		tupid_t tupid;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			break;
+		}
+
+		tupid = sqlite3_column_int64(*stmt, 0);
+
+		if(tree_entry_add(root, tupid, type, count) < 0) {
+			rc = -1;
+			break;
+		}
+	}
+
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_TYPE_TO_TREE];
+	static char s[] = "select id from node where type=?";
+
+	transaction_check("%s [37m[%i][0m", s, type);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int(*stmt, 1, type) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;

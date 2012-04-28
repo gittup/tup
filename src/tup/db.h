@@ -150,6 +150,7 @@ tupid_t env_dt(void);
 
 /* Tree operations */
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type);
+int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type);
 
 /* scanner operations */
 int tup_db_scan_begin(struct tupid_entries *root);
