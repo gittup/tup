@@ -723,7 +723,7 @@ static int tup_fs_unlink(const char *path)
 		}
 		put_finfo(finfo);
 	}
-	fprintf(stderr, "tup error: Unable to unlink files not created during this job.\n");
+	fprintf(stderr, "tup error: Unable to unlink files not created during this job: %s\n", peel(path));
 	return -EPERM;
 }
 
