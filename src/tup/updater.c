@@ -74,7 +74,6 @@ static int warnings;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
-static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -406,7 +405,7 @@ static int load_variants(void)
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_VARIANT) < 0)
 		return -1;
 	TAILQ_FOREACH(n, &g.plist, list) {
-		if(variant_add(&variant_list, n->tent, 1, NULL) < 0)
+		if(variant_add(n->tent, 1, NULL) < 0)
 			return -1;
 	}
 
@@ -458,7 +457,7 @@ static int process_config_nodes(int environ_check)
 			TAILQ_REMOVE(&g.plist, n, list);
 			variant = variant_search(n->tent->dt);
 			if(variant == NULL) {
-				if(variant_add(&variant_list, n->tent, 1, &variant) < 0)
+				if(variant_add(n->tent, 1, &variant) < 0)
 					goto err_rollback;
 				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
 					goto err_rollback;
@@ -500,17 +499,17 @@ static int process_config_nodes(int environ_check)
 			}
 		}
 
-		if(LIST_EMPTY(&variant_list)) {
+		if(variant_list_empty()) {
 			if(tup_db_add_variant_list(vartent->tnode.tupid) < 0)
 				goto err_rollback;
 			enabled = 1;
 		}
-		if(variant_add(&variant_list, vartent, enabled, NULL) < 0)
+		if(variant_add(vartent, enabled, NULL) < 0)
 			goto err_rollback;
 	} else {
 		int external_variant = 0;
 		struct variant *variant;
-		LIST_FOREACH(variant, &variant_list, list) {
+		LIST_FOREACH(variant, get_variant_list(), list) {
 			if(!variant->root_variant) {
 				external_variant = 1;
 				break;
@@ -605,7 +604,7 @@ static int process_create_nodes(void)
 	TAILQ_FOREACH(n, &g.plist, list) {
 		if(tup_entry_variant(n->tent)->root_variant) {
 			struct variant *variant;
-			LIST_FOREACH(variant, &variant_list, list) {
+			LIST_FOREACH(variant, get_variant_list(), list) {
 				/* Add in all other variants to parse */
 				if(!variant->root_variant) {
 					struct tup_entry *new_tent;

@@ -25,10 +25,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
 static struct tupid_entries variant_root = RB_INITIALIZER(&variant_root);
 
-int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled,
-		struct variant **dest)
+int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 {
 	struct variant *variant;
 
@@ -61,7 +61,7 @@ int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled,
 		return -1;
 	}
 
-	LIST_INSERT_HEAD(head, variant, list);
+	LIST_INSERT_HEAD(&variant_list, variant, list);
 	if(tupid_tree_insert(&variant_root, &variant->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->tnode.tupid);
 		return -1;
@@ -81,4 +81,14 @@ struct variant *variant_search(tupid_t dt)
 	if(!tt)
 		return NULL;
 	return container_of(tt, struct variant, tnode);
+}
+
+struct variant_head *get_variant_list(void)
+{
+	return &variant_list;
+}
+
+int variant_list_empty(void)
+{
+	return LIST_EMPTY(&variant_list);
 }
