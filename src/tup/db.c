@@ -4165,7 +4165,7 @@ static int extra_output(tupid_t tupid, void *data)
 	tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
 	fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
 		tent->name.s, tent->dt);
-	delete_file(tent->dt, tent->name.s);
+	delete_file(tent);
 #else
 	fprintf(aod->f, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
 #endif

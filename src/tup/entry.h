@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -58,7 +58,6 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name(tupid_t tupid, const char *new_name);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
-int tup_entry_open_tupid(tupid_t tupid);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);

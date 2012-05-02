@@ -302,15 +302,6 @@ int tup_entry_resolve_dirs(void)
 	return 0;
 }
 
-int tup_entry_open_tupid(tupid_t tupid)
-{
-	struct tup_entry *tent;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
-	return tup_entry_open(tent);
-}
-
 int tup_entry_open(struct tup_entry *tent)
 {
 	return tup_entry_openat(tup_top_fd(), tent);

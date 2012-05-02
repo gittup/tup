@@ -346,7 +346,7 @@ static int delete_files(struct graph *g)
 			/* Only delete if the file wasn't modified (t6031) */
 			show_result(tent, 0, NULL);
 			show_progress(-1, TUP_NODE_GENERATED);
-			if(delete_file(tent->dt, tent->name.s) < 0)
+			if(delete_file(tent) < 0)
 				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				goto out_err;
