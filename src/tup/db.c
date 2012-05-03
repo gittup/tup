@@ -380,7 +380,6 @@ static int version_check(void)
 {
 	int version;
 	char *errmsg;
-	char sql_parser_update[] = "insert or replace into create_list select id from node where type=2";
 	char sql_1a[] = "alter table link add column style integer default 0";
 	char sql_1b[] = "insert or replace into create_list select id from node where type=2 and not id=2";
 	char sql_1c[] = "update node set type=4 where id in (select to_id from link) and type=0";
@@ -772,11 +771,8 @@ static int version_check(void)
 	}
 	if(version != PARSER_VERSION) {
 		printf("Tup parser version has been updated to %i. All Tupfiles will be re-parsed to ensure that nothing broke.\n", PARSER_VERSION);
-		if(sqlite3_exec(tup_db, sql_parser_update, NULL, NULL, &errmsg) != 0) {
-			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-				errmsg, sql_parser_update);
+		if(tup_db_reparse_all() < 0)
 			return -1;
-		}
 		if(tup_db_unflag_create(env_dt()) < 0)
 			return -1;
 		if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
@@ -5826,6 +5822,21 @@ int tup_db_variant_dir_reclaimable(tupid_t dt, int *reclaimable)
 	/* If both checks say it is reclaimable, then it is reclaimable */
 	if(rc1 == 1 && rc2 == 1)
 		*reclaimable = 1;
+	return 0;
+}
+
+int tup_db_reparse_all(void)
+{
+	char sql_parse_all[] = "insert or replace into create_list select id from node where type=2";
+	char *errmsg;
+
+	if(sqlite3_exec(tup_db, sql_parse_all, NULL, NULL, &errmsg) != 0) {
+		fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+			errmsg, sql_parse_all);
+		return -1;
+	}
+	if(tup_db_unflag_create(env_dt()) < 0)
+		return -1;
 	return 0;
 }
 

@@ -553,11 +553,13 @@ static int process_config_nodes(int environ_check)
 
 	if(!variant_search(DOT_DT)) {
 		int enabled = 0;
+		int first_upd = 0;
 		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
 			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
 			goto err_rollback;
 		}
 		if(!vartent) {
+			first_upd = 1;
 			vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
 			if(!vartent) {
 				fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
@@ -566,8 +568,16 @@ static int process_config_nodes(int environ_check)
 		}
 
 		if(variant_list_empty()) {
+			/* Going from variant to in-tree */
 			if(tup_db_add_variant_list(vartent->tnode.tupid) < 0)
 				goto err_rollback;
+
+			/* Minor optimization: Don't do a reparse all if this
+			 * is the first time we are updating.
+			 */
+			if(!first_upd)
+				if(tup_db_reparse_all() < 0)
+					return -1;
 			enabled = 1;
 		}
 		if(variant_add(vartent, enabled, NULL) < 0)

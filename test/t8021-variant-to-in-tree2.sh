@@ -16,7 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure we can go from a variant to in-tree build with a tup.config
+# Make sure we can go from a variant to in-tree build without a tup.config
 . ./tup.sh
 
 tmkdir build
@@ -41,15 +41,11 @@ update
 check_exist build/foo.o build/sub/bar.o build/prog
 check_not_exist foo.o sub/bar.o prog
 
-mv build/tup.config .
+rm -rf build
 update
 
 check_not_exist build/foo.o build/sub/bar.o build/prog
-check_exist foo.o sub/bar.o prog
-
-rm tup.config
-update
-
+check_exist foo.o sub/bar.o
 check_not_exist prog
 
 eotup
