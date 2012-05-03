@@ -44,4 +44,8 @@ update
 check_exist build/foo.o build/sub/bar.o build/prog
 check_not_exist foo.o sub/bar.o prog
 
+# Make sure we can still update the variant
+tup touch sub/Tupfile
+update
+
 eotup

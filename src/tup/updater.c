@@ -584,6 +584,8 @@ static int process_config_nodes(int environ_check)
 		if(external_variant) {
 			if(delete_in_tree() < 0)
 				goto err_rollback;
+			if(tup_db_unflag_variant(variant->tent->tnode.tupid) < 0)
+				goto err_rollback;
 		}
 	}
 
