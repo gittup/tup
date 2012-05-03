@@ -85,6 +85,7 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 int tup_db_rebuild_all(void);
 int tup_db_delete_slash(void);
 tupid_t slash_dt(void);
+int tup_db_variant_dir_reclaimable(tupid_t dt, int *reclaimable);
 
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
