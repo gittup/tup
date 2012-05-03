@@ -4091,7 +4091,6 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
 int tup_db_delete_tup_config(struct tup_entry *tent)
 {
 	struct half_entry_head subdir_list;
-	struct vardb empty_vdb;
 	char vardict_file[PATH_MAX];
 
 	LIST_INIT(&subdir_list);
@@ -4105,7 +4104,6 @@ int tup_db_delete_tup_config(struct tup_entry *tent)
 		LIST_REMOVE(he, list);
 		free(he);
 	}
-	vardb_init(&empty_vdb);
 	if(tent->dt == DOT_DT) {
 		snprintf(vardict_file, sizeof(vardict_file), ".tup/vardict");
 	} else {
