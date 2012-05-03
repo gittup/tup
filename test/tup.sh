@@ -340,7 +340,7 @@ vardict_exist()
 
 vardict_no_exist()
 {
-	if grep "\<$1\>" .tup/vardict > /dev/null; then
+	if grep "\<$1\>" .tup/vardict > /dev/null 2>/dev/null; then
 		echo "Error: $1 found in vardict file when it shouldn't" 1>&2
 		exit 1
 	fi
