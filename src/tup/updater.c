@@ -509,6 +509,13 @@ static int process_config_nodes(int environ_check)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
+
+	while(!LIST_EMPTY(&g.root->edges)) {
+		remove_edge(LIST_FIRST(&g.root->edges));
+	}
+	TAILQ_REMOVE(&g.node_list, g.root, list);
+	remove_node(&g, g.root);
+
 	if(!TAILQ_EMPTY(&g.plist)) {
 		if(environ_check)
 			tup_main_progress("Reading in new configuration/environment variables...\n");
@@ -521,19 +528,28 @@ static int process_config_nodes(int environ_check)
 
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
-			variant = variant_search(n->tent->dt);
-			if(variant == NULL) {
-				if(variant_add(n->tent, 1, &variant) < 0)
+
+			if(n->tent->type == TUP_NODE_DIR) {
+				/* Removing the variant */
+				if(tup_db_delete_variant(n->tent) < 0)
+					return -1;
+			} else {
+				/* tup.config created or modified */
+				variant = variant_search(n->tent->dt);
+				if(variant == NULL) {
+					if(variant_add(n->tent, 1, &variant) < 0)
+						goto err_rollback;
+					if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
+						goto err_rollback;
+					if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
+						goto err_rollback;
+					TAILQ_INSERT_HEAD(&g.node_list, n, list);
+					rm_node = 0;
+				}
+				if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
 					goto err_rollback;
-				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
-					goto err_rollback;
-				if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
-					goto err_rollback;
-				TAILQ_INSERT_HEAD(&g.node_list, n, list);
-				rm_node = 0;
 			}
-			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
-				goto err_rollback;
+
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 				goto err_rollback;
 			if(rm_node) {
@@ -600,10 +616,8 @@ static int process_config_nodes(int environ_check)
 	}
 
 	TAILQ_FOREACH(n, &g.node_list, list) {
-		if(n->tent->type != TUP_NODE_ROOT) {
-			if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
-				goto err_rollback;
-		}
+		if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
+			goto err_rollback;
 	}
 
 	if(tup_db_check_env(environ_check) < 0)

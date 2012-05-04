@@ -183,6 +183,13 @@ static int check_rm_tup_config(struct tup_entry *tent)
 			/* If tup.config was removed, delete all of its variables. */
 			if(tup_db_delete_tup_config(tent) < 0)
 				return -1;
+			if(tent->dt != DOT_DT) {
+				/* Flag the variant dir in config_list so we can clean up the whole
+				 * variant.
+				 */
+				if(tup_db_add_config_list(tent->dt) < 0)
+					return -1;
+			}
 		}
 	}
 	return 0;

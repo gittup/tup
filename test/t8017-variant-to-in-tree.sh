@@ -44,7 +44,7 @@ check_not_exist foo.o sub/bar.o prog
 mv build/tup.config .
 update
 
-check_not_exist build/foo.o build/sub/bar.o build/prog
+check_not_exist build/foo.o build/sub/bar.o build/prog build/sub
 check_exist foo.o sub/bar.o prog
 
 rm tup.config

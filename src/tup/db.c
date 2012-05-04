@@ -1463,6 +1463,80 @@ int tup_db_delete_dir(tupid_t dt)
 	return 0;
 }
 
+static int delete_variant_dir(struct tup_entry *tent)
+{
+	struct half_entry_head subdir_list;
+	int fd;
+
+	LIST_INIT(&subdir_list);
+	if(get_dir_entries(tent->tnode.tupid, &subdir_list) < 0)
+		return -1;
+	fd = tup_entry_open(tent);
+	if(fd < 0) {
+		/* If we can't open the directory, it must already be gone.
+		 * Just go through a normal tup_db_delete_dir().
+		 */
+		if(errno == ENOENT) {
+			if(tup_db_delete_dir(tent->tnode.tupid) < 0)
+				return -1;
+			return 0;
+		}
+		fprintf(stderr, "tup error: Unable to open directory for variant removal: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct half_entry *he = LIST_FIRST(&subdir_list);
+		struct tup_entry *subtent;
+		int flags = 0;
+
+		if(tup_entry_add(he->tupid, &subtent) < 0)
+			return -1;
+
+		if(he->type == TUP_NODE_DIR) {
+			flags = AT_REMOVEDIR;
+			if(delete_variant_dir(subtent) < 0)
+				return -1;
+		}
+
+		if(unlinkat(fd, subtent->name.s, flags) < 0) {
+			if(errno != ENOENT) {
+				perror(subtent->name.s);
+				fprintf(stderr, "tup error: Unable to clean out variant directory: ");
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "\ntup error: Please make sure you have no extra files in the variant directory.\n");
+				return -1;
+			}
+		}
+		if(delete_name_file(he->tupid) < 0)
+			return -1;
+
+		LIST_REMOVE(he, list);
+		free(he);
+	}
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_delete_variant(struct tup_entry *tent)
+{
+	if(tent->tnode.tupid == DOT_DT) {
+		fprintf(stderr, "tup internal error: Shouldn't be trying to clean up the root variant. Tup entry is: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+
+	if(delete_variant_dir(tent) < 0)
+		return -1;
+	return 0;
+}
+
 static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 {
 	struct half_entry *he;
