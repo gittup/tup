@@ -808,6 +808,13 @@ static int gitignore(struct tupfile *tf)
 			tree_entry_remove(&tf->g->gen_delete_root,
 					  tent->tnode.tupid,
 					  &tf->g->gen_delete_count);
+			/* It may be a ghost if we are going from a variant
+			 * to an in-tree build.
+			 */
+			if(tent->type == TUP_NODE_GHOST) {
+				if(tup_db_set_type(tent, TUP_NODE_GENERATED) < 0)
+					return -1;
+			}
 		}
 
 		fd = openat(tf->cur_dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
