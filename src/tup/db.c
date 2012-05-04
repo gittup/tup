@@ -1489,7 +1489,7 @@ static int delete_variant_dir(struct tup_entry *tent)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 		struct tup_entry *subtent;
-		int flags = 0;
+		int flags = -1;
 
 		if(tup_entry_add(he->tupid, &subtent) < 0)
 			return -1;
@@ -1498,15 +1498,19 @@ static int delete_variant_dir(struct tup_entry *tent)
 			flags = AT_REMOVEDIR;
 			if(delete_variant_dir(subtent) < 0)
 				return -1;
+		} else if(he->type == TUP_NODE_GENERATED) {
+			flags = 0;
 		}
 
-		if(unlinkat(fd, subtent->name.s, flags) < 0) {
-			if(errno != ENOENT) {
-				perror(subtent->name.s);
-				fprintf(stderr, "tup error: Unable to clean out variant directory: ");
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "\ntup error: Please make sure you have no extra files in the variant directory.\n");
-				return -1;
+		if(flags >= 0) {
+			if(unlinkat(fd, subtent->name.s, flags) < 0) {
+				if(errno != ENOENT) {
+					perror(subtent->name.s);
+					fprintf(stderr, "tup error: Unable to clean out variant directory: ");
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "\ntup error: Please make sure you have no extra files in the variant directory.\n");
+					return -1;
+				}
 			}
 		}
 		if(delete_name_file(he->tupid) < 0)
