@@ -502,6 +502,7 @@ static int process_config_nodes(int environ_check)
 	struct graph g;
 	struct tup_entry *vartent;
 	struct node *n;
+	struct variant *root_variant;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -567,7 +568,8 @@ static int process_config_nodes(int environ_check)
 			tup_main_progress("No tup.config changes (environment check disabled).\n");
 	}
 
-	if(!variant_search(DOT_DT)) {
+	root_variant = variant_search(DOT_DT);
+	if(!root_variant) {
 		int enabled = 0;
 		int first_upd = 0;
 		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
@@ -610,7 +612,7 @@ static int process_config_nodes(int environ_check)
 		if(external_variant) {
 			if(delete_in_tree() < 0)
 				goto err_rollback;
-			if(tup_db_unflag_variant(variant->tent->tnode.tupid) < 0)
+			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid) < 0)
 				goto err_rollback;
 		}
 	}
