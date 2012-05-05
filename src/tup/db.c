@@ -202,7 +202,7 @@ static int msqlite3_reset(sqlite3_stmt *stmt)
 {
 	if(sql_debug) {
 		timespan_end(&transaction_ts);
-		fprintf(stderr, "[%fs] %s\n", timespan_seconds(&transaction_ts), transaction_buf);
+		fprintf(stderr, "[%fs] {%i} %s\n", timespan_seconds(&transaction_ts), sqlite3_changes(tup_db), transaction_buf);
 	}
 	return sqlite3_reset(stmt);
 }
