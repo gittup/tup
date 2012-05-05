@@ -503,6 +503,8 @@ static int process_config_nodes(int environ_check)
 	struct tup_entry *vartent;
 	struct node *n;
 	struct variant *root_variant;
+	int variants_removed;
+	int new_in_tree = 0;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -516,6 +518,9 @@ static int process_config_nodes(int environ_check)
 	}
 	TAILQ_REMOVE(&g.node_list, g.root, list);
 	remove_node(&g, g.root);
+
+	if(tup_db_config_get_int("variants_removed", 0, &variants_removed) < 0)
+		return -1;
 
 	if(!TAILQ_EMPTY(&g.plist)) {
 		if(environ_check)
@@ -531,13 +536,19 @@ static int process_config_nodes(int environ_check)
 			TAILQ_REMOVE(&g.plist, n, list);
 
 			if(n->tent->type == TUP_NODE_DIR) {
-				/* Removing the variant */
+				/* Removing the variant. This case accounts for
+				 * the user doing 'rm build/tup.config', not
+				 * doing 'rm -rf build'. A full rm -rf has all
+				 * nodes removed by the monitor/scanner.
+				 */
 				if(tup_db_delete_variant(n->tent) < 0)
 					return -1;
 			} else {
 				/* tup.config created or modified */
 				variant = variant_search(n->tent->dt);
 				if(variant == NULL) {
+					if(n->tent->dt == DOT_DT)
+						new_in_tree = 1;
 					if(variant_add(n->tent, 1, &variant) < 0)
 						goto err_rollback;
 					if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
@@ -571,13 +582,11 @@ static int process_config_nodes(int environ_check)
 	root_variant = variant_search(DOT_DT);
 	if(!root_variant) {
 		int enabled = 0;
-		int first_upd = 0;
 		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
 			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
 			goto err_rollback;
 		}
 		if(!vartent) {
-			first_upd = 1;
 			vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
 			if(!vartent) {
 				fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
@@ -590,13 +599,8 @@ static int process_config_nodes(int environ_check)
 			if(tup_db_add_variant_list(vartent->tnode.tupid) < 0)
 				goto err_rollback;
 
-			/* Minor optimization: Don't do a reparse all if this
-			 * is the first time we are updating.
-			 */
-			if(!first_upd)
-				if(tup_db_reparse_all() < 0)
-					return -1;
 			enabled = 1;
+			new_in_tree = 1;
 		}
 		if(variant_add(vartent, enabled, NULL) < 0)
 			goto err_rollback;
@@ -617,9 +621,20 @@ static int process_config_nodes(int environ_check)
 		}
 	}
 
+	/* If we have created an in-tree variant (either a real tup.config
+	 * based one or a fake placeholder one), and variants were removed by
+	 * the scanner/monitor at some point, then we need to reparse all the
+	 * Tupfiles to create the in-tree build.
+	 */
+	if(new_in_tree && variants_removed)
+		if(tup_db_reparse_all() < 0)
+			return -1;
+
 	TAILQ_FOREACH(n, &g.node_list, list) {
-		if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
-			goto err_rollback;
+		if(n->tent->dt != DOT_DT) {
+			if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
+				goto err_rollback;
+		}
 	}
 
 	if(tup_db_check_env(environ_check) < 0)

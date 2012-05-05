@@ -2868,6 +2868,14 @@ int tup_db_unflag_variant(tupid_t tupid)
 		return -1;
 	}
 
+	if(sqlite3_changes(tup_db)) {
+		/* Keep track if variants were removed, since we may need to switch to
+		 * an in-tree build if none are left.
+		 */
+		if(tup_db_config_set_int("variants_removed", 1) < 0)
+			return -1;
+	}
+
 	return 0;
 }
 
