@@ -130,6 +130,8 @@ int server_init(enum server_mode mode)
 	if(server_inited)
 		return 0;
 
+	tup_fuse_fs_init();
+
 	null_fd = open("/dev/null", O_RDONLY);
 	if(null_fd < 0) {
 		perror("/dev/null");
