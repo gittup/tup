@@ -635,6 +635,7 @@ static int process_config_nodes(int environ_check)
 				goto err_rollback;
 			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid) < 0)
 				goto err_rollback;
+			root_variant->enabled = 0;
 		}
 	}
 
