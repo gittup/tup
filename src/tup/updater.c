@@ -729,7 +729,8 @@ static int process_create_nodes(void)
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
 	TAILQ_FOREACH(n, &g.plist, list) {
-		if(tup_entry_variant(n->tent)->root_variant) {
+		struct variant *node_variant = tup_entry_variant(n->tent);
+		if(node_variant->root_variant) {
 			struct variant *variant;
 			LIST_FOREACH(variant, get_variant_list(), list) {
 				/* Add in all other variants to parse */
@@ -745,6 +746,9 @@ static int process_create_nodes(void)
 					if(add_file_cb(&g, new_tent, TUP_LINK_NORMAL) < 0)
 						return -1;
 				}
+			}
+			if(!node_variant->enabled) {
+				g.num_nodes--;
 			}
 		}
 	}
@@ -1250,12 +1254,14 @@ static void *create_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_DIR) {
-			if(n->already_used) {
-				rc = 0;
-			} else {
-				rc = parse(n, g, NULL);
+			if(tup_entry_variant(n->tent)->enabled) {
+				if(n->already_used) {
+					rc = 0;
+				} else {
+					rc = parse(n, g, NULL);
+				}
+				show_progress(-1, TUP_NODE_DIR);
 			}
-			show_progress(-1, TUP_NODE_DIR);
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||

@@ -304,53 +304,48 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
-	if(tf.variant->enabled) {
-		tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
-		if(tf.cur_dfd < 0) {
-			fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
-			goto out_close_vdb;
-		}
+	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
+	if(tf.cur_dfd < 0) {
+		fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
+		goto out_close_vdb;
+	}
 
-		fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
-		if(fd < 0) {
-			if(errno == ENOENT) {
-				/* No Tupfile means we have nothing to do */
-				rc = 0;
-				goto out_close_dfd;
-			} else {
-				parser_error(&tf, "Tupfile");
-				goto out_close_dfd;
-			}
+	fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
+	if(fd < 0) {
+		if(errno == ENOENT) {
+			/* No Tupfile means we have nothing to do */
+			rc = 0;
+			goto out_close_dfd;
+		} else {
+			parser_error(&tf, "Tupfile");
+			goto out_close_dfd;
 		}
+	}
 
-		if(fslurp_null(fd, &b) < 0)
-			goto out_close_file;
-		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+	if(fslurp_null(fd, &b) < 0)
+		goto out_close_file;
+	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+		goto out_free_bs;
+	if(tf.ign) {
+		if(rm_existing_gitignore(&tf, n->tent) < 0)
+			return -1;
+		if(gitignore(&tf) < 0) {
+			rc = -1;
 			goto out_free_bs;
-		if(tf.ign) {
-			if(rm_existing_gitignore(&tf, n->tent) < 0)
-				return -1;
-			if(gitignore(&tf) < 0) {
-				rc = -1;
-				goto out_free_bs;
-			}
 		}
-		rc = 0;
+	}
+	rc = 0;
 out_free_bs:
-		free(b.s);
+	free(b.s);
 out_close_file:
-		if(close(fd) < 0) {
-			parser_error(&tf, "close(fd)");
-			rc = -1;
-		}
+	if(close(fd) < 0) {
+		parser_error(&tf, "close(fd)");
+		rc = -1;
+	}
 out_close_dfd:
-		if(close(tf.cur_dfd) < 0) {
-			parser_error(&tf, "close(tf.cur_dfd)");
-			rc = -1;
-		}
-	} else {
-		/* Disabled variant always succeeds */
-		rc = 0;
+	if(close(tf.cur_dfd) < 0) {
+		parser_error(&tf, "close(tf.cur_dfd)");
+		rc = -1;
 	}
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
