@@ -497,6 +497,19 @@ static int delete_in_tree(void)
 	return 0;
 }
 
+static void initialize_server_struct(struct server *s, struct tup_entry *tent)
+{
+	s->id = tent->tnode.tupid;
+	s->exited = 0;
+	s->signalled = 0;
+	s->exit_status = -1;
+	s->exit_sig = -1;
+	s->output_fd = -1;
+	s->error_fd = -1;
+	s->error_mutex = &display_mutex;
+	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir);
+}
+
 static int process_config_nodes(int environ_check)
 {
 	struct graph g;
@@ -523,6 +536,8 @@ static int process_config_nodes(int environ_check)
 		return -1;
 
 	if(!TAILQ_EMPTY(&g.plist)) {
+		if(server_init(SERVER_CONFIG_MODE) < 0)
+			return -1;
 		if(environ_check)
 			tup_main_progress("Reading in new configuration/environment variables...\n");
 		else
@@ -531,6 +546,7 @@ static int process_config_nodes(int environ_check)
 		while(!TAILQ_EMPTY(&g.plist)) {
 			struct variant *variant;
 			int rm_node = 1;
+			struct parser_server ps;
 
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
@@ -558,8 +574,17 @@ static int process_config_nodes(int environ_check)
 					TAILQ_INSERT_HEAD(&g.node_list, n, list);
 					rm_node = 0;
 				}
-				if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
+				compat_lock_disable();
+				initialize_server_struct(&ps.s, n->tent);
+				if(server_parser_start(&ps) < 0)
 					goto err_rollback;
+				if(tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
+					goto err_rollback;
+				if(server_parser_stop(&ps) < 0)
+					goto err_rollback;
+				if(add_config_files(&ps.s.finfo, n->tent) < 0)
+					goto err_rollback;
+				compat_lock_enable();
 			}
 
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
@@ -1516,19 +1541,11 @@ static int update(struct node *n)
 	rc = tup_db_get_links(n->tent->tnode.tupid, &sticky_root, &normal_root);
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
+	initialize_server_struct(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
 
-	s.id = n->tnode.tupid;
-	s.exited = 0;
-	s.signalled = 0;
-	s.exit_status = -1;
-	s.exit_sig = -1;
-	s.output_fd = -1;
-	s.error_fd = -1;
-	s.error_mutex = &display_mutex;
-	init_file_info(&s.finfo, tup_entry_variant(n->tent)->variant_dir);
 	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);

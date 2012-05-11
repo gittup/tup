@@ -43,6 +43,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
 			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt);
+static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
 
@@ -166,6 +167,15 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	return -1;
 }
 
+int add_config_files(struct file_info *finfo, struct tup_entry *tent)
+{
+	int rc;
+	finfo_lock(finfo);
+	rc = add_config_files_locked(finfo, tent);
+	finfo_unlock(finfo);
+	return rc;
+}
+
 int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt)
 {
 	int rc;
@@ -255,6 +265,35 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 	}
 	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
 		return -1;
+	return 0;
+}
+
+static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent)
+{
+	struct file_entry *r;
+	struct tup_entry_head *entrylist;
+	int full_deps = tup_option_get_int("updater.full_deps");
+
+	entrylist = tup_entry_get_list();
+	while(!LIST_EMPTY(&finfo->read_list)) {
+		struct tup_entry *tmp;
+		r = LIST_FIRST(&finfo->read_list);
+
+		if(add_node_to_list(DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
+			return -1;
+
+		/* Don't link to ourself */
+		tmp = LIST_FIRST(entrylist);
+		if(tmp == tent) {
+			tup_entry_list_del(tmp);
+		}
+
+		del_entry(r);
+	}
+	if(tup_db_check_config_inputs(tent, entrylist) < 0)
+		return -1;
+	tup_entry_release_list();
+
 	return 0;
 }
 

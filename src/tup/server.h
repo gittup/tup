@@ -57,6 +57,7 @@ struct parser_server {
 };
 
 enum server_mode {
+	SERVER_CONFIG_MODE,
 	SERVER_PARSER_MODE,
 	SERVER_UPDATER_MODE,
 };
@@ -69,6 +70,8 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		struct tup_entry *dtent, int full_deps);
 int server_postexec(struct server *s);
 int server_is_dead(void);
+int server_config_start(struct server *s);
+int server_config_stop(struct server *s);
 int server_parser_start(struct parser_server *ps);
 int server_parser_stop(struct parser_server *ps);
 

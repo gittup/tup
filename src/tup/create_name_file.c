@@ -150,6 +150,12 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			if(tup_db_set_dependent_dir_flags(tent->tnode.tupid) < 0)
 				return -1;
 
+			/* It's possible this file is used in a tup.config
+			 * (eg: tup.config is a symlink to here).
+			 */
+			if(tup_db_set_dependent_config_flags(tent->tnode.tupid) < 0)
+				return -1;
+
 			if(tent->mtime != mtime)
 				if(tup_db_set_mtime(tent, mtime) < 0)
 					return -1;

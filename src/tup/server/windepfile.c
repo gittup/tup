@@ -362,6 +362,19 @@ int server_is_dead(void)
 	return (event_got != -1);
 }
 
+int server_config_start(struct server *s)
+{
+	/* Currently unused - this is only needed for symlink detection in fuse. */
+	if(s) {}
+	return 0;
+}
+
+int server_config_stop(struct server *s)
+{
+	if(s) {}
+	return 0;
+}
+
 int server_parser_start(struct parser_server *ps)
 {
 	ps->root_fd = tup_top_fd();

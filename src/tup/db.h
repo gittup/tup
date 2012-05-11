@@ -124,6 +124,7 @@ int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
+int tup_db_set_dependent_config_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 					       int style),
 			       void *arg, tupid_t tupid);
@@ -140,7 +141,7 @@ struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int v
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(struct variant *variant, const char *var, int varlen);
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
+int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 		     const char *vardict_file);
 int tup_db_delete_tup_config(struct tup_entry *tent);
 
@@ -166,5 +167,6 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root);
+int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 
 #endif

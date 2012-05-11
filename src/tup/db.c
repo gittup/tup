@@ -95,6 +95,7 @@ enum {
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
+	DB_SET_DEPENDENT_CONFIG_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
@@ -3480,6 +3481,48 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 	return 0;
 }
 
+int tup_db_set_dependent_config_flags(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_DEPENDENT_CONFIG_FLAGS];
+	static char s[] = "insert or ignore into config_list select to_id from link, node where from_id=? and to_id=id and type=?";
+
+	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_FILE);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_FILE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
 					       int style),
 			       void *arg, tupid_t tupid)
@@ -4117,7 +4160,7 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
+int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 		     const char *vardict_file)
 {
 	struct vardb db_tree;
@@ -4125,12 +4168,16 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
 	int dfd;
 	int fd;
 	int rc;
+	struct tup_entry *tent;
+
+	if(tup_entry_add(dt, &tent) < 0)
+		return -1;
 
 	vardb_init(&db_tree);
 	vardb_init(&file_tree);
 	if(get_db_var_tree(vardt, &db_tree) < 0)
 		return -1;
-	dfd = tup_db_open_tupid(dt);
+	dfd = tup_entry_openat(root_fd, tent);
 	if(dfd < 0) {
 		rc = 0;
 	} else {
@@ -5067,6 +5114,30 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
 	return rc;
+}
+
+int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead)
+{
+	struct actual_input_data aid = {
+		.f = stdout,
+		.cmdid = tent->tnode.tupid,
+		.output_root = {NULL},
+		.missing_input_root = {NULL},
+	};
+	struct tupid_entries sticky_root = RB_INITIALIZER(&sticky_root);
+	struct tupid_entries normal_root = RB_INITIALIZER(&normal_root);
+
+	aid.sticky_root = &sticky_root;
+
+	if(tup_db_get_links(tent->tnode.tupid, &sticky_root, &normal_root) < 0)
+		return -1;
+
+	if(compare_list_tree(readhead, &normal_root, &aid,
+			     new_normal_link, del_normal_link) < 0)
+		return -1;
+	free_tupid_tree(&normal_root);
+	free_tupid_tree(&sticky_root);
+	return 0;
 }
 
 struct parse_output_data {
