@@ -33,6 +33,7 @@
 struct tup_entry;
 struct tup_entry_head;
 struct tup_env;
+struct variant;
 
 /* General operations */
 int tup_db_open(void);
@@ -132,9 +133,9 @@ int tup_db_config_set_string(const char *lval, const char *rval);
 
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);
-struct tup_entry *tup_db_get_var(tupid_t vardt, const char *var, int varlen, char **dest);
+struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, char **dest);
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
-int tup_db_get_varlen(tupid_t vardt, const char *var, int varlen);
+int tup_db_get_varlen(struct variant *variant, const char *var, int varlen);
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
 int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt);
 

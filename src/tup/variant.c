@@ -45,6 +45,7 @@ int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled)
 	else
 		variant->root_variant = 0;
 
+	vardb_init(&variant->vdb);
 	variant->enabled = enabled;
 	if(snprint_tup_entry(variant->variant_dir, sizeof(variant->variant_dir), tent->parent) >= (signed)sizeof(variant->variant_dir)) {
 		fprintf(stderr, "tup internal error: variant_dir is sized incorrectly.\n");

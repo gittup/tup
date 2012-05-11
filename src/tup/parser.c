@@ -594,7 +594,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 
 	if(strncmp(var, "CONFIG_", 7) == 0)
 		var += 7;
-	tent = tup_db_get_var(tf->variant->tent->tnode.tupid, var, strlen(var), NULL);
+	tent = tup_db_get_var(tf->variant, var, strlen(var), NULL);
 	if(!tent)
 		return -1;
 	if(tent->type == TUP_NODE_VAR) {
@@ -3136,7 +3136,7 @@ static char *eval(struct tupfile *tf, const char *string)
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
 					atvar = var+7;
-					vlen = tup_db_get_varlen(tf->variant->tent->tnode.tupid, atvar, rparen-atvar);
+					vlen = tup_db_get_varlen(tf->variant, atvar, rparen-atvar);
 					if(vlen < 0)
 						return NULL;
 					len += vlen;
@@ -3162,7 +3162,7 @@ static char *eval(struct tupfile *tf, const char *string)
 				}
 
 				var = s + 2;
-				vlen = tup_db_get_varlen(tf->variant->tent->tnode.tupid, var, rparen-var);
+				vlen = tup_db_get_varlen(tf->variant, var, rparen-var);
 				if(vlen < 0)
 					return NULL;
 				len += vlen;
@@ -3224,7 +3224,7 @@ static char *eval(struct tupfile *tf, const char *string)
 					struct tup_entry *tent;
 					atvar = var+7;
 
-					tent = tup_db_get_var(tf->variant->tent->tnode.tupid, atvar, rparen-atvar, &p);
+					tent = tup_db_get_var(tf->variant, atvar, rparen-atvar, &p);
 					if(!tent)
 						return NULL;
 					if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
@@ -3251,7 +3251,7 @@ static char *eval(struct tupfile *tf, const char *string)
 				}
 
 				var = s + 2;
-				tent = tup_db_get_var(tf->variant->tent->tnode.tupid, var, rparen-var, &p);
+				tent = tup_db_get_var(tf->variant, var, rparen-var, &p);
 				if(!tent)
 					return NULL;
 				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)

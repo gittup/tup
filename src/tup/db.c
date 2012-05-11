@@ -35,6 +35,7 @@
 #include "option.h"
 #include "environ.h"
 #include "timespan.h"
+#include "variant.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -140,7 +141,6 @@ static struct tup_entry_head ghost_list;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
-static struct vardb atvardb = { {NULL}, 0};
 static struct vardb envdb = { {NULL}, 0};
 static int transaction = 0;
 static tupid_t local_slash_dt = -1;
@@ -3610,7 +3610,7 @@ int tup_db_set_var(tupid_t tupid, const char *value)
 	return 0;
 }
 
-static struct var_entry *get_var_id(struct tup_entry *tent,
+static struct var_entry *get_var_id(struct vardb *vdb, struct tup_entry *tent,
 				    const char *var, int varlen)
 {
 	struct var_entry *ve = NULL;
@@ -3655,7 +3655,7 @@ static struct var_entry *get_var_id(struct tup_entry *tent,
 		goto out_reset;
 	}
 
-	ve = vardb_set2(&atvardb, var, varlen, value, tent);
+	ve = vardb_set2(vdb, var, varlen, value, tent);
 
 out_reset:
 	if(msqlite3_reset(*stmt) != 0) {
@@ -3667,43 +3667,40 @@ out_reset:
 	return ve;
 }
 
-static struct var_entry *get_var(tupid_t vardt, const char *var, int varlen)
+static struct var_entry *get_var(struct variant *variant, const char *var, int varlen)
 {
 	struct var_entry *ve;
 
-	ve = vardb_get(&atvardb, var, varlen);
+	ve = vardb_get(&variant->vdb, var, varlen);
 	if(!ve) {
 		struct tup_entry *tent;
-		struct tup_entry *var_tent;
 
-		if(tup_entry_add(vardt, &var_tent) < 0)
-			return NULL;
-		if(node_select(var_tent->tnode.tupid, var, varlen, &tent) < 0)
+		if(node_select(variant->tent->tnode.tupid, var, varlen, &tent) < 0)
 			return NULL;
 		if(!tent) {
-			tent = tup_db_node_insert(vardt, var, varlen,
+			tent = tup_db_node_insert(variant->tent->tnode.tupid, var, varlen,
 						  TUP_NODE_GHOST, -1, -1);
 			if(!tent)
 				return NULL;
 		}
 		if(tent->type == TUP_NODE_VAR) {
-			ve = get_var_id(tent, var, varlen);
+			ve = get_var_id(&variant->vdb, tent, var, varlen);
 		} else if(varlen == 12 && strncmp(var, "TUP_PLATFORM", varlen) == 0) {
-			ve = vardb_set2(&atvardb, var, varlen, tup_platform, tent);
+			ve = vardb_set2(&variant->vdb, var, varlen, tup_platform, tent);
 		} else if(varlen == 8 && strncmp(var, "TUP_ARCH", varlen) == 0) {
-			ve = vardb_set2(&atvardb, var, varlen, tup_arch, tent);
+			ve = vardb_set2(&variant->vdb, var, varlen, tup_arch, tent);
 		} else {
-			ve = vardb_set2(&atvardb, var, varlen, "", tent);
+			ve = vardb_set2(&variant->vdb, var, varlen, "", tent);
 		}
 	}
 	return ve;
 }
 
-struct tup_entry *tup_db_get_var(tupid_t vardt, const char *var, int varlen, char **dest)
+struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, char **dest)
 {
 	struct var_entry *ve;
 
-	ve = get_var(vardt, var, varlen);
+	ve = get_var(variant, var, varlen);
 	if(!ve)
 		return NULL;
 
@@ -3776,11 +3773,11 @@ out_reset:
 	return rc;
 }
 
-int tup_db_get_varlen(tupid_t vardt, const char *var, int varlen)
+int tup_db_get_varlen(struct variant *variant, const char *var, int varlen)
 {
 	struct var_entry *ve;
 
-	ve = get_var(vardt, var, varlen);
+	ve = get_var(variant, var, varlen);
 	if(!ve)
 		return -1;
 	return ve->vallen;
@@ -3998,12 +3995,6 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
 		/* No tup.config == empty file_tree */
 		rc = 0;
 	} else {
-		/* TODO: Get this straight into atvardb instead? The trick will
-		 * be mapping the atvardb var_entries to tup_entrys, since it
-		 * will map the new variables (from the file) to the old
-		 * tup_entrys (in the database), and will need to updated wrt
-		 * ghost nodes and such.
-		 */
 		rc = get_file_var_tree(&file_tree, fd);
 		if(close(fd) < 0) {
 			perror("close(fd)");

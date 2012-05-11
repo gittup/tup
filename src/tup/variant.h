@@ -24,11 +24,13 @@
 #include "bsd/queue.h"
 #include "compat.h"
 #include "tupid_tree.h"
+#include "vardb.h"
 
 struct variant {
 	struct tupid_tree tnode;
 	LIST_ENTRY(variant) list;
 	struct tup_entry *tent;
+	struct vardb vdb;
 	int enabled;
 	int root_variant;
 	char variant_dir[PATH_MAX];
