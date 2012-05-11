@@ -60,6 +60,21 @@ int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled)
 	return 0;
 }
 
+int variant_rm(tupid_t dt)
+{
+	struct variant *variant;
+
+	variant = variant_search(dt);
+	if(!variant) {
+		fprintf(stderr, "tup internal error: Unable to find variant for node %lli in variant_rm()\n", dt);
+		return -1;
+	}
+	tupid_tree_rm(&variant_root, &variant->tnode);
+	LIST_REMOVE(variant, list);
+	free(variant);
+	return 0;
+}
+
 struct variant *variant_search(tupid_t dt)
 {
 	struct tupid_tree *tt;

@@ -443,7 +443,15 @@ static int process_config_nodes(int environ_check)
 
 		TAILQ_FOREACH(n, &g.plist, list) {
 			int variant_error = 0;
-			if(variant_search(n->tent->dt) == NULL) {
+			int empty = 0;
+			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, &empty) < 0)
+				goto err_rollback;
+			if(empty) {
+				if(variant_rm(n->tent->dt) < 0)
+					return -1;
+				if(tup_db_unflag_variant(n->tent->tnode.tupid) < 0)
+					return -1;
+			} else if(variant_search(n->tent->dt) == NULL) {
 				if(n->tent->dt == DOT_DT) {
 					if(!LIST_EMPTY(&variant_list)) {
 						variant_error = 1;
@@ -467,8 +475,6 @@ static int process_config_nodes(int environ_check)
 				if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
 					goto err_rollback;
 			}
-			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid) < 0)
-				goto err_rollback;
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 				goto err_rollback;
 		}

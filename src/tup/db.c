@@ -3969,7 +3969,7 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
+int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt, int *empty)
 {
 	struct vardb db_tree;
 	struct vardb file_tree;
@@ -3983,27 +3983,33 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
 		return -1;
 	dfd = tup_db_open_tupid(dt);
 	if(dfd < 0) {
-		fprintf(stderr, "Unable to open directory containing tup config\n");
-		return -1;
-	}
-	fd = openat(dfd, file, O_RDONLY);
-	if(fd < 0) {
-		if(errno != ENOENT) {
-			perror(file);
-			return -1;
-		}
-		/* No tup.config == empty file_tree */
+		if(empty)
+			*empty = 1;
 		rc = 0;
 	} else {
-		rc = get_file_var_tree(&file_tree, fd);
-		if(close(fd) < 0) {
-			perror("close(fd)");
+		fd = openat(dfd, file, O_RDONLY);
+		if(fd < 0) {
+			if(errno != ENOENT) {
+				perror(file);
+				return -1;
+			}
+			/* No tup.config == empty file_tree */
+			if(empty)
+				*empty = 1;
+			rc = 0;
+		} else {
+			if(empty)
+				*empty = 0;
+			rc = get_file_var_tree(&file_tree, fd);
+			if(close(fd) < 0) {
+				perror("close(fd)");
+				return -1;
+			}
+		}
+		if(close(dfd) < 0) {
+			perror("close(dfd)");
 			return -1;
 		}
-	}
-	if(close(dfd) < 0) {
-		perror("close(dfd)");
-		return -1;
 	}
 	if(rc < 0)
 		return -1;
