@@ -270,6 +270,11 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 		fprintf(stderr, "tup internal error: ps.path is sized incorrectly in parse()\n");
 		return -1;
 	}
+	RB_INIT(&tf.cmd_root);
+	RB_INIT(&tf.env_root);
+	RB_INIT(&tf.bang_root);
+	RB_INIT(&tf.input_root);
+	RB_INIT(&tf.chain_root);
 	if(server_parser_start(&ps) < 0)
 		return -1;
 
@@ -281,13 +286,8 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 		tf.srctent = NULL;
 	} else {
 		if(get_srctent(&tf, tf.tupid, &tf.srctent) < 0)
-			return -1;
+			goto out_server_stop;
 	}
-	RB_INIT(&tf.cmd_root);
-	RB_INIT(&tf.env_root);
-	RB_INIT(&tf.bang_root);
-	RB_INIT(&tf.input_root);
-	RB_INIT(&tf.chain_root);
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
 	if(vardb_init(&tf.vdb) < 0)
