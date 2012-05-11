@@ -46,7 +46,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
 
-int init_file_info(struct file_info *info)
+int init_file_info(struct file_info *info, const char *variant_dir)
 {
 	LIST_INIT(&info->read_list);
 	LIST_INIT(&info->write_list);
@@ -55,6 +55,7 @@ int init_file_info(struct file_info *info)
 	LIST_INIT(&info->mapping_list);
 	LIST_INIT(&info->tmpdir_list);
 	pthread_mutex_init(&info->lock, NULL);
+	info->variant_dir = variant_dir;
 	info->server_fail = 0;
 	return 0;
 }

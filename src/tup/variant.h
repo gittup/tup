@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,35 +18,24 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_db_types_h
-#define tup_db_types_h
+#ifndef tup_variant_h
+#define tup_variant_h
 
-#define TUP_DIR ".tup"
-#define TUP_DB_FILE ".tup/db"
-#define TUP_VARDICT_FILE ".tup/vardict"
-#define DOT_DT 1
+#include "bsd/queue.h"
+#include "compat.h"
+#include "tupid_tree.h"
 
-enum TUP_NODE_TYPE {
-	TUP_NODE_FILE,
-	TUP_NODE_CMD,
-	TUP_NODE_DIR,
-	TUP_NODE_VAR,
-	TUP_NODE_GENERATED,
-	TUP_NODE_GHOST,
-	TUP_NODE_ROOT,
+struct variant {
+	struct tupid_tree tnode;
+	LIST_ENTRY(variant) list;
+	struct tup_entry *tent;
+	int enabled;
+	int root_variant;
+	char variant_dir[PATH_MAX];
 };
+LIST_HEAD(variant_head, variant);
 
-enum TUP_FLAGS_TYPE {
-	TUP_FLAGS_NONE=0,
-	TUP_FLAGS_MODIFY=1,
-	TUP_FLAGS_CREATE=2,
-	TUP_FLAGS_CONFIG=4,
-	TUP_FLAGS_VARIANT=8,
-};
-
-enum TUP_LINK_TYPE {
-	TUP_LINK_NORMAL=1,
-	TUP_LINK_STICKY=2,
-};
+int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled);
+struct variant *variant_search(tupid_t dt);
 
 #endif

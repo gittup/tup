@@ -62,10 +62,11 @@ struct file_info {
 	struct file_entry_head var_list;
 	struct mapping_head mapping_list;
 	struct tmpdir_head tmpdir_list;
+	const char *variant_dir;
 	int server_fail;
 };
 
-int init_file_info(struct file_info *info);
+int init_file_info(struct file_info *info, const char *variant_dir);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,

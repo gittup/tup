@@ -48,10 +48,11 @@ const char *tup_db_type(enum TUP_NODE_TYPE type);
 
 /* Node operations */
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);
+struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid);
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
-					  int type);
+					  int type, tupid_t srcid);
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
-				     int len, int type, time_t mtime);
+				     int len, int type, time_t mtime, tupid_t srcid);
 int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
 			    time_t mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
@@ -70,11 +71,13 @@ int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt);
 int tup_db_modify_dir(tupid_t dt);
 int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head);
+int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_open_tupid(tupid_t dt);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name);
 int tup_db_set_type(struct tup_entry *tent, int type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
+int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_print(FILE *stream, tupid_t tupid);
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 				    struct tupid_entries *root);

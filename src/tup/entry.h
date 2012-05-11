@@ -27,6 +27,8 @@
 #include <stdio.h>
 #include <time.h>
 
+struct variant;
+
 /* Local cache of the entries in the 'node' database table */
 struct tup_entry {
 	struct tupid_tree tnode;
@@ -35,7 +37,7 @@ struct tup_entry {
 	int type;
 	time_t mtime;
 	tupid_t srcid;
-	tupid_t vardt;
+	struct variant *variant;
 	struct string_tree name;
 	struct string_entries entries;
 	LIST_ENTRY(tup_entry) ghost_list;
@@ -63,6 +65,8 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_open_tupid(tupid_t tupid);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
+int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent);
+struct variant *tup_entry_variant(struct tup_entry *tent);
 tupid_t tup_entry_vardt(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);
 struct tup_entry *tup_entry_get(tupid_t tupid);

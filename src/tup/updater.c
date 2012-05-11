@@ -37,6 +37,7 @@
 #include "path.h"
 #include "environ.h"
 #include "privs.h"
+#include "variant.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,7 @@
 
 static int check_full_deps_rebuild(void);
 static int run_scan(void);
+static int load_variants(void);
 static int process_config_nodes(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
@@ -71,6 +73,8 @@ static int warnings;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
+static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
+static int default_variant = 0;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -178,6 +182,9 @@ int updater(int argc, char **argv, int phase)
 		if(run_scan() < 0)
 			return -1;
 	}
+
+	if(load_variants() < 0)
+		goto out;
 	if(process_config_nodes(environ_check) < 0)
 		goto out;
 	if(phase == 1) { /* Collect underpants */
@@ -393,9 +400,33 @@ out_err:
 	return rc;
 }
 
+static int load_variants(void)
+{
+	struct graph g;
+	struct node *n;
+	if(tup_db_begin() < 0)
+		return -1;
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_VARIANT) < 0)
+		return -1;
+	TAILQ_FOREACH(n, &g.plist, list) {
+		if(n->tent->dt == DOT_DT)
+			default_variant = 1;
+		if(variant_add(&variant_list, n->tent, 1) < 0)
+			return -1;
+	}
+
+	if(destroy_graph(&g) < 0)
+		return -1;
+	tup_db_commit();
+	return 0;
+}
+
 static int process_config_nodes(int environ_check)
 {
 	struct graph g;
+	struct tup_entry *vartent;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -409,7 +440,33 @@ static int process_config_nodes(int environ_check)
 			tup_main_progress("Reading in new configuration/environment variables...\n");
 		else
 			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
+
 		TAILQ_FOREACH(n, &g.plist, list) {
+			int variant_error = 0;
+			if(variant_search(n->tent->dt) == NULL) {
+				if(n->tent->dt == DOT_DT) {
+					if(!LIST_EMPTY(&variant_list)) {
+						variant_error = 1;
+					}
+					default_variant = 1;
+				} else {
+					if(default_variant) {
+						variant_error = 1;
+					}
+				}
+				if(variant_error) {
+					fprintf(stderr, "tup error: Unable to use an in-tree variant and out-of-tree variants at the same time. Please remove tup.config from the project root.\n");
+					return -1;
+				}
+				if(variant_add(&variant_list, n->tent, 1) < 0)
+					goto err_rollback;
+				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
+					goto err_rollback;
+				if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
+					goto err_rollback;
+				if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
+					goto err_rollback;
+			}
 			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid) < 0)
 				goto err_rollback;
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
@@ -421,6 +478,26 @@ static int process_config_nodes(int environ_check)
 		else
 			tup_main_progress("No tup.config changes (environment check disabled).\n");
 	}
+
+	if(!default_variant) {
+		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
+			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
+			goto err_rollback;
+		}
+		if(!vartent) {
+			vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
+			if(!vartent) {
+				fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
+				goto err_rollback;
+			}
+		}
+		/* The default in-tree variant is only enabled if there are no other
+		 * variants
+		 */
+		if(variant_add(&variant_list, vartent, LIST_EMPTY(&variant_list)) < 0)
+			goto err_rollback;
+	}
+
 	if(tup_db_check_env(environ_check) < 0)
 		goto err_rollback;
 	if(destroy_graph(&g) < 0)
@@ -436,9 +513,21 @@ err_rollback:
 	return -1;
 }
 
+static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *tent)
+{
+	struct tup_entry *new;
+	if(!tent->parent)
+		return base;
+	new = get_rel_tent(base, tent->parent);
+	if(tup_db_select_tent(new->tnode.tupid, tent->name.s, &new) < 0)
+		return NULL;
+	return new;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
+	struct node *n;
 	int rc;
 
 	tup_db_begin();
@@ -446,6 +535,26 @@ static int process_create_nodes(void)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
+	TAILQ_FOREACH(n, &g.plist, list) {
+		if(tup_entry_variant(n->tent)->root_variant) {
+			struct variant *variant;
+			LIST_FOREACH(variant, &variant_list, list) {
+				/* Add in all other variants to parse */
+				if(!variant->root_variant) {
+					struct tup_entry *new_tent;
+					new_tent = get_rel_tent(variant->tent->parent, n->tent);
+					if(!new_tent) {
+						fprintf(stderr, "tup internal error: Unable to find directory for variant '%s' for subdirectory: ", variant->variant_dir);
+						print_tup_entry(stderr, n->tent);
+						fprintf(stderr, "\n");
+						return -1;
+					}
+					if(add_file_cb(&g, new_tent, TUP_LINK_NORMAL) < 0)
+						return -1;
+				}
+			}
+		}
+	}
 	if(build_graph(&g) < 0)
 		return -1;
 	if(g.num_nodes) {
@@ -1238,7 +1347,7 @@ static int update(struct node *n)
 	s.output_fd = -1;
 	s.error_fd = -1;
 	s.error_mutex = &display_mutex;
-	init_file_info(&s.finfo);
+	init_file_info(&s.finfo, tup_entry_variant(n->tent)->variant_dir);
 	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);

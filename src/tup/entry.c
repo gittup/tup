@@ -25,12 +25,14 @@
 #include "compat.h"
 #include "colors.h"
 #include "container.h"
+#include "variant.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
@@ -239,8 +241,11 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 {
 	int rc;
-	if(!tent || !tent->parent)
+	if(!tent || !tent->parent) {
+		if(len)
+			*dest = 0;
 		return 0;
+	}
 	rc = snprint_tup_entry(dest, len, tent->parent);
 	rc += snprintf(dest + rc, len - rc, "/%s", tent->name.s);
 	return rc;
@@ -345,38 +350,82 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 	return newdfd;
 }
 
-tupid_t tup_entry_vardt(struct tup_entry *tent)
+struct variant *tup_entry_variant(struct tup_entry *tent)
 {
-	/* The vardt field isn't set when we initially create tup_entrys, since
+	/* The variant field isn't set when we initially create tup_entrys, since
 	 * if we are doing tup_entry_add_all, we may not have the tup.config
 	 * entry until the end. It also doesn't make sense to add that entry
 	 * until we have scanned for a real tup.config node. Instead we just
-	 * use this function to get the vardt field, since the tup_entry tree
+	 * use this function to get the variant field, since the tup_entry tree
 	 * will contain the necessary directory structure at this point. Then
-	 * each entry has the same vardt as its parent, until a tup.config node
+	 * each entry has the same variant as its parent, until a tup.config node
 	 * is found.
 	 */
-	if(tent->vardt != -1)
-		return tent->vardt;
-	if(tent->parent) {
-		tent->vardt = tup_entry_vardt(tent->parent);
-	} else {
-		struct tup_entry *vartent;
-
-		if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
-			fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
-			exit(1);
-		}
-		if(!vartent) {
-			vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
-			if(!vartent) {
-				fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
+	if(!tent->variant) {
+		tent->variant = variant_search(tent->tnode.tupid);
+		if(!tent->variant) {
+			if(tent->parent) {
+				tent->variant = tup_entry_variant(tent->parent);
+			} else {
+				fprintf(stderr, "tup internal error: Unable to set tent->variant for tup entry: ");
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "\n");
 				exit(1);
 			}
 		}
-		tent->vardt = vartent->tnode.tupid;
 	}
-	return tent->vardt;
+	return tent->variant;
+}
+
+tupid_t tup_entry_vardt(struct tup_entry *tent)
+{
+	return tup_entry_variant(tent)->tent->tnode.tupid;
+}
+
+static int create_dir(int dfd, struct tup_entry *tent)
+{
+	int curfd;
+	int newfd;
+
+	if(!tent->parent) {
+		return dup(dfd);
+	}
+
+	curfd = create_dir(dfd, tent->parent);
+	if(curfd < 0)
+		return -1;
+
+	if(mkdirat(curfd, tent->name.s, 0777) < 0) {
+		if(errno != EEXIST) {
+			perror(tent->name.s);
+			fprintf(stderr, "tup error: Unable to create sub-directory in the build tree.\n");
+			return -1;
+		}
+	}
+	newfd = openat(curfd, tent->name.s, O_RDONLY);
+	if(newfd < 0) {
+		perror(tent->name.s);
+		fprintf(stderr, "tup error: Unable to open newly-created sub-directory in the build tree.\n");
+		return -1;
+	}
+	if(close(curfd) < 0) {
+		perror("close(curfd)");
+		return -1;
+	}
+	return newfd;
+}
+
+int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent)
+{
+	int newfd;
+	newfd = create_dir(root_dfd, tent);
+	if(newfd < 0)
+		return -1;
+	if(close(newfd) < 0) {
+		perror("close(newfd)");
+		return -1;
+	}
+	return 0;
 }
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
@@ -402,7 +451,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->type = type;
 	tent->mtime = mtime;
 	tent->srcid = srcid;
-	tent->vardt = -1;
+	tent->variant = NULL;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {
