@@ -1613,6 +1613,8 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 			goto out_skip;
 		if(subsrc->tnode.tupid == env_dt())
 			goto out_skip;
+		if(tup_entry_variant(subsrc)->tent->dt != DOT_DT)
+			goto out_skip;
 
 		if(mkdirat(fd, subsrc->name.s, 0777) < 0) {
 			if(errno != EEXIST) {

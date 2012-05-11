@@ -427,6 +427,7 @@ static int process_config_nodes(int environ_check)
 {
 	struct graph g;
 	struct tup_entry *vartent;
+	struct node *n;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -435,15 +436,18 @@ static int process_config_nodes(int environ_check)
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
 	if(!TAILQ_EMPTY(&g.plist)) {
-		struct node *n;
 		if(environ_check)
 			tup_main_progress("Reading in new configuration/environment variables...\n");
 		else
 			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
 
-		TAILQ_FOREACH(n, &g.plist, list) {
+		while(!TAILQ_EMPTY(&g.plist)) {
 			int variant_error = 0;
 			int empty = 0;
+			int rm_node = 1;
+
+			n = TAILQ_FIRST(&g.plist);
+			TAILQ_REMOVE(&g.plist, n, list);
 			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, &empty) < 0)
 				goto err_rollback;
 			if(empty) {
@@ -470,13 +474,20 @@ static int process_config_nodes(int environ_check)
 					goto err_rollback;
 				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
 					goto err_rollback;
-				if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
-					goto err_rollback;
 				if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
 					goto err_rollback;
+				TAILQ_INSERT_HEAD(&g.node_list, n, list);
+				rm_node = 0;
 			}
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 				goto err_rollback;
+			if(rm_node) {
+				/* Remove the link from the root node to us. */
+				while(!LIST_EMPTY(&n->incoming)) {
+					remove_edge(LIST_FIRST(&n->incoming));
+				}
+				remove_node(&g, n);
+			}
 		}
 	} else {
 		if(environ_check)
@@ -502,6 +513,13 @@ static int process_config_nodes(int environ_check)
 		 */
 		if(variant_add(&variant_list, vartent, LIST_EMPTY(&variant_list)) < 0)
 			goto err_rollback;
+	}
+
+	TAILQ_FOREACH(n, &g.node_list, list) {
+		if(n->tent->type != TUP_NODE_ROOT) {
+			if(tup_db_duplicate_directory_structure(n->tent->parent) < 0)
+				goto err_rollback;
+		}
 	}
 
 	if(tup_db_check_env(environ_check) < 0)

@@ -38,4 +38,8 @@ check_not_exist build/foo
 check_exist build-debug/bar
 check_exist build-debug/foo
 
+# Make sure variant directories don't get propagated
+tup_object_no_exist build build-debug
+tup_object_no_exist build-debug build
+
 eotup
