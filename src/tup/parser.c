@@ -139,6 +139,7 @@ struct tupfile {
 	tupid_t tupid;
 	struct variant *variant;
 	struct tup_entry *curtent;
+	struct tup_entry *srctent;
 	int cur_dfd;
 	int root_fd;
 	struct graph *g;
@@ -164,6 +165,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
+static int get_srctent(struct tupfile *tf, tupid_t tupid, struct tup_entry **srctent);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -275,6 +277,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	tf.curtent = tup_entry_get(tf.tupid);
 	tf.root_fd = ps.root_fd;
 	tf.g = g;
+	if(tf.variant->root_variant) {
+		tf.srctent = NULL;
+	} else {
+		if(get_srctent(&tf, tf.tupid, &tf.srctent) < 0)
+			return -1;
+	}
 	RB_INIT(&tf.cmd_root);
 	RB_INIT(&tf.env_root);
 	RB_INIT(&tf.bang_root);
@@ -2602,6 +2610,16 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
+
+		if(tf->srctent) {
+			struct tup_entry *tent;
+			if(tup_db_select_tent(tf->srctent->tnode.tupid, onle->path, &tent) < 0)
+				return -1;
+			if(tent && tent->type != TUP_NODE_GHOST) {
+				fprintf(tf->f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s) in the source directory. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", onle->path, tup_db_type(tent->type));
+				return -1;
+			}
+		}
 
 		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
 						     TUP_NODE_GENERATED, -1);
