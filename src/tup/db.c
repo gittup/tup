@@ -359,7 +359,7 @@ err_open:
 	return -1;
 }
 
-static int tup_db_get_tup_config_tent(struct tup_entry **tent)
+int tup_db_get_tup_config_tent(struct tup_entry **tent)
 {
 	struct tup_entry *vartent = NULL;
 	if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
