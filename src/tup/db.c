@@ -3848,7 +3848,7 @@ out_reset:
 	return rc;
 }
 
-static int save_vardict_file(struct vardb *vdb)
+static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 {
 	int dfd;
 	int fd;
@@ -3863,7 +3863,7 @@ static int save_vardict_file(struct vardb *vdb)
 	if(dfd < 0) {
 		return -1;
 	}
-	fd = openat(dfd, TUP_VARDICT_FILE, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+	fd = openat(dfd, vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
 	if(fd < 0) {
 		perror("openat");
 		return -1;
@@ -3979,7 +3979,8 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
+int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
+		     const char *vardict_file)
 {
 	struct vardb db_tree;
 	struct vardb file_tree;
@@ -4022,7 +4023,7 @@ int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt)
 			 compare_vars, vardt) < 0)
 		return -1;
 
-	if(save_vardict_file(&file_tree) < 0)
+	if(save_vardict_file(&file_tree, vardict_file) < 0)
 		return -1;
 
 	vardb_close(&file_tree);
@@ -4035,6 +4036,7 @@ int tup_db_delete_tup_config(struct tup_entry *tent)
 {
 	struct half_entry_head subdir_list;
 	struct vardb empty_vdb;
+	char vardict_file[PATH_MAX];
 
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(tent->tnode.tupid, &subdir_list) < 0)
@@ -4048,8 +4050,18 @@ int tup_db_delete_tup_config(struct tup_entry *tent)
 		free(he);
 	}
 	vardb_init(&empty_vdb);
-	if(save_vardict_file(&empty_vdb) < 0)
-		return -1;
+	if(tent->dt == DOT_DT) {
+		snprintf(vardict_file, sizeof(vardict_file), ".tup/vardict");
+	} else {
+		snprintf(vardict_file, sizeof(vardict_file), ".tup/vardict-%s", tent->parent->name.s);
+	}
+	if(unlink(vardict_file) < 0) {
+		if(errno != ENOENT) {
+			perror(vardict_file);
+			fprintf(stderr, "tup error: Unable to remove old vardict file from .tup directory.\n");
+			return -1;
+		}
+	}
 	return 0;
 }
 

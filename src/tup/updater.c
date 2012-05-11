@@ -414,7 +414,7 @@ static int load_variants(void)
 	TAILQ_FOREACH(n, &g.plist, list) {
 		if(n->tent->dt == DOT_DT)
 			default_variant = 1;
-		if(variant_add(&variant_list, n->tent, 1) < 0)
+		if(variant_add(&variant_list, n->tent, 1, NULL) < 0)
 			return -1;
 	}
 
@@ -443,14 +443,14 @@ static int process_config_nodes(int environ_check)
 			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
 
 		while(!TAILQ_EMPTY(&g.plist)) {
+			struct variant *variant;
 			int variant_error = 0;
 			int rm_node = 1;
 
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
-			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid) < 0)
-				goto err_rollback;
-			if(variant_search(n->tent->dt) == NULL) {
+			variant = variant_search(n->tent->dt);
+			if(variant == NULL) {
 				if(n->tent->dt == DOT_DT) {
 					if(!LIST_EMPTY(&variant_list)) {
 						variant_error = 1;
@@ -465,7 +465,7 @@ static int process_config_nodes(int environ_check)
 					fprintf(stderr, "tup error: Unable to use an in-tree variant and out-of-tree variants at the same time. Please remove tup.config from the project root.\n");
 					return -1;
 				}
-				if(variant_add(&variant_list, n->tent, 1) < 0)
+				if(variant_add(&variant_list, n->tent, 1, &variant) < 0)
 					goto err_rollback;
 				if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
 					goto err_rollback;
@@ -474,6 +474,8 @@ static int process_config_nodes(int environ_check)
 				TAILQ_INSERT_HEAD(&g.node_list, n, list);
 				rm_node = 0;
 			}
+			if(tup_db_read_vars(n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
+				goto err_rollback;
 			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 				goto err_rollback;
 			if(rm_node) {
@@ -506,7 +508,7 @@ static int process_config_nodes(int environ_check)
 		/* The default in-tree variant is only enabled if there are no other
 		 * variants
 		 */
-		if(variant_add(&variant_list, vartent, LIST_EMPTY(&variant_list)) < 0)
+		if(variant_add(&variant_list, vartent, LIST_EMPTY(&variant_list), NULL) < 0)
 			goto err_rollback;
 	}
 
@@ -522,8 +524,6 @@ static int process_config_nodes(int environ_check)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	tup_db_commit();
-	if(tup_vardict_open() < 0)
-		return -1;
 
 	return 0;
 

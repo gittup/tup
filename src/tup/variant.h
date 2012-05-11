@@ -33,11 +33,14 @@ struct variant {
 	struct vardb vdb;
 	int enabled;
 	int root_variant;
+	int vardict_len;
 	char variant_dir[PATH_MAX];
+	char vardict_file[PATH_MAX];
 };
 LIST_HEAD(variant_head, variant);
 
-int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled);
+int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled,
+		struct variant **dest);
 struct variant *variant_search(tupid_t dt);
 
 #endif

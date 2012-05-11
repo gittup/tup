@@ -137,7 +137,8 @@ struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int v
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(struct variant *variant, const char *var, int varlen);
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
-int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt);
+int tup_db_read_vars(tupid_t dt, const char *file, tupid_t vardt,
+		     const char *vardict_file);
 int tup_db_delete_tup_config(struct tup_entry *tent);
 
 /* Environment operations */

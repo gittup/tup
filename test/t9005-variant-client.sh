@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,31 +16,35 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure 'tup init' works without the --force flag that is used by default
-# for these test cases.
+# Now try changing a variable and see the client re-execute in a variant
 
 . ./tup.sh
+check_no_windows client
 
-tmpdir="/tmp/tup-t0001"
-cleanup()
-{
-	cd /tmp
-	rm -rf $tmpdir
-}
+tmkdir build
+touch build/tup.config
 
-trap cleanup INT TERM
-cleanup
-mkdir $tmpdir
-cd $tmpdir
-tup init
-for i in db object shared tri; do
-	if [ ! -f ".tup/$i" ]; then
-		echo ".tup/$i not created!" 1>&2
-		cleanup
-		exit 1
-	fi
-done
-cleanup
+make_tup_client
+tmkdir sub
+cd sub
+mv ../client .
 
-cd $tupcurdir
+cat > Tupfile << HERE
+: |> ./client defg > %o |> ok.txt
+HERE
+tup touch Tupfile empty.txt
+update
+
+diff empty.txt ../build/sub/ok.txt
+
+tup_object_exist build/tup.config defg
+
+cd ..
+echo "CONFIG_defg=hey" > build/tup.config
+tup touch build/tup.config
+update
+
+cd sub
+echo 'hey' | diff - ../build/sub/ok.txt
+
 eotup

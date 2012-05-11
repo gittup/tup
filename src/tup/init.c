@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -76,7 +76,6 @@ int tup_cleanup(void)
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
 	}
-	tup_vardict_close();
 	tup_db_close();
 	tup_option_exit();
 	tup_lock_exit();

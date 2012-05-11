@@ -30,6 +30,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
@@ -103,7 +104,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	if(!inited)
 		return 0;
@@ -144,7 +145,8 @@ static int write_all(const void *data, int size)
 }
 
 int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, const char *envstring, int *status)
+		     const char *cmd, const char *envstring,
+		     const char *vardict_file, int *status)
 {
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 	struct status_tree st;
@@ -179,6 +181,8 @@ int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
 	if(write_all(cmd, em->cmdlen) < 0)
 		goto err_out;
 	if(write_all(envstring, em->envlen) < 0)
+		goto err_out;
+	if(write_all(vardict_file, em->vardictlen) < 0)
 		goto err_out;
 	pthread_mutex_unlock(&lock);
 	*status = wait_for_my_sid(&st);
@@ -330,6 +334,7 @@ static int master_fork_loop(void)
 	int vardict_fd = -2;
 	char job[PATH_MAX];
 	char dir[PATH_MAX];
+	char vardict_file[PATH_MAX];
 	char *cmd;
 	char *env;
 	int cmdsize = 4096;
@@ -424,18 +429,14 @@ static int master_fork_loop(void)
 		}
 		if(read_all(msd[0], env, em.envlen) < 0)
 			return -1;
-
-		/* Only open vardict_fd the first time we get an event (this
-		 * avoids annoying synchronization between us and tup, since
-		 * we really only want to open the vardict file after it has
-		 * been created by the updater.
-		 */
-		if(vardict_fd == -2) {
-			vardict_fd = open(TUP_VARDICT_FILE, O_RDONLY);
-			if(vardict_fd < 0) {
-				perror(TUP_VARDICT_FILE);
-				fprintf(stderr, "tup error: Unable to open the vardict file.\n");
-					return -1;
+		if(read_all(msd[0], vardict_file, em.vardictlen) < 0)
+			return -1;
+		vardict_fd = open(vardict_file, O_RDONLY);
+		if(vardict_fd < 0) {
+			if(errno != ENOENT) {
+				perror(vardict_file);
+				fprintf(stderr, "tup error: Unable to open the vardict file in master_fork\n");
+				return -1;
 			}
 		}
 
@@ -493,6 +494,12 @@ static int master_fork_loop(void)
 			perror("execl");
 			exit(1);
 		}
+		if(vardict_fd >= 0) {
+			if(close(vardict_fd) < 0) {
+				perror("close(vardict_fd)");
+				return -1;
+			}
+		}
 		waiter->pid = pid;
 		waiter->sid = em.sid;
 		waiter->do_chroot = em.do_chroot;
@@ -515,9 +522,6 @@ static int master_fork_loop(void)
 		}
 	}
 
-	if(vardict_fd != -2)
-		if(close(vardict_fd) < 0)
-			perror("close(vardict_fd)");
 	if(in_valgrind) {
 		if(close(STDIN_FILENO) < 0)
 			perror("close(STDIN_FILENO)");

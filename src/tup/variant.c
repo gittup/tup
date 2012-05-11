@@ -27,7 +27,8 @@
 
 static struct tupid_entries variant_root = RB_INITIALIZER(&variant_root);
 
-int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled)
+int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled,
+		struct variant **dest)
 {
 	struct variant *variant;
 
@@ -40,10 +41,6 @@ int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled)
 
 	/* We search based on the directory, not tup.config */
 	variant->tnode.tupid = tent->dt;
-	if(tent->dt == DOT_DT)
-		variant->root_variant = 1;
-	else
-		variant->root_variant = 0;
 
 	vardb_init(&variant->vdb);
 	variant->enabled = enabled;
@@ -51,11 +48,27 @@ int variant_add(struct variant_head *head, struct tup_entry *tent, int enabled)
 		fprintf(stderr, "tup internal error: variant_dir is sized incorrectly.\n");
 		return -1;
 	}
+
+	if(tent->dt == DOT_DT) {
+		variant->root_variant = 1;
+		variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict") + 1;
+	} else {
+		variant->root_variant = 0;
+		variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict-%s", variant->variant_dir+1) + 1;
+	}
+	if(variant->vardict_len >= (signed)sizeof(variant->vardict_file)) {
+		fprintf(stderr, "tup error: variant vardict_file is sized incorrectly.\n");
+		return -1;
+	}
+
 	LIST_INSERT_HEAD(head, variant, list);
 	if(tupid_tree_insert(&variant_root, &variant->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->tnode.tupid);
 		return -1;
 	}
+
+	if(dest)
+		*dest = variant;
 
 	return 0;
 }

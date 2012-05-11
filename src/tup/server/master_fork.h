@@ -32,6 +32,7 @@ struct execmsg {
 	int dirlen;
 	int cmdlen;
 	int envlen;
+	int vardictlen;
 	int num_env_entries;
 	int single_output;
 	int do_chroot;
@@ -40,6 +41,7 @@ struct execmsg {
 #define JOB_MAX 64
 
 int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
-		     const char *cmd, const char *newenv, int *status);
+		     const char *cmd, const char *newenv,
+		     const char *vardict_file, int *status);
 
 #endif
