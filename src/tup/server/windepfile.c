@@ -73,6 +73,11 @@ int server_init(enum server_mode mode)
 
 	tup_inject_setexecdir(mycwd);
 
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+
 	if(getcwd(tuptmpdir, sizeof(tuptmpdir)) == NULL) {
 		perror("getcwd");
 		return -1;
