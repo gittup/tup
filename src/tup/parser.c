@@ -2307,7 +2307,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
 			return -1;
 		}
-		if(!tent) {
+		if(!tent || tent->type == TUP_NODE_GHOST) {
 			if(get_srctent(tf, pl->dt, &srctent) < 0)
 				return -1;
 			if(srctent)
