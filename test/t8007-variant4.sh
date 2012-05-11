@@ -18,6 +18,7 @@
 
 # Try a variant with actual stuff in tup.config
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 tmkdir build-debug

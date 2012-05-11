@@ -19,6 +19,7 @@
 # Similar to t8029, but now we have 'bar' as a ghost and then overwrite it
 # with a generated file, which is allowed.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build-default
 

@@ -18,6 +18,7 @@
 
 # Start with an in-tree build, then create a variant, then create another variant.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 

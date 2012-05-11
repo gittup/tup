@@ -20,6 +20,7 @@
 # Note that a dangling tup.config symlink is still considered a valid (empty)
 # config file.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build-default
 tmkdir build-debug

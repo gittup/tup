@@ -19,6 +19,7 @@
 # Make sure that once a subdirectory is cleaned up in a variant,
 # the parent is also checked.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 

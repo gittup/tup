@@ -18,6 +18,7 @@
 
 # Try a variant with git.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 

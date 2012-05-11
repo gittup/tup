@@ -18,6 +18,7 @@
 
 # Similar to t8029, but create the generated file before the normal file.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build-default
 

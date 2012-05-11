@@ -18,6 +18,7 @@
 
 # Make sure an in-tree build doesn't duplicate files.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir sub
 cat > sub/ok.c << HERE

@@ -18,6 +18,7 @@
 
 # Make sure we can go from a variant to in-tree build with a tup.config
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 tmkdir sub

@@ -19,6 +19,7 @@
 # Make sure just deleting the generated files doesn't result in the variant
 # dirs going away.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 tmkdir build-debug

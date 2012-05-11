@@ -18,6 +18,7 @@
 
 # Make sure we can create a new variant.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build
 tmkdir sub

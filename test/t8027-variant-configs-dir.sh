@@ -18,6 +18,7 @@
 
 # Try variants using symlinks to a directory with config files.
 . ./tup.sh
+check_no_windows variant
 
 tmkdir build-default
 tmkdir build-debug
