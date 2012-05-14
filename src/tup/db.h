@@ -103,7 +103,7 @@ int tup_db_in_modify_list(tupid_t tupid);
 int tup_db_unflag_config(tupid_t tupid);
 int tup_db_unflag_create(tupid_t tupid);
 int tup_db_unflag_modify(tupid_t tupid);
-int tup_db_unflag_variant(tupid_t tupid);
+int tup_db_unflag_variant(tupid_t tupid, int erase_variant);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);

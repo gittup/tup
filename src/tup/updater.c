@@ -51,7 +51,6 @@
 
 static int check_full_deps_rebuild(void);
 static int run_scan(void);
-static int load_variants(void);
 static int process_config_nodes(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
@@ -183,8 +182,6 @@ int updater(int argc, char **argv, int phase)
 			return -1;
 	}
 
-	if(load_variants() < 0)
-		goto out;
 	if(process_config_nodes(environ_check) < 0)
 		goto out;
 	if(phase == 1) { /* Collect underpants */
@@ -460,27 +457,6 @@ out_err:
 	return rc;
 }
 
-static int load_variants(void)
-{
-	struct graph g;
-	struct node *n;
-	if(tup_db_begin() < 0)
-		return -1;
-	if(create_graph(&g, TUP_NODE_FILE) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_VARIANT) < 0)
-		return -1;
-	TAILQ_FOREACH(n, &g.plist, list) {
-		if(variant_add(n->tent, 1, NULL) < 0)
-			return -1;
-	}
-
-	if(destroy_graph(&g) < 0)
-		return -1;
-	tup_db_commit();
-	return 0;
-}
-
 static int delete_in_tree(void)
 {
 	struct graph g;
@@ -633,7 +609,7 @@ static int process_config_nodes(int environ_check)
 		if(external_variant) {
 			if(delete_in_tree() < 0)
 				goto err_rollback;
-			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid) < 0)
+			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid, 0) < 0)
 				goto err_rollback;
 			root_variant->enabled = 0;
 		}

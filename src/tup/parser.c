@@ -165,7 +165,6 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
-static int get_srctent(struct tupfile *tf, tupid_t tupid, struct tup_entry **srctent);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -285,7 +284,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	if(tf.variant->root_variant) {
 		tf.srctent = NULL;
 	} else {
-		if(get_srctent(&tf, tf.tupid, &tf.srctent) < 0)
+		if(variant_get_srctent(tf.variant, tf.tupid, &tf.srctent) < 0)
 			goto out_server_stop;
 	}
 	tf.ign = 0;
@@ -877,21 +876,6 @@ static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent)
 	return 0;
 }
 
-static int get_srctent(struct tupfile *tf, tupid_t tupid, struct tup_entry **srctent)
-{
-	struct tup_entry *tent;
-
-	*srctent = NULL;
-	if(tf->variant->root_variant)
-		return 0;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
-	if(tup_entry_add(tent->srcid, srctent) < 0)
-		return -1;
-	return 0;
-}
-
 static int include_file(struct tupfile *tf, const char *file)
 {
 	struct buf incb;
@@ -925,7 +909,7 @@ static int include_file(struct tupfile *tf, const char *file)
 
 	tf->curtent = tup_entry_get(newdt);
 
-	if(get_srctent(tf, newdt, &srctent) < 0)
+	if(variant_get_srctent(tf->variant, newdt, &srctent) < 0)
 		return -1;
 	if(!srctent)
 		srctent = tf->curtent;
@@ -2319,7 +2303,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			if(get_srctent(tf, pl->dt, &srctent) < 0)
+			if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
 				return -1;
 			if(srctent)
 				if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
@@ -2363,7 +2347,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		struct tup_entry *srctent = NULL;
 		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
 			return -1;
-		if(get_srctent(tf, pl->dt, &srctent) < 0)
+		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
 			return -1;
 		if(srctent) {
 			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)

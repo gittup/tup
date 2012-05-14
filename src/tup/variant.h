@@ -27,6 +27,7 @@
 #include "vardb.h"
 
 struct variant {
+	struct tupid_tree dtnode;
 	struct tupid_tree tnode;
 	LIST_ENTRY(variant) list;
 	struct tup_entry *tent;
@@ -39,9 +40,13 @@ struct variant {
 };
 LIST_HEAD(variant_head, variant);
 
+int variant_load(void);
 int variant_add(struct tup_entry *tent, int enabled, struct variant **dest);
+int variant_rm(tupid_t tupid);
 struct variant *variant_search(tupid_t dt);
 struct variant_head *get_variant_list(void);
 int variant_list_empty(void);
+int variant_get_srctent(struct variant *variant, tupid_t tupid, struct tup_entry **srctent);
+void variants_free(void);
 
 #endif

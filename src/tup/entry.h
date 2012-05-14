@@ -67,6 +67,7 @@ int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
 int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent);
 struct variant *tup_entry_variant(struct tup_entry *tent);
+struct variant *tup_entry_variant_null(struct tup_entry *tent);
 tupid_t tup_entry_vardt(struct tup_entry *tent);
 int tup_entry_rm(tupid_t tupid);
 struct tup_entry *tup_entry_get(tupid_t tupid);

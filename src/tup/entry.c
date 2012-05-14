@@ -362,15 +362,24 @@ struct variant *tup_entry_variant(struct tup_entry *tent)
 	 * is found.
 	 */
 	if(!tent->variant) {
+		tent->variant = tup_entry_variant_null(tent);
+		if(!tent->variant) {
+			fprintf(stderr, "tup internal error: Unable to set tent->variant for tup entry: ");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			exit(1);
+		}
+	}
+	return tent->variant;
+}
+
+struct variant *tup_entry_variant_null(struct tup_entry *tent)
+{
+	if(!tent->variant) {
 		tent->variant = variant_search(tent->tnode.tupid);
 		if(!tent->variant) {
 			if(tent->parent) {
-				tent->variant = tup_entry_variant(tent->parent);
-			} else {
-				fprintf(stderr, "tup internal error: Unable to set tent->variant for tup entry: ");
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "\n");
-				exit(1);
+				tent->variant = tup_entry_variant_null(tent->parent);
 			}
 		}
 	}

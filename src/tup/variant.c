@@ -20,13 +20,32 @@
 
 #include "variant.h"
 #include "entry.h"
-#include "db_types.h"
+#include "db.h"
 #include "container.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
+static struct variant_head disabled_list = LIST_HEAD_INITIALIZER(&disabled_list);
 static struct tupid_entries variant_root = RB_INITIALIZER(&variant_root);
+static struct tupid_entries variant_dt_root = RB_INITIALIZER(&variant_dt_root);
+
+static int load_cb(void *arg, struct tup_entry *tent, int style)
+{
+	if(arg) {}
+	if(style) {}
+
+	if(variant_add(tent, 1, NULL) < 0)
+		return -1;
+	return 0;
+}
+
+int variant_load(void)
+{
+	if(tup_db_select_node_by_flags(load_cb, NULL, TUP_FLAGS_VARIANT) < 0)
+		return -1;
+	return 0;
+}
 
 int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 {
@@ -40,7 +59,12 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 	variant->tent = tent;
 
 	/* We search based on the directory, not tup.config */
-	variant->tnode.tupid = tent->dt;
+	variant->dtnode.tupid = tent->dt;
+
+	/* But when we remove from variant_list, we search based on our actual
+	 * tupid.
+	 */
+	variant->tnode.tupid = tent->tnode.tupid;
 
 	vardb_init(&variant->vdb);
 	variant->enabled = enabled;
@@ -62,6 +86,10 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 	}
 
 	LIST_INSERT_HEAD(&variant_list, variant, list);
+	if(tupid_tree_insert(&variant_dt_root, &variant->dtnode) < 0) {
+		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->dtnode.tupid);
+		return -1;
+	}
 	if(tupid_tree_insert(&variant_root, &variant->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->tnode.tupid);
 		return -1;
@@ -73,14 +101,37 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 	return 0;
 }
 
+int variant_rm(tupid_t tupid)
+{
+	struct tupid_tree *tt;
+	struct variant *variant;
+
+	tt = tupid_tree_search(&variant_root, tupid);
+	if(!tt) {
+		fprintf(stderr, "tup internal error: variant ID %lli not found in search in variant_rm()\n", tupid);
+		return -1;
+	}
+	variant = container_of(tt, struct variant, tnode);
+	/* Just disable the variant and remove it from the structures, since
+	 * some tup_entrys may already point to us.
+	 */
+	variant->enabled = 0;
+	tupid_tree_rm(&variant_dt_root, &variant->dtnode);
+	tupid_tree_rm(&variant_root, &variant->tnode);
+	LIST_REMOVE(variant, list);
+	vardb_close(&variant->vdb);
+	LIST_INSERT_HEAD(&disabled_list, variant, list);
+	return 0;
+}
+
 struct variant *variant_search(tupid_t dt)
 {
 	struct tupid_tree *tt;
 
-	tt = tupid_tree_search(&variant_root, dt);
+	tt = tupid_tree_search(&variant_dt_root, dt);
 	if(!tt)
 		return NULL;
-	return container_of(tt, struct variant, tnode);
+	return container_of(tt, struct variant, dtnode);
 }
 
 struct variant_head *get_variant_list(void)
@@ -91,4 +142,37 @@ struct variant_head *get_variant_list(void)
 int variant_list_empty(void)
 {
 	return LIST_EMPTY(&variant_list);
+}
+
+int variant_get_srctent(struct variant *variant, tupid_t tupid, struct tup_entry **srctent)
+{
+	struct tup_entry *tent;
+
+	*srctent = NULL;
+	if(variant->root_variant)
+		return 0;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tup_entry_add(tent->srcid, srctent) < 0)
+		return -1;
+	return 0;
+}
+
+void variants_free(void)
+{
+	struct variant *variant;
+	while(!LIST_EMPTY(&variant_list)) {
+		variant = LIST_FIRST(&variant_list);
+		tupid_tree_rm(&variant_dt_root, &variant->dtnode);
+		tupid_tree_rm(&variant_root, &variant->tnode);
+		LIST_REMOVE(variant, list);
+		vardb_close(&variant->vdb);
+		free(variant);
+	}
+	while(!LIST_EMPTY(&disabled_list)) {
+		variant = LIST_FIRST(&disabled_list);
+		LIST_REMOVE(variant, list);
+		free(variant);
+	}
 }

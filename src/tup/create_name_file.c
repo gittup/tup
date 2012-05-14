@@ -26,6 +26,7 @@
 #include "pel_group.h"
 #include "entry.h"
 #include "option.h"
+#include "variant.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -278,13 +279,33 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 {
 	if(type == TUP_NODE_DIR) {
+		struct tup_entry *tent;
+		struct variant *variant;
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
 		if(tup_db_delete_dir(tupid) < 0)
 			return -1;
 		if(rmdir_callback)
 			rmdir_callback(tupid);
+
+		/* Try to figure out if we are a variant directory - if so, we
+		 * may need to reparse the src directory to try to re-create
+		 * the variant dir. We use tup_entry_variant_null here since
+		 * the root variant may not be created yet. We only try to do
+		 * this if the scanner/monitor detects a missing file, not if
+		 * the updater deletes the variant directory because the src
+		 * directory was already deleted.
+		 */
+		if(!force) {
+			variant = tup_entry_variant_null(tent);
+			if(variant && !variant->root_variant && variant->enabled) {
+				if(tup_db_add_create_list(tent->srcid) < 0)
+					return -1;
+			}
+		}
 	}
 
 	/* If a file was deleted and it was created by a command, set the

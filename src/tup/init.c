@@ -27,6 +27,7 @@
 #include "option.h"
 #include "colors.h"
 #include "privs.h"
+#include "variant.h"
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -75,6 +76,7 @@ int tup_cleanup(void)
 	 */
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
+		variants_free();
 	}
 	tup_db_close();
 	tup_option_exit();

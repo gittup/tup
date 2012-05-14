@@ -2835,7 +2835,7 @@ int tup_db_unflag_modify(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_unflag_variant(tupid_t tupid)
+int tup_db_unflag_variant(tupid_t tupid, int erase_variant)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_VARIANT];
@@ -2870,11 +2870,17 @@ int tup_db_unflag_variant(tupid_t tupid)
 	}
 
 	if(sqlite3_changes(tup_db)) {
-		/* Keep track if variants were removed, since we may need to switch to
-		 * an in-tree build if none are left.
+		/* Keep track if variants were removed, since we may need to
+		 * switch to an in-tree build if none are left. This needs to
+		 * be set in the database since we may be removing the variant
+		 * from the monitor.
 		 */
-		if(tup_db_config_set_int("variants_removed", 1) < 0)
-			return -1;
+		if(erase_variant) {
+			if(tup_db_config_set_int("variants_removed", 1) < 0)
+				return -1;
+			if(variant_rm(tupid) < 0)
+				return -1;
+		}
 	}
 
 	return 0;
@@ -4492,6 +4498,8 @@ int tup_db_scan_begin(struct tupid_entries *root)
 	if(tup_db_begin() < 0)
 		return -1;
 	if(files_to_tree(root) < 0)
+		return -1;
+	if(variant_load() < 0)
 		return -1;
 	tupid_tree_remove(root, env_dt());
 	return 0;

@@ -34,7 +34,7 @@ int delete_name_file(tupid_t tupid)
 		return -1;
 	if(tup_db_unflag_modify(tupid) < 0)
 		return -1;
-	if(tup_db_unflag_variant(tupid) < 0)
+	if(tup_db_unflag_variant(tupid, 1) < 0)
 		return -1;
 	if(tup_db_delete_links(tupid) < 0)
 		return -1;
