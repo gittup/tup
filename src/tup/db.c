@@ -990,16 +990,17 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
 {
-	return tup_db_create_node_part(dt, name, -1, type, -1);
+	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
 }
 
-struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid)
+struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid,
+					   int *node_changed)
 {
-	return tup_db_create_node_part(dt, name, -1, type, srcid);
+	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
 }
 
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
-					  int type, tupid_t srcid)
+					  int type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
 
@@ -1040,6 +1041,10 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 				return NULL;
 			if(tup_db_set_type(tent, type) < 0)
 				return NULL;
+			if(tup_db_set_srcid(tent, srcid) < 0)
+				return NULL;
+			if(node_changed)
+				*node_changed = 1;
 			return tent;
 		}
 		if(tent->type != type) {
@@ -1065,6 +1070,8 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 
 out_create:
 	tent = tup_db_node_insert(dt, name, len, type, -1, srcid);
+	if(node_changed)
+		*node_changed = 1;
 	return tent;
 }
 
@@ -1707,7 +1714,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 				return -1;
 			}
 		}
-		subdest = tup_db_create_node_srcid(dest->tnode.tupid, subsrc->name.s, TUP_NODE_DIR, subsrc->tnode.tupid);
+		subdest = tup_db_create_node_srcid(dest->tnode.tupid, subsrc->name.s, TUP_NODE_DIR, subsrc->tnode.tupid, NULL);
 		if(!subdest) {
 			fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
 			print_tup_entry(stderr, subdest);

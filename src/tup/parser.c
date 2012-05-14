@@ -1953,7 +1953,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 			tmp_nle.extlesslen--;
 
 		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
-						       TUP_NODE_GENERATED, -1);
+						       TUP_NODE_GENERATED, -1, NULL);
 		if(!tmp_nle.tent)
 			return -1;
 		set_nle_base(&tmp_nle);
@@ -2601,7 +2601,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 
 		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
-						     TUP_NODE_GENERATED, -1);
+						     TUP_NODE_GENERATED, -1, NULL);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
