@@ -1439,7 +1439,7 @@ int delete_node(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_delete_dir(tupid_t dt)
+int tup_db_delete_dir(tupid_t dt, int force)
 {
 	struct half_entry_head subdir_list;
 
@@ -1449,11 +1449,17 @@ int tup_db_delete_dir(tupid_t dt)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 
-		/* Don't want to delete ghosts, since they may still link to
-		 * somewhere useful (t6061)
-		 */
-		if(he->type != TUP_NODE_GHOST) {
-			/* tup_del_id_force may call back to tup_db_delete_dir() */
+		if(he->type == TUP_NODE_DIR) {
+			/* Pass the force flag along to removed sub-directories
+			 * so that variants can be handled properly (t8034).
+			 * This will call back to tup_db_delete_dir().
+			 */
+			if(tup_del_id_type(he->tupid, he->type, force, NULL) < 0)
+				return -1;
+		} else if(he->type != TUP_NODE_GHOST) {
+			/* Don't want to delete ghosts, since they may still
+			 * link to somewhere useful (t6061)
+			 */
 			if(tup_del_id_force(he->tupid, he->type) < 0)
 				return -1;
 		}
@@ -1478,7 +1484,7 @@ static int delete_variant_dir(struct tup_entry *tent)
 		 * Just go through a normal tup_db_delete_dir().
 		 */
 		if(errno == ENOENT) {
-			if(tup_db_delete_dir(tent->tnode.tupid) < 0)
+			if(tup_db_delete_dir(tent->tnode.tupid, 0) < 0)
 				return -1;
 			return 0;
 		}

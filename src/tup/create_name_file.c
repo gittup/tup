@@ -35,7 +35,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified);
 static int ghost_to_file(struct tup_entry *tent);
 
 static void (*rmdir_callback)(tupid_t tupid);
@@ -276,7 +275,7 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 	rmdir_callback = callback;
 }
 
-static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
+int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 {
 	if(type == TUP_NODE_DIR) {
 		struct tup_entry *tent;
@@ -286,7 +285,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 		 */
 		if(tup_entry_add(tupid, &tent) < 0)
 			return -1;
-		if(tup_db_delete_dir(tupid) < 0)
+		if(tup_db_delete_dir(tupid, force) < 0)
 			return -1;
 		if(rmdir_callback)
 			rmdir_callback(tupid);
