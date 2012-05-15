@@ -95,6 +95,7 @@ int tup_db_get_tup_config_tent(struct tup_entry **tent);
 int tup_db_get_node_flags(tupid_t tupid);
 int tup_db_add_dir_create_list(tupid_t tupid);
 int tup_db_add_config_list(tupid_t tupid);
+int tup_db_maybe_add_create_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
 int tup_db_add_modify_list(tupid_t tupid);
 int tup_db_add_variant_list(tupid_t tupid);

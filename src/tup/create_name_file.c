@@ -301,7 +301,17 @@ int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 		if(!force) {
 			variant = tup_entry_variant_null(tent);
 			if(variant && !variant->root_variant && variant->enabled) {
-				if(tup_db_add_create_list(tent->srcid) < 0)
+				/* It is possible that the srcid has already
+				 * been removed (ie: The user rm -rf'd the
+				 * variant, and the corresponding source
+				 * directory). If the source directory was
+				 * missing first, then its node has been
+				 * removed from the database. Adding it to the
+				 * create list would confuse tup, so we use the
+				 * 'maybe' version here to make sure the node
+				 * exists before adding it (t8035).
+				 */
+				if(tup_db_maybe_add_create_list(tent->srcid) < 0)
 					return -1;
 			}
 		}

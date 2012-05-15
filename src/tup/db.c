@@ -74,6 +74,7 @@ enum {
 	_DB_GET_NODELIST,
 	DB_ADD_DIR_CREATE_LIST,
 	DB_ADD_CONFIG_LIST,
+	DB_MAYBE_ADD_CREATE_LIST,
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_VARIANT_LIST,
@@ -2467,6 +2468,53 @@ int tup_db_add_config_list(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_maybe_add_create_list(tupid_t tupid)
+{
+	/* We only add a node to the create list if:
+	 * 1) It exists in the node table
+	 * 2) It is a directory (ie: not a ghost)
+	 * This prevents nodes with a stale srcid from ending up in the create_list.
+	 */
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_MAYBE_ADD_CREATE_LIST];
+	static char s[] = "insert or ignore into create_list select id from node where id=? and type=?";
+
+	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_DIR);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
