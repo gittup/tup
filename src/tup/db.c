@@ -2064,7 +2064,7 @@ int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid)
 	sqlite3_stmt **stmt = &stmts[DB_SET_SRCID];
 	static char s[] = "update node set srcid=? where id=?";
 
-	transaction_check("%s [37m[%li, %lli][0m", s, srcid, tent->tnode.tupid);
+	transaction_check("%s [37m[%lli, %lli][0m", s, srcid, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
