@@ -330,6 +330,33 @@ static int run_scan(int do_scan)
 	return 0;
 }
 
+static int cleanup_dir(struct tup_entry *tent)
+{
+	int fd;
+
+	fd = tup_entry_open(tent->parent);
+	if(fd < 0) {
+		fprintf(stderr, "tup error: Expected to open parent directory of node for possible directory deletion: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	if(unlinkat(fd, tent->name.s, AT_REMOVEDIR) < 0) {
+		perror(tent->name.s);
+		fprintf(stderr, "tup error: Unable to clean up old directory in the build tree: \n");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
+	if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
+		return -1;
+	return 0;
+}
+
 static int possibly_cleanup_dir(struct tup_entry *tent, struct tup_entry_head *entrylist)
 {
 	int reclaimable = 0;
@@ -338,28 +365,9 @@ static int possibly_cleanup_dir(struct tup_entry *tent, struct tup_entry_head *e
 		return -1;
 
 	if(reclaimable) {
-		int fd;
 		struct tup_entry *parent = tent->parent;
 
-		fd = tup_entry_open(tent->parent);
-		if(fd < 0) {
-			fprintf(stderr, "tup error: Expected to open parent directory of node for possible directory deletion: ");
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return -1;
-		}
-		if(unlinkat(fd, tent->name.s, AT_REMOVEDIR) < 0) {
-			perror(tent->name.s);
-			fprintf(stderr, "tup error: Unable to clean up old directory in the build tree: \n");
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return -1;
-		}
-		if(close(fd) < 0) {
-			perror("close(fd)");
-			return -1;
-		}
-		if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
+		if(cleanup_dir(tent) < 0)
 			return -1;
 		/* Try to clean up the parent directory, as long as it's not
 		 * the variant root.
@@ -706,6 +714,7 @@ static int process_create_nodes(void)
 {
 	struct graph g;
 	struct node *n;
+	struct node *tmp;
 	int rc;
 
 	tup_db_begin();
@@ -713,7 +722,7 @@ static int process_create_nodes(void)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
-	TAILQ_FOREACH(n, &g.plist, list) {
+	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		struct variant *node_variant = tup_entry_variant(n->tent);
 		if(node_variant->root_variant) {
 			struct variant *variant;
@@ -734,6 +743,31 @@ static int process_create_nodes(void)
 			}
 			if(!node_variant->enabled) {
 				g.num_nodes--;
+			}
+		} else {
+			if(n->tent->type == TUP_NODE_DIR) {
+				struct tup_entry *srctent;
+				if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
+					return -1;
+				}
+				/* If the srctent is a ghost, that means our
+				 * reason for existing is gone. Force our
+				 * removal.
+				 */
+				if(srctent->type == TUP_NODE_GHOST) {
+					if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
+						return -1;
+					if(tup_db_delete_variant(n->tent) < 0)
+						return -1;
+					if(cleanup_dir(n->tent) < 0)
+						return -1;
+					/* Remove the link from the root node to us. */
+					TAILQ_REMOVE(&g.plist, n, list);
+					while(!LIST_EMPTY(&n->incoming)) {
+						remove_edge(LIST_FIRST(&n->incoming));
+					}
+					remove_node(&g, n);
+				}
 			}
 		}
 	}

@@ -1066,6 +1066,17 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 				return NULL;
 			goto out_create;
 		}
+		/* During the initial scan, srcid will be -1 so we don't want
+		 * to overwrite in this case. However, we do want to overwrite
+		 * if we are setting srcid (eg: a directory may exist in the
+		 * variant without a corresponding node in the db if the parser
+		 * failed). In this case we will create the node during the
+		 * initial scan, then overwrite the srcid later.
+		 */
+		if(srcid != -1 && tent->srcid != srcid) {
+			if(tup_db_set_srcid(tent, srcid) < 0)
+				return NULL;
+		}
 		return tent;
 	}
 
