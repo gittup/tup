@@ -71,6 +71,7 @@ static int do_keep_going;
 static int num_jobs;
 static int full_deps;
 static int warnings;
+static int show_warnings;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -132,6 +133,7 @@ int updater(int argc, char **argv, int phase)
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
 	full_deps = tup_option_get_int("updater.full_deps");
+	show_warnings = tup_option_get_int("updater.warnings");
 	progress_init();
 
 	if(full_deps && !tup_privileged()) {
@@ -428,7 +430,7 @@ static int delete_files(struct graph *g)
 			if(!tup_entry_variant(tent)->root_variant)
 				tup_entry_list_add(tent->parent, entrylist);
 
-			if(delete_file(tent->dt, tent->name.s) < 0)
+			if(delete_file(tent) < 0)
 				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 				goto out_err;
@@ -1396,6 +1398,12 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	int is_err = 1;
 	struct timespan *show_ts = NULL;
 	time_t ms = -1;
+	int *warning_dest;
+
+	if(show_warnings)
+		warning_dest = &warnings;
+	else
+		warning_dest = NULL;
 
 	f = tmpfile();
 	if(!f) {
@@ -1406,7 +1414,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 0, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1418,7 +1426,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, &warnings, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}

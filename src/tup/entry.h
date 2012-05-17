@@ -62,7 +62,6 @@ int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name(tupid_t tupid, const char *new_name);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
-int tup_entry_open_tupid(tupid_t tupid);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
 int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent);

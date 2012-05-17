@@ -49,7 +49,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv, int full_deps);
 int gimme_tent(const char *name, struct tup_entry **entry);
 
-int delete_file(tupid_t dt, const char *name);
+int delete_file(struct tup_entry *tent);
 int delete_name_file(tupid_t tupid);
 
 #endif

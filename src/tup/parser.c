@@ -2345,6 +2345,15 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 	} else {
 		struct tup_entry *srctent = NULL;
+		struct tup_entry *dtent;
+
+		if(tup_entry_add(pl->dt, &dtent) < 0)
+			return -1;
+		if(dtent->type == TUP_NODE_GHOST) {
+			fprintf(tf->f, "tup error: Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->path);
+			return -1;
+		}
+
 		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
 			return -1;
 		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)

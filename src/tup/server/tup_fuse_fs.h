@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -36,6 +36,7 @@ int tup_fuse_rm_group(struct file_info *finfo);
 void tup_fuse_set_parser_mode(int mode);
 int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 				    fuse_fill_dir_t filler);
+void tup_fuse_fs_init(void);
 extern struct fuse_operations tup_fs_oper;
 
 #endif

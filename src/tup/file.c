@@ -501,8 +501,10 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		}
 
 		if(w->pg.pg_flags & PG_HIDDEN) {
-			fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
-			(*warnings)++;
+			if(warnings) {
+				fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
+				(*warnings)++;
+			}
 			goto out_skip;
 		}
 

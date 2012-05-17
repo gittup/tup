@@ -615,10 +615,10 @@ static char *unicode_to_ansi(PUNICODE_STRING uni)
 	int len;
 	char *name = NULL;
 
-	len = WideCharToMultiByte(CP_ACP, 0, uni->Buffer, uni->Length, 0, 0, NULL, NULL);
+	len = WideCharToMultiByte(CP_UTF8, 0, uni->Buffer, uni->Length / sizeof(wchar_t), 0, 0, NULL, NULL);
 	if(len > 0) {
 		name = malloc(len + 1);
-		WideCharToMultiByte(CP_ACP, 0, uni->Buffer, uni->Length, name, len, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, uni->Buffer, uni->Length / sizeof(wchar_t), name, len, NULL, NULL);
 		name[len] = 0;
 	}
 	return name;
@@ -1737,16 +1737,17 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	struct access_event* e = (struct access_event*) buf;
 	char* dest = (char*) (e + 1);
 	int ret;
+	int count;
 
 	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
 		return;
 
 	e->at = at;
 
-	WideCharToMultiByte(CP_ACP, 0, file, fsz, afile, fsz, NULL, NULL);
-	WideCharToMultiByte(CP_ACP, 0, file2, f2sz, afile2, f2sz, NULL, NULL);
-	afile[fsz] = 0;
-	afile2[f2sz] = 0;
+	count = WideCharToMultiByte(CP_UTF8, 0, file, fsz, afile, PATH_MAX, NULL, NULL);
+	afile[count] = 0;
+	count = WideCharToMultiByte(CP_UTF8, 0, file2, f2sz, afile2, PATH_MAX, NULL, NULL);
+	afile2[count] = 0;
 
 	e->len = canon_path(afile, dest);
 	dest += e->len;

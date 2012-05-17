@@ -41,6 +41,12 @@
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
+static pid_t ourpgid;
+
+void tup_fuse_fs_init(void)
+{
+	ourpgid = getpgid(0);
+}
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
 {
@@ -235,7 +241,7 @@ static int context_check(void)
 	}
 #endif
 
-	if(getpgid(0) != pgid) {
+	if(ourpgid != pgid) {
 		if(server_debug_enabled()) {
 			fprintf(stderr, "[33mtup fuse warning: Process pid=%i, uid=%i, gid=%i is trying to access the tup server's fuse filesystem.[0m\n",
 					fuse_get_context()->pid, fuse_get_context()->uid, fuse_get_context()->gid);
@@ -824,7 +830,7 @@ static int tup_fs_unlink(const char *path)
 		}
 		put_finfo(finfo);
 	}
-	fprintf(stderr, "tup error: Unable to unlink files not created during this job.\n");
+	fprintf(stderr, "tup error: Unable to unlink files not created during this job: %s\n", peel(path));
 	return -EPERM;
 }
 
