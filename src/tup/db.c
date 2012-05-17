@@ -61,7 +61,6 @@ enum {
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
-	DB_MODIFY_DIR,
 	DB_OPEN_TUPID,
 	DB_CHANGE_NODE_NAME,
 	DB_SET_NAME,
@@ -1610,54 +1609,24 @@ static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 
 int tup_db_modify_dir(tupid_t dt)
 {
-	struct id_entry_head subdir_list;
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_MODIFY_DIR];
-	static char s[] = "insert or ignore into modify_list select id from node where dir=? and type!=?";
-
-	if(tup_db_add_create_list(dt) < 0)
-		return -1;
-	transaction_check("%s [37m[%lli, %i][0m", s, dt, TUP_NODE_DIR);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
+	struct half_entry_head subdir_list;
 
 	LIST_INIT(&subdir_list);
-	if(get_recurse_dirs(dt, &subdir_list) < 0)
+	if(get_dir_entries(dt, &subdir_list) < 0)
 		return -1;
 	while(!LIST_EMPTY(&subdir_list)) {
-		struct id_entry *ide = LIST_FIRST(&subdir_list);
-		tup_db_modify_dir(ide->tupid);
-		LIST_REMOVE(ide, list);
-		free(ide);
+		struct half_entry *he = LIST_FIRST(&subdir_list);
+		if(he->type == TUP_NODE_DIR) {
+			if(tup_db_modify_dir(he->tupid) < 0)
+				return -1;
+		} else if(he->type == TUP_NODE_FILE) {
+			if(tup_db_add_modify_list(he->tupid) < 0)
+				return -1;
+			if(tup_db_set_dependent_dir_flags(he->tupid) < 0)
+				return -1;
+		}
+		LIST_REMOVE(he, list);
+		free(he);
 	}
 
 	return 0;
