@@ -19,6 +19,7 @@
 # Make sure we can't try to use a ghost input dir in the parser.
 
 . ./tup.sh
+check_no_windows shell
 
 # First make a ghost
 tmkdir src
