@@ -62,6 +62,7 @@
 #include "tup/container.h"
 #include "tup/option.h"
 #include "tup/timespan.h"
+#include "tup/variant.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -580,6 +581,17 @@ static int monitor_loop(void)
 					 * entries until they are needed.
 					 */
 					if(tup_entry_clear() < 0)
+						return -1;
+
+					/* Reload the variants, since we may have new ones or
+					 * deleted old ones during the update.
+					 */
+					variants_free();
+					if(tup_db_begin() < 0)
+						return -1;
+					if(variant_load() < 0)
+						return -1;
+					if(tup_db_commit() < 0)
 						return -1;
 					locked = 1;
 					DEBUGP("monitor ON\n");

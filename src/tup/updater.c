@@ -50,7 +50,7 @@
 #define MAX_JOBS 65535
 
 static int check_full_deps_rebuild(void);
-static int run_scan(void);
+static int run_scan(int do_scan);
 static int process_config_nodes(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
@@ -177,10 +177,8 @@ int updater(int argc, char **argv, int phase)
 		num_jobs = MAX_JOBS;
 	}
 
-	if(do_scan) {
-		if(run_scan() < 0)
-			return -1;
-	}
+	if(run_scan(do_scan) < 0)
+		return -1;
 
 	if(process_config_nodes(environ_check) < 0)
 		goto out;
@@ -228,10 +226,8 @@ int todo(int argc, char **argv)
 		}
 	}
 
-	if(do_scan) {
-		if(run_scan() < 0)
-			return -1;
-	}
+	if(run_scan(do_scan) < 0)
+		return -1;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -290,9 +286,10 @@ static int check_full_deps_rebuild(void)
 	return 0;
 }
 
-static int run_scan(void)
+static int run_scan(int do_scan)
 {
 	int rc;
+	int scanned = 0;
 
 	rc = monitor_get_pid(0);
 	if(rc < 0) {
@@ -300,9 +297,14 @@ static int run_scan(void)
 		return -1;
 	}
 	if(rc == 0) {
-		tup_main_progress("Scanning filesystem...\n");
-		if(tup_scan() < 0)
-			return -1;
+		if(do_scan) {
+			tup_main_progress("Scanning filesystem...\n");
+			if(tup_scan() < 0)
+				return -1;
+			scanned = 1;
+		} else {
+			tup_main_progress("No filesystem scan - user requested --no-scan.\n");
+		}
 	} else {
 		if(full_deps) {
 			tup_main_progress("Monitor is running - scanning external dependencies...\n");
@@ -311,6 +313,17 @@ static int run_scan(void)
 		} else {
 			tup_main_progress("No filesystem scan - monitor is running.\n");
 		}
+	}
+	if(!scanned) {
+		/* The scanner loads variants, so if we haven't done that yet
+		 * then we need to do it here.
+		 */
+		if(tup_db_begin() < 0)
+			return -1;
+		if(variant_load() < 0)
+			return -1;
+		if(tup_db_commit() < 0)
+			return -1;
 	}
 	return 0;
 }
