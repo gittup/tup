@@ -711,6 +711,7 @@ static int process_create_nodes(void)
 		} else {
 			if(n->tent->type == TUP_NODE_DIR) {
 				struct tup_entry *srctent;
+				int force_removal = 0;
 				if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
 					return -1;
 				}
@@ -718,7 +719,19 @@ static int process_create_nodes(void)
 				 * reason for existing is gone. Force our
 				 * removal.
 				 */
-				if(srctent->type == TUP_NODE_GHOST) {
+				if(srctent->type == TUP_NODE_GHOST)
+					force_removal = 1;
+				/* If we are a variant subdirectory (our srcid
+				 * is not DOT_DT), and our name doesn't match
+				 * our srcid, that means the srctree was
+				 * renamed, and we go away.
+				 */
+				if(n->tent->srcid != DOT_DT &&
+				   strcmp(srctent->name.s, n->tent->name.s) != 0) {
+					force_removal = 1;
+				}
+
+				if(force_removal) {
 					if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
 						return -1;
 					if(tup_db_delete_variant(n->tent) < 0)
