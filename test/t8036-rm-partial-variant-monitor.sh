@@ -46,4 +46,5 @@ update
 
 check_exist build/sub/bar.o
 
+stop_monitor
 eotup

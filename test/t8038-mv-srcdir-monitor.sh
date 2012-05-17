@@ -53,4 +53,5 @@ update
 check_exist build/foo.o build/newsub/bar.o build/prog
 check_not_exist build/sub
 
+stop_monitor
 eotup
