@@ -16,8 +16,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure that once a subdirectory is cleaned up in a variant,
-# the parent is also checked.
+# Make sure that we can clean up old variant directories, even if the
+# Tupfiles are gone.
 . ./tup.sh
 check_no_windows variant
 
@@ -45,9 +45,19 @@ check_exist build/sub/foo
 tup_object_exist build sub
 tup_object_exist build/sub foo
 
-# Now removing the rest of the subdirectory should result in both directories
-# disappearing.
+# Removing the last Tupfile is still allowed to have the corresponding
+# variant directories around, though they aren't needed anymore.
 rm sub/foo/Tupfile
+update
+
+check_exist build/sub
+check_exist build/sub/foo
+tup_object_exist build sub
+tup_object_exist build/sub foo
+
+# Now removing the actual srctree should result in the variant directories
+# going away as well.
+rm -rf sub
 update
 
 check_not_exist build/sub

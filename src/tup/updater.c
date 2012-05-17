@@ -357,27 +357,6 @@ static int cleanup_dir(struct tup_entry *tent)
 	return 0;
 }
 
-static int possibly_cleanup_dir(struct tup_entry *tent, struct tup_entry_head *entrylist)
-{
-	int reclaimable = 0;
-
-	if(tup_db_variant_dir_reclaimable(tent->tnode.tupid, &reclaimable) < 0)
-		return -1;
-
-	if(reclaimable) {
-		struct tup_entry *parent = tent->parent;
-
-		if(cleanup_dir(tent) < 0)
-			return -1;
-		/* Try to clean up the parent directory, as long as it's not
-		 * the variant root.
-		 */
-		if(parent->dt != DOT_DT)
-			tup_entry_list_add(parent, entrylist);
-	}
-	return 0;
-}
-
 static int delete_files(struct graph *g)
 {
 	struct tupid_tree *tt;
@@ -432,12 +411,6 @@ static int delete_files(struct graph *g)
 			show_result(tent, 0, NULL);
 			show_progress(-1, TUP_NODE_GENERATED);
 
-			/* Add its parent to the entrylist so we can possibly
-			 * clean up the directory in the build tree.
-			 */
-			if(!tup_entry_variant(tent)->root_variant)
-				tup_entry_list_add(tent->parent, entrylist);
-
 			if(delete_file(tent) < 0)
 				goto out_err;
 			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
@@ -449,13 +422,7 @@ static int delete_files(struct graph *g)
 	if(file_resurrection) {
 		tup_show_message("Converting generated files to normal files...\n");
 	}
-	while(!LIST_EMPTY(entrylist)) {
-		/* Remove entries from the entrylist since we may delete them in
-		 * possibly_cleanup_dir().
-		 */
-		tent = LIST_FIRST(entrylist);
-		tup_entry_list_del(tent);
-
+	LIST_FOREACH(tent, entrylist, list) {
 		if(server_is_dead())
 			goto out_err;
 		if(tent->type == TUP_NODE_GENERATED) {
@@ -463,9 +430,6 @@ static int delete_files(struct graph *g)
 				goto out_err;
 			show_result(tent, 0, NULL);
 			show_progress(-1, TUP_NODE_FILE);
-		} else if(tent->type == TUP_NODE_DIR) {
-			if(possibly_cleanup_dir(tent, entrylist) < 0)
-				return -1;
 		} else {
 			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be generated or a directory: ", tent->type);
 			print_tup_entry(stderr, tent);
