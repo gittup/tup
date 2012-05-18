@@ -625,7 +625,10 @@ static int process_config_nodes(int environ_check)
 						return -1;
 					if(tup_db_delete_variant(parent, NULL, NULL) < 0)
 						return -1;
-					if(parent->type != TUP_NODE_GHOST) {
+					if(parent->type == TUP_NODE_GHOST) {
+						if(delete_name_file(parent->tnode.tupid) < 0)
+							return -1;
+					} else {
 						if(tup_db_add_create_list(parent->tnode.tupid) < 0)
 							return -1;
 					}

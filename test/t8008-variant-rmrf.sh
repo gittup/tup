@@ -42,4 +42,6 @@ check_exist build-debug/foo
 rm -rf build-debug
 update
 
+tup_object_no_exist . build-debug
+
 eotup
