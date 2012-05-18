@@ -545,7 +545,7 @@ static int process_config_nodes(int environ_check)
 	struct tup_entry *vartent;
 	struct node *n;
 	struct variant *root_variant;
-	int variants_removed;
+	int variants_removed = 0;
 	int using_variants = 0;
 	int using_in_tree = 0;
 	int new_variants = 0;
@@ -564,27 +564,26 @@ static int process_config_nodes(int environ_check)
 	TAILQ_REMOVE(&g.node_list, g.root, list);
 	remove_node(&g, g.root);
 
-
 	{
 		/* The variants that are already loaded will either have:
 		 * A) No variants at all (this is the first update, or the last variant was removed)
 		 * B) Just a root variant (using_in_tree = 1)
-		 * C) One or more real variants. (using_variants = 1)
+		 * C) One or more real variants. Ghost nodes here correspond to
+		 *    variants that are about to be deleted. (using_variants = 1)
 		 */
 		struct variant *variant;
 		LIST_FOREACH(variant, get_variant_list(), list) {
 			if(!variant->root_variant) {
-				using_variants = 1;
-				break;
+				if(variant->tent->type != TUP_NODE_GHOST) {
+					using_variants = 1;
+					break;
+				}
 			} else {
 				using_in_tree = 1;
 				break;
 			}
 		}
 	}
-
-	if(tup_db_config_get_int("variants_removed", 0, &variants_removed) < 0)
-		return -1;
 
 	if(!TAILQ_EMPTY(&g.plist)) {
 		if(server_init(SERVER_CONFIG_MODE) < 0)
@@ -602,14 +601,46 @@ static int process_config_nodes(int environ_check)
 			n = TAILQ_FIRST(&g.plist);
 			TAILQ_REMOVE(&g.plist, n, list);
 
-			if(n->tent->type == TUP_NODE_DIR) {
-				/* Removing the variant. This case accounts for
-				 * the user doing 'rm build/tup.config', not
-				 * doing 'rm -rf build'. A full rm -rf has all
-				 * nodes removed by the monitor/scanner.
-				 */
-				if(tup_db_delete_variant(n->tent, NULL, NULL) < 0)
-					return -1;
+			variant = variant_search(n->tent->dt);
+
+			if(n->tent->type == TUP_NODE_GHOST && n->tent->dt != DOT_DT) {
+				struct tup_entry *parent = n->tent->parent;
+				/* tup.config deleted */
+				if(variant) {
+					/* If we had a variant corresponding to
+					 * this tup.config, then we need to
+					 * wipe out all of our @-variables,
+					 * remove the varaint, remove our
+					 * tup.config node, and delete teh
+					 * variant tree. We also add the
+					 * variant directory to the create_list
+					 * so it can be propagated to other
+					 * variants (if it still exists).
+					 */
+					if(tup_db_delete_tup_config(n->tent) < 0)
+						return -1;
+					if(variant_rm(n->tent->tnode.tupid) < 0)
+						return -1;
+					if(delete_name_file(n->tent->tnode.tupid) < 0)
+						return -1;
+					if(tup_db_delete_variant(parent, NULL, NULL) < 0)
+						return -1;
+					if(parent->type != TUP_NODE_GHOST) {
+						if(tup_db_add_create_list(parent->tnode.tupid) < 0)
+							return -1;
+					}
+					variants_removed = 1;
+				} else {
+					/* We can get here if we created a
+					 * tup.config in the wrong place and
+					 * then move it out of the way, so a
+					 * variant for it is never created (and
+					 * therefore shouldn't be removed - see
+					 * t8047).
+					 */
+					if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
+						return -1;
+				}
 			} else {
 				/* tup.config created or modified */
 				variant = variant_search(n->tent->dt);
@@ -642,10 +673,11 @@ static int process_config_nodes(int environ_check)
 				if(add_config_files(&ps.s.finfo, n->tent) < 0)
 					goto err_rollback;
 				compat_lock_enable();
+
+				if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
+					goto err_rollback;
 			}
 
-			if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
-				goto err_rollback;
 			if(rm_node) {
 				/* Remove the link from the root node to us. */
 				while(!LIST_EMPTY(&n->incoming)) {
@@ -683,7 +715,7 @@ static int process_config_nodes(int environ_check)
 				goto err_rollback;
 		}
 		if(using_variants || new_variants) {
-			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid, 0) < 0)
+			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid) < 0)
 				goto err_rollback;
 			root_variant->enabled = 0;
 		}

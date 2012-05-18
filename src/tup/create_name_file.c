@@ -177,29 +177,15 @@ static int check_rm_tup_config(struct tup_entry *tent, int *dont_delete)
 {
 	*dont_delete = 0;
 	if(strcmp(tent->name.s, TUP_CONFIG) == 0) {
-		if(tent->dt == DOT_DT) {
-			/* Just go back to a ghost tup.config node, and add it
-			 * to the config list so we can update all of the
-			 * variables.
-			 */
-			if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
-				return -1;
-			if(tup_db_add_config_list(tent->tnode.tupid) < 0)
-				return -1;
-			*dont_delete = 1;
-		}
-		if(tent->parent->dt == DOT_DT) {
-			/* If a variant tup.config was removed, delete all of
-			 * its variables.
-			 */
-			if(tup_db_delete_tup_config(tent) < 0)
-				return -1;
-			/* Flag the variant dir in config_list so we can clean
-			 * up the whole variant.
-			 */
-			if(tup_db_add_config_list(tent->dt) < 0)
-				return -1;
-		}
+		/* Just go back to a ghost tup.config node, and add it to the
+		 * config list so we can update all of the variables, and clean
+		 * up the variant if necessary.
+		 */
+		*dont_delete = 1;
+		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
+			return -1;
+		if(tup_db_add_config_list(tent->tnode.tupid) < 0)
+			return -1;
 	}
 	return 0;
 }
