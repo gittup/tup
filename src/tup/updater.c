@@ -473,6 +473,26 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir);
 }
 
+static int delete_variant_dirs(struct tup_entry *tent)
+{
+	struct variant *variant;
+	LIST_FOREACH(variant, get_variant_list(), list) {
+		if(!variant->root_variant) {
+			struct tup_entry *cleanup_tent;
+
+			if(tup_db_select_tent(variant->tent->dt, tent->name.s, &cleanup_tent) < 0)
+				return -1;
+			if(cleanup_tent) {
+				if(tup_db_delete_variant(cleanup_tent, NULL, NULL) < 0)
+					return -1;
+				if(cleanup_dir(cleanup_tent) < 0)
+					return -1;
+			}
+		}
+	}
+	return 0;
+}
+
 static int process_config_nodes(int environ_check)
 {
 	struct graph g;
@@ -548,8 +568,11 @@ static int process_config_nodes(int environ_check)
 				/* tup.config created or modified */
 				variant = variant_search(n->tent->dt);
 				if(variant == NULL) {
-					if(n->tent->dt != DOT_DT)
+					if(n->tent->dt != DOT_DT) {
 						new_variants = 1;
+						if(delete_variant_dirs(n->tent->parent) < 0)
+							return -1;
+					}
 
 					if(variant_add(n->tent, 1, &variant) < 0)
 						goto err_rollback;
