@@ -480,6 +480,9 @@ static int process_config_nodes(int environ_check)
 	struct node *n;
 	struct variant *root_variant;
 	int variants_removed;
+	int using_variants = 0;
+	int using_in_tree = 0;
+	int new_variants = 0;
 	int new_in_tree = 0;
 
 	if(tup_db_begin() < 0)
@@ -489,11 +492,31 @@ static int process_config_nodes(int environ_check)
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
 
+	/* Pop off the root node since we don't use it here. */
 	while(!LIST_EMPTY(&g.root->edges)) {
 		remove_edge(LIST_FIRST(&g.root->edges));
 	}
 	TAILQ_REMOVE(&g.node_list, g.root, list);
 	remove_node(&g, g.root);
+
+
+	{
+		/* The variants that are already loaded will either have:
+		 * A) No variants at all (this is the first update, or the last variant was removed)
+		 * B) Just a root variant (using_in_tree = 1)
+		 * C) One or more real variants. (using_variants = 1)
+		 */
+		struct variant *variant;
+		LIST_FOREACH(variant, get_variant_list(), list) {
+			if(!variant->root_variant) {
+				using_variants = 1;
+				break;
+			} else {
+				using_in_tree = 1;
+				break;
+			}
+		}
+	}
 
 	if(tup_db_config_get_int("variants_removed", 0, &variants_removed) < 0)
 		return -1;
@@ -528,6 +551,9 @@ static int process_config_nodes(int environ_check)
 				if(variant == NULL) {
 					if(n->tent->dt == DOT_DT)
 						new_in_tree = 1;
+					else
+						new_variants = 1;
+
 					if(variant_add(n->tent, 1, &variant) < 0)
 						goto err_rollback;
 					if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
@@ -585,17 +611,11 @@ static int process_config_nodes(int environ_check)
 		if(variant_add(vartent, enabled, NULL) < 0)
 			goto err_rollback;
 	} else {
-		int external_variant = 0;
-		struct variant *variant;
-		LIST_FOREACH(variant, get_variant_list(), list) {
-			if(!variant->root_variant) {
-				external_variant = 1;
-				break;
-			}
-		}
-		if(external_variant) {
+		if(using_in_tree && new_variants) {
 			if(delete_in_tree() < 0)
 				goto err_rollback;
+		}
+		if(using_variants || new_variants) {
 			if(tup_db_unflag_variant(root_variant->tent->tnode.tupid, 0) < 0)
 				goto err_rollback;
 			root_variant->enabled = 0;
