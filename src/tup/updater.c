@@ -483,7 +483,6 @@ static int process_config_nodes(int environ_check)
 	int using_variants = 0;
 	int using_in_tree = 0;
 	int new_variants = 0;
-	int new_in_tree = 0;
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -549,9 +548,7 @@ static int process_config_nodes(int environ_check)
 				/* tup.config created or modified */
 				variant = variant_search(n->tent->dt);
 				if(variant == NULL) {
-					if(n->tent->dt == DOT_DT)
-						new_in_tree = 1;
-					else
+					if(n->tent->dt != DOT_DT)
 						new_variants = 1;
 
 					if(variant_add(n->tent, 1, &variant) < 0)
@@ -606,7 +603,6 @@ static int process_config_nodes(int environ_check)
 				goto err_rollback;
 
 			enabled = 1;
-			new_in_tree = 1;
 		}
 		if(variant_add(vartent, enabled, NULL) < 0)
 			goto err_rollback;
@@ -627,7 +623,7 @@ static int process_config_nodes(int environ_check)
 	 * the scanner/monitor at some point, then we need to reparse all the
 	 * Tupfiles to create the in-tree build.
 	 */
-	if(new_in_tree && variants_removed) {
+	if(!using_variants && variants_removed) {
 		if(tup_db_config_set_int("variants_removed", 0) < 0)
 			return -1;
 		if(tup_db_reparse_all() < 0)
