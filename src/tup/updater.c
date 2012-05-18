@@ -409,7 +409,7 @@ static int delete_files(struct graph *g)
 			file_resurrection = 1;
 		} else {
 			/* Only delete if the file wasn't modified (t6031) */
-			show_result(tent, 0, NULL);
+			show_result(tent, 0, NULL, "rm");
 			show_progress(-1, TUP_NODE_GENERATED);
 
 			if(delete_file(tent) < 0)
@@ -429,7 +429,7 @@ static int delete_files(struct graph *g)
 		if(tent->type == TUP_NODE_GENERATED) {
 			if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 				goto out_err;
-			show_result(tent, 0, NULL);
+			show_result(tent, 0, NULL, "generated -> normal");
 			show_progress(-1, TUP_NODE_FILE);
 		} else {
 			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be generated or a directory: ", tent->type);
@@ -552,7 +552,7 @@ static int process_config_nodes(int environ_check)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(create_graph(&g, TUP_NODE_FILE) < 0)
+	if(create_graph(&g, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -593,6 +593,7 @@ static int process_config_nodes(int environ_check)
 		else
 			tup_main_progress("Reading in new configuration variables (environment check disabled)...\n");
 
+		start_progress(g.num_nodes, -1, -1);
 		while(!TAILQ_EMPTY(&g.plist)) {
 			struct variant *variant;
 			int rm_node = 1;
@@ -617,6 +618,7 @@ static int process_config_nodes(int environ_check)
 					 * so it can be propagated to other
 					 * variants (if it still exists).
 					 */
+					show_result(n->tent, 0, NULL, "delete variant");
 					if(tup_db_delete_tup_config(n->tent) < 0)
 						return -1;
 					if(variant_rm(n->tent->tnode.tupid) < 0)
@@ -643,6 +645,7 @@ static int process_config_nodes(int environ_check)
 					 */
 					if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 						return -1;
+					show_result(n->tent, 0, NULL, "clean-up node");
 				}
 			} else {
 				/* tup.config created or modified */
@@ -664,6 +667,9 @@ static int process_config_nodes(int environ_check)
 						goto err_rollback;
 					TAILQ_INSERT_HEAD(&g.node_list, n, list);
 					rm_node = 0;
+					show_result(n->tent, 0, NULL, "new variant");
+				} else {
+					show_result(n->tent, 0, NULL, "updated variant");
 				}
 				compat_lock_disable();
 				initialize_server_struct(&ps.s, n->tent);
@@ -688,6 +694,7 @@ static int process_config_nodes(int environ_check)
 				}
 				remove_node(&g, n);
 			}
+			show_progress(-1, TUP_NODE_FILE);
 		}
 	} else {
 		if(environ_check)
@@ -748,6 +755,7 @@ static int process_config_nodes(int environ_check)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	tup_db_commit();
+	clear_progress();
 
 	return 0;
 
@@ -1135,7 +1143,7 @@ edge_create:
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->tent->type == g->count_flags) {
+		if(n->tent->type == g->count_flags || g->count_flags < 0) {
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
 				if(n->tent->mtime == -1)
@@ -1520,7 +1528,7 @@ static void *todo_work(void *arg)
 			break;
 
 		if(n->tent->type == g->count_flags) {
-			show_result(n->tent, 0, NULL);
+			show_result(n->tent, 0, NULL, NULL);
 		}
 
 		worker_ret(wt, 0);
@@ -1537,7 +1545,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
 			if(errno != ENOENT) {
 				pthread_mutex_lock(&display_mutex);
-				show_result(n->tent, 1, NULL);
+				show_result(n->tent, 1, NULL, NULL);
 				perror("unlinkat");
 				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 				pthread_mutex_unlock(&display_mutex);
@@ -1566,7 +1574,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 
 	f = tmpfile();
 	if(!f) {
-		show_result(tent, 1, NULL);
+		show_result(tent, 1, NULL, NULL);
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to open the error log for writing.\n");
 		return -1;
@@ -1603,7 +1611,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	fflush(f);
 	rewind(f);
 
-	show_result(tent, is_err, show_ts);
+	show_result(tent, is_err, show_ts, NULL);
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1645,7 +1653,7 @@ static int update(struct node *n)
 				case 'c':
 					if(!tup_privileged()) {
 						pthread_mutex_lock(&display_mutex);
-						show_result(n->tent, 1, NULL);
+						show_result(n->tent, 1, NULL, NULL);
 						fprintf(stderr, "tup error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
 						pthread_mutex_unlock(&display_mutex);
 						return -1;
@@ -1654,7 +1662,7 @@ static int update(struct node *n)
 					break;
 				default:
 					pthread_mutex_lock(&display_mutex);
-					show_result(n->tent, 1, NULL);
+					show_result(n->tent, 1, NULL, NULL);
 					fprintf(stderr, "tup error: Unknown ^ flag: '%c'\n", *name);
 					pthread_mutex_unlock(&display_mutex);
 					return -1;
@@ -1664,7 +1672,7 @@ static int update(struct node *n)
 		while(*name && *name != '^') name++;
 		if(!*name) {
 			pthread_mutex_lock(&display_mutex);
-			show_result(n->tent, 1, NULL);
+			show_result(n->tent, 1, NULL, NULL);
 			fprintf(stderr, "tup error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
 			pthread_mutex_unlock(&display_mutex);
 			return -1;
@@ -1676,7 +1684,7 @@ static int update(struct node *n)
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
 		pthread_mutex_lock(&display_mutex);
-		show_result(n->tent, 1, NULL);
+		show_result(n->tent, 1, NULL, NULL);
 		fprintf(stderr, "tup error: Unable to open directory for update work.\n");
 		tup_db_print(stderr, n->tent->parent->tnode.tupid);
 		pthread_mutex_unlock(&display_mutex);

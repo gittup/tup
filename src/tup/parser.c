@@ -376,7 +376,7 @@ out_server_stop:
 		memcpy(&retts->start, &orig_start, sizeof(retts->start));
 		memcpy(&retts->end, &tf.ts.end, sizeof(retts->end));
 	}
-	show_result(n->tent, rc != 0, &tf.ts);
+	show_result(n->tent, rc != 0, &tf.ts, NULL);
 	if(fflush(tf.f) != 0) {
 		/* Use perror, since we're trying to flush the tf.f output */
 		perror("fflush");
