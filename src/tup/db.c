@@ -1630,7 +1630,7 @@ int tup_db_modify_dir(tupid_t dt)
 			if(he->type == TUP_NODE_GENERATED || he->type == TUP_NODE_FILE)
 				if(tup_db_add_modify_list(he->tupid) < 0)
 					return -1;
-			if(tup_db_set_dependent_dir_flags(he->tupid) < 0)
+			if(tup_db_set_dependent_flags(he->tupid) < 0)
 				return -1;
 		}
 		LIST_REMOVE(he, list);
@@ -3488,6 +3488,23 @@ int tup_db_modify_cmds_by_input(tupid_t input)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+
+	return 0;
+}
+
+int tup_db_set_dependent_flags(tupid_t tupid)
+{
+	/* It's possible this is a file that was included by a Tupfile. Try to
+	 * set any dependent directory flags.
+	 */
+	if(tup_db_set_dependent_dir_flags(tupid) < 0)
+		return -1;
+
+	/* It's possible this file is used in a tup.config (eg: tup.config is a
+	 * symlink to here).
+	 */
+	if(tup_db_set_dependent_config_flags(tupid) < 0)
+		return -1;
 
 	return 0;
 }

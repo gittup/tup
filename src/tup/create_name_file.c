@@ -94,23 +94,6 @@ enoent:
 	return tup_file_del(dt, file, -1, modified);
 }
 
-static int set_dependent_flags(tupid_t tupid)
-{
-	/* It's possible this is a file that was included by a Tupfile. Try to
-	 * set any dependent directory flags.
-	 */
-	if(tup_db_set_dependent_dir_flags(tupid) < 0)
-		return -1;
-
-	/* It's possible this file is used in a tup.config (eg: tup.config is a
-	 * symlink to here).
-	 */
-	if(tup_db_set_dependent_config_flags(tupid) < 0)
-		return -1;
-
-	return 0;
-}
-
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force, int ignore_generated, int *modified)
 {
@@ -161,7 +144,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 				return -1;
 
-			if(set_dependent_flags(tent->tnode.tupid) < 0)
+			if(tup_db_set_dependent_flags(tent->tnode.tupid) < 0)
 				return -1;
 
 			if(tent->mtime != mtime)
@@ -380,7 +363,7 @@ int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 	if(modified) *modified = 1;
 
 	if(type == TUP_NODE_FILE || type == TUP_NODE_DIR) {
-		if(set_dependent_flags(tupid) < 0)
+		if(tup_db_set_dependent_flags(tupid) < 0)
 			return -1;
 	}
 

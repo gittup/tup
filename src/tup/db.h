@@ -125,6 +125,7 @@ int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
 int tup_db_modify_cmds_by_input(tupid_t input);
+int tup_db_set_dependent_flags(tupid_t tupid);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_set_dependent_config_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
