@@ -689,6 +689,7 @@ static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
 			remove_edge(LIST_FIRST(&n->incoming));
 		}
 		remove_node(g, n);
+		g->num_nodes--;
 	}
 	return 0;
 }
