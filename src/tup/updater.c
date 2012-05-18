@@ -38,6 +38,7 @@
 #include "environ.h"
 #include "privs.h"
 #include "variant.h"
+#include "flist.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -473,6 +474,51 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir);
 }
 
+static int check_empty_variant(struct tup_entry *tent)
+{
+	int fd;
+	struct flist f = {0, 0, 0};
+	int displayed_error = 0;
+
+	fd = tup_entry_open(tent);
+	if(!fd) {
+		fprintf(stderr, "tup error: Unable to open variant directory for checking: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	if(fchdir(fd) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
+	flist_foreach(&f, ".") {
+		if(f.filename[0] == '.')
+			continue;
+		if(strcmp(f.filename, "tup.config") == 0)
+			continue;
+		if(!displayed_error) {
+			fprintf(stderr, "tup error: Variant directory must only contain a tup.config file. Found extra files:\n");
+			displayed_error = 1;
+		}
+		fprintf(stderr, " - %s\n", f.filename);
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir(tup_top_fd())");
+		return -1;
+	}
+	if(displayed_error) {
+		fprintf(stderr, "tup error: Please clean out the variant directory of extra files, or remove the tup.config from this variant: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	return 0;
+}
+
 static int delete_variant_dirs(struct tup_entry *tent)
 {
 	struct variant *variant;
@@ -570,6 +616,8 @@ static int process_config_nodes(int environ_check)
 				if(variant == NULL) {
 					if(n->tent->dt != DOT_DT) {
 						new_variants = 1;
+						if(check_empty_variant(n->tent->parent) < 0)
+							return -1;
 						if(delete_variant_dirs(n->tent->parent) < 0)
 							return -1;
 					}
