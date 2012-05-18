@@ -1486,10 +1486,14 @@ int tup_db_delete_dir(tupid_t dt, int force)
 	return 0;
 }
 
-static int delete_variant_dir(struct tup_entry *tent)
+static int delete_variant_dir(struct tup_entry *tent, void *arg, int (*callback)(void *arg, struct tup_entry *tent))
 {
 	struct half_entry_head subdir_list;
 	int fd;
+
+	if(callback)
+		if(callback(arg, tent) < 0)
+			return -1;
 
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(tent->tnode.tupid, &subdir_list) < 0)
@@ -1519,7 +1523,7 @@ static int delete_variant_dir(struct tup_entry *tent)
 
 		if(he->type == TUP_NODE_DIR) {
 			flags = AT_REMOVEDIR;
-			if(delete_variant_dir(subtent) < 0)
+			if(delete_variant_dir(subtent, arg, callback) < 0)
 				return -1;
 		} else if(he->type == TUP_NODE_GENERATED) {
 			flags = 0;
@@ -1550,7 +1554,7 @@ static int delete_variant_dir(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_db_delete_variant(struct tup_entry *tent)
+int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(void *arg, struct tup_entry *tent))
 {
 	if(tent->tnode.tupid == DOT_DT) {
 		fprintf(stderr, "tup internal error: Shouldn't be trying to clean up the root variant. Tup entry is: ");
@@ -1559,7 +1563,7 @@ int tup_db_delete_variant(struct tup_entry *tent)
 		return -1;
 	}
 
-	if(delete_variant_dir(tent) < 0)
+	if(delete_variant_dir(tent, arg, callback) < 0)
 		return -1;
 	return 0;
 }
@@ -1611,6 +1615,9 @@ int tup_db_modify_dir(tupid_t dt)
 {
 	struct half_entry_head subdir_list;
 
+	if(tup_db_add_create_list(dt) < 0)
+		return -1;
+
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(dt, &subdir_list) < 0)
 		return -1;
@@ -1619,9 +1626,10 @@ int tup_db_modify_dir(tupid_t dt)
 		if(he->type == TUP_NODE_DIR) {
 			if(tup_db_modify_dir(he->tupid) < 0)
 				return -1;
-		} else if(he->type == TUP_NODE_FILE) {
-			if(tup_db_add_modify_list(he->tupid) < 0)
-				return -1;
+		} else {
+			if(he->type == TUP_NODE_GENERATED || he->type == TUP_NODE_FILE)
+				if(tup_db_add_modify_list(he->tupid) < 0)
+					return -1;
 			if(tup_db_set_dependent_dir_flags(he->tupid) < 0)
 				return -1;
 		}

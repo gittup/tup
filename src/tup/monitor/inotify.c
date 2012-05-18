@@ -705,6 +705,18 @@ static int queue_event(struct inotify_event *e)
 	if(ephemeral_event(e) == 0)
 		return 0;
 
+	if(e->mask & IN_IGNORED) {
+		struct dircache *dc;
+		dc = dircache_lookup_wd(&droot, e->wd);
+		if(dc) {
+			/* Disable this dircache until it can be cleaned up in
+			 * handle_event.  This lets us skip any other events in
+			 * handle_event that use this disabled dc.
+			 */
+			dc->dt_node.tupid = -1;
+		}
+	}
+
 	if(e->mask & IN_MOVED_TO) {
 		mfe = check_from_events(e);
 		/* It's possible mfe is still NULL here. For example, the
@@ -1034,9 +1046,15 @@ static int handle_event(struct monitor_event *m, int *modified)
 	struct dircache *dc;
 
 	if(m->e.mask & IN_IGNORED) {
-		/* Ignore IN_IGNORED events - we'll already have removed the
-		 * wd from the dircache in the callback function.
+		/* For variant dirs that are deleted by the updater, we just
+		 * get the ignore event. These don't go through the
+		 * monitor_rmdir_cb, so we need to clean up here.
 		 */
+		dc = dircache_lookup_wd(&droot, m->e.wd);
+		if(dc) {
+			inotify_rm_watch(inot_fd, m->e.wd);
+			dircache_del(&droot, dc);
+		}
 		return 0;
 	}
 
@@ -1045,6 +1063,12 @@ static int handle_event(struct monitor_event *m, int *modified)
 		fprintf(stderr, "tup error: dircache entry not found for wd %i\n",
 			m->e.wd);
 		return -1;
+	}
+	if(dc->dt_node.tupid == -1) {
+		/* Skip the event if the dc is disabled. It will be cleaned up
+		 * soon in the IN_IGNORED block.
+		 */
+		return 0;
 	}
 
 	if(m->e.mask & IN_MOVED_TO && m->from_event) {

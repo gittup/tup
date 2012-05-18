@@ -132,6 +132,7 @@ int create_graph(struct graph *g, int count_flags)
 
 	TAILQ_INIT(&g->node_list);
 	TAILQ_INIT(&g->plist);
+	TAILQ_INIT(&g->removing_list);
 	RB_INIT(&g->gen_delete_root);
 	g->gen_delete_count = 0;
 	RB_INIT(&g->cmd_delete_root);

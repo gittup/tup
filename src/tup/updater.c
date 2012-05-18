@@ -520,7 +520,7 @@ static int process_config_nodes(int environ_check)
 				 * doing 'rm -rf build'. A full rm -rf has all
 				 * nodes removed by the monitor/scanner.
 				 */
-				if(tup_db_delete_variant(n->tent) < 0)
+				if(tup_db_delete_variant(n->tent, NULL, NULL) < 0)
 					return -1;
 			} else {
 				/* tup.config created or modified */
@@ -674,6 +674,25 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 	return sub;
 }
 
+static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
+{
+	struct graph *g = arg;
+	struct node *n;
+	n = find_node(g, tent->tnode.tupid);
+	if(n) {
+		if(n->state == STATE_REMOVING) {
+			TAILQ_REMOVE(&g->removing_list, n, list);
+		} else {
+			TAILQ_REMOVE(&g->plist, n, list);
+		}
+		while(!LIST_EMPTY(&n->incoming)) {
+			remove_edge(LIST_FIRST(&n->incoming));
+		}
+		remove_node(g, n);
+	}
+	return 0;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
@@ -734,20 +753,26 @@ static int process_create_nodes(void)
 				if(force_removal) {
 					if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
 						return -1;
-					if(tup_db_delete_variant(n->tent) < 0)
-						return -1;
-					if(cleanup_dir(n->tent) < 0)
-						return -1;
-					/* Remove the link from the root node to us. */
 					TAILQ_REMOVE(&g.plist, n, list);
-					while(!LIST_EMPTY(&n->incoming)) {
-						remove_edge(LIST_FIRST(&n->incoming));
-					}
-					remove_node(&g, n);
+					TAILQ_INSERT_TAIL(&g.removing_list, n, list);
+					n->state = STATE_REMOVING;
 				}
 			}
 		}
 	}
+
+	while(!TAILQ_EMPTY(&g.removing_list)) {
+		struct tup_entry *cleanup_tent;
+		n = TAILQ_FIRST(&g.removing_list);
+		cleanup_tent = n->tent;
+
+		/* The rm_variant_dir_cb will remove the node from the removing_list */
+		if(tup_db_delete_variant(n->tent, &g, rm_variant_dir_cb) < 0)
+			return -1;
+		if(cleanup_dir(cleanup_tent) < 0)
+			return -1;
+	}
+
 	if(build_graph(&g) < 0)
 		return -1;
 	if(g.num_nodes) {

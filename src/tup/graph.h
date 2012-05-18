@@ -40,6 +40,7 @@ struct tupid_entries;
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
 #define STATE_FINISHED 2
+#define STATE_REMOVING 3
 
 struct node {
 	TAILQ_ENTRY(node) list;
@@ -58,6 +59,7 @@ TAILQ_HEAD(node_head, node);
 struct graph {
 	struct node_head node_list;
 	struct node_head plist;
+	struct node_head removing_list;
 	struct node *root;
 	struct node *cur;
 	int num_nodes;
