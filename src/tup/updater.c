@@ -737,8 +737,6 @@ static int process_config_nodes(int environ_check)
 	 * Tupfiles to create the in-tree build.
 	 */
 	if(!using_variants && variants_removed) {
-		if(tup_db_config_set_int("variants_removed", 0) < 0)
-			return -1;
 		if(tup_db_reparse_all() < 0)
 			return -1;
 	}
