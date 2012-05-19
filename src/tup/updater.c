@@ -1006,25 +1006,33 @@ out_destroy:
 static int check_config_todo(void)
 {
 	struct graph g;
+	int rc;
 	int stuff_todo = 0;
-	struct node *n;
 
-	if(create_graph(&g, TUP_NODE_FILE) < 0)
+	if(create_graph(&g, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
-	if(!TAILQ_EMPTY(&g.plist)) {
+	if(build_graph(&g) < 0)
+		return -1;
+	g.total_mtime = -1;
+	if(g.num_nodes) {
 		printf("Tup phase 1: The following tup.config files must be parsed:\n");
 		stuff_todo = 1;
 	}
-
-	TAILQ_FOREACH(n, &g.plist, list) {
-		print_tup_entry(stdout, n->tent);
+	rc = execute_graph(&g, 0, 1, todo_work);
+	if(rc == 0) {
+		rc = stuff_todo;
+	} else if(rc == -1) {
+		return -1;
+	} else {
+		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
+		return -1;
 	}
 
 	if(destroy_graph(&g) < 0)
 		return -1;
-	return stuff_todo;
+	return rc;
 }
 
 static int check_create_todo(void)
@@ -1527,7 +1535,7 @@ static void *todo_work(void *arg)
 		if(n == (void*)-1)
 			break;
 
-		if(n->tent->type == g->count_flags) {
+		if(n->tent->type == g->count_flags || g->count_flags == -1) {
 			show_result(n->tent, 0, NULL, NULL);
 		}
 
