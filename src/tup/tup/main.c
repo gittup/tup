@@ -694,6 +694,7 @@ static int create_variant(const char *config_path)
 		fprintf(stderr, "tup error: Unable to create tup.config symlink for config file: %s\n", config_path);
 		return -1;
 	}
+	printf("tup: Added variant '%s' using config file '%s'\n", dirname, config_path);
 	return 0;
 }
 
