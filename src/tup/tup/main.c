@@ -23,6 +23,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/monitor.h"
@@ -40,6 +41,7 @@
 #include "tup/access_event.h"
 #include "tup/option.h"
 #include "tup/privs.h"
+#include "tup/flist.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -50,6 +52,7 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
+static int variant(int argc, char **argv);
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
@@ -182,6 +185,8 @@ int main(int argc, char **argv)
 		clear_autoupdate = 1;
 	} else if(strcmp(cmd, "todo") == 0) {
 		rc = todo(argc, argv);
+	} else if(strcmp(cmd, "variant") == 0) {
+		rc = variant(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "link_exists") == 0) {
@@ -600,6 +605,115 @@ static int mlink(int argc, char **argv)
 	if(tup_db_commit() < 0)
 		return -1;
 
+	return 0;
+}
+
+static int dir_empty(const char *dirname)
+{
+	struct flist f = {0, 0, 0};
+	if(chdir(dirname) < 0) {
+		perror(dirname);
+		fprintf(stderr, "tup error: Unable to chdir to variant directory.\n");
+		return -1;
+	}
+	flist_foreach(&f, ".") {
+		if(f.filename[0] == '.')
+			continue;
+		return 0;
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to fchdir to the top of the tup hierarchy.\n");
+		return -1;
+	}
+	return 1;
+}
+
+static int create_variant(const char *config_path)
+{
+	char dirname[PATH_MAX];
+	char linkpath[PATH_MAX];
+	char linkdest[PATH_MAX];
+	const char *dot;
+	const char *last_slash;
+	const char *filename;
+
+	last_slash = strrchr(config_path, '/');
+	if(last_slash) {
+		filename = last_slash + 1;
+	} else {
+		filename = config_path;
+	}
+
+	dot = strchr(filename, '.');
+	if(dot) {
+		int len = dot-filename;
+		snprintf(dirname, sizeof(dirname), "build-%.*s", len, filename);
+	} else {
+		snprintf(dirname, sizeof(dirname), "build-%s", filename);
+	}
+	dirname[sizeof(dirname)-1] = 0;
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to fchdir to the top of the tup hierarchy.\n");
+		return -1;
+	}
+	if(mkdir(dirname, 0777) < 0) {
+		if(errno == EEXIST) {
+			int rc;
+			rc = dir_empty(dirname);
+			if(rc < 0)
+				return -1;
+			if(!rc) {
+				fprintf(stderr, "tup error: Variant directory '%s' already exists and is not empty.\n", dirname);
+				return -1;
+			}
+		} else {
+			perror(dirname);
+			fprintf(stderr, "tup error: Unable to create variant directory '%s' at the top of the tup hierarchy.\n", dirname);
+			return -1;
+		}
+	}
+	if(get_sub_dir_len()) {
+		if(snprintf(linkpath, sizeof(linkpath), "../%s/%s", get_sub_dir(), config_path) >= (signed)sizeof(linkpath)) {
+			fprintf(stderr, "tup error: linkpath is too small to fit the tup.config symlink path.\n");
+			return -1;
+		}
+	} else {
+		if(snprintf(linkpath, sizeof(linkpath), "../%s", config_path) >= (signed)sizeof(linkpath)) {
+			fprintf(stderr, "tup error: linkpath is too small to fit the tup.config symlink path.\n");
+			return -1;
+		}
+	}
+	if(snprintf(linkdest, sizeof(linkdest), "%s/tup.config", dirname) >= (signed)sizeof(linkdest)) {
+		fprintf(stderr, "tup error: linkdest is too small to fit the tup.config symlink destination.\n");
+		return -1;
+	}
+	if(symlink(linkpath, linkdest) < 0) {
+		perror(linkdest);
+		fprintf(stderr, "tup error: Unable to create tup.config symlink for config file: %s\n", config_path);
+		return -1;
+	}
+	return 0;
+}
+
+static int variant(int argc, char **argv)
+{
+	int x;
+
+	if(argc < 2) {
+		fprintf(stderr, "Usage: variant foo.config [bar.config] [...]\n");
+		fprintf(stderr, "This will create a build-foo directory with a tup.config symlink to foo.config\n");
+		return -1;
+	}
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		if(create_variant(argv[x]) < 0)
+			return -1;
+	}
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 
