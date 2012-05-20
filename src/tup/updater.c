@@ -649,6 +649,11 @@ static int process_config_nodes(int environ_check)
 				}
 			} else {
 				/* tup.config created or modified */
+				if(n->tent->parent->srcid != DOT_DT) {
+					if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
+						goto err_rollback;
+				}
+
 				variant = variant_search(n->tent->dt);
 				if(variant == NULL) {
 					if(n->tent->dt != DOT_DT) {
@@ -662,8 +667,6 @@ static int process_config_nodes(int environ_check)
 					if(variant_add(n->tent, 1, &variant) < 0)
 						goto err_rollback;
 					if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
-						goto err_rollback;
-					if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
 						goto err_rollback;
 					TAILQ_INSERT_HEAD(&g.node_list, n, list);
 					rm_node = 0;
