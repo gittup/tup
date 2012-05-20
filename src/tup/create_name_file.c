@@ -193,7 +193,6 @@ static int check_rm_tup_config(struct tup_entry *tent, int *dont_delete)
 int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 {
 	struct tup_entry *tent;
-	int dont_delete = 0;
 
 	if(len < 0)
 		len = strlen(file);
@@ -209,11 +208,6 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 		return 0;
 	}
 
-	if(check_rm_tup_config(tent, &dont_delete) < 0)
-		return -1;
-	if(dont_delete)
-		return 0;
-
 	/* If .gitignore is removed, make sure we re-parse the Tupfile
 	 * (t7040).
 	 */
@@ -226,11 +220,6 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 
 int tup_file_missing(struct tup_entry *tent)
 {
-	int dont_delete = 0;
-	if(check_rm_tup_config(tent, &dont_delete) < 0)
-		return -1;
-	if(dont_delete)
-		return 0;
 	return tup_del_id_type(tent->tnode.tupid, tent->type, 0, NULL);
 }
 
@@ -246,14 +235,22 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 
 int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 {
+	struct tup_entry *tent;
+	int dont_delete = 0;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	if(check_rm_tup_config(tent, &dont_delete) < 0)
+		return -1;
+	if(dont_delete)
+		return 0;
+
 	if(type == TUP_NODE_DIR) {
-		struct tup_entry *tent;
 		struct variant *variant;
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
 		if(tup_db_delete_dir(tupid, force) < 0)
 			return -1;
 		if(rmdir_callback)
@@ -326,16 +323,9 @@ int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 		 * been executed yet.
 		 */
 		if(changed == 1) {
-			struct tup_entry *tent;
-
-			tent = tup_entry_find(tupid);
-			if(!tent) {
-				fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
-			} else {
-				fprintf(stderr, "tup warning: generated file '");
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
-			}
+			fprintf(stderr, "tup warning: generated file '");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
 			if(modified) *modified = 1;
 		}
 
