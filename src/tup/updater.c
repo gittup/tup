@@ -498,7 +498,7 @@ static int check_empty_variant(struct tup_entry *tent)
 	flist_foreach(&f, ".") {
 		if(f.filename[0] == '.')
 			continue;
-		if(strcmp(f.filename, "tup.config") == 0)
+		if(strcmp(f.filename, TUP_CONFIG) == 0)
 			continue;
 		if(!displayed_error) {
 			fprintf(stderr, "tup error: Variant directory must only contain a tup.config file. Found extra files:\n");
