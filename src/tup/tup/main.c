@@ -842,7 +842,7 @@ static int touch(int argc, char **argv)
 			return -1;
 		}
 		if(S_ISDIR(buf.st_mode)) {
-			if(create_dir_file(dt, pel->path) < 0)
+			if(tup_db_create_node(dt, pel->path, TUP_NODE_DIR) == NULL)
 				return -1;
 		} else if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 			if(tup_file_mod_mtime(dt, pel->path, buf.MTIME, 1, 0, NULL) < 0)

@@ -155,7 +155,7 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_update(tupid_t a, tupid_t b, int style);
 static int link_remove(tupid_t a, tupid_t b);
 static int node_has_ghosts(tupid_t tupid);
-static int files_to_tree(struct tupid_entries *root);
+static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int reclaim_ghosts(void);
@@ -945,7 +945,7 @@ int tup_db_debug_add_all_ghosts(void)
 	reclaim_ghost_debug = 1;
 
 	/* First get all tup_entrys loaded */
-	if(files_to_tree(NULL) < 0)
+	if(load_all_nodes() < 0)
 		return -1;
 
 	if(tup_entry_debug_add_all_ghosts(&ghost_list) < 0)
@@ -4543,45 +4543,25 @@ tupid_t slash_dt(void)
 	return local_slash_dt;
 }
 
-int tup_db_scan_begin(struct tupid_entries *root)
+int tup_db_scan_begin(void)
 {
 	if(tup_db_begin() < 0)
 		return -1;
-	if(files_to_tree(root) < 0)
+	if(load_all_nodes() < 0)
 		return -1;
 	if(variant_load() < 0)
 		return -1;
-	tupid_tree_remove(root, env_dt());
 	return 0;
 }
 
-int tup_db_scan_end(struct tupid_entries *root)
+int tup_db_scan_end(void)
 {
-	struct tupid_tree *tt;
-
-	while((tt = RB_ROOT(root)) != NULL) {
-		struct tup_entry *tent;
-
-		/* It is possible that the node has already been removed. For
-		 * example, we may have previously called tup_file_missing on
-		 * the directory that owns a file before calling it on the
-		 * file. In this case, the tent will no longer exist.
-		 */
-		tent = tup_entry_find(tt->tupid);
-		if(tent) {
-			if(tup_file_missing(tent) < 0)
-				return -1;
-		}
-		tupid_tree_rm(root, tt);
-		free(tt);
-	}
-
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
 }
 
-static int files_to_tree(struct tupid_entries *root)
+static int load_all_nodes(void)
 {
 	int rc = -1;
 	int dbrc;
@@ -4644,7 +4624,7 @@ static int files_to_tree(struct tupid_entries *root)
 		srcid = sqlite3_column_int64(*stmt, 4);
 		name = (const char*)sqlite3_column_text(*stmt, 5);
 
-		if(tup_entry_add_all(tupid, dt, type, mtime, srcid, name, root) < 0)
+		if(tup_entry_add_all(tupid, dt, type, mtime, srcid, name) < 0)
 			break;
 	}
 
@@ -5393,7 +5373,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 
 	*entry = NULL;
 
-	if(tup_entry_find_name_in_dir(dt, name, len, entry) < 0)
+	if(tup_entry_find_name_in_dir_dt(dt, name, len, entry) < 0)
 		return -1;
 	if(*entry)
 		return 0;

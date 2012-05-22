@@ -85,11 +85,10 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	return 0;
 }
 
-int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
-			       struct tup_entry **dest)
+int tup_entry_find_name_in_dir_dt(tupid_t dt, const char *name, int len,
+				  struct tup_entry **dest)
 {
 	struct tup_entry *parent;
-	struct string_tree *st;
 
 	if(len < 0)
 		len = strlen(name);
@@ -107,7 +106,18 @@ int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 		fprintf(stderr, "tup error: Unable to find parent entry [%lli] for node '%.*s'\n", dt, len, name);
 		return -1;
 	}
-	st = string_tree_search(&parent->entries, name, len);
+	return tup_entry_find_name_in_dir(parent, name, len, dest);
+}
+
+int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
+			       struct tup_entry **dest)
+{
+	struct string_tree *st;
+
+	if(len < 0)
+		len = strlen(name);
+
+	st = string_tree_search(&tent->entries, name, len);
 	if(!st) {
 		*dest = NULL;
 		return 0;
@@ -278,17 +288,13 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
-		      time_t mtime, tupid_t srcid, const char *name, struct tupid_entries *root)
+		      time_t mtime, tupid_t srcid, const char *name)
 {
 	struct tup_entry *tent;
 
 	tent = new_entry(tupid, dt, name, strlen(name), type, mtime, srcid);
 	if(!tent)
 		return -1;
-
-	if(root)
-		if(tupid_tree_add(root, tupid) < 0)
-			return -1;
 	return 0;
 }
 
@@ -620,6 +626,19 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head)
 
 		tent = container_of(tt, struct tup_entry, tnode);
 		tup_entry_add_ghost_list(tent, head);
+	}
+	return 0;
+}
+
+int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
+{
+	struct string_tree *st;
+	RB_FOREACH(st, string_entries, &tent->entries) {
+		struct tup_entry *subtent;
+		subtent = container_of(st, struct tup_entry, name);
+		if(subtent->type != TUP_NODE_GHOST && subtent->tnode.tupid != env_dt())
+			if(tupid_tree_add(root, subtent->tnode.tupid) < 0)
+				return -1;
 	}
 	return 0;
 }

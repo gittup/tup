@@ -442,16 +442,15 @@ static int monitor_loop(void)
 	int rc;
 	struct timespan ts;
 	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
-	struct tupid_entries scan_root = {NULL};
 	int locked = 1;
 
 	timespan_start(&ts);
 
-	if(tup_db_scan_begin(&scan_root) < 0)
+	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", &scan_root, wp_callback) < 0)
+	if(watch_path(0, tup_top_fd(), ".", wp_callback) < 0)
 		return -1;
-	if(tup_db_scan_end(&scan_root) < 0)
+	if(tup_db_scan_end() < 0)
 		return -1;
 
 	/* If we are running in autoupdate mode, we should check to see if any
@@ -1101,7 +1100,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 			 * in removing them all and re-creating them. The
 			 * dircache already handles this case.
 			 */
-			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
 			if(close(fd) < 0) {
 				perror("close(fd)");
 				return -1;
@@ -1131,7 +1130,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 		fd = tup_db_open_tupid(dc->dt_node.tupid);
 		if(fd < 0)
 			return -1;
-		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
 		if(close(fd) < 0) {
 			perror("close(fd)");
 			return -1;

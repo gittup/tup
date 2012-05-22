@@ -160,8 +160,8 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, i
 int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type);
 
 /* scanner operations */
-int tup_db_scan_begin(struct tupid_entries *root);
-int tup_db_scan_end(struct tupid_entries *root);
+int tup_db_scan_begin(void);
+int tup_db_scan_end(void);
 
 /* updater operations */
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,

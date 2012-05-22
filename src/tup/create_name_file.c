@@ -58,15 +58,6 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 	return -1;
 }
 
-tupid_t create_dir_file(tupid_t dt, const char *path)
-{
-	struct tup_entry *tent;
-	tent = tup_db_create_node(dt, path, TUP_NODE_DIR);
-	if(tent)
-		return tent->tnode.tupid;
-	return -1;
-}
-
 tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 {
 	int fd;
@@ -308,6 +299,15 @@ int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 	 */
 	if(type == TUP_NODE_GENERATED && !force) {
 		int changed = 0;
+
+		/* If a generated.gitignore file was removed, re-parse
+		 * the directory so it will be recreated.
+		 */
+		if(strcmp(tent->name.s, ".gitignore") == 0) {
+			if(tup_db_add_create_list(tent->dt) < 0)
+				return -1;
+			return 0;
+		}
 
 		if(tup_db_modify_cmds_by_output(tupid, &changed) < 0)
 			return -1;
