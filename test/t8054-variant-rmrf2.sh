@@ -41,7 +41,12 @@ tup variant configs/*.config
 update
 
 rm -rf build-foo build-bar build-baz build-zap build-zng
-update
+update > .tupoutput
+
+if ! grep "No Tupfiles to parse" .tupoutput > /dev/null; then
+	echo "Error: Expected not to parse any Tupfiles" 1>&2
+	exit 1
+fi
 
 for i in foo bar baz zap zng; do
 	tup_object_no_exist . build-$i

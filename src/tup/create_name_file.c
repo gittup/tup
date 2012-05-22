@@ -211,7 +211,15 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 
 int tup_file_missing(struct tup_entry *tent)
 {
-	return tup_del_id_type(tent->tnode.tupid, tent->type, 0, NULL);
+	int force = 0;
+	if(variant_search(tent->tnode.tupid)) {
+		/* Variant root directories use a force removal so that we
+		 * don't try to reparse everything or get warnings about
+		 * generated files.
+		 */
+		force = 1;
+	}
+	return tup_del_id_type(tent->tnode.tupid, tent->type, force, NULL);
 }
 
 int tup_del_id_force(tupid_t tupid, int type)

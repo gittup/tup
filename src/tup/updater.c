@@ -621,7 +621,7 @@ static int process_config_nodes(int environ_check)
 					show_result(n->tent, 0, NULL, "delete variant");
 					if(tup_db_delete_tup_config(n->tent) < 0)
 						return -1;
-					if(variant_rm(n->tent->tnode.tupid) < 0)
+					if(variant_rm(variant) < 0)
 						return -1;
 					if(delete_name_file(n->tent->tnode.tupid) < 0)
 						return -1;
@@ -672,6 +672,20 @@ static int process_config_nodes(int environ_check)
 					rm_node = 0;
 					show_result(n->tent, 0, NULL, "new variant");
 				} else {
+					if(!variant->enabled) {
+						/* If the variant is disabled
+						 * it's because we removed the
+						 * build dir and then
+						 * re-created it before getting
+						 * through process_config_nodes
+						 * (t8055).
+						 */
+						new_variants = 1;
+						TAILQ_INSERT_HEAD(&g.node_list, n, list);
+						rm_node = 0;
+						if(variant_enable(variant) < 0)
+							return -1;
+					}
 					show_result(n->tent, 0, NULL, "updated variant");
 				}
 				compat_lock_disable();

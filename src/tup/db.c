@@ -1043,6 +1043,22 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 				return NULL;
 			if(node_changed)
 				*node_changed = 1;
+
+			{
+				struct variant *variant;
+				/* If the variant dir was converted from a
+				 * ghost, that means we rm'd it, scanned
+				 * without processing config nodes, and
+				 * re-created it. In this case we want to
+				 * disable the variant so that we know we need
+				 * to re-parse this variant in the updater.
+				 */
+				variant = variant_search(tent->tnode.tupid);
+				if(variant) {
+					if(variant_rm(variant) < 0)
+						return NULL;
+				}
+			}
 			return tent;
 		}
 		if(tent->type != type) {

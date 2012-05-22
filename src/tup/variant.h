@@ -42,7 +42,8 @@ LIST_HEAD(variant_head, variant);
 
 int variant_load(void);
 int variant_add(struct tup_entry *tent, int enabled, struct variant **dest);
-int variant_rm(tupid_t tupid);
+int variant_rm(struct variant *variant);
+int variant_enable(struct variant *variant);
 struct variant *variant_search(tupid_t dt);
 struct variant_head *get_variant_list(void);
 int variant_list_empty(void);

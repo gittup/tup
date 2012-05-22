@@ -47,6 +47,21 @@ int variant_load(void)
 	return 0;
 }
 
+static int initialize_variant(struct variant *variant)
+{
+	vardb_init(&variant->vdb);
+	LIST_INSERT_HEAD(&variant_list, variant, list);
+	if(tupid_tree_insert(&variant_dt_root, &variant->dtnode) < 0) {
+		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->dtnode.tupid);
+		return -1;
+	}
+	if(tupid_tree_insert(&variant_root, &variant->tnode) < 0) {
+		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->tnode.tupid);
+		return -1;
+	}
+	return 0;
+}
+
 int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 {
 	struct variant *variant;
@@ -66,7 +81,6 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 	 */
 	variant->tnode.tupid = tent->tnode.tupid;
 
-	vardb_init(&variant->vdb);
 	variant->enabled = enabled;
 	if(snprint_tup_entry(variant->variant_dir, sizeof(variant->variant_dir), tent->parent) >= (signed)sizeof(variant->variant_dir)) {
 		fprintf(stderr, "tup internal error: variant_dir is sized incorrectly.\n");
@@ -85,15 +99,8 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 		return -1;
 	}
 
-	LIST_INSERT_HEAD(&variant_list, variant, list);
-	if(tupid_tree_insert(&variant_dt_root, &variant->dtnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->dtnode.tupid);
+	if(initialize_variant(variant) < 0)
 		return -1;
-	}
-	if(tupid_tree_insert(&variant_root, &variant->tnode) < 0) {
-		fprintf(stderr, "tup error: Unable to insert variant for node %lli into the tree in variant_add()\n", variant->tnode.tupid);
-		return -1;
-	}
 
 	if(dest)
 		*dest = variant;
@@ -101,17 +108,8 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 	return 0;
 }
 
-int variant_rm(tupid_t tupid)
+int variant_rm(struct variant *variant)
 {
-	struct tupid_tree *tt;
-	struct variant *variant;
-
-	tt = tupid_tree_search(&variant_root, tupid);
-	if(!tt) {
-		fprintf(stderr, "tup internal error: variant ID %lli not found in search in variant_rm()\n", tupid);
-		return -1;
-	}
-	variant = container_of(tt, struct variant, tnode);
 	/* Just disable the variant and remove it from the structures, since
 	 * some tup_entrys may already point to us.
 	 */
@@ -121,6 +119,14 @@ int variant_rm(tupid_t tupid)
 	LIST_REMOVE(variant, list);
 	vardb_close(&variant->vdb);
 	LIST_INSERT_HEAD(&disabled_list, variant, list);
+	return 0;
+}
+
+int variant_enable(struct variant *variant)
+{
+	variant->enabled = 1;
+	if(initialize_variant(variant) < 0)
+		return -1;
 	return 0;
 }
 
