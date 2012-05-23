@@ -1425,6 +1425,8 @@ int tup_db_delete_node(tupid_t tupid)
 			return -1;
 		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
+		if(tup_db_set_srcid(tent, -1) < 0)
+			return -1;
 		return 0;
 	}
 
