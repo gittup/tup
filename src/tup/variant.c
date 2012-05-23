@@ -160,8 +160,11 @@ int variant_get_srctent(struct variant *variant, tupid_t tupid, struct tup_entry
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	if(tup_entry_add(tent->srcid, srctent) < 0)
-		return -1;
+
+	/* srcid can be -1 if the variant node is a ghost */
+	if(tent->srcid != -1)
+		if(tup_entry_add(tent->srcid, srctent) < 0)
+			return -1;
 	return 0;
 }
 

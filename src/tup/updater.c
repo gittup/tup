@@ -612,7 +612,7 @@ static int process_config_nodes(int environ_check)
 					 * this tup.config, then we need to
 					 * wipe out all of our @-variables,
 					 * remove the varaint, remove our
-					 * tup.config node, and delete teh
+					 * tup.config node, and delete the
 					 * variant tree. We also add the
 					 * variant directory to the create_list
 					 * so it can be propagated to other
