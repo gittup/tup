@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/05/20" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/05/24" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -107,6 +107,29 @@ Temporarily override the monitor.autoparse option to 0. This will prevent the mo
 .TP
 .B stop
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
+.TP
+.B variant foo.config [bar.config] [...]
+For each argument, this command creates a variant directory with tup.config symlinked to the specified config file. For example, if a directory contained several variant configurations, one could easily create a variant for each config file:
+
+.nf
+$ ls configs/
+bar.config
+foo.config
+$ tup variant configs/*.config
+tup: Added variant 'build-bar' using config file 'configs/bar.config'
+tup: Added variant 'build-foo' using config file 'configs/foo.config'
+.fi
+
+This is equivalent to the following:
+
+.nf
+$ mkdir build-bar
+$ ln -s ../configs/bar.config build-bar/tup.config
+$ mkdir build-foo
+$ ln -s ../configs/foo.config build-foo/tup.config
+.fi
+
+For projects that commonly use several variants, the files in the configs/ directory could be checked in to source control. Each developer would run the 'tup variant' after 'tup init' during the initial checkout of the software. Variants can also be created manually by making a build directory and creating a tup.config file in it (see the VARIANTS section). This command merely helps save some steps, so that you don't have to make each build directory and tup.config symlink manually.
 .TP
 .B dbconfig
 Displays the current tup database configuration. These are internal values used by tup.
