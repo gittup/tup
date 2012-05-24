@@ -1090,8 +1090,6 @@ static int handle_event(struct monitor_event *m, int *modified)
 				return -1;
 			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt_node.tupid) < 0)
 				return -1;
-			if(tup_db_modify_dir(tent->tnode.tupid) < 0)
-				return -1;
 			fd = tup_db_open_tupid(dc->dt_node.tupid);
 			if(fd < 0)
 				return -1;

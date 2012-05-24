@@ -539,6 +539,23 @@ static int delete_variant_dirs(struct tup_entry *tent)
 	return 0;
 }
 
+static int is_valid_variant_tent(struct tup_entry *tent)
+{
+	/* If the tup.config file was deleted, the node becomes a ghost until
+	 * we delete it in process_config_nodes().
+	 */
+	if(tent->type == TUP_NODE_GHOST)
+		return 0;
+
+	/* If the variant directory was moved with the monitor running, the
+	 * build directory no longer has DOT_DT as a parent. We can also remove
+	 * the variant in this case (t8063).
+	 */
+	if(tent->parent && tent->parent->dt != DOT_DT)
+		return 0;
+	return 1;
+}
+
 static int process_config_nodes(int environ_check)
 {
 	struct graph g;
@@ -574,7 +591,7 @@ static int process_config_nodes(int environ_check)
 		struct variant *variant;
 		LIST_FOREACH(variant, get_variant_list(), list) {
 			if(!variant->root_variant) {
-				if(variant->tent->type != TUP_NODE_GHOST) {
+				if(is_valid_variant_tent(variant->tent)) {
 					using_variants = 1;
 					break;
 				}
@@ -604,7 +621,7 @@ static int process_config_nodes(int environ_check)
 
 			variant = variant_search(n->tent->dt);
 
-			if(n->tent->type == TUP_NODE_GHOST && n->tent->dt != DOT_DT) {
+			if(!is_valid_variant_tent(n->tent) && n->tent->dt != DOT_DT) {
 				/* tup.config deleted */
 				struct tup_entry *parent = n->tent->parent;
 
@@ -653,7 +670,9 @@ static int process_config_nodes(int environ_check)
 					show_result(n->tent, 0, NULL, "clean-up node");
 				}
 			} else {
-				/* tup.config created or modified */
+				/* tup.config created or modified, or root
+				 * tup.config deleted.
+				 */
 				int rc;
 
 				if(n->tent->parent->srcid != DOT_DT) {

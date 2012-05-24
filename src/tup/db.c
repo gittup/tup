@@ -72,6 +72,7 @@ enum {
 	_DB_NODELIST_LEN,
 	_DB_GET_NODELIST,
 	DB_ADD_DIR_CREATE_LIST,
+	DB_MAYBE_ADD_CONFIG_LIST,
 	DB_ADD_CONFIG_LIST,
 	DB_MAYBE_ADD_CREATE_LIST,
 	DB_ADD_CREATE_LIST,
@@ -1629,7 +1630,7 @@ static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 	return 0;
 }
 
-int tup_db_modify_dir(tupid_t dt)
+static int recurse_modify_dir(tupid_t dt)
 {
 	struct half_entry_head subdir_list;
 
@@ -1642,13 +1643,15 @@ int tup_db_modify_dir(tupid_t dt)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 		if(he->type == TUP_NODE_DIR) {
-			if(tup_db_modify_dir(he->tupid) < 0)
+			if(recurse_modify_dir(he->tupid) < 0)
 				return -1;
 		} else {
 			if(he->type == TUP_NODE_GENERATED || he->type == TUP_NODE_FILE)
 				if(tup_db_add_modify_list(he->tupid) < 0)
 					return -1;
 			if(tup_db_set_dependent_flags(he->tupid) < 0)
+				return -1;
+			if(tup_db_maybe_add_config_list(he->tupid) < 0)
 				return -1;
 		}
 		LIST_REMOVE(he, list);
@@ -1917,6 +1920,8 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	}
 
 	if(tup_entry_change_name_dt(tupid, new_name, new_dt) < 0)
+		return -1;
+	if(recurse_modify_dir(tupid) < 0)
 		return -1;
 
 	return 0;
@@ -2424,6 +2429,43 @@ int tup_db_add_dir_create_list(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_ADD_DIR_CREATE_LIST];
 	static char s[] = "insert or ignore into create_list select dir from node where id=?";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_maybe_add_config_list(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_MAYBE_ADD_CONFIG_LIST];
+	static char s[] = "insert or ignore into config_list select id from variant_list where id=?";
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {

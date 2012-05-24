@@ -72,7 +72,6 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt, int force);
 int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(void *, struct tup_entry *));
-int tup_db_modify_dir(tupid_t dt);
 int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head);
 int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_open_tupid(tupid_t dt);
@@ -93,6 +92,7 @@ int tup_db_get_tup_config_tent(struct tup_entry **tent);
 /* Flag operations */
 int tup_db_get_node_flags(tupid_t tupid);
 int tup_db_add_dir_create_list(tupid_t tupid);
+int tup_db_maybe_add_config_list(tupid_t tupid);
 int tup_db_add_config_list(tupid_t tupid);
 int tup_db_maybe_add_create_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
