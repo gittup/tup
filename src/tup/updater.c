@@ -654,6 +654,8 @@ static int process_config_nodes(int environ_check)
 				}
 			} else {
 				/* tup.config created or modified */
+				int rc;
+
 				if(n->tent->parent->srcid != DOT_DT) {
 					if(tup_db_set_srcid(n->tent->parent, DOT_DT) < 0)
 						goto err_rollback;
@@ -697,9 +699,10 @@ static int process_config_nodes(int environ_check)
 				initialize_server_struct(&ps.s, n->tent);
 				if(server_parser_start(&ps) < 0)
 					goto err_rollback;
-				if(tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file) < 0)
-					goto err_rollback;
+				rc = tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file);
 				if(server_parser_stop(&ps) < 0)
+					goto err_rollback;
+				if(rc < 0)
 					goto err_rollback;
 				if(add_config_files(&ps.s.finfo, n->tent) < 0)
 					goto err_rollback;
