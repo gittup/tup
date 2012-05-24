@@ -212,12 +212,23 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 int tup_file_missing(struct tup_entry *tent)
 {
 	int force = 0;
-	if(variant_search(tent->tnode.tupid)) {
-		/* Variant root directories use a force removal so that we
-		 * don't try to reparse everything or get warnings about
-		 * generated files.
-		 */
-		force = 1;
+	struct variant *variant;
+
+	variant = tup_entry_variant_null(tent);
+	if(variant && !variant->root_variant) {
+		if(variant->dtnode.tupid == tent->tnode.tupid) {
+			/* Variant root directories use a force removal so that we
+			 * don't try to reparse everything.
+			 */
+			force = 1;
+		} else if(tent->type == TUP_NODE_DIR) {
+			/* Variant sub-directories get a warning that they will
+			 * be re-created.
+			 */
+			fprintf(stderr, "tup warning: variant directory '");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "' was deleted outside of tup. This directory will be re-created, unless the corresponding source directory was also removed.\n");
+		}
 	}
 	return tup_del_id_type(tent->tnode.tupid, tent->type, force, NULL);
 }

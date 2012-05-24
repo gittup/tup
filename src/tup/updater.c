@@ -605,8 +605,13 @@ static int process_config_nodes(int environ_check)
 			variant = variant_search(n->tent->dt);
 
 			if(n->tent->type == TUP_NODE_GHOST && n->tent->dt != DOT_DT) {
-				struct tup_entry *parent = n->tent->parent;
 				/* tup.config deleted */
+				struct tup_entry *parent = n->tent->parent;
+
+				/* Reset the build directory's variant link. We
+				 * may have set it in tup_file_missing().
+				 */
+				parent->variant = NULL;
 				if(variant) {
 					/* If we had a variant corresponding to
 					 * this tup.config, then we need to

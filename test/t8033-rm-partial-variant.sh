@@ -39,7 +39,12 @@ check_exist build/foo.o build/sub/bar.o build/prog
 check_not_exist foo.o sub/bar.o prog
 
 rm -rf build/sub
-update
+update > .tupoutput 2>&1
+
+if ! grep 'tup warning.*variant directory.*was deleted outside of tup' .tupoutput > /dev/null; then
+	echo "Error: Expected to get a warning about deleting variant directories." 1>&2
+	exit 1
+fi
 
 check_exist build/sub/bar.o
 
