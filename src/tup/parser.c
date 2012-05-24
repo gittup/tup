@@ -623,7 +623,7 @@ static int include_rules(struct tupfile *tf)
 
 	num_dotdots = 0;
 	tent = tf->curtent;
-	while(tent->tnode.tupid != DOT_DT) {
+	while(tent->tnode.tupid != tf->variant->dtnode.tupid) {
 		tent = tent->parent;
 		num_dotdots++;
 	}
