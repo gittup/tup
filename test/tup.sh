@@ -364,15 +364,18 @@ varsetall()
 monitor()
 {
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup monitor"
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup monitor -f"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup monitor"
+		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup monitor -f"
 	else
-		cmd="tup monitor"
+		cmd="tup monitor -f"
 	fi
 
-	if $cmd "$@"; then
-		:
+	if $cmd "$@" & then
+		monitor_pid=$!
+		# The monitor may not actually have the lock yet - use waitmon to wait
+		# until it is started
+		tup waitmon
 	else
 		echo "*** Failed to run the monitor!" 1>&2
 		exit 1
@@ -385,6 +388,11 @@ stop_monitor()
 	tup flush
 	if tup stop; then :; else
 		echo "Error: tup monitor no longer running when it should be" 1>&2
+		exit 1
+	fi
+	wait $monitor_pid
+	if [ $? != 0 ]; then
+		echo "Error: monitor (pid $monitor_pid) exited with error code $?" 1>&2
 		exit 1
 	fi
 	monitor_running=0

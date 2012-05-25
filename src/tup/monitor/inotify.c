@@ -118,6 +118,7 @@ static int update_argc;
 static int autoupdate_flag = -1;
 static int autoparse_flag = -1;
 static volatile sig_atomic_t dircache_debug = 0;
+static volatile sig_atomic_t monitor_quit = 0;
 static struct moved_from_event_head moved_from_list = LIST_HEAD_INITIALIZER(&moved_from_list);
 
 int monitor_supported(void)
@@ -178,6 +179,7 @@ int monitor(int argc, char **argv)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
+	sigaction(SIGHUP, &sigact, NULL);
 	sigaction(SIGUSR1, &sigact, NULL);
 
 	if(stop_monitor(TUP_MONITOR_RESTARTING) < 0) {
@@ -351,18 +353,21 @@ static int monitor_set_pid(int pid)
 	return 0;
 }
 
-int monitor_get_pid(int restarting)
+int monitor_get_pid(int restarting, int *pid)
 {
 	struct buf b;
 	int fd;
-	int rc = 0;
 
+	*pid = -1;
 	fd = openat(tup_top_fd(), MONITOR_PID_FILE, O_RDWR, 0666);
 	if(fd < 0) {
 		if(errno != ENOENT) {
 			perror(MONITOR_PID_FILE);
 			return -1;
 		}
+		/* No pid file means we don't have the monitor running, so just
+		 * leave it at -1 and return success.
+		 */
 		return 0;
 	}
 	if(tup_flock(fd) < 0) {
@@ -373,12 +378,7 @@ int monitor_get_pid(int restarting)
 	}
 
 	if(b.len > 0) {
-		rc = strtol(b.s, NULL, 0);
-		/* Differentiate between a monitor actually not running and an
-		 * error in getting the monitor pid.
-		 */
-		if(rc == -1)
-			rc = 0;
+		*pid = strtol(b.s, NULL, 0);
 	}
 	free(b.s);
 out:
@@ -390,13 +390,13 @@ out:
 		return -1;
 	}
 
-	if(rc > 0) {
+	if(*pid > 0) {
 		/* Just using getpriority() to see if the monitor process is
 		 * alive.
 		 */
 		errno = 0;
-		if(getpriority(PRIO_PROCESS, rc) == -1 && errno == ESRCH) {
-			printf("Monitor pid %i doesn't exist anymore.\n", rc);
+		if(getpriority(PRIO_PROCESS, *pid) == -1 && errno == ESRCH) {
+			printf("Monitor pid %i doesn't exist anymore.\n", *pid);
 			if(restarting == TUP_MONITOR_RESTARTING) {
 				/* If we are actually restarting the monitor
 				 * make sure we let them know that the 'pid
@@ -406,10 +406,10 @@ out:
 				printf("Restarting the monitor.\n");
 			}
 			monitor_set_pid(-1);
-			rc = 0;
+			*pid = -1;
 		}
 	}
-	return rc;
+	return 0;
 }
 
 static int autoupdate_enabled(void)
@@ -633,8 +633,9 @@ static int monitor_loop(void)
 				}
 			}
 		}
-	} while(1);
+	} while(!monitor_quit);
 
+	monitor_set_pid(-1);
 	return 0;
 }
 
@@ -642,12 +643,11 @@ int stop_monitor(int restarting)
 {
 	int pid;
 
-	pid = monitor_get_pid(restarting);
-	if(pid < 0) {
+	if(monitor_get_pid(restarting, &pid) < 0) {
 		fprintf(stderr, "tup error: Unable to get the current monitor pid in order to shut it down.\n");
 		return -1;
 	}
-	if(pid == 0) {
+	if(pid < 0) {
 		if(restarting == TUP_MONITOR_SHUTDOWN) {
 			/* This case returns an error so we can tell in the
 			 * test code if the monitor isn't actually running when
@@ -662,11 +662,10 @@ int stop_monitor(int restarting)
 		printf("Restarting the monitor.\n");
 	else
 		printf("Shutting down the monitor.\n");
-	if(kill(pid, SIGKILL) < 0) {
+	if(kill(pid, SIGHUP) < 0) {
 		perror("kill");
 		return -1;
 	}
-	monitor_set_pid(-1);
 
 	return 0;
 }
@@ -1225,6 +1224,8 @@ static void sighandler(int sig)
 {
 	if(sig == SIGUSR1) {
 		dircache_debug = 1;
+	} else if(sig == SIGHUP) {
+		monitor_quit = 1;
 	} else {
 		monitor_set_pid(-1);
 		/* TODO: gracefully close, or something? */

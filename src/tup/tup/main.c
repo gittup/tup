@@ -63,6 +63,7 @@ static int dbconfig(int argc, char **argv);
 static int options(int argc, char **argv);
 static int fake_mtime(int argc, char **argv);
 static int fake_parser_version(int argc, char **argv);
+static int waitmon(void);
 static int flush(void);
 static int ghost_check(void);
 static void print_name(const char *s, char c);
@@ -145,6 +146,18 @@ int main(int argc, char **argv)
 		if(open_tup_top() < 0)
 			return -1;
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
+	} else if(strcmp(cmd, "waitmon") == 0) {
+		if(tup_drop_privs() < 0)
+			return 1;
+		if(find_tup_dir() < 0) {
+			fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
+			return -1;
+		}
+		if(open_tup_top() < 0)
+			return -1;
+		if(waitmon() < 0)
+			return 1;
+		return 0;
 	}
 
 	if(tup_init() < 0)
@@ -163,7 +176,8 @@ int main(int argc, char **argv)
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;
-		pid = monitor_get_pid(0);
+		if(monitor_get_pid(0, &pid) < 0)
+			return -1;
 		if(pid > 0) {
 			fprintf(stderr, "tup error: monitor appears to be running as pid %i - not doing scan.\n - Run 'tup stop' if you want to kill the monitor and use scan instead.\n", pid);
 			rc = 1;
@@ -1027,6 +1041,26 @@ static int fake_parser_version(int argc, char **argv)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
+	return 0;
+}
+
+static int waitmon(void)
+{
+	printf("Waitmon\n");
+	while(1) {
+		int pid;
+		if(monitor_get_pid(0, &pid) < 0) {
+			fprintf(stderr, "tup error: Unable to get the current monitor pid in waitmon()\n");
+			return -1;
+		}
+
+		if(pid < 0) {
+			usleep(100000);
+			printf(" -- waitmon (try again)\n");
+		} else {
+			break;
+		}
+	}
 	return 0;
 }
 

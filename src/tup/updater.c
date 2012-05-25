@@ -291,15 +291,14 @@ static int check_full_deps_rebuild(void)
 
 static int run_scan(int do_scan)
 {
-	int rc;
+	int pid;
 	int scanned = 0;
 
-	rc = monitor_get_pid(0);
-	if(rc < 0) {
+	if(monitor_get_pid(0, &pid) < 0) {
 		fprintf(stderr, "tup error: Unable to determine if the file monitor is still running.\n");
 		return -1;
 	}
-	if(rc == 0) {
+	if(pid < 0) {
 		if(do_scan) {
 			tup_main_progress("Scanning filesystem...\n");
 			if(tup_scan() < 0)

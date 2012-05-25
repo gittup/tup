@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -38,11 +38,9 @@ int stop_monitor(int restarting)
 	return -1;
 }
 
-int monitor_get_pid(int restarting)
+int monitor_get_pid(int restarting, int *pid)
 {
 	if(restarting) {}
-	/* Always return 0 to say that we successfully don't have a monitor
-	 * running.
-	 */
+	*pid = -1;
 	return 0;
 }
