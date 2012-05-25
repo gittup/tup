@@ -24,14 +24,18 @@ monitor
 
 rm .tup/db
 x=0
+max=5
+if [ "$TUP_VALGRIND" = "1" ]; then
+	max=500
+fi
 while ! grep "\-1" .tup/monitor.pid > /dev/null; do
 	sleep 0.1
 	x=$((x+1))
-	if [ $x -gt 5 ]; then
+	if [ $x -gt $max ]; then
 		echo "Error: monitor should have quit by now." 1>&2
 		exit 1
 	fi
 done
-monitor_running=0
+wait_monitor
 
 eotup

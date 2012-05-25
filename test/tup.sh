@@ -383,6 +383,16 @@ monitor()
 	monitor_running=1
 }
 
+wait_monitor()
+{
+	wait $monitor_pid
+	if [ $? != 0 ]; then
+		echo "Error: monitor (pid $monitor_pid) exited with error code $?" 1>&2
+		exit 1
+	fi
+	monitor_running=0
+}
+
 stop_monitor()
 {
 	tup flush
@@ -390,12 +400,7 @@ stop_monitor()
 		echo "Error: tup monitor no longer running when it should be" 1>&2
 		exit 1
 	fi
-	wait $monitor_pid
-	if [ $? != 0 ]; then
-		echo "Error: monitor (pid $monitor_pid) exited with error code $?" 1>&2
-		exit 1
-	fi
-	monitor_running=0
+	wait_monitor
 }
 
 signal_monitor()
