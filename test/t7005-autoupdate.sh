@@ -19,7 +19,7 @@
 . ./tup.sh
 check_monitor_supported
 set_autoupdate
-tup monitor
+monitor
 cat > Tupfile << HERE
 : foreach *.txt |> (echo '<html>'; cat %f; echo '</html>') > %o |> %B.html
 HERE

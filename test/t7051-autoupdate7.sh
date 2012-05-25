@@ -25,7 +25,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor --autoupdate > .monitor.output 2>&1
+monitor --autoupdate > .monitor.output 2>&1
 
 cat > ok.sh << HERE
 #! /bin/sh

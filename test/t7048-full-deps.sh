@@ -23,7 +23,7 @@ check_tup_suid
 
 set_full_deps
 
-tup monitor
+monitor
 
 cp ../testTupfile.tup Tupfile
 

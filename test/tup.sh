@@ -361,6 +361,25 @@ varsetall()
 	tup touch tup.config
 }
 
+monitor()
+{
+	if [ -n "$TUP_VALGRIND" ]; then
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup monitor"
+	elif [ -n "$TUP_HELGRIND" ]; then
+		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup monitor"
+	else
+		cmd="tup monitor"
+	fi
+
+	if $cmd "$@"; then
+		:
+	else
+		echo "*** Failed to run the monitor!" 1>&2
+		exit 1
+	fi
+	monitor_running=1
+}
+
 stop_monitor()
 {
 	tup flush
@@ -368,6 +387,7 @@ stop_monitor()
 		echo "Error: tup monitor no longer running when it should be" 1>&2
 		exit 1
 	fi
+	monitor_running=0
 }
 
 signal_monitor()
@@ -506,7 +526,9 @@ clear_full_deps()
 
 eotup()
 {
-	tup stop > /dev/null || true
+	if [ "$monitor_running" = "1" ]; then
+		stop_monitor
+	fi
 	cd $tupcurdir
 	rm -rf $tuptestdir
 	exit 0

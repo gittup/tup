@@ -20,7 +20,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 rm .tup/db
 x=0
@@ -32,5 +32,6 @@ while ! grep "\-1" .tup/monitor.pid > /dev/null; do
 		exit 1
 	fi
 done
+monitor_running=0
 
 eotup

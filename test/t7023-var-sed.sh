@@ -21,7 +21,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
@@ -40,7 +40,7 @@ update
 (echo "a sup b") | diff new.txt -
 
 stop_monitor
-tup monitor
+monitor
 stop_monitor
 check_empty_tupdirs
 

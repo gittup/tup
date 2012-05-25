@@ -19,7 +19,7 @@
 # See what happens if we change where a symlink points while the monitor is away
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 mkdir foo-x86
 mkdir foo-ppc
@@ -47,7 +47,7 @@ rm foo
 ln -s foo-ppc foo
 sleep 1
 symtouch foo
-tup monitor
+monitor
 update
 
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'

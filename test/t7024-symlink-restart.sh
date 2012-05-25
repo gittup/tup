@@ -19,7 +19,7 @@
 # Make sure a symlink doesn't do anything funky when the monitor is restarted
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 # First set everything up and clear all flags
 mkdir foo-x86
@@ -30,13 +30,13 @@ update
 # mtime is different, it will get put into modify)
 stop_monitor
 tup fake_mtime foo 5
-tup monitor
+monitor
 stop_monitor
 update
 
 # Now the mtime should match the symlink. Start and stop the monitor again to
 # see that no flags are set.
-tup monitor
+monitor
 stop_monitor
 check_empty_tupdirs
 

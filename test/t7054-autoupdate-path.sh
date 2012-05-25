@@ -24,7 +24,7 @@
 . ./tup.sh
 check_monitor_supported
 
-tup monitor --autoupdate
+monitor --autoupdate
 
 cat > run.sh << HERE
 echo "var:\$MARF"

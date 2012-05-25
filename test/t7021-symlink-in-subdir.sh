@@ -27,7 +27,7 @@ mkdir a
 cd a
 touch foo
 ln -s foo bar
-tup monitor
+monitor
 tup flush
 tup_object_exist a foo
 tup_object_exist a bar

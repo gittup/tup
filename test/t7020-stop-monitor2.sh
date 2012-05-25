@@ -21,7 +21,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 touch foo
 echo "include foo" > Tupfile
@@ -32,7 +32,7 @@ tup_dep_exist . foo 0 .
 
 # If we just stop and then start the monitor after an update, no flags should
 # be set.
-tup monitor
+monitor
 check_empty_tupdirs
 
 eotup

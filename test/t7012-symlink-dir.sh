@@ -19,7 +19,7 @@
 # Make sure we can use a symlink from the monitor
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 mkdir foo-x86
 echo "#define PROCESSOR 86" > foo-x86/processor.h

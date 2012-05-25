@@ -20,7 +20,7 @@
 # directory over the parent ghost. The rule should execute.
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 ln -s secret/ghost a
 cat > Tupfile << HERE

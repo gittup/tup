@@ -20,7 +20,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 mkdir a
 mkdir a/a2
 

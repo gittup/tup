@@ -32,7 +32,7 @@ check_monitor_supported
 mkdir tuptest
 cd tuptest
 re_init
-tup monitor
+monitor
 
 mkdir -p foo
 cd foo

@@ -18,7 +18,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 mkdir a
 echo ': |> echo "#define FOO 3" > %o |> foo.h' > a/Tupfile
 mkdir b

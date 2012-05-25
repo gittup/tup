@@ -36,7 +36,7 @@ HERE
 update
 check_exist prog
 
-tup monitor
+monitor
 
 cat > Tupfile << HERE
 HERE

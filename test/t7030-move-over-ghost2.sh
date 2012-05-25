@@ -20,7 +20,7 @@
 # necessary directories should be re-parsed.
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 mkdir a
 mkdir a/a2
 cat > a/a2/Tupfile << HERE

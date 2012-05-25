@@ -21,7 +21,7 @@
 check_no_windows variant
 check_monitor_supported
 
-tup monitor
+monitor
 
 mkdir build-foo
 mkdir sub

@@ -21,7 +21,7 @@ check_monitor_supported
 
 # Apparently changing a Tupfile in between monitor invocations doesn't work
 # properly (it doesn't get re-parsed).
-tup monitor
+monitor
 cat > Tupfile << HERE
 : |> echo hey |>
 HERE
@@ -34,7 +34,7 @@ cat > Tupfile << HERE
 HERE
 sleep 1
 touch Tupfile
-tup monitor
+monitor
 update
 stop_monitor
 

@@ -20,7 +20,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 cat > Tupfile << HERE
 srcs-@(FOO) += foo.c
 srcs-@(BAR) += bar.c

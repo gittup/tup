@@ -21,7 +21,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 mkdir .git
 echo ".gitignore" > Tupfile
@@ -31,7 +31,7 @@ tup_object_exist . .gitignore Tupfile
 
 # If we just stop and then start the monitor after an update, no flags should
 # be set.
-tup monitor
+monitor
 check_empty_tupdirs
 tup_object_exist . .gitignore Tupfile
 

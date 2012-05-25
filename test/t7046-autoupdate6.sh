@@ -24,7 +24,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor --autoupdate
+monitor --autoupdate
 
 mkdir dir2
 cat > dir2/Tupfile << HERE

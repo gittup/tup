@@ -22,7 +22,7 @@
 . ./tup.sh
 check_monitor_supported
 
-PATH=$PWD/a:$PATH tup monitor --autoparse
+PATH=$PWD/a:$PATH monitor --autoparse
 export PATH=$PWD/b:$PATH
 
 mkdir a

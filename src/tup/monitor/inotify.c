@@ -63,6 +63,7 @@
 #include "tup/option.h"
 #include "tup/timespan.h"
 #include "tup/variant.h"
+#include "tup/init.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -218,6 +219,8 @@ int monitor(int argc, char **argv)
 			 */
 			tup_unflock(tup_obj_lock());
 			if(tup_wait_flock(tup_obj_lock()) < 0)
+				exit(1);
+			if(tup_cleanup() < 0)
 				exit(1);
 			exit(0);
 		}

@@ -21,12 +21,12 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 
 echo "int main(void) {return 0;}" > foo.c
 cp ../testTupfile.tup Tupfile
 stop_monitor
-tup monitor
+monitor
 update
 tup_object_exist . foo.c foo.o prog.exe
 sym_check foo.o main
@@ -38,7 +38,7 @@ sym_check prog.exe main
 touch foo.c
 stop_monitor
 rm foo.o
-tup monitor
+monitor
 update
 tup_object_exist . foo.c foo.o prog.exe
 sym_check foo.o main
@@ -47,7 +47,7 @@ sym_check prog.exe main
 # If we just stop and then start the monitor after an update, no flags should
 # be set.
 stop_monitor
-tup monitor
+monitor
 check_empty_tupdirs
 
 eotup

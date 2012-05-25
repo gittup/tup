@@ -20,7 +20,7 @@
 # means we have to update the node's dir field when it is renamed.
 . ./tup.sh
 check_monitor_supported
-tup monitor
+monitor
 mkdir a
 mkdir a/a2
 cp ../testTupfile.tup a/a2/Tupfile

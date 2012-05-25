@@ -22,7 +22,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor --autoupdate
+monitor --autoupdate
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
@@ -35,7 +35,7 @@ tup stop
 sleep 1
 echo 'int bar(void) {return 6;}' > ok.c
 
-tup monitor --autoupdate
+monitor --autoupdate
 
 tup flush
 sym_check ok.o ^foo bar

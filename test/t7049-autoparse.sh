@@ -20,7 +20,7 @@
 
 . ./tup.sh
 check_monitor_supported
-tup monitor --autoparse
+monitor --autoparse
 
 touch foo.c
 cat > Tupfile << HERE
