@@ -82,6 +82,10 @@ tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
 
 enoent:
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 	return tup_file_del(dt, file, -1, modified);
 }
 
