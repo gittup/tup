@@ -67,6 +67,18 @@ out_err:
 
 int tup_cleanup(void)
 {
+	tup_db_close();
+	tup_option_exit();
+	tup_lock_exit();
+	if(close(tup_top_fd()) < 0)
+		perror("close(tup_top_fd())");
+	if(server_post_exit() < 0)
+		return -1;
+	return 0;
+}
+
+void tup_valgrind_cleanup(void)
+{
 	/* The tup_entry structures are a cache of the database, so they aren't
 	 * normally freed during execution. There's also no need to go through
 	 * the whole thing and clean them up manually since we can let the OS
@@ -93,12 +105,4 @@ int tup_cleanup(void)
 		close(STDOUT_FILENO);
 		close(STDIN_FILENO);
 	}
-	tup_db_close();
-	tup_option_exit();
-	tup_lock_exit();
-	if(close(tup_top_fd()) < 0)
-		perror("close(tup_top_fd())");
-	if(server_post_exit() < 0)
-		return -1;
-	return 0;
 }

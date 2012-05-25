@@ -222,6 +222,7 @@ int monitor(int argc, char **argv)
 				exit(1);
 			if(tup_cleanup() < 0)
 				exit(1);
+			tup_valgrind_cleanup();
 			exit(0);
 		}
 
