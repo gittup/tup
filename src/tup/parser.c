@@ -905,8 +905,8 @@ static int include_file(struct tupfile *tf, const char *file)
 
 	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
 	if (tf->cur_dfd < 0) {
-	   parser_error(tf, file);
-	   goto out_free_pel;
+		parser_error(tf, file);
+		goto out_free_pel;
 	}
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
@@ -928,8 +928,8 @@ out_close:
 	}
 out_close_dfd:
 	if(close(tf->cur_dfd) < 0) {
-	   parser_error(tf, "close(tf->cur_dfd)");
-	   rc = -1;
+		parser_error(tf, "close(tf->cur_dfd)");
+		rc = -1;
 	}
 out_free_pel:
 	free(pel);
