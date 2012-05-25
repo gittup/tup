@@ -77,6 +77,21 @@ int tup_cleanup(void)
 	if(getenv("TUP_VALGRIND")) {
 		tup_entry_clear();
 		variants_free();
+
+		/* Also close out the standard file descriptors, so valgrind
+		 * doesn't complain about those as well. The outputs need to be
+		 * flushed, otherwise 'tup options | grep foo' will not see the
+		 * output from tup. This is done here rather than tup_cleanup()
+		 * because other parts of tup (such as flush()) will call
+		 * cleanup and then init again. We only want to close the
+		 * standard descriptors once though, so we don't impact other
+		 * file descriptors that may have been opened.
+		 */
+		fflush(stdout);
+		fflush(stderr);
+		close(STDERR_FILENO);
+		close(STDOUT_FILENO);
+		close(STDIN_FILENO);
 	}
 	tup_db_close();
 	tup_option_exit();

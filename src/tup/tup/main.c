@@ -76,7 +76,6 @@ int main(int argc, char **argv)
 	int x;
 	int cmd_arg = 0;
 	const char *cmd = NULL;
-	int in_valgrind = 0;
 	int clear_autoupdate = 0;
 
 	for(x=1; x<argc; x++) {
@@ -106,10 +105,6 @@ int main(int argc, char **argv)
 	if(compat_init() < 0) {
 		fprintf(stderr, "tup error: Unable to initialize compatibility lib\n");
 		return -1;
-	}
-
-	if(getenv("TUP_VALGRIND")) {
-		in_valgrind = 1;
 	}
 
 	argc = argc - cmd_arg;
@@ -237,22 +232,6 @@ int main(int argc, char **argv)
 
 	if(tup_cleanup() < 0)
 		rc = 1;
-	if(in_valgrind) {
-		/* Also close out the standard file descriptors, so valgrind
-		 * doesn't complain about those as well. The outputs need to be
-		 * flushed, otherwise 'tup options | grep foo' will not see the
-		 * output from tup. This is done here rather than tup_cleanup()
-		 * because other parts of tup (such as flush()) will call
-		 * cleanup and then init again. We only want to close the
-		 * standard descriptors once though, so we don't impact other
-		 * file descriptors that may have been opened.
-		 */
-		fflush(stdout);
-		fflush(stderr);
-		close(STDERR_FILENO);
-		close(STDOUT_FILENO);
-		close(STDIN_FILENO);
-	}
 	return rc;
 }
 
