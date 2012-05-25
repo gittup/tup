@@ -100,6 +100,7 @@ static struct moved_from_event *check_from_events(struct inotify_event *e);
 static void monitor_rmdir_cb(tupid_t dt);
 static int handle_event(struct monitor_event *m, int *modified);
 static void pinotify(void);
+static int dump_dircache(void);
 static void sighandler(int sig);
 
 static int inot_fd;
@@ -116,6 +117,7 @@ static char **update_argv;
 static int update_argc;
 static int autoupdate_flag = -1;
 static int autoparse_flag = -1;
+static volatile sig_atomic_t dircache_debug = 0;
 static struct moved_from_event_head moved_from_list = LIST_HEAD_INITIALIZER(&moved_from_list);
 
 int monitor_supported(void)
@@ -512,6 +514,14 @@ static int monitor_loop(void)
 
 			DEBUGP("%c[%i: %li]: '%s' %08x [%i, %i]\n", locked? 'E' : 'e', e->wd,
 			       (long)sizeof(*e) + e->len, e->len ? e->name : "", e->mask, tup_wd, obj_wd);
+
+			if(dircache_debug) {
+				dircache_debug = 0;
+				if(dump_dircache() < 0) {
+					monitor_set_pid(-1);
+					exit(1);
+				}
+			}
 			/* If the object lock file is opened, assume we are now
 			 * locked out. We take the tri lock before releasing
 			 * the object lock, so we can make sure we are the
@@ -1214,10 +1224,7 @@ static int dump_dircache(void)
 static void sighandler(int sig)
 {
 	if(sig == SIGUSR1) {
-		if(dump_dircache() < 0) {
-			monitor_set_pid(-1);
-			exit(-1);
-		}
+		dircache_debug = 1;
 	} else {
 		monitor_set_pid(-1);
 		/* TODO: gracefully close, or something? */
