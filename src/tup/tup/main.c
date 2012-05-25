@@ -1046,6 +1046,7 @@ static int fake_parser_version(int argc, char **argv)
 
 static int waitmon(void)
 {
+	int tries = 0;
 	printf("Waitmon\n");
 	while(1) {
 		int pid;
@@ -1056,7 +1057,11 @@ static int waitmon(void)
 
 		if(pid < 0) {
 			usleep(100000);
-			printf(" -- waitmon (try again)\n");
+			tries++;
+			if(tries > 10) {
+				printf(" -- waitmon (try again)\n");
+				tries = 0;
+			}
 		} else {
 			break;
 		}
