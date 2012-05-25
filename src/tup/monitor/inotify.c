@@ -85,7 +85,7 @@ LIST_HEAD(moved_from_event_head, moved_from_event);
 
 static int monitor_set_pid(int pid);
 static int monitor_loop(void);
-static int wp_callback(tupid_t newdt, int dfd, const char *file);
+static int wp_callback(tupid_t newdt, int dfd, const char *file, int *skip);
 static int events_queued(void);
 static int queue_event(struct inotify_event *e);
 static int flush_queue(int do_autoupdate);
@@ -674,7 +674,7 @@ int stop_monitor(int restarting)
 	return 0;
 }
 
-static int wp_callback(tupid_t newdt, int dfd, const char *file)
+static int wp_callback(tupid_t newdt, int dfd, const char *file, int *skip)
 {
 	int wd;
 	uint32_t mask;
@@ -688,6 +688,10 @@ static int wp_callback(tupid_t newdt, int dfd, const char *file)
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
+		if(errno == ENOENT) {
+			*skip = 1;
+			return 0;
+		}
 		pinotify();
 		return -1;
 	}

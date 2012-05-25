@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 
 int watch_path(tupid_t dt, int dfd, const char *file,
-	       int (*callback)(tupid_t newdt, int dfd, const char *file))
+	       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
 {
 	struct flist f = {0, 0, 0};
 	struct stat buf;
@@ -65,21 +65,38 @@ int watch_path(tupid_t dt, int dfd, const char *file,
 		int newfd;
 		struct tupid_entries root = {NULL};
 		struct tup_entry *tent;
+		int skip = 0;
 
 		tent = tup_db_create_node(dt, file, TUP_NODE_DIR);
 		if(!tent)
 			return -1;
 
 		if(callback) {
-			if(callback(tent->tnode.tupid, dfd, file) < 0)
+			if(callback(tent->tnode.tupid, dfd, file, &skip) < 0)
 				return -1;
 		}
-
-		if(tup_entry_get_dir_tree(tent, &root) < 0)
-			return -1;
+		if(skip) {
+			/* It's possible the directory was deleted in between
+			 * our fstatat() call and the inotify_add_watch() call
+			 * in the monitor. If so just delete the node and
+			 * continue (t7037 race condition).
+			 */
+			if(tup_file_missing(tent) < 0)
+				return -1;
+			return 0;
+		}
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {
+			if(errno == ENOENT) {
+				/* It's possible that we successfully did an fstatat() and
+				 * inotify_add_watch(), but now failed to open the directory because
+				 * it has been removed. This is also ok (t7037 race condition).
+				 */
+				if(tup_file_missing(tent) < 0)
+					return -1;
+				return 0;
+			}
 			fprintf(stderr, "tup error: Unable to openat() directory.\n");
 			perror(file);
 			return -1;
@@ -88,6 +105,9 @@ int watch_path(tupid_t dt, int dfd, const char *file,
 			perror("fchdir");
 			return -1;
 		}
+
+		if(tup_entry_get_dir_tree(tent, &root) < 0)
+			return -1;
 
 		flist_foreach(&f, ".") {
 			struct tup_entry *subtent;
