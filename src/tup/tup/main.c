@@ -138,6 +138,12 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "stop") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
+		if(find_tup_dir() < 0) {
+			fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
+			return -1;
+		}
+		if(open_tup_top() < 0)
+			return -1;
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
 	}
 
