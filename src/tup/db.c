@@ -216,6 +216,7 @@ int tup_db_open(void)
 	if(rc != 0) {
 		fprintf(stderr, "Unable to open database: %s\n",
 			sqlite3_errmsg(tup_db));
+		return -1;
 	}
 	for(x=0; x<ARRAY_SIZE(stmts); x++) {
 		stmts[x] = NULL;
