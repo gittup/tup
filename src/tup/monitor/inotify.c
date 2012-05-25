@@ -754,10 +754,9 @@ static int flush_queue(int do_autoupdate)
 	tup_db_begin();
 
 	DEBUGP("[36mFlush[%i]: mem=%i events_handled=%i[0m\n", do_autoupdate, total_mem, events_handled);
-	while(!TAILQ_EMPTY(&event_list)) {
+	TAILQ_FOREACH(m, &event_list, list) {
 		struct inotify_event *e;
 		int modified = 0;
-		m = TAILQ_FIRST(&event_list);
 
 		e = &m->e;
 		DEBUGP("Handle[%li]: '%s' %08x\n",
@@ -775,6 +774,13 @@ static int flush_queue(int do_autoupdate)
 		if(modified) {
 			events_handled = 1;
 		}
+	}
+
+	/* Free the events separately, since some events may point to earlier
+	 * events in the queue with a moved_from_event pointer.
+	 */
+	while(!TAILQ_EMPTY(&event_list)) {
+		m = TAILQ_FIRST(&event_list);
 		TAILQ_REMOVE(&event_list, m, list);
 		total_mem -= m->mem;
 		free(m);
