@@ -31,13 +31,13 @@ varsetall FOO=3
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
-tup_object_exist @ GHOST
-tup_object_exist @ FOO
-tup_dep_exist @ GHOST 0 .
+tup_object_exist tup.config GHOST
+tup_object_exist tup.config FOO
+tup_dep_exist tup.config GHOST 0 .
 
 # The GHOST variable should still exist and point to the directory
 varsetall FOO=4
-tup_object_exist @ GHOST
-tup_dep_exist @ GHOST 0 .
+tup_object_exist tup.config GHOST
+tup_dep_exist tup.config GHOST 0 .
 
 eotup

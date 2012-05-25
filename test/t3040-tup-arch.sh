@@ -33,13 +33,13 @@ if uname -s | grep Linux > /dev/null; then
 		arch=i386 ;;
 	esac
 	tup_object_exist . "echo $arch"
-	tup_dep_exist @ TUP_ARCH 0 .
+	tup_dep_exist tup.config TUP_ARCH 0 .
 fi
 
 varsetall TUP_ARCH=bar
 tup parse
 tup_object_exist . 'echo bar'
-tup_dep_exist @ TUP_ARCH 0 .
+tup_dep_exist tup.config TUP_ARCH 0 .
 tup_object_no_exist . 'echo x86_64'
 tup_object_no_exist . 'echo i386'
 

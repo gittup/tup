@@ -31,6 +31,7 @@
 #include "tup/privs.h"
 #include "tup/progress.h"
 #include "tup/option.h"
+#include "tup/variant.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -357,6 +358,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	char job[JOB_MAX];
 	char dir[PATH_MAX];
 	struct execmsg em;
+	struct variant *variant;
 
 	memset(&em, 0, sizeof(em));
 	em.sid = s->id;
@@ -382,7 +384,9 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		return -1;
 	}
 	em.cmdlen = strlen(cmd) + 1;
-	if(master_fork_exec(&em, job, dir, cmd, newenv->envblock, &status) < 0) {
+	variant = tup_entry_variant(dtent);
+	em.vardictlen = variant->vardict_len;
+	if(master_fork_exec(&em, job, dir, cmd, newenv->envblock, variant->vardict_file, &status) < 0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
 		pthread_mutex_unlock(s->error_mutex);

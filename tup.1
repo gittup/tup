@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/04/19" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/05/24" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -107,6 +107,29 @@ Temporarily override the monitor.autoparse option to 0. This will prevent the mo
 .TP
 .B stop
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
+.TP
+.B variant foo.config [bar.config] [...]
+For each argument, this command creates a variant directory with tup.config symlinked to the specified config file. For example, if a directory contained several variant configurations, one could easily create a variant for each config file:
+
+.nf
+$ ls configs/
+bar.config
+foo.config
+$ tup variant configs/*.config
+tup: Added variant 'build-bar' using config file 'configs/bar.config'
+tup: Added variant 'build-foo' using config file 'configs/foo.config'
+.fi
+
+This is equivalent to the following:
+
+.nf
+$ mkdir build-bar
+$ ln -s ../configs/bar.config build-bar/tup.config
+$ mkdir build-foo
+$ ln -s ../configs/foo.config build-foo/tup.config
+.fi
+
+For projects that commonly use several variants, the files in the configs/ directory could be checked in to source control. Each developer would run the 'tup variant' after 'tup init' during the initial checkout of the software. Variants can also be created manually by making a build directory and creating a tup.config file in it (see the VARIANTS section). This command merely helps save some steps, so that you don't have to make each build directory and tup.config symlink manually.
 .TP
 .B dbconfig
 Displays the current tup database configuration. These are internal values used by tup.
@@ -474,7 +497,7 @@ Variable expansion in tup is immediate in every case except for !-macros. That i
 When tup parses a Tupfile, it makes a single pass through the file, parsing a line at a time. At the end of the Tupfile, all variable, !-macro, and {bin} definitions are discarded. The only lingering effects of parsing a Tupfile are the command nodes and dependencies that now exist in the tup database. Additionally, a .gitignore file may have been created if requested by the Tupfile.
 
 .SH "@-VARIABLES"
-@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used by the varsed command. Commands are be able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy. For example, tup.config may contain:
+@-variables are special variables in tup. They are used as configuration variables, and can be read by Tupfiles or used by the varsed command. Commands are able to read them too, but the program executed by the command has to have direct knowledge of the variables. @-variables are specified in the tup.config file at the top of the tup hierarchy or in a variant directory. For example, tup.config may contain:
 .nf
 
 CONFIG_FOO=y
@@ -509,6 +532,46 @@ TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the t
 .TP
 .B @(TUP_ARCH)
 TUP_ARCH is another special @-variable. If CONFIG_TUP_ARCH is not set in the tup.config file, it has a default value according to the processor architecture that tup itself was compiled in. Currently the default value is one of "i386", "x86_64", "powerpc", "powerpc64", "ia64", "alpha", "sparc" or "arm".
+
+.SH "VARIANTS"
+Tup supports variants, which allow you to build your project multiple times with different configurations. Perhaps the most common case is to build a release and a debug configuration with different compiler flags, though any number of variants can be used to support whatever configurations you like. Each variant is built in its own directory distinct from each other and from the source tree. When building with variants, the in-tree build is disabled. To create a variant, make a new directory at the top of the tup hierarchy and create a "tup.config" file there. For example:
+.nf
+
+$ mkdir build-default
+$ touch build-default/tup.config
+$ tup upd
+
+.fi
+
+Here we created a directory called "build-default" and made an empty tup.config inside. Note that the build directory must be at the same level as the ".tup" directory. Upon updating, tup will parse all of the Tupfiles using the configuration file we created, and place all build products within subdirectories of build-default that mirror the source tree. We could then create another variant like so:
+
+.nf
+
+$ mkdir build-debug
+$ echo "CONFIG_MYPROJ_DEBUG=y" > build-debug/tup.config
+$ tup upd
+
+.fi
+
+This time all Tupfiles will be parsed with @(MYPROJ_DEBUG) set to "y", and all build products will be placed in the build-debug directory. Note that setting @(MYPROJ_DEBUG) only has any affect if the variable is actually used in a Tupfile (perhaps by adding debug flags to the compiler command-line).
+
+Running "tup upd" will update all variants. For example, updating after modifying a C file that is used in all configurations will cause it to be re-compiled for each variant. As with any command that is executed, this is done in parallel subject to the constraints of the DAG and the number of jobs specified. To build a single variant (or subset of variants), specify the build directory as the target to "tup upd", just like with any partial update. For example:
+
+.nf
+
+$ tup upd build-default
+
+.fi
+
+To delete a variant, just wipe out the build directory:
+
+.nf
+
+$ rm -rf build-debug
+
+.fi
+
+If you build with variants, it is recommended that you always have a default variant that contains an empty tup.config file. This helps check that your software is always able to be built by simply checking it out and doing 'tup init; tup upd' without relying on a specific configuration.
 
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:

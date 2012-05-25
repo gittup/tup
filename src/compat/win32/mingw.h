@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,3 +32,4 @@ int unlinkat(int dirfd, const char *pathname, int flags);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
+int symlink(const char *oldpath, const char *newpath);

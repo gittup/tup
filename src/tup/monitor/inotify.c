@@ -62,6 +62,7 @@
 #include "tup/container.h"
 #include "tup/option.h"
 #include "tup/timespan.h"
+#include "tup/variant.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -441,16 +442,15 @@ static int monitor_loop(void)
 	int rc;
 	struct timespan ts;
 	static char buf[(sizeof(struct inotify_event) + 16) * 4096];
-	struct tupid_entries scan_root = {NULL};
 	int locked = 1;
 
 	timespan_start(&ts);
 
-	if(tup_db_scan_begin(&scan_root) < 0)
+	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", &scan_root, wp_callback) < 0)
+	if(watch_path(0, tup_top_fd(), ".", wp_callback) < 0)
 		return -1;
-	if(tup_db_scan_end(&scan_root) < 0)
+	if(tup_db_scan_end() < 0)
 		return -1;
 
 	/* If we are running in autoupdate mode, we should check to see if any
@@ -581,6 +581,17 @@ static int monitor_loop(void)
 					 */
 					if(tup_entry_clear() < 0)
 						return -1;
+
+					/* Reload the variants, since we may have new ones or
+					 * deleted old ones during the update.
+					 */
+					variants_free();
+					if(tup_db_begin() < 0)
+						return -1;
+					if(variant_load() < 0)
+						return -1;
+					if(tup_db_commit() < 0)
+						return -1;
 					locked = 1;
 					DEBUGP("monitor ON\n");
 				}
@@ -692,6 +703,18 @@ static int queue_event(struct inotify_event *e)
 		return 0;
 	if(ephemeral_event(e) == 0)
 		return 0;
+
+	if(e->mask & IN_IGNORED) {
+		struct dircache *dc;
+		dc = dircache_lookup_wd(&droot, e->wd);
+		if(dc) {
+			/* Disable this dircache until it can be cleaned up in
+			 * handle_event.  This lets us skip any other events in
+			 * handle_event that use this disabled dc.
+			 */
+			dc->dt_node.tupid = -1;
+		}
+	}
 
 	if(e->mask & IN_MOVED_TO) {
 		mfe = check_from_events(e);
@@ -1022,9 +1045,15 @@ static int handle_event(struct monitor_event *m, int *modified)
 	struct dircache *dc;
 
 	if(m->e.mask & IN_IGNORED) {
-		/* Ignore IN_IGNORED events - we'll already have removed the
-		 * wd from the dircache in the callback function.
+		/* For variant dirs that are deleted by the updater, we just
+		 * get the ignore event. These don't go through the
+		 * monitor_rmdir_cb, so we need to clean up here.
 		 */
+		dc = dircache_lookup_wd(&droot, m->e.wd);
+		if(dc) {
+			inotify_rm_watch(inot_fd, m->e.wd);
+			dircache_del(&droot, dc);
+		}
 		return 0;
 	}
 
@@ -1033,6 +1062,12 @@ static int handle_event(struct monitor_event *m, int *modified)
 		fprintf(stderr, "tup error: dircache entry not found for wd %i\n",
 			m->e.wd);
 		return -1;
+	}
+	if(dc->dt_node.tupid == -1) {
+		/* Skip the event if the dc is disabled. It will be cleaned up
+		 * soon in the IN_IGNORED block.
+		 */
+		return 0;
 	}
 
 	if(m->e.mask & IN_MOVED_TO && m->from_event) {
@@ -1055,8 +1090,6 @@ static int handle_event(struct monitor_event *m, int *modified)
 				return -1;
 			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt_node.tupid) < 0)
 				return -1;
-			if(tup_db_modify_dir(tent->tnode.tupid) < 0)
-				return -1;
 			fd = tup_db_open_tupid(dc->dt_node.tupid);
 			if(fd < 0)
 				return -1;
@@ -1065,7 +1098,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 			 * in removing them all and re-creating them. The
 			 * dircache already handles this case.
 			 */
-			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
 			if(close(fd) < 0) {
 				perror("close(fd)");
 				return -1;
@@ -1095,7 +1128,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 		fd = tup_db_open_tupid(dc->dt_node.tupid);
 		if(fd < 0)
 			return -1;
-		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, NULL, wp_callback);
+		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
 		if(close(fd) < 0) {
 			perror("close(fd)");
 			return -1;

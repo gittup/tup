@@ -33,7 +33,7 @@ def config_var(key):
         if fd is None:
             raise Exception('tup error: This python module can only be used as a sub-process from tup')
 
-        if os.fstat(int(fd)).st_size == 0:
+        if int(fd) < 0 or os.fstat(int(fd)).st_size == 0:
             tup_vardict_num = 0
         else:
             tup_vardict_map = mmap.mmap(int(fd), 0, mmap.MAP_PRIVATE, mmap.PROT_READ);

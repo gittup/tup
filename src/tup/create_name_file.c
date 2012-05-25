@@ -26,6 +26,7 @@
 #include "pel_group.h"
 #include "entry.h"
 #include "option.h"
+#include "variant.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +35,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified);
 static int ghost_to_file(struct tup_entry *tent);
 
 static void (*rmdir_callback)(tupid_t tupid);
@@ -42,7 +42,7 @@ static void (*rmdir_callback)(tupid_t tupid);
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry)
 {
-	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, entry) < 0)
+	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
@@ -53,15 +53,6 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 {
 	struct tup_entry *tent;
 	tent = tup_db_create_node(dt, cmd, TUP_NODE_CMD);
-	if(tent)
-		return tent->tnode.tupid;
-	return -1;
-}
-
-tupid_t create_dir_file(tupid_t dt, const char *path)
-{
-	struct tup_entry *tent;
-	tent = tup_db_create_node(dt, path, TUP_NODE_DIR);
 	if(tent)
 		return tent->tnode.tupid;
 	return -1;
@@ -144,10 +135,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 				return -1;
 
-			/* It's possible this is a file that was included by a
-			 * Tupfile.  Try to set any dependent directory flags.
-			 */
-			if(tup_db_set_dependent_dir_flags(tent->tnode.tupid) < 0)
+			if(tup_db_set_dependent_flags(tent->tnode.tupid) < 0)
 				return -1;
 
 			if(tent->mtime != mtime)
@@ -158,26 +146,36 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 
 	if(new || changed) {
 		if(modified) *modified = 1;
-		if(dt == DOT_DT && strcmp(file, TUP_CONFIG) == 0) {
-			/* If tup.config was modified, put the @-directory in
-			 * the create list so we can import any variables that
-			 * have changed.
+		if(strcmp(file, TUP_CONFIG) == 0) {
+			/* tup.config only counts if it's at the project root, or if
+			 * it's in a top-level subdirectory for a variant.
 			 */
-			if(tup_db_add_create_list(VAR_DT) < 0)
-				return -1;
+			if(tent->dt == DOT_DT || tent->parent->dt == DOT_DT) {
+				/* If tup.config was modified, put the @-directory in
+				 * the create list so we can import any variables that
+				 * have changed.
+				 */
+				if(tup_db_add_config_list(tent->tnode.tupid) < 0)
+					return -1;
+			}
 		}
 	}
 
 	return tent->tnode.tupid;
 }
 
-static int check_rm_tup_config(struct tup_entry *tent)
+static int check_rm_tup_config(struct tup_entry *tent, int *dont_delete)
 {
-	if(tent->dt == DOT_DT && strcmp(tent->name.s, TUP_CONFIG) == 0) {
-		/* If tup.config was removed, also add the @-directory to the
-		 * create list.
+	*dont_delete = 0;
+	if(strcmp(tent->name.s, TUP_CONFIG) == 0) {
+		/* Just go back to a ghost tup.config node, and add it to the
+		 * config list so we can update all of the variables, and clean
+		 * up the variant if necessary.
 		 */
-		if(tup_db_add_create_list(VAR_DT) < 0)
+		*dont_delete = 1;
+		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
+			return -1;
+		if(tup_db_add_config_list(tent->tnode.tupid) < 0)
 			return -1;
 	}
 	return 0;
@@ -201,9 +199,6 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 		return 0;
 	}
 
-	if(check_rm_tup_config(tent) < 0)
-		return -1;
-
 	/* If .gitignore is removed, make sure we re-parse the Tupfile
 	 * (t7040).
 	 */
@@ -216,9 +211,26 @@ int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 
 int tup_file_missing(struct tup_entry *tent)
 {
-	if(check_rm_tup_config(tent) < 0)
-		return -1;
-	return tup_del_id_type(tent->tnode.tupid, tent->type, 0, NULL);
+	int force = 0;
+	struct variant *variant;
+
+	variant = tup_entry_variant_null(tent);
+	if(variant && !variant->root_variant) {
+		if(variant->dtnode.tupid == tent->tnode.tupid) {
+			/* Variant root directories use a force removal so that we
+			 * don't try to reparse everything.
+			 */
+			force = 1;
+		} else if(tent->type == TUP_NODE_DIR) {
+			/* Variant sub-directories get a warning that they will
+			 * be re-created.
+			 */
+			fprintf(stderr, "tup warning: variant directory '");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "' was deleted outside of tup. This directory will be re-created, unless the corresponding source directory was also removed.\n");
+		}
+	}
+	return tup_del_id_type(tent->tnode.tupid, tent->type, force, NULL);
 }
 
 int tup_del_id_force(tupid_t tupid, int type)
@@ -231,16 +243,72 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 	rmdir_callback = callback;
 }
 
-static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
+int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 {
+	struct tup_entry *tent;
+	int dont_delete = 0;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	if(check_rm_tup_config(tent, &dont_delete) < 0)
+		return -1;
+	if(dont_delete)
+		return 0;
+
 	if(type == TUP_NODE_DIR) {
+		struct variant *variant;
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
-		if(tup_db_delete_dir(tupid) < 0)
+		if(tup_db_delete_dir(tupid, force) < 0)
 			return -1;
 		if(rmdir_callback)
 			rmdir_callback(tupid);
+
+		/* Try to figure out if we are a variant directory - if so, we
+		 * may need to reparse the src directory to try to re-create
+		 * the variant dir. We use tup_entry_variant_null here since
+		 * the root variant may not be created yet. We only try to do
+		 * this if the scanner/monitor detects a missing file, not if
+		 * the updater deletes the variant directory because the src
+		 * directory was already deleted.
+		 */
+		if(!force) {
+			variant = tup_entry_variant_null(tent);
+			if(variant && !variant->root_variant) {
+				if(variant->enabled) {
+					/* It is possible that the srcid has
+					 * already been removed (ie: The user
+					 * rm -rf'd the variant, and the
+					 * corresponding source directory). If
+					 * the source directory was missing
+					 * first, then its node has been
+					 * removed from the database. Adding it
+					 * to the create list would confuse
+					 * tup, so we use the 'maybe' version
+					 * here to make sure the node exists
+					 * before adding it (t8035).
+					 */
+					if(tup_db_maybe_add_create_list(tent->srcid) < 0)
+						return -1;
+				}
+			} else {
+				/* If we are removing a directory in the
+				 * srctree that has a ghost Tupfile, make sure
+				 * we notify all of the variant directories to
+				 * be re-parsed. This way they can be cleaned
+				 * up as necessary (t8020).
+				 */
+				struct tup_entry *tuptent;
+				if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+					return -1;
+				if(tuptent) {
+					if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
+						return -1;
+				}
+			}
+		}
 	}
 
 	/* If a file was deleted and it was created by a command, set the
@@ -250,6 +318,15 @@ static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 	 */
 	if(type == TUP_NODE_GENERATED && !force) {
 		int changed = 0;
+
+		/* If a generated.gitignore file was removed, re-parse
+		 * the directory so it will be recreated.
+		 */
+		if(strcmp(tent->name.s, ".gitignore") == 0) {
+			if(tup_db_add_create_list(tent->dt) < 0)
+				return -1;
+			return 0;
+		}
 
 		if(tup_db_modify_cmds_by_output(tupid, &changed) < 0)
 			return -1;
@@ -265,16 +342,9 @@ static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 		 * been executed yet.
 		 */
 		if(changed == 1) {
-			struct tup_entry *tent;
-
-			tent = tup_entry_find(tupid);
-			if(!tent) {
-				fprintf(stderr, "tup warning: generated file ID %lli was deleted outside of tup. This file may be re-created on the next update.\n", tupid);
-			} else {
-				fprintf(stderr, "tup warning: generated file '");
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
-			}
+			fprintf(stderr, "tup warning: generated file '");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "' was deleted outside of tup. This file may be re-created on the next update.\n");
 			if(modified) *modified = 1;
 		}
 
@@ -288,10 +358,7 @@ static int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 	if(modified) *modified = 1;
 
 	if(type == TUP_NODE_FILE || type == TUP_NODE_DIR) {
-		/* It's possible this is a file that was included by a Tupfile.
-		 * Try to set any dependent directory flags.
-		 */
-		if(tup_db_set_dependent_dir_flags(tupid) < 0)
+		if(tup_db_set_dependent_flags(tupid) < 0)
 			return -1;
 	}
 
@@ -438,7 +505,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
 					return -1;
 				}
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, &tent) < 0)
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, -1, &tent) < 0)
 					return -1;
 			}
 		}

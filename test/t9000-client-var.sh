@@ -30,7 +30,7 @@ HERE
 tup touch Tupfile
 update
 
-tup_object_exist @ abcd
+tup_object_exist tup.config abcd
 
 cat > Tupfile << HERE
 : |> ./client defg |>
@@ -38,7 +38,7 @@ HERE
 tup touch Tupfile
 update
 
-tup_object_no_exist @ abcd
-tup_object_exist @ defg
+tup_object_no_exist tup.config abcd
+tup_object_exist tup.config defg
 
 eotup

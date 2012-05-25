@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -194,9 +194,10 @@ struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen)
 }
 
 int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
-		  int (*extra_a)(struct var_entry *ve),
-		  int (*extra_b)(struct var_entry *ve),
-		  int (*same)(struct var_entry *vea, struct var_entry *veb))
+		  int (*extra_a)(struct var_entry *ve, tupid_t vardt),
+		  int (*extra_b)(struct var_entry *ve, tupid_t vardt),
+		  int (*same)(struct var_entry *vea, struct var_entry *veb),
+		  tupid_t vardt)
 {
 	struct string_tree *sta;
 	struct string_tree *stb;
@@ -211,12 +212,12 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 	while(sta || stb) {
 		if(!sta) {
 			veb = container_of(stb, struct var_entry, var);
-			if(extra_b && extra_b(veb) < 0)
+			if(extra_b && extra_b(veb, vardt) < 0)
 				return -1;
 			stb = RB_NEXT(string_entries, b, stb);
 		} else if(!stb) {
 			vea = container_of(sta, struct var_entry, var);
-			if(extra_a && extra_a(vea) < 0)
+			if(extra_a && extra_a(vea, vardt) < 0)
 				return -1;
 			sta = RB_NEXT(string_entries, a, sta);
 		} else {
@@ -230,11 +231,11 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 				sta = RB_NEXT(string_entries, a, sta);
 				stb = RB_NEXT(string_entries, b, stb);
 			} else if(rc < 0) {
-				if(extra_a && extra_a(vea) < 0)
+				if(extra_a && extra_a(vea, vardt) < 0)
 					return -1;
 				sta = RB_NEXT(string_entries, a, sta);
 			} else {
-				if(extra_b && extra_b(veb) < 0)
+				if(extra_b && extra_b(veb, vardt) < 0)
 					return -1;
 				stb = RB_NEXT(string_entries, b, stb);
 			}

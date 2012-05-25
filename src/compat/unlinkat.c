@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,13 +27,11 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 {
 	int rc;
 
-	if(flags != 0) {
-		fprintf(stderr, "tup compat unlinkat error: flags=%i not supported\n", flags);
-		return -1;
-	}
-
 	dir_mutex_lock(dirfd);
-	rc = unlink(pathname);
+	if(flags == AT_REMOVEDIR)
+		rc = rmdir(pathname);
+	else
+		rc = unlink(pathname);
 	dir_mutex_unlock();
 	return rc;
 }

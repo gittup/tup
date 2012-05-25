@@ -26,10 +26,10 @@ HERE
 tup touch Tupfile
 varsetall FOO=n
 update
-tup_object_exist @ FOO
+tup_object_exist tup.config FOO
 
 varsetall FOO=y
 update
-tup_object_exist @ FOO
+tup_object_exist tup.config FOO
 
 eotup

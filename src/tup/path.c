@@ -29,18 +29,18 @@
 #include "entry.h"
 #include "option.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 
-int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root,
+int watch_path(tupid_t dt, int dfd, const char *file,
 	       int (*callback)(tupid_t newdt, int dfd, const char *file))
 {
 	struct flist f = {0, 0, 0};
 	struct stat buf;
-	tupid_t newdt;
 
 	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
 		if(errno == ENOENT) {
@@ -60,35 +60,23 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 		tupid = tup_file_mod_mtime(dt, file, buf.MTIME, 0, 0, NULL);
 		if(tupid < 0)
 			return -1;
-		if(root) {
-			tupid_tree_remove(root, tupid);
-		}
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
 		int newfd;
-		struct tup_entry *gitignore_tent = NULL;
-		int gitignore_found = 0;
+		struct tupid_entries root = {NULL};
+		struct tup_entry *tent;
 
-		newdt = create_dir_file(dt, file);
-		if(root) {
-			tupid_tree_remove(root, newdt);
-		}
+		tent = tup_db_create_node(dt, file, TUP_NODE_DIR);
+		if(!tent)
+			return -1;
 
 		if(callback) {
-			if(callback(newdt, dfd, file) < 0)
+			if(callback(tent->tnode.tupid, dfd, file) < 0)
 				return -1;
 		}
 
-		if(tup_entry_find_name_in_dir(newdt, ".gitignore", -1, &gitignore_tent) < 0)
+		if(tup_entry_get_dir_tree(tent, &root) < 0)
 			return -1;
-		if(gitignore_tent) {
-			/* Gitignore's are never put in the modify list. We are
-			 * just checking here if we have the gitignore entry in
-			 * the database, meaning tup is supposed to generate the
-			 * .gitignore file.
-			 */
-			tupid_tree_remove(root, gitignore_tent->tnode.tupid);
-		}
 
 		newfd = openat(dfd, file, O_RDONLY);
 		if(newfd < 0) {
@@ -102,13 +90,17 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 		}
 
 		flist_foreach(&f, ".") {
+			struct tup_entry *subtent;
+
+			if(tup_entry_find_name_in_dir(tent, f.filename, -1, &subtent) < 0)
+				return -1;
+			if(subtent) {
+				tupid_tree_remove(&root, subtent->tnode.tupid);
+			}
 			if(f.filename[0] == '.') {
-				if(strcmp(f.filename, ".gitignore") == 0)
-					gitignore_found = 1;
 				continue;
 			}
-			if(watch_path(newdt, newfd, f.filename, root,
-				      callback) < 0)
+			if(watch_path(tent->tnode.tupid, newfd, f.filename, callback) < 0)
 				return -1;
 		}
 		if(close(newfd) < 0) {
@@ -116,14 +108,19 @@ int watch_path(tupid_t dt, int dfd, const char *file, struct tupid_entries *root
 			return -1;
 		}
 
-		/* If we should have a .gitignore file but it was removed for
-		 * some reason, re-parse the current Tupfile so it gets
-		 * created again (t2077).
-		 */
-		if(gitignore_tent && !gitignore_found) {
-			if(tup_db_add_create_list(newdt) < 0)
-				return -1;
+		{
+			struct tupid_tree *tt;
+			while((tt = RB_ROOT(&root)) != NULL) {
+				struct tup_entry *subtent;
+
+				subtent = tup_entry_get(tt->tupid);
+				if(tup_file_missing(subtent) < 0)
+					return -1;
+				tupid_tree_rm(&root, tt);
+				free(tt);
+			}
 		}
+
 		return 0;
 	} else {
 		fprintf(stderr, "tup error: File '%s' is not regular nor a dir?\n",
@@ -247,14 +244,13 @@ static int scan_full_deps(void)
 
 int tup_scan(void)
 {
-	struct tupid_entries scan_root = {NULL};
-	if(tup_db_scan_begin(&scan_root) < 0)
+	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", &scan_root, NULL) < 0)
+	if(watch_path(0, tup_top_fd(), ".", NULL) < 0)
 		return -1;
 	if(scan_full_deps() < 0)
 		return -1;
-	if(tup_db_scan_end(&scan_root) < 0)
+	if(tup_db_scan_end() < 0)
 		return -1;
 	return 0;
 }

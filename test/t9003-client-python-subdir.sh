@@ -39,7 +39,7 @@ HERE
 tup touch sub/Tupfile
 update
 
-tup_object_exist @ BAZ
+tup_object_exist tup.config BAZ
 
 varsetall FOO=y BAR=hey
 update_fail_msg 'Exception: No: FOO'
@@ -56,7 +56,7 @@ HERE
 tup touch sub/foo.py
 update
 
-tup_object_exist @ BAZ
+tup_object_exist tup.config BAZ
 
 cat > sub/foo.py << HERE
 import tup_client
@@ -68,6 +68,6 @@ HERE
 tup touch sub/foo.py
 update
 
-tup_object_no_exist @ BAZ
+tup_object_no_exist tup.config BAZ
 
 eotup

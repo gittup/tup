@@ -25,12 +25,14 @@
 #include "compat.h"
 #include "colors.h"
 #include "container.h"
+#include "variant.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
@@ -39,7 +41,7 @@ static int do_verbose = 0;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
-				   time_t mtime);
+				   time_t mtime, tupid_t srcid);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
@@ -62,7 +64,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = new_entry(tupid, -1, NULL, 0, -1, -1);
+	tent = new_entry(tupid, -1, NULL, 0, -1, -1, -1);
 	if(!tent)
 		return -1;
 
@@ -83,11 +85,10 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	return 0;
 }
 
-int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
-			       struct tup_entry **dest)
+int tup_entry_find_name_in_dir_dt(tupid_t dt, const char *name, int len,
+				  struct tup_entry **dest)
 {
 	struct tup_entry *parent;
-	struct string_tree *st;
 
 	if(len < 0)
 		len = strlen(name);
@@ -105,7 +106,18 @@ int tup_entry_find_name_in_dir(tupid_t dt, const char *name, int len,
 		fprintf(stderr, "tup error: Unable to find parent entry [%lli] for node '%.*s'\n", dt, len, name);
 		return -1;
 	}
-	st = string_tree_search(&parent->entries, name, len);
+	return tup_entry_find_name_in_dir(parent, name, len, dest);
+}
+
+int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
+			       struct tup_entry **dest)
+{
+	struct string_tree *st;
+
+	if(len < 0)
+		len = strlen(name);
+
+	st = string_tree_search(&tent->entries, name, len);
 	if(!st) {
 		*dest = NULL;
 		return 0;
@@ -239,8 +251,11 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 {
 	int rc;
-	if(!tent || !tent->parent)
+	if(!tent || !tent->parent) {
+		if(len)
+			*dest = 0;
 		return 0;
+	}
 	rc = snprint_tup_entry(dest, len, tent->parent);
 	rc += snprintf(dest + rc, len - rc, "/%s", tent->name.s);
 	return rc;
@@ -257,12 +272,12 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 }
 
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, time_t mtime,
+			 int type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, len, type, mtime);
+	tent = new_entry(tupid, dt, name, len, type, mtime, srcid);
 	if(!tent)
 		return -1;
 	if(resolve_parent(tent) < 0)
@@ -273,17 +288,13 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
-		      time_t mtime, const char *name, struct tupid_entries *root)
+		      time_t mtime, tupid_t srcid, const char *name)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, strlen(name), type, mtime);
+	tent = new_entry(tupid, dt, name, strlen(name), type, mtime, srcid);
 	if(!tent)
 		return -1;
-
-	if(root)
-		if(tupid_tree_add(root, tupid) < 0)
-			return -1;
 	return 0;
 }
 
@@ -336,9 +347,96 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 	return newdfd;
 }
 
+struct variant *tup_entry_variant(struct tup_entry *tent)
+{
+	/* The variant field isn't set when we initially create tup_entrys, since
+	 * if we are doing tup_entry_add_all, we may not have the tup.config
+	 * entry until the end. It also doesn't make sense to add that entry
+	 * until we have scanned for a real tup.config node. Instead we just
+	 * use this function to get the variant field, since the tup_entry tree
+	 * will contain the necessary directory structure at this point. Then
+	 * each entry has the same variant as its parent, until a tup.config node
+	 * is found.
+	 */
+	if(!tent->variant) {
+		tent->variant = tup_entry_variant_null(tent);
+		if(!tent->variant) {
+			fprintf(stderr, "tup internal error: Unable to set tent->variant for tup entry: ");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			exit(1);
+		}
+	}
+	return tent->variant;
+}
+
+struct variant *tup_entry_variant_null(struct tup_entry *tent)
+{
+	if(!tent->variant) {
+		tent->variant = variant_search(tent->tnode.tupid);
+		if(!tent->variant) {
+			if(tent->parent) {
+				tent->variant = tup_entry_variant_null(tent->parent);
+			}
+		}
+	}
+	return tent->variant;
+}
+
+tupid_t tup_entry_vardt(struct tup_entry *tent)
+{
+	return tup_entry_variant(tent)->tent->tnode.tupid;
+}
+
+static int create_dir(int dfd, struct tup_entry *tent)
+{
+	int curfd;
+	int newfd;
+
+	if(!tent->parent) {
+		return dup(dfd);
+	}
+
+	curfd = create_dir(dfd, tent->parent);
+	if(curfd < 0)
+		return -1;
+
+	if(mkdirat(curfd, tent->name.s, 0777) < 0) {
+		if(errno != EEXIST) {
+			perror(tent->name.s);
+			fprintf(stderr, "tup error: Unable to create sub-directory in the build tree.\n");
+			return -1;
+		}
+	}
+	newfd = openat(curfd, tent->name.s, O_RDONLY);
+	if(newfd < 0) {
+		perror(tent->name.s);
+		fprintf(stderr, "tup error: Unable to open newly-created sub-directory in the build tree.\n");
+		return -1;
+	}
+	if(close(curfd) < 0) {
+		perror("close(curfd)");
+		return -1;
+	}
+	return newfd;
+}
+
+int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent)
+{
+	int newfd;
+	newfd = create_dir(root_dfd, tent);
+	if(newfd < 0)
+		return -1;
+	if(close(newfd) < 0) {
+		perror("close(newfd)");
+		return -1;
+	}
+	return 0;
+}
+
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, int type,
-				   time_t mtime)
+				   time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
 
@@ -358,6 +456,8 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->parent = NULL;
 	tent->type = type;
 	tent->mtime = mtime;
+	tent->srcid = srcid;
+	tent->variant = NULL;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {
@@ -526,6 +626,19 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head)
 
 		tent = container_of(tt, struct tup_entry, tnode);
 		tup_entry_add_ghost_list(tent, head);
+	}
+	return 0;
+}
+
+int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
+{
+	struct string_tree *st;
+	RB_FOREACH(st, string_entries, &tent->entries) {
+		struct tup_entry *subtent;
+		subtent = container_of(st, struct tup_entry, name);
+		if(subtent->type != TUP_NODE_GHOST && subtent->tnode.tupid != env_dt())
+			if(tupid_tree_add(root, subtent->tnode.tupid) < 0)
+				return -1;
 	}
 	return 0;
 }
