@@ -1590,7 +1590,6 @@ int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(voi
 
 static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 {
-	struct half_entry *he;
 	struct half_entry_head subdir_list;
 
 	LIST_INIT(&subdir_list);
@@ -1617,7 +1616,8 @@ static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 	if(tup_db_delete_links(tupid) < 0)
 		return -1;
 
-	LIST_FOREACH(he, &subdir_list, list) {
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct half_entry *he = LIST_FIRST(&subdir_list);
 		if(he->type != TUP_NODE_GHOST) {
 			fprintf(stderr, "tup internal error: Why does a node of type %i have a ghost dir?\n", he->type);
 			tup_db_print(stderr, he->tupid);
@@ -1625,6 +1625,8 @@ static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 		}
 		if(recurse_delete_ghost_tree(he->tupid, modify) < 0)
 			return -1;
+		LIST_REMOVE(he, list);
+		free(he);
 	}
 	if(delete_node(tupid) < 0)
 		return -1;

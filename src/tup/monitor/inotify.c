@@ -1182,6 +1182,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 
 		/* An IN_MOVED_FROM event points to itself */
 		LIST_REMOVE(m->from_event, list);
+		free(m->from_event);
 	}
 	return 0;
 }
