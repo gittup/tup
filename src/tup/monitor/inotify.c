@@ -497,15 +497,37 @@ static int monitor_loop(void)
 	do {
 		struct inotify_event *e;
 		int offset = 0;
+		struct timeval tv = {0, 100000};
+		int ret;
+		fd_set rfds;
 
-		x = read(inot_fd, buf, sizeof(buf));
-		if(x < 0) {
-			if(errno == EINTR) {
-				/* SA_RESTART doesn't work for inotify fds */
+		FD_ZERO(&rfds);
+		FD_SET(inot_fd, &rfds);
+		ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
+		if(ret < 0) {
+			if(errno == EINTR)
 				continue;
-			} else {
-				perror("read");
-				return -1;
+			perror("select");
+			return -1;
+		}
+		if(ret == 0) {
+			if(events_queued() && locked) {
+				/* Timeout, flush queue */
+				rc = flush_queue(1);
+				if(rc < 0)
+					return rc;
+			}
+			x = 0;
+		} else {
+			x = read(inot_fd, buf, sizeof(buf));
+			if(x < 0) {
+				if(errno == EINTR) {
+					/* SA_RESTART doesn't work for inotify fds */
+					continue;
+				} else {
+					perror("read");
+					return -1;
+				}
 			}
 		}
 
@@ -613,24 +635,6 @@ static int monitor_loop(void)
 				rc = queue_event(e);
 				if(rc < 0)
 					return rc;
-			}
-		}
-
-		if(events_queued()) {
-			struct timeval tv = {0, 100000};
-			int ret;
-			fd_set rfds;
-
-			FD_ZERO(&rfds);
-			FD_SET(inot_fd, &rfds);
-			ret = select(inot_fd+1, &rfds, NULL, NULL, &tv);
-			if(ret == 0) {
-				if(locked) {
-					/* Timeout, flush queue */
-					rc = flush_queue(1);
-					if(rc < 0)
-						return rc;
-				}
 			}
 		}
 	} while(!monitor_quit);
