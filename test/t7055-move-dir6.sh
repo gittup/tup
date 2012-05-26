@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,24 +16,27 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Check to make sure we get the warnings from hidden files.
-# (This behavior of tup may be stupid).
+# Make sure we can move a directory that contains a file used by a Tupfile
+# and have that Tupfile re-parse.
 
 . ./tup.sh
+check_monitor_supported
 
-# In case the user disabled this, we make sure warnings are on here.
-cat >> .tup/options << HERE
-[updater]
-warnings = 1
+tup monitor
+mkdir a
+cat > a/Tupfile << HERE
+include ../b/file
 HERE
-cat > Tupfile << HERE
-: |> touch .foo; touch .bar |>
+mkdir b
+touch b/file
+update
+
+mv b c
+update_fail_msg "Failed to parse included file.*b/file"
+
+cat > a/Tupfile << HERE
+include ../c/file
 HERE
-if tup upd 2>&1 | grep "Update resulted in 2 warnings" > /dev/null; then
-	:
-else
-	echo "Error: Expected 2 warnings." 1>&2
-	exit 1
-fi
+update
 
 eotup

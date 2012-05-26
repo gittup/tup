@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -39,12 +39,12 @@ int delete_name_file(tupid_t tupid)
 	return 0;
 }
 
-int delete_file(tupid_t dt, const char *name)
+int delete_file(struct tup_entry *tent)
 {
 	int dirfd;
 	int rc = 0;
 
-	dirfd = tup_entry_open_tupid(dt);
+	dirfd = tup_entry_open(tent->parent);
 	if(dirfd < 0) {
 		if(dirfd == -ENOENT) {
 			/* If the directory doesn't exist, the file can't
@@ -56,12 +56,12 @@ int delete_file(tupid_t dt, const char *name)
 		}
 	}
 
-	if(unlinkat(dirfd, name, 0) < 0) {
+	if(unlinkat(dirfd, tent->name.s, 0) < 0) {
 		/* Don't care if the file is already gone, or if the name
 		 * is too long to exist in the filesystem anyway.
 		 */
 		if(errno != ENOENT && errno != ENAMETOOLONG) {
-			perror(name);
+			perror(tent->name.s);
 			rc = -1;
 			goto out;
 		}

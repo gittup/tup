@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,24 +16,33 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Check to make sure we get the warnings from hidden files.
-# (This behavior of tup may be stupid).
+# Make sure we can read and write a utf-8 file.
 
 . ./tup.sh
+case $tupos in
+CYGWIN*)
+	# In Windows, maybe need to modify all filesystem functions to convert from
+	# UTF-16 to UTF-8 and back.
+	echo "[33mTODO: Unicode currently broken on this platform.[0m" 1>&2
+	eotup
+	;;
+Darwin)
+	# In OSX, it uses UTF-8 but in a different style. Eg it uses:
+	# insert[föo]: 66 6f cc 88 6f
+	#
+	# But the Tupfile reads as:
+	# Name[föo]: 66 c3 b6 6f
+	echo "[33mTODO: Unicode currently broken on this platform.[0m" 1>&2
+	eotup
+	;;
+esac
 
-# In case the user disabled this, we make sure warnings are on here.
-cat >> .tup/options << HERE
-[updater]
-warnings = 1
-HERE
 cat > Tupfile << HERE
-: |> touch .foo; touch .bar |>
+: föo |> cat %f > %o |> bär
 HERE
-if tup upd 2>&1 | grep "Update resulted in 2 warnings" > /dev/null; then
-	:
-else
-	echo "Error: Expected 2 warnings." 1>&2
-	exit 1
-fi
+echo "some text" > föo
+update
+
+echo "some text" | diff - bär
 
 eotup
