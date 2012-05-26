@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -58,9 +58,9 @@ struct bin *bin_add(const char *name, struct bin_head *head)
 	name_len = strlen(name);
 	b->name = malloc(name_len + 1);
 	if (!b->name) {
-	    perror("malloc");
-	    free(b);
-	    return NULL;
+		perror("malloc");
+		free(b);
+		return NULL;
 	}
 	memcpy(b->name, name, name_len);
 	b->name[name_len] = 0;

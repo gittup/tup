@@ -89,4 +89,14 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head);
 int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root);
 void dump_tup_entry(void);
 
+struct tent_list {
+	TAILQ_ENTRY(tent_list) list;
+	struct tup_entry *tent;
+};
+TAILQ_HEAD(tent_list_head, tent_list);
+
+void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist);
+void free_tent_list(struct tent_list_head *head);
+int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len);
+
 #endif
