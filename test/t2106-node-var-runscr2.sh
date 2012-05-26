@@ -19,6 +19,7 @@
 # Test using a node-variable in a runscript line, as an argument
 
 . ./tup.sh
+check_no_windows run-script
 
 tmkdir sw
 tmkdir tools

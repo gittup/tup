@@ -19,6 +19,7 @@
 # Test using a node-variable as a rule input
 
 . ./tup.sh
+check_no_windows slashes
 
 tmkdir sw
 tmkdir sw/toolkit
