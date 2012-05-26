@@ -561,3 +561,102 @@ void dump_tup_entry(void)
 		printf("  [%lli, dir=%lli, type=%i] name=%s\n", tent->tnode.tupid, tent->dt, tent->type, tent->name.s);
 	}
 }
+
+void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist)
+{
+	TAILQ_REMOVE(head, tlist, list);
+	free(tlist);
+}
+
+void free_tent_list(struct tent_list_head *head)
+{
+	struct tent_list *tlist;
+	while(!TAILQ_EMPTY(head)) {
+		tlist = TAILQ_FIRST(head);
+		del_tent_list_entry(head, tlist);
+	}
+}
+
+static int get_all_parent_tents(tupid_t tupid, struct tent_list_head *head)
+{
+	struct tup_entry *tent;
+	struct tent_list *tlist;
+
+	tent = tup_entry_get(tupid);
+	while(tent) {
+		tlist = malloc(sizeof *tlist);
+		if(!tlist) {
+			perror("malloc");
+			return -1;
+		}
+		tlist->tent = tent;
+		TAILQ_INSERT_HEAD(head, tlist, list);
+
+		tent = tent->parent;
+	}
+	return 0;
+}
+int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
+{
+	struct tent_list_head startlist;
+	struct tent_list_head endlist;
+	struct tent_list *startentry;
+	struct tent_list *endentry;
+	int first = 0;
+
+	*len = 0;
+
+	TAILQ_INIT(&startlist);
+	TAILQ_INIT(&endlist);
+	if(get_all_parent_tents(start, &startlist) < 0)
+		return -1;
+	if(get_all_parent_tents(end, &endlist) < 0)
+		return -1;
+
+	while(!TAILQ_EMPTY(&startlist) && !TAILQ_EMPTY(&endlist)) {
+		startentry = TAILQ_FIRST(&startlist);
+		endentry = TAILQ_FIRST(&endlist);
+
+		if(startentry->tent == endentry->tent) {
+			del_tent_list_entry(&startlist, startentry);
+			del_tent_list_entry(&endlist, endentry);
+		} else {
+			break;
+		}
+	}
+
+	TAILQ_FOREACH(startentry, &startlist, list) {
+		if(!first) {
+			first = 1;
+		} else {
+			if(dest)
+				sprintf(dest + *len, "/");
+			(*len)++;
+		}
+		if(dest)
+			sprintf(dest + *len, "..");
+		(*len) += 2;
+	}
+	TAILQ_FOREACH(endentry, &endlist, list) {
+		if(!first) {
+			first = 1;
+		} else {
+			if(dest)
+				sprintf(dest + *len, "/");
+			(*len)++;
+		}
+		if(dest)
+			sprintf(dest + *len, "%s", endentry->tent->name.s);
+		(*len) += endentry->tent->name.len;
+	}
+	if(!first) {
+		if(dest)
+			sprintf(dest + *len, ".");
+		(*len)++;
+	}
+
+	free_tent_list(&endlist);
+	free_tent_list(&startlist);
+	return 0;
+}
+
