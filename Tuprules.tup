@@ -28,6 +28,11 @@ CFLAGS += -Wswitch-enum
 CFLAGS += -fno-common
 CFLAGS += -I$(TUP_CWD)/src
 
+ifeq (@(TUP_32_BIT),y)
+CFLAGS += -m32
+LDFLAGS += -m32
+endif
+
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse --cflags`
 
