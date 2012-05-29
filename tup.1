@@ -382,9 +382,19 @@ Tup does not do any special processing for back-ticks, so the pkg-config command
 Append "value" to the end of the current value of "var". If "var" has not been set, this is equivalent to a regular '=' statement. If "var" already has a value, a space is appended to the $-variable before the new value is appended.
 .TP
 .B $(TUP_CWD)
-The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup".
+The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup". For an alternative to $(TUP_CWD) when referring to files, see the section on &-variables below.
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
+.TP
+.B &var = file
+.PD 0
+.TP
+.B &var := file
+.PD 0
+.TP
+.B &var += file
+.PD 1
+Set the &-variable to refer to the given file or directory. The file may be an output from a previous command. &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines.
 .TP
 .B ifeq (lval,rval)
 Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored.
