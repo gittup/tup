@@ -1387,8 +1387,17 @@ static int set_variable(struct tupfile *tf, char *line)
 		struct tup_entry *tent;
 		tent = get_tent_dt(tf->curtent->tnode.tupid, value);
 		if(!tent) {
-			fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", value);
-			return -1;
+			/* didn't find the given file; if using a variant, check the source dir */
+			struct tup_entry *srctent;
+			if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
+				return -1;
+			if(srctent)
+				tent = get_tent_dt(srctent->tnode.tupid, value);
+
+			if(!tent) {
+				fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", value);
+				return -1;
+			}
 		}
 		/* var+1 to skip the leading '&' */
 		if(append)
