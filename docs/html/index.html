@@ -16,17 +16,19 @@
   <li><a href="win32/">List of previous versions</a></li>
 </ul>
 
-<h4>Ubuntu Package</h4>
-<p>If you don't want to install tup from the git tree, you can use the unofficial tup Ubuntu repository.</p>
+<h4>Linux Ubuntu</h4>
+<p>If you don't want to install tup from the git tree, you can use the unofficial tup PPA repository that works for Debian-based distibutives (e.g. Ubuntu 10.04+).</p>
 <pre>
 sudo apt-add-repository 'deb http://ppa.launchpad.net/anatol/tup/ubuntu lucid main'
 sudo apt-get update
 sudo apt-get install tup
 </pre>
 
-<h4>OSX Homebrew</h4>
-<p>If you use <a href="http://mxcl.github.com/homebrew/">Homebrew</a>, you can install tup as follows:</p>
+<h4>MacOSX</h4>
+<p>If you use <a href="http://mxcl.github.com/homebrew/">Homebrew</a> package manager you can install tup as follows:</p>
 <pre>brew install tup</pre>
+<p>If you use <a href="http://www.macports.org/"/>MacPorts</a> install tup as:</p>
+<pre>sudo port install tup</pre>
 
 <h2>Why tup?</h2>
 <p>You can use tup anywhere you would use another build system (like make, or any of its derivatives). One reason you would want to use tup is if you like to update things very quickly. For example, if you typically execute a build in a subdirectory because it takes too long to figure out what to do when you execute the build from the top, you might want to look into tup. Unfortunately, tup is so fast that your <a href="http://xkcd.com/303/">chair mounted jousting</a> might suffer. I apologize in advance if someone besmirches your honor and you are unable to properly defend yourself as a result.</p>
