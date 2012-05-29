@@ -91,7 +91,7 @@ static int os_unmount(void)
 	}
 	return rc;
 }
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) || defined(__FreeBSD__)
 static int os_unmount(void)
 {
 	if(unmount(TUP_MNT, MNT_FORCE) < 0) {

@@ -33,6 +33,9 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#ifdef __FreeBSD__
+# include <sys/param.h>
+#endif
 #include <sys/mount.h>
 #include <signal.h>
 
@@ -279,8 +282,14 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup internal error: Trying to run sub-process in a chroot, but tup is not privileged.\n");
 			return -1;
 		}
-#ifdef __APPLE__
+#if defined(__APPLE__)
 		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");
+			return -1;
+		}
+#elif defined(__FreeBSD__)
+		if(mount("devfs", dev, 0, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");
 			return -1;
@@ -548,7 +557,7 @@ static void *child_waiter(void *arg)
 	}
 	if(waiter->do_chroot && tup_privileged()) {
 		int rc;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 		rc = unmount(waiter->dev, MNT_FORCE);
 #else
 		rc = umount2(waiter->dev, MNT_FORCE);
