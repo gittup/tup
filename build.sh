@@ -38,6 +38,11 @@ case "$os" in
 	plat_cflags="$plat_cflags -DAT_REMOVEDIR=0x200"
 	CC=clang
 	;;
+	FreeBSD)
+	plat_files="$plat_files ../src/compat/clearenv.c "
+	plat_files="$plat_files ../src/compat/dir_mutex.c "
+	plat_files="$plat_files ../src/compat/utimensat.c"
+	;;
 esac
 
 rm -rf build

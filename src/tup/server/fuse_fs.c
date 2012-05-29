@@ -25,6 +25,12 @@
 /* For pread()/pwrite() */
 #define _XOPEN_SOURCE 500
 #endif
+#ifdef __FreeBSD__
+/* For S_IFDIR */
+# define __XSI_VISIBLE 1
+/* For AT_SYMLINK_NOFOLLOW */
+# define __BSD_VISIBLE 1
+#endif
 
 #include "compat/utimensat.h"
 #include "tup_fuse_fs.h"
@@ -38,6 +44,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
+#ifdef __FreeBSD__
+# include <fcntl.h>
+# include <sys/stat.h>
+#endif
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
