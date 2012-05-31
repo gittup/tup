@@ -1424,13 +1424,11 @@ static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_
 {
 	IMAGE_DOS_HEADER* dos_header;
 	IMAGE_NT_HEADERS* nt_headers;
-	IMAGE_SECTION_HEADER* section_headers;
 	IMAGE_DATA_DIRECTORY* import_dir;
 	IMAGE_IMPORT_DESCRIPTOR* imports;
 
 	dos_header = (IMAGE_DOS_HEADER*) h;
 	nt_headers = (IMAGE_NT_HEADERS*) (dos_header->e_lfanew + (char*) h);
-	section_headers = (IMAGE_SECTION_HEADER*) (nt_headers + 1);
 
 	import_dir = &nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 	imports = (IMAGE_IMPORT_DESCRIPTOR*) (import_dir->VirtualAddress + (char*) h);
@@ -1725,6 +1723,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	DEBUG_HOOK("%s: '%s' '%s'\n", access_type_name[at], file, file2);
 	ret = writef((char*) e, dest - (char*) e);
 	DEBUG_HOOK("writef %d\n", ret);
+	if(ret) {}
 }
 
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at)
@@ -1760,6 +1759,7 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	DEBUG_HOOK("%s [wide, %i, %i]: '%S', '%S'\n", access_type_name[at], e->len, e->len2, file, file2);
 	ret = writef((char*) e, dest - (char*) e);
 	DEBUG_HOOK("writef [wide] %d\n", ret);
+	if(ret) {}
 }
 
 static int open_file(const char *depfilename)

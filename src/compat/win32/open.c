@@ -87,5 +87,9 @@ int __wrap_open(const char *pathname, int flags, ...)
 		errno = GetLastError();
 		return -1;
 	}
+	if(mode)
+		if(chmod(pathname, mode) < 0) {
+			return -1;
+		}
 	return _open_osfhandle((intptr_t)h, 0);
 }
