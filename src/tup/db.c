@@ -4911,7 +4911,9 @@ static int extra_output(tupid_t tupid, void *data)
 		tent->name.s, tent->dt);
 	delete_file(tent);
 #else
-	fprintf(aod->f, " -- Unspecified output: %s at dir %lli\n", tent->name.s, tent->dt);
+	fprintf(aod->f, " -- Unspecified output: ");
+	print_tup_entry(aod->f, tent);
+	fprintf(aod->f, "\n");
 #endif
 	/* Return success here so we can display all errant outputs.  Actual
 	 * check is in tup_db_check_actual_outputs().
