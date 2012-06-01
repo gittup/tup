@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/05/24" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/06/01" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -463,7 +463,7 @@ Since the Tupfile-parsing stage is watched for dependencies, any files that this
 
 .TP
 .B export VARIABLE
-The export directive adds the VARIABLE to the export list for future :-rules and run-scripts. By default only PATH is exported. Windows additionally exports several variables suitable for building with the Visual Studio compiler suite. Tup will check the exported environment variables to see if they have changed values between updates, and re-execute any commands that that use those environment variables. Note that this means if PATH is changed, all commands will run again. For example:
+The export directive adds the environment variable VARIABLE to the export list for future :-rules and run-scripts. The value for the variable comes from tup's environment, not from the Tupfile itself. Generally this means you will need to set the variable in your shell if you want to change the value used by commands and scripts. By default only PATH is exported. Windows additionally exports several variables suitable for building with the Visual Studio compiler suite. Tup will check the exported environment variables to see if they have changed values between updates, and re-execute any commands that that use those environment variables. Note that this means if PATH is changed, all commands will run again. For example:
 .nf
 
 : |> command1 ... |>
