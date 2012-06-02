@@ -1399,11 +1399,18 @@ static int set_variable(struct tupfile *tf, char *line)
 				return -1;
 			}
 		}
+		/* we don't actually use the tent we found; it is just to make
+		   sure that the node variable actually refers to a valid file */
+		
 		/* var+1 to skip the leading '&' */
 		if(append)
-			rc = nodedb_append(&tf->node_db, var+1, tent);
+			rc = nodedb_append(&tf->node_db, var+1, value,
+					   tf->curtent->tnode.tupid,
+					   tf->variant->dtnode.tupid);
 		else
-			rc = nodedb_set(&tf->node_db, var+1, tent);
+			rc = nodedb_set(&tf->node_db, var+1, value,
+					tf->curtent->tnode.tupid,
+					tf->variant->dtnode.tupid);
 	} else {
 		if(append)
 			rc = vardb_append(&tf->vdb, var, value);
@@ -1411,7 +1418,7 @@ static int set_variable(struct tupfile *tf, char *line)
 			rc = vardb_set(&tf->vdb, var, value, NULL);
 	}
 	if(rc < 0) {
-		fprintf(tf->f, "Error setting variable '%s'\n", var);
+		fprintf(tf->f, "tup error: Error setting variable '%s'\n", var);
 		return -1;
 	}
 	free(var);
@@ -3134,7 +3141,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 				var = s + 2;
 				vlen = nodedb_len(&tf->node_db, var, rparen-var,
-				                  tf->curtent->tnode.tupid);
+				                  tf->curtent->tnode.tupid, tf->variant->dtnode.tupid);
 				if (vlen < 0)
 					return NULL;
 				len += vlen;
@@ -3246,7 +3253,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 				var = s + 2;
 				if (nodedb_copy(&tf->node_db, var, rparen-var, &p,
-				                tf->curtent->tnode.tupid) < 0)
+				                tf->curtent->tnode.tupid, tf->variant->dtnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {

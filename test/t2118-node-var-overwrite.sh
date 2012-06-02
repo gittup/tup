@@ -39,6 +39,6 @@ tup touch sw/toolkit/toolkit.a
 tup touch sw/app/Tupfile sw/app/app.a
 update
 
-tup_dep_exist sw/app app.a sw/app 'cp app.a app.copy'
+tup_dep_exist sw/app app.a sw/app 'cp ../../sw/app/app.a app.copy'
 
 eotup
