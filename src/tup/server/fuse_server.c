@@ -563,10 +563,12 @@ int server_parser_stop(struct parser_server *ps)
 	 * fuse_fs has access to. We then check it afterward the server
 	 * is shutdown.
 	 */
+	pthread_mutex_lock(&ps->s.finfo.lock);
 	if(ps->s.finfo.server_fail) {
 		fprintf(stderr, "tup error: Fuse server reported an access violation.\n");
 		rc = -1;
 	}
+	pthread_mutex_unlock(&ps->s.finfo.lock);
 	return rc;
 }
 
