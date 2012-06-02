@@ -363,7 +363,7 @@ out_server_stop:
 		rc = -1;
 
 	if(rc == 0) {
-		if(add_parser_files(&ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
+		if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
 			rc = -1;
 		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_root) < 0)
 			rc = -1;
@@ -904,10 +904,10 @@ static int include_file(struct tupfile *tf, const char *file)
 		fprintf(tf->f, "tup error: Unable to include file with hidden path element.\n");
 		goto out_del_pg;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
+	newdt = find_dir_tupid_dt_pg(tf->f, tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
 	if(newdt <= 0) {
 		fprintf(tf->f, "tup error: Unable to find directory for include file relative to '");
-		tup_db_print(tf->f, tf->curtent->tnode.tupid);
+		print_tup_entry(tf->f, tf->curtent);
 		fprintf(tf->f, "'\n");
 		goto out_del_pg;
 	}
@@ -2156,7 +2156,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
-			pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, 0, 0);
+			pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, 0, 0);
 			if(pl->dt <= 0) {
 				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
@@ -2345,8 +2345,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(!tent) {
 			if(!required)
 				return 0;
-			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir %lli.\n", pl->pel->len, pl->pel->path, pl->dt);
-			tup_db_print(tf->f, pl->dt);
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir '", pl->pel->len, pl->pel->path);
+			print_tupid(tf->f, pl->dt);
+			fprintf(tf->f, "'\n");
 			return -1;
 		}
 		variant = tup_entry_variant(tent);
@@ -2358,7 +2359,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			if(!required)
 				return 0;
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
-			tup_db_print(tf->f, tent->tnode.tupid);
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
@@ -2368,8 +2368,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			 * resurrected, so it is still a valid input (t6053).
 			 */
 			if(!tup_db_in_modify_list(tent->tnode.tupid)) {
-				fprintf(tf->f, "tup error: Explicitly named file '%.*s' in subdir %lli is scheduled to be deleted (possibly the command that created it has been removed).\n", pl->pel->len, pl->pel->path, pl->dt);
-				tup_db_print(tf->f, pl->dt);
+				fprintf(tf->f, "tup error: Explicitly named file '%.*s' in subdir '", pl->pel->len, pl->pel->path);
+				print_tupid(tf->f, pl->dt);
+				fprintf(tf->f, "' is scheduled to be deleted (possibly the command that created it has been removed).\n");
 				return -1;
 			}
 		}

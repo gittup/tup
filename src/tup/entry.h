@@ -76,6 +76,7 @@ struct tup_entry *tup_entry_find(tupid_t tupid);
 int tup_entry_sym_follow(struct tup_entry *tent);
 void tup_entry_set_verbose(int verbose);
 void print_tup_entry(FILE *f, struct tup_entry *tent);
+void print_tupid(FILE *f, tupid_t tupid);
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent);
 int tup_entry_clear(void);
 struct tup_entry_head *tup_entry_get_list(void);

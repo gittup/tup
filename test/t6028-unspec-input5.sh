@@ -41,7 +41,7 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> output
 HERE
 tup touch Tupfile
-update_fail_msg "Explicitly named file 'output' in subdir 1 is scheduled to be deleted"
+update_fail_msg "Explicitly named file 'output' in subdir '.' is scheduled to be deleted"
 
 cat > Tupfile << HERE
 : |> echo foo > %o |> output

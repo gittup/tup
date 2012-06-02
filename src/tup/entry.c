@@ -248,6 +248,14 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	fprintf(f, "%s%s%.*s%s", color_type(tent->type), color_append_normal(), name_sz, name, color_end());
 }
 
+void print_tupid(FILE *f, tupid_t tupid)
+{
+	struct tup_entry *tent;
+	if(tup_entry_add(tupid, &tent) < 0)
+		return;
+	print_tup_entry(f, tent);
+}
+
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 {
 	int rc;

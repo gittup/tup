@@ -436,11 +436,11 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 	if(get_path_elements(dir, &pg) < 0)
 		return -1;
 
-	tupid = find_dir_tupid_dt_pg(dt, &pg, last, sotgv, full_deps);
+	tupid = find_dir_tupid_dt_pg(stderr, dt, &pg, last, sotgv, full_deps);
 	return tupid;
 }
 
-tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
+tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv, int full_deps)
 {
 	struct path_element *pel;
@@ -506,7 +506,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			if(!tent) {
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
-					fprintf(stderr, "tup error: Expected node '%.*s' to be in directory %lli, but it is not there.\n", pel->len, pel->path, curdt);
+					fprintf(f, "tup error: Expected node '%.*s' to be in directory '", pel->len, pel->path);
+					print_tupid(f, curdt);
+					fprintf(f, "', but it is not there.\n");
 					return -1;
 				}
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, -1, &tent) < 0)
