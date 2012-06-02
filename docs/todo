@@ -174,16 +174,6 @@ html:
    - or checkout the project as a subdirectory: tup init at a higher level, tup upd
 
 node-variables:
-   * use something other than '@=', to avoid confusion with @-variables
-   * use the parser's get_relative_dir() when converting nodes into paths
-   - support lists of nodes ('@+=' syntax for now)
-   * 'include' should be able to handle both string variables and node-variables (and list of nodes)
-   - probably shouldn't be able to put a node-variable into a string variable,
-     as the path would then be incorrect if the string variable is used in another
-     Tupfile (thus, node-variables are not a replacement for TUP_CWD)
-      - places where it makes sense to string-ify a node-variable:
-         * include
-         * :-rules
-         * run scripts
-   - if using a syntax like 'node LIB_toolkit = toolkit/lib.tup', will likely
-     have to restrict normal variable symbols as well
+   * trying to store an absolute path in a node var with full_deps on
+      - currently works if you add the node var after the full deps have been found
+   
