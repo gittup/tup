@@ -203,23 +203,41 @@ __update()
 		cmd="tup upd"
 	fi
 
-	if $cmd "$@"; then
+	# Run this in a sub-shell so we can get the return code (otherwise the
+	# fact that we run with -e will kill the script).
+	($cmd "$@")
+	rc=$?
+
+	if [ "$rc" = "11" ]; then
+		echo "*** Failed valgrind!" 1>&2
+		exit 1
+	fi
+	if [ "$rc" = "12" ]; then
+		echo "*** Failed helgrind!" 1>&2
+		exit 1
+	fi
+
+	if [ "$rc" = "0" ]; then
 		:
 	else
 		echo "*** Failed to update!" 1>&2
-		exit 1
 	fi
+	return "$rc"
 }
 
 update()
 {
-	__update $@
+	if ! __update $@; then
+		exit 1
+	fi
 	check_empty_tupdirs
 }
 
 update_partial()
 {
-	__update $@
+	if ! __update $@; then
+		exit 1
+	fi
 }
 
 update_fail()

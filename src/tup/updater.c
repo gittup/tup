@@ -1227,6 +1227,7 @@ static void pop_node(struct graph *g, struct node *n)
 
 		remove_edge(e);
 	}
+	remove_node(g, n);
 }
 
 /* Returns:
@@ -1297,7 +1298,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	DEBUGP("root node: %lli\n", root->tnode.tupid);
 	TAILQ_REMOVE(&g->node_list, root, list);
 	pop_node(g, root);
-	remove_node(g, root);
 
 	start_progress(g->num_nodes, g->total_mtime, jobs);
 	/* Keep going as long as:
@@ -1323,7 +1323,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		if(!n->expanded) {
 			TAILQ_REMOVE(&g->plist, n, list);
 			pop_node(g, n);
-			remove_node(g, n);
 			goto check_empties;
 		}
 
@@ -1366,10 +1365,12 @@ check_empties:
 			if(wt->rc == 0) {
 				pop_node(g, n);
 			} else {
+				/* Failed jobs sit on the node_list until the
+				 * graph is destroyed.
+				 */
+				TAILQ_INSERT_TAIL(&g->node_list, n, list);
 				failed++;
 			}
-
-			remove_node(g, n);
 		}
 	}
 	clear_progress();
