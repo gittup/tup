@@ -193,10 +193,15 @@ tup_dep_no_exist()
 	fi
 }
 
+set_leak_check()
+{
+	leak_check=$1
+}
+
 __update()
 {
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup upd"
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=${leak_check-full} tup upd"
 	elif [ -n "$TUP_HELGRIND" ]; then
 		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup upd"
 	else
@@ -242,17 +247,20 @@ update_partial()
 
 update_fail()
 {
-	if tup upd "$@" 2>/dev/null; then
+	set_leak_check no
+	if __update $@ 2>/dev/null; then
 		echo "*** Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
 		echo "Update expected to fail, and did"
 	fi
+	set_leak_check full
 }
 
 update_fail_msg()
 {
-	if tup upd 2>.tupoutput; then
+	set_leak_check no
+	if __update 2>.tupoutput; then
 		echo "*** Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
@@ -268,6 +276,7 @@ update_fail_msg()
 			shift
 		done
 	fi
+	set_leak_check full
 }
 
 parse_fail_msg()
