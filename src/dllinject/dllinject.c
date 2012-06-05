@@ -22,6 +22,9 @@
 #define BUILDING_DLLINJECT
 #include "dllinject.h"
 #include "tup/access_event.h"
+#include "iat_patch.h"
+#include "hot_patch.h"
+#include "trace.h"
 
 #include <windows.h>
 #include <ntdef.h>
@@ -42,41 +45,6 @@
 #define __reserved
 #endif
 
-#ifndef NDEBUG
-#	define DEBUG_HOOK debug_hook
-
-static const char* access_type_name[] = {
-	"read",
-	"write",
-	"rename",
-	"unlink",
-	"var",
-};
-
-FILE *debugf = NULL;
-int opening = 0;
-static void debug_hook(const char* format, ...)
-{
-	char buf[256];
-	va_list ap;
-	if(debugf == NULL && !opening) {
-		opening = 1;
-		debugf = fopen("c:\\cygwin\\home\\marf\\ok.txt", "a");
-		fflush(stdout);
-	}
-	if(debugf == NULL) {
-		printf("No file :(\n");
-		return;
-	}
-	va_start(ap, format);
-	vsnprintf(buf, 255, format, ap);
-	buf[255] = '\0';
-	fprintf(debugf, buf);
-	fflush(debugf);
-}
-#else
-#	define DEBUG_HOOK(...)
-#endif
 
 typedef HFILE (WINAPI *OpenFile_t)(
     __in    LPCSTR lpFileName,
@@ -1419,150 +1387,66 @@ struct remote_thread_t
 };
 
 
-typedef void (*foreach_import_t)(HMODULE, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur);
-static void foreach_module(HMODULE h, foreach_import_t kernel32, foreach_import_t advapi32, foreach_import_t nt, foreach_import_t msvcrt)
+#define HOOK(name) { MODULE_NAME, #name, name##_hook, (void**)&name##_orig, 0 }
+static patch_entry patch_table[] =
 {
-	IMAGE_DOS_HEADER* dos_header;
-	IMAGE_NT_HEADERS* nt_headers;
-	IMAGE_DATA_DIRECTORY* import_dir;
-	IMAGE_IMPORT_DESCRIPTOR* imports;
+#define MODULE_NAME "kernel32.dll"
+	HOOK(OpenFile),
+	HOOK(CreateFileA),
+	HOOK(CreateFileW),
+	HOOK(CreateFileTransactedA),
+	HOOK(CreateFileTransactedW),
+	HOOK(DeleteFileA),
+	HOOK(DeleteFileW),
+	HOOK(DeleteFileTransactedA),
+	HOOK(DeleteFileTransactedW),
+	HOOK(MoveFileA),
+	HOOK(MoveFileW),
+	HOOK(MoveFileExA),
+	HOOK(MoveFileExW),
+	HOOK(MoveFileWithProgressA),
+	HOOK(MoveFileWithProgressW),
+	HOOK(MoveFileTransactedA),
+	HOOK(MoveFileTransactedW),
+	HOOK(ReplaceFileA),
+	HOOK(ReplaceFileW),
+	HOOK(CopyFileA),
+	HOOK(CopyFileW),
+	HOOK(CopyFileExA),
+	HOOK(CopyFileExW),
+	HOOK(CopyFileTransactedA),
+	HOOK(CopyFileTransactedW),
+	HOOK(GetFileAttributesA),
+	HOOK(GetFileAttributesW),
+	HOOK(GetFileAttributesExA),
+	HOOK(GetFileAttributesExW),
+	HOOK(FindFirstFileA),
+	HOOK(FindFirstFileW),
+	HOOK(FindNextFileA),
+	HOOK(FindNextFileW),
+	HOOK(CreateProcessA),
+	HOOK(CreateProcessW),
+#undef MODULE_NAME
+#define MODULE_NAME "advapi32.dll"
+	HOOK(CreateProcessAsUserA),
+	HOOK(CreateProcessAsUserW),
+	HOOK(CreateProcessWithLogonW),
+	HOOK(CreateProcessWithTokenW),
+#undef MODULE_NAME
+#define MODULE_NAME "ntdll.dll"
+	HOOK(NtCreateFile),
+	HOOK(NtOpenFile),
+#undef MODULE_NAME
+#define MODULE_NAME "msvcrt.dll"
+	HOOK(_access),
+	HOOK(fopen),
+	HOOK(rename),
+	HOOK(remove)
+};
+#undef HOOK
+#undef MODULE_NAME
+enum { patch_table_len = sizeof( patch_table ) / sizeof( patch_table[0] ) };
 
-	dos_header = (IMAGE_DOS_HEADER*) h;
-	nt_headers = (IMAGE_NT_HEADERS*) (dos_header->e_lfanew + (char*) h);
-
-	import_dir = &nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-	imports = (IMAGE_IMPORT_DESCRIPTOR*) (import_dir->VirtualAddress + (char*) h);
-	if (import_dir->VirtualAddress == 0)
-		return;
-
-	while (imports->Name != 0) {
-		char* dllname = (char*) h + imports->Name;
-		if (imports->FirstThunk && imports->OriginalFirstThunk) {
-			IMAGE_THUNK_DATA* cur = (IMAGE_THUNK_DATA*) (imports->FirstThunk + (char*) h);
-			IMAGE_THUNK_DATA* orig = (IMAGE_THUNK_DATA*) (imports->OriginalFirstThunk + (char*) h);
-			if (stricmp(dllname, "kernel32.dll") == 0) {
-				while (cur->u1.Function && orig->u1.Function) {
-					kernel32(h, orig, cur);
-					cur++;
-					orig++;
-				}
-			} else if (stricmp(dllname, "advapi32.dll") == 0) {
-				while (cur->u1.Function && orig->u1.Function) {
-					advapi32(h, orig, cur);
-					cur++;
-					orig++;
-				}
-			} else if (stricmp(dllname, "ntdll.dll") == 0) {
-				while (cur->u1.Function && orig->u1.Function) {
-					nt(h, orig, cur);
-					cur++;
-					orig++;
-				}
-			} else if(stricmp(dllname, "msvcrt.dll") == 0) {
-				while (cur->u1.Function && orig->u1.Function) {
-					msvcrt(h, orig, cur);
-					cur++;
-					orig++;
-				}
-			}
-		}
-		imports++;
-	}
-}
-
-static void do_hook(void* fphook, void** fporig, IMAGE_THUNK_DATA* cur)
-{
-	DWORD old_protect;
-	*fporig = (void*) cur->u1.Function;
-	if (!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), PAGE_EXECUTE_READWRITE, &old_protect)) {
-		return;
-	}
-
-	cur->u1.Function = (uintptr_t) fphook;
-
-	if (!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), old_protect, &old_protect)) {
-		return;
-	}
-}
-
-static void hook(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur, void* fphook, void** fporig, const char* wanted_name, DWORD wanted_ordinal)
-{
-	if (orig->u1.Ordinal & IMAGE_ORDINAL_FLAG) {
-		DWORD ordinal = orig->u1.Ordinal & ~IMAGE_ORDINAL_FLAG;
-		if (ordinal == wanted_ordinal) {
-			do_hook(fphook, fporig, cur);
-		}
-	} else {
-		IMAGE_IMPORT_BY_NAME* name = (IMAGE_IMPORT_BY_NAME*) (orig->u1.AddressOfData + (char*) h);
-		if (strcmp((const char*) name->Name, wanted_name) == 0) {
-			do_hook(fphook, fporig, cur);
-		}
-	}
-}
-
-#define HOOK_ORD(name, ordinal) hook(h, orig, cur, (void*) name##_hook, (void**) &name##_orig, #name, ordinal)
-#define HOOK(name) hook(h, orig, cur, (void*) name##_hook, (void**) &name##_orig, #name, IMAGE_ORDINAL_FLAG)
-
-static void have_kernel32_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
-{
-	HOOK(OpenFile);
-	HOOK(CreateFileA);
-	HOOK(CreateFileW);
-	HOOK(CreateFileTransactedA);
-	HOOK(CreateFileTransactedW);
-	HOOK(DeleteFileA);
-	HOOK(DeleteFileW);
-	HOOK(DeleteFileTransactedA);
-	HOOK(DeleteFileTransactedW);
-	HOOK(MoveFileA);
-	HOOK(MoveFileW);
-	HOOK(MoveFileExA);
-	HOOK(MoveFileExW);
-	HOOK(MoveFileWithProgressA);
-	HOOK(MoveFileWithProgressW);
-	HOOK(MoveFileTransactedA);
-	HOOK(MoveFileTransactedW);
-	HOOK(ReplaceFileA);
-	HOOK(ReplaceFileW);
-	HOOK(CopyFileA);
-	HOOK(CopyFileW);
-	HOOK(CopyFileExA);
-	HOOK(CopyFileExW);
-	HOOK(CopyFileTransactedA);
-	HOOK(CopyFileTransactedW);
-	HOOK(GetFileAttributesA);
-	HOOK(GetFileAttributesW);
-	HOOK(GetFileAttributesExA);
-	HOOK(GetFileAttributesExW);
-	HOOK(FindFirstFileA);
-	HOOK(FindFirstFileW);
-	HOOK(FindNextFileA);
-	HOOK(FindNextFileW);
-	HOOK(CreateProcessA);
-	HOOK(CreateProcessW);
-}
-
-static void have_advapi32_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
-{
-	HOOK(CreateProcessAsUserA);
-	HOOK(CreateProcessAsUserW);
-	HOOK(CreateProcessWithLogonW);
-	HOOK(CreateProcessWithTokenW);
-}
-
-static void have_nt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
-{
-	HOOK(NtCreateFile);
-	HOOK(NtOpenFile);
-}
-
-static void have_msvcrt_import(HMODULE h, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur)
-{
-	HOOK(_access);
-	HOOK(fopen);
-	HOOK(rename);
-	HOOK(remove);
-}
 
 /* -------------------------------------------------------------------------- */
 
@@ -1788,10 +1672,6 @@ typedef DWORD (*tup_init_t)(remote_thread_t*);
 DWORD tup_inject_init(remote_thread_t* r)
 {
 	static int initialised = 0;
-
-	size_t i;
-	DWORD modnum;
-	HMODULE modules[256];
 	char filename[MAX_PATH];
 
 	if (initialised)
@@ -1818,12 +1698,6 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	DEBUG_HOOK("%d: %s\n", GetCurrentProcessId(), GetCommandLineA());
 
-	if (!EnumProcessModules(GetCurrentProcess(), modules, sizeof(modules), &modnum)) {
-		return 1;
-	}
-
-	modnum /= sizeof(HMODULE);
-
 	tup_inject_setexecdir(r->execdir);
 
 	if (open_file(r->depfilename))
@@ -1833,14 +1707,8 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	handle_file(filename, NULL, ACCESS_READ);
 
-	for (i = 0; i < modnum; i++) {
-		if (!GetModuleFileNameA(modules[i], filename, sizeof(filename))) {
-			return 1;
-		}
-		handle_file(filename, NULL, ACCESS_READ);
-
-		foreach_module(modules[i], &have_kernel32_import, &have_advapi32_import, &have_nt_import, &have_msvcrt_import);
-	}
+	hot_patch( patch_table, patch_table + patch_table_len );
+	iat_patch( patch_table, patch_table + patch_table_len );
 
 	return 0;
 }
