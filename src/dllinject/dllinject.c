@@ -1845,26 +1845,37 @@ DWORD tup_inject_init(remote_thread_t* r)
 	return 0;
 }
 
-static DWORD WINAPI remote_thread(void* param)
+int remote_stub(void);
+__asm(
+  ".globl _remote_stub\n"
+  "_remote_stub:\n"
+  "pushl $0xDEADBEEF\n"    // return address, [1]
+  "pushfl\n"
+  "pushal\n"
+  "pushl $0xDEADBEEF\n"    // function parameter, [8]
+  "movl $0xDEADBEEF, %eax\n" // function to call, [13]
+  "call *%eax\n"
+  "popal\n"
+  "popfl\n"
+  "ret"
+);
+
+static void WINAPI remote_init( remote_thread_t *r )
 {
-	HMODULE h;
-	tup_init_t p;
-	remote_thread_t* r = (remote_thread_t*) param;
+    HMODULE h;
+    tup_init_t p;
+    h = r->load_library(r->dll_name);
+    if (!h)
+        return;
 
-	h = r->load_library(r->dll_name);
-	if (!h) {
-		return 1;
-	}
+    p = (tup_init_t) r->get_proc_address(h, r->func_name);
+    if (!p)
+        return;
 
-	p = (tup_init_t) r->get_proc_address(h, r->func_name);
-	if (!p) {
-		return 1;
-	}
-
-	return p(r);
+    p(r);
 }
 
-static void remote_thread_end(void)
+static void remote_end(void)
 {
 }
 
@@ -1876,10 +1887,8 @@ int tup_inject_dll(
 	char* remote_data;
 	size_t code_size;
 	DWORD old_protect;
-	HANDLE thread;
 	HANDLE process;
 	HMODULE kernel32;
-	DWORD return_code;
 
 	memset(&remote, 0, sizeof(remote));
 	kernel32 = LoadLibraryA("kernel32.dll");
@@ -1891,6 +1900,11 @@ int tup_inject_dll(
 	strcat(remote.dll_name, "\\");
 	strcat(remote.dll_name, "tup-dllinject.dll");
 	strcat(remote.func_name, "tup_inject_init");
+
+	CONTEXT ctx;
+	ctx.ContextFlags = CONTEXT_CONTROL;
+	if( !GetThreadContext( lpProcessInformation->hThread, &ctx ) )
+		return -1;
 
 	DEBUG_HOOK("Injecting dll '%s' '%s' %s' '%s'\n",
 		remote.execdir,
@@ -1904,8 +1918,8 @@ int tup_inject_dll(
 		return -1;
 
 	/* Align code_size to a 16 byte boundary */
-	code_size = (  (uintptr_t) &remote_thread_end
-		     - (uintptr_t) &remote_thread + 0x0F)
+	code_size = (  (uintptr_t) &remote_end
+		     - (uintptr_t) &remote_stub + 0x0F)
 		  & ~0x0F;
 
 	remote_data = (char*) VirtualAllocEx(
@@ -1921,7 +1935,12 @@ int tup_inject_dll(
 	if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_READWRITE, &old_protect))
 		return -1;
 
-	if (!WriteProcessMemory(process, remote_data, &remote_thread, code_size, NULL))
+	unsigned char code[code_size];
+	memcpy( code, &remote_stub, code_size );
+	*(DWORD*)(code + 1) = ctx.Eip;
+	*(DWORD*)(code + 8) = (DWORD)remote_data + code_size;
+	*(DWORD*)(code + 13) = (DWORD)remote_data + ( (DWORD)&remote_init - (DWORD)&remote_stub );
+	if (!WriteProcessMemory(process, remote_data, code, code_size, NULL))
 		return -1;
 
 	if (!WriteProcessMemory(process, remote_data + code_size, &remote, sizeof(remote), NULL))
@@ -1933,18 +1952,10 @@ int tup_inject_dll(
 	if (!FlushInstructionCache(process, remote_data, code_size + sizeof(remote)))
 		return -1;
 
-	thread = CreateRemoteThread(process, NULL, 0, (LPTHREAD_START_ROUTINE) remote_data, remote_data + code_size, 0, NULL);
+	ctx.Eip = (DWORD)remote_data;
+	ctx.ContextFlags = CONTEXT_CONTROL;
+	if( !SetThreadContext( lpProcessInformation->hThread, &ctx ) )
+        return -1;
 
-	if (thread == INVALID_HANDLE_VALUE)
-		return -1;
-
-	if (WaitForSingleObject(thread, INFINITE) != WAIT_OBJECT_0)
-		return -1;
-
-	if (!GetExitCodeThread(thread, &return_code))
-		return -1;
-
-	CloseHandle(thread);
-
-	return return_code;
+	return 0;
 }
