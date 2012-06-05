@@ -751,7 +751,7 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 			first = 1;
 		} else {
 			if(dest)
-				sprintf(dest + *len, "/");
+				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;
 		}
 		if(dest)
@@ -763,7 +763,7 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 			first = 1;
 		} else {
 			if(dest)
-				sprintf(dest + *len, "/");
+				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;
 		}
 		if(dest)
