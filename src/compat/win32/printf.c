@@ -122,16 +122,20 @@ int __wrap___mingw_vprintf(const char *format, va_list ap)
 
 int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap)
 {
-	int rc;
-
-	if( stream == stdout || stream == stderr )
+    int rc;
+    DWORD dummy;
+    union
+    {
+        HANDLE h;
+        intptr_t v;
+    } handle;
+    handle.v = _get_osfhandle( fileno( stream ) );
+	if( GetConsoleMode( handle.h, &dummy ) )
 	{
-		char buf[32 * 1024];
-		rc = vsnprintf( buf, sizeof( buf ), format, ap );
-
-		parse( stream == stdout? GetStdHandle( STD_OUTPUT_HANDLE ): GetStdHandle( STD_ERROR_HANDLE ),
-			   buf );
-		return rc;
+        char buf[32 * 1024];
+        rc = vsnprintf( buf, sizeof( buf ), format, ap );
+        parse( handle.h, buf );
+        return rc;
 	}
 	else
 		rc = __real___mingw_vfprintf(stream, format, ap);
