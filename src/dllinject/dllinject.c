@@ -1380,14 +1380,17 @@ int _access_hook(const char *pathname, int mode)
 
 FILE *fopen_hook(const char *path, const char *mode)
 {
-	if(strchr(mode, 'w') == NULL &&
-	   strchr(mode, 'a') == NULL &&
-	   strchr(mode, '+') == NULL) {
-		handle_file(path, NULL, ACCESS_READ);
-	} else {
-		handle_file(path, NULL, ACCESS_WRITE);
-	}
-	return fopen_orig(path, mode);
+    DEBUG_HOOK("fopen mode = %s\n", mode );
+
+    FILE *ret = fopen_orig(path, mode);
+    if(strchr(mode, 'w') == NULL &&
+       strchr(mode, 'a') == NULL &&
+       ( strchr(mode, '+') == NULL || ret == NULL ) ) {
+        handle_file(path, NULL, ACCESS_READ);
+    } else {
+        handle_file(path, NULL, ACCESS_WRITE);
+    }
+    return ret;
 }
 
 int rename_hook(const char *oldpath, const char *newpath)
