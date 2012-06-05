@@ -59,11 +59,7 @@ static struct {
 };
 #define NUM_OPTION_LOCATIONS (sizeof(locations) / sizeof(locations[0]))
 
-#ifdef _WIN32
-#define DEFAULT_COLOR "never"
-#else
 #define DEFAULT_COLOR "auto"
-#endif
 
 static int parse_option_file(int x);
 static const char *cpu_number(void);
