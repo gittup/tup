@@ -330,7 +330,7 @@ static int db_backup(int version)
 		fprintf(stderr, "tup internal error: db backup buffer mis-sized.\n");
 		return -1;
 	}
-	fd = creat(backup, 0666);
+	fd = open(backup, O_CREAT|O_WRONLY|O_TRUNC, 0666);
 	if(fd < 0) {
 		perror(backup);
 		return -1;
