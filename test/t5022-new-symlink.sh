@@ -19,6 +19,7 @@
 # Make sure when a symlink is created, the directory gets re-parsed.
 
 . ./tup.sh
+check_no_windows symlink
 
 echo 'int foo(void) {return 0;}' > foo.c
 cat > Tupfile << HERE
