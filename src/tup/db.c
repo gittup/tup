@@ -206,14 +206,12 @@ static int msqlite3_reset(sqlite3_stmt *stmt)
 	return sqlite3_reset(stmt);
 }
 
-int tup_db_open(void)
+static int db_open(void)
 {
-	int rc;
 	int x;
 	int db_sync;
 
-	rc = sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL);
-	if(rc != 0) {
+	if(sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL) != 0) {
 		fprintf(stderr, "Unable to open database: %s\n",
 			sqlite3_errmsg(tup_db));
 		return -1;
@@ -226,14 +224,20 @@ int tup_db_open(void)
 	if(db_sync == 0)
 		if(no_sync() < 0)
 			return -1;
+	return 0;
+}
+
+int tup_db_open(void)
+{
+	if(db_open() < 0)
+		return -1;
 	if(tup_db_begin() < 0)
 		return -1;
 	if(version_check() < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
-
-	return rc;
+	return 0;
 }
 
 int tup_db_close(void)
@@ -313,6 +317,14 @@ static int db_backup(int version)
 	int rc;
 	char buf[1024];
 
+	/* Close our current database file, since Windows doesn't let us open
+	 * it again for backup.
+	 */
+	if(tup_db_commit() < 0)
+		return -1;
+	if(tup_db_close() < 0)
+		return -1;
+
 	if(snprintf(backup, sizeof(backup), ".tup/db_backup_%i", version) >=
 	   (signed)sizeof(backup)) {
 		fprintf(stderr, "tup internal error: db backup buffer mis-sized.\n");
@@ -350,6 +362,10 @@ static int db_backup(int version)
 		return -1;
 	}
 	printf("Old tup database backed up as '%s'\n", backup);
+	if(db_open() < 0)
+		return -1;
+	if(tup_db_begin() < 0)
+		return -1;
 	return 0;
 
 err_fail:
