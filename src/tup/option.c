@@ -59,8 +59,6 @@ static struct {
 };
 #define NUM_OPTION_LOCATIONS (sizeof(locations) / sizeof(locations[0]))
 
-#define DEFAULT_COLOR "auto"
-
 static int parse_option_file(int x);
 static const char *cpu_number(void);
 static const char *stdout_isatty(void);
@@ -77,7 +75,7 @@ static struct option {
 	{"updater.keep_going", "0", NULL},
 	{"updater.full_deps", "0", NULL},
 	{"updater.warnings", "1", NULL},
-	{"display.color", DEFAULT_COLOR, NULL},
+	{"display.color", "auto", NULL},
 	{"display.width", NULL, get_console_width},
 	{"display.progress", NULL, stdout_isatty},
 	{"display.job_numbers", "1", NULL},
