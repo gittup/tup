@@ -533,16 +533,16 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 		}
 
 		if(rc == SYNTAX_ERROR) {
-			fprintf(tf->f, "Syntax error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
+			fprintf(tf->f, "tup error: Syntax error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
 			return -1;
 		}
 		if(rc < 0) {
-			fprintf(tf->f, "Error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
+			fprintf(tf->f, "tup error: Error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
 			return -1;
 		}
 	}
 	if(if_check(&ifs) < 0) {
-		fprintf(tf->f, "Error parsing %s: missing endif before EOF.\n", filename);
+		fprintf(tf->f, "tup error: Error parsing %s: missing endif before EOF.\n", filename);
 		return -1;
 	}
 
@@ -1082,7 +1082,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 
 	value = split_eq(p);
 	if(!value) {
-		fprintf(tf->f, "Parse error line %i: Expecting '=' to set the bang rule.\n", lno);
+		fprintf(tf->f, "tup error: Parse error line %i: Expecting '=' to set the bang rule.\n", lno);
 		return SYNTAX_ERROR;
 	}
 
@@ -1141,7 +1141,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->command_len = cur_br->command_len;
 
 		if(string_tree_add(&tf->bang_root, &br->st, p) < 0) {
-			fprintf(tf->f, "Error inserting bang rule into tree\n");
+			fprintf(tf->f, "tup internal error: Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
 		return 0;
@@ -1205,7 +1205,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->value = alloc_value;
 
 		if(string_tree_add(&tf->bang_root, &br->st, p) < 0) {
-			fprintf(tf->f, "Error inserting bang rule into tree\n");
+			fprintf(tf->f, "tup internal error: Error inserting bang rule into tree\n");
 			goto err_cleanup_br;
 		}
 	}
@@ -1232,7 +1232,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 
 	value = split_eq(p);
 	if(!value) {
-		fprintf(tf->f, "Parse error line %i: Expecting '=' to set the *-chain.\n", lno);
+		fprintf(tf->f, "tup error: Parse error line %i: Expecting '=' to set the *-chain.\n", lno);
 		return -1;
 	}
 
@@ -1243,7 +1243,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		input_pattern = lbracket+1;
 		rbracket = strchr(input_pattern, ']');
 		if(!rbracket) {
-			fprintf(tf->f, "Parse error line %i: Expecting ']' character in *-chain definition\n", lno);
+			fprintf(tf->f, "tup error: Parse error line %i: Expecting ']' character in *-chain definition\n", lno);
 			return -1;
 		}
 		*rbracket = 0;
@@ -1266,7 +1266,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
 		TAILQ_INIT(&ch->banglist);
 
 		if(string_tree_add(&tf->chain_root, &ch->st, p) < 0) {
-			fprintf(tf->f, "Error inserting *-chain into tree\n");
+			fprintf(tf->f, "tup internal error: Error inserting *-chain into tree\n");
 			return -1;
 		}
 	}
@@ -1411,7 +1411,7 @@ static int set_variable(struct tupfile *tf, char *line)
 			rc = vardb_set(&tf->vdb, var, value, NULL);
 	}
 	if(rc < 0) {
-		fprintf(tf->f, "Error setting variable '%s'\n", var);
+		fprintf(tf->f, "tup internal error: Error setting variable '%s'\n", var);
 		return -1;
 	}
 	free(var);
@@ -1491,7 +1491,7 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 	if(!st) {
 		st = string_tree_search(&tf->bang_root, r->command, r->command_len);
 		if(!st) {
-			fprintf(tf->f, "Error finding bang variable: '%s'\n",
+			fprintf(tf->f, "tup error: Error finding bang variable: '%s'\n",
 				r->command);
 			return -1;
 		}
@@ -1582,7 +1582,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 		marker = "<|";
 		p = strstr(p, marker);
 		if(!p) {
-			fprintf(tf->f, "Syntax error: Missing '|>' marker.\n");
+			fprintf(tf->f, "tup error: Missing '|>' marker.\n");
 			return -1;
 		}
 	}
@@ -1601,7 +1601,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 
 	p = strstr(p, marker);
 	if(!p) {
-		fprintf(tf->f, "Syntax error: Missing second '%s' marker.\n", marker);
+		fprintf(tf->f, "tup error: Missing second '%s' marker.\n", marker);
 		return -1;
 	}
 	ce = p - 1;
@@ -2130,19 +2130,19 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			char *endb;
 
 			if(!bl) {
-				fprintf(tf->f, "Parse error: Bins are only usable in an input or output list.\n");
+				fprintf(tf->f, "tup error: Bins are only usable in an input or output list.\n");
 				return -1;
 			}
 
 			endb = strchr(p, '}');
 			if(!endb) {
-				fprintf(tf->f, "Parse error: Expecting end bracket for input bin.\n");
+				fprintf(tf->f, "tup error: Expecting end bracket for input bin.\n");
 				return -1;
 			}
 			*endb = 0;
 			pl->bin = bin_find(p+1, bl);
 			if(!pl->bin) {
-				fprintf(tf->f, "Parse error: Unable to find bin '%s'\n", p+1);
+				fprintf(tf->f, "tup error: Unable to find bin '%s'\n", p+1);
 				return -1;
 			}
 		} else {
@@ -2722,7 +2722,7 @@ out_pl:
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
-			fprintf(tf->f, "You may have multiple commands trying to create file '%s'\n", onle->path);
+			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
@@ -2733,7 +2733,7 @@ out_pl:
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
-			fprintf(tf->f, "You may have multiple commands trying to create file '%s'\n", onle->path);
+			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
@@ -3030,7 +3030,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	}
 	memcpy(&s[x], p, cmd+cmd_len - p + 1);
 	if((signed)strlen(s) != clen) {
-		fprintf(tf->f, "tup error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
+		fprintf(tf->f, "tup internal error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
 		return NULL;
 	}
 	return s;
@@ -3073,7 +3073,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
 					if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
-						fprintf(tf->f, "tup error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
@@ -3185,7 +3185,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
 					if(get_relative_dir(p, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
-						fprintf(tf->f, "tup error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
@@ -3264,7 +3264,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	strcpy(p, s);
 
 	if((signed)strlen(ret) != len) {
-		fprintf(tf->f, "Length mismatch: expected %i bytes, wrote %li\n", len, (long)strlen(ret));
+		fprintf(tf->f, "tup internal error: Length mismatch in eval(): expected %i bytes, wrote %li\n", len, (long)strlen(ret));
 		return NULL;
 	}
 
