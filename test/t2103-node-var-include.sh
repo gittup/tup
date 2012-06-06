@@ -44,7 +44,14 @@ tup touch sw/toolkit/lib.tup
 tup touch sw/app/Tupfile
 update
 
-tup_dep_exist sw/app 'echo app.a ../toolkit/toolkit.a > libs.txt' sw/app libs.txt
+path="../toolkit/toolkit.a"
+case $tupos in
+	CYGWIN*)
+		path="..\toolkit/toolkit.a"
+		;;
+esac
+
+tup_dep_exist sw/app "echo app.a $path > libs.txt" sw/app libs.txt
 tup_dep_exist sw/toolkit lib.tup sw app
 
 eotup
