@@ -59,33 +59,25 @@ void vardb_dump(struct vardb *v);
 /* Node variables */
 
 struct node_vardb {
-	struct string_entries root;
-	int count;
+   struct string_entries root;
+   int count;
 };
-
-struct string_list {
-	char* s;
-	int len;
-	TAILQ_ENTRY(string_list) list;
-};
-TAILQ_HEAD(string_list_head, string_list);
 
 struct node_var_entry {
-	struct string_tree var;
-	struct string_list_head values;
-	int count;
+   struct string_tree var;
+   struct tent_list_head nodes;
 };
 
 int nodedb_init(struct node_vardb *v);
 int nodedb_close(struct node_vardb *v);
-int nodedb_set(struct node_vardb *v, const char *var, const char* value,
-	            tupid_t cur_tupid, tupid_t root_tupid);
-int nodedb_append(struct node_vardb *v, const char *var, const char* value,
-	               tupid_t cur_tupid, tupid_t root_tupid);
+int nodedb_set(struct node_vardb *v, const char *var,
+               struct tup_entry *tent);
+int nodedb_append(struct node_vardb *v, const char *var,
+                  struct tup_entry *tent);
 int nodedb_len(struct node_vardb *v, const char *var, int varlen,
-	            tupid_t relative_to, tupid_t root_tupid);
+               tupid_t relative_to);
 int nodedb_copy(struct node_vardb *v, const char *var, int varlen,
-	             char **dest, tupid_t relative_to, tupid_t root_tupid);
+                char **dest, tupid_t relative_to);
 struct node_var_entry *nodedb_get(struct node_vardb *v,
                                   const char *var, int varlen);
 
