@@ -24,7 +24,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foo.txt |> $tupcp %f %o |> bar.txt
+: foo.txt |> cp %f %o |> bar.txt
 HERE
 echo 'orig' > foo.txt
 tup touch foo.txt Tupfile

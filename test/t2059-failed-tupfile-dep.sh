@@ -25,8 +25,8 @@ cat > foo/Tupfile << HERE
 : |> echo yo > %o |> yo.h
 HERE
 cat > bar/Tupfile << HERE
-: ../foo/*.txt |> $tupcp %f %o |> output
-: ../foo/*.c |> $tupcp %f %o |> output
+: ../foo/*.txt |> cp %f %o |> output
+: ../foo/*.c |> cp %f %o |> output
 HERE
 tup touch foo/Tupfile bar/Tupfile foo/ok.txt
 update

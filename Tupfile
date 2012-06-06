@@ -29,7 +29,6 @@ LDFLAGS += `pkg-config fuse --libs`
 
 ifneq (@(TUP_MINGW),)
 : src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
-: src/cp/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc %f -o %o |> tup-cp.exe
 
 mingwsrcs = src/tup/*.omingw
 mingwsrcs += src/tup/access_event/*.omingw

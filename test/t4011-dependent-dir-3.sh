@@ -37,7 +37,7 @@ HERE
 
 tmkdir B
 cat > B/Tupfile << HERE
-: foreach ../A/*.txt |> $tupcp %f %o |> %b
+: foreach ../A/*.txt |> cp %f %o |> %b
 HERE
 
 tup touch A/Tupfile B/Tupfile
@@ -45,7 +45,7 @@ update
 check_exist A/foo.txt B/foo.txt
 
 cat > C/Tupfile << HERE
-: foreach ../B/*.txt |> $tupcp %f %o |> %b
+: foreach ../B/*.txt |> cp %f %o |> %b
 HERE
 cat > A/Tupfile << HERE
 : |> echo hey > %o |> foo.txt

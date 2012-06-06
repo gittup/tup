@@ -24,7 +24,7 @@
 . ./tup.sh
 single_threaded
 cat > Tupfile << HERE
-: foo.h.in |> $tupcp %f %o |> %B
+: foo.h.in |> cp %f %o |> %B
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
 
