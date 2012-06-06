@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,13 +37,11 @@ static char * handle_color( HANDLE output, char *p )
 	static int reverted = 0;
 
 	int v = 0;
-	while( *p >= '0' && *p <= '9' )
-	{
+	while( *p >= '0' && *p <= '9' ) {
 		v = v * 10 + *p++ - '0';
 	}
 
-	switch( v )
-	{
+	switch( v ) {
 	case 0:
 		reverted = 0;
 		color = FOREGROUND_BLUE + FOREGROUND_GREEN + FOREGROUND_RED;
@@ -84,22 +82,19 @@ static char * handle_color( HANDLE output, char *p )
 static void parse( HANDLE output, char *p )
 {
 	char *out = p;
-	while( *p )
-	{
+	while( *p ) {
 		if( *p++ != ''  )
 			continue;
 
 		DWORD dummy;
-		WriteConsole( output,
-				      out, p - 1 - out, &dummy, NULL );
+		WriteConsole( output, out, p - 1 - out, &dummy, NULL );
 
 		if( *p == '[' )
 			p++;
 
 		p = handle_color( output, p );
 
-		while( *p == ';' )
-		{
+		while( *p == ';' ) {
 			p++;
 			p = handle_color( output, p );
 		}
@@ -111,8 +106,7 @@ static void parse( HANDLE output, char *p )
 	}
 
 	DWORD dummy;
-	WriteConsole( output,
-			      out, p - out, &dummy, NULL );
+	WriteConsole( output, out, p - out, &dummy, NULL );
 }
 
 int __wrap___mingw_vprintf(const char *format, va_list ap)
@@ -122,20 +116,18 @@ int __wrap___mingw_vprintf(const char *format, va_list ap)
 
 int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap)
 {
-    int rc;
-    DWORD dummy;
-    union
-    {
-        HANDLE h;
-        intptr_t v;
-    } handle;
-    handle.v = _get_osfhandle( fileno( stream ) );
-	if( GetConsoleMode( handle.h, &dummy ) )
-	{
-        char buf[32 * 1024];
-        rc = vsnprintf( buf, sizeof( buf ), format, ap );
-        parse( handle.h, buf );
-        return rc;
+	int rc;
+	DWORD dummy;
+	union {
+		HANDLE h;
+		intptr_t v;
+	} handle;
+	handle.v = _get_osfhandle( fileno( stream ) );
+	if( GetConsoleMode( handle.h, &dummy ) ) {
+		char buf[32 * 1024];
+		rc = vsnprintf( buf, sizeof( buf ), format, ap );
+		parse( handle.h, buf );
+		return rc;
 	}
 	else
 		rc = __real___mingw_vfprintf(stream, format, ap);
