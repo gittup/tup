@@ -698,13 +698,30 @@ void free_tent_list(struct tent_list_head *head)
 	}
 }
 
-static int get_all_parent_tents(tupid_t tupid, struct tent_list_head *head)
+/* Note: when used with variants, this function will skip over the variant
+ * root tent, meaning that the returned list of tents isn't a correct parent
+ * list, but when converted to a path it will refer to the correct file.
+ */
+static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
 	struct tent_list *tlist;
+	struct variant *variant;
 
 	tent = tup_entry_get(tupid);
+	variant = tup_entry_variant(tent);
 	while(tent) {
+		if(!variant->root_variant) {
+			/* Pretend the variant dir isn't there. The parser
+			 * handles whether or not the tent should be in the
+			 * variant dir or the src dir - we just get the path as
+			 * if the start and end tents are both in the src dir.
+			 */
+			if(tent->dt == DOT_DT) {
+				tent = tent->parent;
+				continue;
+			}
+		}
 		tlist = malloc(sizeof *tlist);
 		if(!tlist) {
 			perror("malloc");
@@ -729,9 +746,9 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 
 	TAILQ_INIT(&startlist);
 	TAILQ_INIT(&endlist);
-	if(get_all_parent_tents(start, &startlist) < 0)
+	if(get_full_path_tents(start, &startlist) < 0)
 		return -1;
-	if(get_all_parent_tents(end, &endlist) < 0)
+	if(get_full_path_tents(end, &endlist) < 0)
 		return -1;
 
 	while(!TAILQ_EMPTY(&startlist) && !TAILQ_EMPTY(&endlist)) {
