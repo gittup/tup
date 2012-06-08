@@ -879,6 +879,10 @@ static int process_create_nodes(void)
 		return -1;
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		struct variant *node_variant = tup_entry_variant(n->tent);
+
+		if(n->tent->type != TUP_NODE_DIR)
+			continue;
+
 		if(node_variant->root_variant) {
 			struct variant *variant;
 			LIST_FOREACH(variant, get_variant_list(), list) {
@@ -900,35 +904,33 @@ static int process_create_nodes(void)
 				g.num_nodes--;
 			}
 		} else {
-			if(n->tent->type == TUP_NODE_DIR) {
-				struct tup_entry *srctent;
-				int force_removal = 0;
-				if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
-					return -1;
-				}
-				/* If the srctent is a ghost, that means our
-				 * reason for existing is gone. Force our
-				 * removal.
-				 */
-				if(srctent->type == TUP_NODE_GHOST)
-					force_removal = 1;
-				/* If we are a variant subdirectory (our srcid
-				 * is not DOT_DT), and our name doesn't match
-				 * our srcid, that means the srctree was
-				 * renamed, and we go away.
-				 */
-				if(n->tent->srcid != DOT_DT &&
-				   strcmp(srctent->name.s, n->tent->name.s) != 0) {
-					force_removal = 1;
-				}
+			struct tup_entry *srctent;
+			int force_removal = 0;
+			if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
+				return -1;
+			}
+			/* If the srctent is a ghost, that means our
+			 * reason for existing is gone. Force our
+			 * removal.
+			 */
+			if(srctent->type == TUP_NODE_GHOST)
+				force_removal = 1;
+			/* If we are a variant subdirectory (our srcid
+			 * is not DOT_DT), and our name doesn't match
+			 * our srcid, that means the srctree was
+			 * renamed, and we go away.
+			 */
+			if(n->tent->srcid != DOT_DT &&
+			   strcmp(srctent->name.s, n->tent->name.s) != 0) {
+				force_removal = 1;
+			}
 
-				if(force_removal) {
-					if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
-						return -1;
-					TAILQ_REMOVE(&g.plist, n, list);
-					TAILQ_INSERT_TAIL(&g.removing_list, n, list);
-					n->state = STATE_REMOVING;
-				}
+			if(force_removal) {
+				if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
+					return -1;
+				TAILQ_REMOVE(&g.plist, n, list);
+				TAILQ_INSERT_TAIL(&g.removing_list, n, list);
+				n->state = STATE_REMOVING;
 			}
 		}
 	}
