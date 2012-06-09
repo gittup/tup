@@ -18,7 +18,8 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#pragma once
+#ifndef tup_trace_h
+#define tup_trace_h
 
 #ifndef NDEBUG
 #	define DEBUG_HOOK debug_hook
@@ -27,4 +28,6 @@ extern const char* access_type_name[];
 void debug_hook(const char* format, ...);
 #else
 #	define DEBUG_HOOK(...)
+#endif
+
 #endif

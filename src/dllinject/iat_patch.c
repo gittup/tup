@@ -19,49 +19,46 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 #include "iat_patch.h"
+#include "patch.h"
 #include "trace.h"
 #include <windows.h>
 #include <psapi.h>
 
-
-static void do_hook( void* fphook, void** fporig, IMAGE_THUNK_DATA* cur )
+static void do_hook(void* fphook, void** fporig, IMAGE_THUNK_DATA* cur)
 {
 	DWORD old_protect;
 	*fporig = (void*) cur->u1.Function;
-	if (!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), PAGE_EXECUTE_READWRITE, &old_protect)) {
+	if(!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), PAGE_EXECUTE_READWRITE, &old_protect)) {
 		return;
 	}
 
 	cur->u1.Function = (DWORD)fphook;
 
-	if (!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), old_protect, &old_protect)) {
+	if(!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), old_protect, &old_protect)) {
 		return;
 	}
 }
 
-
-static void hook( HMODULE h, const char *module_name, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur,
-		          const patch_entry *begin, const patch_entry *end )
+static void hook(HMODULE h, const char *module_name, IMAGE_THUNK_DATA* orig, IMAGE_THUNK_DATA* cur,
+		 const struct patch_entry *begin, const struct patch_entry *end)
 {
-	if (orig->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+	if(orig->u1.Ordinal & IMAGE_ORDINAL_FLAG)
 		return;
 
 	IMAGE_IMPORT_BY_NAME* name = (IMAGE_IMPORT_BY_NAME*) (orig->u1.AddressOfData + (char*) h);
-	const patch_entry *i;
-	for( i = begin; i != end; i++ )
-	{
-		if( i->skip )
+	const struct patch_entry *i;
+	for(i = begin; i != end; i++) {
+		if(i->skip)
 			continue;
-		if( stricmp( module_name, i->module ) )
+		if(stricmp(module_name, i->module))
 			continue;
-		if( strcmp( (const char*) name->Name, i->name ) )
+		if(strcmp((const char*)name->Name, i->name))
 			continue;
-		do_hook( i->new_proc, i->orig_proc, cur );
+		do_hook(i->new_proc, i->orig_proc, cur);
 	}
 }
 
-
-static void foreach_module( HMODULE h, const patch_entry *begin, const patch_entry *end )
+static void foreach_module(HMODULE h, const struct patch_entry *begin, const struct patch_entry *end)
 {
 	IMAGE_DOS_HEADER* dos_header;
 	IMAGE_NT_HEADERS* nt_headers;
@@ -73,17 +70,17 @@ static void foreach_module( HMODULE h, const patch_entry *begin, const patch_ent
 
 	import_dir = &nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 	imports = (IMAGE_IMPORT_DESCRIPTOR*) (import_dir->VirtualAddress + (char*) h);
-	if (import_dir->VirtualAddress == 0)
+	if(import_dir->VirtualAddress == 0)
 		return;
 
-	while (imports->Name != 0) {
+	while(imports->Name != 0) {
 		char* dllname = (char*) h + imports->Name;
-		if (imports->FirstThunk && imports->OriginalFirstThunk) {
+		if(imports->FirstThunk && imports->OriginalFirstThunk) {
 			IMAGE_THUNK_DATA* cur = (IMAGE_THUNK_DATA*) (imports->FirstThunk + (char*) h);
 			IMAGE_THUNK_DATA* orig = (IMAGE_THUNK_DATA*) (imports->OriginalFirstThunk + (char*) h);
 
-			while (cur->u1.Function && orig->u1.Function) {
-				hook( h, dllname, orig, cur, begin, end );
+			while(cur->u1.Function && orig->u1.Function) {
+				hook(h, dllname, orig, cur, begin, end);
 				cur++;
 				orig++;
 			}
@@ -92,24 +89,23 @@ static void foreach_module( HMODULE h, const patch_entry *begin, const patch_ent
 	}
 }
 
-
-int iat_patch( patch_entry *begin, patch_entry *end )
+int iat_patch(struct patch_entry *begin, struct patch_entry *end)
 {
 	DWORD modnum;
 	HMODULE modules[256];
 	char filename[MAX_PATH];
 
-	if( !EnumProcessModules(GetCurrentProcess(), modules, sizeof(modules), &modnum) )
+	if(!EnumProcessModules(GetCurrentProcess(), modules, sizeof(modules), &modnum))
 		return -1;
 
 	modnum /= sizeof(HMODULE);
 
 	DWORD i;
-	for( i = 0; i < modnum; i++) {
-		if (!GetModuleFileNameA(modules[i], filename, sizeof(filename))) {
+	for(i = 0; i < modnum; i++) {
+		if(!GetModuleFileNameA(modules[i], filename, sizeof(filename))) {
 			return -1;
 		}
-		foreach_module( modules[i], begin, end );
+		foreach_module(modules[i], begin, end);
 	}
 
 	return 0;

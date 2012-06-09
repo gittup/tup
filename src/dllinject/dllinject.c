@@ -24,6 +24,7 @@
 #include "tup/access_event.h"
 #include "iat_patch.h"
 #include "hot_patch.h"
+#include "patch.h"
 #include "trace.h"
 
 #include <windows.h>
@@ -1390,8 +1391,7 @@ struct remote_thread_t
 
 
 #define HOOK(name) { MODULE_NAME, #name, name##_hook, (void**)&name##_orig, 0 }
-static patch_entry patch_table[] =
-{
+static struct patch_entry patch_table[] = {
 #define MODULE_NAME "kernel32.dll"
 	HOOK(OpenFile),
 	HOOK(CreateFileA),
@@ -1613,7 +1613,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 	DEBUG_HOOK("writef %d\n", ret);
 	if(ret) {}
 
-exit:;
+exit:
 	SetLastError( save_error );
 }
 
@@ -1654,7 +1654,7 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	DEBUG_HOOK("writef [wide] %d\n", ret);
 	if(ret) {}
 
-exit:;
+exit:
 	SetLastError( save_error );
 }
 

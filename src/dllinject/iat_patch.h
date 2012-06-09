@@ -18,7 +18,11 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#pragma once
-#include "patch.h"
+#ifndef tup_iat_patch_h
+#define tup_iat_patch_h
 
-int iat_patch( patch_entry *begin, patch_entry *end );
+struct patch_entry;
+
+int iat_patch(struct patch_entry *begin, struct patch_entry *end);
+
+#endif

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,7 +17,11 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#pragma once
-#include "patch.h"
+#ifndef tup_hot_patch_h
+#define tup_hot_patch_h
 
-int hot_patch( patch_entry *begin, patch_entry *end );
+struct patch_entry;
+
+int hot_patch(struct patch_entry *begin, struct patch_entry *end);
+
+#endif
