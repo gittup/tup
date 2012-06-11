@@ -2721,7 +2721,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -2732,7 +2732,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}

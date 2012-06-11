@@ -3136,7 +3136,7 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroot,
+int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
 			      struct tupid_entries *root)
 {
 	int rc;
@@ -3160,9 +3160,10 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroo
 		return 0;
 	}
 	/* Otherwise, someone else got the girl. Err, output file. */
-	fprintf(stderr, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
-	tup_db_print(stderr, a);
-	tup_db_print(stderr, b);
+	fprintf(f, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
+	tup_db_print(f, incoming);
+	tup_db_print(f, a);
+	tup_db_print(f, b);
 	return -1;
 }
 
