@@ -48,14 +48,14 @@ int tup_db_debug_add_all_ghosts(void);
 const char *tup_db_type(enum TUP_NODE_TYPE type);
 
 /* Node operations */
-struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type);
-struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid,
-					   int *node_changed);
+struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type);
+struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type,
+					   tupid_t srcid, int *node_changed);
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
-					  int type, tupid_t srcid, int *node_changed);
+					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed);
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
-				     int len, int type, time_t mtime, tupid_t srcid);
-int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
+				     int len, enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid);
+int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, enum TUP_NODE_TYPE type,
 			    time_t mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
@@ -77,7 +77,7 @@ int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_open_tupid(tupid_t dt);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name);
-int tup_db_set_type(struct tup_entry *tent, int type);
+int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_print(FILE *stream, tupid_t tupid);
@@ -143,7 +143,7 @@ int tup_db_set_var(tupid_t tupid, const char *value);
 struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, char **dest);
 int tup_db_get_var_id_alloc(tupid_t tupid, char **dest);
 int tup_db_get_varlen(struct variant *variant, const char *var, int varlen);
-int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg);
+int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg);
 int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 		     const char *vardict_file);
 int tup_db_delete_tup_config(struct tup_entry *tent);
@@ -156,8 +156,8 @@ int tup_db_get_environ(struct tupid_entries *root,
 tupid_t env_dt(void);
 
 /* Tree operations */
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type);
-int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type);
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 
 /* scanner operations */
 int tup_db_scan_begin(void);

@@ -248,7 +248,7 @@ static int get_time_remaining(char *dest, int len, int part, int whole, int appr
 	return snprintf(dest, len, "ETA%s???", eq);
 }
 
-void show_progress(int active, int type)
+void show_progress(int active, enum TUP_NODE_TYPE type)
 {
 	int console_width = tup_option_get_int("display.width");
 	if(total && display_progress && console_width >= 10) {

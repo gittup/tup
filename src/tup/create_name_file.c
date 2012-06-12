@@ -237,7 +237,7 @@ int tup_file_missing(struct tup_entry *tent)
 	return tup_del_id_type(tent->tnode.tupid, tent->type, force, NULL);
 }
 
-int tup_del_id_force(tupid_t tupid, int type)
+int tup_del_id_force(tupid_t tupid, enum TUP_NODE_TYPE type)
 {
 	return tup_del_id_type(tupid, type, 1, NULL);
 }
@@ -247,7 +247,7 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 	rmdir_callback = callback;
 }
 
-int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
+int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modified)
 {
 	struct tup_entry *tent;
 	int dont_delete = 0;

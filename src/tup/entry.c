@@ -40,7 +40,7 @@ static struct tup_entry_head entry_list;
 static int do_verbose = 0;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
-				   const char *name, int len, int type,
+				   const char *name, int len, enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
@@ -280,7 +280,7 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 }
 
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
-			 int type, time_t mtime, tupid_t srcid,
+			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
@@ -295,7 +295,7 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 	return 0;
 }
 
-int tup_entry_add_all(tupid_t tupid, tupid_t dt, int type,
+int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
 		      time_t mtime, tupid_t srcid, const char *name)
 {
 	struct tup_entry *tent;
@@ -443,7 +443,7 @@ int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent)
 }
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
-				   const char *name, int len, int type,
+				   const char *name, int len, enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;

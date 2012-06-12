@@ -119,7 +119,7 @@ void remove_edge(struct edge *e)
 	free(e);
 }
 
-int create_graph(struct graph *g, int count_flags)
+int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 {
 	root_entry.tnode.tupid = 0;
 	root_entry.dt = 0;

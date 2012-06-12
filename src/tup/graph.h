@@ -23,6 +23,7 @@
 
 #include "bsd/queue.h"
 #include "tupid_tree.h"
+#include "db_types.h"
 #include <time.h>
 
 struct edge {
@@ -64,7 +65,7 @@ struct graph {
 	struct node *cur;
 	int num_nodes;
 	struct tupid_entries node_root;
-	int count_flags;
+	enum TUP_NODE_TYPE count_flags;
 	time_t total_mtime;
 	struct tupid_entries gen_delete_root;
 	int gen_delete_count;
@@ -79,7 +80,7 @@ void remove_node(struct graph *g, struct node *n);
 int create_edge(struct node *n1, struct node *n2, int style);
 void remove_edge(struct edge *e);
 
-int create_graph(struct graph *g, int count_flags);
+int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags);
 int destroy_graph(struct graph *g);
 int graph_empty(struct graph *g);
 int nodes_are_connected(struct tup_entry *src, struct tupid_entries *dest_head,

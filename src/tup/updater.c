@@ -568,7 +568,8 @@ static int process_config_nodes(int environ_check)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(create_graph(&g, -1) < 0)
+	/* Use TUP_NODE_ROOT to count everything */
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1052,7 +1053,8 @@ static int check_config_todo(void)
 	int rc;
 	int stuff_todo = 0;
 
-	if(create_graph(&g, -1) < 0)
+	/* Use TUP_NODE_ROOT to count everything */
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1194,7 +1196,8 @@ edge_create:
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->tent->type == g->count_flags || g->count_flags < 0) {
+		/* TUP_NODE_ROOT means we count everything */
+		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
 				if(n->tent->mtime == -1)
@@ -1579,7 +1582,8 @@ static void *todo_work(void *arg)
 		if(n == (void*)-1)
 			break;
 
-		if(n->tent->type == g->count_flags || g->count_flags == -1) {
+		/* TUP_NODE_ROOT means we count everything */
+		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			show_result(n->tent, 0, NULL, NULL);
 		}
 

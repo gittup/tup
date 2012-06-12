@@ -134,7 +134,7 @@ struct half_entry {
 	LIST_ENTRY(half_entry) list;
 	tupid_t tupid;
 	tupid_t dt;
-	int type;
+	enum TUP_NODE_TYPE type;
 };
 LIST_HEAD(half_entry_head, half_entry);
 
@@ -1004,19 +1004,19 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 	return str;
 }
 
-struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
+struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type)
 {
 	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
 }
 
-struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid,
+struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
 					   int *node_changed)
 {
 	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
 }
 
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
-					  int type, tupid_t srcid, int *node_changed)
+					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
 
@@ -1378,7 +1378,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		struct tup_entry *tent;
 		tupid_t tupid;
 		const char *name;
-		int type;
+		enum TUP_NODE_TYPE type;
 		time_t mtime;
 		tupid_t srcid;
 
@@ -2002,7 +2002,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 	return 0;
 }
 
-int tup_db_set_type(struct tup_entry *tent, int type)
+int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_TYPE];
@@ -2332,7 +2332,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[DB_PRINT];
 	static char s[] = "select dir, type, name from node where id=?";
 	tupid_t parent;
-	int type;
+	enum TUP_NODE_TYPE type;
 	char *path;
 
 	if(tupid == 0) {
@@ -2405,6 +2405,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
 		case TUP_NODE_VAR:
+		case TUP_NODE_ROOT:
 		default:
 			fprintf(stream, "%s", path);
 			break;
@@ -3365,7 +3366,7 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type)
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -3423,7 +3424,7 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, i
 	return rc;
 }
 
-int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type)
+int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -4105,7 +4106,7 @@ int tup_db_get_varlen(struct variant *variant, const char *var, int varlen)
 	return ve->vallen;
 }
 
-int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg)
+int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg)
 {
 	int rc = -1;
 	int dbrc;
@@ -4130,7 +4131,7 @@ int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const 
 	while(1) {
 		const char *var;
 		const char *value;
-		int type;
+		enum TUP_NODE_TYPE type;
 		tupid_t tupid;
 
 		dbrc = sqlite3_step(*stmt);
@@ -4409,7 +4410,7 @@ static struct var_entry *envdb_set(const char *var, int varlen, const char *newe
 	return ve;
 }
 
-static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, int type)
+static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, enum TUP_NODE_TYPE type)
 {
 	const char *env;
 	struct tup_entry *tent;
@@ -4676,7 +4677,7 @@ static int load_all_nodes(void)
 	while(1) {
 		tupid_t tupid;
 		tupid_t dt;
-		int type;
+		enum TUP_NODE_TYPE type;
 		time_t mtime;
 		const char *name;
 		tupid_t srcid;
@@ -5357,7 +5358,7 @@ int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
 }
 
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
-				     int type, time_t mtime, tupid_t srcid)
+				     enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent(dt, name, len, type, mtime, srcid, &tent) < 0)
@@ -5365,7 +5366,7 @@ struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
 	return tent;
 }
 
-int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
+int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, enum TUP_NODE_TYPE type,
 			    time_t mtime, tupid_t srcid, struct tup_entry **entry)
 {
 	int rc;
@@ -5443,7 +5444,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
 	tupid_t tupid;
-	int type;
+	enum TUP_NODE_TYPE type;
 	int mtime;
 	tupid_t srcid;
 	static char s[] = "select id, type, mtime, srcid from node where dir=? and name=?" SQL_NAME_COLLATION;
@@ -6000,7 +6001,7 @@ static int get_db_var_tree(tupid_t dt, struct vardb *vdb)
 		tupid_t tupid;
 		const char *var;
 		const char *value;
-		int type;
+		enum TUP_NODE_TYPE type;
 		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);

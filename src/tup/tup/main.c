@@ -490,6 +490,7 @@ static int graph(int argc, char **argv)
 				style = "dotted";
 				shape = "oval";
 				break;
+			case TUP_NODE_ROOT:
 			default:
 				shape="ellipse";
 		}
@@ -917,7 +918,7 @@ static int rm(int argc, char **argv)
 	return 0;
 }
 
-static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, int type)
+static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type)
 {
 	const char *color1 = "";
 	const char *color2 = "";
