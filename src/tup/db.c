@@ -4586,15 +4586,10 @@ tupid_t env_dt(void)
 
 	if(tup_entry_add(DOT_DT, NULL) < 0)
 		return -1;
-	if(tup_db_select_tent(DOT_DT, "$", &envtent) < 0) {
-		return -1;
-	}
+	envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
 	if(!envtent) {
-		envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
-		if(!envtent) {
-			fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
-			return -1;
-		}
+		fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
+		return -1;
 	}
 	local_env_dt = envtent->tnode.tupid;
 	return local_env_dt;
