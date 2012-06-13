@@ -4724,7 +4724,7 @@ static int load_all_nodes(void)
 	return rc;
 }
 
-static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
+static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group)
 {
 	int rc = 0;
 	int dbrc;
@@ -4745,9 +4745,12 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+	if(group)
+		*group = NULL;
 
 	while(1) {
 		tupid_t tupid;
+		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -4761,11 +4764,28 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add(output_root, tupid);
-
-		if(rc < 0) {
-			fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
-			break;
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP) {
+			if(group) {
+				if(*group == NULL) {
+					*group = tent;
+				} else {
+					fprintf(stderr, "tup error: Unable to specify multiple output groups: ");
+					print_tup_entry(stderr, *group);
+					fprintf(stderr, ", and ");
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "\n");
+					rc = -1;
+					break;
+				}
+			}
+		} else {
+			rc = tupid_tree_add(output_root, tupid);
+			if(rc < 0) {
+				fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+				break;
+			}
 		}
 	}
 
@@ -4971,7 +4991,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.output_error = 0,
 	};
 
-	if(get_output_tree(cmdid, &output_root) < 0)
+	if(get_output_tree(cmdid, &output_root, NULL) < 0)
 		return -1;
 	if(compare_list_tree(writehead, &output_root, &aod,
 			     extra_output, missing_output) < 0)
@@ -5245,7 +5265,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		}
 	}
 
-	if(get_output_tree(cmdid, &aid.output_root) < 0)
+	if(get_output_tree(cmdid, &aid.output_root, NULL) < 0)
 		return -1;
 	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
 		return -1;
@@ -5330,11 +5350,39 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 	struct parse_output_data pod = {
 		.cmdid = cmdid,
 		.outputs_differ = 0,
-		.group = group,
+		.group = NULL,
 	};
+	struct tup_entry *oldgroup;
 
-	if(get_output_tree(cmdid, &output_root) < 0)
+	if(get_output_tree(cmdid, &output_root, &oldgroup) < 0)
 		return -1;
+	if(oldgroup == group) {
+		/* If we have the same group as before, we just update links to the
+		 * group in add/rm_output().
+		 */
+		pod.group = group;
+	} else {
+		struct tupid_tree *tt;
+		pod.outputs_differ = 1;
+		if(group) {
+			/* New group - add links from all outputs */
+			RB_FOREACH(tt, tupid_entries, root) {
+				if(link_insert(tt->tupid, group->tnode.tupid, TUP_LINK_STICKY) < 0)
+					return -1;
+			}
+			if(link_insert(cmdid, group->tnode.tupid, TUP_LINK_STICKY) < 0)
+				return -1;
+		}
+		if(oldgroup) {
+			/* Removed from old group - rm links from all outputs */
+			RB_FOREACH(tt, tupid_entries, root) {
+				if(link_remove(tt->tupid, oldgroup->tnode.tupid) < 0)
+					return -1;
+			}
+			if(link_remove(cmdid, oldgroup->tnode.tupid) < 0)
+				return -1;
+		}
+	}
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
 	if(pod.outputs_differ == 1) {
