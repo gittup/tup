@@ -31,8 +31,8 @@ cat > Tupfile << HERE
 HERE
 update
 
-tup_dep_exist . foo . 'group'
-tup_dep_no_exist . bar . 'group'
+tup_dep_exist . foo . '<group>'
+tup_dep_no_exist . bar . '<group>'
 
 # Now we swap which script touches which file. As a result, 'bar' should be
 # grouped and not 'foo'.
@@ -49,7 +49,7 @@ HERE
 tup touch ok1.sh ok2.sh Tupfile
 update
 
-tup_dep_no_exist . foo . 'group'
-tup_dep_exist . bar . 'group'
+tup_dep_no_exist . foo . '<group>'
+tup_dep_exist . bar . '<group>'
 
 eotup

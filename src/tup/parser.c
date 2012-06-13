@@ -1635,6 +1635,10 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	brace = strchr(output, '{');
 	if(brace) {
 		ebrace = brace - 1;
+		if(!isspace(*ebrace)) {
+			fprintf(tf->f, "tup error: Expected whitespace before '{' character in output list.\n");
+			return -1;
+		}
 		while(isspace(*ebrace) && ebrace > output)
 			ebrace--;
 		bin = brace + 1;
@@ -1648,15 +1652,20 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	angle = strchr(output, '<');
 	if(angle) {
 		eangle = angle - 1;
+		if(!isspace(*eangle)) {
+			fprintf(tf->f, "tup error: Expected whitespace before '<' character in output list.\n");
+			return -1;
+		}
 		while(isspace(*eangle) && eangle > output)
 			eangle--;
-		group = angle + 1;
+		group = angle;
 
 		angle = strchr(group, '>');
 		if(!angle) {
 			fprintf(tf->f, "tup error: Missing '>' to finish group.\n");
 			return -1;
 		}
+		angle++;
 	}
 
 	/* Bin and group can come in any order, but we can only have one of
@@ -1667,7 +1676,10 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 		ebrace[1] = 0;
 	}
 	if(angle) {
-		*angle = 0;
+		if(*angle) {
+			fprintf(tf->f, "tup error: group must be at the end of the output list\n");
+			return -1;
+		}
 		eangle[1] = 0;
 	}
 
@@ -1679,12 +1691,6 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	if(brace) {
 		if(brace[1]) {
 			fprintf(tf->f, "tup error: bin must be at the end of the output list.\n");
-			return -1;
-		}
-	}
-	if(angle) {
-		if(angle[1]) {
-			fprintf(tf->f, "tup error: group must be at the end of the output list\n");
 			return -1;
 		}
 	}
@@ -2210,13 +2216,11 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			if(p[0] == '<') {
 				/* Group */
 				char *endb;
-				p++;
 				endb = strchr(p, '>');
 				if(!endb) {
 					fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
 					return -1;
 				}
-				*endb = 0;
 			}
 			pl->path = p;
 

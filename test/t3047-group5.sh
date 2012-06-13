@@ -28,9 +28,9 @@ cat > Tupfile << HERE
 HERE
 update
 
-tup_dep_exist . 'foo' . 'group'
-tup_dep_exist . 'bar' . 'group'
-tup_dep_exist . 'sh ok.sh' . 'group'
+tup_dep_exist . 'foo' . '<group>'
+tup_dep_exist . 'bar' . '<group>'
+tup_dep_exist . 'sh ok.sh' . '<group>'
 
 # Move bar to another command, and also remove the group from 'sh ok.sh'. The
 # bar node should no longer have a reference to the group (and the group should
@@ -45,6 +45,6 @@ HERE
 tup touch ok.sh Tupfile
 update
 
-tup_object_no_exist . 'group'
+tup_object_no_exist . '<group>'
 
 eotup

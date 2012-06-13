@@ -32,10 +32,10 @@ HERE
 echo '#include "bar.h"' > bar.c
 update
 
-tup_dep_exist . 'foo.h' . 'foo-autoh'
-tup_dep_exist . 'bar.h' . 'foo-autoh'
-tup_dep_exist . 'cp foo.h.in foo.h' . 'foo-autoh'
-tup_dep_exist . 'cp bar.h.in bar.h' . 'foo-autoh'
+tup_dep_exist . 'foo.h' . '<foo-autoh>'
+tup_dep_exist . 'bar.h' . '<foo-autoh>'
+tup_dep_exist . 'cp foo.h.in foo.h' . '<foo-autoh>'
+tup_dep_exist . 'cp bar.h.in bar.h' . '<foo-autoh>'
 
 # If we remove our output group, then the compilation commands should
 # re-execute and fail because they don't include the generated headers as
@@ -47,10 +47,10 @@ HERE
 tup touch Tupfile
 update_fail_msg "Missing input dependency"
 
-tup_dep_no_exist . 'foo.h' . 'foo-autoh'
-tup_dep_no_exist . 'bar.h' . 'foo-autoh'
-tup_dep_no_exist . 'cp foo.h.in foo.h' . 'foo-autoh'
-tup_dep_no_exist . 'cp bar.h.in bar.h' . 'foo-autoh'
+tup_dep_no_exist . 'foo.h' . '<foo-autoh>'
+tup_dep_no_exist . 'bar.h' . '<foo-autoh>'
+tup_dep_no_exist . 'cp foo.h.in foo.h' . '<foo-autoh>'
+tup_dep_no_exist . 'cp bar.h.in bar.h' . '<foo-autoh>'
 
 # Adding the outputs back in the group should work.
 cat > Tupfile << HERE
@@ -60,9 +60,9 @@ HERE
 tup touch Tupfile
 update
 
-tup_dep_exist . 'foo.h' . 'foo-autoh'
-tup_dep_exist . 'bar.h' . 'foo-autoh'
-tup_dep_exist . 'cp foo.h.in foo.h' . 'foo-autoh'
-tup_dep_exist . 'cp bar.h.in bar.h' . 'foo-autoh'
+tup_dep_exist . 'foo.h' . '<foo-autoh>'
+tup_dep_exist . 'bar.h' . '<foo-autoh>'
+tup_dep_exist . 'cp foo.h.in foo.h' . '<foo-autoh>'
+tup_dep_exist . 'cp bar.h.in bar.h' . '<foo-autoh>'
 
 eotup

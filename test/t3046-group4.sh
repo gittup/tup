@@ -28,9 +28,9 @@ cat > Tupfile << HERE
 HERE
 update
 
-tup_dep_exist . 'foo' . 'group'
-tup_dep_exist . 'bar' . 'group'
-tup_dep_exist . 'sh ok.sh' . 'group'
+tup_dep_exist . 'foo' . '<group>'
+tup_dep_exist . 'bar' . '<group>'
+tup_dep_exist . 'sh ok.sh' . '<group>'
 
 cat > ok.sh << HERE
 touch foo
@@ -42,8 +42,8 @@ HERE
 tup touch ok.sh Tupfile
 update
 
-tup_dep_exist . 'foo' . 'group'
-tup_dep_no_exist . 'bar' . 'group'
-tup_dep_exist . 'sh ok.sh' . 'group'
+tup_dep_exist . 'foo' . '<group>'
+tup_dep_no_exist . 'bar' . '<group>'
+tup_dep_exist . 'sh ok.sh' . '<group>'
 
 eotup
