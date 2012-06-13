@@ -3168,7 +3168,7 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 	return -1;
 }
 
-int tup_db_link_exists(tupid_t a, tupid_t b)
+int tup_db_link_exists(tupid_t a, tupid_t b, int *exists)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_LINK_EXISTS];
@@ -3201,7 +3201,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 		return -1;
 	}
 	if(rc == SQLITE_DONE) {
-		return -1;
+		*exists = 0;
+		return 0;
 	}
 	if(rc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
@@ -3209,6 +3210,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 		return -1;
 	}
 
+	*exists = 1;
 	return 0;
 }
 

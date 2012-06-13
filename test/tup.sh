@@ -165,10 +165,17 @@ tup_object_no_exist()
 
 tup_dep_exist()
 {
-	if tup link_exists "$1" "$2" "$3" "$4"; then
+	set +e
+	tup link_exists "$1" "$2" "$3" "$4"
+	rc=$?
+	set -e
+	if [ "$rc" = "1" ]; then
 		:
-	else
+	elif [ "$rc" = "0" ]; then
 		echo "*** Dependency from $2 [$1] -> $4 [$3] does not exist" 1>&2
+		exit 1
+	else
+		echo "*** link_exists() failed." 1>&2
 		exit 1
 	fi
 }
@@ -177,8 +184,17 @@ tup_dep_no_exist()
 {
 	if tup node_exists "$1" "$2"; then
 		if tup node_exists "$3" "$4"; then
-			if tup link_exists "$1" "$2" "$3" "$4"; then
+			set +e
+			tup link_exists "$1" "$2" "$3" "$4"
+			rc=$?
+			set -e
+			if [ "$rc" = "1" ]; then
 				echo "*** Dependency from $2 [$1] -> $4 [$3] exists when it shouldn't" 1>&2
+				exit 1
+			elif [ "$rc" = "0" ]; then
+				:
+			else
+				echo "*** link_exists() failed." 1>&2
 				exit 1
 			fi
 		else
@@ -206,10 +222,10 @@ __update()
 		cmd="tup upd"
 	fi
 
-	# Run this in a sub-shell so we can get the return code (otherwise the
-	# fact that we run with -e will kill the script).
-	($cmd "$@")
+	set +e
+	$cmd "$@"
 	rc=$?
+	set -e
 
 	if [ "$rc" = "11" ]; then
 		echo "*** Failed valgrind!" 1>&2
