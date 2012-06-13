@@ -5045,8 +5045,13 @@ static int rm_sticky(tupid_t tupid, void *data)
 
 	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
 		/* Not a normal link, kill it */
+		struct tup_entry *tent;
 		if(link_remove(tupid, wid->cmdid) < 0)
 			return -1;
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP)
+			tup_entry_add_ghost_list(tent, &ghost_list);
 	} else {
 		if(tupid_tree_search(wid->delete_root, tupid) == NULL) {
 			/* Demote to a normal link */

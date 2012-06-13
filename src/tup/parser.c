@@ -2409,11 +2409,19 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
-				return -1;
-			if(srctent)
-				if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
+			if(pl->pel->path[0] == '<') {
+				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+				if(!tent) {
+					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
 					return -1;
+				}
+			} else {
+				if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+					return -1;
+				if(srctent)
+					if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
+						return -1;
+			}
 		}
 
 		if(!tent) {
