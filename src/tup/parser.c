@@ -995,7 +995,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		dt = find_dir_tupid_dt(tf->tupid, group, &pel, 1, 0);
 		if(dt < 0)
 			return -1;
-		r.group = tup_db_create_node(dt, group, TUP_NODE_GROUP);
+		r.group = tup_db_create_node_part(dt, pel->path, pel->len, TUP_NODE_GROUP, -1, NULL);
 		if(!r.group)
 			return -1;
 		free(pel);
@@ -1652,15 +1652,13 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	angle = strchr(output, '<');
 	if(angle) {
 		eangle = angle - 1;
-		if(!isspace(*eangle)) {
-			fprintf(tf->f, "tup error: Expected whitespace before '<' character in output list.\n");
-			return -1;
-		}
+		while(!isspace(*eangle))
+			eangle--;
+		group = eangle + 1;
 		while(isspace(*eangle) && eangle > output)
 			eangle--;
-		group = angle;
 
-		angle = strchr(group, '>');
+		angle = strchr(angle, '>');
 		if(!angle) {
 			fprintf(tf->f, "tup error: Missing '>' to finish group.\n");
 			return -1;
