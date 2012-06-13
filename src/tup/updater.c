@@ -1392,16 +1392,11 @@ check_empties:
 		if(server_is_dead()) {
 			fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
 		} else {
-			struct node *n;
-			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
-			fprintf(stderr, "Node list:\n");
-			TAILQ_FOREACH(n, &g->node_list, list) {
-				fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
+			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency. See the dumped dependency graph for the dependency structure.\n");
+			if(fchdir(tup_top_fd()) < 0) {
+				perror("fchdir");
 			}
-			fprintf(stderr, "plist:\n");
-			TAILQ_FOREACH(n, &g->plist, list) {
-				fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-			}
+			dump_graph(g, ".tup/tmp/graph-%i.dot");
 		}
 	} else {
 		rc = 0;
