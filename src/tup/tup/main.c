@@ -490,6 +490,9 @@ static int graph(int argc, char **argv)
 				style = "dotted";
 				shape = "oval";
 				break;
+			case TUP_NODE_GROUP:
+				shape = "hexagon";
+				break;
 			case TUP_NODE_ROOT:
 			default:
 				shape="ellipse";

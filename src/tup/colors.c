@@ -84,6 +84,9 @@ const char *color_type(enum TUP_NODE_TYPE type)
 		case TUP_NODE_GENERATED:
 			color = "[35";
 			break;
+		case TUP_NODE_GROUP:
+			color="[36";
+			break;
 		case TUP_NODE_VAR:
 		case TUP_NODE_FILE:
 			/* If a generated node becomes a normal file (t6031) */

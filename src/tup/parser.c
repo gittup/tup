@@ -91,6 +91,7 @@ struct rule {
 	char *input_pattern;
 	char *output_pattern;
 	struct bin *bin;
+	struct tup_entry *group;
 	char *command;
 	int command_len;
 	struct name_list inputs;
@@ -183,7 +184,7 @@ static void free_chain_tree(struct string_entries *root);
 static void free_banglist(struct bang_list_head *head);
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio);
+			       char **o_bin, char **o_group, int *swapio);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
@@ -973,19 +974,33 @@ out_err:
 
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 {
-	char *input, *cmd, *output, *bin;
+	char *input, *cmd, *output, *bin, *group;
 	int cmd_len;
 	struct rule r;
 	int rc;
 	int swapio;
 
-	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin, &swapio) < 0)
+	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin, &group, &swapio) < 0)
 		return -1;
 	if(bin) {
 		if((r.bin = bin_add(bin, bl)) == NULL)
 			return -1;
 	} else {
 		r.bin = NULL;
+	}
+	if(group) {
+		tupid_t dt;
+		struct path_element *pel;
+
+		dt = find_dir_tupid_dt(tf->tupid, group, &pel, 1, 0);
+		if(dt < 0)
+			return -1;
+		r.group = tup_db_create_node(dt, group, TUP_NODE_GROUP);
+		if(!r.group)
+			return -1;
+		free(pel);
+	} else {
+		r.group = NULL;
 	}
 
 	r.foreach = 0;
@@ -1077,6 +1092,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *value;
 	char *alloc_value;
 	char *bin;
+	char *group;
 	int swapio = 0;
 	struct bang_rule *br;
 
@@ -1154,7 +1170,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	}
 
 	if(split_input_pattern(tf, alloc_value, &input, &command, &command_len,
-			       &output, &bin, &swapio) < 0)
+			       &output, &bin, &group, &swapio) < 0)
 		return -1;
 	if(bin != NULL) {
 		fprintf(tf->f, "tup error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
@@ -1559,14 +1575,17 @@ static void free_banglist(struct bang_list_head *head)
 
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio)
+			       char **o_bin, char **o_group, int *swapio)
 {
 	char *input;
 	char *cmd;
 	char *output;
 	char *bin = NULL;
+	char *group = NULL;
 	char *brace;
-	char *ie, *ce, *oe;
+	char *angle;
+	char *ebrace = NULL, *eangle = NULL;
+	char *ie, *ce;
 	char *tmp;
 	const char *marker = "|>";
 
@@ -1615,22 +1634,59 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 
 	brace = strchr(output, '{');
 	if(brace) {
-		oe = brace - 1;
-		while(isspace(*oe) && oe > output)
-			oe--;
-		oe[1] = 0;
+		ebrace = brace - 1;
+		while(isspace(*ebrace) && ebrace > output)
+			ebrace--;
 		bin = brace + 1;
 
 		brace = strchr(bin, '}');
 		if(!brace) {
-			fprintf(tf->f, "tup error: Missing '}' to finish bin\n");
+			fprintf(tf->f, "tup error: Missing '}' to finish bin.\n");
 			return -1;
 		}
-		if(brace[1]) {
-			fprintf(tf->f, "tup error: bin must be at the end of the line\n");
+	}
+	angle = strchr(output, '<');
+	if(angle) {
+		eangle = angle - 1;
+		while(isspace(*eangle) && eangle > output)
+			eangle--;
+		group = angle + 1;
+
+		angle = strchr(group, '>');
+		if(!angle) {
+			fprintf(tf->f, "tup error: Missing '>' to finish group.\n");
 			return -1;
 		}
+	}
+
+	/* Bin and group can come in any order, but we can only have one of
+	 * each at the moment (primarily due to laziness and lack of a need).
+	 */
+	if(brace) {
 		*brace = 0;
+		ebrace[1] = 0;
+	}
+	if(angle) {
+		*angle = 0;
+		eangle[1] = 0;
+	}
+
+	/* Since the bin and group are deleted from the output string by
+	 * writing in a nul-terminator, we want to make sure no other outputs
+	 * exist at the end of the line that would then be silently ignored.
+	 * So, make some noise if this happens.
+	 */
+	if(brace) {
+		if(brace[1]) {
+			fprintf(tf->f, "tup error: bin must be at the end of the output list.\n");
+			return -1;
+		}
+	}
+	if(angle) {
+		if(angle[1]) {
+			fprintf(tf->f, "tup error: group must be at the end of the output list\n");
+			return -1;
+		}
 	}
 
 	*o_input = input;
@@ -1638,6 +1694,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	*o_cmdlen = ce - cmd + 1;
 	*o_output = output;
 	*o_bin = bin;
+	*o_group = group;
 	return 0;
 }
 
@@ -2008,6 +2065,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.empty_input = 0;
 		tmpr.line_number = r->line_number;
 		tmpr.output_nl = &tmp_nl;
+		tmpr.group = NULL;
 
 		if(execute_rule(tf, &tmpr, bl) < 0)
 			return -1;
@@ -2146,8 +2204,20 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				return -1;
 			}
 		} else {
-			struct pel_group pg;
 			/* Path */
+			struct pel_group pg;
+
+			if(p[0] == '<') {
+				/* Group */
+				char *endb;
+				p++;
+				endb = strchr(p, '>');
+				if(!endb) {
+					fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
+					return -1;
+				}
+				*endb = 0;
+			}
 			pl->path = p;
 
 			if(get_path_elements(p, &pg) < 0)
@@ -2741,7 +2811,7 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &root) < 0)
+	if(tup_db_write_outputs(cmdid, &root, r->group) < 0)
 		return -1;
 	free_tupid_tree(&root);
 

@@ -994,6 +994,9 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 		case TUP_NODE_GHOST:
 			str = "ghost";
 			break;
+		case TUP_NODE_GROUP:
+			str = "group";
+			break;
 		case TUP_NODE_ROOT:
 			str = "graph root";
 			break;
@@ -2401,6 +2404,9 @@ static int db_print(FILE *stream, tupid_t tupid)
 			break;
 		case TUP_NODE_GHOST:
 			fprintf(stream, "[47;30m%s[0m", path);
+			break;
+		case TUP_NODE_GROUP:
+			fprintf(stream, "<[36m%s[0m>", path);
 			break;
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
@@ -5154,24 +5160,38 @@ static int del_normal_link(tupid_t tupid, void *data)
 }
 
 static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
-				  struct tupid_entries *valid_input_root)
+				  struct tupid_entries *valid_input_root,
+				  struct tupid_entries *group_root)
 {
 	int found_error = 0;
 	struct tupid_tree *tt;
 	struct tupid_tree *tmp;
 
 	/* First, repeatedly go through the list of missing inputs (ie:
-	 * generated files that we read from, but didn't specify in the Tupfile)
-	 * to see if we can reach them from another generated file that we
-	 * *did* specify in the Tupfile.
+	 * generated files that we read from, but didn't specify in the
+	 * Tupfile) to see if we can reach them from a group or from another
+	 * generated file that we *did* specify in the Tupfile.
 	 */
 	RB_FOREACH_SAFE(tt, tupid_entries, missing_input_root, tmp) {
 		struct tup_entry *tent;
-		int connected;
+		struct tupid_tree *grouptt;
+		int connected = 0;
 		if(tup_entry_add(tt->tupid, &tent) < 0)
 			return -1;
-		if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
-			return -1;
+
+		RB_FOREACH(grouptt, tupid_entries, group_root) {
+			int exists;
+			if(tup_db_link_exists(tt->tupid, grouptt->tupid, &exists) < 0)
+				return -1;
+			if(exists) {
+				connected = 1;
+				break;
+			}
+		}
+		if(!connected) {
+			if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
+				return -1;
+		}
 
 		if(connected) {
 			tupid_tree_rm(missing_input_root, tt);
@@ -5207,10 +5227,23 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	};
 	int rc;
 	struct tup_entry *cmd_tent;
+	struct tupid_entries group_root = {NULL};
+	struct tupid_tree *tt;
 
 	if(tup_entry_add(cmdid, &cmd_tent) < 0)
 		return -1;
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
+
+	/* TODO: Split out the groups in tup_db_get_links() ? */
+	RB_FOREACH(tt, tupid_entries, sticky_root) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP) {
+			if(tupid_tree_add(&group_root, tt->tupid) < 0)
+				return -1;
+		}
+	}
 
 	if(get_output_tree(cmdid, &aid.output_root) < 0)
 		return -1;
@@ -5223,7 +5256,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root, &group_root);
 
 	if(compare_list_tree(readhead, normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
@@ -5231,6 +5264,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	free_tupid_tree(&sticky_copy);
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
+	free_tupid_tree(&group_root);
 	return rc;
 }
 
@@ -5261,6 +5295,7 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 struct parse_output_data {
 	tupid_t cmdid;
 	int outputs_differ;
+	struct tup_entry *group;
 };
 
 static int add_output(tupid_t tupid, void *data)
@@ -5270,6 +5305,9 @@ static int add_output(tupid_t tupid, void *data)
 	pod->outputs_differ = 1;
 	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
+	if(pod->group)
+		if(link_insert(tupid, pod->group->tnode.tupid, TUP_LINK_STICKY) < 0)
+			return -1;
 	return 0;
 }
 
@@ -5280,15 +5318,19 @@ static int rm_output(tupid_t tupid, void *data)
 	pod->outputs_differ = 1;
 	if(link_remove(pod->cmdid, tupid) < 0)
 		return -1;
+	if(pod->group)
+		if(link_remove(tupid, pod->group->tnode.tupid) < 0)
+			return -1;
 	return 0;
 }
 
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root)
+int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_entry *group)
 {
 	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
 		.cmdid = cmdid,
 		.outputs_differ = 0,
+		.group = group,
 	};
 
 	if(get_output_tree(cmdid, &output_root) < 0)
