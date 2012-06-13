@@ -116,6 +116,7 @@ enum {
 	_DB_LINK_REMOVE,
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST_LINKS,
+	_DB_ADD_GROUP_LINKS,
 	_DB_GROUP_RECLAIMABLE,
 	_DB_GHOST_RECLAIMABLE1,
 	_DB_GHOST_RECLAIMABLE2,
@@ -160,6 +161,7 @@ static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
+static int add_group_links(tupid_t tupid);
 static int reclaim_ghosts(void);
 static int ghost_reclaimable(struct tup_entry *tent);
 static int group_reclaimable(tupid_t tupid);
@@ -3340,6 +3342,8 @@ int tup_db_delete_links(tupid_t tupid)
 
 	if(add_ghost_links(tupid) < 0)
 		return -1;
+	if(add_group_links(tupid) < 0)
+		return -1;
 
 	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
@@ -5877,6 +5881,63 @@ out_reset:
 	return rc;
 }
 
+static int add_group_links(tupid_t tupid)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GROUP_LINKS];
+	static char s[] = "select to_id from link where from_id=?";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	do {
+		tupid_t link_tupid;
+		struct tup_entry *tent;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			goto out_reset;
+		}
+
+		link_tupid = sqlite3_column_int64(*stmt, 0);
+		if(tup_entry_add(link_tupid, &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+
+		if(tent->type == TUP_NODE_GROUP)
+			tup_entry_add_ghost_list(tent, &ghost_list);
+	} while(1);
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
 static int reclaim_ghosts(void)
 {
 	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
@@ -5971,6 +6032,11 @@ static int group_reclaimable(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
