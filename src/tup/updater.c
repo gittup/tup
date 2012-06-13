@@ -1177,6 +1177,7 @@ static int add_file_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
+	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -1195,7 +1196,11 @@ edge_create:
 			g->cur->tnode.tupid, tent->tnode.tupid);
 		return -1;
 	}
-	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
+	if(style & TUP_LINK_NORMAL)
+		expandable = 1;
+	if(n->tent->type == TUP_NODE_GROUP)
+		expandable = 1;
+	if(expandable && n->expanded == 0) {
 		/* TUP_NODE_ROOT means we count everything */
 		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			g->num_nodes++;
