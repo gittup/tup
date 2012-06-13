@@ -116,6 +116,7 @@ enum {
 	_DB_LINK_REMOVE,
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST_LINKS,
+	_DB_GROUP_RECLAIMABLE,
 	_DB_GHOST_RECLAIMABLE1,
 	_DB_GHOST_RECLAIMABLE2,
 	_DB_GET_DB_VAR_TREE,
@@ -160,7 +161,8 @@ static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
 static int reclaim_ghosts(void);
-static int ghost_reclaimable(tupid_t tupid);
+static int ghost_reclaimable(struct tup_entry *tent);
+static int group_reclaimable(tupid_t tupid);
 static int ghost_reclaimable1(tupid_t tupid);
 static int ghost_reclaimable2(tupid_t tupid);
 static int get_db_var_tree(tupid_t dt, struct vardb *vdb);
@@ -5365,7 +5367,7 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 		struct tupid_tree *tt;
 		pod.outputs_differ = 1;
 		if(group) {
-			/* New group - add links from all outputs */
+			/* New group - add links from all new outputs */
 			RB_FOREACH(tt, tupid_entries, root) {
 				if(link_insert(tt->tupid, group->tnode.tupid, TUP_LINK_STICKY) < 0)
 					return -1;
@@ -5374,13 +5376,15 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 				return -1;
 		}
 		if(oldgroup) {
-			/* Removed from old group - rm links from all outputs */
-			RB_FOREACH(tt, tupid_entries, root) {
+			/* Removed from old group - rm links from all old outputs */
+			RB_FOREACH(tt, tupid_entries, &output_root) {
 				if(link_remove(tt->tupid, oldgroup->tnode.tupid) < 0)
 					return -1;
 			}
 			if(link_remove(cmdid, oldgroup->tnode.tupid) < 0)
 				return -1;
+			/* Possibly clean up this group if there are no more references. */
+			tup_entry_add_ghost_list(oldgroup, &ghost_list);
 		}
 	}
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
@@ -5893,14 +5897,14 @@ static int reclaim_ghosts(void)
 		int rc;
 
 		tent = LIST_FIRST(&ghost_list);
-		if(tent->type != TUP_NODE_GHOST) {
+		if(tent->type != TUP_NODE_GHOST && tent->type != TUP_NODE_GROUP) {
 			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_list shouldn't be type %i\n", tent->tnode.tupid, tent->type);
 			return -1;
 		}
 		if(tup_entry_del_ghost_list(tent) < 0)
 			return -1;
 
-		rc = ghost_reclaimable(tent->tnode.tupid);
+		rc = ghost_reclaimable(tent);
 		if(rc < 0)
 			return -1;
 		if(rc == 1 && strcmp(tent->name.s, TUP_CONFIG) != 0) {
@@ -5923,12 +5927,17 @@ static int reclaim_ghosts(void)
 	return 0;
 }
 
-static int ghost_reclaimable(tupid_t tupid)
+static int ghost_reclaimable(struct tup_entry *tent)
 {
 	int rc1, rc2;
 
-	rc1 = ghost_reclaimable1(tupid);
-	rc2 = ghost_reclaimable2(tupid);
+	if(tent->type == TUP_NODE_GHOST) {
+		rc1 = ghost_reclaimable1(tent->tnode.tupid);
+		rc2 = ghost_reclaimable2(tent->tnode.tupid);
+	} else {
+		rc1 = group_reclaimable(tent->tnode.tupid);
+		rc2 = 1;
+	}
 
 	/* If either sub-query fails, we fail */
 	if(rc1 < 0 || rc2 < 0)
@@ -5940,6 +5949,60 @@ static int ghost_reclaimable(tupid_t tupid)
 	return 0;
 }
 
+static int group_reclaimable(tupid_t tupid)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GROUP_RECLAIMABLE];
+	static char s[] = "select exists(select 1 from link where from_id=? or to_id=?)";
+
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected group_reclaimable() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are reclaimable, otherwise we aren't */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected group_reclaimable() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
 static int ghost_reclaimable1(tupid_t tupid)
 {
 	int rc = -1;
@@ -5947,7 +6010,7 @@ static int ghost_reclaimable1(tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE1];
 	static char s[] = "select exists(select 1 from node where dir=?)";
 
-	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -6001,7 +6064,7 @@ static int ghost_reclaimable2(tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE2];
 	static char s[] = "select exists(select 1 from link where from_id=?)";
 
-	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));

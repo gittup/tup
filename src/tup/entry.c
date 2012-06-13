@@ -604,7 +604,7 @@ int tup_entry_in_list(struct tup_entry *tent)
 
 void tup_entry_add_ghost_list(struct tup_entry *tent, struct tup_entry_head *head)
 {
-	if(tent->type == TUP_NODE_GHOST) {
+	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GROUP) {
 		/* It is fine if the ghost is already in the list - just make
 		 * sure we don't try to add it twice.
 		 */
