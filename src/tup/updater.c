@@ -1598,14 +1598,16 @@ static int unlink_outputs(int dfd, struct node *n)
 	struct node *output;
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
-			if(errno != ENOENT) {
-				pthread_mutex_lock(&display_mutex);
-				show_result(n->tent, 1, NULL, NULL);
-				perror("unlinkat");
-				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
-				pthread_mutex_unlock(&display_mutex);
-				return -1;
+		if(output->tent->type != TUP_NODE_GROUP) {
+			if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
+				if(errno != ENOENT) {
+					pthread_mutex_lock(&display_mutex);
+					show_result(n->tent, 1, NULL, NULL);
+					perror("unlinkat");
+					fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
+					pthread_mutex_unlock(&display_mutex);
+					return -1;
+				}
 			}
 		}
 	}
