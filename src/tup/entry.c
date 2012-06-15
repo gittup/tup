@@ -644,7 +644,9 @@ int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
 	RB_FOREACH(st, string_entries, &tent->entries) {
 		struct tup_entry *subtent;
 		subtent = container_of(st, struct tup_entry, name);
-		if(subtent->type != TUP_NODE_GHOST && subtent->tnode.tupid != env_dt())
+		if(subtent->type != TUP_NODE_GHOST &&
+		   subtent->type != TUP_NODE_CMD &&
+		   subtent->tnode.tupid != env_dt())
 			if(tupid_tree_add(root, subtent->tnode.tupid) < 0)
 				return -1;
 	}

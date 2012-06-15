@@ -292,39 +292,34 @@ int tup_del_id_type(tupid_t tupid, int type, int force, int *modified)
 		 * the updater deletes the variant directory because the src
 		 * directory was already deleted.
 		 */
-		if(!force) {
-			variant = tup_entry_variant_null(tent);
-			if(variant && !variant->root_variant) {
-				if(variant->enabled) {
-					/* It is possible that the srcid has
-					 * already been removed (ie: The user
-					 * rm -rf'd the variant, and the
-					 * corresponding source directory). If
-					 * the source directory was missing
-					 * first, then its node has been
-					 * removed from the database. Adding it
-					 * to the create list would confuse
-					 * tup, so we use the 'maybe' version
-					 * here to make sure the node exists
-					 * before adding it (t8035).
-					 */
-					if(tup_db_maybe_add_create_list(tent->srcid) < 0)
-						return -1;
-				}
-			} else {
-				/* If we are removing a directory in the
-				 * srctree that has a ghost Tupfile, make sure
-				 * we notify all of the variant directories to
-				 * be re-parsed. This way they can be cleaned
-				 * up as necessary (t8020).
+		variant = tup_entry_variant_null(tent);
+		if(variant && !variant->root_variant) {
+			if(variant->enabled && !force) {
+				/* It is possible that the srcid has already
+				 * been removed (ie: The user rm -rf'd the
+				 * variant, and the corresponding source
+				 * directory). If the source directory was
+				 * missing first, then its node has been
+				 * removed from the database. Adding it to the
+				 * create list would confuse tup, so we use the
+				 * 'maybe' version here to make sure the node
+				 * exists before adding it (t8035).
 				 */
-				struct tup_entry *tuptent;
-				if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+				if(tup_db_maybe_add_create_list(tent->srcid) < 0)
 					return -1;
-				if(tuptent) {
-					if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
-						return -1;
-				}
+			}
+		} else {
+			/* If we are removing a directory in the srctree that
+			 * has a ghost Tupfile, make sure we notify all of the
+			 * variant directories to be re-parsed. This way they
+			 * can be cleaned up as necessary (t8020).
+			 */
+			struct tup_entry *tuptent;
+			if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+				return -1;
+			if(tuptent) {
+				if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
+					return -1;
 			}
 		}
 	}

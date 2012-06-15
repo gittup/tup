@@ -909,11 +909,10 @@ static int process_create_nodes(void)
 			if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
 				return -1;
 			}
-			/* If the srctent is a ghost, that means our
-			 * reason for existing is gone. Force our
-			 * removal.
+			/* If the srctent is no longer a directory, that means
+			 * our reason for existing is gone. Force our removal.
 			 */
-			if(srctent->type == TUP_NODE_GHOST)
+			if(srctent->type != TUP_NODE_DIR)
 				force_removal = 1;
 			/* If we are a variant subdirectory (our srcid
 			 * is not DOT_DT), and our name doesn't match
