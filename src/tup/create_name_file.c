@@ -121,9 +121,23 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			  tent->type != TUP_NODE_GENERATED) {
 			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1, NULL) < 0)
 				return -1;
-			if(create_name_file(dt, file, mtime, &tent) < 0)
+			if(tup_db_select_tent(dt, file, &tent) < 0)
 				return -1;
-			new = 1;
+			if(!tent) {
+				if(create_name_file(dt, file, mtime, &tent) < 0)
+					return -1;
+				new = 1;
+			} else {
+				if(tent->type == TUP_NODE_GHOST) {
+					if(ghost_to_file(tent) < 0)
+						return -1;
+				} else {
+					fprintf(stderr, "tup internal error: After attempting to delete node '");
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "', it still exists as type '%s'\n", tup_db_type(tent->type));
+					return -1;
+				}
+			}
 		}
 		if(changed) {
 			if(tent->type == TUP_NODE_GENERATED) {
@@ -278,39 +292,34 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 		 * the updater deletes the variant directory because the src
 		 * directory was already deleted.
 		 */
-		if(!force) {
-			variant = tup_entry_variant_null(tent);
-			if(variant && !variant->root_variant) {
-				if(variant->enabled) {
-					/* It is possible that the srcid has
-					 * already been removed (ie: The user
-					 * rm -rf'd the variant, and the
-					 * corresponding source directory). If
-					 * the source directory was missing
-					 * first, then its node has been
-					 * removed from the database. Adding it
-					 * to the create list would confuse
-					 * tup, so we use the 'maybe' version
-					 * here to make sure the node exists
-					 * before adding it (t8035).
-					 */
-					if(tup_db_maybe_add_create_list(tent->srcid) < 0)
-						return -1;
-				}
-			} else {
-				/* If we are removing a directory in the
-				 * srctree that has a ghost Tupfile, make sure
-				 * we notify all of the variant directories to
-				 * be re-parsed. This way they can be cleaned
-				 * up as necessary (t8020).
+		variant = tup_entry_variant_null(tent);
+		if(variant && !variant->root_variant) {
+			if(variant->enabled && !force) {
+				/* It is possible that the srcid has already
+				 * been removed (ie: The user rm -rf'd the
+				 * variant, and the corresponding source
+				 * directory). If the source directory was
+				 * missing first, then its node has been
+				 * removed from the database. Adding it to the
+				 * create list would confuse tup, so we use the
+				 * 'maybe' version here to make sure the node
+				 * exists before adding it (t8035).
 				 */
-				struct tup_entry *tuptent;
-				if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+				if(tup_db_maybe_add_create_list(tent->srcid) < 0)
 					return -1;
-				if(tuptent) {
-					if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
-						return -1;
-				}
+			}
+		} else {
+			/* If we are removing a directory in the srctree that
+			 * has a ghost Tupfile, make sure we notify all of the
+			 * variant directories to be re-parsed. This way they
+			 * can be cleaned up as necessary (t8020).
+			 */
+			struct tup_entry *tuptent;
+			if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+				return -1;
+			if(tuptent) {
+				if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
+					return -1;
 			}
 		}
 	}
