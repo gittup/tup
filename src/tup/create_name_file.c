@@ -121,9 +121,23 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			  tent->type != TUP_NODE_GENERATED) {
 			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1, NULL) < 0)
 				return -1;
-			if(create_name_file(dt, file, mtime, &tent) < 0)
+			if(tup_db_select_tent(dt, file, &tent) < 0)
 				return -1;
-			new = 1;
+			if(!tent) {
+				if(create_name_file(dt, file, mtime, &tent) < 0)
+					return -1;
+				new = 1;
+			} else {
+				if(tent->type == TUP_NODE_GHOST) {
+					if(ghost_to_file(tent) < 0)
+						return -1;
+				} else {
+					fprintf(stderr, "tup internal error: After attempting to delete node '");
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "', it still exists as type '%s'\n", tup_db_type(tent->type));
+					return -1;
+				}
+			}
 		}
 		if(changed) {
 			if(tent->type == TUP_NODE_GENERATED) {
