@@ -29,6 +29,8 @@ const char *tup_platform = "solaris";
 const char *tup_platform = "macosx";
 #elif _WIN32
 const char *tup_platform = "win32";
+#elif __FreeBSD__
+const char *tup_platform = "freebsd";
 #else
 #error Unsupported platform. Please add support in tup/platform.c
 #endif

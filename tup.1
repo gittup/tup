@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/06/01" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2012/06/28" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -538,7 +538,7 @@ In tup.config, comments are determined by a '#' character in the first column. T
 In this case, the @-variable "FOO" is explicitly set to "n".
 .TP
 .B @(TUP_PLATFORM)
-TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", "macosx", or "win32".
+TUP_PLATFORM is a special @-variable. If CONFIG_TUP_PLATFORM is not set in the tup.config file, it has a default value according to the platform that tup itself was compiled in. Currently the default value is one of "linux", "solaris", "macosx", "win32", or "freebsd".
 .TP
 .B @(TUP_ARCH)
 TUP_ARCH is another special @-variable. If CONFIG_TUP_ARCH is not set in the tup.config file, it has a default value according to the processor architecture that tup itself was compiled in. Currently the default value is one of "i386", "x86_64", "powerpc", "powerpc64", "ia64", "alpha", "sparc" or "arm".

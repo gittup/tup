@@ -18,7 +18,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__)
 #include <sys/sysctl.h>
 #elif defined(_WIN32)
 /* Don't let Windows define SLIST_ENTRY and conflict with bsd/queue.h */
@@ -284,9 +284,9 @@ static const char *cpu_number(void)
 	static char buf[10];
 
 	int count = 1;
-#if defined(__linux__) || defined(__sun__)
+#if defined(__linux__) || defined(__sun__) || defined(__FreeBSD__)
 	count = sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__APPLE__)
 	int nm[2];
 	size_t len = 4;
 
