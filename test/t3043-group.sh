@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,24 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Try to use a group to get dependencies.
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+: foreach *.h.in |> cp %f %o |> %B <foo-autoh>
+: foreach *.c | <foo-autoh> |> gcc -c %f -o %o |> %B.o {objs}
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+echo '#define FOO 3' > foo.h.in
+echo '#define BAR 4' > bar.h.in
+cat > foo.c << HERE
+#include "foo.h"
+#include "bar.h"
+HERE
+echo '#include "bar.h"' > bar.c
+update
+
+tup_dep_exist . foo.h . 'gcc -c foo.c -o foo.o'
+tup_dep_exist . bar.h . 'gcc -c foo.c -o foo.o'
+tup_dep_exist . bar.h . 'gcc -c bar.c -o bar.o'
 
 eotup

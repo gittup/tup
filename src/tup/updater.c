@@ -568,7 +568,8 @@ static int process_config_nodes(int environ_check)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(create_graph(&g, -1) < 0)
+	/* Use TUP_NODE_ROOT to count everything */
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1051,7 +1052,8 @@ static int check_config_todo(void)
 	int rc;
 	int stuff_todo = 0;
 
-	if(create_graph(&g, -1) < 0)
+	/* Use TUP_NODE_ROOT to count everything */
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1174,6 +1176,7 @@ static int add_file_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
+	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -1192,8 +1195,13 @@ edge_create:
 			g->cur->tnode.tupid, tent->tnode.tupid);
 		return -1;
 	}
-	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
-		if(n->tent->type == g->count_flags || g->count_flags < 0) {
+	if(style & TUP_LINK_NORMAL)
+		expandable = 1;
+	if(n->tent->type == TUP_NODE_GROUP)
+		expandable = 1;
+	if(expandable && n->expanded == 0) {
+		/* TUP_NODE_ROOT means we count everything */
+		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
 				if(n->tent->mtime == -1)
@@ -1383,16 +1391,11 @@ check_empties:
 		if(server_is_dead()) {
 			fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
 		} else {
-			struct node *n;
-			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency.\n");
-			fprintf(stderr, "Node list:\n");
-			TAILQ_FOREACH(n, &g->node_list, list) {
-				fprintf(stderr, " Node[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
+			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency. See the dumped dependency graph for the dependency structure.\n");
+			if(fchdir(tup_top_fd()) < 0) {
+				perror("fchdir");
 			}
-			fprintf(stderr, "plist:\n");
-			TAILQ_FOREACH(n, &g->plist, list) {
-				fprintf(stderr, " Plist[%lli]: %s\n", n->tnode.tupid, n->tent->name.s);
-			}
+			dump_graph(g, ".tup/tmp/graph-%i.dot");
 		}
 	} else {
 		rc = 0;
@@ -1578,7 +1581,8 @@ static void *todo_work(void *arg)
 		if(n == (void*)-1)
 			break;
 
-		if(n->tent->type == g->count_flags || g->count_flags == -1) {
+		/* TUP_NODE_ROOT means we count everything */
+		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			show_result(n->tent, 0, NULL, NULL);
 		}
 
@@ -1593,14 +1597,16 @@ static int unlink_outputs(int dfd, struct node *n)
 	struct node *output;
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
-			if(errno != ENOENT) {
-				pthread_mutex_lock(&display_mutex);
-				show_result(n->tent, 1, NULL, NULL);
-				perror("unlinkat");
-				fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
-				pthread_mutex_unlock(&display_mutex);
-				return -1;
+		if(output->tent->type != TUP_NODE_GROUP) {
+			if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
+				if(errno != ENOENT) {
+					pthread_mutex_lock(&display_mutex);
+					show_result(n->tent, 1, NULL, NULL);
+					perror("unlinkat");
+					fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
+					pthread_mutex_unlock(&display_mutex);
+					return -1;
+				}
 			}
 		}
 	}

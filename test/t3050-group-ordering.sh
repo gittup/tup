@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Make sure groups actually enforce ordering.
 
 . ./tup.sh
+single_threaded
 cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+: foreach *.c | <foo-autoh> |> gcc -c %f -o %o |> %B.o {objs}
+: foreach *.h.in |> cp %f %o |> %B <foo-autoh>
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+echo '#define FOO 3' > foo.h.in
+cat > foo.c << HERE
+#include "foo.h"
+HERE
+update
 
 eotup

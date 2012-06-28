@@ -116,6 +116,8 @@ enum {
 	_DB_LINK_REMOVE,
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST_LINKS,
+	_DB_ADD_GROUP_LINKS,
+	_DB_GROUP_RECLAIMABLE,
 	_DB_GHOST_RECLAIMABLE1,
 	_DB_GHOST_RECLAIMABLE2,
 	_DB_GET_DB_VAR_TREE,
@@ -134,7 +136,7 @@ struct half_entry {
 	LIST_ENTRY(half_entry) list;
 	tupid_t tupid;
 	tupid_t dt;
-	int type;
+	enum TUP_NODE_TYPE type;
 };
 LIST_HEAD(half_entry_head, half_entry);
 
@@ -159,8 +161,10 @@ static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_links(tupid_t tupid);
+static int add_group_links(tupid_t tupid);
 static int reclaim_ghosts(void);
-static int ghost_reclaimable(tupid_t tupid);
+static int ghost_reclaimable(struct tup_entry *tent);
+static int group_reclaimable(tupid_t tupid);
 static int ghost_reclaimable1(tupid_t tupid);
 static int ghost_reclaimable2(tupid_t tupid);
 static int get_db_var_tree(tupid_t dt, struct vardb *vdb);
@@ -994,6 +998,9 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 		case TUP_NODE_GHOST:
 			str = "ghost";
 			break;
+		case TUP_NODE_GROUP:
+			str = "group";
+			break;
 		case TUP_NODE_ROOT:
 			str = "graph root";
 			break;
@@ -1004,19 +1011,19 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 	return str;
 }
 
-struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, int type)
+struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type)
 {
 	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
 }
 
-struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, int type, tupid_t srcid,
+struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
 					   int *node_changed)
 {
 	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
 }
 
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
-					  int type, tupid_t srcid, int *node_changed)
+					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
 
@@ -1378,7 +1385,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		struct tup_entry *tent;
 		tupid_t tupid;
 		const char *name;
-		int type;
+		enum TUP_NODE_TYPE type;
 		time_t mtime;
 		tupid_t srcid;
 
@@ -2002,7 +2009,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 	return 0;
 }
 
-int tup_db_set_type(struct tup_entry *tent, int type)
+int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_TYPE];
@@ -2332,7 +2339,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[DB_PRINT];
 	static char s[] = "select dir, type, name from node where id=?";
 	tupid_t parent;
-	int type;
+	enum TUP_NODE_TYPE type;
 	char *path;
 
 	if(tupid == 0) {
@@ -2402,9 +2409,13 @@ static int db_print(FILE *stream, tupid_t tupid)
 		case TUP_NODE_GHOST:
 			fprintf(stream, "[47;30m%s[0m", path);
 			break;
+		case TUP_NODE_GROUP:
+			fprintf(stream, "<[36m%s[0m>", path);
+			break;
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
 		case TUP_NODE_VAR:
+		case TUP_NODE_ROOT:
 		default:
 			fprintf(stream, "%s", path);
 			break;
@@ -3136,7 +3147,7 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroot,
+int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
 			      struct tupid_entries *root)
 {
 	int rc;
@@ -3160,13 +3171,14 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b, struct tupid_entries *delroo
 		return 0;
 	}
 	/* Otherwise, someone else got the girl. Err, output file. */
-	fprintf(stderr, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
-	tup_db_print(stderr, a);
-	tup_db_print(stderr, b);
+	fprintf(f, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
+	tup_db_print(f, incoming);
+	tup_db_print(f, a);
+	tup_db_print(f, b);
 	return -1;
 }
 
-int tup_db_link_exists(tupid_t a, tupid_t b)
+int tup_db_link_exists(tupid_t a, tupid_t b, int *exists)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_LINK_EXISTS];
@@ -3199,7 +3211,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 		return -1;
 	}
 	if(rc == SQLITE_DONE) {
-		return -1;
+		*exists = 0;
+		return 0;
 	}
 	if(rc != SQLITE_ROW) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
@@ -3207,6 +3220,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b)
 		return -1;
 	}
 
+	*exists = 1;
 	return 0;
 }
 
@@ -3328,6 +3342,8 @@ int tup_db_delete_links(tupid_t tupid)
 
 	if(add_ghost_links(tupid) < 0)
 		return -1;
+	if(add_group_links(tupid) < 0)
+		return -1;
 
 	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
@@ -3364,7 +3380,7 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, int type)
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -3422,7 +3438,7 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, i
 	return rc;
 }
 
-int tup_db_type_to_tree(struct tupid_entries *root, int *count, int type)
+int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -4104,7 +4120,7 @@ int tup_db_get_varlen(struct variant *variant, const char *var, int varlen)
 	return ve->vallen;
 }
 
-int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, int type), void *arg)
+int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg)
 {
 	int rc = -1;
 	int dbrc;
@@ -4129,7 +4145,7 @@ int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const 
 	while(1) {
 		const char *var;
 		const char *value;
-		int type;
+		enum TUP_NODE_TYPE type;
 		tupid_t tupid;
 
 		dbrc = sqlite3_step(*stmt);
@@ -4408,7 +4424,7 @@ static struct var_entry *envdb_set(const char *var, int varlen, const char *newe
 	return ve;
 }
 
-static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, int type)
+static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, enum TUP_NODE_TYPE type)
 {
 	const char *env;
 	struct tup_entry *tent;
@@ -4585,15 +4601,10 @@ tupid_t env_dt(void)
 
 	if(tup_entry_add(DOT_DT, NULL) < 0)
 		return -1;
-	if(tup_db_select_tent(DOT_DT, "$", &envtent) < 0) {
-		return -1;
-	}
+	envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
 	if(!envtent) {
-		envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
-		if(!envtent) {
-			fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
-			return -1;
-		}
+		fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
+		return -1;
 	}
 	local_env_dt = envtent->tnode.tupid;
 	return local_env_dt;
@@ -4680,7 +4691,7 @@ static int load_all_nodes(void)
 	while(1) {
 		tupid_t tupid;
 		tupid_t dt;
-		int type;
+		enum TUP_NODE_TYPE type;
 		time_t mtime;
 		const char *name;
 		tupid_t srcid;
@@ -4719,7 +4730,7 @@ static int load_all_nodes(void)
 	return rc;
 }
 
-static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
+static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group)
 {
 	int rc = 0;
 	int dbrc;
@@ -4740,9 +4751,12 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+	if(group)
+		*group = NULL;
 
 	while(1) {
 		tupid_t tupid;
+		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -4756,11 +4770,28 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add(output_root, tupid);
-
-		if(rc < 0) {
-			fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
-			break;
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP) {
+			if(group) {
+				if(*group == NULL) {
+					*group = tent;
+				} else {
+					fprintf(stderr, "tup error: Unable to specify multiple output groups: ");
+					print_tup_entry(stderr, *group);
+					fprintf(stderr, ", and ");
+					print_tup_entry(stderr, tent);
+					fprintf(stderr, "\n");
+					rc = -1;
+					break;
+				}
+			}
+		} else {
+			rc = tupid_tree_add(output_root, tupid);
+			if(rc < 0) {
+				fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+				break;
+			}
 		}
 	}
 
@@ -4966,7 +4997,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.output_error = 0,
 	};
 
-	if(get_output_tree(cmdid, &output_root) < 0)
+	if(get_output_tree(cmdid, &output_root, NULL) < 0)
 		return -1;
 	if(compare_list_tree(writehead, &output_root, &aod,
 			     extra_output, missing_output) < 0)
@@ -5018,8 +5049,13 @@ static int rm_sticky(tupid_t tupid, void *data)
 
 	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
 		/* Not a normal link, kill it */
+		struct tup_entry *tent;
 		if(link_remove(tupid, wid->cmdid) < 0)
 			return -1;
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP)
+			tup_entry_add_ghost_list(tent, &ghost_list);
 	} else {
 		if(tupid_tree_search(wid->delete_root, tupid) == NULL) {
 			/* Demote to a normal link */
@@ -5155,24 +5191,38 @@ static int del_normal_link(tupid_t tupid, void *data)
 }
 
 static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
-				  struct tupid_entries *valid_input_root)
+				  struct tupid_entries *valid_input_root,
+				  struct tupid_entries *group_root)
 {
 	int found_error = 0;
 	struct tupid_tree *tt;
 	struct tupid_tree *tmp;
 
 	/* First, repeatedly go through the list of missing inputs (ie:
-	 * generated files that we read from, but didn't specify in the Tupfile)
-	 * to see if we can reach them from another generated file that we
-	 * *did* specify in the Tupfile.
+	 * generated files that we read from, but didn't specify in the
+	 * Tupfile) to see if we can reach them from a group or from another
+	 * generated file that we *did* specify in the Tupfile.
 	 */
 	RB_FOREACH_SAFE(tt, tupid_entries, missing_input_root, tmp) {
 		struct tup_entry *tent;
-		int connected;
+		struct tupid_tree *grouptt;
+		int connected = 0;
 		if(tup_entry_add(tt->tupid, &tent) < 0)
 			return -1;
-		if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
-			return -1;
+
+		RB_FOREACH(grouptt, tupid_entries, group_root) {
+			int exists;
+			if(tup_db_link_exists(tt->tupid, grouptt->tupid, &exists) < 0)
+				return -1;
+			if(exists) {
+				connected = 1;
+				break;
+			}
+		}
+		if(!connected) {
+			if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
+				return -1;
+		}
 
 		if(connected) {
 			tupid_tree_rm(missing_input_root, tt);
@@ -5208,12 +5258,25 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	};
 	int rc;
 	struct tup_entry *cmd_tent;
+	struct tupid_entries group_root = {NULL};
+	struct tupid_tree *tt;
 
 	if(tup_entry_add(cmdid, &cmd_tent) < 0)
 		return -1;
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
-	if(get_output_tree(cmdid, &aid.output_root) < 0)
+	/* TODO: Split out the groups in tup_db_get_links() ? */
+	RB_FOREACH(tt, tupid_entries, sticky_root) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GROUP) {
+			if(tupid_tree_add(&group_root, tt->tupid) < 0)
+				return -1;
+		}
+	}
+
+	if(get_output_tree(cmdid, &aid.output_root, NULL) < 0)
 		return -1;
 	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
 		return -1;
@@ -5224,7 +5287,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root, &group_root);
 
 	if(compare_list_tree(readhead, normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
@@ -5232,6 +5295,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	free_tupid_tree(&sticky_copy);
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
+	free_tupid_tree(&group_root);
 	return rc;
 }
 
@@ -5262,6 +5326,7 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 struct parse_output_data {
 	tupid_t cmdid;
 	int outputs_differ;
+	struct tup_entry *group;
 };
 
 static int add_output(tupid_t tupid, void *data)
@@ -5271,6 +5336,9 @@ static int add_output(tupid_t tupid, void *data)
 	pod->outputs_differ = 1;
 	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
+	if(pod->group)
+		if(link_insert(tupid, pod->group->tnode.tupid, TUP_LINK_STICKY) < 0)
+			return -1;
 	return 0;
 }
 
@@ -5281,19 +5349,53 @@ static int rm_output(tupid_t tupid, void *data)
 	pod->outputs_differ = 1;
 	if(link_remove(pod->cmdid, tupid) < 0)
 		return -1;
+	if(pod->group)
+		if(link_remove(tupid, pod->group->tnode.tupid) < 0)
+			return -1;
 	return 0;
 }
 
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root)
+int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_entry *group)
 {
 	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
 		.cmdid = cmdid,
 		.outputs_differ = 0,
+		.group = NULL,
 	};
+	struct tup_entry *oldgroup;
 
-	if(get_output_tree(cmdid, &output_root) < 0)
+	if(get_output_tree(cmdid, &output_root, &oldgroup) < 0)
 		return -1;
+	if(oldgroup == group) {
+		/* If we have the same group as before, we just update links to the
+		 * group in add/rm_output().
+		 */
+		pod.group = group;
+	} else {
+		struct tupid_tree *tt;
+		pod.outputs_differ = 1;
+		if(group) {
+			/* New group - add links from all new outputs */
+			RB_FOREACH(tt, tupid_entries, root) {
+				if(link_insert(tt->tupid, group->tnode.tupid, TUP_LINK_STICKY) < 0)
+					return -1;
+			}
+			if(link_insert(cmdid, group->tnode.tupid, TUP_LINK_STICKY) < 0)
+				return -1;
+		}
+		if(oldgroup) {
+			/* Removed from old group - rm links from all old outputs */
+			RB_FOREACH(tt, tupid_entries, &output_root) {
+				if(link_remove(tt->tupid, oldgroup->tnode.tupid) < 0)
+					return -1;
+			}
+			if(link_remove(cmdid, oldgroup->tnode.tupid) < 0)
+				return -1;
+			/* Possibly clean up this group if there are no more references. */
+			tup_entry_add_ghost_list(oldgroup, &ghost_list);
+		}
+	}
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
 	if(pod.outputs_differ == 1) {
@@ -5361,7 +5463,7 @@ int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
 }
 
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
-				     int type, time_t mtime, tupid_t srcid)
+				     enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent(dt, name, len, type, mtime, srcid, &tent) < 0)
@@ -5369,7 +5471,7 @@ struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
 	return tent;
 }
 
-int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, int type,
+int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, enum TUP_NODE_TYPE type,
 			    time_t mtime, tupid_t srcid, struct tup_entry **entry)
 {
 	int rc;
@@ -5447,7 +5549,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODE_SELECT];
 	tupid_t tupid;
-	int type;
+	enum TUP_NODE_TYPE type;
 	int mtime;
 	tupid_t srcid;
 	static char s[] = "select id, type, mtime, srcid from node where dir=? and name=?" SQL_NAME_COLLATION;
@@ -5779,6 +5881,63 @@ out_reset:
 	return rc;
 }
 
+static int add_group_links(tupid_t tupid)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GROUP_LINKS];
+	static char s[] = "select to_id from link where from_id=?";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	do {
+		tupid_t link_tupid;
+		struct tup_entry *tent;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			goto out_reset;
+		}
+
+		link_tupid = sqlite3_column_int64(*stmt, 0);
+		if(tup_entry_add(link_tupid, &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+
+		if(tent->type == TUP_NODE_GROUP)
+			tup_entry_add_ghost_list(tent, &ghost_list);
+	} while(1);
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
 static int reclaim_ghosts(void)
 {
 	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
@@ -5804,14 +5963,14 @@ static int reclaim_ghosts(void)
 		int rc;
 
 		tent = LIST_FIRST(&ghost_list);
-		if(tent->type != TUP_NODE_GHOST) {
+		if(tent->type != TUP_NODE_GHOST && tent->type != TUP_NODE_GROUP) {
 			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_list shouldn't be type %i\n", tent->tnode.tupid, tent->type);
 			return -1;
 		}
 		if(tup_entry_del_ghost_list(tent) < 0)
 			return -1;
 
-		rc = ghost_reclaimable(tent->tnode.tupid);
+		rc = ghost_reclaimable(tent);
 		if(rc < 0)
 			return -1;
 		if(rc == 1 && strcmp(tent->name.s, TUP_CONFIG) != 0) {
@@ -5834,12 +5993,17 @@ static int reclaim_ghosts(void)
 	return 0;
 }
 
-static int ghost_reclaimable(tupid_t tupid)
+static int ghost_reclaimable(struct tup_entry *tent)
 {
 	int rc1, rc2;
 
-	rc1 = ghost_reclaimable1(tupid);
-	rc2 = ghost_reclaimable2(tupid);
+	if(tent->type == TUP_NODE_GHOST) {
+		rc1 = ghost_reclaimable1(tent->tnode.tupid);
+		rc2 = ghost_reclaimable2(tent->tnode.tupid);
+	} else {
+		rc1 = group_reclaimable(tent->tnode.tupid);
+		rc2 = 1;
+	}
 
 	/* If either sub-query fails, we fail */
 	if(rc1 < 0 || rc2 < 0)
@@ -5851,6 +6015,65 @@ static int ghost_reclaimable(tupid_t tupid)
 	return 0;
 }
 
+static int group_reclaimable(tupid_t tupid)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GROUP_RECLAIMABLE];
+	static char s[] = "select exists(select 1 from link where from_id=? or to_id=?)";
+
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected group_reclaimable() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are reclaimable, otherwise we aren't */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected group_reclaimable() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
 static int ghost_reclaimable1(tupid_t tupid)
 {
 	int rc = -1;
@@ -5858,7 +6081,7 @@ static int ghost_reclaimable1(tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE1];
 	static char s[] = "select exists(select 1 from node where dir=?)";
 
-	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -5912,7 +6135,7 @@ static int ghost_reclaimable2(tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE2];
 	static char s[] = "select exists(select 1 from link where from_id=?)";
 
-	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -6004,7 +6227,7 @@ static int get_db_var_tree(tupid_t dt, struct vardb *vdb)
 		tupid_t tupid;
 		const char *var;
 		const char *value;
-		int type;
+		enum TUP_NODE_TYPE type;
 		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);

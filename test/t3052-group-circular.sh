@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,13 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Try to add circular dependencies with groups.
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+: <groupB> |> touch foo |> foo <groupA>
+: <groupA> |> touch bar |> bar <groupB>
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+update_fail_msg "fatal tup error: Graph is not empty after execution"
 
 eotup

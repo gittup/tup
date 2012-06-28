@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,34 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Make sure that deleting a command will remove only its nodes from the group.
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+: |> touch foo |> foo <group>
+: |> touch bar |> bar <group>
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+update
+
+tup_dep_exist . foo . '<group>'
+tup_dep_exist . bar . '<group>'
+
+# Just remove 'touch foo'. Nothing from bar should be affected
+cat > Tupfile << HERE
+: |> touch bar |> bar <group>
+HERE
+tup touch Tupfile
+update
+
+tup_object_no_exist . foo
+tup_dep_exist . bar . '<group>'
+
+# Remove 'touch bar'. Now the group should be gone.
+cat > Tupfile << HERE
+HERE
+tup touch Tupfile
+update
+
+tup_object_no_exist . '<group>'
 
 eotup

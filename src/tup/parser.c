@@ -1566,7 +1566,8 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	char *output;
 	char *bin = NULL;
 	char *brace;
-	char *ie, *ce, *oe;
+	char *ebrace = NULL;
+	char *ie, *ce;
 	char *tmp;
 	const char *marker = "|>";
 
@@ -1615,22 +1616,26 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 
 	brace = strchr(output, '{');
 	if(brace) {
-		oe = brace - 1;
-		while(isspace(*oe) && oe > output)
-			oe--;
-		oe[1] = 0;
+		ebrace = brace - 1;
+		if(!isspace(*ebrace)) {
+			fprintf(tf->f, "tup error: Expected whitespace before '{' character in output list.\n");
+			return -1;
+		}
+		while(isspace(*ebrace) && ebrace > output)
+			ebrace--;
 		bin = brace + 1;
 
 		brace = strchr(bin, '}');
 		if(!brace) {
-			fprintf(tf->f, "tup error: Missing '}' to finish bin\n");
-			return -1;
-		}
-		if(brace[1]) {
-			fprintf(tf->f, "tup error: bin must be at the end of the line\n");
+			fprintf(tf->f, "tup error: Missing '}' to finish bin.\n");
 			return -1;
 		}
 		*brace = 0;
+		ebrace[1] = 0;
+		if(brace[1]) {
+			fprintf(tf->f, "tup error: bin must be at the end of the output list.\n");
+			return -1;
+		}
 	}
 
 	*o_input = input;
@@ -2146,8 +2151,18 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				return -1;
 			}
 		} else {
-			struct pel_group pg;
 			/* Path */
+			struct pel_group pg;
+
+			if(p[0] == '<') {
+				/* Group */
+				char *endb;
+				endb = strchr(p, '>');
+				if(!endb) {
+					fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
+					return -1;
+				}
+			}
 			pl->path = p;
 
 			if(get_path_elements(p, &pg) < 0)
@@ -2335,11 +2350,19 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
-				return -1;
-			if(srctent)
-				if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
+			if(pl->pel->path[0] == '<') {
+				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+				if(!tent) {
+					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
 					return -1;
+				}
+			} else {
+				if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+					return -1;
+				if(srctent)
+					if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
+						return -1;
+			}
 		}
 
 		if(!tent) {
@@ -2547,6 +2570,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	int extra_outputs = 0;
 	char sep[] = "|";
 	struct tup_entry *tmptent = NULL;
+	struct tup_entry *group = NULL;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -2583,6 +2607,20 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	while(!TAILQ_EMPTY(&oplist)) {
 		struct name_list *use_onl;
 		pl = TAILQ_FIRST(&oplist);
+
+		if(pl->pel->path[0] == '<') {
+			if(group) {
+				fprintf(tf->f, "tup error: Multiple output groups detected: '");
+				print_tup_entry(tf->f, group);
+				fprintf(tf->f, "' and '%s/%.*s'\n", pl->path, pl->pel->len, pl->pel->path);
+				return -1;
+			}
+
+			group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			if(!group)
+				return -1;
+			goto out_pl;
+		}
 
 		if(pl->path) {
 			fprintf(tf->f, "tup error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
@@ -2721,7 +2759,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -2732,7 +2770,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -2741,7 +2779,7 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &root) < 0)
+	if(tup_db_write_outputs(cmdid, &root, group) < 0)
 		return -1;
 	free_tupid_tree(&root);
 

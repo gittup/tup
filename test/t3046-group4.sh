@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,34 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Try to remove an output from a command and see that the group is updated
 
 . ./tup.sh
-cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+cat > ok.sh << HERE
+touch foo
+touch bar
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+cat > Tupfile << HERE
+: |> sh ok.sh |> foo bar <group>
+HERE
+update
+
+tup_dep_exist . 'foo' . '<group>'
+tup_dep_exist . 'bar' . '<group>'
+tup_dep_exist . 'sh ok.sh' . '<group>'
+
+cat > ok.sh << HERE
+touch foo
+HERE
+cat > Tupfile << HERE
+: |> sh ok.sh |> foo <group>
+: |> touch bar |> bar
+HERE
+tup touch ok.sh Tupfile
+update
+
+tup_dep_exist . 'foo' . '<group>'
+tup_dep_no_exist . 'bar' . '<group>'
+tup_dep_exist . 'sh ok.sh' . '<group>'
 
 eotup

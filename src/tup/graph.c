@@ -18,9 +18,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifdef TUP_GRAPH_DEBUGGING
-#define _GNU_SOURCE /* TODO: For asprintf */
-#endif
 #include "graph.h"
 #include "entry.h"
 #include "debug.h"
@@ -28,6 +25,7 @@
 #include "config.h"
 #include "db.h"
 #include "container.h"
+#include "compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -119,7 +117,7 @@ void remove_edge(struct edge *e)
 	free(e);
 }
 
-int create_graph(struct graph *g, int count_flags)
+int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 {
 	root_entry.tnode.tupid = 0;
 	root_entry.dt = 0;
@@ -387,7 +385,6 @@ out_err:
 	return -1;
 }
 
-#ifdef TUP_GRAPH_DEBUGGING
 static void dump_node(FILE *f, struct node *n)
 {
 	struct edge *e;
@@ -402,7 +399,7 @@ static void dump_node(FILE *f, struct node *n)
 	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
 		n, n->tent->name.s, n->tnode.tupid, LIST_EMPTY(&n->incoming), n->expanded, color);
 	LIST_FOREACH(e, &n->edges, list) {
-		fprintf(f, "tup%p -> tup%p [dir=back];\n", e->dest, n);
+		fprintf(f, "tup%p -> tup%p [dir=back,style=\"%s\",arrowtail=\"%s\"];\n", e->dest, n, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
 	}
 }
 
@@ -410,14 +407,14 @@ void dump_graph(const struct graph *g, const char *filename)
 {
 	static int count = 0;
 	struct node *n;
-	char *realfile;
+	char realfile[PATH_MAX];
 	FILE *f;
 
-	if(asprintf(&realfile, filename, getpid(), count) < 0) {
+	if(snprintf(realfile, sizeof(realfile), filename, getpid(), count) < 0) {
 		perror("asprintf");
 		return;
 	}
-	fprintf(stderr, "Dumping graph '%s'\n", realfile);
+	fprintf(stderr, "tup: dumping graph '%s'\n", realfile);
 	count++;
 	f = fopen(realfile, "w");
 	if(!f) {
@@ -425,13 +422,12 @@ void dump_graph(const struct graph *g, const char *filename)
 		return;
 	}
 	fprintf(f, "digraph G {\n");
-	LIST_FOREACH(&g->node_list, n, list) {
+	TAILQ_FOREACH(n, &g->node_list, list) {
 		dump_node(f, n);
 	}
-	LIST_FOREACH(&g->plist, n, list) {
+	TAILQ_FOREACH(n, &g->plist, list) {
 		dump_node(f, n);
 	}
 	fprintf(f, "}\n");
 	fclose(f);
 }
-#endif

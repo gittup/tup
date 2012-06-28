@@ -490,6 +490,10 @@ static int graph(int argc, char **argv)
 				style = "dotted";
 				shape = "oval";
 				break;
+			case TUP_NODE_GROUP:
+				shape = "hexagon";
+				break;
+			case TUP_NODE_ROOT:
 			default:
 				shape="ellipse";
 		}
@@ -766,7 +770,7 @@ static int link_exists(int argc, char **argv)
 {
 	struct tup_entry *tenta;
 	struct tup_entry *tentb;
-	int rc;
+	int exists;
 	tupid_t dta, dtb;
 
 	if(tup_db_begin() < 0)
@@ -800,11 +804,12 @@ static int link_exists(int argc, char **argv)
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
 		return -1;
 	}
-	rc = tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid);
+	if(tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid, &exists) < 0)
+		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
 
-	return rc;
+	return exists;
 }
 
 static int touch(int argc, char **argv)
@@ -917,7 +922,7 @@ static int rm(int argc, char **argv)
 	return 0;
 }
 
-static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, int type)
+static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type)
 {
 	const char *color1 = "";
 	const char *color2 = "";

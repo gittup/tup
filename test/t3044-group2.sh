@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,40 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Multiple output bins don't make sense, so make sure those fail.
+# Try to move an output from one group to another.
 
 . ./tup.sh
-cat > Tupfile << HERE
-: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
+cat > ok1.sh << HERE
+touch foo
 HERE
-tup touch foo.c bar.c Tupfile
-parse_fail_msg "bin must be at the end of the output list"
+cat > ok2.sh << HERE
+touch bar
+HERE
+cat > Tupfile << HERE
+: |> sh ok1.sh |> foo <group>
+: |> sh ok2.sh |> bar
+HERE
+update
+
+tup_dep_exist . foo . '<group>'
+tup_dep_no_exist . bar . '<group>'
+
+# Now we swap which script touches which file. As a result, 'bar' should be
+# grouped and not 'foo'.
+cat > ok1.sh << HERE
+touch bar
+HERE
+cat > ok2.sh << HERE
+touch foo
+HERE
+cat > Tupfile << HERE
+: |> sh ok1.sh |> bar <group>
+: |> sh ok2.sh |> foo
+HERE
+tup touch ok1.sh ok2.sh Tupfile
+update
+
+tup_dep_no_exist . foo . '<group>'
+tup_dep_exist . bar . '<group>'
 
 eotup

@@ -61,7 +61,7 @@ void color_set(FILE *f)
 		active = 1;
 }
 
-const char *color_type(int type)
+const char *color_type(enum TUP_NODE_TYPE type)
 {
 	const char *color = "";
 
@@ -84,6 +84,10 @@ const char *color_type(int type)
 		case TUP_NODE_GENERATED:
 			color = "[35";
 			break;
+		case TUP_NODE_GROUP:
+			color="[36";
+			break;
+		case TUP_NODE_VAR:
 		case TUP_NODE_FILE:
 			/* If a generated node becomes a normal file (t6031) */
 			color = "[37";
