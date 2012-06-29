@@ -100,6 +100,16 @@ static int os_unmount(void)
 	}
 	return 0;
 }
+#elif defined(__FreeBSD__)
+static int os_unmount(void)
+{
+	int rc;
+	rc = system("umount -f " TUP_MNT);
+	if(rc == -1) {
+		perror("system");
+	}
+	return rc;
+}
 #else
 #error Unsupported platform. Please add unmounting code to fuse_server.c
 #endif
