@@ -277,6 +277,30 @@ int server_init(enum server_mode mode)
 		perror("pthread_create");
 		goto err_unmount;
 	}
+
+#ifdef __FreeBSD__
+	/* FreeBSD has a race condition between mounting the fuse fs and the first request.
+	 * Adding an init() hook makes this less likely, but still does not prevent the
+	 * race condition. The only thing that seems to work is to make an initial request,
+	 * and if it fails with ENODEV just ignore it. The next request should work.
+	 */
+	{
+		int fd;
+		fd = open(TUP_MNT, O_RDONLY);
+		if(fd >= 0) {
+			close(fd);
+		} else if(fd < 0 && errno == ENODEV) {
+			/* This is ok - the first time we will get ENODEV, and
+			 * then it should work afterwards.
+			 */
+		} else {
+			perror(TUP_MNT);
+			fprintf(stderr, "tup error: Expecting TUP_MNT open to succeed or fail with ENODEV on FreeBSD.\n");
+			goto err_unmount;
+		}
+	}
+#endif
+
 	server_inited = 1;
 	return 0;
 
