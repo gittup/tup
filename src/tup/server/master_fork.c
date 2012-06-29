@@ -285,7 +285,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");
 			return -1;
 		}
-#else
+#elif defined(__linux__)
 		/* The "tmpfs" argument is ignored since we use MS_BIND, but
 		 * valgrind complains about it if we use NULL.
 		 */
@@ -550,7 +550,7 @@ static void *child_waiter(void *arg)
 		int rc;
 #ifdef __APPLE__
 		rc = unmount(waiter->dev, MNT_FORCE);
-#else
+#elif defined(__linux__)
 		rc = umount2(waiter->dev, MNT_FORCE);
 #endif
 		if(rc < 0) {
