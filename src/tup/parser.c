@@ -2557,6 +2557,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct name_list onl;
 	struct name_list extra_onl;
 	struct name_list_entry *nle, *onle;
+	char *toutput;
 	char *output_pattern;
 	char *extra_pattern = NULL;
 	char *tcmd;
@@ -2589,7 +2590,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&extra_onl);
 	TAILQ_INIT(&oplist);
 
-	output_pattern = eval(tf, r->output_pattern, DISALLOW_NODES);
+	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, 1);
+	if(!toutput)
+		return -1;
+	output_pattern = eval(tf, toutput, DISALLOW_NODES);
+	free(toutput);
 	if(!output_pattern)
 		return -1;
 	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL) < 0)
