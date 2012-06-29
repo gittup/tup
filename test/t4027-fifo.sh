@@ -24,6 +24,10 @@ if [ "$tupos" = "Darwin" ]; then
 	echo "[33mFIFOs currently unsupported in fuse4x. Skipping test.[0m"
 	eotup
 fi
+if [ "$tupos" = "FreeBSD" ]; then
+        echo "[33mFIFOs currently unsupported in FreeBSD. Skipping test.[0m"
+        eotup
+fi
 
 cat > ok.sh << HERE
 #! /bin/sh
