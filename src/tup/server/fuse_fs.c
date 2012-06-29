@@ -18,7 +18,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#define _POSIX_C_SOURCE 200809L
 #define _ATFILE_SOURCE
 #define _GNU_SOURCE
 #ifdef linux
@@ -38,6 +37,13 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
+
+#if defined(__FreeBSD__)
+/* FreeBSD doessn't support AT_SYMLINK_NOFOLLOW in faccessat() */
+static int access_flags = 0;
+#else
+static int access_flags = AT_SYMLINK_NOFOLLOW;
+#endif
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
@@ -443,7 +449,7 @@ static int tup_fs_access(const char *path, int mask)
 				 * permissions assigned in mkdir for a temp
 				 * directory.
 				 */
-				if(faccessat(tup_top_fd(), ".", mask, AT_SYMLINK_NOFOLLOW) < 0)
+				if(faccessat(tup_top_fd(), ".", mask, access_flags) < 0)
 					rc = -errno;
 				entry_found = 1;
 				break;
@@ -465,11 +471,11 @@ static int tup_fs_access(const char *path, int mask)
 	}
 
 	/* This is preceded by a getattr - no need to handle a read event */
-	res = faccessat(tup_top_fd(), peeled, mask, AT_SYMLINK_NOFOLLOW);
+	res = faccessat(tup_top_fd(), peeled, mask, access_flags);
 	if (res == -1 && variant_dir) {
 		const char *stripped = prefix_strip(peeled, variant_dir);
 		if(stripped) {
-			res = faccessat(tup_top_fd(), stripped, mask, AT_SYMLINK_NOFOLLOW);
+			res = faccessat(tup_top_fd(), stripped, mask, access_flags);
 		}
 	}
 	if (res == -1)
