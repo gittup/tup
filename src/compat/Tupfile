@@ -6,6 +6,12 @@ ifeq (@(TUP_PLATFORM),linux)
 	srcs += dummy.c
 endif
 
+ifeq (@(TUP_PLATFORM),freebsd)
+	srcs += utimensat_linux.c
+	srcs += dummy.c
+	srcs += clearenv.c
+endif
+
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += clearenv.c
 srcs += dir_mutex.c
