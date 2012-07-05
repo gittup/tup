@@ -1044,6 +1044,7 @@ __out HANDLE WINAPI FindFirstFileA_hook(
     __out LPWIN32_FIND_DATAA lpFindFileData)
 {
 	DEBUG_HOOK("FindFirstFileA '%s'\n", lpFileName);
+	handle_file(lpFileName, NULL, ACCESS_READ);
 	return FindFirstFileA_orig(lpFileName, lpFindFileData);
 }
 
@@ -1052,6 +1053,7 @@ __out HANDLE WINAPI FindFirstFileW_hook(
     __out LPWIN32_FIND_DATAW lpFindFileData)
 {
 	DEBUG_HOOK("FindFirstFileW '%S'\n", lpFileName);
+	handle_file_w(lpFileName, NULL, ACCESS_READ);
 	return FindFirstFileW_orig(lpFileName, lpFindFileData);
 }
 
