@@ -1,1 +1,1 @@
-# nothing here
+CFLAGS += -include compat/freebsd.h
