@@ -4730,7 +4730,7 @@ static int load_all_nodes(void)
 	return rc;
 }
 
-static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group)
+int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group)
 {
 	int rc = 0;
 	int dbrc;
@@ -4789,7 +4789,7 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root, str
 		} else {
 			rc = tupid_tree_add(output_root, tupid);
 			if(rc < 0) {
-				fprintf(stderr, "tup error: get_output_tree() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+				fprintf(stderr, "tup error: tup_db_get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
 				break;
 			}
 		}
@@ -4804,8 +4804,8 @@ static int get_output_tree(tupid_t cmdid, struct tupid_entries *output_root, str
 	return rc;
 }
 
-int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
-		     struct tupid_entries *normal_root)
+int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
+		      struct tupid_entries *normal_root)
 {
 	int rc = 0;
 	int dbrc;
@@ -4852,7 +4852,7 @@ int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
 		}
 
 		if(rc < 0) {
-			fprintf(stderr, "tup error: tup_db_get_links() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
+			fprintf(stderr, "tup error: tup_db_get_inputs() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
 			break;
 		}
 	}
@@ -4997,7 +4997,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.output_error = 0,
 	};
 
-	if(get_output_tree(cmdid, &output_root, NULL) < 0)
+	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0)
 		return -1;
 	if(compare_list_tree(writehead, &output_root, &aod,
 			     extra_output, missing_output) < 0)
@@ -5092,7 +5092,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		.env_root = env_root,
 	};
 
-	if(tup_db_get_links(cmdid, &sticky_root, &normal_root) < 0)
+	if(tup_db_get_inputs(cmdid, &sticky_root, &normal_root) < 0)
 		return -1;
 	if(compare_trees(input_root, &sticky_root, &wid,
 			 add_sticky, rm_sticky) < 0)
@@ -5265,7 +5265,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		return -1;
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
-	/* TODO: Split out the groups in tup_db_get_links() ? */
+	/* TODO: Split out the groups in tup_db_get_inputs() ? */
 	RB_FOREACH(tt, tupid_entries, sticky_root) {
 		struct tup_entry *tent;
 		if(tup_entry_add(tt->tupid, &tent) < 0)
@@ -5276,7 +5276,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		}
 	}
 
-	if(get_output_tree(cmdid, &aid.output_root, NULL) < 0)
+	if(tup_db_get_outputs(cmdid, &aid.output_root, NULL) < 0)
 		return -1;
 	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
 		return -1;
@@ -5312,7 +5312,7 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 
 	aid.sticky_root = &sticky_root;
 
-	if(tup_db_get_links(tent->tnode.tupid, &sticky_root, &normal_root) < 0)
+	if(tup_db_get_inputs(tent->tnode.tupid, &sticky_root, &normal_root) < 0)
 		return -1;
 
 	if(compare_list_tree(readhead, &normal_root, &aid,
@@ -5365,7 +5365,7 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 	};
 	struct tup_entry *oldgroup;
 
-	if(get_output_tree(cmdid, &output_root, &oldgroup) < 0)
+	if(tup_db_get_outputs(cmdid, &output_root, &oldgroup) < 0)
 		return -1;
 	if(oldgroup == group) {
 		/* If we have the same group as before, we just update links to the
@@ -5447,7 +5447,7 @@ int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
 		.dt = dt,
 	};
 
-	if(tup_db_get_links(dt, &sticky_root, &normal_root) < 0)
+	if(tup_db_get_inputs(dt, &sticky_root, &normal_root) < 0)
 		return -1;
 	if(!RB_EMPTY(&sticky_root)) {
 		/* All links to directories should be TUP_LINK_NORMAL */

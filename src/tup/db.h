@@ -119,8 +119,9 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root);
 int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root);
-int tup_db_get_links(tupid_t cmdid, struct tupid_entries *sticky_root,
-		     struct tupid_entries *normal_root);
+int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
+		      struct tupid_entries *normal_root);
+int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);

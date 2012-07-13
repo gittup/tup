@@ -1752,7 +1752,7 @@ static int update(struct node *n)
 		goto err_close_dfd;
 
 	pthread_mutex_lock(&db_mutex);
-	rc = tup_db_get_links(n->tent->tnode.tupid, &sticky_root, &normal_root);
+	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root);
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
 	initialize_server_struct(&s, n->tent);
