@@ -24,8 +24,8 @@
 #include <string.h>
 #include <unistd.h>
 
-static int enabled[2];
-static int active = 0;
+static int enabled[3];
+static int active = 1;
 /* error_mode is set when we hightlight the whole line in red. In this case,
  * we don't want to switch to a real color when printing tup entrys
  */
@@ -35,30 +35,33 @@ void color_init(void)
 {
 	const char *colors;
 	colors = tup_option_get_string("display.color");
+	enabled[0] = 0;
 	if(strcmp(colors, "never") == 0) {
-		enabled[0] = 0;
 		enabled[1] = 0;
+		enabled[2] = 0;
 	} else if(strcmp(colors, "always") == 0) {
-		enabled[0] = 1;
 		enabled[1] = 1;
+		enabled[2] = 1;
 	} else {
 		if(isatty(STDOUT_FILENO))
-			enabled[0] = 1;
+			enabled[1] = 1;
 		else
-			enabled[0] = 0;
+			enabled[2] = 0;
 		if(isatty(STDERR_FILENO))
 			enabled[1] = 1;
 		else
-			enabled[1] = 0;
+			enabled[2] = 0;
 	}
 }
 
 void color_set(FILE *f)
 {
 	if(f == stdout)
-		active = 0;
-	else
 		active = 1;
+	else if(f == stderr)
+		active = 2;
+	else
+		active = 0;
 }
 
 const char *color_type(enum TUP_NODE_TYPE type)
