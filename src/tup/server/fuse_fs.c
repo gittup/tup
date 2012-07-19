@@ -123,7 +123,7 @@ static const char *peel(const char *path)
 		if(slash) {
 			path = slash;
 		} else {
-			path = ".";
+			path = "/";
 		}
 
 	}
