@@ -1471,6 +1471,7 @@ static void *create_work(void *arg)
 		} else if(n->tent->type == TUP_NODE_VAR ||
 			  n->tent->type == TUP_NODE_FILE ||
 			  n->tent->type == TUP_NODE_GENERATED ||
+			  n->tent->type == TUP_NODE_GROUP ||
 			  n->tent->type == TUP_NODE_CMD) {
 			rc = 0;
 		} else {
