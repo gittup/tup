@@ -254,6 +254,10 @@ int server_init(enum server_mode mode)
 	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)
 		return -1;
 #endif
+#ifdef __FreeBSD__
+	if(fuse_opt_add_arg(&args, "-ouse_ino") < 0)
+		return -1;
+#endif
 
 	fs.ch = fuse_mount(TUP_MNT, &args);
 	if(!fs.ch) {
