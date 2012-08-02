@@ -494,10 +494,7 @@ HERE
 	if [ "$tupos" = "SunOS" ]; then
 		plat_ldflags="$plat_ldflags -lsocket"
 	fi
-	if [ "$tupos" != "FreeBSD" ]; then
-		plat_ldflags="$plat_ldflags -ldl"
-	fi
-	gcc client.c ../../libtup_client.a -o client $plat_ldflags
+	gcc client.c ../../libtup_client.a -o client $plat_ldflags -ldl
 	tup touch client
 }
 
@@ -509,6 +506,20 @@ check_monitor_supported()
 		echo "Monitor is not supported. Skipping test."
 		eotup
 	fi
+}
+
+check_windows()
+{
+	case $tupos in
+	CYGWIN*)
+		return
+		;;
+	MINGW*)
+		return
+		;;
+	esac
+	echo "Only supported in Windows. Skipping test."
+	eotup
 }
 
 check_no_windows()

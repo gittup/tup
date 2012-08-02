@@ -395,6 +395,8 @@ static fopen_t				fopen_orig;
 static rename_t				rename_orig;
 static remove_t				remove_orig;
 
+#define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_PROPERTIES | FILE_WRITE_ATTRIBUTES)
+
 #define handle_file(a, b, c) mhandle_file(a, b, c, __LINE__)
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
 static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
@@ -471,7 +473,7 @@ static HANDLE WINAPI CreateFileA_hook(
 		dwCreationDisposition,
 		dwFlagsAndAttributes);
 
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -501,7 +503,7 @@ static HANDLE WINAPI CreateFileW_hook(
 		dwFlagsAndAttributes,
 		hTemplateFile);
 
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -536,7 +538,7 @@ HANDLE WINAPI CreateFileTransactedA_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 		handle_file(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file(lpFileName, NULL, ACCESS_READ);
@@ -569,7 +571,7 @@ HANDLE WINAPI CreateFileTransactedW_hook(
 		pusMiniVersion,
 		lpExtendedParameter);
 
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & GENERIC_WRITE) {
+	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(lpFileName, NULL, ACCESS_READ);
@@ -635,7 +637,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
 				goto out_free;
 		}
 
-		if (rc == STATUS_SUCCESS && DesiredAccess & GENERIC_WRITE) {
+		if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 			handle_file(name, NULL, ACCESS_WRITE);
 		} else {
 			handle_file(name, NULL, ACCESS_READ);
@@ -699,7 +701,7 @@ NTSTATUS WINAPI NtOpenFile_hook(
 			 * so that should be safe to ignore.
 			 */
 		} else {
-			if (rc == STATUS_SUCCESS && DesiredAccess & GENERIC_WRITE) {
+			if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
 				handle_file(name, NULL, ACCESS_WRITE);
 			} else {
 				handle_file(name, NULL, ACCESS_READ);
@@ -1626,15 +1628,27 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	char buf[ACCESS_EVENT_MAX_SIZE];
 	char afile[PATH_MAX];
 	char afile2[PATH_MAX];
-	size_t fsz = file ? wcslen(file) : 0;
-	size_t f2sz = file2 ? wcslen(file2) : 0;
+	size_t fsz;
+	size_t f2sz;
 	struct access_event* e = (struct access_event*) buf;
 	char* dest = (char*) (e + 1);
 	int ret;
 	int count;
+	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
+	const int backslash_prefix_len = 4;
 
 	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
 		goto exit;
+
+	if(file)
+		if(wcsncmp(file, backslash_prefix, backslash_prefix_len) == 0)
+			file += backslash_prefix_len;
+	if(file2)
+		if(wcsncmp(file2, backslash_prefix, backslash_prefix_len) == 0)
+			file2 += backslash_prefix_len;
+
+	fsz = file ? wcslen(file) : 0;
+	f2sz = file2 ? wcslen(file2) : 0;
 
 	e->at = at;
 
