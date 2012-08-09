@@ -45,6 +45,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/inotify.h>
+#include <sys/resource.h>
 #include <sys/time.h>
 #include <errno.h>
 #include <sys/wait.h>
