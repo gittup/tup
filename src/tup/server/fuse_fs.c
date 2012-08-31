@@ -1170,6 +1170,31 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	return rc;
 }
 
+static int tup_fs_flush(const char *path, struct fuse_file_info *fi)
+{
+	/* We don't actually do anything here, but without flush() sometimes
+	 * the sub-process will finish before our fuse fs finishes writing out
+	 * all data and calling release(). Eg, if we have a command that does
+	 * 'cp bigfile.txt newbigfile.txt', where bigfile.txt contains a lot of
+	 * data, then the waitpid() in master_fork returns before release() is
+	 * called. We then end up stating the output file and gettnig a bad
+	 * timestamp since data is still being written out. (The file is
+	 * written correctly, but our mtime that we store in the db is already
+	 * out of date).
+	 *
+	 * This implementation just mimics what fusexmp_fh does, though the
+	 * close(dup()) doesn't seem to actually be necessary to fix the above
+	 * behavior in tup.
+	 */
+	int rc;
+	if(path) {}
+
+	rc = close(dup(fi->fh));
+	if(rc < 0)
+		return -errno;
+	return 0;
+}
+
 static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 {
 	if(path) {}
@@ -1182,6 +1207,7 @@ static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 
 struct fuse_operations tup_fs_oper = {
 	.getattr = tup_fs_getattr,
+	.flush = tup_fs_flush,
 	.access = tup_fs_access,
 	.readlink = tup_fs_readlink,
 	.readdir = tup_fs_readdir,
