@@ -1115,7 +1115,7 @@ BOOL WINAPI CreateProcessA_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
@@ -1159,7 +1159,7 @@ BOOL WINAPI CreateProcessW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
@@ -1204,7 +1204,7 @@ BOOL WINAPI CreateProcessAsUserA_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
@@ -1249,7 +1249,7 @@ BOOL WINAPI CreateProcessAsUserW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
@@ -1294,7 +1294,7 @@ BOOL WINAPI CreateProcessWithLogonW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
@@ -1335,7 +1335,7 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
 		tup_inject_dll(lpProcessInformation, s_depfilename);
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
