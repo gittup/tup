@@ -65,4 +65,5 @@ else
 endif
 
 TUP_MONITOR = null
+TUP_SUID_GROUP = root
 include @(TUP_PLATFORM).tup

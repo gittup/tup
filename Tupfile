@@ -21,7 +21,7 @@ srcs += src/compat/*.o
 : $(srcs) |> !ar |> libtup.a
 
 ifeq (@(TUP_SUDO_SUID),y)
-suid = ; chown root:root tup; chmod u+s tup
+suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
 LDFLAGS += `pkg-config fuse --libs`

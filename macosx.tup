@@ -6,3 +6,5 @@ CFLAGS += -DAT_REMOVEDIR=0x200
 
 # Implementation of *at() functions
 CFLAGS += -include compat/macosx.h
+
+TUP_SUID_GROUP = wheel
