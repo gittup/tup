@@ -602,8 +602,6 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
 		lua_pushnil(ls); lua_setglobal(ls, "require");
-		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
-		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 
 		luaL_openlibs(ls);
 	}
