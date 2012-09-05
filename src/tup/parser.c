@@ -45,6 +45,11 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+
+typedef lua_State * scriptdata;
 
 #define SYNTAX_ERROR -2
 #define CIRCULAR_DEPENDENCY_ERROR -3
@@ -88,10 +93,10 @@ TAILQ_HEAD(path_list_head, path_list);
 
 struct rule {
 	int foreach;
-	char *input_pattern;
-	char *output_pattern;
+	const char *input_pattern;
+	const char *output_pattern;
 	struct bin *bin;
-	char *command;
+	const char *command;
 	int command_len;
 	struct name_list inputs;
 	struct name_list order_only_inputs;
@@ -158,15 +163,31 @@ struct tupfile {
 	struct timespan ts;
 	char ign;
 	char circular_dep_error;
+	scriptdata sd;
 };
 
+struct tuplua_reader_data
+{
+	struct buf *b;
+	int read;
+};
+
+struct tuplua_glob_data
+{
+	lua_State *ls;
+	const char *directory;
+	int directory_size;
+	int count;
+};
+
+static int execute_script(struct buf *b, struct tupfile *tf, const char *name);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
-static int export(struct tupfile *tf, char *cmdline);
+static int export(struct tupfile *tf, const char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
@@ -184,7 +205,7 @@ static void free_banglist(struct bang_list_head *head);
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
 			       char **o_bin, int *swapio);
-static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
+static int parse_input_pattern(struct tupfile *tf, const char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
@@ -233,6 +254,381 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 static int debug_run = 0;
 
+/* SCRIPTING LANGUAGE CODE START */
+static const char *tuplua_reader(struct lua_State *L, void *data, size_t *size)
+{
+	struct tuplua_reader_data *lrd = data;
+	if(lrd->read)
+	{
+		*size = 0;
+		return 0;
+	}
+
+	lrd->read = 1;
+	*size = lrd->b->len;
+	return lrd->b->s;
+}
+
+static void tuplua_register_function(struct lua_State *ls, const char *name, lua_CFunction function, void *data)
+{
+        lua_getglobal(ls, "tup");
+	lua_pushlightuserdata(ls, data);
+	lua_pushcclosure(ls, function, 1);
+	lua_setfield(ls, 1, name);
+	lua_setglobal(ls, "tup");
+}
+
+static int tuplua_function_include(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *file = NULL;
+
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Must be passed a filename as an argument.");
+
+	file = lua_tostring(ls, -1);
+	if(include_file(tf, file) < 0)
+		return luaL_error(ls, "Failed to include file \"%s\".", file);
+	return 0;
+}
+
+static int tuplua_function_includerules(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	if(include_rules(tf) < 0)
+		return luaL_error(ls, "Failed to include rules file.");
+	return 0;
+}
+
+static int tuplua_function_definerule(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct rule r;
+	size_t command_len = 0;
+	struct bin_head bl; /* Not really used */
+	const char *empty_check = NULL;
+
+	if(!lua_istable(ls, -1))
+		return luaL_error(ls, "This function must be passed a table containing parameters");
+
+	r.input_pattern = "";
+	r.empty_input = 1;
+	lua_getfield(ls, 1, "inputs");
+	if (lua_isstring(ls, -1))
+	{
+		r.input_pattern = lua_tostring(ls, -1);
+		for (empty_check = r.input_pattern; *empty_check != '\0'; ++empty_check)
+		{
+			if ((*empty_check != ' ') && 
+				(*empty_check != '\t') && 
+				(*empty_check != '\r') && 
+				(*empty_check != '\n'))
+			{
+				r.empty_input = 0;
+				break;
+			}
+		}
+	}
+	else lua_pop(ls, 1);
+
+	lua_getfield(ls, 1, "outputs");
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Parameter \"outputs\" must be a space-separated list of output files.");
+	r.output_pattern = lua_tostring(ls, -1);
+
+	lua_getfield(ls, 1, "command");
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Parameter \"command\" must be a string containing command specification.");
+	r.command = lua_tolstring(ls, -1, &command_len);
+	if(command_len > (size_t)1 << (sizeof(r.command_len) * 8))
+		return luaL_error(ls, "Parameter \"command\" is too long.");
+	r.command_len = command_len;
+
+	r.line_number = 0;
+	r.output_nl = NULL;
+	r.foreach = 0;
+	r.bin = NULL;
+
+	LIST_INIT(&bl);
+
+	if(execute_rule(tf, &r, &bl) < 0)
+		return luaL_error(ls, "Failed to define rule.");
+
+	bin_list_del(&bl);
+
+	return 0;
+}
+
+static int tuplua_function_getcwd(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	int dir_size = 0;
+	char *dir = NULL;
+
+	lua_settop(ls, 0);
+
+	if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
+		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+		tup_db_print(tf->f, tf->tupid);
+		tup_db_print(tf->f, tf->curtent->tnode.tupid);
+		return luaL_error(ls, "Failed to get directory path length in getcwd.");
+	}
+
+	if(dir_size == 0) {
+		lua_pushstring(ls, "");
+		return 1;
+	}
+
+	dir = malloc(dir_size + 1);
+	if(get_relative_dir(dir, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
+		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+		tup_db_print(tf->f, tf->tupid);
+		tup_db_print(tf->f, tf->curtent->tnode.tupid);
+		free(dir);
+		return luaL_error(ls, "Failed to get directory path in getcwd.");
+	}
+	dir[dir_size] = '\0';
+
+	lua_pushlstring(ls, dir, dir_size);
+	free(dir);
+	return 1;
+}
+
+static int tuplua_function_getconfig(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *name = NULL;
+	size_t name_size = 0;
+	char *value = NULL;
+	char *value_as_argument = NULL; /* tup_db_get_var moves the pointer, so this is a throwaway */
+	int value_size = 0;
+	struct tup_entry *tent = NULL;
+
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Must be passed an config variable name as an argument.");
+	name = lua_tolstring(ls, -1, &name_size);
+	value_size = tup_db_get_varlen(tf->variant, name, name_size) + 1;
+	if(value_size < 0)
+		luaL_error(ls, "Failed to get config variable length.");
+	value = malloc(value_size);
+	value_as_argument = value;
+	
+	tent = tup_db_get_var(tf->variant, name, name_size, &value_as_argument);
+	if(!tent)
+		return luaL_error(ls, "Failed to get config variable.");
+	value[value_size - 1] = '\0';
+
+	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
+		return luaL_error(ls, "Failed to get config variable (add_dup).");
+	
+	lua_pushstring(ls, value);
+	free(value);
+
+	return 1;
+}
+
+static int tuplua_glob_callback(void *arg, struct tup_entry *tent)
+{
+	struct tuplua_glob_data *data = arg;
+	size_t fullpath_length = 0;
+	char *fullpath = NULL;
+	if(data->directory != NULL)
+	{
+		fullpath_length = data->directory_size + 1 + tent->name.len;
+		fullpath = malloc(fullpath_length);
+		strncpy(fullpath, data->directory, data->directory_size);
+		fullpath[data->directory_size] = PATH_SEP;
+		strncpy(fullpath + data->directory_size + 1, tent->name.s, tent->name.len);
+	}
+	else
+	{
+		fullpath_length = tent->name.len;
+		fullpath = tent->name.s;
+	}
+
+	lua_pushinteger(data->ls, data->count++);
+	lua_pushlstring(data->ls, fullpath, fullpath_length);
+	lua_settable(data->ls, -3);
+
+	if(data->directory != NULL)
+		free(fullpath);
+
+	return 0;
+}
+
+static int tuplua_function_glob(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	char *pattern = NULL;
+	size_t pattern_size = 0;
+	struct path_list_head plist;
+	struct path_list *pl, *tmp;
+	struct tuplua_glob_data tgd;
+	struct tup_entry *srctent = NULL;
+	struct tup_entry *dtent;
+
+	tgd.ls = ls;
+	tgd.count = 1; /* Lua numbering starts from 1 */
+	tgd.directory = NULL;
+	tgd.directory_size = 0;
+
+	lua_settop(ls, 1);
+
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
+	
+	if (lua_tolstring(ls, -1, &pattern_size) == NULL)
+		return luaL_error(ls, "Lua error while trying to retrieve glob pattern.");
+	pattern = malloc(pattern_size + 1);
+	strncpy(pattern, lua_tostring(ls, -1), pattern_size);
+	pattern[pattern_size] = '\0';
+	lua_pop(ls, 1);
+
+	TAILQ_INIT(&plist);
+	if(get_path_list(tf, pattern, &plist, tf->tupid, NULL) < 0)
+	{
+		free(pattern);
+		return luaL_error(ls, "Failed to parse paths in glob pattern \"%s\".", pattern);
+	}
+
+	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
+	{
+		free(pattern);
+		return luaL_error(ls, "Failed to process glob directory for pattern \"%s\".", pattern);
+	}
+	
+	TAILQ_FOREACH(pl, &plist, list) {
+		if(pl->path != NULL) {
+			tgd.directory = pl->path;
+			tgd.directory_size = pl->pel->path - pl->path - 1;
+		}
+
+		lua_newtable(ls);
+		if(tup_entry_add(pl->dt, &dtent) < 0)
+		{
+			free(pattern);
+			return luaL_error(ls, "Failed to add tup entry when processing glob pattern \"%s\".", pattern);
+		}
+		if(dtent->type == TUP_NODE_GHOST)
+		{
+			free(pattern);
+			return luaL_error(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->path);
+		}
+		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
+		{
+			free(pattern);
+			return luaL_error(ls, "Failed to glob for pattern \"%s\" in build(?) tree.", pattern);
+		}
+
+		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+		{
+			free(pattern);
+			return luaL_error(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
+		}
+		if(srctent) {
+			if(tup_db_select_node_dir_glob(build_name_list_cb, &tgd, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
+			{
+				free(pattern);
+				return luaL_error(ls, "Failed to glob for pattern \"%s\" in source(?) tree.", pattern);
+			}
+		}
+	}
+	
+	TAILQ_FOREACH_SAFE(pl, &plist, list, tmp) {
+		del_pl(pl, &plist);
+	}
+
+	return 1;
+}
+
+static int tuplua_function_export(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *name = NULL;
+
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Must be passed an environment variable name as an argument.");
+
+	name = lua_tostring(ls, -1);
+
+	if(export(tf, name) < 0)
+		return luaL_error(ls, "Failed to export environment variable \"%s\".", name);
+
+	return 0;
+}
+
+static int tuplua_function_creategitignore(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	tf->ign = 1;
+	return 0;
+}
+
+static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
+{
+	struct tuplua_reader_data lrd;
+	struct lua_State *ls = NULL;
+	
+	lrd.read = 0;
+	lrd.b = b;
+
+	if(!tf->sd)
+	{
+		ls = luaL_newstate();
+		tf->sd = ls;
+	
+		/* Register tup interaction functions in the "tup" table in Lua */	
+		lua_newtable(ls);
+		lua_setglobal(ls, "tup");
+		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
+		tuplua_register_function(ls, "dorulesfile", tuplua_function_includerules, tf);
+		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
+		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
+		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
+		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
+		tuplua_register_function(ls, "export", tuplua_function_export, tf);
+		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
+
+		/* Load some basic libraries.  File-access functions are avoided so that accesses
+		 * must go through the tup methods. Load the debug library so tracebacks 
+		 * for errors can be formatted nicely */
+		lua_pushcfunction(ls, luaopen_base); lua_pushstring(ls, ""); lua_call(ls, 1, 0);
+		lua_pushcfunction(ls, luaopen_table); lua_pushstring(ls, LUA_TABLIBNAME); lua_call(ls, 1, 0);
+		lua_pushcfunction(ls, luaopen_string); lua_pushstring(ls, LUA_STRLIBNAME); lua_call(ls, 1, 0);
+		lua_pushcfunction(ls, luaopen_bit32); lua_pushstring(ls, LUA_BITLIBNAME); lua_call(ls, 1, 0);
+		lua_pushcfunction(ls, luaopen_math); lua_pushstring(ls, LUA_MATHLIBNAME); lua_call(ls, 1, 0);
+		lua_pushcfunction(ls, luaopen_debug); lua_pushstring(ls, LUA_DBLIBNAME); lua_call(ls, 1, 0);
+		lua_pushnil(ls); lua_setglobal(ls, "dofile");
+		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
+		lua_pushnil(ls); lua_setglobal(ls, "load");
+		lua_pushnil(ls); lua_setglobal(ls, "require");
+		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
+		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
+
+		luaL_openlibs(ls);
+	}
+	else ls = tf->sd;
+
+	lua_getglobal(ls, "debug");
+	lua_getfield(ls, -1, "traceback");
+	lua_remove(ls, -2);
+
+	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK)
+	{
+		fprintf(tf->f, "tup error: Failed to open Tupfile:\n%s\n", lua_tostring(ls, -1));
+		return 0;
+	}
+
+	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK)
+	{
+		fprintf(tf->f, "tup error: Failed to execute Tupfile:\n%s\n", lua_tostring(ls, -1));
+		return 0;
+	}
+
+	return 1;
+}
+/* SCRIPTING LANGUAGE CODE STOP */
+
 void parser_debug_run(void)
 {
 	debug_run = 1;
@@ -264,6 +660,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 		perror("tmpfile");
 		return -1;
 	}
+	tf.sd = NULL;
 
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
@@ -329,8 +726,10 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 
 	if(fslurp_null(fd, &b) < 0)
 		goto out_close_file;
-	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+	if(!execute_script(&b, &tf, "Tupfile"))
 		goto out_free_bs;
+	/*if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+		goto out_free_bs;*/
 	if(tf.ign) {
 		if(rm_existing_gitignore(&tf, n->tent) < 0)
 			return -1;
@@ -780,7 +1179,7 @@ out_err:
 	return -1;
 }
 
-static int export(struct tupfile *tf, char *cmdline)
+static int export(struct tupfile *tf, const char *cmdline)
 {
 	struct tup_entry *tent = NULL;
 
@@ -940,8 +1339,10 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_tupfile(tf, &incb, file) < 0)
+	if(!execute_script(&incb, tf, file))
 		goto out_free;
+	/*if(parse_tupfile(tf, &incb, file) < 0)
+		goto out_free;*/
 	rc = 0;
 out_free:
 	free(incb.s);
@@ -1646,7 +2047,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	return 0;
 }
 
-static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
+static int parse_input_pattern(struct tupfile *tf, const char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required)
@@ -1693,7 +2094,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
 	struct name_list output_nl;
 	struct name_list_entry *nle;
-	char *last_output_pattern;
+	const char *last_output_pattern;
 	char empty_pattern[] = "";
 
 	init_name_list(&r->inputs);
@@ -1829,8 +2230,8 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 	if(foreach) {
 		struct name_list tmp_nl;
 		struct name_list_entry tmp_nle;
-		char *old_command = NULL;
-		char *old_output_pattern = NULL;
+		const char *old_command = NULL;
+		const char *old_output_pattern = NULL;
 		int old_command_len = 0;
 
 		/* For a foreach loop, iterate over each entry in the rule's

@@ -1,47 +1,54 @@
-include_rules
+tup.dorulesfile()
 
-# Changes here need to be reflected in the build.sh file
-ifeq (@(TUP_PLATFORM),linux)
-	srcs += utimensat_linux.c
-	srcs += dummy.c
-endif
+-- Changes here need to be reflected in the build.sh file
+srcs = {}
+mingwsrcs = {}
 
-ifeq (@(TUP_PLATFORM),freebsd)
-	srcs += utimensat_linux.c
-	srcs += dummy.c
-	srcs += clearenv.c
-endif
+if tup.getconfig('TUP_PLATFORM') == 'linux'
+then
+	table.insert(srcs, 'utimensat_linux.c')
+	table.insert(srcs, 'dummy.c')
+end
 
-ifeq (@(TUP_PLATFORM),macosx)
-srcs += clearenv.c
-srcs += dir_mutex.c
+if tup.getconfig('TUP_PLATFORM') == 'freebsd'
+then
+	table.insert(srcs, 'utimensat_linux.c')
+	table.insert(srcs, 'dummy.c')
+	table.insert(srcs, 'clearenv.c')
+end
 
-srcs += faccessat.c
-srcs += fchmodat.c
-srcs += fchownat.c
-srcs += fdopendir.c
-srcs += fstatat.c
-srcs += mkdirat.c
-srcs += openat.c
-srcs += readlinkat.c
-srcs += renameat.c
-srcs += symlinkat.c
-srcs += unlinkat.c
-srcs += utimensat.c
+if tup.getconfig('TUP_PLATFORM') == 'macosx'
+then
+table.insert(srcs, 'clearenv.c')
+table.insert(srcs, 'dir_mutex.c')
 
-endif
+table.insert(srcs, 'faccessat.c')
+table.insert(srcs, 'fchmodat.c')
+table.insert(srcs, 'fchownat.c')
+table.insert(srcs, 'fdopendir.c')
+table.insert(srcs, 'fstatat.c')
+table.insert(srcs, 'mkdirat.c')
+table.insert(srcs, 'openat.c')
+table.insert(srcs, 'readlinkat.c')
+table.insert(srcs, 'renameat.c')
+table.insert(srcs, 'symlinkat.c')
+table.insert(srcs, 'unlinkat.c')
+table.insert(srcs, 'utimensat.c')
 
-ifeq (@(TUP_PLATFORM),solaris)
-srcs += dir_mutex.c
-srcs += mkdirat.c
-srcs += readlinkat.c
-endif
-: foreach $(srcs) |> !cc |>
+end
 
-mingwsrcs += dir_mutex.c
-mingwsrcs += fstatat.c
-mingwsrcs += mkdirat.c
-mingwsrcs += openat.c
-mingwsrcs += renameat.c
-mingwsrcs += unlinkat.c
-: foreach $(mingwsrcs) |> !mingwcc |>
+if tup.getconfig('TUP_PLATFORM') == 'solaris'
+then
+table.insert(srcs, 'dir_mutex.c')
+table.insert(srcs, 'mkdirat.c')
+table.insert(srcs, 'readlinkat.c')
+end
+for index, file in ipairs(srcs) do bang_cc(file) end
+
+table.insert(mingwsrcs, 'dir_mutex.c')
+table.insert(mingwsrcs, 'fstatat.c')
+table.insert(mingwsrcs, 'mkdirat.c')
+table.insert(mingwsrcs, 'openat.c')
+table.insert(mingwsrcs, 'renameat.c')
+table.insert(mingwsrcs, 'unlinkat.c')
+for index, file in ipairs(srcs) do bang_mingwcc(file) end

@@ -1,68 +1,156 @@
-.gitignore
+tup.creategitignore()
 
-CC = gcc
+if not CFLAGS then CFLAGS = {} end
+if not CFLAGS_SPECIFIC then CFLAGS_SPECIFIC = {} end
+if not LDFLAGS then LDFLAGS = {} end
+if not LDFLAGS_SPECIFIC then LDFLAGS_SPECIFIC = {} end
+if not MINGWCFLAGS then MINGWCFLAGS = {} end
+if not MINGWLDFLAGS then MINGWLDFLAGS = {} end
 
-ifeq (@(TUP_DEBUG),y)
-CFLAGS += -g
+-- Lua auxiliary definitions
+prepare_tup_table = function(input)
+	setmetatable(input, { 
+		__index = function(table, key) 
+			rawset(table, key, {})
+			return rawget(table, key) 
+		end 
+	})
+end
+for index, specific in ipairs({CFLAGS_SPECIFIC, LDFLAGS_SPECIFIC})
+do
+	prepare_tup_table(specific)
+end
+
+table_concat = function(first, second)
+	output = {}
+	for index, value in ipairs(first) do table.insert(output, value) end
+	for index, value in ipairs(second) do table.insert(output, value) end
+	return output
+end
+
+CC = 'gcc'
+
+if tup.getconfig('TUP_DEBUG') == 'y'
+then
+	table.insert(CFLAGS, '-g')
 else
-CFLAGS += -Os
-endif
+	table.insert(CFLAGS, '-Os')
+end
 
-CFLAGS += -W
-CFLAGS += -Wall
-ifeq (@(TUP_WERROR),y)
-CFLAGS += -Werror
-endif
-CFLAGS += -Wbad-function-cast
-CFLAGS += -Wcast-align
-CFLAGS += -Wcast-qual
-CFLAGS += -Wchar-subscripts
-CFLAGS += -Wmissing-prototypes
-CFLAGS += -Wnested-externs
-CFLAGS += -Wpointer-arith
-CFLAGS += -Wredundant-decls
-CFLAGS += -Wshadow
-CFLAGS += -Wstrict-prototypes
-CFLAGS += -Wwrite-strings
-CFLAGS += -Wswitch-enum
-CFLAGS += -fno-common
-CFLAGS += -I$(TUP_CWD)/src
+table.insert(CFLAGS, '-Wall')
+table.insert(CFLAGS, '-Wall')
+if tup.getconfig('TUP_WERROR') == 'y'
+then
+	table.insert(CFLAGS, '-Werror')
+end
+table.insert(CFLAGS, '-Wbad-function-cast')
+table.insert(CFLAGS, '-Wcast-align')
+table.insert(CFLAGS, '-Wcast-qual')
+table.insert(CFLAGS, '-Wchar-subscripts')
+table.insert(CFLAGS, '-Wmissing-prototypes')
+table.insert(CFLAGS, '-Wnested-externs')
+table.insert(CFLAGS, '-Wpointer-arith')
+table.insert(CFLAGS, '-Wredundant-decls')
+table.insert(CFLAGS, '-Wshadow')
+table.insert(CFLAGS, '-Wstrict-prototypes')
+table.insert(CFLAGS, '-Wwrite-strings')
+table.insert(CFLAGS, '-Wswitch-enum')
+table.insert(CFLAGS, '-fno-common')
+table.insert(CFLAGS, '-I' .. tup.getcwd() .. '/src')
 
-ifeq (@(TUP_32_BIT),y)
-CFLAGS += -m32
-LDFLAGS += -m32
-endif
+if tup.getconfig('TUP_32_BIT') == 'y'
+then
+	table.insert(CFLAGS, '-m32')
+	table.insert(LDFLAGS, '-m32')
+end
 
-export PKG_CONFIG_PATH
-CFLAGS += `pkg-config fuse --cflags`
+tup.export('PKG_CONFIG_PATH')
+table.insert(CFLAGS, '`pkg-config fuse --cflags`')
+table.insert(CFLAGS, '`pkg-config lua5.2 --cflags`')
 
-# Compatibility function prototypes and include path for wrapper functions
-MINGWCFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
-MINGWCFLAGS += -I$(TUP_CWD)/src/compat/win32
+-- Compatibility function prototypes and include path for wrapper functions
+table.insert(MINGWCFLAGS, '-include $(TUP_CWD)/src/compat/win32/mingw.h')
+table.insert(MINGWCFLAGS, '-I$(TUP_CWD)/src/compat/win32')
 
-# _GNU_SOURCE lets us use the %lli flag correctly
-MINGWCFLAGS += -D_GNU_SOURCE
+-- _GNU_SOURCE lets us use the %lli flag correctly
+table.insert(MINGWCFLAGS, '-D_GNU_SOURCE')
 
-# No symlinks on windows
-MINGWCFLAGS += -D'S_ISLNK(a)=0'
-MINGWCFLAGS += -Dlstat=stat
+-- No symlinks on windows
+table.insert(MINGWCFLAGS, '-D\'S_ISLNK(a)=0\'')
+table.insert(MINGWCFLAGS, '-Dlstat=stat')
 
-# No sig_atomic_t on windows
-MINGWCFLAGS += -Dsig_atomic_t=int
+-- No sig_atomic_t on windows
+table.insert(MINGWCFLAGS, '-Dsig_atomic_t=int')
 
-# Use the same value as linux here. The logic is in src/compat/unlinkat.c
-MINGWCFLAGS += -DAT_REMOVEDIR=0x200
+-- Use the same value as linux here. The logic is in src/compat/unlinkat.c
+table.insert(MINGWCFLAGS, '-DAT_REMOVEDIR=0x200')
 
-!cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
-!ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
-!ar = |> ^ AR %o^ ar crs %o %f |>
-!dot = |> ^ DOT %f^ dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
-!cp = |> ^ CP %f -> %o^ cp %f %o |>
-ifeq (@(TUP_MINGW),)
-!mingwcc = |> |>
+bang_cc = function(input)
+	local output = string.gsub(input, '%.c', '') .. '.o'
+	tup.definerule {
+		inputs = input,
+		outputs = output,
+		command = CC .. ' -c ' .. input .. ' -o ' .. output .. 
+			' ' .. table.concat(CFLAGS, ' ') .. 
+			' ' .. table.concat(CFLAGS_SPECIFIC[input], ' '),
+		print = 'CC ' .. input
+	}
+end
+bang_ld = function(inputs, output)
+	local inputs = table.concat(inputs, ' ')
+	tup.definerule {
+		inputs = inputs,
+		outputs = output,
+		command = CC .. ' ' .. inputs .. ' -o ' .. output ..
+			' ' .. table.concat(LDFLAGS, ' ') ..
+			' ' .. table.concat(LDFLAGS_SPECIFIC[output], ' '),
+		print = 'LINK ' .. output
+	}
+end
+bang_ar = function(inputs, output)
+	inputs = table.concat(inputs, ' ')
+	tup.definerule {
+		inputs = inputs,
+		outputs = output,
+		command = 'ar crs ' .. output .. ' ' .. inputs,
+		print = 'AR ' .. output
+	}
+end
+bang_dot = function(input, output)
+	tup.definerule {
+		inputs = input,
+		outputs = output,
+		command = 'dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng ' .. input .. ' > ' .. output,
+		print = 'DOT ' .. input
+	}
+end
+bang_cp = function(input, output)
+	tup.definerule {
+		inputs = input,
+		outputs = output,
+		command = 'cp ' .. input .. ' ' .. output,
+		print = 'CP ' .. input .. ' -> ' .. output
+	}
+end
+
+if tup.getconfig('TUP_MINGW') == ''
+then
+	bang_mingwcc = function(input)
+	end
 else
-!mingwcc = |> ^ MINGW32CC %f^ @(TUP_MINGW)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw
-endif
+	bang_mingwcc = function(input)
+		local output = string.gsub(input, '%.c', '') .. '.omingw'
+		tup.definerule {
+			inputs = input,
+			outputs = output,
+			command = tup.getconfig('TUP_MINGW') .. '-gcc -c ' .. input .. ' -o ' .. output .. 
+				' ' .. table.concat(CFLAGS, ' ') ..
+				' ' .. table.concat(CFLAGS_SPECIFIC[input], ' ') ..
+				' ' .. table.concat(MINGWCFLAGS, ' '),
+			print = 'MINGW32CC ' .. input
+		}
+	end
+end
 
-TUP_MONITOR = null
-include @(TUP_PLATFORM).tup
+TUP_MONITOR = 'null'
+tup.dofile(tup.getconfig('TUP_PLATFORM') .. '.tup')

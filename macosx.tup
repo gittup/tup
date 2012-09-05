@@ -1,8 +1,8 @@
-# Build for the future as this is the direction Apple is moving to
-CC = clang
+-- Build for the future as this is the direction Apple is moving to
+CC = 'clang'
 
-CFLAGS += -DAT_SYMLINK_NOFOLLOW=0x100
-CFLAGS += -DAT_REMOVEDIR=0x200
+table.insert(CFLAGS, '-DAT_SYMLINK_NOFOLLOW=0x100')
+table.insert(CFLAGS, '-DAT_REMOVEDIR=0x200')
 
-# Implementation of *at() functions
-CFLAGS += -include compat/macosx.h
+-- Implementation of *at() functions
+table.insert(CFLAGS, '-include compat/macosx.h')

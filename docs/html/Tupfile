@@ -1,34 +1,96 @@
-.gitignore
-ifeq (@(TUP_WWW),y)
+prepare_tup_table = function(input)
+	setmetatable(input, { 
+		__index = function(table, key) 
+			rawset(table, key, {})
+			return rawget(table, key) 
+		end 
+	})
+end
 
-pages += index.html
-pages += getting_started.html
-pages += examples.html
-pages += manual.html
-pages += tips_and_tricks.html
-pages += make_vs_tup.html
-pages += tup_vs_mordor.html
-pages += license.html
-pages += support.html
+tup.creategitignore()
 
-examples += ex_a_first_tupfile.html
-examples += ex_dependencies.html
-examples += ex_generated_header.html
-examples += ex_multiple_directories.html
+pages = {}
+examples = {}
+flags = {}
+flags_specific = {}
+prepare_tup_table(flags_specific)
 
-# Use the 'examples' sub-menu for the examples page.
-flags_examples += -x
+if tup.getconfig('TUP_WWW') == 'y'
+then
 
-ifeq (@(TUP_WWW_ANALYTICS),y)
-flags += -a
-endif
+table.insert(pages, 'index.html')
+table.insert(pages, 'getting_started.html')
+table.insert(pages, 'examples.html')
+table.insert(pages, 'manual.html')
+table.insert(pages, 'tips_and_tricks.html')
+table.insert(pages, 'make_vs_tup.html')
+table.insert(pages, 'tup_vs_mordor.html')
+table.insert(pages, 'license.html')
+table.insert(pages, 'support.html')
 
-: |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
-: |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
-: examples.inc |> ^ GEN %o^ ./gen_menu.sh -x $(pages) > %o |> menu-examples.inc
-: |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
-: ../../tup.1 |> ^ man2html %o^ man2html %f > %o |> manual.html
-: foreach $(pages) | menu.inc menu-examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) $(flags_%B) %f > %o |> %f.gen
-: foreach $(examples) | menu-examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) -x %f > %o |> %f.gen
+table.insert(examples, 'ex_a_first_tupfile.html')
+table.insert(examples, 'ex_dependencies.html')
+table.insert(examples, 'ex_generated_header.html')
+table.insert(examples, 'ex_multiple_directories.html')
 
-endif
+-- Use the 'examples' sub-menu for the examples page.
+table.insert(flags_specific['examples'], '-x')
+
+if tup.getconfig('TUP_WWW_ANALYTICS') == 'y'
+then
+	table.insert(flags, '-a')
+end
+
+tup.definerule { 
+	outputs = 'menu.inc',
+	print = 'GEN ' .. outputs,
+	command = './gen_menu.sh ' .. table.concat(pages, ' ') .. ' > ' .. outputs
+}
+tup.definerule { 
+	outputs = 'examples.inc',
+	print = 'GEN ' .. outputs,
+	command = './gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs
+}
+tup.definerule { 
+	inputs = 'examples.inc',
+	outputs = 'menu-examples.inc',
+	print = 'GEN ' .. outputs,
+	command = './gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > ' .. outputs
+}
+tup.definerule { 
+	outputs = 'examples.html',
+	print = 'GEN ' .. outputs,
+	command = './gen_examples.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs
+}
+tup.definerule {
+	inputs = '../../tup.1',
+	outputs = 'manual.html',
+	print = 'man2html ' .. outputs,
+	command = 'man2html ' .. inputs .. ' > ' .. outputs
+}
+for index, page in ipairs(pages)
+do
+	print('%B is ' .. string.gsub(page, '%..*', ''))
+	tup.definerule {
+		inputs = page .. ' menu.inc menu-examples.inc',
+		outputs = page .. '.gen',
+		print = 'GEN ' .. outputs,
+		command = './gen_page.sh ' .. 
+			table.concat(flags, ' ') .. 
+			' ' .. table.concat(flags_specific[string.gsub(page, '%..*', '')], ' ') .. 
+			' ' .. page .. ' > ' .. outputs
+	}
+end
+for index, example in ipairs(examples)
+do
+	tup.definerule {
+		inputs = page .. ' menu-examples.inc',
+		outputs = page .. '.gen',
+		print = 'GEN ' .. outputs,
+		command = './gen_page.sh ' .. 
+			table.concat(flags, ' ') ..
+			' -x ' .. page .. ' > ' .. outputs
+	}
+end
+
+end

@@ -2,7 +2,9 @@
 CFLAGS="-g" ./build.sh
 
 if [ ! -d .tup ]; then
-	./build/tup init
+	#gdb --args ./build/tup init
+	valgrind --sim-hints=fuse-compatible ./build/tup init
 fi
-./build/tup upd
+#gdb --args ./build/tup upd
+valgrind --sim-hints=fuse-compatible ./build/tup upd
 echo "Build complete. If ./tup works, you can remove the 'build' directory."

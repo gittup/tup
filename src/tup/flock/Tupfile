@@ -1,4 +1,4 @@
-include_rules
+tup.dorulesfile()
 
-: foreach fcntl.c |> !cc |>
-: foreach lock_file.c |> !mingwcc |>
+bang_cc('fcntl.c')
+bang_mingwcc('lock_file.c')

@@ -2,8 +2,8 @@
 
 label=${TUP_LABEL:-bootstrap}
 os=`uname -s`
-plat_cflags="`pkg-config fuse --cflags`"
-plat_ldflags="`pkg-config fuse --libs`"
+plat_cflags="`pkg-config fuse --cflags` `pkg-config --cflags lua5.2`"
+plat_ldflags="`pkg-config fuse --libs` `pkg-config --libs lua5.2`"
 plat_files=""
 CC=gcc
 case "$os" in

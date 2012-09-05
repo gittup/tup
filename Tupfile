@@ -1,51 +1,77 @@
-include_rules
+tup.dorulesfile()
 
-client_objs += src/tup/vardict.o
-client_objs += src/tup/access_event/send_event.o
-client_objs += src/tup/flock/fcntl.o
-: $(client_objs) |> !ar |> libtup_client.a
-: src/tup/vardict.h |> !cp |> tup_client.h
+client_objs = {}
+table.insert(client_objs, 'src/tup/vardict.o')
+table.insert(client_objs, 'src/tup/access_event/send_event.o')
+table.insert(client_objs, 'src/tup/flock/fcntl.o')
 
-srcs = src/tup/*.o
-srcs += src/tup/access_event/*.o
-srcs += src/tup/monitor/*.o
-srcs += src/tup/flock/*.o
-srcs += src/tup/server/*.o
-ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
-LDFLAGS += -lsqlite3
+bang_ar(client_objs, 'libtup_client.a')
+bang_cp('src/tup/vardict.h', 'tup_client.h')
+
+srcs = tup.glob('src/tup/*.o')
+table.insert(srcs, 'src/tup/access_event/*.o')
+table.insert(srcs, 'src/tup/monitor/*.o')
+table.insert(srcs, 'src/tup/flock/*.o')
+table.insert(srcs, 'src/tup/server/*.o')
+if tup.getconfig('TUP_USE_SYSTEM_SQLITE') == 'y'
+then
+	table.insert(LDFLAGS, '-lsqlite3')
 else
-srcs += src/sqlite3/*.o
-endif
-srcs += src/inih/*.o
-srcs += src/compat/*.o
-: $(srcs) |> !ar |> libtup.a
+	table.insert(srcs, 'src/sqlite3/*.o')
+end
+table.insert(srcs, 'src/inih/*.o')
+table.insert(srcs, 'src/compat/*.o')
+bang_ar(srcs, 'libtup.a')
 
-ifeq (@(TUP_SUDO_SUID),y)
-suid = ; chown root:root tup; chmod u+s tup
-endif
+suid = ''
+if tup.getconfig('TUP_SUDO_SUID') == 'y'
+then
+	suid = '; chown root:root tup; chmod u+s tup'
+end
 
-LDFLAGS += `pkg-config fuse --libs`
-: src/tup/tup/main.o libtup.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
+table.insert(LDFLAGS, '`pkg-config fuse --libs`')
+table.insert(LDFLAGS, '`pkg-config lua5.2 --libs`')
+tup.definerule {
+	inputs = 'src/tup/tup/main.o libtup.a',
+	outputs = 'tup tup-version.o', 
+	print = 'LINK tup',
+	command = 'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. CC .. ' -x c -c - -o tup-version.o ' .. table.concat(CFLAGS, ' ') .. ' -Wno-missing-prototypes; ' .. CC .. ' %f tup-version.o -o tup -lpthread ' .. table.concat(LDFLAGS, ' ') .. ' ' .. suid
+}
 
-ifneq (@(TUP_MINGW),)
-: src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
+if tup.getconfig('TUP_MINGW') ~= ''
+then
+local inputs = table.concat(tup.glob('src/dllinject/*.omingw'), ' ')
+local output = 'tup-dllinject.dll'
+tup.definerule {
+	inputs = inputs,
+	outputs = output,
+	print = ' MINGW32LINK ' .. output,
+	command = tup.getconfig('TUP_MINGW') .. '-gcc -shared ' .. inputs .. ' -lws2_32 -lpsapi -lshlwapi -o ' .. output 
+}
 
-mingwsrcs = src/tup/*.omingw
-mingwsrcs += src/tup/access_event/*.omingw
-mingwsrcs += src/tup/monitor/*.omingw
-mingwsrcs += src/tup/tup/*.omingw
-mingwsrcs += src/tup/flock/*.omingw
-mingwsrcs += src/tup/server/*.omingw
-mingwsrcs += src/inih/*.omingw
-mingwsrcs += src/sqlite3/*.omingw
-mingwsrcs += src/compat/*.omingw
-mingwsrcs += src/compat/win32/*.omingw
-MINGWLDFLAGS += -Wl,--wrap=open
-MINGWLDFLAGS += -Wl,--wrap=close
-MINGWLDFLAGS += -Wl,--wrap=tmpfile
-MINGWLDFLAGS += -Wl,--wrap=stat
-MINGWLDFLAGS += -Wl,--wrap=dup
-MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
-MINGWLDFLAGS += -Wl,--wrap=__mingw_vfprintf
-: $(mingwsrcs) tup-dllinject.dll |> ^ MINGW32LINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
-endif
+mingwsrcs = tup.glob('src/tup/*.omingw')
+table.insert(mingwsrcs, 'src/tup/access_event/*.omingw')
+table.insert(mingwsrcs, 'src/tup/monitor/*.omingw')
+table.insert(mingwsrcs, 'src/tup/tup/*.omingw')
+table.insert(mingwsrcs, 'src/tup/flock/*.omingw')
+table.insert(mingwsrcs, 'src/tup/server/*.omingw')
+table.insert(mingwsrcs, 'src/inih/*.omingw')
+table.insert(mingwsrcs, 'src/sqlite3/*.omingw')
+table.insert(mingwsrcs, 'src/compat/*.omingw')
+table.insert(mingwsrcs, 'src/compat/win32/*.omingw')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=open')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=close')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=tmpfile')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=stat')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=dup')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vprintf')
+table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vfprintf')
+
+local inputs = table.concat(mingwsrcs, ' ') .. ' tup-dllinject.dll'
+tup.definerule {
+	inputs = inputs,
+	outputs = 'tup.exe tup-version.omingw',
+	print = 'MINGW32LINK tup.exe',
+	command = 'version=`git describe`; echo "const char *tup_version(void) {return "$version";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. inputs .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. '-o tup.exe'
+}
+end

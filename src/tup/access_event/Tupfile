@@ -1,4 +1,4 @@
-include_rules
+tup.dorulesfile()
 
-: foreach send_event.c |> !cc |>
-: foreach send_udp.c |> !mingwcc |>
+bang_cc('send_event.c')
+bang_mingwcc('send_udp.c')

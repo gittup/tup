@@ -1,7 +1,36 @@
-include_rules
-ifeq (@(TUP_WWW),y)
-: foreach ../make*.dat |> ^ PLOT %f^ ../../../test/make_v_tup/plot %f > %o |> %B.png
-: foreach ../tup_vs_eye*.dat |> ^ PLOT %f^ ../../../test/make_v_tup/plot %f Eye > %o |> %B.png
-: foreach ../*.dot |> !dot |> %B.png
-: foreach ../*.gen |> ^ CP %o^ cp %f %o |> %B
-endif
+tup.dorulesfile()
+if tup.getconfig('TUP_WWW') == 'y'
+then
+	for file in tup.glob('../make*.dat')
+	do
+		output = string.sub(file, '\\.dat', '') .. '.png'
+		tup.definerule {
+			inputs = file,
+			outputs = output,
+			command = '../../../test/make_v_tup/plot ' .. input .. ' > ' .. output,
+			print = 'PLOT ' .. input
+		}
+	end
+	for file in tup.glob('../tup_vs_eye*.dat')
+	do
+		output = string.sub(file, '\\.dat', '') .. '.png'
+		tup.definerule {
+			inputs = file,
+			outputs = output,
+			command = '../../../test/make_v_tup/plot ' .. input .. ' Eye > ' .. output,
+			print = 'PLOT ' .. input
+		}
+	end
+	for file in tup.glob('../*.dot') do bang_dot(input, string.sub(file, '\\.dot', '') .. '.png') end
+	for file in tup.glob('../*.gen')
+	do
+		output = string.sub(file, '\\.gen', '')
+		tup.definerule {
+			inputs = file,
+			outputs = output,
+			command = 'cp ' .. file .. ' ' .. output,
+			print = 'CP ' .. output
+		}
+	end
+end
+
