@@ -21,8 +21,13 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc -o prog %f |> prog
+for index, file in pairs(tup.glob('*.c'))
+do
+	local output = string.gsub(file, '%.c', '') .. '.o'
+	tup.definerule{inputs = {file}, outputs = {output}, command = 'gcc -c ' .. file .. ' -o ' .. output}
+end
+local inputs = tup.glob('*.o')
+tup.definerule{inputs = inputs, outputs = {'prog'}, command = 'gcc -o prog ' .. table.concat(inputs, ' ')}
 HERE
 tup touch foo.c bar.c Tupfile
 tup parse

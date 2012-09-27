@@ -1,33 +1,38 @@
 tup.dorulesfile()
 if tup.getconfig('TUP_WWW') == 'y'
 then
-	for file in tup.glob('../make*.dat')
+	for index, file in ipairs(tup.glob('../make*.dat'))
 	do
-		output = string.sub(file, '\\.dat', '') .. '.png'
+		print("ANDR Input is " .. file)
+		local output = string.gsub(string.gsub(file, '../', ''), '%.dat', '') .. '.png'
+		print("ANDR Output is " .. output)
 		tup.definerule {
-			inputs = file,
-			outputs = output,
-			command = '../../../test/make_v_tup/plot ' .. input .. ' > ' .. output,
-			print = 'PLOT ' .. input
+			inputs = {file},
+			outputs = {output},
+			command = '../../../test/make_v_tup/plot ' .. file .. ' > ' .. output,
+			print = 'PLOT ' .. file
 		}
 	end
-	for file in tup.glob('../tup_vs_eye*.dat')
+	for index, file in ipairs(tup.glob('../tup_vs_eye*.dat'))
 	do
-		output = string.sub(file, '\\.dat', '') .. '.png'
+		local output = string.gsub(string.gsub(file, '../', ''), '%.dat', '') .. '.png'
 		tup.definerule {
-			inputs = file,
-			outputs = output,
-			command = '../../../test/make_v_tup/plot ' .. input .. ' Eye > ' .. output,
-			print = 'PLOT ' .. input
+			inputs = {file},
+			outputs = {output},
+			command = '../../../test/make_v_tup/plot ' .. file .. ' Eye > ' .. output,
+			print = 'PLOT ' .. file
 		}
 	end
-	for file in tup.glob('../*.dot') do bang_dot(input, string.sub(file, '\\.dot', '') .. '.png') end
-	for file in tup.glob('../*.gen')
+	for index, file in ipairs(tup.glob('../*.dot')) 
+	do 
+		bang_dot(file, string.gsub(string.gsub(file, '../', ''), '\\.dot', '') .. '.png') 
+	end
+	for index, file in ipairs(tup.glob('../*.gen'))
 	do
-		output = string.sub(file, '\\.gen', '')
+		local output = string.gsub(string.gsub(file, '../', ''), '\\.gen', '')
 		tup.definerule {
-			inputs = file,
-			outputs = output,
+			inputs = {file},
+			outputs = {output},
 			command = 'cp ' .. file .. ' ' .. output,
 			print = 'CP ' .. output
 		}

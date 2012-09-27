@@ -20,16 +20,20 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-include Tupfile.vars
-: foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %B.o
-: *.o |> \$(CC) -o %o %f |> prog.exe
+tup.dofile 'Tupfile.vars'
+for index, file in pairs(tup.glob('*.c'))
+do
+	local output = string.gsub(file, '%.c', '') .. '.o'
+	tup.definerule{inputs = {file}, outputs = {output}, command = CC .. ' -c ' .. file .. ' -o ' .. output .. ' ' .. table.concat(CCARGS, ' ')}
+end
+local inputs = tup.glob('*.o')
+tup.definerule{inputs = inputs, outputs = {'prog.exe'}, command = CC .. ' -o prog.exe ' .. table.concat(inputs, ' ')}
 HERE
 
 cat > Tupfile.vars << HERE
-CC = gcc
-CCARGS := -DFOO=1
-CCARGS += -DBAR=1
-CC = \$(CC)
+CC = 'gcc'
+CCARGS = {'-DFOO=1'}
+table.insert(CCARGS, '-DBAR=1')
 HERE
 
 echo "int main(void) {return 0;}" > foo.c
@@ -44,10 +48,9 @@ tup_object_exist . "gcc -o prog.exe bar.o foo.o"
 # Now change the compiler to 'gcc -W' and verify that we re-parse the parent
 # Tupfile to generate new commands and get rid of the old ones.
 cat > Tupfile.vars << HERE
-CC = gcc -W
-CCARGS := -DFOO=1
-CCARGS += -DBAR=1
-CC = \$(CC)
+CC = 'gcc -W'
+CCARGS = {'-DFOO=1'}
+table.insert(CCARGS, '-DBAR=1')
 HERE
 tup touch Tupfile.vars
 update

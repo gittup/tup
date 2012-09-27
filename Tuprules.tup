@@ -88,8 +88,8 @@ table.insert(MINGWCFLAGS, '-DAT_REMOVEDIR=0x200')
 bang_cc = function(input)
 	local output = string.gsub(input, '%.c', '') .. '.o'
 	tup.definerule {
-		inputs = input,
-		outputs = output,
+		inputs = {input},
+		outputs = {output},
 		command = CC .. ' -c ' .. input .. ' -o ' .. output .. 
 			' ' .. table.concat(CFLAGS, ' ') .. 
 			' ' .. table.concat(CFLAGS_SPECIFIC[input], ' '),
@@ -100,7 +100,7 @@ bang_ld = function(inputs, output)
 	local inputs = table.concat(inputs, ' ')
 	tup.definerule {
 		inputs = inputs,
-		outputs = output,
+		outputs = {output},
 		command = CC .. ' ' .. inputs .. ' -o ' .. output ..
 			' ' .. table.concat(LDFLAGS, ' ') ..
 			' ' .. table.concat(LDFLAGS_SPECIFIC[output], ' '),
@@ -108,26 +108,25 @@ bang_ld = function(inputs, output)
 	}
 end
 bang_ar = function(inputs, output)
-	inputs = table.concat(inputs, ' ')
 	tup.definerule {
 		inputs = inputs,
-		outputs = output,
-		command = 'ar crs ' .. output .. ' ' .. inputs,
+		outputs = {output},
+		command = 'ar crs ' .. output .. ' ' .. table.concat(inputs, ' '),
 		print = 'AR ' .. output
 	}
 end
 bang_dot = function(input, output)
 	tup.definerule {
-		inputs = input,
-		outputs = output,
+		inputs = {input},
+		outputs = {output},
 		command = 'dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng ' .. input .. ' > ' .. output,
 		print = 'DOT ' .. input
 	}
 end
 bang_cp = function(input, output)
 	tup.definerule {
-		inputs = input,
-		outputs = output,
+		inputs = {input},
+		outputs = {output},
 		command = 'cp ' .. input .. ' ' .. output,
 		print = 'CP ' .. input .. ' -> ' .. output
 	}
@@ -141,8 +140,8 @@ else
 	bang_mingwcc = function(input)
 		local output = string.gsub(input, '%.c', '') .. '.omingw'
 		tup.definerule {
-			inputs = input,
-			outputs = output,
+			inputs = {input},
+			outputs = {output},
 			command = tup.getconfig('TUP_MINGW') .. '-gcc -c ' .. input .. ' -o ' .. output .. 
 				' ' .. table.concat(CFLAGS, ' ') ..
 				' ' .. table.concat(CFLAGS_SPECIFIC[input], ' ') ..

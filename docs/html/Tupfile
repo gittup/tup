@@ -41,55 +41,73 @@ then
 	table.insert(flags, '-a')
 end
 
-tup.definerule { 
-	outputs = 'menu.inc',
-	print = 'GEN ' .. outputs,
-	command = './gen_menu.sh ' .. table.concat(pages, ' ') .. ' > ' .. outputs
-}
-tup.definerule { 
-	outputs = 'examples.inc',
-	print = 'GEN ' .. outputs,
-	command = './gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs
-}
-tup.definerule { 
-	inputs = 'examples.inc',
-	outputs = 'menu-examples.inc',
-	print = 'GEN ' .. outputs,
-	command = './gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > ' .. outputs
-}
-tup.definerule { 
-	outputs = 'examples.html',
-	print = 'GEN ' .. outputs,
-	command = './gen_examples.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs
-}
-tup.definerule {
-	inputs = '../../tup.1',
-	outputs = 'manual.html',
-	print = 'man2html ' .. outputs,
-	command = 'man2html ' .. inputs .. ' > ' .. outputs
-}
+do
+	local outputs = {'menu.inc'}
+	tup.definerule { 
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
+		command = './gen_menu.sh ' .. table.concat(pages, ' ') .. ' > ' .. outputs[1]
+	}
+end
+do
+	local outputs = {'examples.inc'}
+	tup.definerule { 
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
+		command = './gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > ' .. table.concat(outputs, ' ')
+	}
+end
+do
+	local outputs = {'menu-examples.inc'}
+	tup.definerule { 
+		inputs = {'examples.inc'},
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
+		command = './gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > ' .. outputs[1]
+	}
+end
+do
+	local outputs = {'examples.html'}
+	tup.definerule { 
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
+		command = './gen_examples.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs[1]
+	}
+end
+do
+	local inputs = {'../../tup.1'}
+	local outputs = {'manual.html'}
+	tup.definerule {
+		inputs = inputs,
+		outputs = outputs,
+		print = 'man2html ' .. outputs[1],
+		command = 'man2html ' .. inputs[1] .. ' > ' .. outputs[1]
+	}
+end
 for index, page in ipairs(pages)
 do
 	print('%B is ' .. string.gsub(page, '%..*', ''))
+	local outputs = {page .. '.gen'}
 	tup.definerule {
-		inputs = page .. ' menu.inc menu-examples.inc',
-		outputs = page .. '.gen',
-		print = 'GEN ' .. outputs,
+		inputs = {page, 'menu.inc', 'menu-examples.inc'},
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
 		command = './gen_page.sh ' .. 
 			table.concat(flags, ' ') .. 
 			' ' .. table.concat(flags_specific[string.gsub(page, '%..*', '')], ' ') .. 
-			' ' .. page .. ' > ' .. outputs
+			' ' .. page .. ' > ' .. outputs[1]
 	}
 end
 for index, example in ipairs(examples)
 do
+	local outputs = {example .. '.gen'}
 	tup.definerule {
-		inputs = page .. ' menu-examples.inc',
-		outputs = page .. '.gen',
-		print = 'GEN ' .. outputs,
+		inputs = {example, 'menu-examples.inc'},
+		outputs = outputs,
+		print = 'GEN ' .. outputs[1],
 		command = './gen_page.sh ' .. 
 			table.concat(flags, ' ') ..
-			' -x ' .. page .. ' > ' .. outputs
+			' -x ' .. example .. ' > ' .. outputs[1]
 	}
 end
 
