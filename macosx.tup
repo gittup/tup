@@ -6,3 +6,5 @@ table.insert(CFLAGS, '-DAT_REMOVEDIR=0x200')
 
 -- Implementation of *at() functions
 table.insert(CFLAGS, '-include compat/macosx.h')
+
+TUP_SUID_GROUP = 'wheel'

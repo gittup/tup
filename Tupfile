@@ -4,7 +4,6 @@ client_objs = {}
 table.insert(client_objs, 'src/tup/vardict.o')
 table.insert(client_objs, 'src/tup/access_event/send_event.o')
 table.insert(client_objs, 'src/tup/flock/fcntl.o')
-
 bang_ar(client_objs, 'libtup_client.a')
 bang_cp('src/tup/vardict.h', 'tup_client.h')
 
@@ -26,7 +25,7 @@ bang_ar(srcs, 'libtup.a')
 suid = ''
 if tup.getconfig('TUP_SUDO_SUID') == 'y'
 then
-	suid = '; chown root:root tup; chmod u+s tup'
+	suid = '; chown root:' .. TUP_SUID_GROUP .. ' tup; chmod u+s tup'
 end
 
 table.insert(LDFLAGS, '`pkg-config fuse --libs`')
@@ -81,3 +80,4 @@ do
 	}
 end
 end
+

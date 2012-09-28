@@ -37,7 +37,7 @@ else
 	table.insert(CFLAGS, '-Os')
 end
 
-table.insert(CFLAGS, '-Wall')
+table.insert(CFLAGS, '-W')
 table.insert(CFLAGS, '-Wall')
 if tup.getconfig('TUP_WERROR') == 'y'
 then
@@ -152,4 +152,6 @@ else
 end
 
 TUP_MONITOR = 'null'
+TUP_SUID_GROUP = 'root'
 tup.dofile(tup.getconfig('TUP_PLATFORM') .. '.tup')
+
