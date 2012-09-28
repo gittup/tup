@@ -36,8 +36,8 @@ do
 	tup.definerule {
 		inputs = inputs,
 		outputs = outputs, 
-		print = 'LINK tup',
-		command = 'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. CC .. ' -x c -c - -o tup-version.o ' .. table.concat(CFLAGS, ' ') .. ' -Wno-missing-prototypes; ' .. CC .. ' ' .. table.concat(inputs, ' ') .. ' tup-version.o -o tup -lpthread ' .. table.concat(LDFLAGS, ' ') .. ' ' .. suid
+		command = '^ LINK tup^' .. 
+			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. CC .. ' -x c -c - -o tup-version.o ' .. table.concat(CFLAGS, ' ') .. ' -Wno-missing-prototypes; ' .. CC .. ' ' .. table.concat(inputs, ' ') .. ' tup-version.o -o tup -lpthread ' .. table.concat(LDFLAGS, ' ') .. ' ' .. suid
 	}
 end
 
@@ -48,8 +48,8 @@ local output = 'tup-dllinject.dll'
 tup.definerule {
 	inputs = inputs,
 	outputs = {output},
-	print = 'MINGW32LINK ' .. output,
-	command = tup.getconfig('TUP_MINGW') .. '-gcc -shared ' .. table.concat(inputs, ' ') .. ' -lws2_32 -lpsapi -lshlwapi -o ' .. output 
+	command = '^ MINGW32LINK ' .. output .. '^' ..
+		tup.getconfig('TUP_MINGW') .. '-gcc -shared ' .. table.concat(inputs, ' ') .. ' -lws2_32 -lpsapi -lshlwapi -o ' .. output 
 }
 
 mingwsrcs = tup.glob('src/tup/*.omingw')
@@ -75,8 +75,8 @@ do
 	tup.definerule {
 		inputs = inputs,
 		outputs = 'tup.exe tup-version.omingw',
-		print = 'MINGW32LINK tup.exe',
-		command = 'version=`git describe`; echo "const char *tup_version(void) {return "$version";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. '-o tup.exe'
+		command = '^ MINGW32LINK tup.exe^' ..
+			'version=`git describe`; echo "const char *tup_version(void) {return "$version";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. '-o tup.exe'
 	}
 end
 end

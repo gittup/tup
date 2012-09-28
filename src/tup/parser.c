@@ -171,7 +171,7 @@ static char *tuplua_strdup(struct lua_State *ls, int strindex)
 	return strndup(lua_tolstring(ls, strindex, NULL), size);
 }
 
-static const char *tuplua_reader(struct lua_State *L, void *data, size_t *size)
+static const char *tuplua_reader(struct lua_State *ls, void *data, size_t *size)
 {
 	struct tuplua_reader_data *lrd = data;
 	if(lrd->read)

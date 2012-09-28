@@ -3,14 +3,12 @@ if tup.getconfig('TUP_WWW') == 'y'
 then
 	for index, file in ipairs(tup.glob('../make*.dat'))
 	do
-		print("ANDR Input is " .. file)
 		local output = string.gsub(string.gsub(file, '../', ''), '%.dat', '') .. '.png'
-		print("ANDR Output is " .. output)
 		tup.definerule {
 			inputs = {file},
 			outputs = {output},
-			command = '../../../test/make_v_tup/plot ' .. file .. ' > ' .. output,
-			print = 'PLOT ' .. file
+			command = '^ PLOT ' .. file .. '^' ..
+				'../../../test/make_v_tup/plot ' .. file .. ' > ' .. output,
 		}
 	end
 	for index, file in ipairs(tup.glob('../tup_vs_eye*.dat'))
@@ -19,8 +17,8 @@ then
 		tup.definerule {
 			inputs = {file},
 			outputs = {output},
-			command = '../../../test/make_v_tup/plot ' .. file .. ' Eye > ' .. output,
-			print = 'PLOT ' .. file
+			command = '^ PLOT ' .. file .. '^' ..
+				'../../../test/make_v_tup/plot ' .. file .. ' Eye > ' .. output,
 		}
 	end
 	for index, file in ipairs(tup.glob('../*.dot')) 
@@ -33,8 +31,8 @@ then
 		tup.definerule {
 			inputs = {file},
 			outputs = {output},
-			command = 'cp ' .. file .. ' ' .. output,
-			print = 'CP ' .. output
+			command = '^ CP ' .. output .. '^' ..
+				'cp ' .. file .. ' ' .. output,
 		}
 	end
 end
