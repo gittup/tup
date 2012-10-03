@@ -51,4 +51,4 @@ table.insert(mingwsrcs, 'mkdirat.c')
 table.insert(mingwsrcs, 'openat.c')
 table.insert(mingwsrcs, 'renameat.c')
 table.insert(mingwsrcs, 'unlinkat.c')
-for index, file in ipairs(srcs) do bang_mingwcc(file) end
+for index, file in ipairs(mingwsrcs) do bang_mingwcc(file) end

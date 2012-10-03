@@ -167,8 +167,13 @@ static int debug_run = 0;
 static char *tuplua_strdup(struct lua_State *ls, int strindex)
 {
 	size_t size;
-	lua_tolstring(ls, strindex, &size);
-	return strndup(lua_tolstring(ls, strindex, NULL), size);
+	const char *source;
+	char *out;
+	source = lua_tolstring(ls, strindex, &size);
+	out = (char *)malloc(size + 1);
+	strncpy(out, source, size);
+	out[size] = 0;
+	return out;
 }
 
 static const char *tuplua_reader(struct lua_State *ls, void *data, size_t *size)
@@ -292,7 +297,8 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "Parameter \"command\" must be a string containing command specification.");
 	}
 	r.command = lua_tolstring(ls, -1, &command_len);
-	if(command_len > (size_t)1 << (sizeof(r.command_len) * 8))
+	if((sizeof(r.command_len) < sizeof(command_len)) &&
+		(command_len > ((intmax_t)1 << (sizeof(r.command_len) * 8)) - 1))
 	{
 		delete_name_list(&r.inputs);
 		delete_name_list(&output_name_list);

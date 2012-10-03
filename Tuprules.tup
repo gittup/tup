@@ -69,8 +69,8 @@ table.insert(CFLAGS, '`pkg-config fuse --cflags`')
 table.insert(CFLAGS, '`pkg-config lua5.2 --cflags`')
 
 -- Compatibility function prototypes and include path for wrapper functions
-table.insert(MINGWCFLAGS, '-include $(TUP_CWD)/src/compat/win32/mingw.h')
-table.insert(MINGWCFLAGS, '-I$(TUP_CWD)/src/compat/win32')
+table.insert(MINGWCFLAGS, '-include ' .. tup.getcwd() .. '/src/compat/win32/mingw.h')
+table.insert(MINGWCFLAGS, '-I' .. tup.getcwd() .. '/src/compat/win32')
 
 -- _GNU_SOURCE lets us use the %lli flag correctly
 table.insert(MINGWCFLAGS, '-D_GNU_SOURCE')

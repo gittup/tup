@@ -18,6 +18,13 @@ then
 else
 	srcs = table_concat(srcs, tup.glob('src/sqlite3/*.o'))
 end
+if tup.getconfig('TUP_USE_SYSTEM_LUA') == 'y'
+then
+	table.insert(LDFLAGS, '`pkg-config lua5.2 --libs`')
+else
+	srcs = table_concat(srcs, tup.glob('src/lua-5.2.0/src/*.o'))
+	table.insert(LDFLAGS, '-lm')
+end
 srcs = table_concat(srcs, tup.glob('src/inih/*.o'))
 srcs = table_concat(srcs, tup.glob('src/compat/*.o'))
 bang_ar(srcs, 'libtup.a')
@@ -29,7 +36,6 @@ then
 end
 
 table.insert(LDFLAGS, '`pkg-config fuse --libs`')
-table.insert(LDFLAGS, '`pkg-config lua5.2 --libs`')
 do
 	local inputs = {'src/tup/tup/main.o', 'libtup.a'}
 	local outputs = {'tup', 'tup-version.o'}
@@ -60,8 +66,10 @@ mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/flock/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/server/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/inih/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/sqlite3/*.omingw'))
+mingwsrcs = table_concat(mingwsrcs, tup.glob('src/lua-5.2.0/src/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/compat/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/compat/win32/*.omingw'))
+table.insert(MINGWLDFLAGS, '-lm')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=open')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=close')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=tmpfile')
@@ -74,9 +82,9 @@ do
 	local inputs = table_concat(mingwsrcs, {'tup-dllinject.dll'})
 	tup.definerule {
 		inputs = inputs,
-		outputs = 'tup.exe tup-version.omingw',
-		command = '^ MINGW32LINK tup.exe^' ..
-			'version=`git describe`; echo "const char *tup_version(void) {return "$version";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. '-o tup.exe'
+		outputs = {'tup.exe', 'tup-version.omingw'},
+		command = --'^ MINGW32LINK tup.exe^' ..
+			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. ' -o tup.exe'
 	}
 end
 end
