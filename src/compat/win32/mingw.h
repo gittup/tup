@@ -18,8 +18,11 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#define __USE_MINGW_ANSI_STDIO 1
 #include <stddef.h> /* get size_t */
-#include <fcntl.h> /* get mode_t */
+#include <fcntl.h> /* get mode_t (mingw with gcc 4.5) */
+#include <sys/types.h> /* get mode_t (mingw with gcc 4.6) */
+#include <sys/stat.h> /* struct stat redirection */
 #define AT_SYMLINK_NOFOLLOW 0x100
 
 struct stat;

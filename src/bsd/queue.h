@@ -135,6 +135,10 @@ struct qm_trace {
 #define TRASHIT(x)
 #endif  /* QUEUE_MACRO_DEBUG */
 
+/* Disabled for tup since we don't use it and it conflicts with definitions in
+ * winnt.h for Windows
+ */
+#if 0
 /*
  * Singly-linked List declarations.
  */
@@ -217,6 +221,7 @@ struct {                                                                \
         SLIST_FIRST(head1) = SLIST_FIRST(head2);                        \
         SLIST_FIRST(head2) = swap_first;                                \
 } while (0)
+#endif
 
 /*
  * Singly-linked Tail queue declarations.

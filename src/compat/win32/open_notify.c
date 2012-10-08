@@ -31,11 +31,6 @@ struct finfo_list {
 };
 LIST_HEAD(,finfo_list) finfo_list_head;
 
-/* The stat() wrapper will call open_notify(), which uses stat(), so we have
- * to call the real version to avoid an infinite recursion.
- */
-int __real_stat(const char *path, struct stat *buf);
-
 int open_notify_push(struct file_info *finfo)
 {
 	struct finfo_list *flist;
@@ -98,7 +93,7 @@ int open_notify(enum access_type at, const char *pathname)
 		 * want failed stats for ghost nodes, and all successful
 		 * file accesses.
 		 */
-		if(__real_stat(pathname, &buf) < 0 || !S_ISDIR(buf.st_mode)) {
+		if(stat(pathname, &buf) < 0 || !S_ISDIR(buf.st_mode)) {
 			flist = LIST_FIRST(&finfo_list_head);
 			if(handle_open_file(at, fullpath, flist->finfo) < 0)
 				return -1;

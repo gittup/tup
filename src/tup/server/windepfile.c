@@ -28,6 +28,7 @@
 #include "compat/win32/open_notify.h"
 #include "compat/dir_mutex.h"
 #include <stdio.h>
+#include <fcntl.h>
 #include <errno.h>
 
 #define TUP_TMP ".tup/tmp"

@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <windows.h>
+#include <fcntl.h>
 #include "dirpath.h"
 #include "open_notify.h"
 
