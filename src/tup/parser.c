@@ -1125,7 +1125,6 @@ static int input_nl_add_path(struct tupfile *tf, struct path_list *pl, struct na
 	args.nl = nl;
 	
 	struct tup_entry *tent;
-	struct tup_entry *srctent = NULL;
 	struct variant *variant;
 
 	if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
@@ -1136,9 +1135,18 @@ static int input_nl_add_path(struct tupfile *tf, struct path_list *pl, struct na
 			tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!tent) {
 				fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
+
+
+
+
+
+
+
 				return -1;
 			}
 		} else {
+			struct tup_entry *srctent = NULL;
+
 			if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
 				return -1;
 			if(srctent)
@@ -1163,10 +1171,32 @@ static int input_nl_add_path(struct tupfile *tf, struct path_list *pl, struct na
 		return -1;
 	}
 	if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
-		/* If the file is in the modify list, it is going to be
+		struct tup_entry *srctent = NULL;
+		int valid_input = 0;
+
+		/* If the file now exists in the srctree (ie: we
+		* deleted the rule to create a generated file and
+		* created a regular file in the srctree), then we are
+		* good (t8072).
+		*/
+		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+		      return -1;
+		if(srctent) {
+		      struct tup_entry *tmp;
+		      if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tmp) < 0)
+				return -1;
+			if(tmp && tmp->type != TUP_NODE_GHOST) {
+				valid_input = 1;
+			}
+		}
+
+		/* If the file is in the modify list, it is going to be 
 		 * resurrected, so it is still a valid input (t6053).
 		 */
-		if(!tup_db_in_modify_list(tent->tnode.tupid)) {
+		if(tup_db_in_modify_list(tent->tnode.tupid))
+			valid_input = 1;
+
+		if(!valid_input) {
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' in subdir '", pl->pel->len, pl->pel->path);
 			print_tupid(tf->f, pl->dt);
 			fprintf(tf->f, "' is scheduled to be deleted (possibly the command that created it has been removed).\n");

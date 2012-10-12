@@ -29,6 +29,9 @@
 
 #include <windows.h>
 #include <ntdef.h>
+#ifndef STATUS_SUCCESS
+#include <ntstatus.h>
+#endif
 #include <psapi.h>
 #include <stdio.h>
 #include <string.h>
@@ -395,7 +398,9 @@ static fopen_t				fopen_orig;
 static rename_t				rename_orig;
 static remove_t				remove_orig;
 
-#define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_PROPERTIES | FILE_WRITE_ATTRIBUTES)
+#define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES)
+/* Including ddk/wdm.h causes other issues, and this is all we need... */
+#define FILE_OPEN_FOR_BACKUP_INTENT 0x00004000
 
 #define handle_file(a, b, c) mhandle_file(a, b, c, __LINE__)
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);

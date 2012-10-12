@@ -20,7 +20,7 @@
 . ./tup.sh
 check_no_windows symlink
 
-ln -s ./t5055-sym-outside-tup.sh foo
+ln -s ../t5055-sym-outside-tup.sh foo
 tup touch foo
 update
 

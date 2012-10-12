@@ -73,7 +73,6 @@ table.insert(MINGWLDFLAGS, '-lm')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=open')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=close')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=tmpfile')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=stat')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=dup')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vprintf')
 table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vfprintf')
@@ -88,4 +87,8 @@ do
 	}
 end
 end
+
+
+
+
 
