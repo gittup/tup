@@ -3014,6 +3014,29 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				return NULL;
 			}
 			clen += onl->extlessbasetotlen;
+		} else if(*next == 'd') {
+			if(tf->tupid == DOT_DT) {
+				/* At the top of the tup-hierarchy, we get the
+				 * directory from where .tup is stored, since
+				 * the top-level tup entry is just "."
+				 */
+				char *last_slash;
+				const char *dirstring;
+
+				last_slash = strrchr(get_tup_top(), PATH_SEP);
+				if(last_slash) {
+					/* Point to the directory after the last slash */
+					dirstring = last_slash + 1;
+				} else {
+					dirstring = get_tup_top();
+				}
+				clen += strlen(dirstring);
+			} else {
+				/* Anywhere else in the hierarchy can just use
+				 * the last tup entry as the %d replacement.
+				 */
+				clen += tf->curtent->name.len;
+			}
 		} else if(*next == '%') {
 			clen++;
 		} else {
@@ -3090,6 +3113,28 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 		} else if(*next == '%') {
 			s[x] = '%';
 			x++;
+		} else if(*next == 'd') {
+			if(tf->tupid == DOT_DT) {
+				char *last_slash;
+				const char *dirstring;
+				int len;
+
+				last_slash = strrchr(get_tup_top(), PATH_SEP);
+				if(last_slash) {
+					dirstring = last_slash + 1;
+				} else {
+					dirstring = get_tup_top();
+				}
+				len = strlen(dirstring);
+				memcpy(&s[x], dirstring, len);
+				x += len;
+			} else {
+				/* Anywhere else in the hierarchy can just use
+				 * the last tup entry as the %d replacement.
+				 */
+				memcpy(&s[x], tf->curtent->name.s, tf->curtent->name.len);
+				x += tf->curtent->name.len;
+			}
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
 			return NULL;

@@ -362,6 +362,15 @@ The name of the output file without the extension. This only works in the extra-
 : foo1.o foo2.o |> !ldmap |> foo.so
 
 .fi
+.TP
+.B %d
+The name of the lowest level of the directory. For example, in foo/bar/Tupfile, this would be the string "bar". One case where this can be useful is in naming libraries based on the directory they are in, such as with the following !-macro:
+.nf
+
+!ar = |> ar crs %o %f |> lib%d.a
+
+.fi
+Using this macro in foo/bar/Tupfile would then create foo/bar/libbar.a
 .RE
 .RE
 .TP
