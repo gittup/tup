@@ -40,4 +40,7 @@ update
 tup_dep_exist a foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
 sym_check ok.o y
 
+# Make sure we don't have a dependency on the directory anymore.
+tup_dep_no_exist . a . 'gcc -c ok.c -o ok.o -Ia -Ib'
+
 eotup

@@ -407,9 +407,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	} else {
 		rc = 0;
 	}
-	if(!S_ISDIR(stbuf->st_mode)) {
-		tup_fuse_handle_file(path, stripped, ACCESS_READ);
-	}
+	tup_fuse_handle_file(path, stripped, ACCESS_READ);
 
 	return rc;
 }
