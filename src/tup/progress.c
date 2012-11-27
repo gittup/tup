@@ -90,7 +90,11 @@ void tup_show_message(const char *s)
 void clear_active(FILE *f)
 {
 	if(is_active) {
-		int console_width = tup_option_get_int("display.width");
+		/* Subtract 1 so we don't scroll to the next line if we print
+		 * exactly the correct amount of characters for a row. At least
+		 * Windows does this.
+		 */
+		int console_width = tup_option_get_int("display.width") - 1;
 		char spaces[console_width];
 		memset(spaces, ' ', console_width);
 		printf("\r%.*s\r", console_width, spaces);
