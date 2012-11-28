@@ -47,7 +47,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 14
-#define PARSER_VERSION 5
+#define PARSER_VERSION 6
 
 enum {
 	DB_BEGIN,
@@ -1344,14 +1344,25 @@ out_reset:
 
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
-				int len, struct tupid_entries *delete_root)
+				int len, struct tupid_entries *delete_root,
+				int include_directories)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR_GLOB];
-	static char s[] = "select id, name, type, mtime, srcid from node where dir=? and (type=? or type=?) and name glob ?" SQL_NAME_COLLATION;
+	static char s[] = "select id, name, type, mtime, srcid from node where dir=? and (type=? or type=? or type=?) and name glob ?" SQL_NAME_COLLATION;
+	int extra_type;
 
-	transaction_check("%s [37m[%lli, %i, %i, '%s'][0m", s, dt, TUP_NODE_FILE, TUP_NODE_GENERATED, glob);
+	if(include_directories) {
+		extra_type = TUP_NODE_DIR;
+	} else {
+		/* We already specify TUP_NODE_GENERATED, but it doesn't really
+		 * hurt to specify it again in the 'or type=?' part.
+		 */
+		extra_type = TUP_NODE_GENERATED;
+	}
+
+	transaction_check("%s [37m[%lli, %i, %i, %i, '%s'][0m", s, dt, TUP_NODE_FILE, TUP_NODE_GENERATED, extra_type, glob);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -1375,7 +1386,12 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	if(sqlite3_bind_text(*stmt, 4, glob, len, SQLITE_STATIC) != 0) {
+	if(sqlite3_bind_int(*stmt, 4, extra_type) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_text(*stmt, 5, glob, len, SQLITE_STATIC) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;

@@ -738,7 +738,7 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 		return -1;
 	}
 	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dt,
-				       "*", -1, &tf->g->gen_delete_root) < 0)
+				       "*", -1, &tf->g->gen_delete_root, 1) < 0)
 		return -EIO;
 	st = string_tree_search(&tf->ps->directories, path, strlen(path));
 	if(st)
@@ -2517,12 +2517,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
 			return -1;
 		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
 			return -1;
 		if(srctent) {
-			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root) < 0)
+			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
 				return -1;
 		}
 	}
