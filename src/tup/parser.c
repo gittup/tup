@@ -164,6 +164,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int include_rules(struct tupfile *tf);
+static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
 static int export(struct tupfile *tf, char *cmdline);
@@ -181,6 +182,7 @@ static void free_bang_rule(struct string_entries *root, struct bang_rule *br);
 static void free_bang_tree(struct string_entries *root);
 static void free_chain_tree(struct string_entries *root);
 static void free_banglist(struct bang_list_head *head);
+static void free_dir_lists(struct string_entries *root);
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
 			       char **o_bin, int *swapio);
@@ -202,10 +204,10 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl);
 static void make_path_list_unique(struct path_list_head *plist);
+static void free_path_list(struct path_list_head *plist);
 static void del_pl(struct path_list *pl, struct path_list_head *head);
 static void make_name_list_unique(struct name_list *nl);
-static int parse_dependent_tupfiles(struct path_list_head *plist,
-				    struct tupfile *tf, struct graph *g);
+static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			 struct name_list *nl, int required);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
@@ -268,16 +270,13 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
-	memset(ps.path, 0, sizeof(ps.path));
-	if(snprint_tup_entry(ps.path, sizeof(ps.path), n->tent) >= (signed)sizeof(ps.path)) {
-		fprintf(stderr, "tup internal error: ps.path is sized incorrectly in parse()\n");
-		return -1;
-	}
+
 	RB_INIT(&tf.cmd_root);
 	RB_INIT(&tf.env_root);
 	RB_INIT(&tf.bang_root);
 	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
+	RB_INIT(&ps.directories);
 	if(server_parser_start(&ps) < 0)
 		return -1;
 
@@ -368,6 +367,10 @@ out_server_stop:
 		if(tup_db_write_dir_inputs(tf.tupid, &tf.input_root) < 0)
 			rc = -1;
 	}
+
+	pthread_mutex_lock(&ps.lock);
+	free_dir_lists(&ps.directories);
+	pthread_mutex_unlock(&ps.lock);
 
 	free_chain_tree(&tf.chain_root);
 	free_tupid_tree(&tf.env_root);
@@ -516,6 +519,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			}
 		} else if(strcmp(line, "include_rules") == 0) {
 			rc = include_rules(tf);
+		} else if(strncmp(line, "preload ", 8) == 0) {
+			rc = preload(tf, line+8);
 		} else if(strncmp(line, "run ", 4) == 0) {
 			rc = run_script(tf, line+4, lno, &bl);
 		} else if(strncmp(line, "export ", 7) == 0) {
@@ -685,28 +690,105 @@ static int readdir_parser_cb(void *arg, struct tup_entry *tent)
 	return 0;
 }
 
-static int gen_dir_list(struct tupfile *tf)
-{
-	struct parser_server *ps = tf->ps;
-	struct readdir_parser_params rpp = {
-		&ps->file_list,
-	};
-	LIST_INIT(&tf->ps->file_list);
-	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, tf->tupid,
-				       "*", -1, &tf->g->gen_delete_root) < 0)
-		return -EIO;
-	return 0;
-}
-
-static void free_dir_list(struct parser_server *ps)
+static void free_dir_list(struct string_entries *root, struct parser_directory *pd)
 {
 	struct parser_entry *pe;
-	while(!LIST_EMPTY(&ps->file_list)) {
-		pe = LIST_FIRST(&ps->file_list);
+	while(!LIST_EMPTY(&pd->file_list)) {
+		pe = LIST_FIRST(&pd->file_list);
 		LIST_REMOVE(pe, list);
 		free(pe->name);
 		free(pe);
 	}
+	string_tree_free(root, &pd->st);
+	free(pd);
+}
+
+static void free_dir_lists(struct string_entries *root)
+{
+	struct string_tree *st;
+
+	while((st = RB_ROOT(root)) != NULL) {
+		struct parser_directory *pd = container_of(st, struct parser_directory, st);
+
+		free_dir_list(root, pd);
+	}
+}
+
+static int gen_dir_list(struct tupfile *tf, tupid_t dt)
+{
+	char path[PATH_MAX];
+	struct tup_entry *tent;
+	struct parser_directory *pd;
+	struct readdir_parser_params rpp;
+	struct string_tree *st;
+
+	if(tup_entry_add(dt, &tent) < 0)
+		return -1;
+	pd = malloc(sizeof *pd);
+	if(!pd) {
+		perror("malloc");
+		return -1;
+	}
+	LIST_INIT(&pd->file_list);
+
+	rpp.head = &pd->file_list;
+
+	if(snprint_tup_entry(path, sizeof(path), tent) >= (signed)sizeof(path)) {
+		fprintf(tf->f, "tup internal error: ps.path is sized incorrectly in gen_dir_list()\n");
+		return -1;
+	}
+	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dt,
+				       "*", -1, &tf->g->gen_delete_root) < 0)
+		return -EIO;
+	st = string_tree_search(&tf->ps->directories, path, strlen(path));
+	if(st)
+		free_dir_list(&tf->ps->directories, container_of(st, struct parser_directory, st));
+
+	if(string_tree_add(&tf->ps->directories, &pd->st, path) < 0) {
+		fprintf(tf->f, "tup internal error: Unable to add '%s' to the directories string tree\n", path);
+		return -1;
+	}
+	return 0;
+}
+
+static int preload(struct tupfile *tf, char *cmdline)
+{
+	struct path_list_head plist;
+	struct path_list *pl;
+
+	TAILQ_INIT(&plist);
+	if(get_path_list(tf, cmdline, &plist, tf->tupid, NULL) < 0)
+		return -1;
+
+	/* get_path_list() leaves us with the last path uncompleted (since it
+	 * usually just handles filenames), so we resolve the last path here
+	 * and store that in dt.  We don't need the pel for
+	 * parse_dependent_tupfiles().
+	 */
+	TAILQ_FOREACH(pl, &plist, list) {
+		struct tup_entry *tent;
+		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0)
+			return -1;
+		if(!tent) {
+			fprintf(tf->f, "tup error: Unable to find node '%.*s' for preloading in directory %lli\n", pl->pel->len, pl->pel->path, pl->dt);
+			tup_db_print(tf->f, pl->dt);
+			return -1;
+		}
+		if(tent->type != TUP_NODE_DIR) {
+			fprintf(tf->f, "tup error: preload needs to specify a pathname, but node '%.*s' has type '%s'\n", pl->pel->len, pl->pel->path, tup_db_type(tent->type));
+			return -1;
+		}
+		pl->dt = tent->tnode.tupid;
+	}
+	if(parse_dependent_tupfiles(&plist, tf) < 0)
+		return -1;
+
+	TAILQ_FOREACH(pl, &plist, list) {
+		if(gen_dir_list(tf, pl->dt) < 0)
+			return -1;
+	}
+	free_path_list(&plist);
+	return 0;
 }
 
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
@@ -725,7 +807,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	}
 
 	pthread_mutex_lock(&tf->ps->lock);
-	rc = gen_dir_list(tf);
+	rc = gen_dir_list(tf, tf->tupid);
 	pthread_mutex_unlock(&tf->ps->lock);
 	if(rc < 0)
 		return -1;
@@ -769,10 +851,6 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	}
 
 	free(rules);
-	pthread_mutex_lock(&tf->ps->lock);
-	free_dir_list(tf->ps);
-	pthread_mutex_unlock(&tf->ps->lock);
-
 	return 0;
 
 out_err:
@@ -2090,18 +2168,15 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       int required)
 {
 	struct path_list_head plist;
-	struct path_list *pl, *tmp;
 
 	TAILQ_INIT(&plist);
 	if(get_path_list(tf, p, &plist, tf->tupid, bl) < 0)
 		return -1;
-	if(parse_dependent_tupfiles(&plist, tf, tf->g) < 0)
+	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
 	if(get_name_list(tf, &plist, nl, required) < 0)
 		return -1;
-	TAILQ_FOREACH_SAFE(pl, &plist, list, tmp) {
-		del_pl(pl, &plist);
-	}
+	free_path_list(&plist);
 	return 0;
 }
 
@@ -2217,6 +2292,15 @@ static void make_path_list_unique(struct path_list_head *plist)
 	}
 }
 
+static void free_path_list(struct path_list_head *plist)
+{
+	struct path_list *pl, *tmp;
+
+	TAILQ_FOREACH_SAFE(pl, plist, list, tmp) {
+		del_pl(pl, plist);
+	}
+}
+
 static void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
@@ -2253,8 +2337,7 @@ static void make_name_list_unique(struct name_list *nl)
 	tup_entry_release_list();
 }
 
-static int parse_dependent_tupfiles(struct path_list_head *plist,
-				    struct tupfile *tf, struct graph *g)
+static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 {
 	struct path_list *pl;
 
@@ -2265,12 +2348,12 @@ static int parse_dependent_tupfiles(struct path_list_head *plist,
 		if(!pl->bin && pl->dt != tf->tupid) {
 			struct node *n;
 
-			n = find_node(g, pl->dt);
+			n = find_node(tf->g, pl->dt);
 			if(n != NULL && !n->already_used) {
 				int rc;
 				struct timespan ts;
 				n->already_used = 1;
-				rc = parse(n, g, &ts);
+				rc = parse(n, tf->g, &ts);
 				if(rc < 0) {
 					if(rc == CIRCULAR_DEPENDENCY_ERROR) {
 						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");

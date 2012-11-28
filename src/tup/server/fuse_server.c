@@ -32,6 +32,7 @@
 #include "tup/progress.h"
 #include "tup/option.h"
 #include "tup/variant.h"
+#include "tup/container.h"
 #include "tup_fuse_fs.h"
 #include "master_fork.h"
 #include <stdio.h>
@@ -608,6 +609,8 @@ int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 				    fuse_fill_dir_t filler)
 {
 	struct parser_entry *pe;
+	struct parser_directory *pd;
+	struct string_tree *st;
 	int rc = -1;
 
 	pthread_mutex_lock(&curps_lock);
@@ -616,11 +619,15 @@ int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 		goto out_err;
 	}
 	pthread_mutex_lock(&curps->lock);
-	if(strcmp(path, curps->path) != 0) {
-		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory.\n", path);
+	st = string_tree_search(&curps->directories, path, strlen(path));
+	if(!st) {
+		/* path+1 to skip leading '/' */
+		fprintf(stderr, "tup error: Unable to readdir() on directory '%s'. Run-scripts are currently limited to readdir() only the current directory, and any preloaded directories. Try using the 'preload' keyword in the Tupfile to load the directory before running the run script.\n", path+1);
 		goto out_unps;
 	}
-	LIST_FOREACH(pe, &curps->file_list, list) {
+	pd = container_of(st, struct parser_directory, st);
+
+	LIST_FOREACH(pe, &pd->file_list, list) {
 		if(filler(buf, pe->name, NULL, 0))
 			goto out_unps;
 	}

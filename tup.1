@@ -481,6 +481,17 @@ Tup will then treat this as if a Tupfile was written with 5 lines like so:
 Since the Tupfile-parsing stage is watched for dependencies, any files that this script accesses within the tup hierarchy will cause the Tupfile to be re-parsed. There are some limitations, however. First, the readdir() call is instrumented to return the list of files that would be accessible at that time that the run-script starts executing. This means the files that you see in 'ls' on the command-line may be different from the files that your script sees when it is parsed. Tup essentially pretends that the generated files don't exist until it parses a :-rule that lists it as an output. Note that any :-rules executed by the run-script itself are not parsed until the script executes successfully. Second, due to some structural limitations in tup, the script cannot readdir() on any directory other than the directory of the Tupfile. In other words, a script can do 'for i in *.c', but not 'for i in sub/*.c'. The '--debug-run' flag can be passed to 'tup upd' in order to show the list of :-rules that tup receives from the script. Due to the readdir() instrumentation, this may be different than the script's output when it is run manually from the command-line.
 
 .TP
+.B preload directory
+By default, a run-script can only use a readdir() (ie: use a wild-card) on the current directory. To specify a list of other allowable wild-card directories, use the preload keyword. For example, if a run script needs to look at *.c and src/*.c, the src directory needs to be preloaded:
+
+.nf
+
+preload src
+run ./build.sh *.c src/*.c
+
+.fi
+
+.TP
 .B export VARIABLE
 The export directive adds the environment variable VARIABLE to the export list for future :-rules and run-scripts. The value for the variable comes from tup's environment, not from the Tupfile itself. Generally this means you will need to set the variable in your shell if you want to change the value used by commands and scripts. By default only PATH is exported. Windows additionally exports several variables suitable for building with the Visual Studio compiler suite. Tup will check the exported environment variables to see if they have changed values between updates, and re-execute any commands that that use those environment variables. Note that this means if PATH is changed, all commands will run again. For example:
 .nf

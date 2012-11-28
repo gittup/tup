@@ -23,6 +23,7 @@
 
 #include "file.h"
 #include "bsd/queue.h"
+#include "string_tree.h"
 #include <pthread.h>
 
 struct tupid_entries;
@@ -42,17 +43,23 @@ struct server {
 };
 
 struct parser_entry {
+	/* parser_directory gets one of these for each file in a directory */
 	char *name;
 	LIST_ENTRY(parser_entry) list;
 };
 LIST_HEAD(parser_entry_head, parser_entry);
 
+struct parser_directory {
+	/* parser_server gets one of these for each directory that is preloaded with files. */
+	struct string_tree st;
+	struct parser_entry_head file_list;
+};
+
 struct parser_server {
 	struct server s;
 	int root_fd;
 	struct parser_server *oldps;
-	char path[PATH_MAX];
-	struct parser_entry_head file_list;
+	struct string_entries directories;
 	pthread_mutex_t lock;
 };
 
