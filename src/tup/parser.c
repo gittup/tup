@@ -757,7 +757,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	struct path_list *pl;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, cmdline, &plist, tf->tupid, NULL) < 0)
+	if(get_path_list(tf, cmdline, &plist, tf->curtent->tnode.tupid, NULL) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
