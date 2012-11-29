@@ -71,7 +71,7 @@ static char * handle_color( HANDLE output, char *p )
 		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
 		break;
 	case 41:
-		color = ( color & ~bmask ) | BACKGROUND_RED;
+		color = ( color & ~bmask ) | BACKGROUND_RED | BACKGROUND_INTENSITY;
 		break;
 	default:;
 	}
