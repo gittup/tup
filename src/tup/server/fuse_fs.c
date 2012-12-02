@@ -805,15 +805,16 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 		if(!tmpdir) {
 			perror("malloc");
 			rc = -ENOMEM;
-		}
-		tmpdir->dirname = strdup(peel(path));
-		if(!tmpdir->dirname) {
-			perror("strdup");
-			rc = -ENOMEM;
-		}
-		if(tmpdir && tmpdir->dirname) {
-			LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
-			rc = 0;
+		} else {
+			tmpdir->dirname = strdup(peel(path));
+			if(!tmpdir->dirname) {
+				perror("strdup");
+				rc = -ENOMEM;
+			}
+			if(tmpdir && tmpdir->dirname) {
+				LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
+				rc = 0;
+			}
 		}
 		put_finfo(finfo);
 		return rc;
@@ -1041,7 +1042,6 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	if(context_check() < 0)
 		return -EPERM;
 
-	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
