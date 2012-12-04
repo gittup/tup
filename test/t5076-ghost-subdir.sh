@@ -25,7 +25,7 @@ echo 'int x;' > b/foo.h
 echo '#include "foo.h"' > ok.c
 
 cat > Tupfile << HERE
-: ok.c |> gcc -c %f -o %o -Ia -Ib |> ok.o
+tup.definerule{inputs = {'ok.c'}, outputs = {'ok.o'}, command = 'gcc -c ok.c -o ok.o -Ia -Ib'}
 HERE
 tup touch b/foo.h ok.c Tupfile
 update

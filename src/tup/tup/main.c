@@ -253,6 +253,8 @@ int main(int argc, char **argv)
 	if(tup_cleanup() < 0)
 		rc = 1;
 	tup_valgrind_cleanup();
+	if(rc < 0)
+		return 1;
 	return rc;
 }
 

@@ -22,6 +22,7 @@
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <dirent.h>
+#include <unistd.h>
 
 DIR *fdopendir(int fd)
 {
@@ -32,6 +33,10 @@ DIR *fdopendir(int fd)
 	if(fcntl(fd, F_GETPATH, fullpath) < 0) {
 		perror("fcntl");
 		fprintf(stderr, "tup error: Unable to convert file descriptor back to pathname in fdopendir() compat library.\n");
+		return NULL;
+	}
+	if(close(fd) < 0) {
+		perror("close(fd) in tup's OSX fdopendir() wrapper:");
 		return NULL;
 	}
 

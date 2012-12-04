@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,31 +16,30 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Same as t5076, only the first directory doesn't exist when we do the
-# initial compilation.
+# Try a preload from an included script. It should preload from that directory.
 . ./tup.sh
+check_no_windows run-script
 
-tmkdir b
-echo 'int x;' > b/foo.h
-echo '#include "foo.h"' > ok.c
+tmkdir sub
+cat > sub/include.tup << HERE
+preload foo
+HERE
+
+tmkdir sub/foo
+touch sub/foo/bar.c
 
 cat > Tupfile << HERE
-tup.definerule{ inputs = {'ok.c'}, outputs = {'ok.o'}, command = 'gcc -c ok.c -o ok.o -Ia -Ib' }
+include sub/include.tup
+run sh -e ok.sh
 HERE
-tup touch b/foo.h ok.c Tupfile
+
+cat > ok.sh << HERE
+for i in sub/foo/*.c; do
+	echo ": |> echo \$i |>"
+done
+HERE
 update
 
-tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
-sym_check ok.o x
-
-tmkdir a
-echo 'int y;' > a/foo.h
-update
-
-tup_dep_exist a foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
-sym_check ok.o y
-
-# Make sure we don't have a dependency on the directory anymore.
-tup_dep_no_exist . a . 'gcc -c ok.c -o ok.o -Ia -Ib'
+tup_object_exist . 'echo sub/foo/bar.c'
 
 eotup

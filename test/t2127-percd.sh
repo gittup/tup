@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,31 +16,32 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Same as t5076, only the first directory doesn't exist when we do the
-# initial compilation.
+# Try %d to refer to the directory name.
+
 . ./tup.sh
 
-tmkdir b
-echo 'int x;' > b/foo.h
-echo '#include "foo.h"' > ok.c
-
 cat > Tupfile << HERE
-tup.definerule{ inputs = {'ok.c'}, outputs = {'ok.o'}, command = 'gcc -c ok.c -o ok.o -Ia -Ib' }
+tup.definerule{command = 'echo ' .. tup.getparent()}
 HERE
-tup touch b/foo.h ok.c Tupfile
-update
 
-tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
-sym_check ok.o x
+tmkdir foo
+cat > foo/Tupfile << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
 
-tmkdir a
-echo 'int y;' > a/foo.h
-update
+tmkdir bar
+tmkdir bar/baz
+cat > bar/Tupfile << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
+cat > bar/baz/Tupfile << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
 
-tup_dep_exist a foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
-sym_check ok.o y
-
-# Make sure we don't have a dependency on the directory anymore.
-tup_dep_no_exist . a . 'gcc -c ok.c -o ok.o -Ia -Ib'
+tup parse
+tup_object_exist . 'echo tuptesttmp-t2127-percd'
+tup_object_exist foo 'echo foo'
+tup_object_exist bar 'echo bar'
+tup_object_exist bar/baz 'echo baz'
 
 eotup

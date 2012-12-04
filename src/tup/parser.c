@@ -144,8 +144,7 @@ static int include_file(struct tupfile *tf, const char *file);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list *plist,
 			 tupid_t dt);
 static void make_name_list_unique(struct name_list *nl);
-static int parse_dependent_tupfiles(struct path_list *plist,
-				    struct tupfile *tf, struct graph *g);
+static int parse_dependent_tupfiles(struct path_list *plist, struct tupfile *tf);
 static int input_nl_add_path(struct tupfile *tf, struct path_list *pl, 
 			     struct name_list *nl);
 static int output_nl_add_path(struct tupfile *tf, struct path_list *pl, 
@@ -249,7 +248,7 @@ static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tup
 			delete_name_list(nl);
 			return -1;
 		}
-		if ((parse_dependent_tupfiles(&pl, tf, tf->g) < -1) ||
+		if ((parse_dependent_tupfiles(&pl, tf) < -1) ||
 			(output ? (output_nl_add_path(tf, &pl, nl) < 0) :
 				(input_nl_add_path(tf, &pl, nl) < 0)))
 
@@ -357,6 +356,36 @@ static int tuplua_function_getcwd(lua_State *ls)
 	return 1;
 }
 
+static int tuplua_function_getparent(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+
+	if(tf->tupid == DOT_DT) {
+		/* At the top of the tup-hierarchy, we get the
+		 * directory from where .tup is stored, since
+		 * the top-level tup entry is just "."
+		 */
+		char *last_slash;
+		const char *dirstring;
+
+		last_slash = strrchr(get_tup_top(), PATH_SEP);
+		if(last_slash) {
+			/* Point to the directory after the last slash */
+			dirstring = last_slash + 1;
+		} else {
+			dirstring = get_tup_top();
+		}
+		lua_pushlstring(ls, dirstring, strlen(dirstring));
+		return 1;
+	} else {
+		/* Anywhere else in the hierarchy can just use
+		 * the last tup entry as the %d replacement.
+		 */
+		lua_pushlstring(ls, tf->curtent->name.s, tf->curtent->name.len);
+		return 1;
+	}
+}
+
 static int tuplua_function_getconfig(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
@@ -446,7 +475,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Failed to parse paths in glob pattern \"%s\".", pattern);
 	}
 
-	if(parse_dependent_tupfiles(&pl, tf, tf->g) < 0)
+	if(parse_dependent_tupfiles(&pl, tf) < 0)
 	{
 		free(pl.pel);
 		free(pattern);
@@ -471,7 +500,7 @@ static int tuplua_function_glob(lua_State *ls)
 		free(pattern);
 		return luaL_error(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl.path);
 	}
-	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl.dt, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root) < 0)
+	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl.dt, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
 	{
 		free(pl.pel);
 		free(pattern);
@@ -485,7 +514,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
 	}
 	if(srctent) {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
 		{
 			free(pl.pel);
 			free(pattern);
@@ -543,6 +572,7 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		tuplua_register_function(ls, "dorulesfile", tuplua_function_includerules, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
+		tuplua_register_function(ls, "getparent", tuplua_function_getparent, tf);
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
@@ -638,11 +668,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
-	memset(ps.path, 0, sizeof(ps.path));
-	if(snprint_tup_entry(ps.path, sizeof(ps.path), n->tent) >= (signed)sizeof(ps.path)) {
-		fprintf(stderr, "tup internal error: ps.path is sized incorrectly in parse()\n");
-		return -1;
-	}
+
 	RB_INIT(&tf.cmd_root);
 	RB_INIT(&tf.env_root);
 	RB_INIT(&tf.input_root);
@@ -737,6 +763,8 @@ out_server_stop:
 			rc = -1;
 	}
 
+	pthread_mutex_lock(&ps.lock);
+	pthread_mutex_unlock(&ps.lock);
 	free_tupid_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
 	free_tupid_tree(&tf.input_root);
@@ -1070,8 +1098,7 @@ static void make_name_list_unique(struct name_list *nl)
 	tup_entry_release_list();
 }
 
-static int parse_dependent_tupfiles(struct path_list *pl,
-				    struct tupfile *tf, struct graph *g)
+static int parse_dependent_tupfiles(struct path_list *pl, struct tupfile *tf)
 {
 	/* Only care about non-bins, and directories that are not our
 	 * own.
@@ -1079,12 +1106,12 @@ static int parse_dependent_tupfiles(struct path_list *pl,
 	if(pl->dt != tf->tupid) {
 		struct node *n;
 
-		n = find_node(g, pl->dt);
+		n = find_node(tf->g, pl->dt);
 		if(n != NULL && !n->already_used) {
 			int rc;
 			struct timespan ts;
 			n->already_used = 1;
-			rc = parse(n, g, &ts);
+			rc = parse(n, tf->g, &ts);
 			if(rc < 0) {
 				if(rc == CIRCULAR_DEPENDENCY_ERROR) {
 					fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");

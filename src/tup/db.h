@@ -68,7 +68,8 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style
 			   void *arg, tupid_t dt);
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
-				int len, struct tupid_entries *delete_root);
+				int len, struct tupid_entries *delete_root,
+				int include_directories);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt, int force);
 int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(void *, struct tup_entry *));

@@ -50,25 +50,28 @@ static char * handle_color( HANDLE output, char *p )
 		reverted = 1;
 		break;
 	case 31:
-		color = ( color & ~fmask ) | FOREGROUND_RED;
+		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_INTENSITY;
 		break;
 	case 32:
-		color = ( color & ~fmask ) | FOREGROUND_GREEN;
+		color = ( color & ~fmask ) | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 		break;
 	case 33:
 		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 		break;
 	case 34:
-		color = ( color & ~fmask ) | FOREGROUND_BLUE;
+		color = ( color & ~fmask ) | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
 		break;
 	case 35:
-		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_BLUE;
+		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+		break;
+	case 36:
+		color = ( color & ~fmask ) | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 		break;
 	case 37:
 		color = ( color & ~fmask ) | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
 		break;
 	case 41:
-		color = ( color & ~bmask ) | BACKGROUND_RED;
+		color = ( color & ~bmask ) | BACKGROUND_RED | BACKGROUND_INTENSITY;
 		break;
 	default:;
 	}
