@@ -755,9 +755,16 @@ static int preload(struct tupfile *tf, char *cmdline)
 {
 	struct path_list_head plist;
 	struct path_list *pl;
+	char *eval_cmdline;
+
+	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
+	if(!eval_cmdline) {
+		return -1;
+	}
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, cmdline, &plist, tf->curtent->tnode.tupid, NULL) < 0)
+	printf("CMdline: '%s', eval: '%s'\n", cmdline, eval_cmdline);
+	if(get_path_list(tf, eval_cmdline, &plist, tf->curtent->tnode.tupid, NULL) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -788,6 +795,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 			return -1;
 	}
 	free_path_list(&plist);
+	free(eval_cmdline);
 	return 0;
 }
 
