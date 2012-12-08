@@ -149,7 +149,8 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 		while(1) {
 			rc = read(fd, buf, sizeof(buf));
 			if(rc < 0) {
-				perror("read");
+				perror("display_output: read");
+				fprintf(stderr, "tup internal error: Unable to display output from a sub-process.\n");
 				return -1;
 			}
 			if(rc == 0)
