@@ -39,10 +39,10 @@ tup_object_exist build-foo/tup.config FOO
 mv build-foo sub
 update
 
-# When we move the variant directory and detect with the monitor, the
-# variant tree is deleted.
+# When we move the variant directory and detect with the monitor, all of the
+# generated nodes become normal nodes.
 check_exist sub/foo.o sub/bar.o
-check_not_exist sub/build-foo/sub
+check_exist sub/build-foo/sub/foo.o sub/build-foo/sub/bar.o
 
 tup_object_no_exist sub/build-foo/tup.config FOO
 
