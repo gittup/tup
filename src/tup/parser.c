@@ -763,7 +763,6 @@ static int preload(struct tupfile *tf, char *cmdline)
 	}
 
 	TAILQ_INIT(&plist);
-	printf("CMdline: '%s', eval: '%s'\n", cmdline, eval_cmdline);
 	if(get_path_list(tf, eval_cmdline, &plist, tf->curtent->tnode.tupid, NULL) < 0)
 		return -1;
 
