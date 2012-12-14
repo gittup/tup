@@ -62,7 +62,7 @@ static int do_slurp(int fd, struct buf *b, int extra)
 
 	rc = read(fd, tmp, st.st_size);
 	if(rc < 0) {
-		perror("read");
+		perror("fslurp: read");
 		goto err_out;
 	}
 	if(rc != st.st_size) {

@@ -1681,9 +1681,9 @@ exit:
 
 static int open_file(const char *depfilename)
 {
-	deph = CreateFile(depfilename, FILE_APPEND_DATA, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	deph = CreateFile(depfilename, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if(deph == INVALID_HANDLE_VALUE) {
-		perror(depfilename);
+		fprintf(stderr, "tup error: Unable to open dependency file '%s' in dllinject. Windows error code: 0x%08lx\n", depfilename, GetLastError());
 		return -1;
 	}
 	return 0;

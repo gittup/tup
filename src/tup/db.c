@@ -373,6 +373,7 @@ static int db_backup(int version)
 	return 0;
 
 err_fail:
+	fprintf(stderr, "tup error: Unable to backup database.\n");
 	close(ifd);
 err_open:
 	close(fd);

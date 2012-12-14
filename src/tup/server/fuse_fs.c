@@ -735,7 +735,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return fill_actual_directory(peeled, buf, filler, finfo != NULL, NULL);
 }
 
-static int mknod_internal(const char *path, mode_t mode, int close_fd)
+static int mknod_internal(const char *path, mode_t mode, int flags, int close_fd)
 {
 	int rc;
 	struct mapping *map;
@@ -746,7 +746,6 @@ static int mknod_internal(const char *path, mode_t mode, int close_fd)
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
 	if (S_ISREG(mode)) {
-		int flags = O_CREAT | O_EXCL | O_WRONLY;
 		map = add_mapping(path);
 		if(!map) {
 			return -ENOMEM;
@@ -786,7 +785,7 @@ static int mknod_internal(const char *path, mode_t mode, int close_fd)
 static int tup_fs_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	if(rdev) {}
-	return mknod_internal(path, mode, 1);
+	return mknod_internal(path, mode, O_CREAT | O_EXCL | O_WRONLY, 1);
 }
 
 static int tup_fs_mkdir(const char *path, mode_t mode)
@@ -806,15 +805,16 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 		if(!tmpdir) {
 			perror("malloc");
 			rc = -ENOMEM;
-		}
-		tmpdir->dirname = strdup(peel(path));
-		if(!tmpdir->dirname) {
-			perror("strdup");
-			rc = -ENOMEM;
-		}
-		if(tmpdir && tmpdir->dirname) {
-			LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
-			rc = 0;
+		} else {
+			tmpdir->dirname = strdup(peel(path));
+			if(!tmpdir->dirname) {
+				perror("strdup");
+				rc = -ENOMEM;
+			}
+			if(tmpdir && tmpdir->dirname) {
+				LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
+				rc = 0;
+			}
 		}
 		put_finfo(finfo);
 		return rc;
@@ -1042,7 +1042,6 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	if(context_check() < 0)
 		return -EPERM;
 
-	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
@@ -1065,7 +1064,7 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 static int tup_fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	int rc;
-	rc = mknod_internal(path, mode, 0);
+	rc = mknod_internal(path, mode, fi->flags, 0);
 	if(rc < 0)
 		return -errno;
 	fi->fh = rc;

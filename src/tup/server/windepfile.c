@@ -33,8 +33,8 @@
 
 #define TUP_TMP ".tup/tmp"
 
-static int initialize_depfile(struct server *s, char *depfile);
-static int process_depfile(struct server *s, const char *depfile);
+static int initialize_depfile(struct server *s, char *depfile, HANDLE *h);
+static int process_depfile(struct server *s, HANDLE h);
 static int server_inited = 0;
 static BOOL WINAPI console_handler(DWORD cevent);
 static sig_atomic_t event_got = -1;
@@ -227,6 +227,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
 	char buf[64];
 	char depfile[PATH_MAX];
+	HANDLE h;
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
 		|| strncmp(cmd, "bash ", 5) == 0
@@ -239,7 +240,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	if(dtent) {}
 	if(full_deps) {}
 
-	if(initialize_depfile(s, depfile) < 0) {
+	if(initialize_depfile(s, depfile, &h) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
 		return -1;
 	}
@@ -332,19 +333,21 @@ end:
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 
-	if(process_depfile(s, depfile) < 0) {
+	if(process_depfile(s, h) < 0) {
 		return -1;
 	}
-	if(unlink(depfile) < 0) {
-		perror(depfile);
-		fprintf(stderr, "tup error: Unable to unlink depfile\n");
-	}
+
 	return rc;
 
 err_terminate:
 	TerminateProcess(pi.hProcess, 10);
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
+
+	/* The depfile handle is normally closed in process_depfile(). If we
+	 * fail for some reason, close it here.
+	 */
+	CloseHandle(h);
 	return -1;
 }
 
@@ -404,35 +407,36 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
-static int initialize_depfile(struct server *s, char *depfile)
+static int initialize_depfile(struct server *s, char *depfile, HANDLE *h)
 {
-	HANDLE h;
-
 	snprintf(depfile, PATH_MAX, "%s\\deps-%i", tuptmpdir, s->id);
 	depfile[PATH_MAX-1] = 0;
 
-	h = CreateFile(depfile, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-	if(!h) {
+	*h = CreateFile(depfile, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+	if(*h == INVALID_HANDLE_VALUE) {
 		perror(depfile);
 		fprintf(stderr, "tup error: Unable to create temporary file for dependency storage\n");
 		return -1;
 	}
-	/* We just want the file to be created here since it's easier to display the error. The
-	 * file is re-opened in the dllinject code in append mode.
-	 */
-	CloseHandle(h);
 	return 0;
 }
 
-static int process_depfile(struct server *s, const char *depfile)
+static int process_depfile(struct server *s, HANDLE h)
 {
 	char event1[PATH_MAX];
 	char event2[PATH_MAX];
+	int fd;
 	FILE *f;
 
-	f = fopen(depfile, "rb");
+	fd = _open_osfhandle((intptr_t)h, 0);
+	if(fd < 0) {
+		perror("open_osfhandle() in process_depfile");
+		fprintf(stderr, "tup error: Unable to call open_osfhandle when processing the dependency file.\n");
+		return -1;
+	}
+	f = fdopen(fd, "rb");
 	if(!f) {
-		perror(depfile);
+		perror("fdopen");
 		fprintf(stderr, "tup error: Unable to open dependency file for post-processing.\n");
 		return -1;
 	}
@@ -502,6 +506,10 @@ static int process_depfile(struct server *s, const char *depfile)
 			return -1;
 		}
 	}
+
+	/* Since this file is FILE_FLAG_DELETE_ON_CLOSE, the temporary file
+	 * goes away after this fclose.
+	 */
 	if(fclose(f) < 0) {
 		perror("fclose");
 		return -1;
