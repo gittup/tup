@@ -1,5 +1,14 @@
 " Vim syntax file
 " Language:     Tupfile
+"
+" HOWTO use:
+" 1) Add this to your ~/.vim/filetype.vim -
+" au BufNewFile,BufRead Tupfile,*.tup setf tup
+"
+" 2) Add a symlink to this file in ~/.vim/syntax/ -
+" mkdir -p ~/.vim/syntax
+" cd ~/.vim/syntax
+" ln -s /path/to/tup.vim
 
 " For version 5.x: Clear all syntax items
 " For version 6.x: Quit when a syntax file was already loaded
