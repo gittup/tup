@@ -230,7 +230,7 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
-			const char *ext, int extlen, int is_command);
+			const char *ext, int extlen);
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 static int debug_run = 0;
@@ -1513,7 +1513,7 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 
 	/* Add any order only inputs to the list */
 	if(nl && br->input) {
-		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, 0, 0);
+		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, 0);
 		if(!tinput)
 			return -1;
 	} else {
@@ -1827,7 +1827,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 
 				banglist = &sc->banglist;
 
-				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, 0);
+				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0);
 				if(!tinput)
 					return -1;
 				input_pattern = eval(tf, tinput, DISALLOW_NODES);
@@ -2081,7 +2081,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		set_nle_base(&tmp_nle);
 		add_name_list_entry(&tmp_nl, &tmp_nle);
 
-		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, 0);
+		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0);
 		if(!tinput)
 			return -1;
 		input_pattern = eval(tf, tinput, DISALLOW_NODES);
@@ -2704,7 +2704,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&extra_onl);
 	TAILQ_INIT(&oplist);
 
-	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, 1);
+	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen);
 	if(!toutput)
 		return -1;
 	output_pattern = eval(tf, toutput, DISALLOW_NODES);
@@ -2762,7 +2762,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		} else {
 			use_onl = NULL;
 		}
-		onle->path = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, 0);
+		onle->path = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0);
 		if(!onle->path) {
 			free(onle);
 			return -1;
@@ -2826,7 +2826,7 @@ out_pl:
 	free(output_pattern);
 	free(extra_pattern);
 
-	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, 1);
+	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, ALLOW_NODES);
@@ -3023,7 +3023,7 @@ static const char *find_char(const char *s, int len, char c)
 
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
-			const char *ext, int extlen, int is_command)
+			const char *ext, int extlen)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -3085,8 +3085,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			}
 			clen += extlen;
 		} else if(*next == 'o') {
-			if(!is_command) {
-				fprintf(tf->f, "tup error: %%o can only be used in a command.\n");
+			if(!onl) {
+				fprintf(tf->f, "tup error: %%o can only be used in a command string.\n");
 				return NULL;
 			}
 			if(onl->num_entries == 0) {
