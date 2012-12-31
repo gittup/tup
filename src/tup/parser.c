@@ -1484,6 +1484,14 @@ static int set_variable(struct tupfile *tf, char *line)
 				return -1;
 			}
 		}
+
+		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
+			fprintf(tf->f, "tup error: Generated node '");
+			print_tup_entry(tf->f, tent);
+			fprintf(tf->f, "' is scheduled to be deleted, so it cannot be set in a node variable. Make sure the node-variable is declared after the :-rule that creates this file.\n");
+			return -1;
+		}
+
 		/* var+1 to skip the leading '&' */
 		if(append)
 			rc = nodedb_append(&tf->node_db, var+1, tent);
