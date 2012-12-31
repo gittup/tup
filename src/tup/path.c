@@ -36,20 +36,20 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-static int watch_path_internal(tupid_t dt, int dfd, const char *file,
-			       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
+static int watch_path_internal(tupid_t dt, const char *file,
+			       int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
 	struct flist f = {0, 0, 0};
 	struct stat buf;
 
-	if(fstatat(dfd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
+	if(lstat(file, &buf) != 0) {
 		if(errno == ENOENT) {
 			/* The file may have been created and then removed before
 			 * we got here. Assume the file is now gone (t7037).
 			 */
 			return 0;
 		} else {
-			fprintf(stderr, "tup error: fstatat failed\n");
+			fprintf(stderr, "tup error: lstat failed\n");
 			perror(file);
 			return -1;
 		}
@@ -62,7 +62,6 @@ static int watch_path_internal(tupid_t dt, int dfd, const char *file,
 			return -1;
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
-		int newfd;
 		struct tupid_entries root = {NULL};
 		struct tup_entry *tent;
 		int skip = 0;
@@ -72,12 +71,12 @@ static int watch_path_internal(tupid_t dt, int dfd, const char *file,
 			return -1;
 
 		if(callback) {
-			if(callback(tent->tnode.tupid, dfd, file, &skip) < 0)
+			if(callback(tent->tnode.tupid, file, &skip) < 0)
 				return -1;
 		}
 		if(skip) {
 			/* It's possible the directory was deleted in between
-			 * our fstatat() call and the inotify_add_watch() call
+			 * our lstat() call and the inotify_add_watch() call
 			 * in the monitor. If so just delete the node and
 			 * continue (t7037 race condition).
 			 */
@@ -86,23 +85,20 @@ static int watch_path_internal(tupid_t dt, int dfd, const char *file,
 			return 0;
 		}
 
-		newfd = openat(dfd, file, O_RDONLY);
-		if(newfd < 0) {
+		if(chdir(file) < 0) {
 			if(errno == ENOENT) {
-				/* It's possible that we successfully did an fstatat() and
-				 * inotify_add_watch(), but now failed to open the directory because
-				 * it has been removed. This is also ok (t7037 race condition).
+				/* It's possible that we successfully did an
+				 * lstat() and inotify_add_watch(), but now
+				 * failed to open the directory because it has
+				 * been removed. This is also ok (t7037 race
+				 * condition).
 				 */
 				if(tup_file_missing(tent) < 0)
 					return -1;
 				return 0;
 			}
-			fprintf(stderr, "tup error: Unable to openat() directory.\n");
+			fprintf(stderr, "tup error: Unable to chdir() directory.\n");
 			perror(file);
-			return -1;
-		}
-		if(fchdir(newfd) < 0) {
-			perror("fchdir");
 			return -1;
 		}
 
@@ -120,12 +116,12 @@ static int watch_path_internal(tupid_t dt, int dfd, const char *file,
 			if(f.filename[0] == '.') {
 				continue;
 			}
-			if(watch_path_internal(tent->tnode.tupid, newfd, f.filename, callback) < 0)
+			if(watch_path_internal(tent->tnode.tupid, f.filename, callback) < 0)
 				return -1;
 		}
-		if(close(newfd) < 0) {
-			perror("close(newfd)");
-			return -1;
+		if(chdir("..") < 0) {
+			perror("..");
+			fprintf(stderr, "tup error: Unable to chdir() back to parent directory in watch_path()\n");
 		}
 
 		{
@@ -149,11 +145,11 @@ static int watch_path_internal(tupid_t dt, int dfd, const char *file,
 	}
 }
 
-int watch_path(tupid_t dt, int dfd, const char *file,
-	       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
+int watch_path(tupid_t dt, const char *file,
+	       int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
 	int rc;
-	rc = watch_path_internal(dt, dfd, file, callback);
+	rc = watch_path_internal(dt, file, callback);
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
 		return -1;
@@ -276,7 +272,7 @@ int tup_scan(void)
 {
 	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", NULL) < 0)
+	if(watch_path(0, ".", NULL) < 0)
 		return -1;
 	if(scan_full_deps() < 0)
 		return -1;

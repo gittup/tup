@@ -71,33 +71,19 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 
 tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 {
-	int fd;
 	struct stat buf;
 
-	fd = tup_db_open_tupid(dt);
-	if(fd == -ENOENT)
-		goto enoent;
-	if(fd < 0)
+	if(tup_db_chdir(dt) < 0)
 		return -1;
-	if(fstatat(fd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		if(errno == ENOENT)
-			goto enoent;
-		fprintf(stderr, "tup error: tup_file_mod() fstatat failed.\n");
+	if(lstat(file, &buf) != 0) {
+		if(errno == ENOENT) {
+			return tup_file_del(dt, file, -1, modified);
+		}
+		fprintf(stderr, "tup error: tup_file_mod() lstat failed.\n");
 		perror(file);
 		return -1;
 	}
-	if(close(fd) < 0) {
-		perror("close(fd)");
-		return -1;
-	}
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
-
-enoent:
-	if(close(fd) < 0) {
-		perror("close(fd)");
-		return -1;
-	}
-	return tup_file_del(dt, file, -1, modified);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,

@@ -76,7 +76,7 @@ int tup_db_delete_dir(tupid_t dt, int force);
 int tup_db_flag_generated_dirs(tupid_t dt);
 int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(void *, struct tup_entry *));
 int tup_db_duplicate_directory_structure(struct tup_entry *dest);
-int tup_db_open_tupid(tupid_t dt);
+int tup_db_chdir(tupid_t dt);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);

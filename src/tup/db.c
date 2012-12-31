@@ -62,7 +62,7 @@ enum {
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
-	DB_OPEN_TUPID,
+	DB_CHDIR,
 	DB_CHANGE_NODE_NAME,
 	DB_SET_NAME,
 	DB_SET_TYPE,
@@ -1940,22 +1940,21 @@ int tup_db_duplicate_directory_structure(struct tup_entry *dest)
 	return rc;
 }
 
-int tup_db_open_tupid(tupid_t tupid)
+int tup_db_chdir(tupid_t tupid)
 {
 	int rc;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_OPEN_TUPID];
+	sqlite3_stmt **stmt = &stmts[DB_CHDIR];
 	static char s[] = "select dir, name from node where id=?";
 	tupid_t parent;
 	char *path;
-	int fd;
 
 	if(tupid == 0) {
 		fprintf(stderr, "tup error: Trying to tup_db_open_tupid(0)\n");
 		return -1;
 	}
 	if(tupid == 1) {
-		return dup(tup_top_fd());
+		return chdir(get_tup_top());
 	}
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -1998,22 +1997,17 @@ int tup_db_open_tupid(tupid_t tupid)
 		return -1;
 	}
 
-	fd = tup_db_open_tupid(parent);
-	if(fd < 0) {
+	if(tup_db_chdir(parent) < 0) {
 		free(path);
-		return fd;
+		return -1;
 	}
 
-	rc = openat(fd, path, O_RDONLY);
+	rc = chdir(path);
 	if(rc < 0) {
 		if(errno == ENOENT)
 			rc = -ENOENT;
 		else
 			perror(path);
-	}
-	if(close(fd) < 0) {
-		perror("close(fd)");
-		rc = -1;
 	}
 	free(path);
 
@@ -4821,7 +4815,6 @@ out_reset:
 
 static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 {
-	int dfd;
 	int fd;
 	int rc = -1;
 	unsigned int x;
@@ -4830,18 +4823,15 @@ static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 	if(tup_db_var_changed == 0)
 		return 0;
 
-	dfd = tup_db_open_tupid(DOT_DT);
-	if(dfd < 0) {
+	if(chdir(get_tup_top()) < 0) {
+		perror(get_tup_top());
+		fprintf(stderr, "tup error: Unable to change directory to project root.\n");
 		return -1;
 	}
-	fd = openat(dfd, vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+	fd = open(vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
 	if(fd < 0) {
 		perror("openat");
 		fprintf(stderr, "tup error: Unable to create the vardict file: '%s'\n", vardict_file);
-		return -1;
-	}
-	if(close(dfd) < 0) {
-		perror("close(dfd)");
 		return -1;
 	}
 	if(write(fd, &vdb->count, sizeof(vdb->count)) != sizeof(vdb->count)) {
