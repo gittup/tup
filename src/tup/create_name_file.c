@@ -402,7 +402,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	struct tup_entry *tent;
 
 	dt = find_dir_tupid_dt(dt, path, &pel, 0, 1);
-	if(dt < 0)
+	if(dt <= 0)
 		return NULL;
 
 	if(pel) {
