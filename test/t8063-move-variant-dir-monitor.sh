@@ -27,7 +27,11 @@ mkdir sub
 mkdir configs
 
 cat > sub/Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %B.o
+for index, source in ipairs(tup.glob('*.c'))
+do
+	local output = source:gsub('%.c', '.o')
+	tup.definerule{inputs = {source}, outputs = {output}, command = 'gcc -c ' .. source .. ' -o ' .. output}
+end
 HERE
 touch sub/foo.c sub/bar.c
 echo "CONFIG_FOO=y" > configs/foo.config
@@ -39,10 +43,10 @@ tup_object_exist build-foo/tup.config FOO
 mv build-foo sub
 update
 
-# When we move the variant directory and detect with the monitor, the
-# variant tree is deleted.
+# When we move the variant directory and detect with the monitor, all of the
+# generated nodes become normal nodes.
 check_exist sub/foo.o sub/bar.o
-check_not_exist sub/build-foo/sub
+check_exist sub/build-foo/sub/foo.o sub/build-foo/sub/bar.o
 
 tup_object_no_exist sub/build-foo/tup.config FOO
 

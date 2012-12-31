@@ -514,7 +514,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
 	}
 	if(srctent) {
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
+		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
 		{
 			free(pl.pel);
 			free(pattern);

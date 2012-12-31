@@ -555,6 +555,30 @@ static int is_valid_variant_tent(struct tup_entry *tent)
 	return 1;
 }
 
+static int recurse_delete_variant(struct tup_entry *tent)
+{
+	/* If we had a variant corresponding to this tup.config, then we need
+	 * to wipe out all of our @-variables, remove the varaint, remove our
+	 * tup.config node, and delete the variant tree. We also add the
+	 * variant directory to the create_list so it can be propagated to
+	 * other variants (if it still exists).
+	 */
+	struct tup_entry *parent = tent->parent;
+
+	if(delete_name_file(tent->tnode.tupid) < 0)
+		return -1;
+	if(tup_db_delete_variant(parent, NULL, NULL) < 0)
+		return -1;
+	if(parent->type == TUP_NODE_GHOST) {
+		if(delete_name_file(parent->tnode.tupid) < 0)
+			return -1;
+	} else {
+		if(tup_db_add_create_list(parent->tnode.tupid) < 0)
+			return -1;
+	}
+	return 0;
+}
+
 static int process_config_nodes(int environ_check)
 {
 	struct graph g;
@@ -623,37 +647,35 @@ static int process_config_nodes(int environ_check)
 
 			if(!is_valid_variant_tent(n->tent) && n->tent->dt != DOT_DT) {
 				/* tup.config deleted */
-				struct tup_entry *parent = n->tent->parent;
 
 				/* Reset the build directory's variant link. We
 				 * may have set it in tup_file_missing().
 				 */
-				parent->variant = NULL;
+				n->tent->parent->variant = NULL;
 				if(variant) {
-					/* If we had a variant corresponding to
-					 * this tup.config, then we need to
-					 * wipe out all of our @-variables,
-					 * remove the varaint, remove our
-					 * tup.config node, and delete the
-					 * variant tree. We also add the
-					 * variant directory to the create_list
-					 * so it can be propagated to other
-					 * variants (if it still exists).
-					 */
-					show_result(n->tent, 0, NULL, "delete variant");
-					if(tup_db_delete_tup_config(n->tent) < 0)
-						return -1;
 					if(variant_rm(variant) < 0)
 						return -1;
-					if(delete_name_file(n->tent->tnode.tupid) < 0)
+					if(tup_db_delete_tup_config(n->tent) < 0)
 						return -1;
-					if(tup_db_delete_variant(parent, NULL, NULL) < 0)
-						return -1;
-					if(parent->type == TUP_NODE_GHOST) {
-						if(delete_name_file(parent->tnode.tupid) < 0)
+
+					if(n->tent->parent->dt == DOT_DT) {
+						show_result(n->tent, 0, NULL, "delete variant");
+						if(recurse_delete_variant(n->tent) < 0)
 							return -1;
 					} else {
-						if(tup_db_add_create_list(parent->tnode.tupid) < 0)
+						/* The variant directory was
+						 * moved to the source tree,
+						 * and the monitor saw it.
+						 * We've already deleted the
+						 * variant and @-variables, so
+						 * just unset the config flag,
+						 * and all the generated nodes
+						 * will become normal nodes
+						 * during the regular
+						 * generated -> normal code.
+						 */
+						show_result(n->tent, 0, NULL, "discard variant");
+						if(tup_db_unflag_config(n->tent->tnode.tupid) < 0)
 							return -1;
 					}
 					variants_removed = 1;
