@@ -30,10 +30,8 @@ update
 
 cat > Tupfile <<HERE
 &node_var = a.txt
-: |> touch %o |> a.txt
-: &(node_var) |> cp &(node_var) %o |> out.txt
 HERE
 tup touch Tupfile
-update_fail_msg "Generated node 'a.txt' is scheduled to be deleted"
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

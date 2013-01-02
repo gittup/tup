@@ -1485,10 +1485,8 @@ static int set_variable(struct tupfile *tf, char *line)
 			}
 		}
 
-		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
-			fprintf(tf->f, "tup error: Generated node '");
-			print_tup_entry(tf->f, tent);
-			fprintf(tf->f, "' is scheduled to be deleted, so it cannot be set in a node variable. Make sure the node-variable is declared after the :-rule that creates this file.\n");
+		if(tent->type != TUP_NODE_FILE && tent->type != TUP_NODE_DIR) {
+			fprintf(tf->f, "tup error: Node-variables can only refer to normal files and directories, not a '%s'.\n", tup_db_type(tent->type));
 			return -1;
 		}
 
