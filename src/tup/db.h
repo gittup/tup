@@ -34,6 +34,7 @@ struct tup_entry;
 struct tup_entry_head;
 struct tup_env;
 struct variant;
+struct mapping_head;
 
 /* General operations */
 int tup_db_open(void);
@@ -167,7 +168,9 @@ int tup_db_scan_end(void);
 
 /* updater operations */
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
-				struct tup_entry_head *writehead);
+				struct tup_entry_head *writehead,
+				struct mapping_head *mapping_list,
+				int *write_bork);
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,

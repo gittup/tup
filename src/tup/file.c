@@ -151,11 +151,11 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 			finfo_unlock(info);
 			return -1;
 		}
-
-		entrylist = tup_entry_get_list();
-		rc1 = update_write_info(f, cmdid, info, warnings, entrylist);
-		tup_entry_release_list();
 	}
+
+	entrylist = tup_entry_get_list();
+	rc1 = update_write_info(f, cmdid, info, warnings, entrylist);
+	tup_entry_release_list();
 
 	entrylist = tup_entry_get_list();
 	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, full_deps, vardt);
@@ -532,8 +532,22 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			return -1;
 		free(pel);
 		if(!tent) {
+			struct mapping *map;
+
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
+#ifdef _WIN32
+			/* t5038 - Need to clean up files until Windows supports tmpfiles properly. */
+			fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
+			unlink(w->filename);
+#endif
+
+			LIST_FOREACH(map, &info->mapping_list, list) {
+				if(strcmp(map->realname, w->filename) == 0) {
+					del_map(map);
+					break;
+				}
+			}
 		} else {
 			struct mapping *map;
 			tup_entry_list_add(tent, entryhead);
@@ -549,18 +563,7 @@ out_skip:
 		del_entry(w);
 	}
 
-	if(write_bork) {
-		while(!LIST_EMPTY(&info->mapping_list)) {
-			struct mapping *map;
-
-			map = LIST_FIRST(&info->mapping_list);
-			unlink(map->tmpname);
-			del_map(map);
-		}
-		return -1;
-	}
-
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {
