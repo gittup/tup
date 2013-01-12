@@ -26,9 +26,10 @@ cat > foo.py << HERE
 import tup_client
 var = tup_client.config_var('FOO')
 if var is None:
-	print ": |> echo None |>"
+	print(": |> echo None |>")
 else:
-	print ": |> echo foo", var, "|>"
+	# python 3 is ugly.
+	print(" ".join([": |> echo foo", var, "|>"]))
 HERE
 cat > Tupfile << HERE
 run PYTHONPATH=../.. python -B foo.py
