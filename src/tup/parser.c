@@ -80,6 +80,7 @@ struct path_list {
 	/* For files: */
 	char *path;
 	struct path_element *pel;
+	int group;
 	tupid_t dt;
 	/* For bins: */
 	struct bin *bin;
@@ -2215,6 +2216,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 		}
 		pl->path = NULL;
 		pl->pel = NULL;
+		pl->group = 0;
 		pl->dt = 0;
 		pl->bin = NULL;
 
@@ -2242,7 +2244,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			/* Path */
 			struct pel_group pg;
 
-			if(p[0] == '<') {
+			if(strchr(p, '<') != NULL) {
 				/* Group */
 				char *endb;
 				endb = strchr(p, '>');
@@ -2250,6 +2252,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 					fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
 					return -1;
 				}
+				pl->group = 1;
 			}
 			pl->path = p;
 
@@ -2358,7 +2361,7 @@ static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile
 		/* Only care about non-bins, and directories that are not our
 		 * own.
 		 */
-		if(!pl->bin && pl->dt != tf->tupid) {
+		if(!pl->bin && pl->dt != tf->tupid && !pl->group) {
 			struct node *n;
 
 			n = find_node(tf->g, pl->dt);
