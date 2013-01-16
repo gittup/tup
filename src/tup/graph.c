@@ -290,7 +290,14 @@ static void mark_nodes(struct node *n)
 		if(mark->tent->type == TUP_NODE_CMD) {
 			struct edge *e2;
 			LIST_FOREACH(e2, &mark->edges, list) {
-				mark_nodes(e2->dest);
+				struct node *dest = e2->dest;
+
+				/* Groups are skipped, otherwise we end up
+				 * building everything in the group (t3058).
+				 */
+				if(dest->tent->type != TUP_NODE_GROUP) {
+					mark_nodes(dest);
+				}
 			}
 		}
 	}
