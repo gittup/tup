@@ -20,6 +20,7 @@
 # successfully created. This could include a log file, for example.
 
 . ./tup.sh
+check_no_windows Unreliable return codes: http://cygwin.1069669.n5.nabble.com/Intermittent-failures-retrieving-process-exit-codes-td94814.html
 
 cat > ok.sh << HERE
 echo info > log.txt
