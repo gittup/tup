@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -992,7 +992,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 	newdt = find_dir_tupid_dt_pg(tf->f, tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
 	if(newdt <= 0) {
-		fprintf(tf->f, "tup error: Unable to find directory for include file relative to '");
+		fprintf(tf->f, "tup error: Unable to find directory for include file '%s' relative to '", file);
 		print_tup_entry(tf->f, tf->curtent);
 		fprintf(tf->f, "'\n");
 		goto out_del_pg;
