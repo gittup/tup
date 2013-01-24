@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to use a python client in a run script and use @-variables
+# Test that a node-variable can't refer to a generated file from a previous
+# build (ie: in the delete list).
 
 . ./tup.sh
-check_no_windows client, run-script
-check_python
 
-cat > foo.py << HERE
-import tup_client
-var = tup_client.config_var('FOO')
-if var is None:
-	print(": |> echo None |>")
-else:
-	# python 3 is ugly.
-	print(" ".join([": |> echo foo", var, "|>"]))
-HERE
 cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B foo.py
+: |> touch %o |> a.txt
 HERE
-tup touch Tupfile foo.py
+
+tup touch Tupfile
 update
 
-tup_object_exist . 'echo None'
-
-varsetall FOO=y
-update
-tup_object_exist . 'echo foo y'
-
-varsetall FOO=hey
-update
-tup_object_exist . 'echo foo hey'
+cat > Tupfile <<HERE
+&node_var = a.txt
+HERE
+tup touch Tupfile
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

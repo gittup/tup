@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -261,6 +261,29 @@ void tup_register_rmdir_callback(void (*callback)(tupid_t tupid))
 	rmdir_callback = callback;
 }
 
+/* Find the tup_entry equivalent to srctent in the given variant.  Eg: srctent
+ * = foo/, variant = build-debug/, then it returns the tent for
+ * build-debug/foo.
+ */
+static struct tup_entry *get_variant_tent(struct tup_entry *srctent, struct variant *variant)
+{
+	struct tup_entry *parent_tent;
+	struct tup_entry *variant_tent;
+
+	if(srctent->tnode.tupid == DOT_DT) {
+		return variant->tent->parent;
+	}
+
+	parent_tent = get_variant_tent(srctent->parent, variant);
+	if(!parent_tent) {
+		return NULL;
+	}
+	if(tup_db_select_tent(parent_tent->tnode.tupid, srctent->name.s, &variant_tent) < 0) {
+		return NULL;
+	}
+	return variant_tent;
+}
+
 int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modified)
 {
 	struct tup_entry *tent;
@@ -320,6 +343,16 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 			if(tuptent) {
 				if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
 					return -1;
+			}
+			LIST_FOREACH(variant, get_variant_list(), list) {
+				if(!variant->root_variant) {
+					struct tup_entry *variant_tent;
+					variant_tent = get_variant_tent(tent, variant);
+					if(variant_tent) {
+						if(tup_db_set_srcid(variant_tent, VARIANT_SRCDIR_REMOVED) < 0)
+							return -1;
+					}
+				}
 			}
 		}
 	}
@@ -402,7 +435,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	struct tup_entry *tent;
 
 	dt = find_dir_tupid_dt(dt, path, &pel, 0, 1);
-	if(dt < 0)
+	if(dt <= 0)
 		return NULL;
 
 	if(pel) {

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -888,6 +888,16 @@ static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
 	return 0;
 }
 
+static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
+{
+	if(tup_db_select_node_by_link(add_file_cb, g, n->tent->tnode.tupid) < 0)
+		return -1;
+	TAILQ_REMOVE(&g->plist, n, list);
+	TAILQ_INSERT_TAIL(&g->removing_list, n, list);
+	n->state = STATE_REMOVING;
+	return 0;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
@@ -930,10 +940,14 @@ static int process_create_nodes(void)
 			struct tup_entry *srctent;
 			int force_removal = 0;
 
-			/* Ignore directories that we manually created inside
-			 * the variant directory (eg: mkdir build/tmpdir)
-			 */
-			if(n->tent->srcid != -1) {
+			if(n->tent->srcid == -1) {
+				/* Ignore directories that we manually created inside
+				 * the variant directory (eg: mkdir build/tmpdir)
+				 */
+			} else if(n->tent->srcid == VARIANT_SRCDIR_REMOVED) {
+				if(mark_variant_dir_for_deletion(&g, n) < 0)
+					return -1;
+			} else {
 				if(tup_entry_add(n->tent->srcid, &srctent) < 0) {
 					return -1;
 				}
@@ -953,11 +967,8 @@ static int process_create_nodes(void)
 				}
 
 				if(force_removal) {
-					if(tup_db_select_node_by_link(add_file_cb, &g, n->tent->tnode.tupid) < 0)
+					if(mark_variant_dir_for_deletion(&g, n) < 0)
 						return -1;
-					TAILQ_REMOVE(&g.plist, n, list);
-					TAILQ_INSERT_TAIL(&g.removing_list, n, list);
-					n->state = STATE_REMOVING;
 				}
 			}
 		}

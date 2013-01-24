@@ -16,7 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that a node-variable can refer to a generated file in a variant build.
+# Test that a node-variable cannot refer to a generated file in a variant build.
 
 . ./tup.sh
 check_no_windows variant
@@ -26,12 +26,9 @@ tmkdir build
 cat > Tupfile << HERE
 : |> touch %o |> a.txt
 &node_var = a.txt
-: &(node_var) |> cp &(node_var) %o |> out.txt
 HERE
 
 tup touch Tupfile build/tup.config
-update
-
-tup_dep_exist build a.txt build 'cp a.txt out.txt'
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

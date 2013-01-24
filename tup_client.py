@@ -18,6 +18,12 @@ tup_vardict_map = None
 tup_vardict_num = None
 tup_entry_size = 0
 
+def config_read_byte(vardict_map):
+    p = tup_vardict_map.read_byte()
+    if(type(p) == int):
+        return chr(p)
+    return p
+
 def config_var(key):
     global tup_vardict_map
     global tup_vardict_num
@@ -44,7 +50,7 @@ def config_var(key):
     right = tup_vardict_num
 
     while(True):
-        cur = (right - left) / 2
+        cur = int((right - left) / 2)
         if(cur <= 0):
             return None
         cur += left
@@ -59,7 +65,7 @@ def config_var(key):
 
         p = '\0'
         while(bytesleft > 0):
-            p = tup_vardict_map.read_byte()
+            p = config_read_byte(tup_vardict_map)
             k = key[keylen - bytesleft]
             if(p == '=' or p < k):
                 left = cur
@@ -70,13 +76,13 @@ def config_var(key):
             bytesleft -= 1
 
         if(bytesleft == 0):
-            p = tup_vardict_map.read_byte()
+            p = config_read_byte(tup_vardict_map)
             if(p == '='):
                 rc = []
                 while(1):
-                    p = tup_vardict_map.read_byte()
+                    p = config_read_byte(tup_vardict_map)
                     if(p == '\0'):
-                        return string.join(rc, "")
+                        return "".join(rc)
                     rc.append(p)
             else:
                 right = cur

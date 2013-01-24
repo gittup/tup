@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,33 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to use a python client in a run script and use @-variables
+# Same as t4079, but now the file we accidentally write to is a ghost.
 
 . ./tup.sh
-check_no_windows client, run-script
-check_python
 
-cat > foo.py << HERE
-import tup_client
-var = tup_client.config_var('FOO')
-if var is None:
-	print(": |> echo None |>")
-else:
-	# python 3 is ugly.
-	print(" ".join([": |> echo foo", var, "|>"]))
+cat > ok.sh << HERE
+echo info > log.txt
+echo haha > ghost.txt
+exit 2
+echo hey > foo.txt
 HERE
+
+cat > gen-output.sh << HERE
+if [ -f ghost.txt ]; then cat ghost.txt; else echo nofile; fi
+HERE
+chmod +x gen-output.sh
+
 cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B foo.py
+: |> ./gen-output.sh > %o |> output.txt
+: output.txt |> sh ok.sh |> log.txt foo.txt
 HERE
-tup touch Tupfile foo.py
-update
+tup touch Tupfile ok.sh
+update_fail_msg 'Unspecified output'
 
-tup_object_exist . 'echo None'
+check_exist log.txt
+check_not_exist ghost.txt
+check_not_exist foo.txt
 
-varsetall FOO=y
-update
-tup_object_exist . 'echo foo y'
-
-varsetall FOO=hey
-update
-tup_object_exist . 'echo foo hey'
+echo info | diff - log.txt
 
 eotup

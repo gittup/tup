@@ -22,6 +22,7 @@
 #include "db.h"
 #include "array_size.h"
 #include "tupid_tree.h"
+#include "file.h"
 #include "fileio.h"
 #include "config.h"
 #include "vardb.h"
@@ -47,7 +48,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 14
-#define PARSER_VERSION 6
+#define PARSER_VERSION 7
 
 enum {
 	DB_BEGIN,
@@ -4953,12 +4954,14 @@ struct actual_output_data {
 	FILE *f;
 	tupid_t cmdid;
 	int output_error;
+	struct mapping_head *mapping_list;
 };
 
 static int extra_output(tupid_t tupid, void *data)
 {
 	struct tup_entry *tent;
 	struct actual_output_data *aod = data;
+	struct mapping *map;
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
@@ -4979,6 +4982,21 @@ static int extra_output(tupid_t tupid, void *data)
 	print_tup_entry(aod->f, tent);
 	fprintf(aod->f, "\n");
 #endif
+
+	/* The tent could already exist, for example if there is a ghost file
+	 * here. In such cases if we didn't actually specify this as an output,
+	 * we want to avoid moving the file out of the tmp directory and into
+	 * the real fs, so delete the mapping (t4081).
+	 */
+	LIST_FOREACH(map, aod->mapping_list, list) {
+		/* Easiest to check for the tent, since the tent is already set
+		 * in update_write_info().
+		 */
+		if(map->tent == tent) {
+			del_map(map);
+			break;
+		}
+	}
 	/* Return success here so we can display all errant outputs.  Actual
 	 * check is in tup_db_check_actual_outputs().
 	 */
@@ -5005,13 +5023,16 @@ static int missing_output(tupid_t tupid, void *data)
 }
 
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
-				struct tup_entry_head *writehead)
+				struct tup_entry_head *writehead,
+				struct mapping_head *mapping_list,
+				int *write_bork)
 {
 	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
 		.f = f,
 		.cmdid = cmdid,
 		.output_error = 0,
+		.mapping_list = mapping_list,
 	};
 
 	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0)
@@ -5021,7 +5042,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		return -1;
 	free_tupid_tree(&output_root);
 	if(aod.output_error)
-		return -1;
+		*write_bork = 1;
 	return 0;
 }
 

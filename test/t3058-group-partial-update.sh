@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,25 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to use a python client in a run script and use @-variables
+# If we do a partial update, make sure we don't force compiling everything else
+# in the group as well.
 
 . ./tup.sh
-check_no_windows client, run-script
-check_python
-
-cat > foo.py << HERE
-import tup_client
-var = tup_client.config_var('FOO')
-if var is None:
-	print(": |> echo None |>")
-else:
-	# python 3 is ugly.
-	print(" ".join([": |> echo foo", var, "|>"]))
-HERE
 cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B foo.py
+: foreach *.c |> gcc -c %f -o %o |> %B.o | <group>
 HERE
-tup touch Tupfile foo.py
+echo '#include "foo.h"' > foo.c
+echo '#include "foo.h"' > bar.c
+tup touch foo.c bar.c foo.h
 update
 
-tup_object_exist . 'echo None'
+tup touch foo.h
+update_partial foo.o > .output.txt
 
-varsetall FOO=y
-update
-tup_object_exist . 'echo foo y'
-
-varsetall FOO=hey
-update
-tup_object_exist . 'echo foo hey'
+if grep bar.o .output.txt > /dev/null; then
+	cat .output.txt
+	echo "Error: should not have compiled bar.o in partial update." 1>&2
+	exit 1
+fi
 
 eotup

@@ -16,19 +16,16 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that a node-variable can refer to a generated file.
+# Test that a node-variable cannot refer to a generated file.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
 : |> touch %o |> a.txt
 &node_var = a.txt
-: &(node_var) |> cp &(node_var) %o |> out.txt
 HERE
 
 tup touch Tupfile
-update
-
-tup_dep_exist . a.txt . 'cp a.txt out.txt'
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

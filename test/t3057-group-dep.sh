@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,26 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to use a python client in a run script and use @-variables
+# We don't actually need a dependency on the directory a group is in, since we
+# aren't reading file entries from it.
 
 . ./tup.sh
-check_no_windows client, run-script
-check_python
-
-cat > foo.py << HERE
-import tup_client
-var = tup_client.config_var('FOO')
-if var is None:
-	print(": |> echo None |>")
-else:
-	# python 3 is ugly.
-	print(" ".join([": |> echo foo", var, "|>"]))
+tmkdir sub
+tmkdir bar
+cat > sub/Tupfile << HERE
+: ../bar/<group> |> echo foo |>
 HERE
-cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B foo.py
+touch bar/Tupfile
+update
+
+tup_dep_no_exist . bar . sub
+
+cat > sub/Tupfile << HERE
+: ../bar/<group> ../bar/*.c |> echo foo |>
 HERE
-tup touch Tupfile foo.py
+tup touch sub/Tupfile
 update
 
-tup_object_exist . 'echo None'
-
-varsetall FOO=y
-update
-tup_object_exist . 'echo foo y'
-
-varsetall FOO=hey
-update
-tup_object_exist . 'echo foo hey'
+tup_dep_exist . bar . sub
 
 eotup
