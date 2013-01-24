@@ -29,7 +29,7 @@ echo hey > foo.txt
 HERE
 
 cat > Tupfile << HERE
-: |> sh ok.sh |> log.txt foo.txt
+tup.definerule{outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
 HERE
 tup touch Tupfile ok.sh
 update_fail_msg "failed with return value 2"

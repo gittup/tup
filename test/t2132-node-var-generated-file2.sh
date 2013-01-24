@@ -22,14 +22,14 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: |> touch %o |> a.txt
+tup.definerule{outputs = {'a.txt'}, command = 'touch a.txt'}
 HERE
 
 tup touch Tupfile
 update
 
 cat > Tupfile <<HERE
-&node_var = a.txt
+node_var = tup.nodevariable 'a.txt'
 HERE
 tup touch Tupfile
 update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."

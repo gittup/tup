@@ -33,8 +33,8 @@ HERE
 chmod +x gen-output.sh
 
 cat > Tupfile << HERE
-: |> ./gen-output.sh > %o |> output.txt
-: output.txt |> sh ok.sh |> log.txt foo.txt
+tup.definerule{outputs = {'output.txt'}, command = './gen-output.sh > output.txt'}
+tup.definerule{inputs = {'output.txt'}, outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
 HERE
 tup touch Tupfile ok.sh
 update_fail_msg 'Unspecified output'

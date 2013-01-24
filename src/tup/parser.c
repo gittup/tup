@@ -191,11 +191,9 @@ static const char *tuplua_reader(struct lua_State *ls, void *data, size_t *size)
 
 static void tuplua_register_function(struct lua_State *ls, const char *name, lua_CFunction function, void *data)
 {
-        lua_getglobal(ls, "tup");
 	lua_pushlightuserdata(ls, data);
 	lua_pushcclosure(ls, function, 1);
 	lua_setfield(ls, 1, name);
-	lua_setglobal(ls, "tup");
 }
 
 static int tuplua_function_include(lua_State *ls)
@@ -550,6 +548,79 @@ static int tuplua_function_creategitignore(lua_State *ls)
 	return 0;
 }
 
+static int tuplua_function_nodevariable(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	
+	lua_settop(ls, 1);
+
+	if(!lua_isstring(ls, -1))
+		return luaL_error(ls, "Must be passed a string referring to a node as argument 1.");
+
+	struct tup_entry *tent;
+	tent = get_tent_dt(tf->curtent->tnode.tupid, lua_tostring(ls, 1));
+	if(!tent) {
+		/* didn't find the given file; if using a variant, check the source dir */
+		struct tup_entry *srctent;
+		if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
+			return luaL_error(ls, "tup error: Internal error locating source tup entry for node variable.");
+		if(srctent)
+			tent = get_tent_dt(srctent->tnode.tupid, lua_tostring(ls, 1));
+
+		if(!tent) {
+			return luaL_error(ls, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", lua_tostring(ls, 1));
+		}
+	}
+
+	if(tent->type != TUP_NODE_FILE && tent->type != TUP_NODE_DIR) {
+		return luaL_error(ls, "tup error: Node-variables can only refer to normal files and directories, not a '%s'.\n", tup_db_type(tent->type));
+	}
+	
+	lua_pop(ls, 1);
+
+	// TODO To guard from users confusing userdata items, allocate extra space and add a type identifier at the beginning (plus a magic number?).
+	void *stackid = lua_newuserdata(ls, sizeof(tent->tnode.tupid));
+	memcpy(stackid, &tent->tnode.tupid, sizeof(tent->tnode.tupid));
+	lua_pushvalue(ls, lua_upvalueindex(2));
+	lua_setmetatable(ls, 1);
+	
+	return 1;
+}
+
+static int tuplua_function_nodevariable_tostring(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	
+	int slen = 0;
+	int rc = -1;
+
+	void *stackid;
+	tupid_t tid;
+	char *value;
+	
+	lua_settop(ls, 1);
+
+	if(!lua_isuserdata(ls, 1))
+		return luaL_error(ls, "Argument 1 is not a node variable.");
+	stackid = lua_touserdata(ls, 1);
+	tid = *(tupid_t *)stackid;
+	
+	rc = get_relative_dir(NULL, tf->curtent->tnode.tupid, tid, &slen);
+	if (rc < 0 || slen < 0) return 0;
+	
+	value = malloc(slen);
+	rc = get_relative_dir(value, tf->curtent->tnode.tupid, tid, &slen);
+	if (rc < 0 || slen < 0) {
+		free(value);
+		return 0;
+	}
+
+	lua_pushlstring(ls, value, slen);
+	free(value);
+
+	return 1;
+}
+
 static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 {
 	struct tuplua_reader_data lrd;
@@ -567,7 +638,6 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 	
 		/* Register tup interaction functions in the "tup" table in Lua */	
 		lua_newtable(ls);
-		lua_setglobal(ls, "tup");
 		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
 		tuplua_register_function(ls, "dorulesfile", tuplua_function_includerules, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
@@ -577,6 +647,16 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
 		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
+		
+		lua_pushlightuserdata(ls, tf);
+		lua_newtable(ls);
+		lua_pushlightuserdata(ls, tf);
+		lua_pushcclosure(ls, tuplua_function_nodevariable_tostring, 1);
+		lua_setfield(ls, -2, "__tostring");
+		lua_pushcclosure(ls, tuplua_function_nodevariable, 2);
+		lua_setfield(ls, 1, "nodevariable");
+	
+		lua_setglobal(ls, "tup");
 
 		/* Load some basic libraries.  File-access functions are avoided so that accesses
 		 * must go through the tup methods. Load the debug library so tracebacks 
