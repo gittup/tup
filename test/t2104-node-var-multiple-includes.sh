@@ -51,7 +51,7 @@ HERE
 
 cat > sw/app/core/Tupfile << HERE
 tup.dorulesfile()
-tup.dofile(tostring(lib_tupfile))
+tup.dofile(lib_tupfile)
 if vars then vars = vars .. ' core' else vars = 'core' end
 
 if tup.getcwd() == '.' then
@@ -61,7 +61,7 @@ HERE
 
 cat > sw/test/Tupfile << HERE
 tup.dorulesfile()
-tup.dofile(tostring(core_tupfile))
+tup.dofile(core_tupfile)
 if vars then vars = vars .. ' test' else vars = 'test' end
 bang_vars 'test.txt'
 HERE
