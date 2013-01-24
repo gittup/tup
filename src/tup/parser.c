@@ -615,6 +615,8 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 		return 0;
 	}
 
+	lua_settop(ls, 0);
+
 	lua_pushlstring(ls, value, slen);
 	free(value);
 

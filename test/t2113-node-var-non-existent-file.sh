@@ -21,7 +21,7 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-&node_var = lib.a
+node_var = tup.nodevariable 'lib.a'
 HERE
 
 tup touch Tupfile
