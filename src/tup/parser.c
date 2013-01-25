@@ -109,7 +109,6 @@ struct tupfile {
 	int root_fd;
 	struct graph *g;
 	struct vardb vdb;
-	struct node_vardb node_db;
 	struct tupid_entries cmd_root;
 	struct tupid_entries env_root;
 	struct tupid_entries input_root;
@@ -804,10 +803,8 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	}
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
-	if(nodedb_init(&tf.node_db) < 0)
-		goto out_server_stop;
 	if(vardb_init(&tf.vdb) < 0)
-		goto out_close_node_db;
+		goto out_server_stop;
 	if(environ_add_defaults(&tf.env_root) < 0)
 		goto out_close_vdb;
 
@@ -865,9 +862,6 @@ out_close_dfd:
 	}
 out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
-		rc = -1;
-out_close_node_db:
-	if(nodedb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
 	if(server_parser_stop(&ps) < 0)
