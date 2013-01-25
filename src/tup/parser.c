@@ -638,6 +638,23 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 	return 1;
 }
 
+static int tuplua_function_concat(struct lua_State *ls)
+{
+	size_t slen1, slen2;
+
+	if (tuplua_tolstring(ls, 1, &slen1) == NULL)
+		return luaL_error(ls, "Cannot concatenate; Argument 1 cannot be converted to a string.");
+	if (tuplua_tolstring(ls, 2, &slen2) == NULL)
+		return luaL_error(ls, "Cannot concatenate; Argument 2 cannot be converted to a string.");
+
+	char *out = malloc(slen1 + slen2);
+	memcpy(out, tuplua_tostring(ls, 1), slen1);
+	memcpy(out + slen1, tuplua_tostring(ls, 2), slen2);
+	lua_pushlstring(ls, out, slen1 + slen2);
+	free(out);
+	return 1;
+}
+
 static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 {
 	struct tuplua_reader_data lrd;
@@ -670,6 +687,9 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_pushlightuserdata(ls, tf);
 		lua_pushcclosure(ls, tuplua_function_nodevariable_tostring, 1);
 		lua_setfield(ls, -2, "__tostring");
+		lua_pushlightuserdata(ls, tf);
+		lua_pushcclosure(ls, tuplua_function_concat, 1);
+		lua_setfield(ls, -2, "__concat");
 		lua_pushcclosure(ls, tuplua_function_nodevariable, 2);
 		lua_setfield(ls, 1, "nodevariable");
 	
