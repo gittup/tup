@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -25,15 +25,16 @@ cat > ok.c << HERE
 
 int main(void)
 {
-	printf(": foreach *.c |> gcc -c %%f -o %%o |> %%B.o");
+	printf(": |> touch foo |> foo");
 	return 0;
 }
 HERE
-gcc ok.c -o ok
-./ok > Tupfile
+gcc ok.c -o ok.exe
+./ok.exe > Tupfile
 
-tup touch Tupfile ok.c ok
-parse_fail_msg "Missing newline character"
+tup touch Tupfile ok.c ok.exe
+update
+check_exist foo
 
 cat > ok.c << HERE
 #include <stdio.h>
@@ -44,7 +45,7 @@ int main(void)
 	 * become a backslash in the Tupfile, and 1 of which is used with
 	 * the newline.
 	 */
-	printf(": foreach *.c |> \\\\\\ngcc -c %%f -o %%o |> %%B.o");
+	printf(": |> \\\\\\ntouch bar |> bar");
 	return 0;
 }
 HERE
@@ -52,6 +53,7 @@ gcc ok.c -o ok.exe
 ./ok.exe > Tupfile
 
 tup touch Tupfile
-parse_fail_msg "Missing newline character"
+update
+check_exist bar
 
 eotup

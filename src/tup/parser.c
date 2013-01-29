@@ -408,6 +408,17 @@ out_server_stop:
 	return rc;
 }
 
+static char *get_newline(char *p)
+{
+	char *newline;
+
+	newline = strchr(p, '\n');
+	if(!newline) {
+		newline = strchr(p, '\0');
+	}
+	return newline;
+}
+
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename)
 {
 	char *p, *e;
@@ -438,10 +449,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			break;
 
 		line = p;
-		newline = strchr(p, '\n');
+		newline = get_newline(p);
 		if(!newline) {
-			fprintf(tf->f, "tup error: Missing newline character.\n");
-			fprintf(tf->f, "  Line was: %s\n", line);
+			fprintf(tf->f, "tup error: Unable to find trailing nul-byte.\n");
+			fprintf(tf->f, "  Line was: '%s'\n", line);
 			return -1;
 		}
 		lno++;
@@ -451,10 +462,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			}
 			newline[-1] = ' ';
 			newline[0] = ' ';
-			newline = strchr(p, '\n');
+			newline = get_newline(p);
 			if(!newline) {
-				fprintf(tf->f, "tup error: Missing newline character.\n");
-				fprintf(tf->f, "  Line was: %s\n", line);
+				fprintf(tf->f, "tup error: Unable to find trailing nul-byte.\n");
+				fprintf(tf->f, "  Line was: '%s'\n", line);
 				return -1;
 			}
 			lno++;
