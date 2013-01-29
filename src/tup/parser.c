@@ -2278,6 +2278,14 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
 			}
+			if(!pl->pel) {
+				if(strcmp(pl->path, ".") == 0) {
+					fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
+					return -1;
+				}
+				fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
+				return -1;
+			}
 			if(pl->path == pl->pel->path) {
 				pl->path = NULL;
 			} else {
