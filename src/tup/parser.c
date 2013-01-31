@@ -697,18 +697,16 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		/* Load some basic libraries.  File-access functions are avoided so that accesses
 		 * must go through the tup methods. Load the debug library so tracebacks 
 		 * for errors can be formatted nicely */
-		lua_pushcfunction(ls, luaopen_base); lua_pushstring(ls, ""); lua_call(ls, 1, 0);
-		lua_pushcfunction(ls, luaopen_table); lua_pushstring(ls, LUA_TABLIBNAME); lua_call(ls, 1, 0);
-		lua_pushcfunction(ls, luaopen_string); lua_pushstring(ls, LUA_STRLIBNAME); lua_call(ls, 1, 0);
-		lua_pushcfunction(ls, luaopen_bit32); lua_pushstring(ls, LUA_BITLIBNAME); lua_call(ls, 1, 0);
-		lua_pushcfunction(ls, luaopen_math); lua_pushstring(ls, LUA_MATHLIBNAME); lua_call(ls, 1, 0);
-		lua_pushcfunction(ls, luaopen_debug); lua_pushstring(ls, LUA_DBLIBNAME); lua_call(ls, 1, 0);
+		luaL_requiref(ls, "_G", luaopen_base, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_TABLIBNAME, luaopen_table, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_STRLIBNAME, luaopen_string, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_BITLIBNAME, luaopen_bit32, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
 		lua_pushnil(ls); lua_setglobal(ls, "dofile");
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
 		lua_pushnil(ls); lua_setglobal(ls, "require");
-
-		luaL_openlibs(ls);
 	}
 	else ls = tf->sd;
 
