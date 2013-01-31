@@ -50,10 +50,12 @@ echo "  mkdir build"
 mkdir -p build
 echo "  cd build"
 cd build
+(cd ../src/tup/; ./generate-luabuiltin.sh > luabuiltin.h)
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/access_event/send_event.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	$CC $CFLAGS -c $i -I../src $plat_cflags
 done
+rm ../src/tup/luabuiltin.h
 
 echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"
 $CC $CFLAGS -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags

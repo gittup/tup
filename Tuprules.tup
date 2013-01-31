@@ -85,10 +85,12 @@ table.insert(MINGWCFLAGS, '-Dsig_atomic_t=int')
 -- Use the same value as linux here. The logic is in src/compat/unlinkat.c
 table.insert(MINGWCFLAGS, '-DAT_REMOVEDIR=0x200')
 
-bang_cc = function(input)
+bang_cc = function(input, extradependency)
 	local output = string.gsub(input, '%.c', '') .. '.o'
+	local inputs = {input}
+	if extradependency then table.insert(inputs, extradependency) end
 	tup.definerule {
-		inputs = {input},
+		inputs = inputs,
 		outputs = {output},
 		command = '^ CC ' .. input .. '^' ..
 			CC .. ' -c ' .. input .. ' -o ' .. output .. 
@@ -137,10 +139,12 @@ then
 	bang_mingwcc = function(input)
 	end
 else
-	bang_mingwcc = function(input)
+	bang_mingwcc = function(input, extradependency)
 		local output = string.gsub(input, '%.c', '') .. '.omingw'
+		local inputs = {input}
+		if extradependency then table.insert(inputs, extradependency) end
 		tup.definerule {
-			inputs = {input},
+			inputs = inputs,
 			outputs = {output},
 			command = '^ MINGW32CC ' .. input .. '^' ..
 				tup.getconfig('TUP_MINGW') .. '-gcc -c ' .. input .. ' -o ' .. output .. 

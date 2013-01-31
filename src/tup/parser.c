@@ -49,6 +49,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include "luabuiltin.h" /* Generated from builtin.lua */
+
 typedef lua_State * scriptdata;
 
 #define SYNTAX_ERROR -2
@@ -707,6 +709,9 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
 		lua_pushnil(ls); lua_setglobal(ls, "require");
+
+		/* Load lua built-in lua helper functions from luabuiltin.h */
+		luaL_loadbuffer(ls, tuplua_builtin, sizeof(tuplua_builtin), "builtin");
 	}
 	else ls = tf->sd;
 
