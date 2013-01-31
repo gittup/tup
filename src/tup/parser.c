@@ -711,7 +711,23 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_pushnil(ls); lua_setglobal(ls, "require");
 
 		/* Load lua built-in lua helper functions from luabuiltin.h */
-		luaL_loadbuffer(ls, tuplua_builtin, sizeof(tuplua_builtin), "builtin");
+		lua_getglobal(ls, "debug");
+		lua_getfield(ls, -1, "traceback");
+		lua_remove(ls, -2);
+		if (luaL_loadbuffer(ls, tuplua_builtin, sizeof(tuplua_builtin) - 1, "builtin") != LUA_OK)
+		{
+			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
+			lua_close(ls);
+			tf->sd = NULL;
+			return 0;
+		}
+		if(lua_pcall(ls, 0, 0, 1) != LUA_OK)
+		{
+			fprintf(tf->f, "tup error: Failed to parse builtins:\n%s\n", tuplua_tostring(ls, -1));
+			lua_close(ls);
+			tf->sd = NULL;
+			return 0;
+		}
 	}
 	else ls = tf->sd;
 
@@ -730,7 +746,7 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		return 0;
 	}
 
-	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK)
+	if(lua_pcall(ls, 0, 0, 1) != LUA_OK)
 	{
 		fprintf(tf->f, "tup error: Failed to execute Tupfile:\n%s\n", tuplua_tostring(ls, -1));
 		if(ownstate)
