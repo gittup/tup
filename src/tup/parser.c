@@ -396,7 +396,7 @@ out_server_stop:
 		rc = -1;
 	}
 	rewind(tf.f);
-	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0);
+	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0, NULL);
 	if(fclose(tf.f) != 0) {
 		/* Use perror, since we're trying to close the tf.f output */
 		perror("fclose");
@@ -841,7 +841,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		if(tupid_tree_add_dup(&tf->input_root, tt->tupid) < 0)
 			return -1;
 	}
-	rc = server_run_script(tf->tupid, eval_cmdline, &tf->env_root, &rules);
+	rc = server_run_script(tf->f, tf->tupid, eval_cmdline, &tf->env_root, &rules);
 	free(eval_cmdline);
 	if(rc < 0)
 		return -1;

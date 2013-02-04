@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -503,7 +503,7 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
-int server_run_script(tupid_t tupid, const char *cmdline,
+int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tupid_entries *env_root, char **rules)
 {
 	struct tup_entry *tent;
@@ -525,7 +525,7 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 		return -1;
 	environ_free(&te);
 
-	if(display_output(s.error_fd, 1, cmdline, 1) < 0)
+	if(display_output(s.error_fd, 1, cmdline, 1, f) < 0)
 		return -1;
 	if(close(s.error_fd) < 0) {
 		perror("close(s.error_fd)");
@@ -544,12 +544,12 @@ int server_run_script(tupid_t tupid, const char *cmdline,
 			*rules = b.s;
 			return 0;
 		}
-		fprintf(stderr, "tup error: run-script exited with failure code: %i\n", s.exit_status);
+		fprintf(f, "tup error: run-script exited with failure code: %i\n", s.exit_status);
 	} else {
 		if(s.signalled) {
-			fprintf(stderr, "tup error: run-script terminated with signal %i\n", s.exit_sig);
+			fprintf(f, "tup error: run-script terminated with signal %i\n", s.exit_sig);
 		} else {
-			fprintf(stderr, "tup error: run-script terminated abnormally.\n");
+			fprintf(f, "tup error: run-script terminated abnormally.\n");
 		}
 	}
 	return -1;

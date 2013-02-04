@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,6 +22,7 @@
 #define tup_config_h
 
 #include "tupid.h"
+#include <stdio.h>
 
 int find_tup_dir(void);
 int open_tup_top(void);
@@ -31,6 +32,6 @@ int get_tup_top_len(void);
 const char *get_sub_dir(void);
 int get_sub_dir_len(void);
 int tup_top_fd(void);
-int display_output(int fd, int iserr, const char *name, int display_name);
+int display_output(int fd, int iserr, const char *name, int display_name, FILE *f);
 
 #endif

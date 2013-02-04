@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -82,7 +82,7 @@ int server_config_stop(struct server *s);
 int server_parser_start(struct parser_server *ps);
 int server_parser_stop(struct parser_server *ps);
 
-int server_run_script(tupid_t tupid, const char *cmdline,
+int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tupid_entries *env_root, char **rules);
 
 #endif
