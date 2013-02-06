@@ -714,7 +714,7 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_getglobal(ls, "debug");
 		lua_getfield(ls, -1, "traceback");
 		lua_remove(ls, -2);
-		if (luaL_loadbuffer(ls, tuplua_builtin, sizeof(tuplua_builtin) - 1, "builtin") != LUA_OK)
+		if (luaL_loadbuffer(ls, (char *)builtin_luac, builtin_luac_len, "builtin") != LUA_OK)
 		{
 			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);

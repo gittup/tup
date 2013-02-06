@@ -1,5 +1,6 @@
 tup.dorulesfile()
-tup.definerule{inputs = {'builtin.lua'}, outputs = {'luabuiltin.h'}, command = './generate-luabuiltin.sh > luabuiltin.h'}
+tup.definerule{inputs = {'builtin.lua'}, outputs = {'builtin.luac'}, command = 'luac -o builtin.luac builtin.lua'}
+tup.definerule{inputs = {'builtin.luac'}, outputs = {'luabuiltin.h'}, command = 'xxd -i builtin.luac luabuiltin.h'}
 bang_cc('parser.c', 'luabuiltin.h')
 bang_mingwcc('parser.c', 'luabuiltin.h')
 for index, file in ipairs(tup.glob('*.c'))

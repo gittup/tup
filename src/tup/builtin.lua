@@ -8,7 +8,7 @@ end
 
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
-	return string.gsub(filename, '[^/]*/', '')
+	return string.gsub(filename, '[^/\\]*[/\\]', '')
 end
 
 tup.base = function(filename)
@@ -130,5 +130,9 @@ tup.frule = function(arguments)
 	end
 
 	tup.definerule{inputs = inputs, outputs = outputs, command = command}
+end
+
+tup.rule = function(inputs, command, outputs)
+	tup.frule{ inputs = inputs, outputs = outputs, command = command }
 end
 
