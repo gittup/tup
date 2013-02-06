@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -4216,6 +4216,7 @@ static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 	fd = openat(dfd, vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
 	if(fd < 0) {
 		perror("openat");
+		fprintf(stderr, "tup error: Unable to create the vardict file: '%s'\n", vardict_file);
 		return -1;
 	}
 	if(close(dfd) < 0) {
@@ -4224,6 +4225,7 @@ static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 	}
 	if(write(fd, &vdb->count, sizeof(vdb->count)) != sizeof(vdb->count)) {
 		perror("write");
+		fprintf(stderr, "tup error: Unable to write to the vardict file: '%s'\n", vardict_file);
 		goto out_err;
 	}
 	/* Write out index */

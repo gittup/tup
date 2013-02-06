@@ -1,4 +1,4 @@
-.TH "tup" "1" "2012/06/28" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/01/28" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -18,8 +18,8 @@ Tup has no domain specific knowledge. You must tell tup how to build your progra
 .SH "PRIMARY COMMANDS"
 You can do all of your development with just 'tup init' and 'tup upd', along with writing Tupfiles. See also the TUPFILES section below.
 .TP
-.B init
-Creates a '.tup' directory in the current directory and initializes the tup database. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
+.B init [directory]
+Creates a '.tup' directory in the specified directory and initializes the tup database. If a directory name is unspecified, it defaults to creating '.tup' in the current directory. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You only need to run this once when you first create your project, or check it out from version control, or whatever.
 .RS
 .TP
 .B --no-sync

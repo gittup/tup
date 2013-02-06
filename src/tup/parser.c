@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -253,7 +253,7 @@ static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tup
 			delete_name_list(nl);
 			return -1;
 		}
-		if(get_path_list(tf, entry, &pl, tf->tupid) < -1)
+		if(get_path_list(tf, entry, &pl, tf->tupid) < 0)
 		{
 			fprintf(tf->f, "Element '%s' in '%s' is invalid.\n", entry, table);
 			free(entry);
@@ -261,7 +261,7 @@ static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tup
 			delete_name_list(nl);
 			return -1;
 		}
-		if ((parse_dependent_tupfiles(&pl, tf) < -1) ||
+		if ((parse_dependent_tupfiles(&pl, tf) < 0) ||
 			(output ? (output_nl_add_path(tf, &pl, nl) < 0) :
 				(input_nl_add_path(tf, &pl, nl) < 0)))
 
@@ -895,7 +895,7 @@ out_server_stop:
 		rc = -1;
 	}
 	rewind(tf.f);
-	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0);
+	display_output(fileno(tf.f), rc == 0 ? 0 : 3, NULL, 0, NULL);
 	if(fclose(tf.f) != 0) {
 		/* Use perror, since we're trying to close the tf.f output */
 		perror("fclose");
@@ -1077,7 +1077,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 	newdt = find_dir_tupid_dt_pg(tf->f, tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
 	if(newdt <= 0) {
-		fprintf(tf->f, "tup error: Unable to find directory for include file relative to '");
+		fprintf(tf->f, "tup error: Unable to find directory for include file '%s' relative to '", file);
 		print_tup_entry(tf->f, tf->curtent);
 		fprintf(tf->f, "'\n");
 		goto out_del_pg;
@@ -1164,6 +1164,14 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list *pl,
 	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, 0, 0);
 	if(pl->dt <= 0) {
 		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
+		return -1;
+	}
+	if(!pl->pel) {
+		if(strcmp(pl->path, ".") == 0) {
+			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
+			return -1;
+		}
+		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
 		return -1;
 	}
 	if(pl->path == pl->pel->path) {
@@ -1271,13 +1279,6 @@ static int input_nl_add_path(struct tupfile *tf, struct path_list *pl, struct na
 			tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!tent) {
 				fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
-
-
-
-
-
-
-
 				return -1;
 			}
 		} else {

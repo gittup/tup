@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,44 +16,34 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Tup should parse correctly if the last newline is missing.
-
+# Make sure stderr from a run-script is displayed under the correct banner
 . ./tup.sh
+check_no_windows run-script
 
-cat > ok.c << HERE
-#include <stdio.h>
-
-int main(void)
-{
-	printf(": |> touch foo |> foo");
-	return 0;
-}
+cat > run.sh << HERE
+echo "Run script \$1" 1>&2
 HERE
-gcc ok.c -o ok.exe
-./ok.exe > Tupfile
+chmod +x run.sh
 
-tup touch Tupfile ok.c ok.exe
-update
-check_exist foo
-
-cat > ok.c << HERE
-#include <stdio.h>
-
-int main(void)
-{
-	/* The six backslashes here becomes 3 in the C program, 2 of which
-	 * become a backslash in the Tupfile, and 1 of which is used with
-	 * the newline.
-	 */
-	printf(": |> \\\\\\ntouch bar |> bar");
-	return 0;
-}
+tmkdir sub1
+tmkdir sub2
+cat > sub1/Tupfile << HERE
+run ../run.sh part1A
+: ../sub2/foo.txt |> echo %f |>
+run ../run.sh part1B
 HERE
-gcc ok.c -o ok.exe
-./ok.exe > Tupfile
 
-tup touch Tupfile
-update
-check_exist bar
+cat > sub2/Tupfile << HERE
+run ../run.sh part2
+HERE
+
+tup touch sub1/Tupfile sub2/Tupfile sub2/foo.txt
+update > .output.txt 2>&1
+
+if ! cat .output.txt | tr '\n' ' ' | grep '2).*sub2.*part2.*3).*sub1.*part1A.*part1B' > /dev/null; then
+	cat .output.txt
+	echo "Error: Expected 'part2' under sub2, and 'part1[AB]' under sub1"
+	exit 1
+fi
 
 eotup

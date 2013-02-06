@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -258,25 +258,79 @@ int main(int argc, char **argv)
 	return rc;
 }
 
+static int mkdirtree(const char *dirname)
+{
+	char *dirpart = strdup(dirname);
+	char *p;
+
+	if(!dirpart) {
+		perror("strdup");
+		return -1;
+	}
+
+	p = dirpart;
+	while(1) {
+		char *slash = p;
+		char slash_found = 0;
+
+		while(*slash && !is_path_sep(slash)) {
+			slash++;
+		}
+		if(*slash) {
+			slash_found = *slash;
+			*slash = 0;
+		}
+		if(mkdir(dirpart, 0777) < 0) {
+			if(errno != EEXIST) {
+				perror(dirpart);
+				fprintf(stderr, "tup error: Unable to create directory '%s' for a tup repository.\n", dirname);
+				return -1;
+			}
+		}
+		if(slash_found) {
+			*slash = slash_found;
+			p = slash + 1;
+		} else {
+			break;
+		}
+	}
+	free(dirpart);
+	return 0;
+}
+
 static int init(int argc, char **argv)
 {
 	int x;
 	int db_sync = 1;
 	int force_init = 0;
 	int fd;
+	const char *dirname = NULL;
 
-	for(x=0; x<argc; x++) {
+	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "--no-sync") == 0) {
 			db_sync = 0;
 		} else if(strcmp(argv[x], "--force") == 0) {
 			/* force should only be used for tup/test */
 			force_init = 1;
+		} else {
+			if(dirname) {
+				fprintf(stderr, "tup error: Expected only one directory name for 'tup init', but got '%s' and '%s'\n", dirname, argv[x]);
+				return -1;
+			}
+			dirname = argv[x];
 		}
 	}
 
-	fd = open(".", O_RDONLY);
+	if(dirname) {
+		if(mkdirtree(dirname) < 0)
+			return -1;
+	} else {
+		dirname = ".";
+	}
+
+	fd = open(dirname, O_RDONLY);
 	if(fd < 0) {
-		perror(".");
+		perror(dirname);
 		return -1;
 	}
 

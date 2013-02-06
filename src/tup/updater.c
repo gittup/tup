@@ -1709,13 +1709,13 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	rewind(f);
 
 	show_result(tent, is_err, show_ts, NULL);
-	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0) < 0)
+	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0, NULL) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
 		perror("close(s->output_fd)");
 		return -1;
 	}
-	if(display_output(fileno(f), 2, tent->name.s, 0) < 0)
+	if(display_output(fileno(f), 2, tent->name.s, 0, NULL) < 0)
 		return -1;
 	if(fclose(f) != 0) {
 		perror("fclose");
