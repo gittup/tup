@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -135,7 +135,7 @@ int tup_top_fd(void)
  * iserr=2 means stderr, for tup errors (eg: missing deps)
  * iserr=3 means stderr, for sub-processes that fail
  */
-int display_output(int fd, int iserr, const char *name, int display_name)
+int display_output(int fd, int iserr, const char *name, int display_name, FILE *f)
 {
 	if(fd != -1) {
 		char buf[1024];
@@ -145,6 +145,8 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 
 		if(iserr)
 			out = stderr;
+		if(f)
+			out = f;
 
 		while(1) {
 			rc = read(fd, buf, sizeof(buf));
@@ -160,13 +162,13 @@ int display_output(int fd, int iserr, const char *name, int display_name)
 				clear_active(out);
 				if(iserr == 2) {
 					/* For tup errors (eg: missing deps) */
-					fprintf(stderr, " *** tup errors ***\n");
+					fprintf(out, " *** tup errors ***\n");
 				}
 				if(iserr == 1) {
 					/* This is for run-scripts */
 					if(display_name) {
 						color_set(stderr);
-						fprintf(stderr, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
+						fprintf(out, " *** tup: stderr from command '%s%s%s%s' ***\n", color_type(TUP_NODE_CMD), color_append_normal(), name, color_end());
 					}
 				}
 			}
