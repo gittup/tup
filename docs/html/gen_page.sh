@@ -38,7 +38,7 @@ cat $1
 cat << HERE
 <div style="clear:both;"></div>
 </div>
-<div id="footer">&copy; 2008-2012 Mike Shal. All Rights Reserved.</div>
+<div id="footer">&copy; 2008-2013 Mike Shal. All Rights Reserved.</div>
 HERE
 
 if [ $analytics = "1" ]; then
