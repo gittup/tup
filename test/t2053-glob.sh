@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -20,18 +20,18 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach *.c [123].d ?.e |> test %f |>
+: foreach *.c [123].d ?.e |> cat %f |>
 HERE
 tup touch foo.c bar.c 1.d 2.d 3.d 5.e Tupfile
 tup touch boo.cc 4.d 52.e
-tup parse
+update
 for i in foo.c bar.c 1.d 2.d 3.d 5.e; do
 	check_exist $i
-	tup_dep_exist . $i . "test $i"
+	tup_dep_exist . $i . "cat $i"
 done
 for i in boo.cc 4.d 52.e; do
 	check_exist $i
-	tup_object_no_exist . "test $i"
+	tup_object_no_exist . "cat $i"
 done
 
 eotup

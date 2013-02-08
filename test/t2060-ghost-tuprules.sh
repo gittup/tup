@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -39,7 +39,7 @@ tup touch fs/sub/Tupfile Tuprules.tup fs/sub/Tuprules.tup
 tup touch fs/sub/helper.c
 tup parse
 
-tup_dep_exist fs/sub helper.c fs/sub 'gcc -Wall -O0 -c helper.c -o helper.o'
+tup_object_exist fs/sub 'gcc -Wall -O0 -c helper.c -o helper.o'
 tup_dep_exist fs/sub helper.o fs/sub 'gcc -lm helper.o -o prog'
 
 tup_dep_exist . Tuprules.tup fs sub
@@ -53,7 +53,7 @@ HERE
 tup touch fs/Tuprules.tup
 tup parse
 
-tup_dep_exist fs/sub helper.c fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'
+tup_object_exist fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'
 tup_dep_exist fs/sub helper.o fs/sub 'gcc -lm -lfoo helper.o -o prog'
 
 eotup

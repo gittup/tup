@@ -2693,6 +2693,21 @@ static int find_existing_command(const struct name_list *onl,
 	return 0;
 }
 
+static int add_input(struct tupid_entries *root, tupid_t tupid)
+{
+	struct tup_entry *tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->type == TUP_NODE_GENERATED ||
+	   tent->type == TUP_NODE_VAR ||
+	   tent->type == TUP_NODE_GROUP) {
+		if(tupid_tree_add_dup(root, tupid) < 0)
+			return -1;
+	}
+	return 0;
+}
+
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl)
 {
@@ -2931,19 +2946,19 @@ out_pl:
 	free_tupid_tree(&root);
 
 	TAILQ_FOREACH(nle, &nl->entries, list) {
-		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
-		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
-		if(tupid_tree_add_dup(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(&root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
-		if(tupid_tree_add_dup(&root, tt->tupid) < 0)
+		if(add_input(&root, tt->tupid) < 0)
 			return -1;
 	}
 	if(tup_db_write_inputs(cmdid, &root, &tf->env_root, &tf->g->gen_delete_root) < 0)

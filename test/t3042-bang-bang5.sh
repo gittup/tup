@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -20,7 +20,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-!touch = |> touch %o |>
+!touch = |> cat %f && touch %o |>
 !cc = |> gcc -c %f -o %o |>
 
 !mplayer.c = !touch
@@ -38,6 +38,6 @@ update
 
 check_exist foo.o bar.o
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
-tup_dep_exist . bar.asm . 'touch bar.o'
+tup_dep_exist . bar.asm . 'cat bar.asm && touch bar.o'
 
 eotup
