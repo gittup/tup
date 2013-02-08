@@ -2693,16 +2693,29 @@ static int find_existing_command(const struct name_list *onl,
 	return 0;
 }
 
-static int add_input(struct tupid_entries *root, tupid_t tupid)
+static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid_t tupid)
 {
 	struct tup_entry *tent;
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	if(tent->type == TUP_NODE_GENERATED ||
-	   tent->type == TUP_NODE_VAR ||
-	   tent->type == TUP_NODE_GROUP) {
-		if(tupid_tree_add_dup(root, tupid) < 0)
+	if(tent->type == TUP_NODE_GENERATED) {
+		tupid_t cmdid;
+
+		if(tupid_tree_add_dup(input_root, tupid) < 0)
+			return -1;
+		if(tup_db_get_incoming_link(tupid, &cmdid) < 0)
+			return -1;
+		if(cmdid < 0) {
+			fprintf(tf->f, "tup error: Unable to find command id for output file: ");
+			print_tup_entry(tf->f, tent);
+			fprintf(tf->f, "\n");
+			return -1;
+		}
+		if(tup_db_get_inputs(cmdid, input_root, NULL) < 0)
+			return -1;
+	} else if(tent->type == TUP_NODE_VAR || tent->type == TUP_NODE_GROUP) {
+		if(tupid_tree_add_dup(input_root, tupid) < 0)
 			return -1;
 	}
 	return 0;
@@ -2724,7 +2737,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tupid_tree *cmd_tt;
 	tupid_t cmdid = -1;
 	struct path_list_head oplist;
-	struct tupid_entries root = {NULL};
+	struct tupid_entries input_root = {NULL};
+	struct tupid_entries output_root = {NULL};
 	int extra_outputs = 0;
 	char sep[] = "|";
 	struct tup_entry *tmptent = NULL;
@@ -2921,7 +2935,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
-		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &output_root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -2932,7 +2946,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &root) < 0) {
+		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &output_root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;
 		}
@@ -2941,29 +2955,29 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &root, group) < 0)
+	if(tup_db_write_outputs(cmdid, &output_root, group) < 0)
 		return -1;
-	free_tupid_tree(&root);
+	free_tupid_tree(&output_root);
 
 	TAILQ_FOREACH(nle, &nl->entries, list) {
-		if(add_input(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
-		if(add_input(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
-		if(add_input(&root, nle->tent->tnode.tupid) < 0)
+		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
 			return -1;
 	}
 	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
-		if(add_input(&root, tt->tupid) < 0)
+		if(add_input(tf, &input_root, tt->tupid) < 0)
 			return -1;
 	}
-	if(tup_db_write_inputs(cmdid, &root, &tf->env_root, &tf->g->gen_delete_root) < 0)
+	if(tup_db_write_inputs(cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root) < 0)
 		return -1;
-	free_tupid_tree(&root);
+	free_tupid_tree(&input_root);
 	return 0;
 }
 

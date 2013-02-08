@@ -48,7 +48,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 14
-#define PARSER_VERSION 7
+#define PARSER_VERSION 8
 
 enum {
 	DB_BEGIN,
@@ -4865,10 +4865,12 @@ int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		tupid = sqlite3_column_int64(*stmt, 0);
 		style = sqlite3_column_int(*stmt, 1);
 		if(style & TUP_LINK_STICKY) {
-			rc = tupid_tree_add(sticky_root, tupid);
+			if(sticky_root)
+				rc = tupid_tree_add_dup(sticky_root, tupid);
 		}
 		if(style & TUP_LINK_NORMAL) {
-			rc = tupid_tree_add(normal_root, tupid);
+			if(normal_root)
+				rc = tupid_tree_add_dup(normal_root, tupid);
 		}
 
 		if(rc < 0) {
@@ -5231,7 +5233,6 @@ static int del_normal_link(tupid_t tupid, void *data)
 }
 
 static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
-				  struct tupid_entries *valid_input_root,
 				  struct tupid_entries *group_root)
 {
 	int found_error = 0;
@@ -5258,10 +5259,6 @@ static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_r
 				connected = 1;
 				break;
 			}
-		}
-		if(!connected) {
-			if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
-				return -1;
 		}
 
 		if(connected) {
@@ -5327,7 +5324,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root, &group_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, &group_root);
 
 	if(compare_list_tree(readhead, normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)
