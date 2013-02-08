@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -392,25 +392,59 @@ out_err:
 	return -1;
 }
 
-static void dump_node(FILE *f, struct node *n)
+static void dump_node(FILE *f, struct node *n, int trim)
 {
 	struct edge *e;
 	int color = 0;
 	int flags;
+	char label[PATH_MAX];
 
 	flags = tup_db_get_node_flags(n->tnode.tupid);
 	if(flags & TUP_FLAGS_CREATE)
 		color |= 0x00bb00;
 	if(flags & TUP_FLAGS_MODIFY)
 		color |= 0x0000ff;
-	fprintf(f, "tup%p [label=\"%s [%lli] (%i, %i)\",color=\"#%06x\"];\n",
-		n, n->tent->name.s, n->tnode.tupid, LIST_EMPTY(&n->incoming), n->expanded, color);
+
+	strncpy(label, n->tent->name.s, sizeof(label));
+	label[sizeof(label)-1] = 0;
+	if(trim) {
+		char *marker;
+		marker = strchr(label, '^');
+		if(marker) {
+			marker = strchr(marker+1, '^');
+			if(marker) {
+				marker[1] = 0;
+			}
+		}
+	}
+	fprintf(f, "node_%lli [label=\"%s (%i, %i)\",color=\"#%06x\"];\n",
+		n->tnode.tupid, label, LIST_EMPTY(&n->incoming), n->expanded, color);
 	LIST_FOREACH(e, &n->edges, list) {
-		fprintf(f, "tup%p -> tup%p [dir=back,style=\"%s\",arrowtail=\"%s\"];\n", e->dest, n, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
+		fprintf(f, "node_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"];\n", e->dest->tent->tnode.tupid, n->tent->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
 	}
 }
 
-void dump_graph(const struct graph *g, const char *filename)
+void trim_graph(struct graph *g)
+{
+	struct node *n;
+	struct node *tmp;
+	int nodes_removed;
+	do {
+		nodes_removed = 0;
+		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
+			/* Get rid of any node that is either at the root or a
+			 * leaf - nodes in the cycle will have both incoming
+			 * and outgoing edges.
+			 */
+			if(LIST_EMPTY(&n->incoming) || LIST_EMPTY(&n->edges)) {
+				remove_node_internal(g, n);
+				nodes_removed = 1;
+			}
+		}
+	} while(nodes_removed);
+}
+
+void dump_graph(const struct graph *g, const char *filename, int trim)
 {
 	static int count = 0;
 	struct node *n;
@@ -430,10 +464,10 @@ void dump_graph(const struct graph *g, const char *filename)
 	}
 	fprintf(f, "digraph G {\n");
 	TAILQ_FOREACH(n, &g->node_list, list) {
-		dump_node(f, n);
+		dump_node(f, n, trim);
 	}
 	TAILQ_FOREACH(n, &g->plist, list) {
-		dump_node(f, n);
+		dump_node(f, n, trim);
 	}
 	fprintf(f, "}\n");
 	fclose(f);
