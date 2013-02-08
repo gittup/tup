@@ -395,6 +395,7 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
+	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -404,7 +405,11 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 		return -1;
 
 edge_create:
-	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
+	if(style & TUP_LINK_NORMAL)
+		expandable = 1;
+	if(n->tent->type == TUP_NODE_GROUP)
+		expandable = 1;
+	if(expandable && n->expanded == 0) {
 		n->expanded = 1;
 		TAILQ_REMOVE(&g->node_list, n, list);
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
