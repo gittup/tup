@@ -2975,6 +2975,15 @@ out_pl:
 		if(add_input(tf, &input_root, tt->tupid) < 0)
 			return -1;
 	}
+	if(group) {
+		if(tupid_tree_search(&input_root, group->tnode.tupid) != NULL) {
+			fprintf(tf->f, "tup error: command ID %lli both reads from and writes to this group: ", cmdid);
+			print_tup_entry(tf->f, group);
+			fprintf(tf->f, "\n");
+			tup_db_print(tf->f, cmdid);
+			return -1;
+		}
+	}
 	if(tup_db_write_inputs(cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root) < 0)
 		return -1;
 	free_tupid_tree(&input_root);
