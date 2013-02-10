@@ -392,38 +392,6 @@ out_err:
 	return -1;
 }
 
-static void dump_node(FILE *f, struct node *n, int trim)
-{
-	struct edge *e;
-	int color = 0;
-	int flags;
-	char label[PATH_MAX];
-
-	flags = tup_db_get_node_flags(n->tnode.tupid);
-	if(flags & TUP_FLAGS_CREATE)
-		color |= 0x00bb00;
-	if(flags & TUP_FLAGS_MODIFY)
-		color |= 0x0000ff;
-
-	strncpy(label, n->tent->name.s, sizeof(label));
-	label[sizeof(label)-1] = 0;
-	if(trim) {
-		char *marker;
-		marker = strchr(label, '^');
-		if(marker) {
-			marker = strchr(marker+1, '^');
-			if(marker) {
-				marker[1] = 0;
-			}
-		}
-	}
-	fprintf(f, "node_%lli [label=\"%s (%i, %i)\",color=\"#%06x\"];\n",
-		n->tnode.tupid, label, LIST_EMPTY(&n->incoming), n->expanded, color);
-	LIST_FOREACH(e, &n->edges, list) {
-		fprintf(f, "node_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"];\n", e->dest->tent->tnode.tupid, n->tent->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
-	}
-}
-
 void trim_graph(struct graph *g)
 {
 	struct node *n;
@@ -444,10 +412,9 @@ void trim_graph(struct graph *g)
 	} while(nodes_removed);
 }
 
-void dump_graph(const struct graph *g, const char *filename, int trim)
+void save_graph(struct graph *g, const char *filename)
 {
 	static int count = 0;
-	struct node *n;
 	char realfile[PATH_MAX];
 	FILE *f;
 
@@ -455,20 +422,148 @@ void dump_graph(const struct graph *g, const char *filename, int trim)
 		perror("asprintf");
 		return;
 	}
-	fprintf(stderr, "tup: dumping graph '%s'\n", realfile);
+	fprintf(stderr, "tup: saving graph '%s'\n", realfile);
+
 	count++;
 	f = fopen(realfile, "w");
 	if(!f) {
 		perror(realfile);
 		return;
 	}
+	dump_graph(g, f, 0, 0, 0);
+	fclose(f);
+}
+
+static void print_name(FILE *f, const char *s, char c)
+{
+	for(; *s && *s != c; s++) {
+		if(*s == '"') {
+			fprintf(f, "\\\"");
+		} else if(*s == '\\') {
+			fprintf(f, "\\\\");
+		} else {
+			fprintf(f, "%c", *s);
+		}
+	}
+}
+
+static void dump_node(FILE *f, struct graph *g, struct node *n,
+		      int show_dirs, int show_env, int show_ghosts)
+{
+	int color;
+	int fontcolor;
+	const char *shape;
+	const char *style;
+	char *s;
+	struct edge *e;
+	int flags;
+
+	if(n == g->root)
+		return;
+
+	if(!show_env) {
+		if(n->tent->tnode.tupid == env_dt() ||
+		   n->tent->dt == env_dt())
+			return;
+	}
+
+	style = "solid";
+	color = 0;
+	fontcolor = 0;
+	switch(n->tent->type) {
+		case TUP_NODE_FILE:
+		case TUP_NODE_GENERATED:
+			/* Skip Tupfiles in no-dirs mode since they
+			 * point to directories.
+			 */
+			if(!show_dirs && strcmp(n->tent->name.s, "Tupfile") == 0)
+				return;
+			shape = "oval";
+			break;
+		case TUP_NODE_CMD:
+			shape = "rectangle";
+			break;
+		case TUP_NODE_DIR:
+			if(!show_dirs)
+				return;
+			shape = "diamond";
+			break;
+		case TUP_NODE_VAR:
+			shape = "octagon";
+			break;
+		case TUP_NODE_GHOST:
+			if(!show_ghosts)
+				return;
+			/* Ghost nodes won't have flags set */
+			color = 0x888888;
+			fontcolor = 0x888888;
+			style = "dotted";
+			shape = "oval";
+			break;
+		case TUP_NODE_GROUP:
+			shape = "hexagon";
+			break;
+		case TUP_NODE_ROOT:
+		default:
+			shape="ellipse";
+	}
+
+	flags = tup_db_get_node_flags(n->tnode.tupid);
+	if(flags & TUP_FLAGS_MODIFY) {
+		color |= 0x0000ff;
+		style = "dashed";
+	}
+	if(flags & TUP_FLAGS_CREATE) {
+		color |= 0x00ff00;
+		style = "dashed peripheries=2";
+	}
+	if(n->expanded == 0) {
+		if(color == 0) {
+			color = 0x888888;
+			fontcolor = 0x888888;
+		} else {
+			/* Might only be graphing a subset. Ie:
+			 * graph node foo, which points to command bar,
+			 * and command bar is in the modify list. In
+			 * this case, bar won't be expanded.
+			 */
+		}
+	}
+	fprintf(f, "\tnode_%lli [label=\"", n->tnode.tupid);
+	s = n->tent->name.s;
+	if(s[0] == '^') {
+		s++;
+		while(*s && *s != ' ') {
+			/* Skip flags (Currently there are none) */
+			s++;
+		}
+		print_name(f, s, '^');
+	} else {
+		print_name(f, s, 0);
+	}
+	fprintf(f, "\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
+	if(show_dirs && n->tent->dt) {
+		struct node *tmp;
+		tmp = find_node(g, n->tent->dt);
+		if(tmp)
+			fprintf(f, "\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
+	}
+
+	LIST_FOREACH(e, &n->edges, list) {
+		fprintf(f, "\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
+	}
+}
+
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts)
+{
+	struct node *n;
+
 	fprintf(f, "digraph G {\n");
 	TAILQ_FOREACH(n, &g->node_list, list) {
-		dump_node(f, n, trim);
+		dump_node(f, g, n, show_dirs, show_env, show_ghosts);
 	}
 	TAILQ_FOREACH(n, &g->plist, list) {
-		dump_node(f, n, trim);
+		dump_node(f, g, n, show_dirs, show_env, show_ghosts);
 	}
 	fprintf(f, "}\n");
-	fclose(f);
 }

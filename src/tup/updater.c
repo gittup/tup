@@ -1434,9 +1434,9 @@ check_empties:
 			if(fchdir(tup_top_fd()) < 0) {
 				perror("fchdir");
 			}
-			dump_graph(g, ".tup/tmp/graph-full-%i.dot", 0);
+			save_graph(g, ".tup/tmp/graph-full-%i.dot");
 			trim_graph(g);
-			dump_graph(g, ".tup/tmp/graph-trimmed-%i.dot", 1);
+			save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
 		}
 	} else {
 		rc = 0;

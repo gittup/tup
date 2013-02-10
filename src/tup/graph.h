@@ -25,6 +25,7 @@
 #include "tupid_tree.h"
 #include "db_types.h"
 #include <time.h>
+#include <stdio.h>
 
 struct edge {
 	LIST_ENTRY(edge) list;
@@ -87,6 +88,7 @@ int nodes_are_connected(struct tup_entry *src, struct tupid_entries *dest_head,
 			int *connected);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
 void trim_graph(struct graph *g);
-void dump_graph(const struct graph *g, const char *filename, int trim);
+void save_graph(struct graph *g, const char *filename);
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts);
 
 #endif
