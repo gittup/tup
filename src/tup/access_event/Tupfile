@@ -1,4 +1,0 @@
-include_rules
-
-: foreach send_event.c |> !cc |>
-: foreach send_udp.c |> !mingwcc |>

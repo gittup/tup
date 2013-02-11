@@ -50,7 +50,7 @@ echo "  mkdir build"
 mkdir -p build
 echo "  cd build"
 cd build
-for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/access_event/send_event.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
+for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	$CC $CFLAGS -c $i -I../src $plat_cflags
 done

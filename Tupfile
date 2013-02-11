@@ -1,13 +1,12 @@
 include_rules
 
 client_objs += src/tup/vardict.o
-client_objs += src/tup/access_event/send_event.o
+client_objs += src/tup/send_event.o
 client_objs += src/tup/flock/fcntl.o
 : $(client_objs) |> !ar |> libtup_client.a
 : src/tup/vardict.h |> !cp |> tup_client.h
 
 srcs = src/tup/*.o
-srcs += src/tup/access_event/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
@@ -31,7 +30,6 @@ ifneq (@(TUP_MINGW),)
 : src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
 
 mingwsrcs = src/tup/*.omingw
-mingwsrcs += src/tup/access_event/*.omingw
 mingwsrcs += src/tup/monitor/*.omingw
 mingwsrcs += src/tup/tup/*.omingw
 mingwsrcs += src/tup/flock/*.omingw
