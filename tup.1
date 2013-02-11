@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/01/28" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/02/11" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -145,7 +145,16 @@ command-line overrides (eg: -j flag passed to 'tup upd')
 tup's compiled in defaults
 .fi
 
-All three files use the same .ini-style syntax. A section header is enclosed in square brackets, like so:
+For Windows, the options files are read in as follows:
+
+.nf
+command-line overrides
+\&.tup/options file
+tup.ini in the Application Data path (usually C:\\ProgramData\\tup\\tup.ini)
+tup's compiled in defaults
+.fi
+
+For an exact list of paths on your platform, type 'tup options'. All files use the same .ini-style syntax. A section header is enclosed in square brackets, like so:
 .nf
 [updater]
 .fi
