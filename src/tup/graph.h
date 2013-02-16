@@ -72,6 +72,7 @@ struct graph {
 	int gen_delete_count;
 	struct tupid_entries cmd_delete_root;
 	int cmd_delete_count;
+	int style;
 };
 
 struct node *find_node(struct graph *g, tupid_t tupid);
@@ -83,6 +84,9 @@ void remove_edge(struct edge *e);
 
 int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags);
 int destroy_graph(struct graph *g);
+void save_graphs(struct graph *g);
+int build_graph_cb(void *arg, struct tup_entry *tent);
+int build_graph(struct graph *g);
 int graph_empty(struct graph *g);
 int add_graph_stickies(struct graph *g);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);

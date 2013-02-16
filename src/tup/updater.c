@@ -58,8 +58,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned);
 static int check_config_todo(void);
 static int check_create_todo(void);
 static int check_update_todo(int argc, char **argv);
-static int build_graph(struct graph *g);
-static int add_file_cb(void *arg, struct tup_entry *tent);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 
@@ -595,7 +593,7 @@ static int process_config_nodes(int environ_check)
 	/* Use TUP_NODE_ROOT to count everything */
 	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
 
 	/* Pop off the root node since we don't use it here. */
@@ -890,7 +888,7 @@ static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
 
 static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
 {
-	if(tup_db_select_node_by_link(add_file_cb, g, n->tent->tnode.tupid) < 0)
+	if(tup_db_select_node_by_link(build_graph_cb, g, n->tent->tnode.tupid) < 0)
 		return -1;
 	TAILQ_REMOVE(&g->plist, n, list);
 	TAILQ_INSERT_TAIL(&g->removing_list, n, list);
@@ -908,7 +906,7 @@ static int process_create_nodes(void)
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		struct variant *node_variant = tup_entry_variant(n->tent);
@@ -929,7 +927,7 @@ static int process_create_nodes(void)
 						fprintf(stderr, "\n");
 						return -1;
 					}
-					if(add_file_cb(&g, new_tent) < 0)
+					if(build_graph_cb(&g, new_tent) < 0)
 						return -1;
 				}
 			}
@@ -1035,7 +1033,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -1094,7 +1092,7 @@ static int check_config_todo(void)
 	/* Use TUP_NODE_ROOT to count everything */
 	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CONFIG) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -1126,7 +1124,7 @@ static int check_create_todo(void)
 
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_CREATE) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -1157,7 +1155,7 @@ static int check_update_todo(int argc, char **argv)
 
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(add_file_cb, &g, TUP_FLAGS_MODIFY) < 0)
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -1182,87 +1180,6 @@ static int check_update_todo(int argc, char **argv)
 	if(destroy_graph(&g) < 0)
 		return -1;
 	return rc;
-}
-
-static int build_graph(struct graph *g)
-{
-	struct node *cur;
-
-	while(!TAILQ_EMPTY(&g->plist)) {
-		cur = TAILQ_FIRST(&g->plist);
-		if(cur->state == STATE_INITIALIZED) {
-			DEBUGP("find deps for node: %lli\n", cur->tnode.tupid);
-			g->cur = cur;
-			if(tup_db_select_node_by_link(add_file_cb, g, cur->tnode.tupid) < 0)
-				return -1;
-			cur->state = STATE_PROCESSING;
-		} else if(cur->state == STATE_PROCESSING) {
-			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
-			TAILQ_REMOVE(&g->plist, cur, list);
-			TAILQ_INSERT_TAIL(&g->node_list, cur, list);
-			cur->state = STATE_FINISHED;
-		} else if(cur->state == STATE_FINISHED) {
-			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", cur->tnode.tupid);
-			tup_db_print(stderr, cur->tnode.tupid);
-			return -1;
-		}
-	}
-
-	if(add_graph_stickies(g) < 0)
-		return -1;
-
-	return 0;
-}
-
-static void save_graphs(struct graph *g)
-{
-	save_graph(g, ".tup/tmp/graph-full-%i.dot");
-	trim_graph(g);
-	save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
-}
-
-static int add_file_cb(void *arg, struct tup_entry *tent)
-{
-	struct graph *g = arg;
-	struct node *n;
-
-	n = find_node(g, tent->tnode.tupid);
-	if(n != NULL)
-		goto edge_create;
-	n = create_node(g, tent);
-	if(!n)
-		return -1;
-
-edge_create:
-	if(n->state == STATE_PROCESSING) {
-		/* A circular dependency is not guaranteed to trigger this,
-		 * but it is easy to check before going through the graph.
-		 */
-		fprintf(stderr, "tup error: Circular dependency detected! "
-			"Last edge was: %lli -> %lli\n",
-			g->cur->tnode.tupid, tent->tnode.tupid);
-		save_graphs(g);
-		return -1;
-	}
-	if(n->expanded == 0) {
-		/* TUP_NODE_ROOT means we count everything */
-		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
-			g->num_nodes++;
-			if(g->total_mtime != -1) {
-				if(n->tent->mtime == -1)
-					g->total_mtime = -1;
-				else
-					g->total_mtime += n->tent->mtime;
-			}
-		}
-		n->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, n, list);
-		TAILQ_INSERT_HEAD(&g->plist, n, list);
-	}
-
-	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
-		return -1;
-	return 0;
 }
 
 static void pop_node(struct graph *g, struct node *n)

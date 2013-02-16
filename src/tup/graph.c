@@ -144,6 +144,10 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 	g->num_nodes = 0;
 	g->count_flags = count_flags;
 	g->total_mtime = 0;
+	if(count_flags == TUP_NODE_GROUP)
+		g->style = TUP_LINK_GROUP;
+	else
+		g->style = TUP_LINK_NORMAL;
 	return 0;
 }
 
@@ -155,6 +159,87 @@ int destroy_graph(struct graph *g)
 	while(!TAILQ_EMPTY(&g->node_list)) {
 		remove_node_internal(g, TAILQ_FIRST(&g->node_list));
 	}
+	return 0;
+}
+
+void save_graphs(struct graph *g)
+{
+	save_graph(g, ".tup/tmp/graph-full-%i.dot");
+	trim_graph(g);
+	save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
+}
+
+int build_graph_cb(void *arg, struct tup_entry *tent)
+{
+	struct graph *g = arg;
+	struct node *n;
+
+	n = find_node(g, tent->tnode.tupid);
+	if(n != NULL)
+		goto edge_create;
+	n = create_node(g, tent);
+	if(!n)
+		return -1;
+
+edge_create:
+	if(n->state == STATE_PROCESSING) {
+		/* A circular dependency is not guaranteed to trigger this,
+		 * but it is easy to check before going through the graph.
+		 */
+		fprintf(stderr, "tup error: Circular dependency detected! "
+			"Last edge was: %lli -> %lli\n",
+			g->cur->tnode.tupid, tent->tnode.tupid);
+		save_graphs(g);
+		return -1;
+	}
+	if(n->expanded == 0) {
+		/* TUP_NODE_ROOT means we count everything */
+		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
+			g->num_nodes++;
+			if(g->total_mtime != -1) {
+				if(n->tent->mtime == -1)
+					g->total_mtime = -1;
+				else
+					g->total_mtime += n->tent->mtime;
+			}
+		}
+		n->expanded = 1;
+		TAILQ_REMOVE(&g->node_list, n, list);
+		TAILQ_INSERT_HEAD(&g->plist, n, list);
+	}
+
+	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
+		return -1;
+	return 0;
+}
+
+int build_graph(struct graph *g)
+{
+	struct node *cur;
+
+	while(!TAILQ_EMPTY(&g->plist)) {
+		cur = TAILQ_FIRST(&g->plist);
+		if(cur->state == STATE_INITIALIZED) {
+			DEBUGP("find deps for node: %lli\n", cur->tnode.tupid);
+			g->cur = cur;
+			if(tup_db_select_node_by_link(build_graph_cb, g, cur->tnode.tupid) < 0)
+				return -1;
+			cur->state = STATE_PROCESSING;
+		} else if(cur->state == STATE_PROCESSING) {
+			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
+			TAILQ_REMOVE(&g->plist, cur, list);
+			TAILQ_INSERT_TAIL(&g->node_list, cur, list);
+			cur->state = STATE_FINISHED;
+		} else if(cur->state == STATE_FINISHED) {
+			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", cur->tnode.tupid);
+			tup_db_print(stderr, cur->tnode.tupid);
+			return -1;
+		}
+	}
+
+	if(add_graph_stickies(g) < 0)
+		return -1;
+
 	return 0;
 }
 
