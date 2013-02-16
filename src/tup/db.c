@@ -838,8 +838,6 @@ static int version_check(void)
 		printf("Tup parser version has been updated to %i. All Tupfiles will be re-parsed to ensure that nothing broke.\n", PARSER_VERSION);
 		if(tup_db_reparse_all() < 0)
 			return -1;
-		if(tup_db_unflag_create(env_dt()) < 0)
-			return -1;
 		if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
 			return -1;
 	}
