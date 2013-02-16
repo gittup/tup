@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -150,10 +150,9 @@ int watch_path(tupid_t dt, int dfd, const char *file,
 }
 
 
-static int full_scan_cb(void *arg, struct tup_entry *tent, int style)
+static int full_scan_cb(void *arg, struct tup_entry *tent)
 {
 	struct tup_entry_head *head = arg;
-	if(style) {}
 	tup_entry_list_add(tent, head);
 	return 0;
 }

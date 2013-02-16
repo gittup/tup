@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2012-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,10 +30,9 @@ static struct variant_head disabled_list = LIST_HEAD_INITIALIZER(&disabled_list)
 static struct tupid_entries variant_root = RB_INITIALIZER(&variant_root);
 static struct tupid_entries variant_dt_root = RB_INITIALIZER(&variant_dt_root);
 
-static int load_cb(void *arg, struct tup_entry *tent, int style)
+static int load_cb(void *arg, struct tup_entry *tent)
 {
 	if(arg) {}
-	if(style) {}
 
 	if(variant_add(tent, 1, NULL) < 0)
 		return -1;

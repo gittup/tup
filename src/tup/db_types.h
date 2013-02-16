@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -47,6 +47,7 @@ enum TUP_FLAGS_TYPE {
 enum TUP_LINK_TYPE {
 	TUP_LINK_NORMAL=1,
 	TUP_LINK_STICKY=2,
+	TUP_LINK_GROUP=3,
 };
 
 #endif

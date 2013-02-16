@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -435,10 +435,9 @@ static int autoparse_enabled(void)
 	return 0;
 }
 
-static int mod_cb(void *arg, struct tup_entry *tent, int style)
+static int mod_cb(void *arg, struct tup_entry *tent)
 {
 	if(tent) {}
-	if(style) {}
 	*(int*)arg = 1;
 	return 0;
 }

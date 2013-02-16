@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -26,7 +26,7 @@ HERE
 
 tup touch Tupfile foo.c bar.c
 tup parse
-tup_dep_exist . foo.h . "echo gcc -c foo.c -o foo.o"
-tup_dep_exist . foo.h . "echo gcc -c bar.c -o bar.o"
+tup_sticky_exist . foo.h . "echo gcc -c foo.c -o foo.o"
+tup_sticky_exist . foo.h . "echo gcc -c bar.c -o bar.o"
 
 eotup

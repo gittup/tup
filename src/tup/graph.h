@@ -84,8 +84,7 @@ void remove_edge(struct edge *e);
 int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags);
 int destroy_graph(struct graph *g);
 int graph_empty(struct graph *g);
-int nodes_are_connected(struct tup_entry *src, struct tupid_entries *dest_head,
-			int *connected);
+int add_graph_stickies(struct graph *g);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
 void trim_graph(struct graph *g);
 void save_graph(struct graph *g, const char *filename);

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2010-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -41,6 +41,7 @@ tup touch Tupfile
 update_fail_msg "Expected to write to file 'output'"
 
 tup_dep_no_exist . output . 'if [ -f output ]; then cat output; fi'
+tup_sticky_no_exist . output . 'if [ -f output ]; then cat output; fi'
 
 update_fail_msg "Expected to write to file 'output'"
 

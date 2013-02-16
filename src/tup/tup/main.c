@@ -48,7 +48,7 @@
 #endif
 
 static int init(int argc, char **argv);
-static int graph_cb(void *arg, struct tup_entry *tent, int style);
+static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
@@ -203,8 +203,14 @@ int main(int argc, char **argv)
 		rc = variant(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
-	} else if(strcmp(cmd, "link_exists") == 0) {
+	} else if(strcmp(cmd, "normal_exists") == 0 ||
+		  strcmp(cmd, "sticky_exists") == 0) {
 		rc = link_exists(argc, argv);
+		/* Since an error code of <0 gets converted to 1, we have to
+		 * make 1 (meaning the link exists) something else.
+		 */
+		if(rc == 1)
+			rc = 11;
 	} else if(strcmp(cmd, "flags_exists") == 0) {
 		rc = tup_db_check_flags(TUP_FLAGS_CONFIG | TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY);
 	} else if(strcmp(cmd, "create_flags_exists") == 0) {
@@ -390,11 +396,10 @@ err_close:
 	return -1;
 }
 
-static int graph_cb(void *arg, struct tup_entry *tent, int style)
+static int graph_cb(void *arg, struct tup_entry *tent)
 {
 	struct graph *g = arg;
 	struct node *n;
-	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -404,17 +409,13 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 		return -1;
 
 edge_create:
-	if(style & TUP_LINK_NORMAL)
-		expandable = 1;
-	if(n->tent->type == TUP_NODE_GROUP)
-		expandable = 1;
-	if(expandable && n->expanded == 0) {
+	if(n->expanded == 0) {
 		n->expanded = 1;
 		TAILQ_REMOVE(&g->node_list, n, list);
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
 	}
 	if(g->cur)
-		if(create_edge(g->cur, n, style) < 0)
+		if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
 			return -1;
 	return 0;
 }
@@ -497,6 +498,9 @@ static int graph(int argc, char **argv)
 			if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
 				return -1;
 	}
+
+	if(add_graph_stickies(&g) < 0)
+		return -1;
 
 	dump_graph(&g, stdout, show_dirs, show_env, show_ghosts);
 
@@ -727,12 +731,21 @@ static int link_exists(int argc, char **argv)
 	struct tup_entry *tenta;
 	struct tup_entry *tentb;
 	int exists;
+	int style;
 	tupid_t dta, dtb;
 
 	if(tup_db_begin() < 0)
 		return -1;
 	if(argc != 5) {
-		fprintf(stderr, "tup error: link_exists requires two dir/name pairs.\n");
+		fprintf(stderr, "tup error: %s requires two dir/name pairs.\n", argv[0]);
+		return -1;
+	}
+	if(strcmp(argv[0], "normal_exists") == 0) {
+		style = TUP_LINK_NORMAL;
+	} else if(strcmp(argv[0], "sticky_exists") == 0) {
+		style = TUP_LINK_STICKY;
+	} else {
+		fprintf(stderr, "[31mError: link_exists called with unknown style: %s\n", argv[0]);
 		return -1;
 	}
 	dta = find_dir_tupid(argv[1]);
@@ -760,7 +773,7 @@ static int link_exists(int argc, char **argv)
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
 		return -1;
 	}
-	if(tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid, &exists) < 0)
+	if(tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid, style, &exists) < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;

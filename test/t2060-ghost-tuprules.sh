@@ -40,7 +40,7 @@ tup touch fs/sub/helper.c
 tup parse
 
 tup_object_exist fs/sub 'gcc -Wall -O0 -c helper.c -o helper.o'
-tup_dep_exist fs/sub helper.o fs/sub 'gcc -lm helper.o -o prog'
+tup_sticky_exist fs/sub helper.o fs/sub 'gcc -lm helper.o -o prog'
 
 tup_dep_exist . Tuprules.tup fs sub
 tup_dep_exist fs Tuprules.tup fs sub
@@ -54,6 +54,6 @@ tup touch fs/Tuprules.tup
 tup parse
 
 tup_object_exist fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'
-tup_dep_exist fs/sub helper.o fs/sub 'gcc -lm -lfoo helper.o -o prog'
+tup_sticky_exist fs/sub helper.o fs/sub 'gcc -lm -lfoo helper.o -o prog'
 
 eotup

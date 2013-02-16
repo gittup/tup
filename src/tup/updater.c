@@ -59,7 +59,7 @@ static int check_config_todo(void);
 static int check_create_todo(void);
 static int check_update_todo(int argc, char **argv);
 static int build_graph(struct graph *g);
-static int add_file_cb(void *arg, struct tup_entry *tent, int style);
+static int add_file_cb(void *arg, struct tup_entry *tent);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
 			 void *(*work_func)(void *));
 
@@ -929,7 +929,7 @@ static int process_create_nodes(void)
 						fprintf(stderr, "\n");
 						return -1;
 					}
-					if(add_file_cb(&g, new_tent, TUP_LINK_NORMAL) < 0)
+					if(add_file_cb(&g, new_tent) < 0)
 						return -1;
 				}
 			}
@@ -1208,6 +1208,9 @@ static int build_graph(struct graph *g)
 		}
 	}
 
+	if(add_graph_stickies(g) < 0)
+		return -1;
+
 	return 0;
 }
 
@@ -1218,11 +1221,10 @@ static void save_graphs(struct graph *g)
 	save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
 }
 
-static int add_file_cb(void *arg, struct tup_entry *tent, int style)
+static int add_file_cb(void *arg, struct tup_entry *tent)
 {
 	struct graph *g = arg;
 	struct node *n;
-	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -1242,11 +1244,7 @@ edge_create:
 		save_graphs(g);
 		return -1;
 	}
-	if(style & TUP_LINK_NORMAL)
-		expandable = 1;
-	if(n->tent->type == TUP_NODE_GROUP)
-		expandable = 1;
-	if(expandable && n->expanded == 0) {
+	if(n->expanded == 0) {
 		/* TUP_NODE_ROOT means we count everything */
 		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
 			g->num_nodes++;
@@ -1262,7 +1260,7 @@ edge_create:
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
 	}
 
-	if(create_edge(g->cur, n, style) < 0)
+	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	return 0;
 }
@@ -1709,6 +1707,9 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
+		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+			fprintf(f, " *** Additionally, command %lli failed to process input dependencies.", tent->tnode.tupid);
+		}
 	} else {
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}

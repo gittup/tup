@@ -165,6 +165,31 @@ int graph_empty(struct graph *g)
 	return 0;
 }
 
+int add_graph_stickies(struct graph *g)
+{
+	struct node *n;
+
+	TAILQ_FOREACH(n, &g->node_list, list) {
+		if(n->tent->type == TUP_NODE_CMD) {
+			struct tupid_entries sticky_root = {NULL};
+			struct tupid_tree *tt;
+			struct node *inputn;
+
+			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL) < 0)
+				return -1;
+			RB_FOREACH(tt, tupid_entries, &sticky_root) {
+				inputn = find_node(g, tt->tupid);
+				if(inputn) {
+					if(create_edge(inputn, n, TUP_LINK_STICKY) < 0)
+						return -1;
+				}
+			}
+			free_tupid_tree(&sticky_root);
+		}
+	}
+	return 0;
+}
+
 /* Marks the node and everything that links to it, on up to the root node.
  * Everything that is marked will stay in the PDAG; the rest are pruned.
  *

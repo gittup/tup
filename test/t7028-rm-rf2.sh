@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -25,7 +25,7 @@ mkdir b
 echo ': foreach *.c | ../a/foo.h |> gcc -c %f -o %o |> %B.o' > b/Tupfile
 touch b/foo.c
 update
-tup_dep_exist a foo.h b 'gcc -c foo.c -o foo.o'
+tup_sticky_exist a foo.h b 'gcc -c foo.c -o foo.o'
 
 rm -rf a
 update_fail_msg "Failed to find directory ID for dir"

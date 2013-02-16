@@ -45,11 +45,11 @@ tup touch fs/sub/helper.c
 tup parse
 
 tup_object_exist fs 'gcc -Wall -DFS=1 -c ext1.c -o ext1.o'
-tup_dep_exist fs ext1.o fs 'gcc -lfoo ext1.o ext2.o -o prog'
-tup_dep_exist fs ext2.o fs 'gcc -lfoo ext1.o ext2.o -o prog'
+tup_sticky_exist fs ext1.o fs 'gcc -lfoo ext1.o ext2.o -o prog'
+tup_sticky_exist fs ext2.o fs 'gcc -lfoo ext1.o ext2.o -o prog'
 
 tup_object_exist fs/sub 'gcc -O0 -c helper.c -o helper.o'
-tup_dep_exist fs/sub helper.o fs/sub 'gcc -lfoo helper.o -o prog'
+tup_sticky_exist fs/sub helper.o fs/sub 'gcc -lfoo helper.o -o prog'
 
 tup_dep_exist . Tuprules.tup . fs
 tup_dep_exist . Tuprules.tup fs sub

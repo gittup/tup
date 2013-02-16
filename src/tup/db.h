@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -62,10 +62,9 @@ int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
 			    struct tup_entry **entry);
-int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *,
-						int style),
+int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
 				void *arg, int flags);
-int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *, int style),
+int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 			   void *arg, tupid_t dt);
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, tupid_t dt, const char *glob,
@@ -112,8 +111,8 @@ int tup_db_unflag_variant(tupid_t tupid);
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
 int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
 			      struct tupid_entries *root);
-int tup_db_link_exists(tupid_t a, tupid_t b, int *exists);
-int tup_db_link_style(tupid_t a, tupid_t b, int *style);
+int tup_db_link_exists(tupid_t a, tupid_t b, int style,
+		       int *exists);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_entry *group);
@@ -131,8 +130,7 @@ int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_flags(tupid_t tupid);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_set_dependent_config_flags(tupid_t tupid);
-int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *,
-					       int style),
+int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid);
 
 /* Config operations */

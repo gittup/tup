@@ -31,7 +31,7 @@ tup touch foo.c Tupfile
 varsetall FOO=y
 tup parse
 tup_object_exist . 'gcc -c foo.c -o foo.o'
-tup_dep_exist . 'foo.o' . 'gcc -Wl,-r foo.o -o built-in.o'
+tup_sticky_exist . 'foo.o' . 'gcc -Wl,-r foo.o -o built-in.o'
 tup_object_no_exist . 'ar crs built-in.o'
 
 varsetall FOO=n

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -37,7 +37,7 @@ tup touch foo.c Tupfile headers/Tupfile
 update
 
 check_exist foo.o
-tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
+tup_sticky_exist headers foo.h . 'gcc -c foo.c -o foo.o'
 tup_object_no_exist headers bar.h
 
 # Secretly remove foo.o
@@ -52,8 +52,8 @@ tup touch headers/Tupfile
 update --no-scan
 
 check_not_exist foo.o
-tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
-tup_dep_exist headers bar.h . 'gcc -c foo.c -o foo.o'
+tup_sticky_exist headers foo.h . 'gcc -c foo.c -o foo.o'
+tup_sticky_exist headers bar.h . 'gcc -c foo.c -o foo.o'
 
 # Removing an unused sticky link shouldn't cause foo.o to be re-created.
 cat > headers/Tupfile << HERE
@@ -63,7 +63,7 @@ tup touch headers/Tupfile
 update --no-scan
 
 check_not_exist foo.o
-tup_dep_exist headers foo.h . 'gcc -c foo.c -o foo.o'
+tup_sticky_exist headers foo.h . 'gcc -c foo.c -o foo.o'
 tup_object_no_exist headers bar.h
 
 # Only removing a sticky link that is used should try to re-compile (and fail)
