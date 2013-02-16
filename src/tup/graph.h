@@ -91,7 +91,7 @@ int graph_empty(struct graph *g);
 int add_graph_stickies(struct graph *g);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
 void trim_graph(struct graph *g);
-void save_graph(struct graph *g, const char *filename);
+void save_graph(FILE *err, struct graph *g, const char *filename);
 void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts);
 
 #endif

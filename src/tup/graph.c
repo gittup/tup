@@ -164,9 +164,9 @@ int destroy_graph(struct graph *g)
 
 void save_graphs(struct graph *g)
 {
-	save_graph(g, ".tup/tmp/graph-full-%i.dot");
+	save_graph(stderr, g, ".tup/tmp/graph-full-%i.dot");
 	trim_graph(g);
-	save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
+	save_graph(stderr, g, ".tup/tmp/graph-trimmed-%i.dot");
 }
 
 int build_graph_cb(void *arg, struct tup_entry *tent)
@@ -424,7 +424,7 @@ void trim_graph(struct graph *g)
 	} while(nodes_removed);
 }
 
-void save_graph(struct graph *g, const char *filename)
+void save_graph(FILE *err, struct graph *g, const char *filename)
 {
 	static int count = 0;
 	char realfile[PATH_MAX];
@@ -434,7 +434,7 @@ void save_graph(struct graph *g, const char *filename)
 		perror("asprintf");
 		return;
 	}
-	fprintf(stderr, "tup: saving graph '%s'\n", realfile);
+	fprintf(err, "tup: saving graph '%s'\n", realfile);
 
 	count++;
 	f = fopen(realfile, "w");
