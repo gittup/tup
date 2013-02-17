@@ -1,23 +1,23 @@
-tup.dorulesfile()
+dorulesfile()
 
 -- Changes here need to be reflected in the build.sh file
 srcs = {}
 mingwsrcs = {}
 
-if tup.getconfig('TUP_PLATFORM') == 'linux'
+if getconfig('TUP_PLATFORM') == 'linux'
 then
 	table.insert(srcs, 'utimensat_linux.c')
 	table.insert(srcs, 'dummy.c')
 end
 
-if tup.getconfig('TUP_PLATFORM') == 'freebsd'
+if getconfig('TUP_PLATFORM') == 'freebsd'
 then
 	table.insert(srcs, 'utimensat_linux.c')
 	table.insert(srcs, 'dummy.c')
 	table.insert(srcs, 'clearenv.c')
 end
 
-if tup.getconfig('TUP_PLATFORM') == 'macosx'
+if getconfig('TUP_PLATFORM') == 'macosx'
 then
 table.insert(srcs, 'clearenv.c')
 table.insert(srcs, 'dir_mutex.c')
@@ -37,7 +37,7 @@ table.insert(srcs, 'utimensat.c')
 
 end
 
-if tup.getconfig('TUP_PLATFORM') == 'solaris'
+if getconfig('TUP_PLATFORM') == 'solaris'
 then
 table.insert(srcs, 'dir_mutex.c')
 table.insert(srcs, 'mkdirat.c')

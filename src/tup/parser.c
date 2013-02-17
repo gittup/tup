@@ -211,7 +211,7 @@ static void tuplua_register_function(struct lua_State *ls, const char *name, lua
 {
 	lua_pushlightuserdata(ls, data);
 	lua_pushcclosure(ls, function, 1);
-	lua_setfield(ls, 1, name);
+	lua_setglobal(ls, name);
 }
 
 static int tuplua_function_include(lua_State *ls)
@@ -670,9 +670,22 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		ownstate = 1;
 		ls = luaL_newstate();
 		tf->sd = ls;
+		
+		/* Load some basic libraries.  File-access functions are avoided so that accesses
+		 * must go through the tup methods. Load the debug library so tracebacks 
+		 * for errors can be formatted nicely */
+		luaL_requiref(ls, "_G", luaopen_base, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_TABLIBNAME, luaopen_table, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_STRLIBNAME, luaopen_string, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_BITLIBNAME, luaopen_bit32, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
+		lua_pushnil(ls); lua_setglobal(ls, "dofile"); /* Will be overwritten below */
+		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
+		lua_pushnil(ls); lua_setglobal(ls, "load");
+		lua_pushnil(ls); lua_setglobal(ls, "require");
 	
-		/* Register tup interaction functions in the "tup" table in Lua */	
-		lua_newtable(ls);
+		/* Register tup interaction functions in Lua */	
 		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
 		tuplua_register_function(ls, "dorulesfile", tuplua_function_includerules, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
@@ -692,24 +705,8 @@ static int execute_script(struct buf *b, struct tupfile *tf, const char *name)
 		lua_pushcclosure(ls, tuplua_function_concat, 1);
 		lua_setfield(ls, -2, "__concat");
 		lua_pushcclosure(ls, tuplua_function_nodevariable, 2);
-		lua_setfield(ls, 1, "nodevariable");
+		lua_setglobal(ls, "nodevariable");
 	
-		lua_setglobal(ls, "tup");
-
-		/* Load some basic libraries.  File-access functions are avoided so that accesses
-		 * must go through the tup methods. Load the debug library so tracebacks 
-		 * for errors can be formatted nicely */
-		luaL_requiref(ls, "_G", luaopen_base, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_TABLIBNAME, luaopen_table, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_STRLIBNAME, luaopen_string, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_BITLIBNAME, luaopen_bit32, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
-		lua_pushnil(ls); lua_setglobal(ls, "dofile");
-		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
-		lua_pushnil(ls); lua_setglobal(ls, "load");
-		lua_pushnil(ls); lua_setglobal(ls, "require");
-
 		/* Load lua built-in lua helper functions from luabuiltin.h */
 		lua_getglobal(ls, "debug");
 		lua_getfield(ls, -1, "traceback");

@@ -1,39 +1,13 @@
-tup.dorulesfile()
-if tup.getconfig('TUP_WWW') == 'y'
+dorulesfile()
+if getconfig('TUP_WWW') == 'y'
 then
-	for index, file in ipairs(tup.glob('../make*.dat'))
-	do
-		local output = string.gsub(string.gsub(file, '../', ''), '%.dat', '') .. '.png'
-		tup.definerule {
-			inputs = {file},
-			outputs = {output},
-			command = '^ PLOT ' .. file .. '^' ..
-				'../../../test/make_v_tup/plot ' .. file .. ' > ' .. output,
-		}
-	end
-	for index, file in ipairs(tup.glob('../tup_vs_eye*.dat'))
-	do
-		local output = string.gsub(string.gsub(file, '../', ''), '%.dat', '') .. '.png'
-		tup.definerule {
-			inputs = {file},
-			outputs = {output},
-			command = '^ PLOT ' .. file .. '^' ..
-				'../../../test/make_v_tup/plot ' .. file .. ' Eye > ' .. output,
-		}
-	end
-	for index, file in ipairs(tup.glob('../*.dot')) 
-	do 
-		bang_dot(file, string.gsub(string.gsub(file, '../', ''), '\\.dot', '') .. '.png') 
-	end
-	for index, file in ipairs(tup.glob('../*.gen'))
-	do
-		local output = string.gsub(string.gsub(file, '../', ''), '\\.gen', '')
-		tup.definerule {
-			inputs = {file},
-			outputs = {output},
-			command = '^ CP ' .. output .. '^' ..
-				'cp ' .. file .. ' ' .. output,
-		}
-	end
+	for index, file in ipairs(glob('../make*.dat'))
+		do rule(file, '^ PLOT %f^ ../../../test/make_v_tup/plot %f > %o', '%B.png') end
+	for index, file in ipairs(glob('../tup_vs_eye*.dat'))
+		do rule(file, '^ PLOT %f^ ../../../test/make_v_tup/plot %f Eye > %o', '%B.png') end
+	for index, file in ipairs(glob('../*.dot')) 
+		do bang_dot(file, string.gsub(string.gsub(file, '../', ''), '\\.dot', '') .. '.png') end
+	for index, file in ipairs(glob('../*.gen'))
+		do rule(file, '^ CP %o^ cp %f %o', '%B') end
 end
 

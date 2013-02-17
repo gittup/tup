@@ -1,2 +1,2 @@
-tup.dorulesfile()
-for index, file in ipairs(tup.glob('*.c')) do bang_mingwcc(file) end
+dorulesfile()
+for index, file in ipairs(glob('*.c')) do bang_mingwcc(file) end

@@ -7,7 +7,7 @@ prepare_tup_table = function(input)
 	})
 end
 
-tup.creategitignore()
+creategitignore()
 
 pages = {}
 examples = {}
@@ -15,7 +15,7 @@ flags = {}
 flags_specific = {}
 prepare_tup_table(flags_specific)
 
-if tup.getconfig('TUP_WWW') == 'y'
+if getconfig('TUP_WWW') == 'y'
 then
 
 table.insert(pages, 'index.html')
@@ -36,71 +36,29 @@ table.insert(examples, 'ex_multiple_directories.html')
 -- Use the 'examples' sub-menu for the examples page.
 table.insert(flags_specific['examples'], '-x')
 
-if tup.getconfig('TUP_WWW_ANALYTICS') == 'y'
+if getconfig('TUP_WWW_ANALYTICS') == 'y'
 then
 	table.insert(flags, '-a')
 end
 
-do
-	local outputs = {'menu.inc'}
-	tup.definerule { 
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_menu.sh ' .. table.concat(pages, ' ') .. ' > ' .. outputs[1]
-	}
-end
-do
-	local outputs = {'examples.inc'}
-	tup.definerule { 
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > ' .. table.concat(outputs, ' ')
-	}
-end
-do
-	local outputs = {'menu-examples.inc'}
-	tup.definerule { 
-		inputs = {'examples.inc'},
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > ' .. outputs[1]
-	}
-end
-do
-	local outputs = {'examples.html'}
-	tup.definerule { 
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_examples.sh ' .. table.concat(examples, ' ') .. ' > ' .. outputs[1]
-	}
-end
-do
-	local inputs = {'../../tup.1'}
-	local outputs = {'manual.html'}
-	tup.definerule {
-		inputs = inputs,
-		outputs = outputs,
-		command = '^ man2html ' .. outputs[1] .. '^' ..
-			'man2html ' .. inputs[1] .. ' > ' .. outputs[1]
-	}
-end
+rule(nil, '^ GEN %o^ ./gen_menu.sh ' .. table.concat(pages, ' ') .. ' > %o', 'menu.inc')
+rule(nil, '^ GEN %o^ ./gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > %o', 'examples.inc')
+rule('examples.inc', '^ GEN %o^ ./gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > %o', 'menu-examples.inc')
+rule(nil, '^ GEN %o^ ./gen_examples.sh ' .. table.concat(examples, ' ') .. ' > %o', 'examples.html')
+rule('../../tup.1', '^ man2html %o^ man2html %f > %o', 'manual.html')
 for index, page in ipairs(pages)
 do
-	local outputs = {page .. '.gen'}
-	tup.definerule {
-		inputs = {page, 'menu.inc', 'menu-examples.inc'},
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_page.sh ' .. 
-			table.concat(flags, ' ') .. 
+	rule(
+		{page, 'menu.inc', 'menu-examples.inc'}, 
+		'^ GEN %o^ ./gen_page.sh ' ..  table.concat(flags, ' ') .. 
 			' ' .. table.concat(flags_specific[string.gsub(page, '%..*', '')], ' ') .. 
-			' ' .. page .. ' > ' .. outputs[1]
-	}
+			' ' .. page .. ' > %o', 
+		page .. '.gen')
 end
 for index, example in ipairs(examples)
 do
 	local outputs = {example .. '.gen'}
-	tup.definerule {
+	definerule {
 		inputs = {example, 'menu-examples.inc'},
 		outputs = outputs,
 		command = '^ GEN ' .. outputs[1] .. '^' ..
