@@ -36,59 +36,32 @@ then
 end
 
 LDFLAGS:insert '`pkg-config fuse --libs`'
-do
-	local inputs = {'src/tup/tup/main.o', 'liba'}
-	local outputs = {'tup', 'tup-version.o'}
-	definerule {
-		inputs = inputs,
-		outputs = outputs, 
-		command = '^ LINK tup^' .. 
-			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. CC .. ' -x c -c - -o tup-version.o ' .. CFLAGS .. ' -Wno-missing-prototypes; ' .. CC .. ' ' .. table.concat(inputs, ' ') .. ' tup-version.o -o tup -lpthread ' .. LDFLAGS .. ' ' .. suid
-	}
-end
+
+rule({'src/tup/tup/main.o', 'liba'}, '^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid)',{'tup', 'tup-version.o'})
 
 if getconfig('TUP_MINGW') ~= ''
 then
-local inputs = glob('src/dllinject/*.omingw')
-local output = 'tup-dllinject.dll'
-definerule {
-	inputs = inputs,
-	outputs = {output},
-	command = '^ MINGW32LINK ' .. output .. '^' ..
-		getconfig('TUP_MINGW') .. '-gcc -shared ' .. table.concat(inputs, ' ') .. ' -lws2_32 -lpsapi -lshlwapi -o ' .. output 
-}
+	rule(glob('src/dllinject/*.omingw'), '^ MINGW32LINK %o ^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o', 'tup-dllinject.dll')
 
-mingwsrcs = tupvar(glob('src/tup/*.omingw'))
-mingwsrcs = mingwsrcs .. glob('src/tup/access_event/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/tup/monitor/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/tup/tup/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/tup/flock/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/tup/server/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/inih/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/sqlite3/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/lua-5.2.0/src/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/compat/*.omingw')
-mingwsrcs = mingwsrcs .. glob('src/compat/win32/*.omingw')
-MINGWLDFLAGS:insert '-lm'
-MINGWLDFLAGS:insert '-Wl,--wrap=open'
-MINGWLDFLAGS:insert '-Wl,--wrap=close'
-MINGWLDFLAGS:insert '-Wl,--wrap=tmpfile'
-MINGWLDFLAGS:insert '-Wl,--wrap=dup'
-MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vprintf'
-MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vfprintf'
+	mingwsrcs = tupvar(glob('src/tup/*.omingw'))
+	mingwsrcs = mingwsrcs .. glob('src/tup/access_event/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/tup/monitor/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/tup/tup/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/tup/flock/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/tup/server/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/inih/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/sqlite3/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/lua-5.2.0/src/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/compat/*.omingw')
+	mingwsrcs = mingwsrcs .. glob('src/compat/win32/*.omingw')
+	MINGWLDFLAGS:insert '-lm'
+	MINGWLDFLAGS:insert '-Wl,--wrap=open'
+	MINGWLDFLAGS:insert '-Wl,--wrap=close'
+	MINGWLDFLAGS:insert '-Wl,--wrap=tmpfile'
+	MINGWLDFLAGS:insert '-Wl,--wrap=dup'
+	MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vprintf'
+	MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vfprintf'
 
-do
-	local inputs = mingwsrcs .. {'tup-dllinject.dll'}
-	definerule {
-		inputs = inputs,
-		outputs = {'exe', 'tup-version.omingw'},
-		command = --'^ MINGW32LINK exe^' ..
-			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. MINGWLDFLAGS  .. ' -o exe'
-	}
+	rule(mingwsrcs .. {'tup-dllinject.dll'}, '^ MINGW32LINK exe^ version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc %f tup-version.omingw $(MINGWLDFLAGS) -o exe', {'exe', 'tup-version.omingw'})
 end
-end
-
-
-
-
 

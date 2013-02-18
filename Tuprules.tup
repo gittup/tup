@@ -112,41 +112,14 @@ bang_cc = function(input, extradependency)
 			' ' .. table.concat(CFLAGS_SPECIFIC[input], ' '),
 	}
 end
-bang_ld = function(inputs, output)
-	local inputs = table.concat(inputs, ' ')
-	definerule {
-		inputs = inputs,
-		outputs = {output},
-		command = '^ LINK ' .. output .. '^' ..
-			 CC .. ' ' .. inputs .. ' -o ' .. output ..
-			' ' .. LDFLAGS ..
-			' ' .. LDFLAGS_SPECIFIC[output]
-	}
-end
-bang_ar = function(inputs, output)
-	definerule {
-		inputs = inputs,
-		outputs = {output},
-		command = '^ AR ' .. output .. '^' ..
-			'ar crs ' .. output .. ' ' .. table.concat(inputs, ' '),
-	}
-end
-bang_dot = function(input, output)
-	definerule {
-		inputs = {input},
-		outputs = {output},
-		command = '^ DOT ' .. input .. '^' ..
-			'dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng ' .. input .. ' > ' .. output,
-	}
-end
-bang_cp = function(input, output)
-	definerule {
-		inputs = {input},
-		outputs = {output},
-		command = '^ CP ' .. input .. ' -> ' .. output .. '^' ..
-			'cp ' .. input .. ' ' .. output,
-	}
-end
+
+bang_ld = function(inputs, output) rule(inputs, '^ LINK %o ^ $(CC) %f -o %o $(LDFLAGS) ' .. LDFLAGS_SPECIFIC[output], output) end
+
+bang_ar = function(inputs, output) rule(inputs, '^ AR %o ^ ar crs %o %f', output) end
+
+bang_dot = function(input, output) rule(input, '^ DOT %f ^ dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o', output) end
+
+bang_cp = function(input, output) rule(input, '^ CP %f -> %o^ cp %f %o', output) end
 
 if getconfig('TUP_MINGW') == ''
 then

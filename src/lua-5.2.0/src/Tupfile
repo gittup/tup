@@ -4,11 +4,11 @@ luasrcs = {'lapi.c', 'lcode.c', 'lctype.c', 'ldebug.c', 'ldo.c', 'ldump.c', 'lfu
 
 if getconfig('TUP_MINGW') == ''
 then
-        table.insert(CFLAGS, '-DLUA_USE_LINUX')
+        CFLAGS:insert '-DLUA_USE_LINUX'
 end
         
-table.insert(CFLAGS, '-DLUA_COMPAT_ALL')
-table.insert(CFLAGS, '-Wno-switch-enum')
+CFLAGS:insert '-DLUA_COMPAT_ALL'
+CFLAGS:insert '-Wno-switch-enum'
 
 if getconfig('TUP_USE_SYSTEM_LUA') ~= 'y'
 then

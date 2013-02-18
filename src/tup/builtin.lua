@@ -30,22 +30,21 @@ frule = function(arguments)
 	-- Replaces $(), @(), %d, %f, %b, %B, %o in command with proper values
 	-- Returns the expanded outputs
 	
-	function evalGlobals(raw)
+	function evalGlobals(text)
 		-- Replace $(VAR) with value of global variable VAR
-		local var = raw:match('%$%(([^%)]*)%)')
-		if var then
-			return raw:gsub('%$%(' .. var .. '%)', _G[var] and _G[var] or '')
-		end
-		return raw
+		return text:gsub('%$%(([^%)]*)%)', 
+			function(var)
+				if _G[var] then return tostring(_G[var]) end
+				return ''
+			end)
 	end
 
-	function evalConfig(raw)
+	function evalConfig(text)
 		-- Replace @(VAR) with value of config variable VAR
-		local configvar = raw:match('@%(([^%)]*)%)')
-		if configvar then
-			return raw:gsub('@%(' .. configvar .. '%)', getconfig(configvar))
-		end
-		return raw
+		return text:gsub('@%(([^%)]*)%)',
+			function(configvar)
+				return getconfig(configvar)
+			end)
 	end
 
 	local inputs

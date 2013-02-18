@@ -1,71 +1,92 @@
-prepare_tup_table = function(input)
-	setmetatable(input, { 
-		__index = function(table, key) 
-			rawset(table, key, {})
-			return rawget(table, key) 
-		end 
-	})
+tupvar_metatable = {
+	__tostring = function(self)
+		return table.concat(self, ' ')
+	end,
+	__concat = function(first, second)
+		if type(first) == 'table' and type(second) == 'table'
+		then 
+			local output = tupvar{}
+			for index, value in ipairs(first) do table.insert(output, value) end
+			for index, value in ipairs(second) do table.insert(output, value) end
+			return output
+		end
+		return tostring(first) .. tostring(second)
+	end,
+	__index = table
+}
+tupvar = function(contents)
+	if not contents then contents = {} end
+	setmetatable(contents, tupvar_metatable)
+	return contents
+end
+
+tuparray_metatable = { 
+	__index = function(table, key) 
+		rawset(table, key, tupvar{})
+		return rawget(table, key) 
+	end 
+}
+tuparray = function(contents)
+	if not contents then contents = {} end
+	setmetatable(contents, tuparray_metatable)
+	return contents
 end
 
 creategitignore()
 
-pages = {}
-examples = {}
-flags = {}
-flags_specific = {}
-prepare_tup_table(flags_specific)
+pages = tupvar{}
+examples = tupvar{}
+flags = tupvar{}
+flags_specific = tuparray{}
 
 if getconfig('TUP_WWW') == 'y'
 then
+	pages:insert 'index.html'
+	pages:insert 'getting_started.html'
+	pages:insert 'examples.html'
+	pages:insert 'manual.html'
+	pages:insert 'tips_and_tricks.html'
+	pages:insert 'make_vs_tup.html'
+	pages:insert 'tup_vs_mordor.html'
+	pages:insert 'license.html'
+	pages:insert 'support.html'
 
-table.insert(pages, 'index.html')
-table.insert(pages, 'getting_started.html')
-table.insert(pages, 'examples.html')
-table.insert(pages, 'manual.html')
-table.insert(pages, 'tips_and_tricks.html')
-table.insert(pages, 'make_vs_tup.html')
-table.insert(pages, 'tup_vs_mordor.html')
-table.insert(pages, 'license.html')
-table.insert(pages, 'support.html')
+	examples:insert 'ex_a_first_tupfile.html'
+	examples:insert 'ex_dependencies.html'
+	examples:insert 'ex_generated_header.html'
+	examples:insert 'ex_multiple_directories.html'
 
-table.insert(examples, 'ex_a_first_tupfile.html')
-table.insert(examples, 'ex_dependencies.html')
-table.insert(examples, 'ex_generated_header.html')
-table.insert(examples, 'ex_multiple_directories.html')
+	-- Use the 'examples' sub-menu for the examples page.
+	flags_specific['examples']:insert '-x'
 
--- Use the 'examples' sub-menu for the examples page.
-table.insert(flags_specific['examples'], '-x')
+	if getconfig('TUP_WWW_ANALYTICS') == 'y'
+	then
+		flags:insert '-a'
+	end
 
-if getconfig('TUP_WWW_ANALYTICS') == 'y'
-then
-	table.insert(flags, '-a')
-end
-
-rule(nil, '^ GEN %o^ ./gen_menu.sh ' .. table.concat(pages, ' ') .. ' > %o', 'menu.inc')
-rule(nil, '^ GEN %o^ ./gen_ex_header.sh ' .. table.concat(examples, ' ') .. ' > %o', 'examples.inc')
-rule('examples.inc', '^ GEN %o^ ./gen_menu.sh -x ' .. table.concat(pages, ' ') .. ' > %o', 'menu-examples.inc')
-rule(nil, '^ GEN %o^ ./gen_examples.sh ' .. table.concat(examples, ' ') .. ' > %o', 'examples.html')
-rule('../../tup.1', '^ man2html %o^ man2html %f > %o', 'manual.html')
-for index, page in ipairs(pages)
-do
-	rule(
-		{page, 'menu.inc', 'menu-examples.inc'}, 
-		'^ GEN %o^ ./gen_page.sh ' ..  table.concat(flags, ' ') .. 
-			' ' .. table.concat(flags_specific[string.gsub(page, '%..*', '')], ' ') .. 
-			' ' .. page .. ' > %o', 
-		page .. '.gen')
-end
-for index, example in ipairs(examples)
-do
-	local outputs = {example .. '.gen'}
-	definerule {
-		inputs = {example, 'menu-examples.inc'},
-		outputs = outputs,
-		command = '^ GEN ' .. outputs[1] .. '^' ..
-			'./gen_page.sh ' .. 
-			table.concat(flags, ' ') ..
-			' -x ' .. example .. ' > ' .. outputs[1]
-	}
-end
-
+	rule(nil, '^ GEN %o^ ./gen_menu.sh $(pages) > %o', 'menu.inc')
+	rule(nil, '^ GEN %o^ ./gen_ex_header.sh $(examples) > %o', 'examples.inc')
+	rule('examples.inc', '^ GEN %o^ ./gen_menu.sh -x $(pages) > %o', 'menu-examples.inc')
+	rule(nil, '^ GEN %o^ ./gen_examples.sh $(examples) > %o', 'examples.html')
+	rule('../../tup.1', '^ man2html %o^ man2html %f > %o', 'manual.html')
+	for index, page in ipairs(pages)
+	do
+		rule(
+			{page, 'menu.inc', 'menu-examples.inc'}, 
+			'^ GEN %o^ ./gen_page.sh $(flags) ' .. 
+				' ' .. table.concat(flags_specific[string.gsub(page, '%..*', '')], ' ') .. 
+				' ' .. page .. ' > %o', 
+			page .. '.gen')
+	end
+	for index, example in ipairs(examples)
+	do
+		local outputs = {example .. '.gen'}
+		definerule {
+			inputs = {example, 'menu-examples.inc'},
+			outputs = outputs,
+			command = '^ GEN ' .. outputs[1] .. '^' ..
+				'./gen_page.sh $(flags) ' ..
+				' -x ' .. example .. ' > ' .. outputs[1]
+		}
+	end
 end

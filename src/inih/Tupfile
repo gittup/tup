@@ -1,10 +1,10 @@
 dorulesfile()
 
 -- Has some warnings about casting away const
-table.insert(CFLAGS, '-Wno-cast-qual')
+CFLAGS:insert '-Wno-cast-qual'
 
 -- Don't need multiline support - we just set some ints.
-table.insert(CFLAGS, '-DINI_ALLOW_MULTILINE=0')
+CFLAGS:insert '-DINI_ALLOW_MULTILINE=0'
 
 for index, file in ipairs(glob('*.c'))
 do
