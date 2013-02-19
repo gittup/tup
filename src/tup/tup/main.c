@@ -66,7 +66,6 @@ static int fake_parser_version(int argc, char **argv);
 static int waitmon(void);
 static int flush(void);
 static int ghost_check(void);
-static void print_name(const char *s, char c);
 
 static void version(void);
 static void usage(void);
@@ -395,6 +394,7 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
 	struct node *n;
+	int expandable = 0;
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -404,7 +404,11 @@ static int graph_cb(void *arg, struct tup_entry *tent, int style)
 		return -1;
 
 edge_create:
-	if(style & TUP_LINK_NORMAL && n->expanded == 0) {
+	if(style & TUP_LINK_NORMAL)
+		expandable = 1;
+	if(n->tent->type == TUP_NODE_GROUP)
+		expandable = 1;
+	if(expandable && n->expanded == 0) {
 		n->expanded = 1;
 		TAILQ_REMOVE(&g->node_list, n, list);
 		TAILQ_INSERT_HEAD(&g->plist, n, list);
@@ -494,112 +498,8 @@ static int graph(int argc, char **argv)
 				return -1;
 	}
 
-	printf("digraph G {\n");
-	TAILQ_FOREACH(n, &g.node_list, list) {
-		int color;
-		int fontcolor;
-		const char *shape;
-		const char *style;
-		char *s;
-		struct edge *e;
-		int flags;
+	dump_graph(&g, stdout, show_dirs, show_env, show_ghosts);
 
-		if(n == g.root)
-			continue;
-
-		if(!show_env) {
-			if(n->tent->tnode.tupid == env_dt() ||
-			   n->tent->dt == env_dt())
-				continue;
-		}
-
-		style = "solid";
-		color = 0;
-		fontcolor = 0;
-		switch(n->tent->type) {
-			case TUP_NODE_FILE:
-			case TUP_NODE_GENERATED:
-				/* Skip Tupfiles in no-dirs mode since they
-				 * point to directories.
-				 */
-				if(!show_dirs && strcmp(n->tent->name.s, "Tupfile") == 0)
-					continue;
-				shape = "oval";
-				break;
-			case TUP_NODE_CMD:
-				shape = "rectangle";
-				break;
-			case TUP_NODE_DIR:
-				if(!show_dirs)
-					continue;
-				shape = "diamond";
-				break;
-			case TUP_NODE_VAR:
-				shape = "octagon";
-				break;
-			case TUP_NODE_GHOST:
-				if(!show_ghosts)
-					continue;
-				/* Ghost nodes won't have flags set */
-				color = 0x888888;
-				fontcolor = 0x888888;
-				style = "dotted";
-				shape = "oval";
-				break;
-			case TUP_NODE_GROUP:
-				shape = "hexagon";
-				break;
-			case TUP_NODE_ROOT:
-			default:
-				shape="ellipse";
-		}
-
-		flags = tup_db_get_node_flags(n->tnode.tupid);
-		if(flags & TUP_FLAGS_MODIFY) {
-			color |= 0x0000ff;
-			style = "dashed";
-		}
-		if(flags & TUP_FLAGS_CREATE) {
-			color |= 0x00ff00;
-			style = "dashed peripheries=2";
-		}
-		if(n->expanded == 0) {
-			if(color == 0) {
-				color = 0x888888;
-				fontcolor = 0x888888;
-			} else {
-				/* Might only be graphing a subset. Ie:
-				 * graph node foo, which points to command bar,
-				 * and command bar is in the modify list. In
-				 * this case, bar won't be expanded.
-				 */
-			}
-		}
-		printf("\tnode_%lli [label=\"", n->tnode.tupid);
-		s = n->tent->name.s;
-		if(s[0] == '^') {
-			s++;
-			while(*s && *s != ' ') {
-				/* Skip flags (Currently there are none) */
-				s++;
-			}
-			print_name(s, '^');
-		} else {
-			print_name(s, 0);
-		}
-		printf("\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
-		if(show_dirs && n->tent->dt) {
-			struct node *tmp;
-			tmp = find_node(&g, n->tent->dt);
-			if(tmp)
-				printf("\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
-		}
-
-		LIST_FOREACH(e, &n->edges, list) {
-			printf("\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
-		}
-	}
-	printf("}\n");
 	destroy_graph(&g);
 	if(tup_db_commit() < 0)
 		return -1;
@@ -1165,19 +1065,6 @@ static int ghost_check(void)
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
-}
-
-static void print_name(const char *s, char c)
-{
-	for(; *s && *s != c; s++) {
-		if(*s == '"') {
-			printf("\\\"");
-		} else if(*s == '\\') {
-			printf("\\\\");
-		} else {
-			printf("%c", *s);
-		}
-	}
 }
 
 static void version(void)

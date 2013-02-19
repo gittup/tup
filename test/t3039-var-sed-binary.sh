@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -19,7 +19,6 @@
 # Test using the --binary flag to tup varsed
 
 . ./tup.sh
-check_no_windows varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed --binary %f %o |> out.txt
 HERE

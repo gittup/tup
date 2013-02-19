@@ -2,13 +2,12 @@ tup.dorulesfile()
 
 client_objs = {}
 table.insert(client_objs, 'src/tup/vardict.o')
-table.insert(client_objs, 'src/tup/access_event/send_event.o')
+table.insert(client_objs, 'src/tup/send_event.o')
 table.insert(client_objs, 'src/tup/flock/fcntl.o')
 bang_ar(client_objs, 'libtup_client.a')
 bang_cp('src/tup/vardict.h', 'tup_client.h')
 
 srcs = tup.glob('src/tup/*.o')
-srcs = table_concat(srcs, tup.glob('src/tup/access_event/*.o'))
 srcs = table_concat(srcs, tup.glob('src/tup/monitor/*.o'))
 srcs = table_concat(srcs, tup.glob('src/tup/flock/*.o'))
 srcs = table_concat(srcs, tup.glob('src/tup/server/*.o'))
@@ -59,7 +58,6 @@ tup.definerule {
 }
 
 mingwsrcs = tup.glob('src/tup/*.omingw')
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/access_event/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/monitor/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/tup/*.omingw'))
 mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/flock/*.omingw'))

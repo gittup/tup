@@ -1,4 +1,0 @@
-tup.dorulesfile()
-
-bang_cc('send_event.c')
-bang_mingwcc('send_udp.c')

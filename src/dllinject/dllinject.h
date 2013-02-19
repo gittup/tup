@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2010  James McKaskill
- * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -40,7 +40,8 @@ DLLINJECT_API DWORD tup_inject_init(remote_thread_t *r);
 
 DLLINJECT_API void tup_inject_setexecdir(const char *dir);
 
-DLLINJECT_API int tup_inject_dll(LPPROCESS_INFORMATION process, const char *depfilename);
+DLLINJECT_API int tup_inject_dll(LPPROCESS_INFORMATION process, const char *depfilename,
+				 const char *vardict_file);
 
 #ifdef __cplusplus
 }

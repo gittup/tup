@@ -16,27 +16,23 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a var to sed a file
+# Same as t3001, but in a sub-directory.
 
 . ./tup.sh
-cat > Tupfile << HERE
+tmkdir sub
+cat > sub/Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
 HERE
-echo "hey @FOO@ yo" > foo.txt
-echo "This is an email@address.com" >> foo.txt
-tup touch foo.txt Tupfile
+echo "hey @FOO@ yo" > sub/foo.txt
+echo "This is an email@address.com" >> sub/foo.txt
+tup touch sub/foo.txt sub/Tupfile
 varsetall FOO=sup
 update
-tup_object_exist . foo.txt out.txt
-tup_object_exist . "tup varsed foo.txt out.txt"
-(echo "hey sup yo"; echo "This is an email@address.com") | diff out.txt -
+tup_object_exist sub foo.txt out.txt
+(echo "hey sup yo"; echo "This is an email@address.com") | diff sub/out.txt -
 
-cat > Tupfile << HERE
-HERE
-tup touch Tupfile
+varsetall FOO=blah
 update
-
-tup_object_no_exist . out.txt
-tup_object_no_exist . "tup varsed foo.txt out.txt"
+(echo "hey blah yo"; echo "This is an email@address.com") | diff sub/out.txt -
 
 eotup
