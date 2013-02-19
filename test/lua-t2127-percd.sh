@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,32 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
+# Try %d to refer to the directory name.
+
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+cat > Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+tmkdir foo
+cat > foo/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
+
+tmkdir bar
+tmkdir bar/baz
+cat > bar/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
+cat > bar/baz/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
+
+tup parse
+tup_object_exist . 'echo tuptesttmp-t2127-percd'
+tup_object_exist foo 'echo foo'
+tup_object_exist bar 'echo bar'
+tup_object_exist bar/baz 'echo baz'
 
 eotup

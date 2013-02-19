@@ -24,19 +24,21 @@ check_no_windows variant
 mkdir build
 touch build/tup.config
 
-cat > Tupfile << HERE
-: |> echo generated > %o |> genfile.txt
-: genfile.txt |> cat %f > %o |> output.txt
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{outputs = {genfile}, command = 'echo generated > ' .. genfile}
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
-tup touch Tupfile
+tup touch Tupfile.lua
 update
 
 echo 'generated' | diff - build/output.txt
 
-cat > Tupfile << HERE
-: genfile.txt |> cat %f > %o |> output.txt
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
-tup touch Tupfile
+tup touch Tupfile.lua
 update_fail_msg "Explicitly named file.*genfile.txt.*scheduled to be deleted"
 
 echo 'manual' > genfile.txt

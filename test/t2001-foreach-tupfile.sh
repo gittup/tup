@@ -20,10 +20,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-for index, file in pairs(tup.glob('*.c'))
-do
-	tup.definerule{inputs = {file}, command = 'echo gcc -c ' .. file .. ' -o ' .. string.gsub(file, '%.c', '') .. '.o'}
-end
+: foreach *.c |> echo gcc -c %f -o %B.o |>
 HERE
 tup touch foo.c bar.c Tupfile
 update

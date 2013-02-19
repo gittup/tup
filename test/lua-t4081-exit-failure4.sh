@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,33 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
+# Same as t4079, but now the file we accidentally write to is a ghost.
+
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+cat > ok.sh << HERE
+echo info > log.txt
+echo haha > ghost.txt
+exit 2
+echo hey > foo.txt
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+cat > gen-output.sh << HERE
+if [ -f ghost.txt ]; then cat ghost.txt; else echo nofile; fi
+HERE
+chmod +x gen-output.sh
+
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'output.txt'}, command = './gen-output.sh > output.txt'}
+tup.definerule{inputs = {'output.txt'}, outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
+HERE
+tup touch Tupfile.lua ok.sh
+update_fail_msg 'Unspecified output'
+
+check_exist log.txt
+check_not_exist ghost.txt
+check_not_exist foo.txt
+
+echo info | diff - log.txt
 
 eotup

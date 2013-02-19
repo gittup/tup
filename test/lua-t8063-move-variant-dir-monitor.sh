@@ -16,33 +16,39 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Same as t8072, but we forget to create the file initially.
-
+# Move a variant directory to the src tree with the monitor running.
 . ./tup.sh
 check_no_windows variant
+check_monitor_supported
 
-mkdir build
-touch build/tup.config
+monitor
 
-cat > Tupfile << HERE
-: |> echo generated > %o |> genfile.txt
-: genfile.txt |> cat %f > %o |> output.txt
+mkdir sub
+mkdir configs
+
+cat > sub/Tupfile.lua << HERE
+for index, source in ipairs(tup.glob('*.c'))
+do
+	local output = source:gsub('%.c', '.o')
+	tup.definerule{inputs = {source}, outputs = {output}, command = 'gcc -c ' .. source .. ' -o ' .. output}
+end
 HERE
-tup touch Tupfile
+touch sub/foo.c sub/bar.c
+echo "CONFIG_FOO=y" > configs/foo.config
+tup variant configs/*.config
 update
 
-echo 'generated' | diff - build/output.txt
+tup_object_exist build-foo/tup.config FOO
 
-cat > Tupfile << HERE
-: genfile.txt |> cat %f > %o |> output.txt
-HERE
-tup touch Tupfile
-update_fail_msg "Explicitly named file.*genfile.txt.*scheduled to be deleted"
-
-echo 'manual' > genfile.txt
-tup touch genfile.txt
+mv build-foo sub
 update
 
-echo 'manual' | diff - build/output.txt
+# When we move the variant directory and detect with the monitor, all of the
+# generated nodes become normal nodes.
+check_exist sub/foo.o sub/bar.o
+check_exist sub/build-foo/sub/foo.o sub/build-foo/sub/bar.o
 
+tup_object_no_exist sub/build-foo/tup.config FOO
+
+stop_monitor
 eotup

@@ -21,15 +21,15 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
---: foreach \$(srcs) |> nope |> %B.o
---: \$(objs) |> not gonna work |> prog
-tup.definerule{outputs = {'bar'}, command = 'echo foo > bar'}
+: foreach \$(srcs) |> nope |> %B.o
+: \$(objs) |> not gonna work |> prog
+: |> echo foo > %o |> bar
 HERE
 
 tup touch Tupfile
 tup parse
-#tup_object_no_exist . "nope"
-#tup_object_no_exist . "not gonna work"
+tup_object_no_exist . "nope"
+tup_object_no_exist . "not gonna work"
 tup_object_exist . "echo foo > bar"
 
 eotup

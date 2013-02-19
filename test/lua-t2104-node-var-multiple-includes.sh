@@ -17,7 +17,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # Test for node-variables getting set multiple times (through multiple
-# Tuprules.tup inclusion)
+# Tuprules.lua inclusion)
 
 . ./tup.sh
 
@@ -27,44 +27,46 @@ tmkdir sw/app
 tmkdir sw/app/core
 tmkdir sw/test
 
-cat > sw/Tuprules.tup << HERE
-&lib_tupfile = lib/Tupfile
-&core_tupfile = app/core/Tupfile
-vars += sw
-!vars = |> echo \$(vars) > %o |>
+cat > sw/Tuprules.lua << HERE
+lib_tupfile = tup.nodevariable 'lib/Tupfile.lua'
+core_tupfile = tup.nodevariable 'app/core/Tupfile.lua'
+if vars then vars = vars .. ' sw' else vars = 'sw' end
+function bang_vars(output)
+	tup.definerule{command = 'echo ' .. vars .. ' > ' .. output, outputs = {output}}
+end
 HERE
 
-cat > sw/lib/Tupfile << HERE
-include_rules
-vars += lib
+cat > sw/lib/Tupfile.lua << HERE
+tup.dorulesfile()
+if vars then vars = vars .. ' lib' else vars = 'lib' end
 
-ifeq (\$(TUP_CWD),.)
-: |> !vars |> lib.txt
-endif
+if tup.getcwd() == '.' then
+	bang_vars 'lib.txt'
+end
 HERE
 
-cat > sw/app/Tuprules.tup << HERE
-vars += app
+cat > sw/app/Tuprules.lua << HERE
+if vars then vars = vars .. ' app' else vars = 'app' end
 HERE
 
-cat > sw/app/core/Tupfile << HERE
-include_rules
-include &(lib_tupfile)
-vars += core
+cat > sw/app/core/Tupfile.lua << HERE
+tup.dorulesfile()
+tup.dofile(lib_tupfile)
+if vars then vars = vars .. ' core' else vars = 'core' end
 
-ifeq (\$(TUP_CWD),.)
-: |> !vars |> core.txt
-endif
+if tup.getcwd() == '.' then
+	bang_vars 'core.txt'
+end
 HERE
 
-cat > sw/test/Tupfile << HERE
-include_rules
-include &(core_tupfile)
-vars += test
-: |> !vars |> test.txt
+cat > sw/test/Tupfile.lua << HERE
+tup.dorulesfile()
+tup.dofile(core_tupfile)
+if vars then vars = vars .. ' test' else vars = 'test' end
+bang_vars 'test.txt'
 HERE
 
-tup touch sw/Tuprules.tup sw/lib/Tupfile sw/app/Tuprules.tup sw/app/core/Tupfile sw/test/Tupfile
+tup touch sw/Tuprules.lua sw/lib/Tupfile.lua sw/app/Tuprules.lua sw/app/core/Tupfile.lua sw/test/Tupfile.lua
 update
 
 tup_dep_exist sw/lib 'echo sw lib > lib.txt' sw/lib lib.txt

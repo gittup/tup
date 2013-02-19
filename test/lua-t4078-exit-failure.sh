@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,27 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
-. ./tup.sh
+# If the process fails, we should still move over any files that were
+# successfully created. This could include a log file, for example.
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+. ./tup.sh
+check_no_windows Unreliable return codes: http://cygwin.1069669.n5.nabble.com/Intermittent-failures-retrieving-process-exit-codes-td94814.html
+
+cat > ok.sh << HERE
+echo info > log.txt
+exit 2
+echo hey > foo.txt
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
+HERE
+tup touch Tupfile.lua ok.sh
+update_fail_msg "failed with return value 2"
+
+check_exist log.txt
+check_not_exist foo.txt
+
+echo info | diff - log.txt
 
 eotup

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,31 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
-. ./tup.sh
+# Same as t4079, but now the file we accidentally write to already exists.
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+. ./tup.sh
+check_no_windows output_tmp
+
+cat > ok.sh << HERE
+echo info > log.txt
+echo haha > badfile.txt
+exit 2
+echo hey > foo.txt
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+echo goodtext > badfile.txt
+
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
+HERE
+tup touch Tupfile.lua ok.sh badfile.txt
+update_fail_msg 'Unspecified output: badfile.txt'
+
+check_exist log.txt
+check_exist badfile.txt
+check_not_exist foo.txt
+
+echo info | diff - log.txt
+echo goodtext | diff - badfile.txt
 
 eotup

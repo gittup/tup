@@ -27,11 +27,7 @@ mkdir sub
 mkdir configs
 
 cat > sub/Tupfile << HERE
-for index, source in ipairs(tup.glob('*.c'))
-do
-	local output = source:gsub('%.c', '.o')
-	tup.definerule{inputs = {source}, outputs = {output}, command = 'gcc -c ' .. source .. ' -o ' .. output}
-end
+: foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 touch sub/foo.c sub/bar.c
 echo "CONFIG_FOO=y" > configs/foo.config

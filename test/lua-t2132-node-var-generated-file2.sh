@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
+# Test that a node-variable can't refer to a generated file from a previous
+# build (ie: in the delete list).
+
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'a.txt'}, command = 'touch a.txt'}
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+tup touch Tupfile.lua
+update
+
+cat > Tupfile.lua <<HERE
+node_var = tup.nodevariable 'a.txt'
+HERE
+tup touch Tupfile.lua
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

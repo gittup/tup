@@ -47,11 +47,11 @@ int main(void)
 	return 0;
 }
 HERE
-cat > Tupfile << HERE
-: |> gcc ok.c -o %o |> ok.exe
-: ok.exe |> ./%f |> out.txt
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'ok.exe'}, command = 'gcc ok.c -o ok.exe'}
+tup.definerule{inputs = {'ok.exe'}, outputs = {'out.txt'}, command = './ok.exe'}
 HERE
-tup touch ok.c Tupfile
+tup touch ok.c Tupfile.lua
 update
 
 eotup

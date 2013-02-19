@@ -36,7 +36,7 @@ echo hey > foo.txt
 sed -i.tmp -e 's/hey/there/' foo.txt
 HERE
 cat > Tupfile << HERE
-tup.definerule{outputs = {'foo.txt', 'foo.txt.tmp'}, command = 'sh ok.sh'}
+: |> sh ok.sh |> foo.txt foo.txt.tmp
 HERE
 tup touch ok.sh Tupfile
 update

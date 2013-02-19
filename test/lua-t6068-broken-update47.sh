@@ -19,8 +19,8 @@
 # Try to specify '.' as an input dependency.
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+cat > Tupfile.lua << HERE
+tup.definerule{inputs = {'.'}, command = 'echo foo'}
 HERE
 update_fail_msg "Not expecting '.' path here"
 

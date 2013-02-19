@@ -16,7 +16,9 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Same as t8072, but we forget to create the file initially.
+# Same as t8072, but this time we only do the initial parsing, rather than run
+# the commands. This causes us to not have a ghost node for genfile.txt in the
+# root directory.
 
 . ./tup.sh
 check_no_windows variant
@@ -24,23 +26,20 @@ check_no_windows variant
 mkdir build
 touch build/tup.config
 
-cat > Tupfile << HERE
-: |> echo generated > %o |> genfile.txt
-: genfile.txt |> cat %f > %o |> output.txt
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{outputs = {genfile}, command = 'echo generated > ' .. genfile}
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
-tup touch Tupfile
-update
+tup touch Tupfile.lua
+tup parse
 
-echo 'generated' | diff - build/output.txt
-
-cat > Tupfile << HERE
-: genfile.txt |> cat %f > %o |> output.txt
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
-tup touch Tupfile
-update_fail_msg "Explicitly named file.*genfile.txt.*scheduled to be deleted"
-
 echo 'manual' > genfile.txt
-tup touch genfile.txt
+tup touch genfile.txt Tupfile.lua
 update
 
 echo 'manual' | diff - build/output.txt

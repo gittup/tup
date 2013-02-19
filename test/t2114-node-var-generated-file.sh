@@ -21,8 +21,8 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-tup.definerule{command = 'touch a.txt', outputs = {'a.txt'}}
-node_var = tup.nodevariable 'a.txt'
+: |> touch %o |> a.txt
+&node_var = a.txt
 HERE
 
 tup touch Tupfile

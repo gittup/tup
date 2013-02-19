@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,20 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
-. ./tup.sh
+# Make sure an empty input variable doesn't generate a rule, but a blank input
+# pattern does.
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+. ./tup.sh
+cat > Tupfile.lua << HERE
+--: foreach \$(srcs) |> nope |> %B.o
+--: \$(objs) |> not gonna work |> prog
+tup.definerule{outputs = {'bar'}, command = 'echo foo > bar'}
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+tup touch Tupfile.lua
+tup parse
+#tup_object_no_exist . "nope"
+#tup_object_no_exist . "not gonna work"
+tup_object_exist . "echo foo > bar"
 
 eotup

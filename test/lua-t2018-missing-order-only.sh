@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,14 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
-. ./tup.sh
+# Like t2011, but this time the order-only prerequisite is missing.
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+. ./tup.sh
+cat > Tupfile.lua << HERE
+: foreach *.c | foo.h |> echo gcc -c %f -o %o |> %B.o
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+tup touch Tupfile.lua foo.c bar.c
+parse_fail_msg "Explicitly named file 'foo.h' not found"
 
 eotup

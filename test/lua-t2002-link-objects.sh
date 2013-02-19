@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,32 +16,24 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try %d to refer to the directory name.
+# Since *.o isn't 'tup touched', we have to get them from the output of the
+# first rule.
 
 . ./tup.sh
-
-cat > Tupfile << HERE
-: |> echo %d |>
+cat > Tupfile.lua << HERE
+for index, file in pairs(tup.glob('*.c'))
+do
+	local output = string.gsub(file, '%.c', '') .. '.o'
+	tup.definerule{inputs = {file}, outputs = {output}, command = 'gcc -c ' .. file .. ' -o ' .. output}
+end
+local inputs = tup.glob('*.o')
+tup.definerule{inputs = inputs, outputs = {'prog'}, command = 'gcc -o prog ' .. table.concat(inputs, ' ')}
 HERE
-
-tmkdir foo
-cat > foo/Tupfile << HERE
-: |> echo %o |> %d
-HERE
-
-tmkdir bar
-tmkdir bar/baz
-cat > bar/Tupfile << HERE
-: |> echo %o |> %d
-HERE
-cat > bar/baz/Tupfile << HERE
-: |> echo %o |> %d
-HERE
-
+tup touch foo.c bar.c Tupfile.lua
 tup parse
-tup_object_exist . 'echo tuptesttmp-t2127-percd'
-tup_object_exist foo 'echo foo'
-tup_object_exist bar 'echo bar'
-tup_object_exist bar/baz 'echo baz'
+tup_object_exist . foo.c bar.c
+tup_object_exist . "gcc -c foo.c -o foo.o"
+tup_object_exist . "gcc -c bar.c -o bar.o"
+tup_object_exist . "gcc -o prog bar.o foo.o"
 
 eotup

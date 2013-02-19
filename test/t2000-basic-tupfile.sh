@@ -20,7 +20,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-tup.definerule{inputs = {'foo.c'}, command = 'echo gcc -c foo.c -o foo.o'}
+: foo.c |> echo gcc -c foo.c -o foo.o |>
 HERE
 tup touch foo.c Tupfile
 update

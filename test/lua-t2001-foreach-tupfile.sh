@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,19 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
-. ./tup.sh
+# Basic foreach rule
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+. ./tup.sh
+cat > Tupfile.lua << HERE
+for index, file in pairs(tup.glob('*.c'))
+do
+	tup.definerule{inputs = {file}, command = 'echo gcc -c ' .. file .. ' -o ' .. string.gsub(file, '%.c', '') .. '.o'}
+end
 HERE
-update_fail_msg "Not expecting '.' path here"
+tup touch foo.c bar.c Tupfile.lua
+update
+tup_object_exist . foo.c bar.c
+tup_object_exist . "echo gcc -c foo.c -o foo.o"
+tup_object_exist . "echo gcc -c bar.c -o bar.o"
 
 eotup

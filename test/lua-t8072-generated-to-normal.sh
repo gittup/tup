@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,32 +16,32 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try %d to refer to the directory name.
+# Same as t6053, but in a variant.
 
 . ./tup.sh
+check_no_windows variant
 
-cat > Tupfile << HERE
-: |> echo %d |>
-HERE
+mkdir build
+touch build/tup.config
 
-tmkdir foo
-cat > foo/Tupfile << HERE
-: |> echo %o |> %d
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{outputs = {genfile}, command = 'echo generated > ' .. genfile}
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
+tup touch Tupfile.lua
+update
 
-tmkdir bar
-tmkdir bar/baz
-cat > bar/Tupfile << HERE
-: |> echo %o |> %d
-HERE
-cat > bar/baz/Tupfile << HERE
-: |> echo %o |> %d
-HERE
+echo 'generated' | diff - build/output.txt
 
-tup parse
-tup_object_exist . 'echo tuptesttmp-t2127-percd'
-tup_object_exist foo 'echo foo'
-tup_object_exist bar 'echo bar'
-tup_object_exist bar/baz 'echo baz'
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
+HERE
+echo 'manual' > genfile.txt
+tup touch genfile.txt Tupfile.lua
+update
+
+echo 'manual' | diff - build/output.txt
 
 eotup

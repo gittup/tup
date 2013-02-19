@@ -25,33 +25,20 @@
 
 . ./tup.sh
 
-# Make sure we can creat() a file in RDWR mode. Here we use fopen() and try to
-# read from it with fscanf().
-cat > ok.c << HERE
-#include <stdio.h>
-#include <fcntl.h>
+# The foo.txt.tmp file is created and then renamed with NtSetInformationFile.
+# Trying to hook this currently crashes tup - not sure why.
+check_no_windows TODO: Fix NtSetInformationFile hook
 
-int main(void)
-{
-	int x;
-	FILE *f = fopen("out.txt", "w+");
-	fprintf(f, "5\n");
-	rewind(f);
-	if(fscanf(f, "%i", &x) != 1) {
-		perror("fscanf");
-		return 1;
-	}
-	fclose(f);
-	if(x != 5)
-		return 1;
-	return 0;
-}
+# Note we need to explicitly give an extension (-i.tmp) since OSX will create
+# a file called 'foo.txt-e' even though it says it won't in the man page.
+cat > ok.sh << HERE
+echo hey > foo.txt
+sed -i.tmp -e 's/hey/there/' foo.txt
 HERE
-cat > Tupfile << HERE
-: |> gcc ok.c -o %o |> ok.exe
-: ok.exe |> ./%f |> out.txt
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'foo.txt', 'foo.txt.tmp'}, command = 'sh ok.sh'}
 HERE
-tup touch ok.c Tupfile
+tup touch ok.sh Tupfile.lua
 update
 
 eotup

@@ -31,7 +31,7 @@ HERE
 echo goodtext > badfile.txt
 
 cat > Tupfile << HERE
-tup.definerule{outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
+: |> sh ok.sh |> log.txt foo.txt
 HERE
 tup touch Tupfile ok.sh badfile.txt
 update_fail_msg 'Unspecified output: badfile.txt'

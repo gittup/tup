@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,31 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
+# Same as t5076, only the first directory doesn't exist when we do the
+# initial compilation.
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+tmkdir b
+echo 'int x;' > b/foo.h
+echo '#include "foo.h"' > ok.c
+
+cat > Tupfile.lua << HERE
+tup.definerule{ inputs = {'ok.c'}, outputs = {'ok.o'}, command = 'gcc -c ok.c -o ok.o -Ia -Ib' }
 HERE
-update_fail_msg "Not expecting '.' path here"
+tup touch b/foo.h ok.c Tupfile.lua
+update
+
+tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
+sym_check ok.o x
+
+tmkdir a
+echo 'int y;' > a/foo.h
+update
+
+tup_dep_exist a foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
+sym_check ok.o y
+
+# Make sure we don't have a dependency on the directory anymore.
+tup_dep_no_exist . a . 'gcc -c ok.c -o ok.o -Ia -Ib'
 
 eotup

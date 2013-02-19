@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,12 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to specify '.' as an input dependency.
+# Test that using a node-variable as the value of a regular variable doesn't
+# work - converting a node-variable to a string only makes sense in places
+# where the string will be consumed immediately. Putting the string into a
+# variable is not one of these places (the variable could be used as an output
+# file, or it could be used in another Tupfile.lua where the relative path is no
+# longer valid).
+
 . ./tup.sh
 
-cat > Tupfile << HERE
-: . |> echo foo |>
+cat > Tupfile.lua << HERE
+node_var = tup.nodevariable 'lib.a'
+var = tostring(node_var)
 HERE
-update_fail_msg "Not expecting '.' path here"
+
+tup touch lib.a Tupfile.lua
+
+update_fail_msg "&-variables not allowed here"
 
 eotup
