@@ -5211,6 +5211,7 @@ struct write_input_data {
 	tupid_t cmdid;
 	tupid_t groupid;
 	int new_groups;
+	int normal_links_invalid;
 	struct tupid_entries *normal_root;
 	struct tupid_entries *delete_root;
 	struct tupid_entries *env_root;
@@ -5261,11 +5262,27 @@ static int rm_sticky(tupid_t tupid, void *data)
 		if(tup_entry_add(tupid, &tent) < 0)
 			return -1;
 		if(tent->type == TUP_NODE_GROUP) {
+			/* Removing an input group means we need to check if
+			 * the group also needs to be removed from the
+			 * database.
+			 */
 			tup_entry_add_ghost_list(tent, &ghost_list);
+
+			/* If this command also writes to a group, we need to
+			 * remove the group_link for this input group.
+			 */
 			if(wid->groupid != -1) {
 				if(group_link_remove(tupid, wid->groupid, wid->cmdid) < 0)
 					return -1;
 			}
+
+			/* Removing a group input invalidates all file inputs.
+			 * We can't remove all normal links because we want to
+			 * keep environment links, and we can't just remove all
+			 * normal links that are in the group, because the
+			 * group may have changed since we last used it.
+			 */
+			wid->normal_links_invalid = 1;
 		}
 	} else {
 		if(tupid_tree_search(wid->delete_root, tupid) != NULL) {
@@ -5286,6 +5303,25 @@ static int rm_sticky(tupid_t tupid, void *data)
 	return 0;
 }
 
+static int delete_normal_file_links(tupid_t cmdid, struct tupid_entries *root)
+{
+	struct tupid_tree *tt;
+
+	if(tup_db_add_modify_list(cmdid) < 0)
+		return -1;
+	RB_FOREACH(tt, tupid_entries, root) {
+		struct tup_entry *tent;
+
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_GENERATED) {
+			if(link_remove(tt->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root,
@@ -5301,6 +5337,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		.env_root = env_root,
 		.groupid = -1,
 		.new_groups = 0,
+		.normal_links_invalid = 0,
 	};
 
 	if(group && group == old_group) {
@@ -5312,6 +5349,10 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 	if(compare_trees(input_root, &sticky_root, &wid,
 			 add_sticky, rm_sticky) < 0)
 		return -1;
+	if(wid.normal_links_invalid) {
+		if(delete_normal_file_links(cmdid, &normal_root) < 0)
+			return -1;
+	}
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
 
