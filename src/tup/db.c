@@ -107,7 +107,6 @@ enum {
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
 	DB_GET_VAR_ID_ALLOC,
-	DB_WRITE_VAR,
 	DB_VAR_FOREACH,
 	DB_FILES_TO_TREE,
 	_DB_GET_OUTPUT_TREE,
@@ -3363,7 +3362,11 @@ int tup_db_delete_links(tupid_t tupid)
 		const char *sql;
 		int sqlsize;
 
-		stmt = &stmts[DB_DELETE_LINKS1 + x];
+		if(x == 0) {
+			stmt = &stmts[DB_DELETE_LINKS1];
+		} else {
+			stmt = &stmts[DB_DELETE_LINKS2];
+		}
 		sql = sqls[x];
 		sqlsize = strlen(sqls[x]) + 1;
 
