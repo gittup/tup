@@ -23,6 +23,8 @@
 #include "tup/config.h"
 #include "tup/flist.h"
 #include "tup/environ.h"
+#include "tup/entry.h"
+#include "tup/variant.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
@@ -227,7 +229,10 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
 	char buf[64];
 	char depfile[PATH_MAX];
+	char vardict_file[PATH_MAX];
 	HANDLE h;
+	struct variant *variant;
+	unsigned int x;
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
 		|| strncmp(cmd, "bash ", 5) == 0
@@ -244,6 +249,22 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		fprintf(stderr, "Error starting update server.\n");
 		return -1;
 	}
+
+	variant = tup_entry_variant(dtent);
+
+	if(get_tup_top_len() + 1 + strlen(variant->vardict_file) + 1 >= sizeof(vardict_file)) {
+		fprintf(stderr, "tup internal error: vardict_file sized incorrectly in server_exec() for Windows.\n");
+		return -1;
+	}
+	strcpy(vardict_file, get_tup_top());
+	vardict_file[get_tup_top_len()] = PATH_SEP;
+	for(x=0; x<strlen(variant->vardict_file); x++) {
+		char c = variant->vardict_file[x];
+		if(c == '/')
+			c = PATH_SEP;
+		vardict_file[get_tup_top_len() + 1 + x] = c;
+	}
+	vardict_file[get_tup_top_len() + 1 + strlen(variant->vardict_file)] = 0;
 
 	cmdline[0] = '\0';
 	/* Only pull in cmd/sh if really necessary */
@@ -279,7 +300,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 	pthread_mutex_unlock(&dir_mutex);
 
-	if(tup_inject_dll(&pi, depfile)) {
+	if(tup_inject_dll(&pi, depfile, vardict_file)) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to inject dll: %s\n", strerror(errno));
 		pthread_mutex_unlock(s->error_mutex);

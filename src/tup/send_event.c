@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,9 +20,17 @@
 
 #include "tup/access_event.h"
 #include <stdio.h>
+#include <fcntl.h>
 
 void tup_send_event(const char *file, int len, const char *file2, int len2, int at)
 {
-	if(file || len || file2 || len2 || at) {}
-	fprintf(stderr, "tup_send_event: Operation unsupported on this platform.\n");
+	char path[PATH_MAX];
+
+	if(file2 || len2 || at) {/*TODO */}
+	if(snprintf(path, sizeof(path), TUP_VAR_VIRTUAL_DIR "/%.*s", len, file) >= (signed)sizeof(path)) {
+		fprintf(stderr, "tup internal error: path is too small in tup_send_event()\n");
+		return;
+	}
+
+	open(path, O_RDONLY);
 }

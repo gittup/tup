@@ -1,4 +1,8 @@
 /* Used for commands */
+html {
+	overflow-y: scroll;
+}
+
 pre {
 	border: 1px solid silver;
 	border-radius: 0.25em;

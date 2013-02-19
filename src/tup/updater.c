@@ -1211,6 +1211,13 @@ static int build_graph(struct graph *g)
 	return 0;
 }
 
+static void save_graphs(struct graph *g)
+{
+	save_graph(g, ".tup/tmp/graph-full-%i.dot");
+	trim_graph(g);
+	save_graph(g, ".tup/tmp/graph-trimmed-%i.dot");
+}
+
 static int add_file_cb(void *arg, struct tup_entry *tent, int style)
 {
 	struct graph *g = arg;
@@ -1232,6 +1239,7 @@ edge_create:
 		fprintf(stderr, "tup error: Circular dependency detected! "
 			"Last edge was: %lli -> %lli\n",
 			g->cur->tnode.tupid, tent->tnode.tupid);
+		save_graphs(g);
 		return -1;
 	}
 	if(style & TUP_LINK_NORMAL)
@@ -1434,7 +1442,7 @@ check_empties:
 			if(fchdir(tup_top_fd()) < 0) {
 				perror("fchdir");
 			}
-			dump_graph(g, ".tup/tmp/graph-%i.dot");
+			save_graphs(g);
 		}
 	} else {
 		rc = 0;

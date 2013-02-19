@@ -2,13 +2,12 @@ dorulesfile()
 
 client_objs = tupvar {}
 client_objs:insert 'src/tup/vardict.o'
-client_objs:insert 'src/tup/access_event/send_event.o'
+client_objs:insert 'src/tup/send_event.o'
 client_objs:insert 'src/tup/flock/fcntl.o'
 bang_ar(client_objs, 'libtup_client.a')
 bang_cp('src/tup/vardict.h', 'tup_client.h')
 
 srcs = tupvar(glob('src/tup/*.o'))
-srcs = srcs .. glob('src/tup/access_event/*.o')
 srcs = srcs .. glob('src/tup/monitor/*.o')
 srcs = srcs .. glob('src/tup/flock/*.o')
 srcs = srcs .. glob('src/tup/server/*.o')
@@ -44,7 +43,6 @@ then
 	rule(glob('src/dllinject/*.omingw'), '^ MINGW32LINK %o ^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o', 'tup-dllinject.dll')
 
 	mingwsrcs = tupvar(glob('src/tup/*.omingw'))
-	mingwsrcs = mingwsrcs .. glob('src/tup/access_event/*.omingw')
 	mingwsrcs = mingwsrcs .. glob('src/tup/monitor/*.omingw')
 	mingwsrcs = mingwsrcs .. glob('src/tup/tup/*.omingw')
 	mingwsrcs = mingwsrcs .. glob('src/tup/flock/*.omingw')

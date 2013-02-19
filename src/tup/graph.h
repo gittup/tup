@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,6 +25,7 @@
 #include "tupid_tree.h"
 #include "db_types.h"
 #include <time.h>
+#include <stdio.h>
 
 struct edge {
 	LIST_ENTRY(edge) list;
@@ -86,6 +87,8 @@ int graph_empty(struct graph *g);
 int nodes_are_connected(struct tup_entry *src, struct tupid_entries *dest_head,
 			int *connected);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned);
-void dump_graph(const struct graph *g, const char *filename);
+void trim_graph(struct graph *g);
+void save_graph(struct graph *g, const char *filename);
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts);
 
 #endif
