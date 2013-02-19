@@ -139,7 +139,6 @@ static void delete_name_list_entry(struct name_list *nl,
 
 static int debug_run = 0;
 
-/* SCRIPTING LANGUAGE CODE START */
 static const char *tuplua_tostring(struct lua_State *ls, int strindex)
 {
 	const char *out = luaL_tolstring(ls, strindex, NULL);
@@ -700,7 +699,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 			lua_close(ls);
 			tf->ls = NULL;
 		}
-		return 0;
+		return -1;
 	}
 
 	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK)
@@ -711,7 +710,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 			lua_close(ls);
 			tf->ls = NULL;
 		}
-		return 0;
+		return -1;
 	}
 
 	if(ownstate)
@@ -720,9 +719,8 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tf->ls = NULL;
 	}
 
-	return 1;
+	return 0;
 }
-/* SCRIPTING LANGUAGE CODE STOP */
 
 void lua_parser_debug_run(void)
 {
@@ -847,7 +845,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(!parse_lua_tupfile(tf, &incb, file))
+	if(parse_lua_tupfile(tf, &incb, file) < 0)
 		goto out_free;
 	rc = 0;
 out_free:

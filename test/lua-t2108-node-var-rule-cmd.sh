@@ -16,22 +16,35 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as the value of a regular variable doesn't
-# work - converting a node-variable to a string only makes sense in places
-# where the string will be consumed immediately. Putting the string into a
-# variable is not one of these places (the variable could be used as an output
-# file, or it could be used in another Tupfile.lua where the relative path is no
-# longer valid).
+# Test using a node-variable in a rule command line.
 
 . ./tup.sh
 
-cat > Tupfile.lua << HERE
-node_var = tup.nodevariable 'lib.a'
-var = tostring(node_var)
+tmkdir sw
+tmkdir sw/toolkit
+tmkdir sw/app
+
+cat > sw/Tuprules.lua << HERE
+toolkit_lib = tup.nodevariable 'toolkit/toolkit.a'
 HERE
 
-tup touch lib.a Tupfile.lua
+cat > sw/app/Tupfile.lua << HERE
+tup.dorulesfile()
+tup.definerule{command = 'cp ' .. toolkit_lib .. ' lib_copy.a', outputs = {'lib_copy.a'}}
+HERE
 
-update_fail_msg "&-variables not allowed here"
+tup touch sw/Tuprules.lua
+tup touch sw/toolkit/toolkit.a
+tup touch sw/app/Tupfile.lua
+update
+
+path="../toolkit/toolkit.a"
+case $tupos in
+	CYGWIN*)
+		path="..\toolkit\toolkit.a"
+		;;
+esac
+
+tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
 
 eotup

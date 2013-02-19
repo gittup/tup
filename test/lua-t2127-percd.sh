@@ -39,7 +39,7 @@ tup.definerule{command = 'echo ' .. tup.getparent()}
 HERE
 
 tup parse
-tup_object_exist . 'echo tuptesttmp-t2127-percd'
+tup_object_exist . 'echo tuptesttmp-lua-t2127-percd'
 tup_object_exist foo 'echo foo'
 tup_object_exist bar 'echo bar'
 tup_object_exist bar/baz 'echo baz'

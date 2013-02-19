@@ -25,12 +25,12 @@ tmkdir sw/toolkit
 tmkdir sw/app
 
 cat > sw/Tuprules.tup << HERE
-toolkit_lib = tup.nodevariable 'toolkit/toolkit.a'
+&toolkit_lib = toolkit/toolkit.a
 HERE
 
 cat > sw/app/Tupfile << HERE
-tup.dorulesfile()
-tup.definerule{command = 'cp ' .. toolkit_lib .. ' lib_copy.a', outputs = {'lib_copy.a'}}
+include_rules
+: |> cp &(toolkit_lib) %o |> lib_copy.a
 HERE
 
 tup touch sw/Tuprules.tup
