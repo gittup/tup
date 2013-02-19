@@ -91,8 +91,8 @@ enum {
 	DB_LINK_EXISTS1,
 	DB_LINK_EXISTS2,
 	DB_GET_INCOMING_LINK,
-	DB_DELETE_LINKS1,
-	DB_DELETE_LINKS2,
+	_DB_DELETE_NORMAL_LINKS,
+	_DB_DELETE_STICKY_LINKS,
 	DB_DIRTYPE_TO_TREE,
 	DB_TYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
@@ -3341,68 +3341,100 @@ out_reset:
 	return rc;
 }
 
-int tup_db_delete_links(tupid_t tupid)
+static int delete_normal_links(tupid_t tupid)
 {
 	int rc;
-	int x;
-	sqlite3_stmt **stmt;
-	static const char *sqls[] = {
-		"delete from normal_link where from_id=? or to_id=?",
-		"delete from sticky_link where from_id=? or to_id=?",
-	};
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_NORMAL_LINKS];
+	static const char s[] = "delete from normal_link where from_id=? or to_id=?";
 
-	if(add_ghost_checks(tupid) < 0)
-		return -1;
-	if(add_group_checks(tupid) < 0)
-		return -1;
-	if(delete_group_links(tupid) < 0)
-		return -1;
-
-	for(x=0; x<2; x++) {
-		const char *sql;
-		int sqlsize;
-
-		if(x == 0) {
-			stmt = &stmts[DB_DELETE_LINKS1];
-		} else {
-			stmt = &stmts[DB_DELETE_LINKS2];
-		}
-		sql = sqls[x];
-		sqlsize = strlen(sqls[x]) + 1;
-
-		transaction_check("%s [37m[%lli, %lli][0m", sql, tupid, tupid);
-		if(!*stmt) {
-			if(sqlite3_prepare_v2(tup_db, sql, sqlsize, stmt, NULL) != 0) {
-				fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-				fprintf(stderr, "Statement was: %s\n", sql);
-				return -1;
-			}
-		}
-
-		if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-			fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", sql);
-			return -1;
-		}
-		if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
-			fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", sql);
-			return -1;
-		}
-
-		rc = sqlite3_step(*stmt);
-		if(msqlite3_reset(*stmt) != 0) {
-			fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", sql);
-			return -1;
-		}
-		if(rc != SQLITE_DONE) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", sql);
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
 			return -1;
 		}
 	}
 
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int delete_sticky_links(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_STICKY_LINKS];
+	static const char s[] = "delete from sticky_link where from_id=? or to_id=?";
+
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_delete_links(tupid_t tupid)
+{
+	if(add_ghost_checks(tupid) < 0)
+		return -1;
+	if(add_group_checks(tupid) < 0)
+		return -1;
+	if(delete_normal_links(tupid) < 0)
+		return -1;
+	if(delete_sticky_links(tupid) < 0)
+		return -1;
+	if(delete_group_links(tupid) < 0)
+		return -1;
 	return 0;
 }
 
