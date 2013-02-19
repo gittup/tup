@@ -94,4 +94,8 @@ void trim_graph(struct graph *g);
 void save_graph(FILE *err, struct graph *g, const char *filename);
 void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts);
 
+int group_need_circ_check(void);
+int add_group_circ_check(struct tup_entry *tent);
+int group_circ_check(void);
+
 #endif

@@ -1004,12 +1004,20 @@ static int process_create_nodes(void)
 	rc = execute_graph(&g, 0, 1, create_work);
 	compat_lock_enable();
 	if(rc == 0) {
-		if(g.gen_delete_count) {
-			tup_main_progress("Deleting files...\n");
-		} else {
-			tup_main_progress("No files to delete.\n");
+		if(group_need_circ_check()) {
+			/* TODO: Extra space */
+			tup_show_message("Checking circular dependencies among groups...\n");
+			if(group_circ_check() < 0)
+				rc = -1;
 		}
-		rc = delete_files(&g);
+		if(rc == 0) {
+			if(g.gen_delete_count) {
+				tup_main_progress("Deleting files...\n");
+			} else {
+				tup_main_progress("No files to delete.\n");
+			}
+			rc = delete_files(&g);
+		}
 	}
 	if(rc < 0) {
 		tup_db_rollback();

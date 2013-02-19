@@ -30,6 +30,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static struct graph group_graph;
+static int group_graph_inited = 0;
+
 static struct tup_entry root_entry;
 static char root_name[] = "root";
 
@@ -213,6 +216,55 @@ edge_create:
 	return 0;
 }
 
+static int build_group_cb(void *arg, struct tup_entry *tent,
+			  struct tup_entry *cmdtent)
+{
+	struct graph *g = arg;
+	struct node *cmdn;
+	struct node *n;
+
+	n = find_node(g, tent->tnode.tupid);
+	if(!n) {
+		n = create_node(g, tent);
+		if(!n) {
+			printf("Can't create node: ");
+			print_tup_entry(stdout, tent);
+			printf("\n");
+			return -1;
+		}
+	}
+
+	cmdn = find_node(g, cmdtent->tnode.tupid);
+	if(!cmdn) {
+		cmdn = create_node(g, cmdtent);
+		if(!cmdn) {
+			printf("Can't create cmd node: ");
+			print_tup_entry(stdout, cmdtent);
+			printf("\n");
+			return -1;
+		}
+	}
+
+	if(n->expanded == 0) {
+		/* TUP_NODE_ROOT means we count everything */
+		n->expanded = 1;
+		TAILQ_REMOVE(&g->node_list, n, list);
+		TAILQ_INSERT_HEAD(&g->plist, n, list);
+	}
+	if(cmdn->expanded == 0) {
+		cmdn->expanded = 1;
+		TAILQ_REMOVE(&g->node_list, cmdn, list);
+		TAILQ_INSERT_HEAD(&g->plist, cmdn, list);
+	}
+
+	if(create_edge(g->cur, cmdn, TUP_LINK_NORMAL) < 0)
+		return -1;
+	if(create_edge(cmdn, n, TUP_LINK_NORMAL) < 0)
+		return -1;
+
+	return 0;
+}
+
 int build_graph(struct graph *g)
 {
 	struct node *cur;
@@ -222,8 +274,13 @@ int build_graph(struct graph *g)
 		if(cur->state == STATE_INITIALIZED) {
 			DEBUGP("find deps for node: %lli\n", cur->tnode.tupid);
 			g->cur = cur;
-			if(tup_db_select_node_by_link(build_graph_cb, g, cur->tnode.tupid) < 0)
-				return -1;
+			if(g->style == TUP_LINK_GROUP) {
+				if(tup_db_select_node_by_group_link(build_group_cb, g, cur->tnode.tupid) < 0)
+					return -1;
+			} else {
+				if(tup_db_select_node_by_link(build_graph_cb, g, cur->tnode.tupid) < 0)
+					return -1;
+			}
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
 			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
@@ -237,8 +294,9 @@ int build_graph(struct graph *g)
 		}
 	}
 
-	if(add_graph_stickies(g) < 0)
-		return -1;
+	if(g->style != TUP_LINK_GROUP)
+		if(add_graph_stickies(g) < 0)
+			return -1;
 
 	return 0;
 }
@@ -578,4 +636,53 @@ void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_
 		dump_node(f, g, n, show_dirs, show_env, show_ghosts);
 	}
 	fprintf(f, "}\n");
+}
+
+int group_need_circ_check(void)
+{
+	return group_graph_inited;
+}
+
+int add_group_circ_check(struct tup_entry *tent)
+{
+	struct node *n;
+	if(!group_graph_inited) {
+		if(create_graph(&group_graph, TUP_NODE_GROUP) < 0)
+			return -1;
+		group_graph_inited = 1;
+	}
+	if(find_node(&group_graph, tent->tnode.tupid) != NULL)
+		return 0;
+
+	n = create_node(&group_graph, tent);
+	if(!n) {
+		return -1;
+	}
+	TAILQ_REMOVE(&group_graph.node_list, n, list);
+	TAILQ_INSERT_HEAD(&group_graph.plist, n, list);
+	return 0;
+}
+
+int group_circ_check(void)
+{
+	if(!group_graph_inited)
+		return 0;
+	if(build_graph(&group_graph) < 0)
+		return -1;
+	trim_graph(&group_graph);
+	if(!TAILQ_EMPTY(&group_graph.node_list)) {
+		struct node *n;
+		fprintf(stderr, "tup error: Circular dependency found among the following groups:\n");
+		TAILQ_FOREACH(n, &group_graph.node_list, list) {
+			if(n->tent->type == TUP_NODE_GROUP) {
+				fprintf(stderr, " - ");
+				print_tup_entry(stderr, n->tent);
+				fprintf(stderr, "\n");
+			}
+		}
+		fprintf(stderr, "See the saved graph for the commands involved.\n");
+		save_graph(stderr, &group_graph, ".tup/tmp/graph-group-circular-%i.dot");
+		return -1;
+	}
+	return 0;
 }

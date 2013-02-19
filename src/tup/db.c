@@ -93,7 +93,6 @@ enum {
 	DB_GET_INCOMING_LINK,
 	DB_DELETE_LINKS1,
 	DB_DELETE_LINKS2,
-	DB_DELETE_LINKS3,
 	DB_DIRTYPE_TO_TREE,
 	DB_TYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
@@ -101,6 +100,7 @@ enum {
 	DB_SET_DEPENDENT_DIR_FLAGS,
 	DB_SET_DEPENDENT_CONFIG_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
+	DB_SELECT_NODE_BY_GROUP_LINK,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
 	DB_CONFIG_SET_STRING,
@@ -117,14 +117,14 @@ enum {
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT1,
 	_DB_LINK_INSERT2,
-	_DB_LINK_INSERT3,
-	_DB_LINK_UPDATE,
 	_DB_LINK_REMOVE1,
 	_DB_LINK_REMOVE2,
-	_DB_LINK_REMOVE3,
+	_DB_GROUP_LINK_INSERT,
+	_DB_GROUP_LINK_REMOVE,
+	_DB_DELETE_GROUP_LINKS,
 	_DB_NODE_HAS_GHOSTS,
-	_DB_ADD_GHOST_LINKS,
-	_DB_ADD_GROUP_LINKS,
+	_DB_ADD_GHOST_CHECKS,
+	_DB_ADD_GROUP_CHECKS,
 	_DB_GROUP_RECLAIMABLE1,
 	_DB_GROUP_RECLAIMABLE2,
 	_DB_GHOST_RECLAIMABLE1,
@@ -165,11 +165,14 @@ static int node_select(tupid_t dt, const char *name, int len,
 
 static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_remove(tupid_t a, tupid_t b, int style);
+static int group_link_insert(tupid_t a, tupid_t b, tupid_t cmdid);
+static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
+static int delete_group_links(tupid_t cmdid);
 static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
-static int add_ghost_links(tupid_t tupid);
-static int add_group_links(tupid_t tupid);
+static int add_ghost_checks(tupid_t tupid);
+static int add_group_checks(tupid_t tupid);
 static int reclaim_ghosts(void);
 static int ghost_reclaimable(struct tup_entry *tent);
 static int group_reclaimable1(tupid_t tupid);
@@ -3347,15 +3350,16 @@ int tup_db_delete_links(tupid_t tupid)
 	static const char *sqls[] = {
 		"delete from normal_link where from_id=? or to_id=?",
 		"delete from sticky_link where from_id=? or to_id=?",
-		"delete from group_link where from_id=? or to_id=?",
 	};
 
-	if(add_ghost_links(tupid) < 0)
+	if(add_ghost_checks(tupid) < 0)
 		return -1;
-	if(add_group_links(tupid) < 0)
+	if(add_group_checks(tupid) < 0)
+		return -1;
+	if(delete_group_links(tupid) < 0)
 		return -1;
 
-	for(x=0; x<3; x++) {
+	for(x=0; x<2; x++) {
 		const char *sql;
 		int sqlsize;
 
@@ -3737,6 +3741,70 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 		}
 
 		if(callback(arg, tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *, struct tup_entry *),
+				     void *arg, tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_GROUP_LINK];
+	static char s[] = "select to_id, cmdid from group_link where from_id=?";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	while(1) {
+		struct tup_entry *tent;
+		struct tup_entry *cmdtent;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			goto out_reset;
+		}
+
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+		if(tup_entry_add(sqlite3_column_int64(*stmt, 1), &cmdtent) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+
+		if(callback(arg, tent, cmdtent) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -5106,6 +5174,8 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 
 struct write_input_data {
 	tupid_t cmdid;
+	tupid_t groupid;
+	int new_groups;
 	struct tupid_entries *normal_root;
 	struct tupid_entries *delete_root;
 	struct tupid_entries *env_root;
@@ -5114,6 +5184,16 @@ struct write_input_data {
 static int add_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
+	struct tup_entry *tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
+	if(tent->type == TUP_NODE_GROUP && wid->groupid != -1) {
+		if(group_link_insert(tupid, wid->groupid, wid->cmdid) < 0)
+			return -1;
+		wid->new_groups = 1;
+	}
 
 	if(tupid_tree_search(wid->env_root, tupid) != NULL) {
 		/* Environment links have to be normal so we can build the
@@ -5145,8 +5225,13 @@ static int rm_sticky(tupid_t tupid, void *data)
 		struct tup_entry *tent;
 		if(tup_entry_add(tupid, &tent) < 0)
 			return -1;
-		if(tent->type == TUP_NODE_GROUP)
+		if(tent->type == TUP_NODE_GROUP) {
 			tup_entry_add_ghost_list(tent, &ghost_list);
+			if(wid->groupid != -1) {
+				if(group_link_remove(tupid, wid->groupid, wid->cmdid) < 0)
+					return -1;
+			}
+		}
 	} else {
 		if(tupid_tree_search(wid->delete_root, tupid) != NULL) {
 			/* The node is in the delete list and we are no longer
@@ -5168,7 +5253,9 @@ static int rm_sticky(tupid_t tupid, void *data)
 
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
-			struct tupid_entries *delete_root)
+			struct tupid_entries *delete_root,
+			struct tup_entry *group,
+			struct tup_entry *old_group)
 {
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
@@ -5177,7 +5264,13 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		.normal_root = &normal_root,
 		.delete_root = delete_root,
 		.env_root = env_root,
+		.groupid = -1,
+		.new_groups = 0,
 	};
+
+	if(group && group == old_group) {
+		wid.groupid = group->tnode.tupid;
+	}
 
 	if(tup_db_get_inputs(cmdid, &sticky_root, &normal_root) < 0)
 		return -1;
@@ -5186,6 +5279,34 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		return -1;
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
+
+	if(group != old_group) {
+		if(old_group) {
+			if(delete_group_links(cmdid) < 0)
+				return -1;
+		}
+		if(group) {
+			struct tupid_tree *tt;
+
+			wid.new_groups = 1;
+			/* We now output to a group, so add all of our
+			 * group_links.
+			 */
+			RB_FOREACH(tt, tupid_entries, input_root) {
+				struct tup_entry *tent;
+				if(tup_entry_add(tt->tupid, &tent) < 0)
+					return -1;
+				if(tent->type == TUP_NODE_GROUP) {
+					if(group_link_insert(tt->tupid, group->tnode.tupid, cmdid) < 0)
+						return -1;
+				}
+			}
+		}
+	}
+	if(wid.new_groups) {
+		if(add_group_circ_check(group) < 0)
+			return -1;
+	}
 	return 0;
 }
 
@@ -5423,7 +5544,9 @@ static int rm_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_entry *group)
+int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
+			 struct tup_entry *group,
+			 struct tup_entry **old_group)
 {
 	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
@@ -5431,11 +5554,10 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 		.outputs_differ = 0,
 		.group = NULL,
 	};
-	struct tup_entry *oldgroup;
 
-	if(tup_db_get_outputs(cmdid, &output_root, &oldgroup) < 0)
+	if(tup_db_get_outputs(cmdid, &output_root, old_group) < 0)
 		return -1;
-	if(oldgroup == group) {
+	if(*old_group == group) {
 		/* If we have the same group as before, we just update links to the
 		 * group in add/rm_output().
 		 */
@@ -5452,16 +5574,16 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_e
 			if(link_insert(cmdid, group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
-		if(oldgroup) {
+		if(*old_group) {
 			/* Removed from old group - rm links from all old outputs */
 			RB_FOREACH(tt, tupid_entries, &output_root) {
-				if(link_remove(tt->tupid, oldgroup->tnode.tupid, TUP_LINK_NORMAL) < 0)
+				if(link_remove(tt->tupid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 					return -1;
 			}
-			if(link_remove(cmdid, oldgroup->tnode.tupid, TUP_LINK_NORMAL) < 0)
+			if(link_remove(cmdid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			/* Possibly clean up this group if there are no more references. */
-			tup_entry_add_ghost_list(oldgroup, &ghost_list);
+			tup_entry_add_ghost_list(*old_group, &ghost_list);
 		}
 	}
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
@@ -5688,7 +5810,6 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 	sqlite3_stmt **stmt;
 	static char s1[] = "insert into normal_link(from_id, to_id) values(?, ?)";
 	static char s2[] = "insert into sticky_link(from_id, to_id) values(?, ?)";
-	static char s3[] = "insert into group_link(from_id, to_id) values(?, ?)";
 	char *sql;
 	int sqlsize;
 
@@ -5711,11 +5832,6 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 			stmt = &stmts[_DB_LINK_INSERT2];
 			sql = s2;
 			sqlsize = sizeof(s2);
-			break;
-		case TUP_LINK_GROUP:
-			stmt = &stmts[_DB_LINK_INSERT3];
-			sql = s3;
-			sqlsize = sizeof(s3);
 			break;
 		default:
 			fprintf(stderr, "tup error: Attempt to insert unstyled link %lli -> %lli, style=%i\n", a, b, style);
@@ -5764,7 +5880,6 @@ static int link_remove(tupid_t a, tupid_t b, int style)
 	sqlite3_stmt **stmt;
 	static char s1[] = "delete from normal_link where from_id=? and to_id=?";
 	static char s2[] = "delete from sticky_link where from_id=? and to_id=?";
-	static char s3[] = "delete from group_link where from_id=? and to_id=?";
 	char *sql;
 	int sqlsize;
 
@@ -5778,11 +5893,6 @@ static int link_remove(tupid_t a, tupid_t b, int style)
 			stmt = &stmts[_DB_LINK_REMOVE2];
 			sql = s2;
 			sqlsize = sizeof(s2);
-			break;
-		case TUP_LINK_GROUP:
-			stmt = &stmts[_DB_LINK_REMOVE3];
-			sql = s3;
-			sqlsize = sizeof(s3);
 			break;
 		default:
 			fprintf(stderr, "tup error: Attempt to remove unstyled link %lli -> %lli, style=%i\n", a, b, style);
@@ -5819,6 +5929,146 @@ static int link_remove(tupid_t a, tupid_t b, int style)
 	if(rc != SQLITE_DONE) {
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", sql);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int group_link_insert(tupid_t a, tupid_t b, tupid_t cmdid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_GROUP_LINK_INSERT];
+	static char s[] = "insert into group_link(from_id, to_id, cmdid) values(?, ?, ?)";
+
+	if(a == b) {
+		fprintf(stderr, "tup error: Attempt made to group-link a node to itself (%lli)\n", a);
+		return -1;
+	}
+	if(a <= 0 || b <= 0 || cmdid <= 0) {
+		fprintf(stderr, "tup error: Attmept to insert invalid group link: %lli -> %lli [%lli]\n", a, b, cmdid);
+		return -1;
+	}
+
+	transaction_check("%s [37m[%lli, %lli, %lli][0m", s, a, b, cmdid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, a) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, b) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 3, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_GROUP_LINK_REMOVE];
+	static char s[] = "delete from group_link where from_id=? and to_id=? and cmdid=?";
+
+	transaction_check("%s [37m[%lli, %lli, %lli][0m", s, a, b, cmdid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, a) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, b) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 3, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int delete_group_links(tupid_t cmdid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_GROUP_LINKS];
+	static char s[] = "delete from group_link where cmdid=?";
+
+	transaction_check("%s [37m[%lli][0m", s, cmdid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
 
@@ -5887,11 +6137,11 @@ static int add_ghost(tupid_t tupid)
 	return 0;
 }
 
-static int add_ghost_links(tupid_t tupid)
+static int add_ghost_checks(tupid_t tupid)
 {
 	int rc = 0;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_LINKS];
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_CHECKS];
 	static char s[] = "select from_id from normal_link where to_id=?";
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
@@ -5943,11 +6193,11 @@ out_reset:
 	return rc;
 }
 
-static int add_group_links(tupid_t tupid)
+static int add_group_checks(tupid_t tupid)
 {
 	int rc = 0;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_ADD_GROUP_LINKS];
+	sqlite3_stmt **stmt = &stmts[_DB_ADD_GROUP_CHECKS];
 	static char s[] = "select to_id from normal_link where from_id=?";
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
@@ -6359,7 +6609,7 @@ static int get_db_var_tree(tupid_t dt, struct vardb *vdb)
 		/* Only add the entry if we don't have it already. It is
 		 * possible that variables have been added if a file was
 		 * removed, causing incoming links to be added to the
-		 * by add_ghost_links.
+		 * by add_ghost_checks.
 		 */
 		tent = tup_entry_find(tupid);
 		if(!tent)

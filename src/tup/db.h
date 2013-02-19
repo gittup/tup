@@ -115,10 +115,14 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root, struct tup_entry *group);
+int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
+			 struct tup_entry *group,
+			 struct tup_entry **old_group);
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
-			struct tupid_entries *delete_root);
+			struct tupid_entries *delete_root,
+			struct tup_entry *group,
+			struct tup_entry *old_group);
 int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		      struct tupid_entries *normal_root);
@@ -132,6 +136,8 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid);
 int tup_db_set_dependent_config_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid);
+int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *, struct tup_entry *),
+				     void *arg, tupid_t tupid);
 
 /* Config operations */
 int tup_db_show_config(void);

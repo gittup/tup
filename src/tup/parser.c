@@ -2693,7 +2693,8 @@ static int find_existing_command(const struct name_list *onl,
 	return 0;
 }
 
-static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid_t tupid)
+static int add_input(struct tupfile *tf, struct tupid_entries *input_root,
+		     tupid_t tupid)
 {
 	struct tup_entry *tent;
 
@@ -2743,6 +2744,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char sep[] = "|";
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
+	struct tup_entry *old_group = NULL;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -2955,7 +2957,7 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &output_root, group) < 0)
+	if(tup_db_write_outputs(cmdid, &output_root, group, &old_group) < 0)
 		return -1;
 	free_tupid_tree(&output_root);
 
@@ -2976,15 +2978,19 @@ out_pl:
 			return -1;
 	}
 	if(group) {
+		/* This is a quick check for a simple circular dependency that
+		 * can be done before the full check after all parsing is
+		 * complete.
+		 */
 		if(tupid_tree_search(&input_root, group->tnode.tupid) != NULL) {
-			fprintf(tf->f, "tup error: command ID %lli both reads from and writes to this group: ", cmdid);
+			fprintf(tf->f, "tup error: Command ID %lli both reads from and writes to this group: ", cmdid);
 			print_tup_entry(tf->f, group);
 			fprintf(tf->f, "\n");
 			tup_db_print(tf->f, cmdid);
 			return -1;
 		}
 	}
-	if(tup_db_write_inputs(cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root) < 0)
+	if(tup_db_write_inputs(cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root, group, old_group) < 0)
 		return -1;
 	free_tupid_tree(&input_root);
 	return 0;

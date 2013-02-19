@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,6 @@ cat > Tupfile << HERE
 : <groupB> |> touch foo |> foo <groupA>
 : <groupA> |> touch bar |> bar <groupB>
 HERE
-update_fail_msg "fatal tup error: Graph is not empty after execution"
+update_fail_msg "tup error.*Circular dependency found among the following groups"
 
 eotup
