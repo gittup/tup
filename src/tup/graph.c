@@ -172,6 +172,13 @@ void save_graphs(struct graph *g)
 	save_graph(stderr, g, ".tup/tmp/graph-trimmed-%i.dot");
 }
 
+static void expand_node(struct graph *g, struct node *n)
+{
+	n->expanded = 1;
+	TAILQ_REMOVE(&g->node_list, n, list);
+	TAILQ_INSERT_HEAD(&g->plist, n, list);
+}
+
 int build_graph_cb(void *arg, struct tup_entry *tent)
 {
 	struct graph *g = arg;
@@ -206,14 +213,28 @@ edge_create:
 					g->total_mtime += n->tent->mtime;
 			}
 		}
-		n->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, n, list);
-		TAILQ_INSERT_HEAD(&g->plist, n, list);
+		expand_node(g, n);
 	}
 
 	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	return 0;
+}
+
+static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
+{
+	struct node *n;
+	n = find_node(g, tent->tnode.tupid);
+	if(n)
+		return n;
+	n = create_node(g, tent);
+	if(!n) {
+		fprintf(stderr, "tup error: Can't create node for tup_entry: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
+		return NULL;
+	}
+	return n;
 }
 
 static int build_group_cb(void *arg, struct tup_entry *tent,
@@ -223,38 +244,19 @@ static int build_group_cb(void *arg, struct tup_entry *tent,
 	struct node *cmdn;
 	struct node *n;
 
-	n = find_node(g, tent->tnode.tupid);
-	if(!n) {
-		n = create_node(g, tent);
-		if(!n) {
-			printf("Can't create node: ");
-			print_tup_entry(stdout, tent);
-			printf("\n");
-			return -1;
-		}
-	}
+	n = find_or_create_node(g, tent);
+	if(!n)
+		return -1;
 
-	cmdn = find_node(g, cmdtent->tnode.tupid);
-	if(!cmdn) {
-		cmdn = create_node(g, cmdtent);
-		if(!cmdn) {
-			printf("Can't create cmd node: ");
-			print_tup_entry(stdout, cmdtent);
-			printf("\n");
-			return -1;
-		}
-	}
+	cmdn = find_or_create_node(g, cmdtent);
+	if(!cmdn)
+		return -1;
 
 	if(n->expanded == 0) {
-		/* TUP_NODE_ROOT means we count everything */
-		n->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, n, list);
-		TAILQ_INSERT_HEAD(&g->plist, n, list);
+		expand_node(g, n);
 	}
 	if(cmdn->expanded == 0) {
-		cmdn->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, cmdn, list);
-		TAILQ_INSERT_HEAD(&g->plist, cmdn, list);
+		expand_node(g, cmdn);
 	}
 
 	if(create_edge(g->cur, cmdn, TUP_LINK_NORMAL) < 0)
