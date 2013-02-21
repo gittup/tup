@@ -88,6 +88,7 @@ enum {
 	DB_UNFLAG_VARIANT,
 	_DB_GET_RECURSE_DIRS,
 	_DB_GET_DIR_ENTRIES,
+	_DB_GET_OUTPUT_GROUP,
 	DB_LINK_EXISTS1,
 	DB_LINK_EXISTS2,
 	DB_GET_INCOMING_LINK,
@@ -3188,6 +3189,73 @@ int tup_db_create_link(tupid_t a, tupid_t b, int style)
 	return 0;
 }
 
+static int get_output_group(tupid_t cmdid, struct tup_entry **tent)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_GROUP];
+	static char s[] = "select to_id from normal_link, node where from_id=? and to_id=node.id and node.type=?";
+
+	*tent = NULL;
+
+	transaction_check("%s [37m[%lli][0m", s, cmdid, TUP_NODE_GROUP);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, cmdid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, TUP_NODE_GROUP) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		rc = -1;
+		goto out_reset;
+	}
+	if(tup_entry_add(sqlite3_column_int64(*stmt, 0), tent) < 0) {
+		rc = -1;
+		goto out_reset;
+	}
+
+	/* Do a quick double-check to make sure there isn't a duplicate link. */
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc != SQLITE_DONE) {
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+		fprintf(stderr, "tup error: Node %lli is supposed to only have one output group, but multiple were found. The database is probably in a bad state. Sadness :(\n", cmdid);
+		rc = -1;
+		goto out_reset;
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
 int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
 			      struct tupid_entries *root)
 {
@@ -3199,6 +3267,18 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 		return -1;
 	if(incoming != -1) {
 		if(tupid_tree_search(delroot, incoming) != NULL) {
+			struct tup_entry *output_group = NULL;
+
+			if(get_output_group(incoming, &output_group) < 0)
+				return -1;
+			if(output_group) {
+				/* Make sure we remove the old group for the
+				 * output (t3065)
+				 */
+				if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+					return -1;
+				tup_entry_add_ghost_list(output_group, &ghost_list);
+			}
 			/* Delete any old links (t6029) */
 			if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
 				return -1;
