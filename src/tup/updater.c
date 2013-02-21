@@ -1454,6 +1454,21 @@ static void *create_work(void *arg)
 	return NULL;
 }
 
+static int modify_outputs(struct node *n)
+{
+	struct edge *e;
+	int rc = 0;
+
+	LIST_FOREACH(e, &n->edges, list) {
+		if(e->style & TUP_LINK_NORMAL &&
+		   e->dest->tent->type == TUP_NODE_CMD) {
+			if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
+				rc = -1;
+		}
+	}
+	return rc;
+}
+
 static void *update_work(void *arg)
 {
 	struct worker_thread *wt = arg;
@@ -1492,14 +1507,9 @@ static void *update_work(void *arg)
 			if(rc == 0) {
 				pthread_mutex_lock(&db_mutex);
 				LIST_FOREACH(e, &n->edges, list) {
-					struct edge *f;
-
-					LIST_FOREACH(f, &e->dest->edges, list) {
-						if(f->style & TUP_LINK_NORMAL) {
-							if(tup_db_add_modify_list(f->dest->tnode.tupid) < 0)
-								rc = -1;
-						}
-					}
+					if(e->dest->tent->type == TUP_NODE_GENERATED)
+						if(modify_outputs(e->dest) < 0)
+							rc = -1;
 				}
 				if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 					rc = -1;
@@ -1510,12 +1520,8 @@ static void *update_work(void *arg)
 			/* Mark the next nodes as modify in case we hit
 			 * an error - we'll need to pick up there (t6006).
 			 */
-			LIST_FOREACH(e, &n->edges, list) {
-				if(e->style & TUP_LINK_NORMAL) {
-					if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
-						rc = -1;
-				}
-			}
+			if(modify_outputs(n) < 0)
+				rc = -1;
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
 
