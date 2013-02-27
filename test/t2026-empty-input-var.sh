@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -23,13 +23,17 @@
 cat > Tupfile << HERE
 : foreach \$(srcs) |> nope |> %B.o
 : \$(objs) |> not gonna work |> prog
+: \$(objs) | order.h |> also not gonna work |> prog2
+: | order.h |> this should work |> prog3
 : |> echo foo > %o |> bar
 HERE
 
-tup touch Tupfile
+tup touch Tupfile order.h
 tup parse
 tup_object_no_exist . "nope"
 tup_object_no_exist . "not gonna work"
+tup_object_no_exist . "also not gonna work"
+tup_object_exist . "this should work"
 tup_object_exist . "echo foo > bar"
 
 eotup

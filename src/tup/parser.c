@@ -1092,6 +1092,12 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 			input += 7;
 			while(*input == ' ') input++;
 		}
+	}
+
+	/* Make sure we have an input string, and the input string doesn't
+	 * just contain order-only inputs.
+	 */
+	if(input && input[0] != '|') {
 		r.empty_input = 0;
 	} else {
 		r.empty_input = 1;
