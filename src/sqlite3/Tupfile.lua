@@ -1,5 +1,3 @@
-tup.dorulesfile()
-
 -- Remove warnings from CFLAGS
 CFLAGS:insert '-w'
 

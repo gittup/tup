@@ -321,7 +321,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 			goto out_free_bs;
 	} else {
-		if (parse_lua_tupfile(&tf, &b, "Tupfile.lua") < 0)
+		if (parse_lua_tupfile(&tf, &b, "Tupfile.lua", 1) < 0)
 			goto out_free_bs;
 	}
 	if(tf.ign) {

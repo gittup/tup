@@ -1,5 +1,3 @@
-tup.dorulesfile()
-
 client_objs = tup.var {}
 client_objs:insert 'src/tup/vardict.o'
 client_objs:insert 'src/tup/send_event.o'

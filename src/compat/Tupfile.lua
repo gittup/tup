@@ -1,5 +1,3 @@
-tup.dorulesfile()
-
 -- Changes here need to be reflected in the build.sh file
 srcs = tup.var {}
 mingwsrcs = tup.var {}

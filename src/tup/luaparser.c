@@ -203,14 +203,6 @@ static int tuplua_function_include(lua_State *ls)
 	return 0;
 }
 
-static int tuplua_function_includerules(lua_State *ls)
-{
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
-	if(include_rules(tf) < 0)
-		return luaL_error(ls, "Failed to include rules file.");
-	return 0;
-}
-
 static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tupfile *tf, struct name_list *nl, int output)
 {
 	init_name_list(nl);
@@ -632,7 +624,7 @@ static int tuplua_function_concat(struct lua_State *ls)
 	return 1;
 }
 
-int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
+int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int toplevel)
 {
 	struct tuplua_reader_data lrd;
 	struct lua_State *ls = NULL;
@@ -650,7 +642,6 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		/* Register tup interaction functions in the "tup" table in Lua */	
 		lua_newtable(ls);
 		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
-		tuplua_register_function(ls, "dorulesfile", tuplua_function_includerules, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
 		tuplua_register_function(ls, "getparent", tuplua_function_getparent, tf);
@@ -713,7 +704,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 
 	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK)
 	{
-		fprintf(tf->f, "tup error: Failed to open Tupfile.lua:\n%s\n", tuplua_tostring(ls, -1));
+		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", name, tuplua_tostring(ls, -1));
 		if(ownstate)
 		{
 			lua_close(ls);
@@ -721,10 +712,13 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		}
 		return -1;
 	}
+	
+	if(toplevel && (include_rules(tf) < 0))
+		return -1;
 
 	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK)
 	{
-		fprintf(tf->f, "tup error: Failed to execute Tupfile.lua:\n%s\n", tuplua_tostring(ls, -1));
+		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", name, tuplua_tostring(ls, -1));
 		if(ownstate)
 		{
 			lua_close(ls);
@@ -865,7 +859,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_lua_tupfile(tf, &incb, file) < 0)
+	if(parse_lua_tupfile(tf, &incb, file, 0) < 0)
 		goto out_free;
 	rc = 0;
 out_free:

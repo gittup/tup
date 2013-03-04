@@ -1,4 +1,3 @@
-tup.dorulesfile()
 if tup.getconfig('TUP_WWW') == 'y'
 then
 	for index, file in ipairs(tup.glob('../make*.dat'))

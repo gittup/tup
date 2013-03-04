@@ -1,4 +1,3 @@
-tup.dorulesfile()
 tup.rule('builtin.lua', 'luac -o %o %f', '%B.luac')
 tup.rule('builtin.luac', 'xxd -i %f %o', 'luabuiltin.h')
 bang_cc('luaparser.c', 'luabuiltin.h')

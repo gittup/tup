@@ -1,5 +1,3 @@
-tup.dorulesfile()
-
 -- Has some warnings about casting away const
 CFLAGS:insert '-Wno-cast-qual'
 
