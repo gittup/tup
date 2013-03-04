@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,32 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Same as t6053, but in a variant.
 
 . ./tup.sh
+check_no_windows variant
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
+mkdir build
+touch build/tup.config
 
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{outputs = {genfile}, command = 'echo generated > ' .. genfile}
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
 HERE
-
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
-HERE
-
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
+tup touch Tupfile.lua
 update
 
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
+echo 'generated' | diff - build/output.txt
 
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+cat > Tupfile.lua << HERE
+genfile = 'genfile.txt'
+tup.definerule{inputs = {genfile}, outputs = {'output.txt'}, command = 'cat ' .. genfile .. ' > output.txt'}
+HERE
+echo 'manual' > genfile.txt
+tup touch genfile.txt Tupfile.lua
+update
+
+echo 'manual' | diff - build/output.txt
 
 eotup

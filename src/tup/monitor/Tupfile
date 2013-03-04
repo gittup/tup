@@ -1,4 +1,0 @@
-include_rules
-
-: $(TUP_MONITOR).c |> !cc |>
-: null.c |> !mingwcc |>

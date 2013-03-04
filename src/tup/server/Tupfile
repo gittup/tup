@@ -1,3 +1,0 @@
-include_rules
-: foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
-: windepfile.c |> !mingwcc |>

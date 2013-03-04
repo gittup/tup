@@ -16,35 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Test that a node-variable can't refer to a generated file from a previous
+# build (ie: in the delete list).
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
-
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'a.txt'}, command = 'touch a.txt'}
 HERE
 
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
-HERE
-
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
+tup touch Tupfile.lua
 update
 
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
-
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+cat > Tupfile.lua <<HERE
+node_var = tup.nodevariable 'a.txt'
+HERE
+tup touch Tupfile.lua
+update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

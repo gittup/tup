@@ -1,1 +1,1 @@
-CFLAGS += -include compat/freebsd.h
+table.insert(CFLAGS, '-include compat/freebsd.h')
