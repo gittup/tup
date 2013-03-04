@@ -50,6 +50,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include "luabuiltin.h" /* Generated from builtin.lua */
 typedef lua_State * scriptdata;
 
 #define SYNTAX_ERROR -2
@@ -684,6 +685,25 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
 		lua_pushnil(ls); lua_setglobal(ls, "require");
+
+		/* Load lua built-in lua helper functions from luabuiltin.h */
+		lua_getglobal(ls, "debug");
+		lua_getfield(ls, -1, "traceback");
+		lua_remove(ls, -2);
+		if (luaL_loadbuffer(ls, (char *)builtin_luac, builtin_luac_len, "builtin") != LUA_OK)
+		{
+			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
+			lua_close(ls);
+			tf->ls = NULL;
+			return 0;
+		}
+		if(lua_pcall(ls, 0, 0, 1) != LUA_OK)
+		{
+			fprintf(tf->f, "tup error: Failed to parse builtins:\n%s\n", tuplua_tostring(ls, -1));
+			lua_close(ls);
+			tf->ls = NULL;
+			return 0;
+		}
 	}
 	else ls = tf->ls;
 

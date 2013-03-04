@@ -1,32 +1,32 @@
 tup.dorulesfile()
 
-client_objs = {}
-table.insert(client_objs, 'src/tup/vardict.o')
-table.insert(client_objs, 'src/tup/send_event.o')
-table.insert(client_objs, 'src/tup/flock/fcntl.o')
+client_objs = tup.var {}
+client_objs:insert 'src/tup/vardict.o'
+client_objs:insert 'src/tup/send_event.o'
+client_objs:insert 'src/tup/flock/fcntl.o'
 bang_ar(client_objs, 'libtup_client.a')
 bang_cp('src/tup/vardict.h', 'tup_client.h')
 
-srcs = tup.glob('src/tup/*.o')
-srcs = table_concat(srcs, tup.glob('src/tup/monitor/*.o'))
-srcs = table_concat(srcs, tup.glob('src/tup/flock/*.o'))
-srcs = table_concat(srcs, tup.glob('src/tup/server/*.o'))
+srcs = tup.var(tup.glob('src/tup/*.o'))
+srcs = srcs .. tup.glob('src/tup/monitor/*.o')
+srcs = srcs .. tup.glob('src/tup/flock/*.o')
+srcs = srcs .. tup.glob('src/tup/server/*.o')
 if tup.getconfig('TUP_USE_SYSTEM_SQLITE') == 'y'
 then
-	table.insert(LDFLAGS, '-lsqlite3')
+	LDFLAGS:insert '-lsqlite3'
 else
-	srcs = table_concat(srcs, tup.glob('src/sqlite3/*.o'))
+	srcs = srcs .. tup.glob('src/sqlite3/*.o')
 end
 if tup.getconfig('TUP_USE_SYSTEM_LUA') == 'y'
 then
-	table.insert(LDFLAGS, '`pkg-config lua5.2 --libs`')
+	LDFLAGS:insert '`pkg-config lua5.2 --libs`'
 else
-	srcs = table_concat(srcs, tup.glob('src/lua-5.2.0/src/*.o'))
-	table.insert(LDFLAGS, '-lm')
+	srcs = srcs .. tup.glob('src/lua-5.2.0/src/*.o')
+	LDFLAGS:insert '-lm'
 end
-srcs = table_concat(srcs, tup.glob('src/inih/*.o'))
-srcs = table_concat(srcs, tup.glob('src/compat/*.o'))
-bang_ar(srcs, 'libtup.a')
+srcs = srcs .. tup.glob('src/inih/*.o')
+srcs = srcs .. tup.glob('src/compat/*.o')
+bang_ar(srcs, 'liba')
 
 suid = ''
 if tup.getconfig('TUP_SUDO_SUID') == 'y'
@@ -34,59 +34,32 @@ then
 	suid = '; chown root:' .. TUP_SUID_GROUP .. ' tup; chmod u+s tup'
 end
 
-table.insert(LDFLAGS, '`pkg-config fuse --libs`')
-do
-	local inputs = {'src/tup/tup/main.o', 'libtup.a'}
-	local outputs = {'tup', 'tup-version.o'}
-	tup.definerule {
-		inputs = inputs,
-		outputs = outputs, 
-		command = '^ LINK tup^' .. 
-			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. CC .. ' -x c -c - -o tup-version.o ' .. table.concat(CFLAGS, ' ') .. ' -Wno-missing-prototypes; ' .. CC .. ' ' .. table.concat(inputs, ' ') .. ' tup-version.o -o tup -lpthread ' .. table.concat(LDFLAGS, ' ') .. ' ' .. suid
-	}
-end
+LDFLAGS:insert '`pkg-config fuse --libs`'
+
+tup.rule({'src/tup/tup/main.o', 'liba'}, '^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid)',{'tup', 'tup-version.o'})
 
 if tup.getconfig('TUP_MINGW') ~= ''
 then
-local inputs = tup.glob('src/dllinject/*.omingw')
-local output = 'tup-dllinject.dll'
-tup.definerule {
-	inputs = inputs,
-	outputs = {output},
-	command = '^ MINGW32LINK ' .. output .. '^' ..
-		tup.getconfig('TUP_MINGW') .. '-gcc -shared ' .. table.concat(inputs, ' ') .. ' -lws2_32 -lpsapi -lshlwapi -o ' .. output 
-}
+	tup.rule(tup.glob('src/dllinject/*.omingw'), '^ MINGW32LINK %o ^ @(TUP_MINGW)-gcc -shared %f -lws2_32 -lpsapi -lshlwapi -o %o', 'tup-dllinject.dll')
 
-mingwsrcs = tup.glob('src/tup/*.omingw')
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/monitor/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/tup/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/flock/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/tup/server/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/inih/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/sqlite3/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/lua-5.2.0/src/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/compat/*.omingw'))
-mingwsrcs = table_concat(mingwsrcs, tup.glob('src/compat/win32/*.omingw'))
-table.insert(MINGWLDFLAGS, '-lm')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=open')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=close')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=tmpfile')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=dup')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vprintf')
-table.insert(MINGWLDFLAGS, '-Wl,--wrap=__mingw_vfprintf')
+	mingwsrcs = tup.var(tup.glob('src/tup/*.omingw'))
+	mingwsrcs = mingwsrcs .. tup.glob('src/tup/monitor/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/tup/tup/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/tup/flock/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/tup/server/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/inih/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/sqlite3/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/lua-5.2.0/src/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/compat/*.omingw')
+	mingwsrcs = mingwsrcs .. tup.glob('src/compat/win32/*.omingw')
+	MINGWLDFLAGS:insert '-lm'
+	MINGWLDFLAGS:insert '-Wl,--wrap=open'
+	MINGWLDFLAGS:insert '-Wl,--wrap=close'
+	MINGWLDFLAGS:insert '-Wl,--wrap=tmpfile'
+	MINGWLDFLAGS:insert '-Wl,--wrap=dup'
+	MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vprintf'
+	MINGWLDFLAGS:insert '-Wl,--wrap=__mingw_vfprintf'
 
-do
-	local inputs = table_concat(mingwsrcs, {'tup-dllinject.dll'})
-	tup.definerule {
-		inputs = inputs,
-		outputs = {'tup.exe', 'tup-version.omingw'},
-		command = --'^ MINGW32LINK tup.exe^' ..
-			'version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | ' .. tup.getconfig('TUP_MINGW') .. '-gcc -x c -c - -o tup-version.omingw; ' .. tup.getconfig('TUP_MINGW') .. '-gcc ' .. table.concat(inputs, ' ') .. ' tup-version.omingw ' .. table.concat(MINGWLDFLAGS, ' ')  .. ' -o tup.exe'
-	}
+	tup.rule(mingwsrcs .. {'tup-dllinject.dll'}, '^ MINGW32LINK exe^ version=`git describe`; echo "const char *tup_version(void) {return \\\"$version\\\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc %f tup-version.omingw $(MINGWLDFLAGS) -o exe', {'exe', 'tup-version.omingw'})
 end
-end
-
-
-
-
 

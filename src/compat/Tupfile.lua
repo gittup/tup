@@ -1,54 +1,53 @@
 tup.dorulesfile()
 
 -- Changes here need to be reflected in the build.sh file
-srcs = {}
-mingwsrcs = {}
+srcs = tup.var {}
+mingwsrcs = tup.var {}
 
 if tup.getconfig('TUP_PLATFORM') == 'linux'
 then
-	table.insert(srcs, 'utimensat_linux.c')
-	table.insert(srcs, 'dummy.c')
+	srcs:insert 'utimensat_linux.c'
+	srcs:insert 'dummy.c'
 end
 
 if tup.getconfig('TUP_PLATFORM') == 'freebsd'
 then
-	table.insert(srcs, 'utimensat_linux.c')
-	table.insert(srcs, 'dummy.c')
-	table.insert(srcs, 'clearenv.c')
+	srcs:insert 'utimensat_linux.c'
+	srcs:insert 'dummy.c'
+	srcs:insert 'clearenv.c'
 end
 
 if tup.getconfig('TUP_PLATFORM') == 'macosx'
 then
-table.insert(srcs, 'clearenv.c')
-table.insert(srcs, 'dir_mutex.c')
+	srcs:insert 'clearenv.c'
+	srcs:insert 'dir_mutex.c'
 
-table.insert(srcs, 'faccessat.c')
-table.insert(srcs, 'fchmodat.c')
-table.insert(srcs, 'fchownat.c')
-table.insert(srcs, 'fdopendir.c')
-table.insert(srcs, 'fstatat.c')
-table.insert(srcs, 'mkdirat.c')
-table.insert(srcs, 'openat.c')
-table.insert(srcs, 'readlinkat.c')
-table.insert(srcs, 'renameat.c')
-table.insert(srcs, 'symlinkat.c')
-table.insert(srcs, 'unlinkat.c')
-table.insert(srcs, 'utimensat.c')
-
+	srcs:insert 'faccessat.c'
+	srcs:insert 'fchmodat.c'
+	srcs:insert 'fchownat.c'
+	srcs:insert 'fdopendir.c'
+	srcs:insert 'fstatat.c'
+	srcs:insert 'mkdirat.c'
+	srcs:insert 'openat.c'
+	srcs:insert 'readlinkat.c'
+	srcs:insert 'renameat.c'
+	srcs:insert 'symlinkat.c'
+	srcs:insert 'unlinkat.c'
+	srcs:insert 'utimensat.c'
 end
 
 if tup.getconfig('TUP_PLATFORM') == 'solaris'
 then
-table.insert(srcs, 'dir_mutex.c')
-table.insert(srcs, 'mkdirat.c')
-table.insert(srcs, 'readlinkat.c')
+	srcs:insert 'dir_mutex.c'
+	srcs:insert 'mkdirat.c'
+	srcs:insert 'readlinkat.c'
 end
 for index, file in ipairs(srcs) do bang_cc(file) end
 
-table.insert(mingwsrcs, 'dir_mutex.c')
-table.insert(mingwsrcs, 'fstatat.c')
-table.insert(mingwsrcs, 'mkdirat.c')
-table.insert(mingwsrcs, 'openat.c')
-table.insert(mingwsrcs, 'renameat.c')
-table.insert(mingwsrcs, 'unlinkat.c')
+mingwsrcs:insert 'dir_mutex.c'
+mingwsrcs:insert 'fstatat.c'
+mingwsrcs:insert 'mkdirat.c'
+mingwsrcs:insert 'openat.c'
+mingwsrcs:insert 'renameat.c'
+mingwsrcs:insert 'unlinkat.c'
 for index, file in ipairs(mingwsrcs) do bang_mingwcc(file) end
