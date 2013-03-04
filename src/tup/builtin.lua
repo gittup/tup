@@ -1,4 +1,11 @@
-tup.var_metatable = {
+local conditionalglob = function(input)
+	if input:match('%*') or input:match('%?') or input:match('%[.*%]') then
+		return tup.glob(input)
+	end
+	return {input}
+end
+
+local var_metatable = {
         __tostring = function(this)
                 return table.concat(this, ' ')
         end,
@@ -19,10 +26,12 @@ tup.var_metatable = {
         end,
 	insert = function(this, item)
 		if type(item) == 'table' then
-                        for index, value in ipairs(item) do tup.var_metatable.insert(this, value) end
+                        for index, value in ipairs(item) do var_metatable.insert(this, value) end
 		elseif type(item) == 'string' then
-			items = tup.glob(item)
-			for index, value in ipairs(tiem) do table.insert(this, value) end
+			items = conditionalglob(item)
+			for index, value in ipairs(tiem) do 
+				table.insert(this, value) 
+			end
 		else
 			table.insert(this, value)
 		end
@@ -30,7 +39,7 @@ tup.var_metatable = {
 }
 tup.var = function(contents)
         if not contents then contents = {} end
-        setmetatable(contents, tup.var_metatable)
+        setmetatable(contents, var_metatable)
         return contents
 end
 
@@ -96,7 +105,7 @@ tup.frule = function(arguments)
 		
 		newinputs = {}
 		for index, input in ipairs(inputs) do
-			glob = tup.glob(input)
+			glob = conditionalglob(input)
 			for globindex, globvalue in ipairs(glob) do
 				table.insert(newinputs, globvalue)
 			end
@@ -144,7 +153,7 @@ tup.frule = function(arguments)
 		
 		newoutputs = {}
 		for index, output in ipairs(outputs) do
-			glob = tup.glob(output)
+			glob = conditionalglob(output)
 			for globindex, globvalue in ipairs(glob) do
 				table.insert(newoutputs, globvalue)
 			end

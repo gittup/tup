@@ -454,15 +454,17 @@ static int tuplua_function_glob(lua_State *ls)
 
 	if(get_path_list(tf, pattern, &pl, tf->tupid) < 0)
 	{
+		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern \"%s\".", __FILE__, __LINE__, pattern);
 		free(pattern);
-		return luaL_error(ls, "Failed to parse paths in glob pattern \"%s\".", pattern);
+		return lua_error(ls);
 	}
 
 	if(parse_dependent_tupfiles(&pl, tf) < 0)
 	{
+		lua_pushfstring(ls, "%s:%d: Failed to process glob directory for pattern \"%s\".", __FILE__, __LINE__, pattern);
 		free(pl.pel);
 		free(pattern);
-		return luaL_error(ls, "Failed to process glob directory for pattern \"%s\".", pattern);
+		return lua_error(ls);
 	}
 	
 	if(pl.path != NULL) {
@@ -473,35 +475,40 @@ static int tuplua_function_glob(lua_State *ls)
 	lua_newtable(ls);
 	if(tup_entry_add(pl.dt, &dtent) < 0)
 	{
+		lua_pushfstring(ls, "%s:%d: Failed to add tup entry when processing glob pattern \"%s\".", __FILE__, __LINE__, pattern);
 		free(pl.pel);
 		free(pattern);
-		return luaL_error(ls, "Failed to add tup entry when processing glob pattern \"%s\".", pattern);
+		return lua_error(ls);
 	}
 	if(dtent->type == TUP_NODE_GHOST)
 	{
+		lua_pushfstring(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl.path);
 		free(pl.pel);
 		free(pattern);
-		return luaL_error(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl.path);
+		return lua_error(ls);
 	}
 	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl.dt, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
 	{
+		lua_pushfstring(ls, "Failed to glob for pattern \"%s\" in build(?) tree.", pattern);
 		free(pl.pel);
 		free(pattern);
-		return luaL_error(ls, "Failed to glob for pattern \"%s\" in build(?) tree.", pattern);
+		return lua_error(ls);
 	}
 
 	if(variant_get_srctent(tf->variant, pl.dt, &srctent) < 0)
 	{
+		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
 		free(pl.pel);
 		free(pattern);
-		return luaL_error(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
+		return lua_error(ls);
 	}
 	if(srctent) {
 		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0)
 		{
+			lua_pushfstring(ls, "Failed to glob for pattern \"%s\" in source(?) tree.", pattern);
 			free(pl.pel);
 			free(pattern);
-			return luaL_error(ls, "Failed to glob for pattern \"%s\" in source(?) tree.", pattern);
+			return lua_error(ls);
 		}
 	}
 	
@@ -697,11 +704,14 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		}
 	}
 	else ls = tf->ls;
+	
+	if(toplevel && (include_rules(tf) < 0))
+		return -1;
 
 	lua_getglobal(ls, "debug");
 	lua_getfield(ls, -1, "traceback");
 	lua_remove(ls, -2);
-
+	
 	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK)
 	{
 		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", name, tuplua_tostring(ls, -1));
@@ -713,9 +723,6 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		return -1;
 	}
 	
-	if(toplevel && (include_rules(tf) < 0))
-		return -1;
-
 	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK)
 	{
 		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", name, tuplua_tostring(ls, -1));
