@@ -1,10 +1,9 @@
 tup.var_metatable = {
-        __tostring = function(self)
-                return table.concat(self, ' ')
+        __tostring = function(this)
+                return table.concat(this, ' ')
         end,
         __concat = function(first, second)
-                if type(first) == 'table' and type(second) == 'table'
-                then
+                if type(first) == 'table' and type(second) == 'table' then
                         local output = tup.var{}
                         for index, value in ipairs(first) do table.insert(output, value) end
                         for index, value in ipairs(second) do table.insert(output, value) end
@@ -17,7 +16,17 @@ tup.var_metatable = {
                 local out = tup.var {}
                 rawset(this, key, out)
                 return out
-        end
+        end,
+	insert = function(this, item)
+		if type(item) == 'table' then
+                        for index, value in ipairs(item) do tup.var_metatable.insert(this, value) end
+		elseif type(item) == 'string' then
+			items = tup.glob(item)
+			for index, value in ipairs(tiem) do table.insert(this, value) end
+		else
+			table.insert(this, value)
+		end
+	end
 }
 tup.var = function(contents)
         if not contents then contents = {} end
@@ -84,6 +93,15 @@ tup.frule = function(arguments)
 			table.insert(newinputs, newinput)
 		end
 		inputs = newinputs
+		
+		newinputs = {}
+		for index, input in ipairs(inputs) do
+			glob = tup.glob(input)
+			for globindex, globvalue in ipairs(glob) do
+				table.insert(newinputs, globvalue)
+			end
+		end
+		inputs = newinputs
 	end
 
 	local outputs
@@ -121,6 +139,15 @@ tup.frule = function(arguments)
 			newoutput = newoutput:gsub('%%d', tup.getparent())
 
 			table.insert(newoutputs, newoutput)
+		end
+		outputs = newoutputs
+		
+		newoutputs = {}
+		for index, output in ipairs(outputs) do
+			glob = tup.glob(output)
+			for globindex, globvalue in ipairs(glob) do
+				table.insert(newoutputs, globvalue)
+			end
 		end
 		outputs = newoutputs
 	end
