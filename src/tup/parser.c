@@ -785,12 +785,22 @@ static int preload(struct tupfile *tf, char *cmdline)
 	 */
 	TAILQ_FOREACH(pl, &plist, list) {
 		struct tup_entry *tent;
-		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0)
-			return -1;
-		if(!tent) {
-			fprintf(tf->f, "tup error: Unable to find node '%.*s' for preloading in directory %lli\n", pl->pel->len, pl->pel->path, pl->dt);
-			tup_db_print(tf->f, pl->dt);
-			return -1;
+		if(pl->pel->len == 2 && strncmp(pl->pel->path, "..", 2) == 0) {
+			if(tup_entry_add(pl->dt, &tent) < 0)
+				return -1;
+			if(!tent->parent) {
+				fprintf(tf->f, "tup error: Unable to preload a directory beyond the tup hierarchy.\n");
+				return -1;
+			}
+			tent = tent->parent;
+		} else {
+			if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0)
+				return -1;
+			if(!tent) {
+				fprintf(tf->f, "tup error: Unable to find node '%.*s' for preloading in directory %lli\n", pl->pel->len, pl->pel->path, pl->dt);
+				tup_db_print(tf->f, pl->dt);
+				return -1;
+			}
 		}
 		if(tent->type != TUP_NODE_DIR) {
 			fprintf(tf->f, "tup error: preload needs to specify a pathname, but node '%.*s' has type '%s'\n", pl->pel->len, pl->pel->path, tup_db_type(tent->type));
