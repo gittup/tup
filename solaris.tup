@@ -1,4 +1,4 @@
 # _REENTRANT makes errno threadsafe. Otherwise things explode in an otherwise
 # not-so-informative fashion.
-CFLAGS += -D_REENTRANT
-LDFLAGS += -lsocket
+table.insert(CFLAGS, '-D_REENTRANT')
+table.insert(LDFLAGS, '-lsocket')

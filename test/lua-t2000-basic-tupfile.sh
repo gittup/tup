@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,15 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Check a basic rule in a Tupfile.lua
 
 . ./tup.sh
-
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
-
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+tup.definerule{inputs = {'foo.c'}, command = 'echo gcc -c foo.c -o foo.o'}
 HERE
-
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
-HERE
-
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
+tup touch foo.c Tupfile.lua
 update
-
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
-
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+tup_object_exist . foo.c
+tup_object_exist . "echo gcc -c foo.c -o foo.o"
 
 eotup

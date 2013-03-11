@@ -16,35 +16,16 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Test that a node-variable cannot refer to a non-existent file.
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
-
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+node_var = tup.nodevariable 'lib.a'
 HERE
 
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
-HERE
+tup touch Tupfile.lua
 
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
-update
-
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
-
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+update_fail_msg "Unable to find tup entry for file 'lib.a' in node reference declaration"
 
 eotup

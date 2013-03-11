@@ -1,1 +1,1 @@
-TUP_MONITOR = inotify
+TUP_MONITOR = 'inotify'

@@ -1,4 +1,0 @@
-include_rules
-
-: foreach fcntl.c |> !cc |>
-: foreach lock_file.c |> !mingwcc |>

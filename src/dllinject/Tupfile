@@ -1,4 +1,0 @@
-include_rules
-CFLAGS += -Wno-missing-prototypes
-CFLAGS += -DNDEBUG
-: foreach *.c |> !mingwcc |>

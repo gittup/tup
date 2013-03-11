@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,31 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
-
+# Same as t5076, only the first directory doesn't exist when we do the
+# initial compilation.
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
+tmkdir b
+echo 'int x;' > b/foo.h
+echo '#include "foo.h"' > ok.c
 
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+tup.definerule{ inputs = {'ok.c'}, outputs = {'ok.o'}, command = 'gcc -c ok.c -o ok.o -Ia -Ib' }
 HERE
-
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
-HERE
-
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
+tup touch b/foo.h ok.c Tupfile.lua
 update
 
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
+tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
+sym_check ok.o x
 
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+tmkdir a
+echo 'int y;' > a/foo.h
+update
+
+tup_dep_exist a foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
+sym_check ok.o y
+
+# Make sure we don't have a dependency on the directory anymore.
+tup_dep_no_exist . a . 'gcc -c ok.c -o ok.o -Ia -Ib'
 
 eotup

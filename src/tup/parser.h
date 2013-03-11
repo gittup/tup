@@ -21,6 +21,40 @@
 #ifndef tup_parser_h
 #define tup_parser_h
 
+#include "tupid_tree.h"
+#include "string_tree.h"
+#include "timespan.h"
+#include "vardb.h"
+
+struct variant;
+struct tup_entry;
+struct graph;
+struct parser_server;
+struct lua_State;
+
+struct tupfile {
+	tupid_t tupid;
+	struct variant *variant;
+	struct tup_entry *curtent;
+	struct tup_entry *srctent;
+	int cur_dfd;
+	int root_fd;
+	struct graph *g;
+	struct vardb vdb;
+	struct node_vardb node_db;
+	struct tupid_entries cmd_root;
+	struct tupid_entries env_root;
+	struct string_entries bang_root;
+	struct tupid_entries input_root;
+	struct string_entries chain_root;
+	FILE *f;
+	struct parser_server *ps;
+	struct timespan ts;
+	char ign;
+	char circular_dep_error;
+	struct lua_State *ls;
+};
+
 struct node;
 struct graph;
 struct timespan;
