@@ -16,35 +16,32 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Try %d to refer to the directory name.
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
-
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
 HERE
 
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
+tmkdir foo
+cat > foo/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
 HERE
 
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
-update
+tmkdir bar
+tmkdir bar/baz
+cat > bar/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
+cat > bar/baz/Tupfile.lua << HERE
+tup.definerule{command = 'echo ' .. tup.getparent()}
+HERE
 
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
-
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+tup parse
+tup_object_exist . 'echo tuptesttmp-lua-t2127-percd'
+tup_object_exist foo 'echo foo'
+tup_object_exist bar 'echo bar'
+tup_object_exist bar/baz 'echo baz'
 
 eotup

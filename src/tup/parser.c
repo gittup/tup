@@ -21,21 +21,19 @@
 /* _ATFILE_SOURCE needed at least on linux x86_64 */
 #define _ATFILE_SOURCE
 #include "parser.h"
+#include "luaparser.h"
 #include "progress.h"
 #include "fileio.h"
 #include "fslurp.h"
 #include "db.h"
-#include "vardb.h"
 #include "environ.h"
 #include "graph.h"
 #include "config.h"
 #include "bin.h"
 #include "entry.h"
-#include "string_tree.h"
 #include "container.h"
 #include "if_stmt.h"
 #include "server.h"
-#include "timespan.h"
 #include "variant.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,28 +137,6 @@ struct build_name_list_args {
 	int dirlen;
 };
 
-struct tupfile {
-	tupid_t tupid;
-	struct variant *variant;
-	struct tup_entry *curtent;
-	struct tup_entry *srctent;
-	int cur_dfd;
-	int root_fd;
-	struct graph *g;
-	struct vardb vdb;
-	struct node_vardb node_db;
-	struct tupid_entries cmd_root;
-	struct tupid_entries env_root;
-	struct string_entries bang_root;
-	struct tupid_entries input_root;
-	struct string_entries chain_root;
-	FILE *f;
-	struct parser_server *ps;
-	struct timespan ts;
-	char ign;
-	char circular_dep_error;
-};
-
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
@@ -239,6 +215,7 @@ static int debug_run = 0;
 void parser_debug_run(void)
 {
 	debug_run = 1;
+	lua_parser_debug_run();
 }
 
 int parse(struct node *n, struct graph *g, struct timespan *retts)
@@ -246,6 +223,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	struct tupfile tf;
 	int fd;
 	int rc = -1;
+	int parser_lua = 0;
 	struct buf b;
 	struct parser_server ps;
 	struct timeval orig_start;
@@ -267,6 +245,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 		perror("tmpfile");
 		return -1;
 	}
+	tf.ls = NULL;
 
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
@@ -318,19 +297,33 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
 	if(fd < 0) {
 		if(errno == ENOENT) {
+			parser_lua = 1;
+			fd = openat(tf.cur_dfd, "Tupfile.lua", O_RDONLY);
+		} else {
+			parser_error(&tf, "Tupfile");
+			goto out_close_dfd;
+		}
+	}
+	if(fd < 0) {
+		if(errno == ENOENT) {
 			/* No Tupfile means we have nothing to do */
 			rc = 0;
 			goto out_close_dfd;
 		} else {
-			parser_error(&tf, "Tupfile");
+			parser_error(&tf, "Tupfile.lua");
 			goto out_close_dfd;
 		}
 	}
 
 	if(fslurp_null(fd, &b) < 0)
 		goto out_close_file;
-	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
-		goto out_free_bs;
+	if(!parser_lua) {
+		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+			goto out_free_bs;
+	} else {
+		if (parse_lua_tupfile(&tf, &b, "Tupfile.lua", 1) < 0)
+			goto out_free_bs;
+	}
 	if(tf.ign) {
 		if(rm_existing_gitignore(&tf, n->tent) < 0)
 			return -1;
@@ -2806,6 +2799,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		if(name_cmp(onle->path, "Tupfile") == 0 ||
 		   name_cmp(onle->path, "Tuprules.tup") == 0 ||
+		   name_cmp(onle->path, "Tupfile.lua") == 0 ||
+		   name_cmp(onle->path, "Tuprules.lua") == 0 ||
 		   name_cmp(onle->path, TUP_CONFIG) == 0) {
 			fprintf(tf->f, "tup error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
 			free(onle->path);

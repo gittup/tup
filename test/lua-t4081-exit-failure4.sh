@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,33 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test using a node-variable in a rule command line.
+# Same as t4079, but now the file we accidentally write to is a ghost.
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
-
-cat > sw/Tuprules.tup << HERE
-&toolkit_lib = toolkit/toolkit.a
+cat > ok.sh << HERE
+echo info > log.txt
+echo haha > ghost.txt
+exit 2
+echo hey > foo.txt
 HERE
 
-cat > sw/app/Tupfile << HERE
-include_rules
-: |> cp &(toolkit_lib) %o |> lib_copy.a
+cat > gen-output.sh << HERE
+if [ -f ghost.txt ]; then cat ghost.txt; else echo nofile; fi
 HERE
+chmod +x gen-output.sh
 
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
-update
+cat > Tupfile.lua << HERE
+tup.definerule{outputs = {'output.txt'}, command = './gen-output.sh > output.txt'}
+tup.definerule{inputs = {'output.txt'}, outputs = {'log.txt', 'foo.txt'}, command = 'sh ok.sh'}
+HERE
+tup touch Tupfile.lua ok.sh
+update_fail_msg 'Unspecified output'
 
-path="../toolkit/toolkit.a"
-case $tupos in
-	CYGWIN*)
-		path="..\toolkit\toolkit.a"
-		;;
-esac
+check_exist log.txt
+check_not_exist ghost.txt
+check_not_exist foo.txt
 
-tup_dep_exist sw/toolkit toolkit.a sw/app "cp $path lib_copy.a"
+echo info | diff - log.txt
 
 eotup
