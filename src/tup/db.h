@@ -123,7 +123,7 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *delete_root,
 			struct tup_entry *group,
 			struct tup_entry *old_group);
-int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root);
+int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		      struct tupid_entries *normal_root);
 int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group);

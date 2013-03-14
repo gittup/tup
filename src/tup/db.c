@@ -5754,6 +5754,7 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
 
 struct write_dir_input_data {
 	tupid_t dt;
+	FILE *f;
 };
 
 static int add_dir_link(tupid_t tupid, void *data)
@@ -5764,9 +5765,9 @@ static int add_dir_link(tupid_t tupid, void *data)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
-		fprintf(stderr, "tup error: Unable to read from generated file '");
-		print_tup_entry(stderr, tent);
-		fprintf(stderr, "'. Your build configuration must be comprised of files you wrote yourself.\n");
+		fprintf(wdid->f, "tup error: Unable to read from generated file '");
+		print_tup_entry(wdid->f, tent);
+		fprintf(wdid->f, "'. Your build configuration must be comprised of files you wrote yourself.\n");
 		return -1;
 	}
 	if(link_insert(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
@@ -5785,19 +5786,20 @@ static int rm_dir_link(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_dir_inputs(tupid_t dt, struct tupid_entries *root)
+int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root)
 {
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct write_dir_input_data wdid = {
 		.dt = dt,
+		.f = f,
 	};
 
 	if(tup_db_get_inputs(dt, &sticky_root, &normal_root) < 0)
 		return -1;
 	if(!RB_EMPTY(&sticky_root)) {
 		/* All links to directories should be TUP_LINK_NORMAL */
-		fprintf(stderr, "tup internal error: sticky link found to dir %lli\n", dt);
+		fprintf(f, "tup internal error: sticky link found to dir %lli\n", dt);
 		return -1;
 	}
 	if(compare_trees(root, &normal_root, &wdid,
