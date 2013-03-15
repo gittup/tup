@@ -71,6 +71,7 @@ static int num_jobs;
 static int full_deps;
 static int warnings;
 static int show_warnings;
+static int refactoring;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -176,6 +177,11 @@ int updater(int argc, char **argv, int phase)
 	if(num_jobs > MAX_JOBS) {
 		fprintf(stderr, "Warning: Setting the number of jobs to MAX_JOBS\n");
 		num_jobs = MAX_JOBS;
+	}
+
+	if(phase < 0) {
+		phase = -phase;
+		refactoring = 1;
 	}
 
 	if(run_scan(do_scan) < 0)
@@ -1027,6 +1033,14 @@ static int process_create_nodes(void)
 out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
+
+	if(refactoring) {
+		if(tup_db_changes()) {
+			fprintf(stderr, "tup error: The database changed while refactoring. Tup should have caught this change before here and reported it as an error. Please run 'tup refactor --debug-sql' and send the output to the tup-users@googlegroups.com mailing list.\n");
+			tup_db_rollback();
+			return -1;
+		}
+	}
 	tup_db_commit();
 	return 0;
 }
@@ -1432,7 +1446,7 @@ static void *create_work(void *arg)
 				if(n->already_used) {
 					rc = 0;
 				} else {
-					rc = parse(n, g, NULL);
+					rc = parse(n, g, NULL, refactoring);
 				}
 				show_progress(-1, TUP_NODE_DIR);
 			}
@@ -1446,8 +1460,10 @@ static void *create_work(void *arg)
 			fprintf(stderr, "tup error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
 			rc = -1;
 		}
-		if(tup_db_unflag_create(n->tnode.tupid) < 0)
-			rc = -1;
+		if(!refactoring) {
+			if(tup_db_unflag_create(n->tnode.tupid) < 0)
+				rc = -1;
+		}
 
 		worker_ret(wt, rc);
 	}

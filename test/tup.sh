@@ -334,6 +334,30 @@ parse_fail_msg()
 	fi
 }
 
+refactor()
+{
+	if ! tup refactor; then
+		exit 1
+	fi
+}
+
+refactor_fail_msg()
+{
+	if tup refactor 2>.tupoutput; then
+		echo "*** Expected refactoring to fail, but didn't" 1>&2
+		exit 1
+	else
+		if grep "$1" .tupoutput > /dev/null; then
+			echo "Refactoring expected to fail, and failed for the right reason."
+		else
+			echo "*** Refactoring expected to fail because of: $1" 1>&2
+			echo "*** But failed because of:" 1>&2
+			cat .tupoutput 1>&2
+			exit 1
+		fi
+	fi
+}
+
 check_same_link()
 {
 	if stat $* | grep Inode | awk 'BEGIN{x=-1} {if(x == -1) {x=$4} if(x != $4) {exit 1}}'; then

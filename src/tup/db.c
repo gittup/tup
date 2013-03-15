@@ -912,6 +912,11 @@ int tup_db_commit(void)
 	return 0;
 }
 
+int tup_db_changes(void)
+{
+	return sqlite3_changes(tup_db);
+}
+
 int tup_db_rollback(void)
 {
 	int rc;

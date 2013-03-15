@@ -42,6 +42,7 @@ int tup_db_close(void);
 int tup_db_create(int db_sync);
 int tup_db_begin(void);
 int tup_db_commit(void);
+int tup_db_changes(void);
 int tup_db_rollback(void);
 int tup_db_check_flags(int flags);
 void tup_db_enable_sql_debug(void);

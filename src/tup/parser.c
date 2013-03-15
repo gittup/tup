@@ -146,6 +146,7 @@ struct tupfile {
 	struct tup_entry *srctent;
 	int cur_dfd;
 	int root_fd;
+	int refactoring;
 	struct graph *g;
 	struct vardb vdb;
 	struct node_vardb node_db;
@@ -241,7 +242,7 @@ void parser_debug_run(void)
 	debug_run = 1;
 }
 
-int parse(struct node *n, struct graph *g, struct timespan *retts)
+int parse(struct node *n, struct graph *g, struct timespan *retts, int refactoring)
 {
 	struct tupfile tf;
 	int fd;
@@ -285,6 +286,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts)
 	tf.curtent = tup_entry_get(tf.tupid);
 	tf.root_fd = ps.root_fd;
 	tf.g = g;
+	tf.refactoring = refactoring;
 	if(tf.variant->root_variant) {
 		tf.srctent = NULL;
 	} else {
@@ -2404,7 +2406,7 @@ static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile
 				int rc;
 				struct timespan ts;
 				n->already_used = 1;
-				rc = parse(n, tf->g, &ts);
+				rc = parse(n, tf->g, &ts, tf->refactoring);
 				if(rc < 0) {
 					if(rc == CIRCULAR_DEPENDENCY_ERROR) {
 						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");
@@ -2924,6 +2926,10 @@ out_pl:
 			return -1;
 		}
 	} else {
+		if(tf->refactoring) {
+			fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
+			return -1;
+		}
 		if(find_existing_command(&onl, &tf->g->cmd_delete_root, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
