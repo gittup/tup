@@ -351,6 +351,17 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			rc = -1;
 			goto out_free_bs;
 		}
+	} else {
+		if(refactoring) {
+			struct tup_entry *tent;
+			if(tup_db_select_tent(tf.tupid, ".gitignore", &tent) < 0)
+				return -1;
+			if(tent && tent->type == TUP_NODE_GENERATED) {
+				fprintf(tf.f, "tup refactoring error: Attempting to remove the .gitignore file.\n");
+				rc = -1;
+				goto out_free_bs;
+			}
+		}
 	}
 	rc = 0;
 out_free_bs:
@@ -947,6 +958,10 @@ static int gitignore(struct tupfile *tf)
 		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 			return -1;
 		if(!tent) {
+			if(tf->refactoring) {
+				fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
+				return -1;
+			}
 			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, -1, &tent) < 0)
 				return -1;
 		} else {
