@@ -908,6 +908,10 @@ static int process_create_nodes(void)
 	struct node *n;
 	struct node *tmp;
 	int rc;
+	int old_changes = 0;
+
+	if(refactoring)
+		old_changes = tup_db_changes();
 
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_DIR) < 0)
@@ -1035,7 +1039,7 @@ out_destroy:
 		return -1;
 
 	if(refactoring) {
-		if(tup_db_changes()) {
+		if(tup_db_changes() != old_changes) {
 			fprintf(stderr, "tup error: The database changed while refactoring. Tup should have caught this change before here and reported it as an error. Please run 'tup refactor --debug-sql' and send the output to the tup-users@googlegroups.com mailing list.\n");
 			tup_db_rollback();
 			return -1;

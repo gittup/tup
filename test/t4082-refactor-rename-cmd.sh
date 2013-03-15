@@ -26,11 +26,13 @@ HERE
 tup touch Tupfile
 update
 
+# Sleep 1 here so that we update the mtime in a transaction prior to
+# parsing.
+sleep 1
 cat > Tupfile << HERE
 string = foo
 : |> echo \$(string) |>
 HERE
-tup touch Tupfile
 refactor
 
 cat > Tupfile << HERE

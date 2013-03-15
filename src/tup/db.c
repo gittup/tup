@@ -914,7 +914,7 @@ int tup_db_commit(void)
 
 int tup_db_changes(void)
 {
-	return sqlite3_changes(tup_db);
+	return sqlite3_total_changes(tup_db);
 }
 
 int tup_db_rollback(void)
