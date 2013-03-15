@@ -5674,9 +5674,11 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 }
 
 struct parse_output_data {
+	FILE *f;
 	tupid_t cmdid;
 	int outputs_differ;
 	struct tup_entry *group;
+	int refactoring;
 };
 
 static int add_output(tupid_t tupid, void *data)
@@ -5684,6 +5686,21 @@ static int add_output(tupid_t tupid, void *data)
 	struct parse_output_data *pod = data;
 
 	pod->outputs_differ = 1;
+
+	if(pod->refactoring) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		fprintf(pod->f, "tup refactoring error: Attempting to add a new output to a command: ");
+		print_tup_entry(pod->f, tent);
+		fprintf(pod->f, "\n");
+		/* Return 0 so we get multiple outputs if there are several.
+		 * The actual error return is in the outputs_differ check in
+		 * tup_db_write_outputs().
+		 */
+		return 0;
+	}
+
 	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 	if(pod->group)
@@ -5705,15 +5722,18 @@ static int rm_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
+int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			 struct tup_entry *group,
-			 struct tup_entry **old_group)
+			 struct tup_entry **old_group,
+			 int refactoring)
 {
 	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
+		.f = f,
 		.cmdid = cmdid,
 		.outputs_differ = 0,
 		.group = NULL,
+		.refactoring = refactoring,
 	};
 
 	if(tup_db_get_outputs(cmdid, &output_root, old_group) < 0)
@@ -5750,6 +5770,8 @@ int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
 	if(pod.outputs_differ == 1) {
+		if(refactoring)
+			return -1;
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
 	}

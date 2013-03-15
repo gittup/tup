@@ -3025,7 +3025,7 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(cmdid, &output_root, group, &old_group) < 0)
+	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring) < 0)
 		return -1;
 	free_tupid_tree(&output_root);
 

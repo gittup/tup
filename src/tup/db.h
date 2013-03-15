@@ -116,9 +116,10 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_write_outputs(tupid_t cmdid, struct tupid_entries *root,
+int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			 struct tup_entry *group,
-			 struct tup_entry **old_group);
+			 struct tup_entry **old_group,
+			 int refactoring);
 int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root,
