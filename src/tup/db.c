@@ -5791,6 +5791,12 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 		struct tupid_tree *tt;
 		pod.outputs_differ = 1;
 		if(group) {
+			if(refactoring) {
+				fprintf(f, "tup refactoring error: Attempting to add a new output group to command %lli: ", cmdid);
+				print_tup_entry(f, group);
+				fprintf(f, "\n");
+				tup_db_print(f, cmdid);
+			}
 			/* New group - add links from all new outputs */
 			RB_FOREACH(tt, tupid_entries, root) {
 				if(link_insert(tt->tupid, group->tnode.tupid, TUP_LINK_NORMAL) < 0)
@@ -5800,6 +5806,12 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 				return -1;
 		}
 		if(*old_group) {
+			if(refactoring) {
+				fprintf(f, "tup refactoring error: Attempting to remove the output group from command %lli: ", cmdid);
+				print_tup_entry(f, *old_group);
+				fprintf(f, "\n");
+				tup_db_print(f, cmdid);
+			}
 			/* Removed from old group - rm links from all old outputs */
 			RB_FOREACH(tt, tupid_entries, &output_root) {
 				if(link_remove(tt->tupid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
