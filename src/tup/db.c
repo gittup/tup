@@ -5293,6 +5293,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 }
 
 struct write_input_data {
+	FILE *f;
 	tupid_t cmdid;
 	tupid_t groupid;
 	int new_groups;
@@ -5300,6 +5301,8 @@ struct write_input_data {
 	struct tupid_entries *normal_root;
 	struct tupid_entries *delete_root;
 	struct tupid_entries *env_root;
+	int refactoring;
+	int refactoring_failed;
 };
 
 static int add_sticky(tupid_t tupid, void *data)
@@ -5309,6 +5312,14 @@ static int add_sticky(tupid_t tupid, void *data)
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
+
+	if(wid->refactoring) {
+		wid->refactoring_failed = 1;
+		fprintf(wid->f, "tup refactoring error: Attempting to add a new input link: ");
+		print_tup_entry(wid->f, tent);
+		fprintf(wid->f, "\n");
+		return 0;
+	}
 
 	if(tent->type == TUP_NODE_GROUP && wid->groupid != -1) {
 		if(group_link_insert(tupid, wid->groupid, wid->cmdid) < 0)
@@ -5335,6 +5346,18 @@ static int add_sticky(tupid_t tupid, void *data)
 static int rm_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
+
+	if(wid->refactoring) {
+		struct tup_entry *tent;
+
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		wid->refactoring_failed = 1;
+		fprintf(wid->f, "tup refactoring error: Attempting to remove an input link: ");
+		print_tup_entry(wid->f, tent);
+		fprintf(wid->f, "\n");
+		return 0;
+	}
 
 	if(link_remove(tupid, wid->cmdid, TUP_LINK_STICKY) < 0)
 		return -1;
@@ -5407,15 +5430,17 @@ static int delete_normal_file_links(tupid_t cmdid, struct tupid_entries *root)
 	return 0;
 }
 
-int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
+int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
 			struct tupid_entries *delete_root,
 			struct tup_entry *group,
-			struct tup_entry *old_group)
+			struct tup_entry *old_group,
+			int refactoring)
 {
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct write_input_data wid = {
+		.f = f,
 		.cmdid = cmdid,
 		.normal_root = &normal_root,
 		.delete_root = delete_root,
@@ -5423,6 +5448,8 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 		.groupid = -1,
 		.new_groups = 0,
 		.normal_links_invalid = 0,
+		.refactoring = refactoring,
+		.refactoring_failed = 0,
 	};
 
 	if(group && group == old_group) {
@@ -5464,6 +5491,8 @@ int tup_db_write_inputs(tupid_t cmdid, struct tupid_entries *input_root,
 			}
 		}
 	}
+	if(wid.refactoring_failed)
+		return -1;
 	if(wid.new_groups) {
 		if(add_group_circ_check(group) < 0)
 			return -1;

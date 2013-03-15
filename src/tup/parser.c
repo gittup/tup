@@ -3040,7 +3040,7 @@ out_pl:
 			return -1;
 		}
 	}
-	if(tup_db_write_inputs(cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root, group, old_group) < 0)
+	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root, group, old_group, tf->refactoring) < 0)
 		return -1;
 	free_tupid_tree(&input_root);
 	return 0;
