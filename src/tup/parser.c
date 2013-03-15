@@ -155,6 +155,8 @@ struct tupfile {
 	struct string_entries bang_root;
 	struct tupid_entries input_root;
 	struct string_entries chain_root;
+	struct tupid_entries refactoring_cmd_delete_root;
+	struct tupid_entries refactoring_gen_delete_root;
 	FILE *f;
 	struct parser_server *ps;
 	struct timespan ts;
@@ -279,6 +281,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
 	RB_INIT(&ps.directories);
+
+	if(refactoring) {
+		RB_INIT(&tf.refactoring_cmd_delete_root);
+		RB_INIT(&tf.refactoring_gen_delete_root);
+	}
+
 	if(server_parser_start(&ps) < 0)
 		return -1;
 
@@ -310,6 +318,13 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		goto out_close_vdb;
 	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
+
+	if(refactoring) {
+		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
+			goto out_close_vdb;
+		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_gen_delete_root, NULL, TUP_NODE_GENERATED) < 0)
+			goto out_close_vdb;
+	}
 
 	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
 	if(tf.cur_dfd < 0) {
@@ -363,6 +378,28 @@ out_close_node_db:
 out_server_stop:
 	if(server_parser_stop(&ps) < 0)
 		rc = -1;
+
+	if(refactoring) {
+		struct tupid_tree *tt;
+		struct tup_entry *tent;
+
+		RB_FOREACH(tt, tupid_entries, &tf.refactoring_cmd_delete_root) {
+			rc = -1;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			fprintf(tf.f, "tup refactoring error: Attempting to delete a command: ");
+			print_tup_entry(tf.f, tent);
+			fprintf(tf.f, "\n");
+		}
+		RB_FOREACH(tt, tupid_entries, &tf.refactoring_gen_delete_root) {
+			rc = -1;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			fprintf(tf.f, "tup refactoring error: Attempting to delete a generated file: ");
+			print_tup_entry(tf.f, tent);
+			fprintf(tf.f, "\n");
+		}
+	}
 
 	if(rc == 0) {
 		if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
@@ -2956,6 +2993,9 @@ out_pl:
 		return -1;
 	}
 	tree_entry_remove(&tf->g->cmd_delete_root, cmdid, &tf->g->cmd_delete_count);
+	if(tf->refactoring) {
+		tree_entry_remove(&tf->refactoring_cmd_delete_root, cmdid, NULL);
+	}
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
@@ -2965,6 +3005,9 @@ out_pl:
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
+		if(tf->refactoring) {
+			tree_entry_remove(&tf->refactoring_gen_delete_root, onle->tent->tnode.tupid, NULL);
+		}
 		move_name_list_entry(output_nl, &onl, onle);
 	}
 
@@ -2976,6 +3019,9 @@ out_pl:
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
+		if(tf->refactoring) {
+			tree_entry_remove(&tf->refactoring_gen_delete_root, onle->tent->tnode.tupid, NULL);
+		}
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
