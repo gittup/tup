@@ -5838,6 +5838,8 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 struct write_dir_input_data {
 	tupid_t dt;
 	FILE *f;
+	int refactoring;
+	int refactoring_failed;
 };
 
 static int add_dir_link(tupid_t tupid, void *data)
@@ -5847,6 +5849,21 @@ static int add_dir_link(tupid_t tupid, void *data)
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
+
+	if(wdid->refactoring) {
+		struct tup_entry *dest;
+
+		wdid->refactoring_failed = 1;
+
+		if(tup_entry_add(wdid->dt, &dest) < 0)
+			return -1;
+
+		fprintf(wdid->f, "tup refactoring error: Attempting to add a parser dependency: ");
+		print_tup_entry(wdid->f, tent);
+		fprintf(wdid->f, " -> ");
+		print_tup_entry(wdid->f, dest);
+		fprintf(wdid->f, "\n");
+	}
 	if(tent->type == TUP_NODE_GENERATED) {
 		fprintf(wdid->f, "tup error: Unable to read from generated file '");
 		print_tup_entry(wdid->f, tent);
@@ -5862,6 +5879,24 @@ static int rm_dir_link(tupid_t tupid, void *data)
 {
 	struct write_dir_input_data *wdid = data;
 
+	if(wdid->refactoring) {
+		struct tup_entry *tent;
+		struct tup_entry *dest;
+
+		wdid->refactoring_failed = 1;
+
+		if(tup_entry_add(tupid, &tent) < 0)
+			return -1;
+		if(tup_entry_add(wdid->dt, &dest) < 0)
+			return -1;
+
+		fprintf(wdid->f, "tup refactoring error: Attempting to remove a parser dependency: ");
+		print_tup_entry(wdid->f, tent);
+		fprintf(wdid->f, " -> ");
+		print_tup_entry(wdid->f, dest);
+		fprintf(wdid->f, "\n");
+	}
+
 	if(add_ghost(tupid) < 0)
 		return -1;
 	if(link_remove(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
@@ -5869,13 +5904,16 @@ static int rm_dir_link(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root)
+int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root,
+			    int refactoring)
 {
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct write_dir_input_data wdid = {
 		.dt = dt,
 		.f = f,
+		.refactoring = refactoring,
+		.refactoring_failed = 0,
 	};
 
 	if(tup_db_get_inputs(dt, &sticky_root, &normal_root) < 0)
@@ -5890,6 +5928,8 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root)
 		return -1;
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
+	if(wdid.refactoring_failed)
+		return -1;
 	return 0;
 }
 

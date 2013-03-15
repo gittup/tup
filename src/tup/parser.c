@@ -399,12 +399,11 @@ out_server_stop:
 				print_tup_entry(tf.f, tent);
 				fprintf(tf.f, "\n");
 			}
-		} else {
-			if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
-				rc = -1;
-			if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root) < 0)
-				rc = -1;
 		}
+		if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
+			rc = -1;
+		if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root, refactoring) < 0)
+			rc = -1;
 	}
 
 	pthread_mutex_lock(&ps.lock);
