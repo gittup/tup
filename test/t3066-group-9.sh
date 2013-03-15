@@ -23,6 +23,7 @@
 # group. Since group removal just goes directly to delete_node(), this would
 # leave the group in the modify list.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> echo hey > %o |> foo.txt | <group>

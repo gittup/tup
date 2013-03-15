@@ -22,8 +22,8 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-#: gen |> ./gen |> out.cpp <more>
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+#: gen.exe |> ./gen.exe |> out.cpp <more>
 #: <more> |> gcc -c out.cpp -o out.o |> out.o <generated>
 HERE
 cat > gen.c << HERE
@@ -41,16 +41,16 @@ HERE
 update
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-: gen |> ./gen |> out.cpp <more>
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+: gen.exe |> ./gen.exe |> out.cpp <more>
 #: <more> |> gcc -c out.cpp -o out.o |> out.o <generated>
 HERE
 tup touch Tupfile
 update
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-: gen |> ./gen |> out.cpp <more>
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+: gen.exe |> ./gen.exe |> out.cpp <more>
 : <more> |> gcc -c out.cpp -o out.o |> out.o <generated>
 HERE
 tup touch Tupfile

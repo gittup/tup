@@ -23,8 +23,8 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-#: gen |> ./gen |> out.cpp <generated>
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+#: gen.exe |> ./gen.exe |> out.cpp <generated>
 HERE
 cat > gen.c << HERE
 #include <stdio.h>
@@ -41,15 +41,15 @@ HERE
 update
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-: gen |> ./gen |> out.cpp <generated>
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+: gen.exe |> ./gen.exe |> out.cpp <generated>
 HERE
 tup touch Tupfile
 update_fail_msg 'both reads from and writes to this group.*generated'
 
 cat > Tupfile << HERE
-: gen.c | <generated> |> gcc %f -o %o |> gen
-: gen |> ./gen |> out.cpp
+: gen.c | <generated> |> gcc %f -o %o |> gen.exe
+: gen.exe |> ./gen.exe |> out.cpp
 HERE
 tup touch Tupfile
 update
