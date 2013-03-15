@@ -156,7 +156,6 @@ struct tupfile {
 	struct tupid_entries input_root;
 	struct string_entries chain_root;
 	struct tupid_entries refactoring_cmd_delete_root;
-	struct tupid_entries refactoring_gen_delete_root;
 	FILE *f;
 	struct parser_server *ps;
 	struct timespan ts;
@@ -284,7 +283,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 
 	if(refactoring) {
 		RB_INIT(&tf.refactoring_cmd_delete_root);
-		RB_INIT(&tf.refactoring_gen_delete_root);
 	}
 
 	if(server_parser_start(&ps) < 0)
@@ -321,8 +319,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 
 	if(refactoring) {
 		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
-			goto out_close_vdb;
-		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_gen_delete_root, NULL, TUP_NODE_GENERATED) < 0)
 			goto out_close_vdb;
 	}
 
@@ -379,33 +375,25 @@ out_server_stop:
 	if(server_parser_stop(&ps) < 0)
 		rc = -1;
 
-	if(refactoring) {
-		struct tupid_tree *tt;
-		struct tup_entry *tent;
-
-		RB_FOREACH(tt, tupid_entries, &tf.refactoring_cmd_delete_root) {
-			rc = -1;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
-				return -1;
-			fprintf(tf.f, "tup refactoring error: Attempting to delete a command: ");
-			print_tup_entry(tf.f, tent);
-			fprintf(tf.f, "\n");
-		}
-		RB_FOREACH(tt, tupid_entries, &tf.refactoring_gen_delete_root) {
-			rc = -1;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
-				return -1;
-			fprintf(tf.f, "tup refactoring error: Attempting to delete a generated file: ");
-			print_tup_entry(tf.f, tent);
-			fprintf(tf.f, "\n");
-		}
-	}
-
 	if(rc == 0) {
-		if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
-			rc = -1;
-		if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root) < 0)
-			rc = -1;
+		if(refactoring) {
+			struct tupid_tree *tt;
+			struct tup_entry *tent;
+
+			RB_FOREACH(tt, tupid_entries, &tf.refactoring_cmd_delete_root) {
+				rc = -1;
+				if(tup_entry_add(tt->tupid, &tent) < 0)
+					return -1;
+				fprintf(tf.f, "tup refactoring error: Attempting to delete a command: ");
+				print_tup_entry(tf.f, tent);
+				fprintf(tf.f, "\n");
+			}
+		} else {
+			if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
+				rc = -1;
+			if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root) < 0)
+				rc = -1;
+		}
 	}
 
 	pthread_mutex_lock(&ps.lock);
@@ -3005,9 +2993,6 @@ out_pl:
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
-		if(tf->refactoring) {
-			tree_entry_remove(&tf->refactoring_gen_delete_root, onle->tent->tnode.tupid, NULL);
-		}
 		move_name_list_entry(output_nl, &onl, onle);
 	}
 
@@ -3019,9 +3004,6 @@ out_pl:
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
-		if(tf->refactoring) {
-			tree_entry_remove(&tf->refactoring_gen_delete_root, onle->tent->tnode.tupid, NULL);
-		}
 		delete_name_list_entry(&extra_onl, onle);
 	}
 

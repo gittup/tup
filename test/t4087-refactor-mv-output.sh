@@ -16,21 +16,20 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try the 'tup refactor' command, by deleting an output.
+# Try the 'tup refactor' command, by moving an output to another command.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
 : |> touch bar |> bar
+: |> echo foo |>
 HERE
 tup touch Tupfile
 update
 
-tup touch Tupfile
-refactor
-
 cat > Tupfile << HERE
 : |> touch bar |>
+: |> echo foo |> bar
 HERE
 tup touch Tupfile
 refactor_fail_msg "Attempting to remove an output from a command: bar"
