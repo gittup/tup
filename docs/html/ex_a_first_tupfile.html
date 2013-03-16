@@ -253,17 +253,15 @@ Five squared is: 25
 : hello.o square.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
-<p>An easy way to see that your Tupfile refactoring didn't cause any functional changes is to run <span class="cmd">tup upd</span>. If you see commands being executed, that means you either changed the actual command string, or made other changes to input files. If the commands expand to the same string, you will only see the Tupfile being re-parsed, followed by "No files to delete" and "No commands to execute" messages:</p>
+<p>An easy way to see that your Tupfile refactoring didn't cause any functional changes is to run <span class="cmd">tup refactor</span>. If the commands expand to the same string, you will only see the Tupfile being re-parsed, followed by "No files to delete" message:</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup refactor
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
 [    1/1    ] .
 [ tup ] No files to delete.
-[ tup ] No commands to execute.
-[ tup ] Updated.
 </pre>
 
 <h4>More!</h4>
@@ -282,7 +280,7 @@ Five squared is: 25
 : hello.o square.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
-<p>If you run <span class="cmd">tup upd</span> again you should only see any activity during the parsing stage.</p>
+<p>If you run <span class="cmd">tup refactor</span> again you should not see any errors.</p>
 
 <h4>More! More!</h4>
 <p>Continuing our efforts to remove redundancy, let's take another look at the first two rules:</p>
@@ -301,7 +299,7 @@ Five squared is: 25
 : hello.o square.o |&gt; gcc %f -o %o |&gt; hello
 </pre>
 
-<p>Once again verify that no functional changes have been made by running <span class="cmd">tup upd</span>.</p>
+<p>Once again verify that no functional changes have been made by running <span class="cmd">tup refactor</span>.</p>
 
 <h4>MMMMMMMMMore!</h4>
 <p>By now you can see that there isn't a whole lot of redundancy left. One thing that may not be apparent is that the Tupfile is redundant with the directory itself!</p>

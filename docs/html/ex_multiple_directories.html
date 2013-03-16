@@ -80,7 +80,7 @@ square.o:
 
 <hr>
 <h3>Refactoring the library Tupfile</h3>
-<p>When making changes to a Tupfile, tup will re-execute any commands that have changed. If none of the command-lines have changed, tup will simply re-parse the Tupfile and then quit (assuming no other files have changed). We can use this behavior as a way to check that the refactoring isn't actually changing our output. Let's give it a shot:</p>
+<p>When making changes to a Tupfile, we can use the <span class="cmd">tup refactor</span> command to verify that our edits do not actually change the commands in the database. If none of the command-lines have changed, tup will simply re-parse the Tupfile and then quit. Otherwise, we will get an error message about what we changed. Let's give it a shot:</p>
 
 <span class="modfileheader">newmath/Tupfile</span>
 <pre class="code"><span class="added">CFLAGS += -Wall
@@ -89,20 +89,18 @@ CFLAGS += -O</span>
 : *.o |&gt; ar crs %o %f |&gt; libnewmath.a
 </pre>
 
-<p>When we tell tup to update, you can see it will parse the changed Tupfile and then report that it has "No files to delete" and "No commands to execute" -- this is our key that the refactoring had no unintended side effects.</p>
+<p>When we tell tup to refactor, you can see it will parse the changed Tupfile and then report that it has "No files to delete" -- this is our key that the refactoring had no unintended side effects.</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup refactor
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
 [    1/1    ] newmath
 [ tup ] No files to delete.
-[ tup ] No commands to execute.
-[ tup ] Updated.
 </pre>
 
-<p>If we had made some meaningful change, for example by changing -O to -O2, then tup will re-execute the command:</p>
+<p>If we had made some meaningful change, for example by changing -O to -O2, then tup will produce an error message with the refactor command:</p>
 
 <span class="modfileheader">newmath/Tupfile</span>
 <pre class="code">CFLAGS += -Wall
@@ -112,19 +110,20 @@ CFLAGS += -O<span class="added">2</span>
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup refactor
 [ tup ] Scanning filesystem...0.008s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
 [    1/1    ] newmath
-[ tup ] No files to delete.
-[ tup ] Executing Commands...
-[    1/2    ] newmath: gcc -Wall -O2 -c square.c -o square.o
-[    2/2    ] newmath: ar crs libnewmath.a square.o
-[ tup ] Updated.
+tup refactoring error: Attempting to modify a command string:
+Old: 'gcc -Wall -O -c hello.c -o hello.o'
+New: 'gcc -Wall -O2 -c hello.c -o hello.o'
+tup error: Error parsing Tupfile line 3
+  Line was: ': foreach *.c |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o'
+ *** tup: 1 job failed.
 </pre>
 
-<p>If we didn't intend for the Tupfile refactoring to change anything, the "Executing Commands..." line would indicate that we goofed. You would want to go back to the original Tupfile and 'tup upd' to get back to where you were before you tried to refactor. In this example we'll just keep the -O2 as it is, though.</p>
+<p>If we didn't intend for the Tupfile refactoring to change anything, we could keep modifying the Tupfile and running <span class="cmd">tup refactor</span> until all of the refactoring errors are fixed. Of course, if we *do* actually want to change command-lines (such as by switching to -O2 in this case), then just run <span class="cmd">tup upd</span> as normal.</p>
 
 <hr>
 <h3>Build the program</h3>
@@ -263,7 +262,6 @@ CFLAGS += -O2</span>
 [ tup ] Updated.
 </pre>
 
-<p>Again we know that our refactoring didn't mess anything up because there are no commands to execute.</p>
 <p>A quick note about the <span class="keyword">include_rules</span> directive: in this case, this is effectively equivalent to the following Tupfiles:</p>
 
 <span class="samefileheader">Tupfile (example)</span>
@@ -307,15 +305,13 @@ CFLAGS += -Inewmath
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup refactor
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
 [    1/2    ] newmath
 [    2/2    ] .
 [ tup ] No files to delete.
-[ tup ] No commands to execute.
-[ tup ] Updated.
 </pre>
 
 <p>Note that even though we have $(CFLAGS) when we initialize the !cc macro, it does not actually expand until we use the !cc macro in the :-rule in the Tupfile. This allows us to add the -Inewmath flag in the main Tupfile.</p>
