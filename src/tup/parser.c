@@ -2965,15 +2965,24 @@ out_pl:
 			return -1;
 		}
 	} else {
-		if(tf->refactoring) {
-			fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
-			return -1;
-		}
 		if(find_existing_command(&onl, &tf->g->cmd_delete_root, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
+			if(tf->refactoring) {
+				fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
+				return -1;
+			}
 			cmdid = create_command_file(tf->tupid, cmd);
 		} else {
+			if(tf->refactoring) {
+				struct tup_entry *old;
+				if(tup_entry_add(cmdid, &old) < 0)
+					return -1;
+				fprintf(tf->f, "tup refactoring error: Attempting to modify a command string:\n");
+				fprintf(tf->f, "Old: '%s'\n", old->name.s);
+				fprintf(tf->f, "New: '%s'\n", cmd);
+				return -1;
+			}
 			if(tup_db_set_name(cmdid, cmd) < 0)
 				return -1;
 		}

@@ -21,7 +21,7 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: |> echo foo |>
+: |> touch foo |> foo
 HERE
 tup touch Tupfile
 update
@@ -31,14 +31,16 @@ update
 sleep 1
 cat > Tupfile << HERE
 string = foo
-: |> echo \$(string) |>
+: |> touch \$(string) |> foo
 HERE
 refactor
 
 cat > Tupfile << HERE
-string = bar
-: |> echo \$(string) |>
+string = foo
+: |> touch  \$(string) |> foo
 HERE
-refactor_fail_msg "Attempting to create a new command: echo bar"
+refactor_fail_msg "Attempting to modify a command string:"
+refactor_fail_msg "Old: 'touch foo'"
+refactor_fail_msg "New: 'touch  foo'"
 
 eotup
