@@ -191,7 +191,8 @@ int main(int argc, char **argv)
 		rc = updater(argc, argv, 2);
 	} else if(strcmp(cmd, "upd") == 0) {
 		rc = updater(argc, argv, 0);
-	} else if(strcmp(cmd, "refactor") == 0) {
+	} else if(strcmp(cmd, "refactor") == 0 ||
+		  strcmp(cmd, "ref") == 0) {
 		rc = updater(argc, argv, -2);
 	} else if(strcmp(cmd, "autoupdate") == 0) {
 		rc = updater(argc, argv, 0);
