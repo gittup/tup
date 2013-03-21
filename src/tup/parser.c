@@ -345,8 +345,10 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 		goto out_free_bs;
 	if(tf.ign) {
-		if(rm_existing_gitignore(&tf, n->tent) < 0)
-			return -1;
+		if(!refactoring) {
+			if(rm_existing_gitignore(&tf, n->tent) < 0)
+				return -1;
+		}
 		if(gitignore(&tf) < 0) {
 			rc = -1;
 			goto out_free_bs;
@@ -975,6 +977,17 @@ static int gitignore(struct tupfile *tf)
 					return -1;
 			}
 		}
+		if(tf->refactoring) {
+			/* If we're refactoring, we don't actually need to
+			 * write out the .gitignore file, since for the
+			 * refactoring to succeed, the contents of .gitignore
+			 * must be unchanged. Additionally, changing the
+			 * .gitignore file would cause its mtime to change,
+			 * resulting in a change detected in tup_db_changes()
+			 * (t4096).
+			 */
+			goto out_free;
+		}
 
 		fd = openat(tf->cur_dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
 		if(fd < 0) {
@@ -1003,6 +1016,8 @@ static int gitignore(struct tupfile *tf)
 			return -1;
 		}
 	}
+
+out_free:
 	if(s) {
 		free(s); /* Freeze gopher! */
 	}
