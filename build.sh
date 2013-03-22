@@ -5,6 +5,7 @@ os=`uname -s`
 plat_cflags="`pkg-config fuse --cflags`"
 plat_ldflags="`pkg-config fuse --libs`"
 plat_files=""
+LDFLAGS="-lm"
 CC=gcc
 case "$os" in
 	Linux)
@@ -50,9 +51,26 @@ echo "  mkdir build"
 mkdir -p build
 echo "  cd build"
 cd build
+
+for i in ../src/lua/*.c; do
+	echo "  bootstrap CC $CFLAGS $i"
+	$CC $CFLAGS -c $i
+done
+
+rm lua.o
+echo "  link luac"
+$CC *.o -o luac $LDFLAGS
+rm luac.o
+
+./luac -o builtin.luac ../src/luabuiltin/builtin.lua
+mkdir luabuiltin
+xxd -i builtin.luac luabuiltin/luabuiltin.h
+
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
-	$CC $CFLAGS -c $i -I../src $plat_cflags
+	# Put -I. first so we find our new luabuiltin.h file, not one built
+	# by a previous 'tup upd'.
+	$CC $CFLAGS -c $i -I. -I../src $plat_cflags
 done
 
 echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"
