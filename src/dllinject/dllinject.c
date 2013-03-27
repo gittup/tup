@@ -1735,6 +1735,7 @@ DWORD tup_inject_init(remote_thread_t* r)
 	char filename[MAX_PATH];
 	char vardict_env[64];
 	int vardict_fd = -1;
+	OSVERSIONINFO osinfo;
 
 	if (initialised)
 		return 0;
@@ -1773,7 +1774,23 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	handle_file(filename, NULL, ACCESS_READ);
 
-	hot_patch( patch_table, patch_table + patch_table_len );
+	/* What a horrible API... */
+	osinfo.dwOSVersionInfoSize = sizeof(osinfo);
+	GetVersionEx(&osinfo);
+
+	if(osinfo.dwMajorVersion >= 6) {
+		/* Only hot patch for Windows Vista and above. Hot patching
+		 * here gets our hook for FindFirstFile, which iat patching
+		 * doesn't get for some reason. I also tried to just iat patch
+		 * NtQueryDirectoryFile(), but then that ends up crashing for
+		 * some reason.
+		 *
+		 * For XP, the FindFirstFile hook works with iat patching, but
+		 * hot patching breaks file removal for some reason, so for
+		 * example 'gcc -flto foo.o -o foo.exe' will fail.
+		 */
+		hot_patch( patch_table, patch_table + patch_table_len );
+	}
 	iat_patch( patch_table, patch_table + patch_table_len );
 
 	return 0;
