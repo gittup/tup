@@ -502,7 +502,7 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 		perror(realfile);
 		return;
 	}
-	dump_graph(g, f, 0, 0, 0);
+	dump_graph(g, f, 1, 0, 0);
 	fclose(f);
 }
 
