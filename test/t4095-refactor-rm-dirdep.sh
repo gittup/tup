@@ -34,6 +34,6 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile
-refactor_fail_msg "Attempting to remove a parser dependency: sub -> ."
+refactor
 
 eotup
