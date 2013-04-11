@@ -4735,6 +4735,7 @@ int tup_db_findenv(const char *var, struct tup_entry **tent)
 		ve = envdb_set(var, varlen, newenv, newenvlen, newtent, 1);
 		if(!ve)
 			return -1;
+		expected_changes++;
 	}
 	*tent = ve->tent;
 	return 0;
@@ -5977,6 +5978,10 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, enum TUP_NODE
 
 	if(tup_entry_add_to_dir(dt, tupid, name, len, type, mtime, srcid, entry) < 0)
 		return -1;
+	/* It's ok for refactoring to create new nodes, such as for ghosts that
+	 * are new inputs (eg: Tuprules.tup or a Tupfile for a new directory.)
+	 */
+	expected_changes++;
 
 	return 0;
 }
