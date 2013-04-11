@@ -1464,10 +1464,8 @@ static void *create_work(void *arg)
 			fprintf(stderr, "tup error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
 			rc = -1;
 		}
-		if(!refactoring) {
-			if(tup_db_unflag_create(n->tnode.tupid) < 0)
-				rc = -1;
-		}
+		if(tup_db_unflag_create(n->tnode.tupid) < 0)
+			rc = -1;
 
 		worker_ret(wt, rc);
 	}

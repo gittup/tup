@@ -912,6 +912,10 @@ int tup_db_commit(void)
 	return 0;
 }
 
+/* This counts the database changes that are "expected" during refactoring,
+ * such as adding/removing directory level dependencies, or removing the
+ * create flag.
+ */
 static int expected_changes = 0;
 int tup_db_changes(void)
 {
@@ -2990,6 +2994,7 @@ int tup_db_unflag_create(tupid_t tupid)
 		return -1;
 	}
 
+	expected_changes++;
 	return 0;
 }
 

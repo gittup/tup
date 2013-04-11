@@ -39,6 +39,7 @@ cat > Tupfile << HERE
 string = foo
 : |> touch  \$(string) |> foo
 HERE
+tup touch Tupfile
 refactor_fail_msg "Attempting to modify a command string:"
 refactor_fail_msg "Old: 'touch foo'"
 refactor_fail_msg "New: 'touch  foo'"
