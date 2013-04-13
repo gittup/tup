@@ -1555,7 +1555,7 @@ static int set_variable(struct tupfile *tf, char *line)
 	if(var[0] == '&') {
 		struct tup_entry *tent;
 		tent = get_tent_dt(tf->curtent->tnode.tupid, value);
-		if(!tent) {
+		if(!tent || tent->type == TUP_NODE_GHOST) {
 			/* didn't find the given file; if using a variant, check the source dir */
 			struct tup_entry *srctent;
 			if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
