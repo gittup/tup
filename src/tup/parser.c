@@ -769,6 +769,7 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 {
 	char path[PATH_MAX];
 	struct tup_entry *tent;
+	struct tup_entry *srctent;
 	struct parser_directory *pd;
 	struct readdir_parser_params rpp;
 	struct string_tree *st;
@@ -791,6 +792,14 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dt,
 				       "*", -1, &tf->g->gen_delete_root, 1) < 0)
 		return -EIO;
+	if(variant_get_srctent(tf->variant, dt, &srctent) < 0)
+		return -1;
+	if(srctent) {
+		if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, srctent->tnode.tupid,
+					       "*", -1, &tf->g->gen_delete_root, 1) < 0)
+			return -EIO;
+	}
+
 	st = string_tree_search(&tf->ps->directories, path, strlen(path));
 	if(st)
 		free_dir_list(&tf->ps->directories, container_of(st, struct parser_directory, st));
