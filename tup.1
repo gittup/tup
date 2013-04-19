@@ -288,7 +288,7 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .SH "TUPFILES"
 You must create a file called "Tupfile" anywhere in the tup hierarchy that you want to create an output file based on the input files. The input files can be anywhere else in the tup hierarchy, but the output file(s) must be written in the same directory as the Tupfile.
 .TP
-.B : [foreach] [inputs] [ | order-only inputs] |> command |> [outputs] [ | extra outputs] [{bin}]
+.B : [foreach] [inputs] [ | order-only inputs] |> command |> [outputs] [ | extra outputs] [<group>] [{bin}]
 The :-rules are the primary means of creating commands, and are denoted by the fact that the ':' character appears in the first column of the Tupfile. The syntax is supposed to look somewhat like a pipeline, in that the input files on the left go into the command in the middle, and the output files come out on the right.
 .RS
 .TP
@@ -338,6 +338,22 @@ The outputs section specifies the files that will be written to by the command. 
 .TP
 .B extra-outputs
 The extra-outputs section is similar to the order-only inputs section. It is separated from the regular outputs by the '|' character. The extra-outputs behave exactly as regular outputs, except they do not appear in the %o flag. These can be used if a command generates files whose names do not actually appear in the command line. If there is exactly one output specified by the rule, the extra-outputs section can use the %O flag to represent the basename of the output. This can be useful in extra-outputs for !-macros.
+.TP
+.B <group>
+Output files can be grouped into global groups by specifying a <group> after the outputs but before a bin. Groups allow for order-only dependencies between folders. Note that groups are directory specific, however, so when referring to a group you must specify the path to where it is assigned. For example, if a main project depends on the output from several submodules you can structure Tup like so to make sure the submodules are built before the main project:
+.nf
+
+#./submodules/sm1/Tupfile
+: foo.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+#./submodules/sm2/Tupfile
+: bar.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+#./project/Tupfile
+: baz.c | ../submodules/<submodgroup> |> gcc -c %f -o %o |> %B.o
+
+.fi
+Notice how groups are directory specific and the path is specified outside of the <>. By specifying the <submodgroup> as an order-only input Tup will build the submodules before attempting to build the entire project.
 .TP
 .B {bin}
 Outputs can be grouped into a bin using the "{bin}" syntax. A later rule can use "{bin}" as an input to use all of the files in that bin. For example, the foreach rule will put each .o file in the objs bin, which is used as an input in the linker rule:
