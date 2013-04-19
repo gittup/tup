@@ -94,6 +94,8 @@ enum {
 	DB_GET_INCOMING_LINK,
 	_DB_DELETE_NORMAL_LINKS,
 	_DB_DELETE_STICKY_LINKS,
+	_DB_FLAG_GROUP_USERS1,
+	_DB_FLAG_GROUP_USERS2,
 	DB_DIRTYPE_TO_TREE,
 	DB_TYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
@@ -3514,11 +3516,100 @@ static int delete_sticky_links(tupid_t tupid)
 	return 0;
 }
 
+static int flag_group_users1(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_FLAG_GROUP_USERS1];
+	static const char s[] = "insert or ignore into create_list select dir from node where id in (select to_id from sticky_link where from_id=?)";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int flag_group_users2(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_FLAG_GROUP_USERS2];
+	static const char s[] = "insert or ignore into create_list select dir from node where id in (select from_id from normal_link where to_id=?)";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int flag_group_users(tupid_t tupid)
+{
+	struct tup_entry *tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->type == TUP_NODE_GROUP) {
+		if(flag_group_users1(tupid) < 0)
+			return -1;
+		if(flag_group_users2(tupid) < 0)
+			return -1;
+	}
+	return 0;
+}
+
 int tup_db_delete_links(tupid_t tupid)
 {
 	if(add_ghost_checks(tupid) < 0)
 		return -1;
 	if(add_group_checks(tupid) < 0)
+		return -1;
+	if(flag_group_users(tupid) < 0)
 		return -1;
 	if(delete_normal_links(tupid) < 0)
 		return -1;
