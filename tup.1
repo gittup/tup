@@ -331,7 +331,7 @@ A command string can begin with the special sequence ^\ TEXT^, which will tell t
 
 .fi
 .IP
-A command string can also begin with the special character '!', in which case the !-macro specified will be substituted in for the actual command. See the !-macro definition later.
+A command string can also begin with the special character '!', in which case the !-macro specified will be substituted in for the actual command. See the !-macro definition later. Commands can also be blank, which is useful to put all the input files in a {bin} for a later rule.
 .TP
 .B outputs
 The outputs section specifies the files that will be written to by the command. Only one command can write to a specific file, but a single command can output multiple files (such as how a bison command will output both a .c and .h file). The output can use any %-flags except %o. Once a file is specified in an output section, it is put into the tup database. Any following rules can use that file as an input, even if it doesn't exist in the filesystem yet.
