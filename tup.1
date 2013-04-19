@@ -368,7 +368,7 @@ The 'c' flag causes the command to run inside a chroot on Linux and OSX, so that
 
 .TP
 .B %-flags
-Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs.
+Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs. %-flags may be written as %(<flag>) (i.e. %(f)) to allow for flag options.
 .RS
 .TP
 .B %f
@@ -403,6 +403,33 @@ The name of the lowest level of the directory. For example, in foo/bar/Tupfile, 
 
 .fi
 Using this macro in foo/bar/Tupfile would then create foo/bar/libbar.a
+.TP
+.B %g
+The string that a glob operator matched. For example with the files a_text.txt and b_text.txt, the rule:
+.nf
+
+: foreach *_text.txt |> foo %f |> %g_binary.bin
+
+.fi
+will output the filenames a_binary.bin and b_binary.bin. If there are multiple glob operators, the desired glob can be selected by specifying an index after the 'g' like so: %(g1). Using the same files as before and this rule:
+.nf
+
+: foreach *_*.txt |> foo %f |> %(g0)_%(g1).bin
+
+.fi
+will output the filenames a_text.bin and b_text.bin. If there are multiple input files and foreach is not used, %g uses slightly different semantics. In this case, the matched strings are concatenated with an '_'. Again using the example files:
+.nf
+
+: *_*.txt |> foo %f |> %g_binary.bin
+
+.fi
+will output a_b_binary.bin. The separator can be chosen by adding the 's' argument to the %g flag, like so: %(gs<separator>). For example, to use two hyphens and the word 'TUP' as the separators:
+.nf
+
+: *_*.txt |> foo %f |> %(gs--)_%(g1sTUP).bin
+
+.fi
+will output a--b_textTUPtext.bin
 .RE
 .RE
 .TP
