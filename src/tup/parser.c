@@ -2775,7 +2775,7 @@ static int glob_parse(const char *pattern, int patlen, char *match, int *globidx
 	int glob_cnt = 0;
 
 	/* Two outputs differed, must be a wildcard */
-	while(p_it < baselen) {
+	while(p_it < patlen) {
 		while(pattern[p_it] == match[m_it] && p_it < patlen && match[m_it] != '\0') {
 			/* Iterate through while the strings are the same */
 			p_it++;
@@ -2811,8 +2811,8 @@ static int glob_parse(const char *pattern, int patlen, char *match, int *globidx
 		} else if (pattern[p_it] == '?') {
 			/* Must match one character */
 			globidx[glob_cnt*2+1] = 1;
-			b_it++;
-			e_it++;
+			p_it++;
+			m_it++;
 
 		} else {
 			int more_wildcards = 0;
@@ -2872,7 +2872,7 @@ static int glob_parse(const char *pattern, int patlen, char *match, int *globidx
 				 */
 				for (i=strlen(match)-non_wildcard_len; i>=m_it; i--) {
 					int c;
-					c = strncmp(base + b_it, match + i, non_wildcard_len);
+					c = strncmp(pattern + p_it, match + i, non_wildcard_len);
 					if (c == 0) {
 						globidx[glob_cnt*2 + 1] = i - m_it;
 						m_it = i;
