@@ -200,3 +200,31 @@ end
 tup.rule = function(inputs, command, outputs)
 	return tup.frule{ input = inputs, output = outputs, command = command }
 end
+
+-- This function is called when we do 'a += b' in a Tupfile.lua. It works
+-- if a and b are strings, tables, or nils, and always makes a result that
+-- is an array of strings.
+tup_append_assignment = function(a, b)
+	local result
+	if type(a) == 'string' then
+		result = {a}
+	elseif type(a) == 'table' then
+		result = a
+	elseif type(a) == 'nil' then
+		result = {}
+	else
+		error '+= operator only works when the source is a table or string'
+	end
+
+	if type(b) == 'string' then
+		result[#result+1] = b
+	elseif type(b) == 'table' then
+		-- append_table in C is almost twice as fast.
+		tup.append_table(result, b)
+	elseif type(b) == 'nil' then
+		-- nothing to do
+	else
+		error '+= operator only works when the value is a table or string'
+	end
+	return result
+end

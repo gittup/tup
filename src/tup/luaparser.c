@@ -290,6 +290,22 @@ static int tuplua_function_definerule(lua_State *ls)
 	return 0;
 }
 
+static int tuplua_function_append_table(lua_State *ls)
+{
+	int n1 = luaL_len(ls, 1);
+	int n2 = luaL_len(ls, 2);
+	int x;
+	if(!lua_istable(ls, 1))
+		return luaL_error(ls, "This function must be passed two tables");
+	if(!lua_istable(ls, 2))
+		return luaL_error(ls, "This function must be passed two tables");
+	for(x=1; x<=n2; x++) {
+		lua_rawgeti(ls, 2, x);
+		lua_rawseti(ls, 1, n1+x);
+	}
+	return 0;
+}
+
 static int tuplua_function_getcwd(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
@@ -625,6 +641,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		lua_newtable(ls);
 		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
+		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
 		tuplua_register_function(ls, "getparent", tuplua_function_getparent, tf);
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);

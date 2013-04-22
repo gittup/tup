@@ -1138,6 +1138,56 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
   }
 }
 
+static void append_assignment (LexState *ls, struct LHS_assign *lh) {
+  int line;
+  FuncState * fs=ls->fs;
+  expdesc tup_append;
+  expdesc mfunc;
+  expdesc var;
+  expdesc value;
+  TString *ts;
+  int reg;
+
+  luaX_next(ls);
+
+  checknext(ls, '=');
+
+  /* Most of the actual work is done by tup_append_assignment in the
+   * builtin.lua file.
+   */
+  ts = luaS_new(ls->L, "tup_append_assignment");
+  codestring(ls, &tup_append, ts);
+
+  /* Grab a free register for the tup_append_assignment function call */
+  reg = fs->freereg;
+  luaK_reserveregs(fs, 1);
+
+  /* Find the tup_append_assignment function call using the constant in
+   * tup_append.
+   */
+  init_exp(&mfunc, VNONRELOC, reg);
+  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, 0, luaK_exp2RK(fs, &tup_append));
+
+  /* First value on register stack after the function call is our variable that
+   * we are appending to.
+   */
+  var = lh->v;
+  luaK_exp2nextreg(fs, &var);
+
+  /* Second value on the register stack is the value being appended. */
+  expr(ls, &value);
+  luaK_exp2nextreg(fs, &value);
+
+  /* Do the function call, with 2 parameters and 1 return value (aka: 3 and 2
+   * because of the 1-offset).
+   */
+  luaK_codeABC(fs, OP_CALL, mfunc.u.info, 3, 2);
+
+  /* Store the result in our original variable. */
+  luaK_storevar(fs, &lh->v, &mfunc);
+
+  fs->freereg = reg;
+}
 
 static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
   expdesc e;
@@ -1154,6 +1204,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
   }
   else {  /* assignment -> `=' explist */
     int nexps;
+
+    if(nvars==1) {
+      if(ls->t.token == '+') {
+        append_assignment(ls, lh);
+        return;
+      }
+    }
     checknext(ls, '=');
     nexps = explist(ls, &e);
     if (nexps != nvars) {
