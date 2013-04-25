@@ -52,27 +52,6 @@
 #define DISALLOW_NODES 0
 #define ALLOW_NODES 1
 
-struct name_list_entry {
-	TAILQ_ENTRY(name_list_entry) list;
-	char *path;
-	char *base;
-	int len;
-	int extlesslen;
-	int baselen;
-	int extlessbaselen;
-	int dirlen;
-	struct tup_entry *tent;
-};
-TAILQ_HEAD(name_list_entry_head, name_list_entry);
-
-struct name_list {
-	struct name_list_entry_head entries;
-	int num_entries;
-	int totlen;
-	int basetotlen;
-	int extlessbasetotlen;
-};
-
 struct path_list {
 	TAILQ_ENTRY(path_list) list;
 	/* For files: */
@@ -84,22 +63,6 @@ struct path_list {
 	struct bin *bin;
 };
 TAILQ_HEAD(path_list_head, path_list);
-
-struct rule {
-	int foreach;
-	char *input_pattern;
-	char *output_pattern;
-	struct bin *bin;
-	char *command;
-	int command_len;
-	struct name_list inputs;
-	struct name_list order_only_inputs;
-	struct name_list bang_oo_inputs;
-	char *bang_extra_outputs;
-	int empty_input;
-	int line_number;
-	struct name_list *output_nl;
-};
 
 struct bang_rule {
 	struct string_tree st;
@@ -167,7 +130,6 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				 struct name_list *output_nl);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
@@ -1864,7 +1826,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
+int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
 	struct name_list output_nl;
 	struct name_list_entry *nle;
@@ -2004,7 +1966,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 	if(foreach) {
 		struct name_list tmp_nl;
 		struct name_list_entry tmp_nle;
-		char *old_command = NULL;
+		const char *old_command = NULL;
 		char *old_output_pattern = NULL;
 		int old_command_len = 0;
 
