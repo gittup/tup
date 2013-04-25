@@ -92,7 +92,6 @@ static int export(struct tupfile *tf, const char *cmdline);
 static int include_file(struct tupfile *tf, const char *file);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list *plist,
 			 tupid_t dt);
-static int parse_dependent_tupfiles(struct path_list *plist, struct tupfile *tf);
 
 static int debug_run = 0;
 
@@ -407,10 +406,13 @@ static int tuplua_function_glob(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	char *pattern = NULL;
+	struct path_list_head plist;
 	struct path_list pl;
 	struct tuplua_glob_data tgd;
 	struct tup_entry *srctent = NULL;
 	struct tup_entry *dtent;
+
+	TAILQ_INIT(&plist);
 
 	tgd.ls = ls;
 	tgd.count = 1; /* Lua numbering starts from 1 */
@@ -430,7 +432,9 @@ static int tuplua_function_glob(lua_State *ls)
 		return lua_error(ls);
 	}
 
-	if(parse_dependent_tupfiles(&pl, tf) < 0) {
+	TAILQ_INSERT_TAIL(&plist, &pl, list);
+
+	if(parse_dependent_tupfiles(&plist, tf) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to process glob directory for pattern \"%s\".", __FILE__, __LINE__, pattern);
 		free(pl.pel);
 		free(pattern);
@@ -898,41 +902,5 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list *pl,
 		pl->path[pl->pel->path - pl->path - 1] = 0;
 	}
 
-	return 0;
-}
-
-static int parse_dependent_tupfiles(struct path_list *pl, struct tupfile *tf)
-{
-	/* Only care about non-bins, and directories that are not our
-	 * own.
-	 */
-	if(pl->dt != tf->tupid) {
-		struct node *n;
-
-		n = find_node(tf->g, pl->dt);
-		if(n != NULL && !n->already_used) {
-			int rc;
-			struct timespan ts;
-			n->already_used = 1;
-			rc = parse(n, tf->g, &ts, tf->refactoring);
-			if(rc < 0) {
-				if(rc == CIRCULAR_DEPENDENCY_ERROR) {
-					fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");
-					tf->circular_dep_error = 1;
-				} else {
-					fprintf(tf->f, "tup error: Unable to parse dependent Tupfile: ");
-				}
-				print_tup_entry(tf->f, n->tent);
-				fprintf(tf->f, "\n");
-				return -1;
-			}
-			/* Ignore any time the dependent Tupfile was parsing, so that
-			 * we don't account for it twice.
-			 */
-			timespan_add_delta(&tf->ts, &ts);
-		}
-		if(tupid_tree_add_dup(&tf->input_root, pl->dt) < 0)
-			return -1;
-	}
 	return 0;
 }

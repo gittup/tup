@@ -95,8 +95,10 @@ struct rule {
 };
 
 struct bin_head;
+struct path_list_head;
 
 int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
+int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 
 struct node;
 struct graph;

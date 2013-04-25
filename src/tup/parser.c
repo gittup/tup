@@ -146,7 +146,6 @@ static void make_path_list_unique(struct path_list_head *plist);
 static void free_path_list(struct path_list_head *plist);
 static void del_pl(struct path_list *pl, struct path_list_head *head);
 static void make_name_list_unique(struct name_list *nl);
-static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			 struct name_list *nl, int required);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
@@ -2406,7 +2405,7 @@ static void make_name_list_unique(struct name_list *nl)
 	tup_entry_release_list();
 }
 
-static int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
+int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 {
 	struct path_list *pl;
 
