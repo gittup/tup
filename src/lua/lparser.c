@@ -1171,6 +1171,8 @@ static void append_assignment (LexState *ls, struct LHS_assign *lh) {
   /* First value on register stack after the function call is our variable that
    * we are appending to.
    */
+  if((lh->v.k == VINDEXED) && (lh->v.u.ind.vt == VLOCAL))
+    luaK_reserveregs(fs, 1);
   var = lh->v;
   luaK_exp2nextreg(fs, &var);
 
