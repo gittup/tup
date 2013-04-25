@@ -107,7 +107,6 @@ static int include_rules(struct tupfile *tf);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
-static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
 static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
@@ -887,7 +886,7 @@ out_err:
 	return -1;
 }
 
-static int export(struct tupfile *tf, char *cmdline)
+int export(struct tupfile *tf, const char *cmdline)
 {
 	struct tup_entry *tent = NULL;
 

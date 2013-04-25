@@ -88,7 +88,6 @@ struct tuplua_glob_data
 };
 
 static int include_rules(struct tupfile *tf);
-static int export(struct tupfile *tf, const char *cmdline);
 static int include_file(struct tupfile *tf, const char *file);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list *plist,
 			 tupid_t dt);
@@ -754,25 +753,6 @@ out_free:
 	free(path);
 
 	return rc;
-}
-
-static int export(struct tupfile *tf, const char *cmdline)
-{
-	struct tup_entry *tent = NULL;
-
-	if(!cmdline[0]) {
-		fprintf(tf->f, "tup error: Expected environment variable to export.\n");
-		return SYNTAX_ERROR;
-	}
-
-	/* Pull from tup's environment */
-	if(!tup_db_findenv(cmdline, &tent) < 0) {
-		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
-		return -1;
-	}
-	if(tupid_tree_add_dup(&tf->env_root, tent->tnode.tupid) < 0)
-		return -1;
-	return 0;
 }
 
 static int include_file(struct tupfile *tf, const char *file)
