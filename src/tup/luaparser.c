@@ -144,7 +144,7 @@ static int debug_run = 0;
 static const char *tuplua_tostring(struct lua_State *ls, int strindex)
 {
 	const char *out = luaL_tolstring(ls, strindex, NULL);
-	if (out != NULL)
+	if(out != NULL)
 		lua_replace(ls, strindex);
 	return out;
 }
@@ -152,7 +152,7 @@ static const char *tuplua_tostring(struct lua_State *ls, int strindex)
 static const char *tuplua_tolstring(struct lua_State *ls, int strindex, size_t *len)
 {
 	const char *out = luaL_tolstring(ls, strindex, len);
-	if (out != NULL)
+	if(out != NULL)
 		lua_replace(ls, strindex);
 	return out;
 }
@@ -163,7 +163,7 @@ static char *tuplua_strdup(struct lua_State *ls, int strindex)
 	const char *source;
 	char *out;
 	source = tuplua_tolstring(ls, strindex, &size);
-	if (!source) return NULL;
+	if(!source) return NULL;
 	out = malloc(size + 1);
 	strncpy(out, source, size);
 	out[size] = 0;
@@ -198,7 +198,7 @@ static int tuplua_function_include(lua_State *ls)
 	const char *file = NULL;
 
 	file = tuplua_tostring(ls, -1);
-	if (file == NULL)
+	if(file == NULL)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
 	if(include_file(tf, file) < 0)
 		return luaL_error(ls, "Failed to include file \"%s\".", file);
@@ -217,7 +217,7 @@ static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tup
 	while(lua_next(ls, -2)) {
 		struct path_list pl;
 		char *entry = tuplua_strdup(ls, -1);
-		if (entry == NULL) {
+		if(entry == NULL) {
 			fprintf(tf->f, "Element in table '%s' is not a string.  All entries must be path strings.\n", table);
 			delete_name_list(nl);
 			return -1;
@@ -229,7 +229,7 @@ static int tuplua_table_to_namelist(lua_State *ls, const char *table, struct tup
 			delete_name_list(nl);
 			return -1;
 		}
-		if ((parse_dependent_tupfiles(&pl, tf) < 0) ||
+		if((parse_dependent_tupfiles(&pl, tf) < 0) ||
 			(output ? (output_nl_add_path(tf, &pl, nl) < 0) :
 				(input_nl_add_path(tf, &pl, nl) < 0))) {
 			fprintf(tf->f, "Element '%s' in '%s' is invalid.\n", entry, table);
@@ -257,18 +257,18 @@ static int tuplua_function_definerule(lua_State *ls)
 	if(!lua_istable(ls, -1))
 		return luaL_error(ls, "This function must be passed a table containing parameters");
 
-	if (tuplua_table_to_namelist(ls, "inputs", tf, &r.inputs, 0) < 0)
+	if(tuplua_table_to_namelist(ls, "inputs", tf, &r.inputs, 0) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
 	make_name_list_unique(&r.inputs);
 
-	if (tuplua_table_to_namelist(ls, "outputs", tf, &output_name_list, 1) < 0) {
+	if(tuplua_table_to_namelist(ls, "outputs", tf, &output_name_list, 1) < 0) {
 		delete_name_list(&r.inputs);
 		return luaL_error(ls, "Error while parsing 'outputs'.");
 	}
 
 	lua_getfield(ls, 1, "command");
 	r.command = tuplua_tolstring(ls, -1, &command_len);
-	if (!r.command) {
+	if(!r.command) {
 		delete_name_list(&r.inputs);
 		delete_name_list(&output_name_list);
 		return luaL_error(ls, "Parameter \"command\" must be a string containing command specification.");
@@ -382,7 +382,7 @@ static int tuplua_function_getconfig(lua_State *ls)
 	struct tup_entry *tent = NULL;
 
 	name = tuplua_tolstring(ls, -1, &name_size);
-	if (!name)
+	if(!name)
 		return luaL_error(ls, "Must be passed an config variable name as an argument.");
 	value_size = tup_db_get_varlen(tf->variant, name, name_size) + 1;
 	if(value_size < 0)
@@ -447,7 +447,7 @@ static int tuplua_function_glob(lua_State *ls)
 	lua_settop(ls, 1);
 
 	pattern = tuplua_strdup(ls, -1);
-	if (pattern == NULL)
+	if(pattern == NULL)
 		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
 	lua_pop(ls, 1);
 
@@ -515,7 +515,7 @@ static int tuplua_function_export(lua_State *ls)
 	const char *name = NULL;
 
 	name = tuplua_tostring(ls, -1);
-	if (name == NULL)
+	if(name == NULL)
 		return luaL_error(ls, "Must be passed an environment variable name as an argument.");
 
 	if(export(tf, name) < 0)
@@ -589,11 +589,11 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 	tid = *(tupid_t *)stackid;
 
 	rc = get_relative_dir(NULL, tf->curtent->tnode.tupid, tid, &slen);
-	if (rc < 0 || slen < 0) return 0;
+	if(rc < 0 || slen < 0) return 0;
 
 	value = malloc(slen);
 	rc = get_relative_dir(value, tf->curtent->tnode.tupid, tid, &slen);
-	if (rc < 0 || slen < 0) {
+	if(rc < 0 || slen < 0) {
 		free(value);
 		return 0;
 	}
@@ -610,9 +610,9 @@ static int tuplua_function_concat(struct lua_State *ls)
 {
 	size_t slen1, slen2;
 
-	if (tuplua_tolstring(ls, 1, &slen1) == NULL)
+	if(tuplua_tolstring(ls, 1, &slen1) == NULL)
 		return luaL_error(ls, "Cannot concatenate; Argument 1 cannot be converted to a string.");
-	if (tuplua_tolstring(ls, 2, &slen2) == NULL)
+	if(tuplua_tolstring(ls, 2, &slen2) == NULL)
 		return luaL_error(ls, "Cannot concatenate; Argument 2 cannot be converted to a string.");
 
 	char *out = malloc(slen1 + slen2);
@@ -682,7 +682,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		lua_getglobal(ls, "debug");
 		lua_getfield(ls, -1, "traceback");
 		lua_remove(ls, -2);
-		if (luaL_loadbuffer(ls, (char *)builtin_luac, builtin_luac_len, "builtin") != LUA_OK) {
+		if(luaL_loadbuffer(ls, (char *)builtin_luac, builtin_luac_len, "builtin") != LUA_OK) {
 			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
@@ -841,7 +841,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 
 	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
-	if (tf->cur_dfd < 0) {
+	if(tf->cur_dfd < 0) {
 		parser_error(tf, file);
 		goto out_free_pel;
 	}
