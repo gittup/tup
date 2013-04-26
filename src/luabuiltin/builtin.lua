@@ -220,6 +220,14 @@ local function set_list(t, s)
 	return t
 end
 
+local function set_string_or_table(st)
+	if type(st) == 'string' then
+		return {st}
+	else
+		return st
+	end
+end
+
 local function get_abc(a, b, c)
 	local inputs = nil
 	local command = nil
@@ -228,6 +236,10 @@ local function get_abc(a, b, c)
 		if b == nil then
 			command = set_command(a)
 		else
+			if type(a) == 'string' and type(b) == 'string' then
+				error 'Ambiguous rule: the 2-variable form of this rule must use a table for either the inputs or outputs.'
+			end
+
 			if type(a) == 'string' then
 				command = set_command(a)
 				outputs = set_list(b, 'outputs')
@@ -237,9 +249,9 @@ local function get_abc(a, b, c)
 			end
 		end
 	else
-		inputs = set_list(a, 'inputs')
+		inputs = set_string_or_table(a)
 		command = set_command(b)
-		outputs = set_list(c, 'outputs')
+		outputs = set_string_or_table(c)
 	end
 	return inputs, command, outputs
 end

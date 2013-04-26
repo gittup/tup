@@ -21,7 +21,7 @@
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
-objs = tup.foreach_rule({'*.c'}, 'gcc -c %f -o %o', {'%B.o'})
+objs = tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
 tup.rule(objs, 'gcc -o %o %f', {'prog'})
 HERE
 tup touch foo.c bar.c Tupfile.lua
