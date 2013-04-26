@@ -104,7 +104,8 @@ tup.frule = function(arguments)
 	if inputs then
 		local newinputs = {}
 		for index, input in ipairs(inputs) do
-			local newinput = input
+			-- Explicitly convert to string for node variables.
+			local newinput = tostring(input)
 			newinput = evalGlobals(newinput)
 			newinput = evalConfig(newinput)
 			table.insert(newinputs, newinput)
