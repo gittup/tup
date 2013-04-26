@@ -211,7 +211,7 @@ local function set_list(t, s)
 	return t
 end
 
-tup.rule = function(a, b, c)
+local function get_abc(a, b, c)
 	local inputs = nil
 	local command = nil
 	local outputs = nil
@@ -232,8 +232,32 @@ tup.rule = function(a, b, c)
 		command = set_command(b)
 		outputs = set_list(c, 'outputs')
 	end
+	return inputs, command, outputs
+end
 
-	return tup.frule{ input = inputs, output = outputs, command = command }
+tup.rule = function(a, b, c)
+	local input, command, output = get_abc(a, b, c)
+	return tup.frule{ input = input, command = command, output = output}
+end
+
+tup.foreach_rule = function(a, b, c)
+	local input, command, output = get_abc(a, b, c)
+	local newinput = {}
+	local routputs = {}
+
+	for k, v in ipairs(input) do
+		local glob
+		glob = conditionalglob(v)
+		for globindex, globvalue in ipairs(glob) do
+			table.insert(newinput, globvalue)
+		end
+	end
+
+	for k, v in ipairs(newinput) do
+		table.insert(routputs, tup.frule{input = v, command = command, output = output})
+--		routputs += tup.frule{input = v, command = command, output = output}
+	end
+	return routputs
 end
 
 -- This function is called when we do 'a += b' in a Tupfile.lua. It works
