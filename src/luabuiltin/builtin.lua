@@ -59,6 +59,14 @@ tup.ext = function(filename)
 	return match and match or ''
 end
 
+local function mytostring(s)
+	if type(s) == 'table' then
+		return table.concat(s, ' ')
+	else
+		return s
+	end
+end
+
 tup.frule = function(arguments)
 	-- Takes inputs, outputs, and commands as in tup.definerule,
 	-- additionally accepts, input and output which may be either tables or strings
@@ -71,7 +79,7 @@ tup.frule = function(arguments)
 		-- Replace $(VAR) with value of global variable VAR
 		return text:gsub('%$%(([^%)]*)%)',
 			function(var)
-				if _G[var] then return tostring(_G[var]) end
+				if _G[var] then return mytostring(_G[var]) end
 				return ''
 			end)
 	end
@@ -260,6 +268,7 @@ tup.foreach_rule = function(a, b, c)
 				table.insert(routputs, ov)
 			end
 		end
+		-- TODO: Why doesn't this work?
 --		routputs += tup.frule{input = v, command = command, output = output}
 	end
 	return routputs

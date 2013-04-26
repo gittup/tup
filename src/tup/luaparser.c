@@ -616,7 +616,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 
 		/* Register tup interaction functions in the "tup" table in Lua */
 		lua_newtable(ls);
-		tuplua_register_function(ls, "dofile", tuplua_function_include, tf);
+		tuplua_register_function(ls, "include", tuplua_function_include, tf);
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
 		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
