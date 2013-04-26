@@ -73,14 +73,12 @@ struct path_list {
 };
 TAILQ_HEAD(path_list_head, path_list);
 
-struct tuplua_reader_data
-{
+struct tuplua_reader_data {
 	struct buf *b;
 	int read;
 };
 
-struct tuplua_glob_data
-{
+struct tuplua_glob_data {
 	lua_State *ls;
 	const char *directory;
 	int directory_size;
