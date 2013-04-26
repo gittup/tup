@@ -18,6 +18,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lstate.h"
 
 
 static int luaB_print (lua_State *L) {
@@ -34,11 +35,11 @@ static int luaB_print (lua_State *L) {
     if (s == NULL)
       return luaL_error(L,
          LUA_QL("tostring") " must return a string to " LUA_QL("print"));
-    if (i>1) luai_writestring("\t", 1);
-    luai_writestring(s, l);
+    if (i>1) luai_writestringout("\t", 1, L);
+    luai_writestringout(s, l, L);
     lua_pop(L, 1);  /* pop result */
   }
-  luai_writeline();
+  luai_writelineout(L);
   return 0;
 }
 

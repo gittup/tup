@@ -83,6 +83,8 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
 
 LUALIB_API lua_State *(luaL_newstate) (void);
 
+LUALIB_API void (luaL_setoutput) (lua_State *L, FILE *output);
+
 LUALIB_API int (luaL_len) (lua_State *L, int idx);
 
 LUALIB_API const char *(luaL_gsub) (lua_State *L, const char *s, const char *p,
