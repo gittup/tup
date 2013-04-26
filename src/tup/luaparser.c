@@ -250,6 +250,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	}
 	r.command_len = command_len;
 
+	r.bin = NULL;
 	r.line_number = 0;
 
 	if(execute_rule(tf, &r, NULL) < 0)

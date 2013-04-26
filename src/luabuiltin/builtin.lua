@@ -197,7 +197,42 @@ tup.frule = function(arguments)
 	return outputs
 end
 
-tup.rule = function(inputs, command, outputs)
+local function set_command(str)
+	if type(str) != 'string' then
+		error 'Expected command to be a string'
+	end
+	return str
+end
+
+local function set_list(t, s)
+	if type(t) != 'table' then
+		error('Expected ' .. s .. ' to be an array of strings')
+	end
+	return t
+end
+
+tup.rule = function(a, b, c)
+	local inputs = nil
+	local command = nil
+	local outputs = nil
+	if c == nil then
+		if b == nil then
+			command = set_command(a)
+		else
+			if type(a) == 'string' then
+				command = set_command(a)
+				outputs = set_list(b, 'outputs')
+			else
+				inputs = set_list(a, 'inputs')
+				command = set_command(b)
+			end
+		end
+	else
+		inputs = set_list(a, 'inputs')
+		command = set_command(b)
+		outputs = set_list(c, 'outputs')
+	end
+
 	return tup.frule{ input = inputs, output = outputs, command = command }
 end
 
