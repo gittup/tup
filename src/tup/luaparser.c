@@ -610,6 +610,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 	if(!tf->ls) {
 		ownstate = 1;
 		ls = luaL_newstate();
+		luaL_setoutput(ls, tf->f);
 		tf->ls = ls;
 
 		/* Register tup interaction functions in the "tup" table in Lua */

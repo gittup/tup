@@ -213,6 +213,8 @@
 #include <stdio.h>
 #define luai_writestring(s,l)	fwrite((s), sizeof(char), (l), stdout)
 #define luai_writeline()	(luai_writestring("\n", 1), fflush(stdout))
+#define luai_writestringout(s,l,ls)	fwrite((s), sizeof(char), (l), ls->output)
+#define luai_writelineout(ls)	(luai_writestringout("\n", 1, ls), fflush(ls->output))
 #endif
 
 /*

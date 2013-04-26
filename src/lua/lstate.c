@@ -272,7 +272,13 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   }
   else
     luai_userstateopen(L);
+  L->output = stdout;
   return L;
+}
+
+
+LUA_API void lua_setoutput (lua_State *L, FILE *output) {
+	L->output = output;
 }
 
 
