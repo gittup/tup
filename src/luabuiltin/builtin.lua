@@ -19,6 +19,14 @@
 -- 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 --
 
+local realtostring = tostring
+function tostring(t)
+	if type(t) == 'table' then
+		return table.concat(t, ' ')
+	end
+	return realtostring(t)
+end
+
 local conditionalglob = function(input)
 	if input:match('%*') or input:match('%?') or input:match('%[.*%]') then
 		return tup.glob(input)
@@ -80,14 +88,6 @@ tup.ext = function(filename)
 	return match and match or ''
 end
 
-local function mytostring(s)
-	if type(s) == 'table' then
-		return table.concat(s, ' ')
-	else
-		return s
-	end
-end
-
 tup.frule = function(arguments)
 	-- Takes inputs, outputs, and commands as in tup.definerule,
 	-- additionally accepts, input and output which may be either tables or strings
@@ -100,7 +100,7 @@ tup.frule = function(arguments)
 		-- Replace $(VAR) with value of global variable VAR
 		return text:gsub('%$%(([^%)]*)%)',
 			function(var)
-				if _G[var] then return mytostring(_G[var]) end
+				if _G[var] then return tostring(_G[var]) end
 				return ''
 			end)
 	end
