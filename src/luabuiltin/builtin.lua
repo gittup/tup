@@ -154,7 +154,7 @@ tup.frule = function(arguments)
 					:gsub('%%e', tup.ext(inputs[1]))
 			end
 
-			newoutput = newoutput:gsub('%%d', tup.getparent())
+			newoutput = newoutput:gsub('%%d', tup.getdirectory())
 
 			table.insert(newoutputs, newoutput)
 		end
@@ -194,7 +194,7 @@ tup.frule = function(arguments)
 				:gsub('%%e', tup.ext(inputs[1]))
 		end
 
-		command = command:gsub('%%d', tup.getparent())
+		command = command:gsub('%%d', tup.getdirectory())
 	end
 
 	--print('Defining tup.frule: ' ..

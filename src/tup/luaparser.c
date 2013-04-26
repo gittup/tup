@@ -313,7 +313,7 @@ static int tuplua_function_getcwd(lua_State *ls)
 	return 1;
 }
 
-static int tuplua_function_getparent(lua_State *ls)
+static int tuplua_function_getdirectory(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 
@@ -620,7 +620,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
 		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
-		tuplua_register_function(ls, "getparent", tuplua_function_getparent, tf);
+		tuplua_register_function(ls, "getdirectory", tuplua_function_getdirectory, tf);
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
