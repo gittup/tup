@@ -42,7 +42,7 @@ tup_object_exist . "touch output"
 check_exist output
 
 cat > Tupfile.lua << HERE
-tup.rule({'foo.c'}, 'touch output', {'output'})
+tup.rule('foo.c', 'touch output', 'output')
 HERE
 tup touch Tupfile.lua
 update

@@ -21,8 +21,8 @@
 . ./tup.sh
 cat > Tupfile.lua << HERE
 tup.include 'Tupfile.lua.vars'
-tup.foreach_rule({'*.c'}, '\$(CC) -c %f -o %o \$(CCARGS)', {'%B.o'})
-tup.rule({'*.o'}, '\$(CC) -o %o %f', {'prog.exe'})
+tup.foreach_rule('*.c', '\$(CC) -c %f -o %o \$(CCARGS)', '%B.o')
+tup.rule('*.o', '\$(CC) -o %o %f', 'prog.exe')
 HERE
 
 cat > Tupfile.lua.vars << HERE

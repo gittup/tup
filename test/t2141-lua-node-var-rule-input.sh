@@ -30,7 +30,7 @@ toolkit_lib = tup.nodevariable('toolkit/toolkit.a')
 HERE
 
 cat > sw/app/Tupfile.lua << HERE
-tup.rule({toolkit_lib}, 'cp %f %o', {'toolkit.copy'})
+tup.rule(toolkit_lib, 'cp %f %o', 'toolkit.copy')
 HERE
 
 tup touch sw/Tuprules.lua
