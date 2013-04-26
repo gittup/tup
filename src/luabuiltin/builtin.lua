@@ -254,7 +254,12 @@ tup.foreach_rule = function(a, b, c)
 	end
 
 	for k, v in ipairs(newinput) do
-		table.insert(routputs, tup.frule{input = v, command = command, output = output})
+		local moreoutputs = tup.frule{input = v, command = command, output = output}
+		if moreoutputs then
+			for ok, ov in ipairs(moreoutputs) do
+				table.insert(routputs, ov)
+			end
+		end
 --		routputs += tup.frule{input = v, command = command, output = output}
 	end
 	return routputs
