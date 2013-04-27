@@ -566,7 +566,7 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 	rc = get_relative_dir(NULL, tf->curtent->tnode.tupid, tid, &slen);
 	if(rc < 0 || slen < 0) return 0;
 
-	value = malloc(slen);
+	value = malloc(slen + 1);
 	rc = get_relative_dir(value, tf->curtent->tnode.tupid, tid, &slen);
 	if(rc < 0 || slen < 0) {
 		free(value);
