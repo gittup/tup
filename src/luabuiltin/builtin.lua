@@ -179,6 +179,11 @@ tup.frule = function(arguments)
 
 		command = command:gsub('%%d', tup.getdirectory())
 	end
+	if arguments.input and type(arguments.input) == 'table' and arguments.input.order_only then
+		for k, v in ipairs(arguments.input.order_only) do
+			table.insert(inputs, v)
+		end
+	end
 
 	--print('Defining tup.frule: ' ..
 	--	'inputs (' ..  (type(inputs) == 'table' and table.concat(inputs, ' ') or tostring(inputs)) ..
@@ -258,7 +263,9 @@ tup.foreach_rule = function(a, b, c)
 	end
 
 	for k, v in ipairs(newinput) do
-		local moreoutputs = tup.frule{input = v, command = command, output = output}
+		local tmpi = {v}
+		tmpi.order_only = input.order_only
+		local moreoutputs = tup.frule{input = tmpi, command = command, output = output}
 		if moreoutputs then
 			for ok, ov in ipairs(moreoutputs) do
 				table.insert(routputs, ov)
