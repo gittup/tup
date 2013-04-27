@@ -20,7 +20,7 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-: foreach *_text.txt |> touch %(g0)_binary.bin |> %g_binary.bin
+: foreach *_text.txt |> touch %g_binary.bin |> %g_binary.bin
 HERE
 tup touch a_text.txt b_text.txt c_text.txt
 tup parse
