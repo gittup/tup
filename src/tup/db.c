@@ -5999,6 +5999,10 @@ struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent(dt, name, len, type, mtime, srcid, &tent) < 0)
 		return NULL;
+	if(tent->type == TUP_NODE_DIR && tent->tnode.tupid != env_dt()) {
+		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+			return NULL;
+	}
 	return tent;
 }
 
