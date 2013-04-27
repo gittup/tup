@@ -100,6 +100,8 @@ struct build_name_list_args {
 	int dirlen;
 };
 
+static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
+			    char *luafilename);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
@@ -187,6 +189,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	struct buf b;
 	struct parser_server ps;
 	struct timeval orig_start;
+	char luafilename[PATH_MAX];
 
 	timespan_start(&tf.ts);
 	memcpy(&orig_start, &tf.ts.start, sizeof(orig_start));
@@ -269,7 +272,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(fd < 0) {
 		if(errno == ENOENT) {
 			parser_lua = 1;
-			fd = openat(tf.cur_dfd, "Tupfile.lua", O_RDONLY);
+			fd = open_lua_tupfile(&tf, n->tent, luafilename);
 		} else {
 			parser_error(&tf, "Tupfile");
 			goto out_close_dfd;
@@ -281,7 +284,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			rc = 0;
 			goto out_close_dfd;
 		} else {
-			parser_error(&tf, "Tupfile.lua");
+			parser_error(&tf, luafilename);
 			goto out_close_dfd;
 		}
 	}
@@ -292,7 +295,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 			goto out_free_bs;
 	} else {
-		if(parse_lua_tupfile(&tf, &b, "Tupfile.lua", 1) < 0)
+		if(parse_lua_tupfile(&tf, &b, luafilename, 1) < 0)
 			goto out_free_bs;
 	}
 	if(tf.ign) {
@@ -396,6 +399,46 @@ out_server_stop:
 		rc = CIRCULAR_DEPENDENCY_ERROR;
 
 	return rc;
+}
+
+static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
+			    char *luafilename)
+{
+	int fd;
+	int n = 0;
+
+	fd = openat(tf->cur_dfd, "Tupfile.lua", O_RDONLY);
+	if(fd < 0 && errno != ENOENT)
+		return -1;
+	if(fd >= 0) {
+		strcpy(luafilename, "Tupfile.lua");
+		return fd;
+	}
+
+	fd = openat(tf->cur_dfd, "Tupdefault.lua", O_RDONLY);
+	if(fd < 0 && errno != ENOENT)
+		return -1;
+	if(fd >= 0) {
+		strcpy(luafilename, "Tupdefault.lua");
+		return fd;
+	}
+	while(tent->parent) {
+		int x;
+
+		n++;
+		for(x=0; x<n; x++) {
+			strcpy(luafilename + x*3, "../");
+		}
+		strcpy(luafilename + n*3, "Tupdefault.lua");
+		fd = openat(tf->cur_dfd, luafilename, O_RDONLY);
+		if(fd < 0 && errno != ENOENT)
+			return -1;
+		if(fd >= 0)
+			return fd;
+		tent = tent->parent;
+	}
+	errno = ENOENT;
+	return -1;
 }
 
 static char *get_newline(char *p)
