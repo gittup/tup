@@ -54,6 +54,8 @@
 #define DISALLOW_NODES 0
 #define ALLOW_NODES 1
 
+#define MAX_GLOBS 10
+
 struct name_list_entry {
 	TAILQ_ENTRY(name_list_entry) list;
 	char *path;
@@ -63,6 +65,13 @@ struct name_list_entry {
 	int baselen;
 	int extlessbaselen;
 	int dirlen;
+	int glob[MAX_GLOBS*2];  /* Array of integer pairs to identify portions of
+	                         * of the name that were the result of glob
+	                         * expansions. The first int is the index of the
+	                         * start of the glob portion, relative to *base.
+	                         * The second int is the length of the glob.
+	                         */
+	int globcnt;            /* Number of globs expanded in this name. */
 	struct tup_entry *tent;
 };
 TAILQ_HEAD(name_list_entry_head, name_list_entry);
@@ -73,6 +82,13 @@ struct name_list {
 	int totlen;
 	int basetotlen;
 	int extlessbasetotlen;
+	int globtotlen[MAX_GLOBS]; /* Array of sums of the glob matches. This has
+	                            * to be an array because a string can have
+	                            * multiple wildcards.
+	                            */
+	int globcnt;               /* Copy of the total glob match count. Useful in
+				    * tup_printf.
+				    */
 };
 
 struct path_list {
@@ -137,6 +153,8 @@ struct build_name_list_args {
 	struct name_list *nl;
 	const char *dir;
 	int dirlen;
+	const char *globstr;  /* Pointer to the basename of the filename in the tupfile */
+	int globstrlen;       /* Length of the basename */
 };
 
 struct tupfile {
@@ -235,6 +253,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen);
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
+
+static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
 
 static int debug_run = 0;
 
@@ -2540,6 +2560,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		args.dirlen = 0;
 	}
 	args.nl = nl;
+	/* Save the original string with globs to pass to the function that
+	 * determines the length, extension length, and basename length in order to
+	 * handle globs.
+	 */
+	args.globstr = pl->pel->path;
+	args.globstrlen = pl->pel->len;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct variant *variant;
@@ -2714,8 +2740,153 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
 
+	/* Do the glob parsing for %g */
+	nle->globcnt = glob_parse(args->globstr, args->globstrlen, tent->name.s, nle->glob);
+
 	add_name_list_entry(args->nl, nle);
 	return 0;
+}
+
+/* Compares a globful string and the subsequent expansion to determine which
+ * portions of the string are results of the glob expansion.
+ *
+ * This function is not guaranteed to give the same results as what sqlite3
+ * parsed from the Tupfile. For instance, given the glob str:
+ *     a*b*c
+ * and the match:
+ *     axbybzc
+ * the resulting glob sections could be "x","ybz" OR "xby","z".
+ * This function will allways try to match the shortest string. In this example
+ * it would return the first option.
+ *
+ * char *base     : pointer to the globful string
+ * int baselen    : length of the globful string
+ * char *expanded : pointer to the matched string
+ * int *globidx   : pointer to an array of index storage
+ *
+ * Returns: number of globs matched, or -1 on error.
+ */
+static int glob_parse(const char *pattern, int patlen, char *match, int *globidx)
+{
+	int p_it = 0;
+	int m_it = 0;
+	int p2_it;
+	int i;
+	int glob_cnt = 0;
+
+	/* Two outputs differed, must be a wildcard */
+	while(p_it < patlen) {
+		while(pattern[p_it] == match[m_it] && p_it < patlen && match[m_it] != '\0') {
+			/* Iterate through while the strings are the same */
+			p_it++;
+			m_it++;
+		}
+
+		if (p_it == patlen && match[m_it] == '\0') {
+			break;
+		}
+
+		/* Found a glob */
+		globidx[glob_cnt*2] = m_it;
+
+		/* Handle all of the cases of glob characters */
+		if (pattern[p_it] == '[') {
+			/* User specified a range of characters. One MUST be matched.
+			 * Move p_it to the character after the glob. This will be where
+			 * we start looking for the next glob
+			 * Need to find closing ']'
+			 * Skip first character because it must be there.
+			 */
+			for (i=2; i<patlen-p_it; i++) {
+				if (pattern[p_it+i] == ']') {
+					p_it += i + 1;
+					break;
+				}
+			}
+
+			/* Must match one character */
+			globidx[glob_cnt*2+1] = 1;
+			m_it++;
+
+		} else if (pattern[p_it] == '?') {
+			/* Must match one character */
+			globidx[glob_cnt*2+1] = 1;
+			p_it++;
+			m_it++;
+
+		} else {
+			int more_wildcards = 0;
+			/* Must have found an * */
+			p_it++;
+
+			/* Skip any subsequent *. They don't mean anything. */
+			while (p_it < patlen && pattern[p_it] == '*') {
+				glob_cnt++;
+				globidx[glob_cnt*2] = m_it;
+				p_it++;
+			}
+
+			/* Need to check if there are any glob characters after the *.
+			 * Parsing this case is much trickier and not supported yet.
+			 */
+			for (i=p_it+1; i<patlen; i++) {
+				if (pattern[i] == '?' || pattern[i] == '[') {
+					more_wildcards = 1;
+					break;
+				}
+			}
+			if (more_wildcards) {
+				globidx[glob_cnt*2 + 1] = 0;
+				glob_cnt++;
+				break;
+
+			} else {
+				int non_wildcard_len;
+
+				/* Scan for the next glob
+				 * p2_it will be the idx of the next glob char
+				 */
+				p2_it = p_it;
+				while (p2_it < patlen) {
+					if (pattern[p2_it] == '*' || pattern[p2_it] == '?' || pattern[p2_it] == '[') {
+						break;
+					}
+					p2_it++;
+				}
+
+				if (p_it == p2_it) {
+					/* Asterisk at the end of the glob string
+					 * Match the rest of the matched string
+					 */
+					globidx[glob_cnt*2 + 1] = strlen(match) - m_it;
+					break;
+				}
+
+				non_wildcard_len = p2_it - p_it;
+
+				/* Need to start at the end of the expanded string and scan
+				 * to the left. This is because:
+				 *     pattern:  *.txt
+				 *     filename: a.txt.txt
+				 * The match should be 'a.txt', not 'a'
+				 */
+				for (i=strlen(match)-non_wildcard_len; i>=m_it; i--) {
+					int c;
+					c = strncmp(pattern + p_it, match + i, non_wildcard_len);
+					if (c == 0) {
+						globidx[glob_cnt*2 + 1] = i - m_it;
+						m_it = i;
+						break;
+					}
+				}
+			}
+		}
+
+		glob_cnt++;
+		break;
+	}
+
+	return glob_cnt;
 }
 
 static char *set_path(const char *name, const char *dir, int dirlen)
@@ -3100,6 +3271,8 @@ static void init_name_list(struct name_list *nl)
 	nl->totlen = 0;
 	nl->basetotlen = 0;
 	nl->extlessbasetotlen = 0;
+	memset(nl->globtotlen, 0, MAX_GLOBS);
+	nl->globcnt = 0;
 }
 
 static void set_nle_base(struct name_list_entry *nle)
@@ -3119,6 +3292,7 @@ out:
 	 * length of the extension we calculated before.
 	 */
 	nle->extlessbaselen = nle->baselen - (nle->len - nle->extlesslen);
+	nle->globcnt = 0;
 }
 
 static void add_name_list_entry(struct name_list *nl,
@@ -3129,6 +3303,13 @@ static void add_name_list_entry(struct name_list *nl,
 	nl->totlen += nle->len;
 	nl->basetotlen += nle->baselen;
 	nl->extlessbasetotlen += nle->extlessbaselen;
+	{
+		int i;
+		for (i=0; i<nle->globcnt; i++) {
+			nl->globtotlen[i] += nle->glob[i*2+1];
+		}
+	}
+	nl->globcnt = nle->globcnt;
 }
 
 static void delete_name_list(struct name_list *nl)
@@ -3147,6 +3328,12 @@ static void delete_name_list_entry(struct name_list *nl,
 	nl->totlen -= nle->len;
 	nl->basetotlen -= nle->baselen;
 	nl->extlessbasetotlen -= nle->extlessbaselen;
+	{
+		int i;
+		for (i=0; i<nle->globcnt; i++) {
+			nl->globtotlen[i] -= nle->glob[i*2+1];
+		}
+	}
 
 	TAILQ_REMOVE(&nl->entries, nle, list);
 	free(nle->path);
@@ -3160,6 +3347,12 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 	oldnl->totlen -= nle->len;
 	oldnl->basetotlen -= nle->baselen;
 	oldnl->extlessbasetotlen -= nle->extlessbaselen;
+	{
+		int i;
+		for (i=0; i<nle->globcnt; i++) {
+			oldnl->globtotlen[i] -= nle->glob[i*2+1];
+		}
+	}
 
 	TAILQ_REMOVE(&oldnl->entries, nle, list);
 
@@ -3167,6 +3360,13 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 	newnl->totlen += nle->len;
 	newnl->basetotlen += nle->baselen;
 	newnl->extlessbasetotlen += nle->extlessbaselen;
+	{
+		int i;
+		for (i=0; i<nle->globcnt; i++) {
+			newnl->globtotlen[i] += nle->glob[i*2+1];
+		}
+	}
+	newnl->globcnt = nle->globcnt;
 	TAILQ_INSERT_TAIL(&newnl->entries, nle, list);
 }
 
@@ -3220,9 +3420,11 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			fprintf(tf->f, "tup error: Unfinished %%-flag at the end of the string '%s'\n", cmd);
 			return NULL;
 		}
+
 		next++;
 		p = next+1;
 		space_chars = nl->num_entries - 1;
+
 		if(*next == 'f') {
 			if(nl->num_entries == 0) {
 				fprintf(tf->f, "tup error: %%f used in rule pattern and no input files were specified.\n");
@@ -3296,6 +3498,27 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				 */
 				clen += tf->curtent->name.len;
 			}
+		} else if(*next == 'g') {
+			/* g: Expands to the "glob" portion of an *, ?, [] expansion.
+			 *    Given the filnames: a_text.txt, b_text.txt and c_text.txt,
+			 *    and the tupfiles:   : foreach *_text.txt |> foo %f |> %g_binary.bin
+			 *                        : foreach ?_text.txt |> foo %f |> %g_binary.bin
+			 *                        : foreach [abc]_text.txt |> foo %f |> %g_binary.bin
+			 *    then outputs ->:    a_binary.bin, b_binary.bin, c_binary.bin
+			 */
+			if(nl->num_entries == 0) {
+				fprintf(tf->f, "tup error: %%g used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
+			if(nl->num_entries > 1) {
+				fprintf(tf->f, "tup error: %%g is only valid with one file.\n");
+				return NULL;
+			}
+			if(nl->globcnt == 0) {
+				fprintf(tf->f, "tup error: %%g flag found no globs.\n");
+				return NULL;
+			}
+			clen += nl->globtotlen[0];
 		} else if(*next == '%') {
 			clen++;
 		} else {
@@ -3318,6 +3541,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 
 		next++;
 		p = next + 1;
+
 		if(*next == 'f') {
 			int first = 1;
 			TAILQ_FOREACH(nle, &nl->entries, list) {
@@ -3393,6 +3617,11 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				 */
 				memcpy(&s[x], tf->curtent->name.s, tf->curtent->name.len);
 				x += tf->curtent->name.len;
+			}
+		} else if(*next == 'g') {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				memcpy(&s[x], nle->base + nle->glob[0], nle->glob[1]);
+				x += nle->glob[1];
 			}
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
