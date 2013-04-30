@@ -265,14 +265,7 @@ tup.foreach_rule = function(a, b, c)
 	for k, v in ipairs(newinput) do
 		local tmpi = {v}
 		tmpi.order_only = input.order_only
-		local moreoutputs = tup.frule{input = tmpi, command = command, output = output}
-		if moreoutputs then
-			for ok, ov in ipairs(moreoutputs) do
-				table.insert(routputs, ov)
-			end
-		end
-		-- TODO: Why doesn't this work?
---		routputs += tup.frule{input = v, command = command, output = output}
+		routputs += tup.frule{input = tmpi, command = command, output = output}
 	end
 	return routputs
 end

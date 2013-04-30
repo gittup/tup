@@ -1145,6 +1145,7 @@ static void append_assignment (LexState *ls, struct LHS_assign *lh) {
   expdesc mfunc;
   expdesc var;
   expdesc value;
+  expdesc env;
   TString *ts;
   int reg;
 
@@ -1157,6 +1158,8 @@ static void append_assignment (LexState *ls, struct LHS_assign *lh) {
    */
   ts = luaS_new(ls->L, "tup_append_assignment");
   codestring(ls, &tup_append, ts);
+  singlevaraux(fs, ls->envn, &env, 1);  /* get environment variable */
+  lua_assert(env.k == VLOCAL || env.k == VUPVAL);
 
   /* Grab a free register for the tup_append_assignment function call */
   reg = fs->freereg;
@@ -1166,7 +1169,8 @@ static void append_assignment (LexState *ls, struct LHS_assign *lh) {
    * tup_append.
    */
   init_exp(&mfunc, VNONRELOC, reg);
-  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, 0, luaK_exp2RK(fs, &tup_append));
+  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, env.u.info,
+	       luaK_exp2RK(fs, &tup_append));
 
   /* First value on register stack after the function call is our variable that
    * we are appending to.
