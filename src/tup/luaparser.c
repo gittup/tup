@@ -146,18 +146,25 @@ static void tuplua_register_function(struct lua_State *ls, const char *name, lua
 static int tuplua_function_include(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	lua_State *oldls = tf->ls;
 	char *file = NULL;
 
 	file = tuplua_strdup(ls, -1);
 	lua_pop(ls, 1);
 	if(file == NULL)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
+
+	tf->ls = ls;
 	if(include_file(tf, file) < 0) {
+		tf->ls = oldls;
 		lua_pushfstring(ls, "Failed to include file \"%s\".", file);
 		free(file);
 		return lua_error(ls);
 	}
 	free(file);
+	tf->ls = oldls;
+	lua_pop(ls, 1);
+
 	return 0;
 }
 
