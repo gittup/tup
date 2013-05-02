@@ -192,6 +192,7 @@ static int tuplua_table_to_string(lua_State *ls, const char *table, struct tupfi
 		perror("malloc");
 		return -1;
 	}
+	*res = '\0';
 	*out = res;
 	lua_getfield(ls, 1, table);
 	lua_pushnil(ls);
