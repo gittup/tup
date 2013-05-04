@@ -62,9 +62,9 @@ echo "  link luac"
 $CC *.o -o luac $LDFLAGS
 rm luac.o
 
-./luac -o builtin.luac ../src/luabuiltin/builtin.lua
+cp ../src/luabuiltin/builtin.lua builtin.lua
 mkdir luabuiltin
-xxd -i builtin.luac luabuiltin/luabuiltin.h
+xxd -i builtin.lua luabuiltin/luabuiltin.h
 
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
