@@ -109,6 +109,7 @@ struct rule {
 	char *output_pattern;
 	struct bin *bin;
 	char *command;
+	char *extra_command;
 	int command_len;
 	struct name_list inputs;
 	struct name_list order_only_inputs;
@@ -198,7 +199,7 @@ static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int set_variable(struct tupfile *tf, char *line);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
-			   struct name_list *nl,const char *ext, int extlen);
+			   struct name_list *nl, const char *ext, int extlen);
 static void free_bang_rule(struct string_entries *root, struct bang_rule *br);
 static void free_bang_tree(struct string_entries *root);
 static void free_chain_tree(struct string_entries *root);
@@ -251,7 +252,8 @@ static void move_name_list_entry(struct name_list *newnl, struct name_list *oldn
 static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
-			const char *ext, int extlen);
+			const char *ext, int extlen,
+			const char *extra_command);
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
@@ -1201,8 +1203,19 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	r.output_pattern = output;
 	r.command = cmd;
 	r.command_len = cmd_len;
+	r.extra_command = NULL;
 	r.line_number = lno;
 	r.output_nl = NULL;
+
+	if(r.command[0] == '!') {
+		char *space;
+		space = memchr(r.command, ' ', r.command_len);
+		if(space) {
+			*space = 0;
+			r.extra_command = space + 1;
+			r.command_len = strlen(r.command);
+		}
+	}
 
 	if(swapio)
 		rc = execute_reverse_rule(tf, &r, bl);
@@ -1632,7 +1645,7 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 
 	/* Add any order only inputs to the list */
 	if(nl && br->input) {
-		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, 0);
+		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, 0, NULL);
 		if(!tinput)
 			return -1;
 	} else {
@@ -1946,7 +1959,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 
 				banglist = &sc->banglist;
 
-				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0);
+				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, NULL);
 				if(!tinput)
 					return -1;
 				input_pattern = eval(tf, tinput, DISALLOW_NODES);
@@ -2200,7 +2213,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		set_nle_base(&tmp_nle);
 		add_name_list_entry(&tmp_nl, &tmp_nle);
 
-		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0);
+		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, NULL);
 		if(!tinput)
 			return -1;
 		input_pattern = eval(tf, tinput, DISALLOW_NODES);
@@ -2213,6 +2226,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.output_pattern = tmp_nle.path;
 		tmpr.bin = r->bin;
 		tmpr.command = r->command;
+		tmpr.extra_command = NULL;
 		tmpr.command_len = r->command_len;
 		tmpr.empty_input = 0;
 		tmpr.line_number = r->line_number;
@@ -2274,6 +2288,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 				tmpr.bin = NULL;
 				tmpr.command = r->command;
 				tmpr.command_len = r->command_len;
+				tmpr.extra_command = NULL;
 				tmpr.empty_input = 0;
 				tmpr.line_number = r->line_number;
 				tmpr.output_nl = NULL;
@@ -3015,7 +3030,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&extra_onl);
 	TAILQ_INIT(&oplist);
 
-	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen);
+	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, NULL);
 	if(!toutput)
 		return -1;
 	output_pattern = eval(tf, toutput, DISALLOW_NODES);
@@ -3073,7 +3088,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		} else {
 			use_onl = NULL;
 		}
-		onle->path = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0);
+		onle->path = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
 		if(!onle->path) {
 			free(onle);
 			return -1;
@@ -3137,7 +3152,7 @@ out_pl:
 	free(output_pattern);
 	free(extra_pattern);
 
-	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen);
+	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, ALLOW_NODES);
@@ -3392,7 +3407,8 @@ static const char *find_char(const char *s, int len, char c)
 
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
-			const char *ext, int extlen)
+			const char *ext, int extlen,
+			const char *extra_command)
 {
 	struct name_list_entry *nle;
 	char *s;
@@ -3410,6 +3426,10 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 		cmd_len = strlen(cmd);
 	}
 	clen = cmd_len;
+
+	if(extra_command) {
+		clen += strlen(extra_command) + 1;
+	}
 
 	p = cmd;
 	while((next = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
@@ -3628,7 +3648,17 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			return NULL;
 		}
 	}
-	memcpy(&s[x], p, cmd+cmd_len - p + 1);
+	memcpy(&s[x], p, cmd+cmd_len - p);
+	x += cmd+cmd_len - p;
+
+	if(extra_command) {
+		int eclen = strlen(extra_command);
+		s[x] = ' ';
+		x++;
+		memcpy(&s[x], extra_command, eclen);
+		x += eclen;
+	}
+	s[x] = 0;
 	if((signed)strlen(s) != clen) {
 		fprintf(tf->f, "tup internal error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
 		return NULL;
