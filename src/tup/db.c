@@ -1070,16 +1070,16 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type)
 {
-	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
+	return tup_db_create_node_part(stderr, dt, name, -1, type, -1, NULL);
 }
 
 struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
 					   int *node_changed)
 {
-	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
+	return tup_db_create_node_part(stderr, dt, name, -1, type, srcid, node_changed);
 }
 
-struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
+struct tup_entry *tup_db_create_node_part(FILE *f, tupid_t dt, const char *name, int len,
 					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
@@ -1149,7 +1149,7 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			 * screwing up the Tupfile.
 			 */
 			if(type == TUP_NODE_GENERATED) {
-				fprintf(stderr, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
+				fprintf(f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
 				return NULL;
 			}
 

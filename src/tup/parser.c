@@ -2167,7 +2167,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		while(tmp_nle.extlesslen > 0 && tmp_nle.path[tmp_nle.extlesslen] != '.')
 			tmp_nle.extlesslen--;
 
-		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
+		tmp_nle.tent = tup_db_create_node_part(tf->f, tf->tupid, tmp_nle.path, -1,
 						       TUP_NODE_GENERATED, -1, NULL);
 		if(!tmp_nle.tent)
 			return -1;
@@ -2543,7 +2543,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
 			if(pl->pel->path[0] == '<') {
-				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+				tent = tup_db_create_node_part(tf->f, pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 				if(!tent) {
 					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
 					return -1;
@@ -2869,7 +2869,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 			}
 
-			group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			group = tup_db_create_node_part(tf->f, pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!group)
 				return -1;
 			goto out_pl;
@@ -2935,7 +2935,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			}
 		}
 
-		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
+		onle->tent = tup_db_create_node_part(tf->f, tf->tupid, onle->path, -1,
 						     TUP_NODE_GENERATED, -1, NULL);
 		if(!onle->tent) {
 			free(onle->path);
