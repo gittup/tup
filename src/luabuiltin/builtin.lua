@@ -36,12 +36,12 @@ end
 
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
-	return string.gsub(filename, '[^/\\]*[/\\]', '')
+	return (string.gsub(filename, '[^/\\]*[/\\]', ''))
 end
 
 tup.base = function(filename)
 	-- Returns filename sans preceeding dir/'s and sans the final . and following characters
-	return string.gsub(tup.file(filename), '%.%w*$', '')
+	return (string.gsub(tup.file(filename), '%.%w*$', ''))
 end
 
 tup.ext = function(filename)
