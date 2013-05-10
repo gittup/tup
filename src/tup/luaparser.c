@@ -675,13 +675,13 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
-			return 0;
+			return -1;
 		}
 		if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
 			fprintf(tf->f, "tup error: Failed to parse builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
-			return 0;
+			return -1;
 		}
 	}
 	else ls = tf->ls;
