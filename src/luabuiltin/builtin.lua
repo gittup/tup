@@ -157,9 +157,6 @@ tup.frule = function(arguments)
 	if arguments.command then
 		command = arguments.command
 
-		command = evalGlobals(command)
-		command = evalConfig(command)
-
 		local outputreplacement = (outputs and table.concat(outputs, ' '):gsub('%%', '%%%%') or '')
 		command = command:gsub('%%o', outputreplacement)
 
@@ -178,6 +175,9 @@ tup.frule = function(arguments)
 		end
 
 		command = command:gsub('%%d', tup.getdirectory())
+
+		command = evalGlobals(command)
+		command = evalConfig(command)
 	end
 	if arguments.input and type(arguments.input) == 'table' and arguments.input.order_only then
 		for k, v in ipairs(arguments.input.order_only) do
