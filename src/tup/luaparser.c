@@ -670,7 +670,9 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		/* Load lua built-in lua helper functions from luabuiltin.h */
 		lua_getglobal(ls, "debug");
 		lua_getfield(ls, -1, "traceback");
-		lua_remove(ls, -2);
+		lua_setfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
+		lua_pop(ls, 1);
+		lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 		if(luaL_loadbuffer(ls, (char *)builtin_lua, builtin_lua_len, "builtin") != LUA_OK) {
 			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
@@ -689,9 +691,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 	if(toplevel && (include_rules(tf) < 0))
 		return -1;
 
-	lua_getglobal(ls, "debug");
-	lua_getfield(ls, -1, "traceback");
-	lua_remove(ls, -2);
+	lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 
 	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK) {
 		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", name, tuplua_tostring(ls, -1));
@@ -702,7 +702,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		return -1;
 	}
 
-	if(lua_pcall(ls, 0, LUA_MULTRET, 1) != LUA_OK) {
+	if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
 		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", name, tuplua_tostring(ls, -1));
 		if(ownstate) {
 			lua_close(ls);
