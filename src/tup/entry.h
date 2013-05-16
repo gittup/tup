@@ -41,6 +41,8 @@ struct tup_entry {
 	struct variant *variant;
 	struct string_tree name;
 	struct string_entries entries;
+	struct tupid_entries stickies;
+	int retrieved_stickies;
 	struct tup_entry *incoming;
 	LIST_ENTRY(tup_entry) ghost_list;
 
