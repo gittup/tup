@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -466,6 +466,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->mtime = mtime;
 	tent->srcid = srcid;
 	tent->variant = NULL;
+	tent->incoming = NULL;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {

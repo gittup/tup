@@ -3281,6 +3281,7 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 	if(incoming != -1) {
 		if(tupid_tree_search(delroot, incoming) != NULL) {
 			struct tup_entry *output_group = NULL;
+			struct tup_entry *tent;
 
 			if(get_output_group(incoming, &output_group) < 0)
 				return -1;
@@ -3296,6 +3297,10 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 			if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
 				return -1;
 			incoming = -1;
+
+			if(tup_entry_add(b, &tent) < 0)
+				return -1;
+			tent->incoming = NULL;
 		}
 	}
 	/* See if we already own the link, or if the link doesn't exist yet */
@@ -3381,8 +3386,17 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
 	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tup_entry *tent;
+	struct tup_entry *incoming_tent;
 
 	*incoming = -1;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->incoming) {
+		*incoming = tent->incoming->tnode.tupid;
+		return 0;
+	}
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -3410,6 +3424,10 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 		goto out_reset;
 	}
 	*incoming = sqlite3_column_int64(*stmt, 0);
+
+	if(tup_entry_add(*incoming, &incoming_tent) < 0)
+		return -1;
+	tent->incoming = incoming_tent;
 
 	/* Do a quick double-check to make sure there isn't a duplicate link. */
 	dbrc = sqlite3_step(*stmt);
