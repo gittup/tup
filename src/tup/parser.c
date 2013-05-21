@@ -209,6 +209,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		return -1;
 	}
 	tf.ls = NULL;
+	tf.luaerror = TUPLUA_NOERROR;
 
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
@@ -295,7 +296,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 			goto out_free_bs;
 	} else {
-		if(parse_lua_tupfile(&tf, &b, luafilename, 1) < 0)
+		if(parse_lua_tupfile(&tf, &b, luafilename) < 0)
 			goto out_free_bs;
 	}
 	if(tf.ign) {
