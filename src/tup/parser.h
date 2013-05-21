@@ -26,6 +26,10 @@
 #include "timespan.h"
 #include "vardb.h"
 
+#define TUPLUA_NOERROR 0
+#define TUPLUA_PENDINGERROR 1
+#define TUPLUA_ERRORSHOWN 2
+
 struct variant;
 struct tup_entry;
 struct graph;
@@ -55,6 +59,7 @@ struct tupfile {
 	char ign;
 	char circular_dep_error;
 	struct lua_State *ls;
+	int luaerror;
 };
 
 struct name_list_entry {
