@@ -50,6 +50,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include "luabuiltin/luabuiltin.h" /* Generated from builtin.lua */
 typedef lua_State * scriptdata;
@@ -151,6 +152,7 @@ static int tuplua_function_include(lua_State *ls)
 
 	file = tuplua_strdup(ls, -1);
 	lua_pop(ls, 1);
+	assert(lua_gettop(ls) == 0);
 	if(file == NULL)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
 
@@ -692,9 +694,11 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		lua_pop(ls, 1);
 	}
 	else ls = tf->ls;
+	assert(lua_gettop(ls) == 0);
 
 	if(ownstate && (include_rules(tf) < 0)) {
 		if(tf->luaerror == TUPLUA_PENDINGERROR) {
+			assert(lua_gettop(ls) == 2);
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
 			lua_pop(ls, 1);
 			tf->luaerror = TUPLUA_ERRORSHOWN;
@@ -703,6 +707,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tf->ls = NULL;
 		return -1;
 	}
+	assert(lua_gettop(ls) == 0);
 
 	lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 
@@ -714,6 +719,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		}
 		else {
 			tf->luaerror = TUPLUA_PENDINGERROR;
+			assert(lua_gettop(ls) == 2);
 		}
 		return -1;
 	}
@@ -723,13 +729,14 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 			fprintf(tf->f, "%s\n", tuplua_tostring(ls, -1));
 		else if(tf->luaerror == TUPLUA_PENDINGERROR)
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
+		tf->luaerror = TUPLUA_ERRORSHOWN;
 		if(ownstate) {
 			lua_close(ls);
 			tf->ls = NULL;
 		} 
 		else {
-			lua_pop(ls, 1);
-			tf->luaerror = TUPLUA_ERRORSHOWN;
+			lua_pop(ls, 2);
+			assert(lua_gettop(ls) == 0);
 		}
 		return -1;
 	}
@@ -740,6 +747,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	} 
 	else {
 		lua_pop(ls, 1);
+		assert(lua_gettop(ls) == 0);
 	}
 	return 0;
 }
