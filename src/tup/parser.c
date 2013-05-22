@@ -1091,6 +1091,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	struct tup_entry *oldtent = tf->curtent;
 	int old_dfd = tf->cur_dfd;
 	struct tup_entry *srctent = NULL;
+	struct tup_entry *newtent;
 
 	if(get_path_elements(file, &pg) < 0)
 		goto out_err;
@@ -1110,7 +1111,12 @@ static int include_file(struct tupfile *tf, const char *file)
 		goto out_del_pg;
 	}
 
-	tf->curtent = tup_entry_get(newdt);
+	newtent = tup_entry_get(newdt);
+	if(tup_entry_variant(newtent) != tf->variant) {
+		fprintf(tf->f, "tup error: Unable to include file '%s' since it is outside of the variant tree.\n", file);
+		return -1;
+	}
+	tf->curtent = newtent;
 
 	if(variant_get_srctent(tf->variant, newdt, &srctent) < 0)
 		return -1;
