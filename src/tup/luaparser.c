@@ -725,9 +725,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	}
 
 	if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
-		if(tf->luaerror == TUPLUA_NOERROR)
-			fprintf(tf->f, "%s\n", tuplua_tostring(ls, -1));
-		else if(tf->luaerror == TUPLUA_PENDINGERROR)
+		if(tf->luaerror != TUPLUA_ERRORSHOWN)
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
 		tf->luaerror = TUPLUA_ERRORSHOWN;
 		if(ownstate) {
