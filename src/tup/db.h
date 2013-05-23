@@ -166,7 +166,9 @@ int tup_db_get_environ(struct tupid_entries *root,
 tupid_t env_dt(void);
 
 /* Tree operations */
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
+#define TUP_SRCID_LOCAL -1
+#define TUP_SRCID_ANY -2
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type, tupid_t requested_srcid);
 int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 
 /* scanner operations */

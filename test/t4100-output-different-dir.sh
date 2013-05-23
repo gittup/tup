@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,14 +16,21 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Simple test to write to a file in another directory.
+# Make sure parsing foo/ after writing another file there doesn't fail.
 
 . ./tup.sh
-tmkdir bar
+
+tmkdir foo
 cat > Tupfile << HERE
-: |> echo hey > %o |> bar/foo.o
+: |> echo hey > %o |> foo/bar.txt
 HERE
-tup touch Tupfile
 update
+
+cat > foo/Tupfile << HERE
+HERE
+tup touch foo/Tupfile
+update
+
+check_exist foo/bar.txt
 
 eotup

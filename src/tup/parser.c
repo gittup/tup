@@ -334,13 +334,13 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD, TUP_SRCID_LOCAL) < 0)
 		goto out_close_vdb;
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_dirtype_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED, TUP_SRCID_LOCAL) < 0)
 		goto out_close_vdb;
 
 	if(refactoring) {
-		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
+		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD, TUP_SRCID_LOCAL) < 0)
 			goto out_close_vdb;
 	}
 
@@ -994,7 +994,7 @@ static int gitignore(struct tupfile *tf)
 				fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
 				return -1;
 			}
-			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, -1, &tent) < 0)
+			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, tf->tupid, &tent) < 0)
 				return -1;
 		} else {
 			tree_entry_remove(&tf->g->gen_delete_root,
@@ -3057,6 +3057,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 	while(!TAILQ_EMPTY(&oplist)) {
 		struct name_list *use_onl;
+		char *newpath;
 		pl = TAILQ_FIRST(&oplist);
 
 		if(pl->pel->path[0] == '<') {
@@ -3073,10 +3074,6 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			goto out_pl;
 		}
 
-		if(pl->path) {
-			fprintf(tf->f, "tup error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", pl->path, tf->tupid, r->line_number, r->command);
-			return -1;
-		}
 		if(pl->pel->len == 1 && pl->pel->path[0] == '|') {
 			extra_outputs = 1;
 			goto out_pl;
@@ -3094,17 +3091,22 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		} else {
 			use_onl = NULL;
 		}
-		onle->path = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
-		if(!onle->path) {
-			free(onle);
-			return -1;
+		newpath = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
+		if(pl->path) {
+			int plpathlen;
+			plpathlen = strlen(pl->path);
+			onle->path = malloc(plpathlen + strlen(newpath) + 2);
+			strcpy(onle->path, pl->path);
+			onle->path[plpathlen] = '/';
+			onle->path[plpathlen + 1] = 0;
+			onle->base = &onle->path[plpathlen + 1];
+			strcpy(onle->base, newpath);
+			free(newpath);
+		} else {
+			onle->path = newpath;
+			onle->base = onle->path;
 		}
-		if(strchr(onle->path, '/')) {
-			/* Same error as above...uhh, I guess I should rework
-			 * this.
-			 */
-			fprintf(tf->f, "tup error: Attempted to create an output file '%s', which contains a '/' character. Tupfiles should only output files in their own directories.\n - Directory: %lli\n - Rule at line %i: [35m%s[0m\n", onle->path, tf->tupid, r->line_number, r->command);
-			free(onle->path);
+		if(!onle->path) {
 			free(onle);
 			return -1;
 		}
@@ -3131,8 +3133,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			}
 		}
 
-		onle->tent = tup_db_create_node_part(tf->tupid, onle->path, -1,
-						     TUP_NODE_GENERATED, -1, NULL);
+		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
+						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);

@@ -1766,7 +1766,7 @@ int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head)
 	struct tupid_tree *tt;
 
 	RB_INIT(&dir_entries);
-	if(tup_db_dirtype_to_tree(dt, &dir_entries, NULL, TUP_NODE_GENERATED) < 0)
+	if(tup_db_dirtype_to_tree(dt, &dir_entries, NULL, TUP_NODE_GENERATED, TUP_SRCID_ANY) < 0)
 		return -1;
 	while((tt = RB_ROOT(&dir_entries)) != NULL) {
 		struct tup_entry *subtent;
@@ -3652,12 +3652,17 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type, tupid_t requested_srcid)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE_TO_TREE];
-	static char s[] = "select id from node where dir=? and type=?";
+	static char s[] = "select id, srcid from node where dir=? and type=?";
+
+	/* Commands have srcid == -1, but generated files have srcid == directory that creates them. */
+	if(requested_srcid == TUP_SRCID_LOCAL && type == TUP_NODE_GENERATED) {
+		requested_srcid = dt;
+	}
 
 	transaction_check("%s [37m[%lli, %i][0m", s, dt, type);
 	if(!*stmt) {
@@ -3681,6 +3686,7 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 
 	while(1) {
 		tupid_t tupid;
+		tupid_t srcid;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -3694,10 +3700,13 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
+		srcid = sqlite3_column_int64(*stmt, 1);
 
-		if(tree_entry_add(root, tupid, type, count) < 0) {
-			rc = -1;
-			break;
+		if(requested_srcid == TUP_SRCID_ANY || srcid == requested_srcid) {
+			if(tree_entry_add(root, tupid, type, count) < 0) {
+				rc = -1;
+				break;
+			}
 		}
 	}
 
