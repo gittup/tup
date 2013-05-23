@@ -50,6 +50,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include "luabuiltin/luabuiltin.h" /* Generated from builtin.lua */
 typedef lua_State * scriptdata;
@@ -151,19 +152,24 @@ static int tuplua_function_include(lua_State *ls)
 
 	file = tuplua_strdup(ls, -1);
 	lua_pop(ls, 1);
+	assert(lua_gettop(ls) == 0);
 	if(file == NULL)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
 
 	tf->ls = ls;
 	if(include_file(tf, file) < 0) {
 		tf->ls = oldls;
-		lua_pushfstring(ls, "Failed to include file \"%s\".", file);
+		if (tf->luaerror == TUPLUA_NOERROR) {
+			luaL_where(ls, 1);
+			lua_pushfstring(ls, "Failed to include file '%s'.", file);
+			lua_concat(ls, 2);
+			tf->luaerror = TUPLUA_PENDINGERROR;
+		}
 		free(file);
 		return lua_error(ls);
 	}
 	free(file);
 	tf->ls = oldls;
-	lua_pop(ls, 1);
 
 	return 0;
 }
@@ -257,7 +263,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	lua_getfield(ls, 1, "command");
 	r.command = tuplua_tolstring(ls, -1, &command_len);
 	if(!r.command) {
-		return luaL_error(ls, "Parameter \"command\" must be a string containing command specification.");
+		return luaL_error(ls, "Parameter 'command' must be a string containing command specification.");
 	}
 	r.command_len = command_len;
 
@@ -438,7 +444,7 @@ static int tuplua_function_glob(lua_State *ls)
 	lua_pop(ls, 1);
 
 	if(get_path_list(tf, pattern, &pl, tf->tupid) < 0) {
-		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern \"%s\".", __FILE__, __LINE__, pattern);
+		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		free(pattern);
 		return lua_error(ls);
 	}
@@ -446,7 +452,7 @@ static int tuplua_function_glob(lua_State *ls)
 	TAILQ_INSERT_TAIL(&plist, &pl, list);
 
 	if(parse_dependent_tupfiles(&plist, tf) < 0) {
-		lua_pushfstring(ls, "%s:%d: Failed to process glob directory for pattern \"%s\".", __FILE__, __LINE__, pattern);
+		lua_pushfstring(ls, "%s:%d: Failed to process glob directory for pattern '%s'.", __FILE__, __LINE__, pattern);
 		free(pl.pel);
 		free(pattern);
 		return lua_error(ls);
@@ -459,7 +465,7 @@ static int tuplua_function_glob(lua_State *ls)
 
 	lua_newtable(ls);
 	if(tup_entry_add(pl.dt, &dtent) < 0) {
-		lua_pushfstring(ls, "%s:%d: Failed to add tup entry when processing glob pattern \"%s\".", __FILE__, __LINE__, pattern);
+		lua_pushfstring(ls, "%s:%d: Failed to add tup entry when processing glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		free(pl.pel);
 		free(pattern);
 		return lua_error(ls);
@@ -471,21 +477,21 @@ static int tuplua_function_glob(lua_State *ls)
 		return lua_error(ls);
 	}
 	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl.dt, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0) {
-		lua_pushfstring(ls, "Failed to glob for pattern \"%s\" in build(?) tree.", pattern);
+		lua_pushfstring(ls, "Failed to glob for pattern '%s' in build(?) tree.", pattern);
 		free(pl.pel);
 		free(pattern);
 		return lua_error(ls);
 	}
 
 	if(variant_get_srctent(tf->variant, pl.dt, &srctent) < 0) {
-		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern \"%s\".", pattern);
+		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern '%s'.", pattern);
 		free(pl.pel);
 		free(pattern);
 		return lua_error(ls);
 	}
 	if(srctent) {
 		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent->tnode.tupid, pl.pel->path, pl.pel->len, &tf->g->gen_delete_root, 0) < 0) {
-			lua_pushfstring(ls, "Failed to glob for pattern \"%s\" in source(?) tree.", pattern);
+			lua_pushfstring(ls, "Failed to glob for pattern '%s' in source(?) tree.", pattern);
 			free(pl.pel);
 			free(pattern);
 			return lua_error(ls);
@@ -507,7 +513,7 @@ static int tuplua_function_export(lua_State *ls)
 		return luaL_error(ls, "Must be passed an environment variable name as an argument.");
 
 	if(export(tf, name) < 0)
-		return luaL_error(ls, "Failed to export environment variable \"%s\".", name);
+		return luaL_error(ls, "Failed to export environment variable '%s'.", name);
 
 	return 0;
 }
@@ -611,7 +617,7 @@ static int tuplua_function_concat(struct lua_State *ls)
 	return 1;
 }
 
-int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int toplevel)
+int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 {
 	struct tuplua_reader_data lrd;
 	struct lua_State *ls = NULL;
@@ -685,28 +691,50 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 			tf->ls = NULL;
 			return -1;
 		}
+		lua_pop(ls, 1);
 	}
 	else ls = tf->ls;
+	assert(lua_gettop(ls) == 0);
 
-	if(toplevel && (include_rules(tf) < 0))
+	if(ownstate && (include_rules(tf) < 0)) {
+		if(tf->luaerror == TUPLUA_PENDINGERROR) {
+			assert(lua_gettop(ls) == 2);
+			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
+			lua_pop(ls, 1);
+			tf->luaerror = TUPLUA_ERRORSHOWN;
+		}
+		lua_close(ls);
+		tf->ls = NULL;
 		return -1;
+	}
+	assert(lua_gettop(ls) == 0);
 
 	lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 
 	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK) {
-		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", name, tuplua_tostring(ls, -1));
 		if(ownstate) {
+			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
+		}
+		else {
+			tf->luaerror = TUPLUA_PENDINGERROR;
+			assert(lua_gettop(ls) == 2);
 		}
 		return -1;
 	}
 
 	if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
-		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", name, tuplua_tostring(ls, -1));
+		if(tf->luaerror != TUPLUA_ERRORSHOWN)
+			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
+		tf->luaerror = TUPLUA_ERRORSHOWN;
 		if(ownstate) {
 			lua_close(ls);
 			tf->ls = NULL;
+		} 
+		else {
+			lua_pop(ls, 2);
+			assert(lua_gettop(ls) == 0);
 		}
 		return -1;
 	}
@@ -714,8 +742,11 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 	if(ownstate) {
 		lua_close(ls);
 		tf->ls = NULL;
+	} 
+	else {
+		lua_pop(ls, 1);
+		assert(lua_gettop(ls) == 0);
 	}
-
 	return 0;
 }
 
@@ -823,7 +854,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_lua_tupfile(tf, &incb, file, 0) < 0)
+	if(parse_lua_tupfile(tf, &incb, file) < 0)
 		goto out_free;
 	rc = 0;
 out_free:
@@ -847,7 +878,6 @@ out_err:
 	tf->curtent = oldtent;
 	tf->cur_dfd = old_dfd;
 	if(rc < 0) {
-		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", file);
 		return -1;
 	}
 
