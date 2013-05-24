@@ -78,7 +78,7 @@ int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head);
 int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_open_tupid(tupid_t dt);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
-int tup_db_set_name(tupid_t tupid, const char *new_name);
+int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);

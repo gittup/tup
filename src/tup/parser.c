@@ -2860,7 +2860,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int find_existing_command(const struct name_list *onl,
+static int find_existing_command(struct tupfile *tf, const struct name_list *onl,
 				 struct tupid_entries *del_root,
 				 tupid_t *cmdid)
 {
@@ -2876,9 +2876,29 @@ static int find_existing_command(const struct name_list *onl,
 		 * command not in the del_root will mean it has already been
 		 * parsed, and so will probably cause an error later in the
 		 * duplicate link check.
+		 *
+		 * For outputs in other directories, we can also check if the
+		 * owner of the output file also needs to be re-parsed, since
+		 * the command may have moved to a different directory (t4103).
 		 */
 		if(incoming != -1) {
-			if(tupid_tree_search(del_root, incoming) != NULL) {
+			int available = 0;
+
+			if(tupid_tree_search(del_root, incoming) != NULL)
+				available = 1;
+			if(!available) {
+				struct tup_entry *tent;
+				if(tup_entry_add(incoming, &tent) < 0)
+					return -1;
+				if(tent->dt != tf->tupid) {
+					struct node *n;
+					n = find_node(tf->g, tent->dt);
+					if(n != NULL && !n->already_used) {
+						available = 1;
+					}
+				}
+			}
+			if(available) {
 				*cmdid = incoming;
 				return 0;
 			}
@@ -3107,7 +3127,7 @@ out_pl:
 			return -1;
 		}
 	} else {
-		if(find_existing_command(&onl, &tf->g->cmd_delete_root, &cmdid) < 0)
+		if(find_existing_command(tf, &onl, &tf->g->cmd_delete_root, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
 			if(tf->refactoring) {
@@ -3125,7 +3145,7 @@ out_pl:
 				fprintf(tf->f, "New: '%s'\n", cmd);
 				return -1;
 			}
-			if(tup_db_set_name(cmdid, cmd) < 0)
+			if(tup_db_set_name(cmdid, cmd, tf->tupid) < 0)
 				return -1;
 		}
 	}

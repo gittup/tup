@@ -513,14 +513,6 @@ static int resolve_parent(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_entry_change_name(tupid_t tupid, const char *new_name)
-{
-	struct tup_entry *tent;
-
-	tent = tup_entry_get(tupid);
-	return change_name(tent, new_name);
-}
-
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 			     tupid_t new_dt)
 {

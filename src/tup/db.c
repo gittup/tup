@@ -2024,19 +2024,17 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	return 0;
 }
 
-int tup_db_set_name(tupid_t tupid, const char *new_name)
+int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 {
 	int rc;
 	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_SET_NAME];
-	static char s[] = "update node set name=? where id=?";
+	static char s[] = "update node set name=?, dir=? where id=?";
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	rc = strcmp(tent->name.s, new_name);
-	if(rc == 0) {
+	if(strcmp(tent->name.s, new_name) == 0 && tent->dt == new_dt)
 		return 0;
-	}
 
 	transaction_check("%s [37m['%s', %lli][0m", s, new_name, tupid);
 	if(!*stmt) {
@@ -2052,7 +2050,12 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, new_dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 3, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2070,7 +2073,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name)
 		return -1;
 	}
 
-	if(tup_entry_change_name(tupid, new_name) < 0)
+	if(tup_entry_change_name_dt(tupid, new_name, new_dt) < 0)
 		return -1;
 
 	/* Since we changed the name, we have to run the command again. */
