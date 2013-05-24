@@ -47,7 +47,7 @@
 #include <sys/stat.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 15
+#define DB_VERSION 16
 #define PARSER_VERSION 8
 
 enum {
@@ -97,6 +97,7 @@ enum {
 	_DB_FLAG_GROUP_USERS1,
 	_DB_FLAG_GROUP_USERS2,
 	DB_DIRTYPE_TO_TREE,
+	DB_SRCID_TO_TREE,
 	DB_TYPE_TO_TREE,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
@@ -300,6 +301,7 @@ int tup_db_create(int db_sync)
 		"create index normal_index2 on normal_link(to_id)",
 		"create index sticky_index2 on sticky_link(to_id)",
 		"create index group_index2 on group_link(cmdid)",
+		"create index srcid_index on node(srcid)",
 		"insert into config values('db_version', 0)",
 		"insert into node values(1, 0, 2, -1, -1, '.')",
 	};
@@ -496,6 +498,8 @@ static int version_check(void)
 		"delete from node where type=6",
 		"drop table link",
 	};
+	char sql_15a[] = "create index srcid_index on node(srcid)";
+	char sql_15b[] = "update node set srcid=dir where type=4";
 
 	char *tmpsql;
 	struct tup_entry *vartent;
@@ -825,6 +829,21 @@ static int version_check(void)
 			if(tup_db_config_set_int("db_version", 15) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 15.\nThe link table was split to better handle groups and simplify logic. All Tupfiles will be re-parsed to add groups using the new tables.\n");
+
+		case 15:
+			if(sqlite3_exec(tup_db, sql_15a, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_15a);
+				return -1;
+			}
+			if(sqlite3_exec(tup_db, sql_15b, NULL, NULL, &errmsg) != 0) {
+				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+					errmsg, sql_15b);
+				return -1;
+			}
+			if(tup_db_config_set_int("db_version", 16) < 0)
+				return -1;
+			printf("NOTE: Tup database updated to version 16.\nAdded an index for node.srcid\n");
 
 			/***************************************/
 			/* Last case must fall through to here */
@@ -1765,7 +1784,7 @@ int tup_db_get_generated_tup_entries(tupid_t dt, struct tup_entry_head *head)
 	struct tupid_tree *tt;
 
 	RB_INIT(&dir_entries);
-	if(tup_db_dirtype_to_tree(dt, &dir_entries, NULL, TUP_NODE_GENERATED, TUP_SRCID_ANY) < 0)
+	if(tup_db_dirtype_to_tree(dt, &dir_entries, NULL, TUP_NODE_GENERATED) < 0)
 		return -1;
 	while((tt = RB_ROOT(&dir_entries)) != NULL) {
 		struct tup_entry *subtent;
@@ -3649,17 +3668,12 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type, tupid_t requested_srcid)
+int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE_TO_TREE];
-	static char s[] = "select id, srcid from node where dir=? and type=?";
-
-	/* Commands have srcid == -1, but generated files have srcid == directory that creates them. */
-	if(requested_srcid == TUP_SRCID_LOCAL && type == TUP_NODE_GENERATED) {
-		requested_srcid = dt;
-	}
+	static char s[] = "select id from node where dir=? and type=?";
 
 	transaction_check("%s [37m[%lli, %i][0m", s, dt, type);
 	if(!*stmt) {
@@ -3683,7 +3697,6 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 
 	while(1) {
 		tupid_t tupid;
-		tupid_t srcid;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -3697,13 +3710,68 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		srcid = sqlite3_column_int64(*stmt, 1);
 
-		if(requested_srcid == TUP_SRCID_ANY || srcid == requested_srcid) {
-			if(tree_entry_add(root, tupid, type, count) < 0) {
-				rc = -1;
-				break;
-			}
+		if(tree_entry_add(root, tupid, type, count) < 0) {
+			rc = -1;
+			break;
+		}
+	}
+
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_SRCID_TO_TREE];
+	static char s[] = "select id from node where srcid=? and type=?";
+
+	transaction_check("%s [37m[%lli, %i][0m", s, srcid, type);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, srcid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, type) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	while(1) {
+		tupid_t tupid;
+
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			break;
+		}
+
+		tupid = sqlite3_column_int64(*stmt, 0);
+
+		if(tree_entry_add(root, tupid, type, count) < 0) {
+			rc = -1;
+			break;
 		}
 	}
 
