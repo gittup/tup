@@ -139,6 +139,7 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 	RB_INIT(&g->cmd_delete_root);
 	g->cmd_delete_count = 0;
 
+	RB_INIT(&g->parse_gitignore_root);
 	RB_INIT(&g->node_root);
 
 	g->cur = g->root = create_node(g, &root_entry);

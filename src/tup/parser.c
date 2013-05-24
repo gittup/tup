@@ -191,7 +191,6 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
 static int export(struct tupfile *tf, char *cmdline);
 static int gitignore(struct tupfile *tf);
-static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -367,10 +366,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 		goto out_free_bs;
 	if(tf.ign) {
-		if(!refactoring) {
-			if(rm_existing_gitignore(&tf, n->tent) < 0)
-				return -1;
-		}
 		if(gitignore(&tf) < 0) {
 			rc = -1;
 			goto out_free_bs;
@@ -978,104 +973,31 @@ static int export(struct tupfile *tf, char *cmdline)
 
 static int gitignore(struct tupfile *tf)
 {
-	char *s;
-	int len;
-	int fd;
+	struct tup_entry *tent;
 
-	if(tup_db_alloc_generated_nodelist(&s, &len, tf->tupid, &tf->g->gen_delete_root) < 0)
+	if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
 		return -1;
-	if((s && len) || tf->tupid == 1) {
-		struct tup_entry *tent;
-
-		if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
-			return -1;
-		if(!tent) {
-			if(tf->refactoring) {
-				fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
-				return -1;
-			}
-			if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, tf->tupid, &tent) < 0)
-				return -1;
-		} else {
-			tree_entry_remove(&tf->g->gen_delete_root,
-					  tent->tnode.tupid,
-					  &tf->g->gen_delete_count);
-			/* It may be a ghost if we are going from a variant
-			 * to an in-tree build.
-			 */
-			if(tent->type == TUP_NODE_GHOST) {
-				if(tup_db_set_type(tent, TUP_NODE_GENERATED) < 0)
-					return -1;
-			}
-		}
+	if(!tent) {
 		if(tf->refactoring) {
-			/* If we're refactoring, we don't actually need to
-			 * write out the .gitignore file, since for the
-			 * refactoring to succeed, the contents of .gitignore
-			 * must be unchanged. Additionally, changing the
-			 * .gitignore file would cause its mtime to change,
-			 * resulting in a change detected in tup_db_changes()
-			 * (t4096).
-			 */
-			goto out_free;
-		}
-
-		fd = openat(tf->cur_dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
-		if(fd < 0) {
-			parser_error(tf, ".gitignore");
-			fprintf(tf->f, "tup error: Unable to create the .gitignore file.\n");
+			fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
 			return -1;
 		}
-		if(tf->tupid == 1) {
-			if(write(fd, ".tup\n", 5) < 0) {
-				parser_error(tf, "write");
-				goto err_close;
-			}
-		}
-		if(write(fd, "/.gitignore\n", 12) < 0) {
-			parser_error(tf, "write");
-			goto err_close;
-		}
-		if(s && len) {
-			if(write(fd, s, len) < 0) {
-				parser_error(tf, "write");
-				goto err_close;
-			}
-		}
-		if(close(fd) < 0) {
-			parser_error(tf, "close(fd)");
+		if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, tf->tupid, &tent) < 0)
 			return -1;
+	} else {
+		tree_entry_remove(&tf->g->gen_delete_root,
+				  tent->tnode.tupid,
+				  &tf->g->gen_delete_count);
+		/* It may be a ghost if we are going from a variant
+		 * to an in-tree build.
+		 */
+		if(tent->type == TUP_NODE_GHOST) {
+			if(tup_db_set_type(tent, TUP_NODE_GENERATED) < 0)
+				return -1;
 		}
 	}
-
-out_free:
-	if(s) {
-		free(s); /* Freeze gopher! */
-	}
-	return 0;
-
-err_close:
-	close(fd);
-	return -1;
-}
-
-static int rm_existing_gitignore(struct tupfile *tf, struct tup_entry *tent)
-{
-	int dfd;
-	dfd = tup_entry_open(tent);
-	if(dfd < 0)
+	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, tf->tupid) < 0)
 		return -1;
-	if(unlinkat(dfd, ".gitignore", 0) < 0) {
-		if(errno != ENOENT) {
-			parser_error(tf, "unlinkat");
-			fprintf(tf->f, "tup error: Unable to unlink the .gitignore file.\n");
-			return -1;
-		}
-	}
-	if(close(dfd) < 0) {
-		parser_error(tf, "close(dfd)");
-		return -1;
-	}
 	return 0;
 }
 
@@ -3133,6 +3055,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			}
 		}
 
+		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, pl->dt) < 0)
+			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {

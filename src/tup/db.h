@@ -83,8 +83,7 @@ int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_print(FILE *stream, tupid_t tupid);
-int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
-				    struct tupid_entries *root);
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt);
 int tup_db_rebuild_all(void);
 int tup_db_delete_slash(void);
 tupid_t slash_dt(void);

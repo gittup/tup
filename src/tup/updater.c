@@ -902,11 +902,78 @@ static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
 	return 0;
 }
 
+static int gitignore(tupid_t tupid)
+{
+	int fd;
+	int dfd;
+	struct tup_entry *tent;
+	struct tup_entry *gitignore_tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tup_db_select_tent(tupid, ".gitignore", &gitignore_tent) < 0)
+		return -1;
+	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
+		char *s;
+		int len;
+		struct stat buf;
+		if(tup_db_alloc_generated_nodelist(&s, &len, tupid) < 0)
+			return -1;
+		dfd = tup_entry_open(tent);
+		if(dfd < 0)
+			return -1;
+		fd = openat(dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
+		if(fd < 0) {
+			perror(".gitignore");
+			goto err_out;
+		}
+		if(tupid == 1) {
+			if(write(fd, ".tup\n", 5) < 0) {
+				perror("write");
+				goto err_close;
+			}
+		}
+		if(s && len) {
+			if(write(fd, s, len) < 0) {
+				perror("write");
+				goto err_close;
+			}
+		}
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			goto err_out;
+		}
+
+		if(fstatat(dfd, ".gitignore", &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+			perror("fstatat(.gitignore)");
+			goto err_out;
+		}
+		if(tup_db_set_mtime(gitignore_tent, buf.MTIME) < 0)
+			goto err_out;
+
+		if(s) {
+			free(s); /* Freeze gopher! */
+		}
+		close(dfd);
+	}
+	return 0;
+
+err_close:
+	close(fd);
+err_out:
+	close(dfd);
+	fprintf(stderr, "tup error: Unable to create the .gitignore file in directory: ");
+	print_tup_entry(stderr, tent);
+	fprintf(stderr, "\n");
+	return -1;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
 	struct node *n;
 	struct node *tmp;
+	struct tupid_tree *tt;
 	int rc;
 	int old_changes = 0;
 
@@ -1013,6 +1080,7 @@ static int process_create_nodes(void)
 	compat_lock_disable();
 	rc = execute_graph(&g, 0, 1, create_work);
 	compat_lock_enable();
+
 	if(rc == 0) {
 		if(g.gen_delete_count) {
 			tup_main_progress("Deleting files...\n");
@@ -1025,6 +1093,16 @@ static int process_create_nodes(void)
 			tup_show_message("Checking circular dependencies among groups...\n");
 			if(group_circ_check() < 0)
 				rc = -1;
+		}
+		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
+			tup_show_message("Generating .gitignore files...\n");
+			RB_FOREACH(tt, tupid_entries, &g.parse_gitignore_root) {
+				if(gitignore(tt->tupid) < 0) {
+					rc = -1;
+					break;
+				}
+			}
+			free_tupid_tree(&g.parse_gitignore_root);
 		}
 	}
 	if(rc < 0) {

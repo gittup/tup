@@ -349,16 +349,9 @@ static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 
 		if(gimme_tent(map->realname, &tent) < 0)
 			return -1;
-		if(!tent || strcmp(tent->name.s, ".gitignore") != 0) {
-			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed. Only a .gitignore file may be created during the parsing stage.\n", map->realname);
+		if(!tent) {
+			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed\n", map->realname);
 			map_bork = 1;
-		} else {
-			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
-				perror("renameat");
-				return -1;
-			}
-			if(file_set_mtime(tent, map->realname) < 0)
-				return -1;
 		}
 		del_map(map);
 	}

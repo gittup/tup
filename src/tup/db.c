@@ -196,8 +196,7 @@ static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int generated_nodelist_len(tupid_t dt);
-static int get_generated_nodelist(char *dest, tupid_t dt,
-				  struct tupid_entries *root, int *total_len);
+static int get_generated_nodelist(char *dest, tupid_t dt, int *total_len);
 static int db_print(FILE *stream, tupid_t tupid);
 static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head);
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
@@ -2217,8 +2216,7 @@ int tup_db_print(FILE *stream, tupid_t tupid)
 	return rc;
 }
 
-int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
-				    struct tupid_entries *root)
+int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt)
 {
 	int alloc_len;
 
@@ -2237,7 +2235,7 @@ int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt,
 		perror("calloc");
 		return -1;
 	}
-	if(get_generated_nodelist(*s, dt, root, len) < 0)
+	if(get_generated_nodelist(*s, dt, len) < 0)
 		return -1;
 	return 0;
 }
@@ -2338,8 +2336,7 @@ out_reset:
 	return rc;
 }
 
-static int get_generated_nodelist(char *dest, tupid_t dt,
-				  struct tupid_entries *root, int *total_len)
+static int get_generated_nodelist(char *dest, tupid_t dt, int *total_len)
 {
 	int rc;
 	int dbrc;
@@ -2380,9 +2377,6 @@ static int get_generated_nodelist(char *dest, tupid_t dt,
 			fprintf(stderr, "Statement was: %s\n", s);
 			rc = -1;
 			goto out_reset;
-		}
-		if(tupid_tree_search(root, sqlite3_column_int64(*stmt, 2)) != NULL) {
-			continue;
 		}
 		*p = PATH_SEP;
 		p++;
