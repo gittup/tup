@@ -2657,6 +2657,13 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	int len;
 	struct name_list_entry *nle;
 
+	/* If the file is generated from another directory, we can't use it in
+	 * a wildcard.  (srcid == -1 is for normal files, tent->srcid ==
+	 * tent->dt is for locally generated files.
+	 */
+	if(tent->srcid != -1 && tent->srcid != tent->dt)
+		return 0;
+
 	len = tent->name.len + args->dirlen;
 	extlesslen = tent->name.len - 1;
 	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
