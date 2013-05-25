@@ -42,10 +42,21 @@ static void (*rmdir_callback)(tupid_t tupid);
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry)
 {
+	struct tup_entry *dtent;
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
 	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
+	while(dtent && dtent->type == TUP_NODE_GENERATED_DIR) {
+		printf("tup: Converting ");
+		print_tup_entry(stdout, dtent);
+		printf(" to a normal directory.\n");
+		if(tup_db_set_type(dtent, TUP_NODE_DIR) < 0)
+			return -1;
+		dtent = dtent->parent;
+	}
 	return 0;
 }
 
