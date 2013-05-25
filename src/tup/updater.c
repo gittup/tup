@@ -1672,8 +1672,12 @@ static int unlink_outputs(int dfd, struct node *n)
 			int output_dfd = dfd;
 			if(output->tent->dt != n->tent->dt) {
 				output_dfd = tup_entry_open(output->tent->parent);
-				if(output_dfd < 0)
+				if(output_dfd < 0) {
+					fprintf(stderr, "tup error: Unable to open directory to unlink previous output files: ");
+					print_tup_entry(stderr, output->tent->parent);
+					fprintf(stderr, "\n");
 					return -1;
+				}
 			}
 			if(unlinkat(output_dfd, output->tent->name.s, 0) < 0) {
 				if(errno != ENOENT) {

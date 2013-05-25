@@ -343,6 +343,14 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 		return dfd;
 
 	newdfd = openat(dfd, tent->name.s, O_RDONLY);
+	if(newdfd < 0 && errno == ENOENT && tent->type == TUP_NODE_GENERATED_DIR) {
+		if(mkdirat(dfd, tent->name.s, 0777) < 0) {
+			perror(tent->name.s);
+			close(dfd);
+			return -1;
+		}
+		newdfd = openat(dfd, tent->name.s, O_RDONLY);
+	}
 	if(close(dfd) < 0) {
 		perror("close(dfd)");
 		return -1;

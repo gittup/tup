@@ -1084,6 +1084,9 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 		case TUP_NODE_GROUP:
 			str = "group";
 			break;
+		case TUP_NODE_GENERATED_DIR:
+			str = "generated directory";
+			break;
 		case TUP_NODE_ROOT:
 			str = "graph root";
 			break;
@@ -1179,13 +1182,19 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 				return NULL;
 			}
 
-			/* If we changed from one type to another (eg: a file
-			 * became a directory), then delete the old one and
-			 * create a new one.
+			/* If we have a generated dir in the tup db, the
+			 * scanner will report TUP_NODE_DIR. In this case we
+			 * don't want to change the type.
 			 */
-			if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
-				return NULL;
-			goto out_create;
+			if(! (tent->type == TUP_NODE_GENERATED_DIR && type == TUP_NODE_DIR)) {
+				/* If we changed from one type to another (eg: a file
+				 * became a directory), then delete the old one and
+				 * create a new one.
+				 */
+				if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
+					return NULL;
+				goto out_create;
+			}
 		}
 		/* During the initial scan, srcid will be -1 so we don't want
 		 * to overwrite in this case. However, we do want to overwrite
@@ -1526,6 +1535,12 @@ out_reset:
 int tup_db_delete_node(tupid_t tupid)
 {
 	int rc;
+	struct tup_entry *tent;
+	struct tup_entry *parent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	parent = tent->parent;
 
 	rc = node_has_ghosts(tupid);
 	if(rc < 0)
@@ -1534,10 +1549,6 @@ int tup_db_delete_node(tupid_t tupid)
 		/* We're but a ghost now. This can happen if a directory is
 		 * removed that contains a ghost (t6061).
 		 */
-		struct tup_entry *tent;
-
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
 		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
@@ -1545,7 +1556,35 @@ int tup_db_delete_node(tupid_t tupid)
 		return 0;
 	}
 
-	return delete_node(tupid);
+	if(tent->type == TUP_NODE_GENERATED_DIR) {
+		int dfd;
+		dfd = tup_entry_open(tent->parent);
+		if(dfd < 0) {
+			fprintf(stderr, "tup error: Unable to delete generated directory: ");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			return -1;
+		}
+		if(unlinkat(dfd, tent->name.s, AT_REMOVEDIR) < 0) {
+			perror(tent->name.s);
+			fprintf(stderr, "tup error: Unable to delete generated directory: ");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			return -1;
+		}
+		if(close(dfd) < 0) {
+			perror("close(dfd)");
+			return -1;
+		}
+	}
+
+	if(delete_node(tupid) < 0)
+		return -1;
+	if(parent->type == TUP_NODE_GENERATED_DIR && ghost_reclaimable1(parent->tnode.tupid)) {
+		return tup_db_delete_node(parent->tnode.tupid);
+	}
+
+	return 0;
 }
 
 int delete_node(tupid_t tupid)
@@ -2489,6 +2528,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 	}
 	switch(type) {
 		case TUP_NODE_DIR:
+		case TUP_NODE_GENERATED_DIR:
 			fprintf(stream, "%s", path);
 			break;
 		case TUP_NODE_CMD:
@@ -5066,9 +5106,9 @@ static int load_all_nodes(void)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_FILES_TO_TREE];
-	static char s[] = "select id, dir, type, mtime, srcid, name from node where type=? or type=? or type=?";
+	static char s[] = "select id, dir, type, mtime, srcid, name from node where type=? or type=? or type=? or type=?";
 
-	transaction_check("%s [37m[%i, %i, %i][0m", s, TUP_NODE_FILE, TUP_NODE_DIR, TUP_NODE_GENERATED);
+	transaction_check("%s [37m[%i, %i, %i][0m", s, TUP_NODE_FILE, TUP_NODE_DIR, TUP_NODE_GENERATED, TUP_NODE_GENERATED_DIR);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -5088,6 +5128,11 @@ static int load_all_nodes(void)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 4, TUP_NODE_GENERATED_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;

@@ -31,6 +31,8 @@ struct tup_entry_head;
 struct path_element;
 struct pel_group;
 
+#define SOTGV_CREATE_DIRS 2
+
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
 tupid_t create_command_file(tupid_t dt, const char *cmd);

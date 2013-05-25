@@ -557,6 +557,7 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 			shape = "rectangle";
 			break;
 		case TUP_NODE_DIR:
+		case TUP_NODE_GENERATED_DIR:
 			if(!show_dirs)
 				return;
 			shape = "diamond";

@@ -549,7 +549,15 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 			curdt = tent->tnode.tupid;
 			if(tup_db_select_tent_part(curdt, pel->path, pel->len, &tent) < 0)
 				return -1;
-			if(!tent) {
+			if(tent) {
+				if(sotgv == SOTGV_CREATE_DIRS && tent->type == TUP_NODE_GHOST) {
+					if(tup_db_set_type(tent, TUP_NODE_GENERATED_DIR) < 0)
+						return -1;
+					if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+						return -1;
+				}
+			} else {
+				int type = TUP_NODE_GHOST;
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
 					fprintf(f, "tup error: Expected node '%.*s' to be in directory '", pel->len, pel->path);
@@ -557,7 +565,9 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 					fprintf(f, "', but it is not there.\n");
 					return -1;
 				}
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, -1, &tent) < 0)
+				if(sotgv == SOTGV_CREATE_DIRS)
+					type = TUP_NODE_GENERATED_DIR;
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, -1, -1, &tent) < 0)
 					return -1;
 			}
 		}

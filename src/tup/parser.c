@@ -223,7 +223,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl);
+			 tupid_t dt, struct bin_head *bl, int create_output_dirs);
 static void make_path_list_unique(struct path_list_head *plist);
 static void free_path_list(struct path_list_head *plist);
 static void del_pl(struct path_list *pl, struct path_list_head *head);
@@ -840,7 +840,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	}
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, eval_cmdline, &plist, tf->curtent->tnode.tupid, NULL) < 0)
+	if(get_path_list(tf, eval_cmdline, &plist, tf->curtent->tnode.tupid, NULL, 0) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -2103,7 +2103,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		return -1;
 
 	TAILQ_INIT(&oplist);
-	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL) < 0)
+	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL, 0) < 0)
 		return -1;
 	make_path_list_unique(&oplist);
 
@@ -2189,7 +2189,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 	}
 
 	TAILQ_INIT(&inp_list);
-	if(get_path_list(tf, inp, &inp_list, tf->tupid, NULL) < 0)
+	if(get_path_list(tf, inp, &inp_list, tf->tupid, NULL, 0) < 0)
 		return -1;
 	make_path_list_unique(&inp_list);
 
@@ -2239,7 +2239,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	struct path_list_head plist;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, p, &plist, tf->tupid, bl) < 0)
+	if(get_path_list(tf, p, &plist, tf->tupid, bl, 0) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -2250,7 +2250,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 }
 
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl)
+			 tupid_t dt, struct bin_head *bl, int create_output_dirs)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -2298,6 +2298,10 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 		} else {
 			/* Path */
 			struct pel_group pg;
+			int sotgv = 0;
+
+			if(create_output_dirs)
+				sotgv = SOTGV_CREATE_DIRS;
 
 			if(strchr(p, '<') != NULL) {
 				/* Group */
@@ -2317,7 +2321,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
-			pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, 0, 0);
+			pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
 			if(pl->dt <= 0) {
 				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
 				return -1;
@@ -2992,16 +2996,16 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	free(toutput);
 	if(!output_pattern)
 		return -1;
-	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL) < 0)
+	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL, 1) < 0)
 		return -1;
 	if(r->bang_extra_outputs) {
 		/* Insert a fake separator in case the rule doesn't have one */
-		if(get_path_list(tf, sep, &oplist, tf->tupid, NULL) < 0)
+		if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0) < 0)
 			return -1;
 		extra_pattern = eval(tf, r->bang_extra_outputs, DISALLOW_NODES);
 		if(!extra_pattern)
 			return -1;
-		if(get_path_list(tf, extra_pattern, &oplist, tf->tupid, NULL) < 0)
+		if(get_path_list(tf, extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
 			return -1;
 	}
 	while(!TAILQ_EMPTY(&oplist)) {
