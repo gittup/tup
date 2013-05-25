@@ -301,6 +301,12 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 	if(dont_delete)
 		return 0;
 
+	if(type == TUP_NODE_GENERATED_DIR) {
+		if(tup_db_flag_generated_dirs(tupid) < 0)
+			return -1;
+		return 0;
+	}
+
 	if(type == TUP_NODE_DIR) {
 		struct variant *variant;
 		/* Recurse and kill anything below this dir. Note that

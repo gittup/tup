@@ -1558,7 +1558,7 @@ int tup_db_delete_node(tupid_t tupid)
 
 	if(tent->type == TUP_NODE_GENERATED_DIR) {
 		int dfd;
-		dfd = tup_entry_open(tent->parent);
+		dfd = tup_entry_open(parent);
 		if(dfd < 0) {
 			fprintf(stderr, "tup error: Unable to delete generated directory: ");
 			print_tup_entry(stderr, tent);
@@ -1566,11 +1566,13 @@ int tup_db_delete_node(tupid_t tupid)
 			return -1;
 		}
 		if(unlinkat(dfd, tent->name.s, AT_REMOVEDIR) < 0) {
-			perror(tent->name.s);
-			fprintf(stderr, "tup error: Unable to delete generated directory: ");
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return -1;
+			if(errno != ENOENT) {
+				perror(tent->name.s);
+				fprintf(stderr, "tup error: Unable to delete generated directory: ");
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "\n");
+				return -1;
+			}
 		}
 		if(close(dfd) < 0) {
 			perror("close(dfd)");
@@ -1649,6 +1651,30 @@ int tup_db_delete_dir(tupid_t dt, int force)
 			 * link to somewhere useful (t6061)
 			 */
 			if(tup_del_id_force(he->tupid, he->type) < 0)
+				return -1;
+		}
+		LIST_REMOVE(he, list);
+		free(he);
+	}
+
+	return 0;
+}
+
+int tup_db_flag_generated_dirs(tupid_t dt)
+{
+	struct half_entry_head subdir_list;
+
+	LIST_INIT(&subdir_list);
+	if(get_dir_entries(dt, &subdir_list) < 0)
+		return -1;
+	while(!LIST_EMPTY(&subdir_list)) {
+		struct half_entry *he = LIST_FIRST(&subdir_list);
+
+		if(he->type == TUP_NODE_GENERATED_DIR) {
+			if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
+				return -1;
+		} else if(he->type == TUP_NODE_GENERATED) {
+			if(tup_db_modify_cmds_by_output(he->tupid, NULL) < 0)
 				return -1;
 		}
 		LIST_REMOVE(he, list);
