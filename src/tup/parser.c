@@ -2960,7 +2960,7 @@ static int add_input(struct tupfile *tf, struct tupid_entries *input_root,
 			fprintf(tf->f, "\n");
 			return -1;
 		}
-		if(tup_db_get_inputs(cmdid, input_root, NULL) < 0)
+		if(tup_db_get_inputs(cmdid, input_root, NULL, NULL) < 0)
 			return -1;
 	} else if(tent->type == TUP_NODE_VAR || tent->type == TUP_NODE_GROUP) {
 		if(tupid_tree_add_dup(input_root, tupid) < 0)

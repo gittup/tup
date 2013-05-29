@@ -321,7 +321,7 @@ int add_graph_stickies(struct graph *g)
 			struct tupid_tree *tt;
 			struct node *inputn;
 
-			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL) < 0)
+			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL, NULL) < 0)
 				return -1;
 			RB_FOREACH(tt, tupid_entries, &sticky_root) {
 				inputn = find_node(g, tt->tupid);

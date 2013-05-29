@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,7 +42,9 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt);
+			    struct tupid_entries *normal_root,
+			    struct tupid_entries *group_sticky_root,
+			    int full_deps, tupid_t vardt);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
@@ -132,7 +134,9 @@ int handle_open_file(enum access_type at, const char *filename,
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
+		struct tupid_entries *normal_root,
+		struct tupid_entries *group_sticky_root,
+		int full_deps, tupid_t vardt)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -158,7 +162,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	tup_entry_release_list();
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, full_deps, vardt);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -589,7 +593,9 @@ out_skip:
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
+			    struct tupid_entries *normal_root,
+			    struct tupid_entries *group_sticky_root,
+			    int full_deps, tupid_t vardt)
 {
 	struct file_entry *r;
 
@@ -609,7 +615,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		del_entry(r);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root) < 0)
 		return -1;
 	return 0;
 }

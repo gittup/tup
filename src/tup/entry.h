@@ -42,6 +42,7 @@ struct tup_entry {
 	struct string_tree name;
 	struct string_entries entries;
 	struct tupid_entries stickies;
+	struct tupid_entries group_stickies;
 	int retrieved_stickies;
 	struct tup_entry *incoming;
 	LIST_ENTRY(tup_entry) ghost_list;

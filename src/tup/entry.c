@@ -166,6 +166,7 @@ static int rm_entry(tupid_t tupid, int safe)
 		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
 	free_tupid_tree(&tent->stickies);
+	free_tupid_tree(&tent->group_stickies);
 	free(tent->name.s);
 	free(tent);
 	return 0;
@@ -476,6 +477,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->srcid = srcid;
 	tent->variant = NULL;
 	RB_INIT(&tent->stickies);
+	RB_INIT(&tent->group_stickies);
 	tent->retrieved_stickies = 0;
 	tent->incoming = NULL;
 	if(name) {

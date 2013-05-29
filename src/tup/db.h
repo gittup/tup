@@ -128,7 +128,8 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 			int refactoring);
 int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
-		      struct tupid_entries *normal_root);
+		      struct tupid_entries *normal_root,
+		      struct tupid_entries *group_sticky_root);
 int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group);
 
 /* Combo operations */
@@ -182,7 +183,8 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,
-			       struct tupid_entries *normal_root);
+			       struct tupid_entries *normal_root,
+			       struct tupid_entries *group_sticky_root);
 int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 
 #endif
