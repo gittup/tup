@@ -2482,7 +2482,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 			fprintf(stream, "[47;30m%s[0m", path);
 			break;
 		case TUP_NODE_GROUP:
-			fprintf(stream, "<[36m%s[0m>", path);
+			fprintf(stream, "[36m%s[0m", path);
 			break;
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
