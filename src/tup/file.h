@@ -78,7 +78,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
 		struct tupid_entries *normal_root,
 		struct tupid_entries *group_sticky_root,
-		int full_deps, tupid_t vardt);
+		int full_deps, tupid_t vardt, int used_groups);
 int add_config_files(struct file_info *finfo, struct tup_entry *tent);
 int add_parser_files(FILE *f, struct file_info *finfo, struct tupid_entries *root, tupid_t vardt);
 void del_map(struct mapping *map);

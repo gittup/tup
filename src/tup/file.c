@@ -44,7 +44,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *sticky_root,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
-			    int full_deps, tupid_t vardt);
+			    int full_deps, tupid_t vardt, int used_groups);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
@@ -136,7 +136,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
 		struct tupid_entries *normal_root,
 		struct tupid_entries *group_sticky_root,
-		int full_deps, tupid_t vardt)
+		int full_deps, tupid_t vardt, int used_groups)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -162,7 +162,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	tup_entry_release_list();
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -595,7 +595,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *sticky_root,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
-			    int full_deps, tupid_t vardt)
+			    int full_deps, tupid_t vardt, int used_groups)
 {
 	struct file_entry *r;
 
@@ -613,6 +613,16 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		if(add_node_to_list(f, vardt, &r->pg, entryhead, 0, NULL) < 0)
 			return -1;
 		del_entry(r);
+	}
+
+	if(used_groups) {
+		struct tupid_tree *tt;
+		RB_FOREACH(tt, tupid_entries, group_sticky_root) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			tup_entry_list_add(tent, entryhead);
+		}
 	}
 
 	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root) < 0)

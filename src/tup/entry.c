@@ -743,7 +743,7 @@ static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 	return 0;
 }
 
-int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
+int get_relative_dir(FILE *f, char *dest, tupid_t start, tupid_t end, int *len)
 {
 	struct tent_list_head startlist;
 	struct tent_list_head endlist;
@@ -776,10 +776,14 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 		if(!first) {
 			first = 1;
 		} else {
+			if(f)
+				fprintf(f, PATH_SEP_STR);
 			if(dest)
 				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;
 		}
+		if(f)
+			fprintf(f, "..");
 		if(dest)
 			sprintf(dest + *len, "..");
 		(*len) += 2;
@@ -788,15 +792,21 @@ int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 		if(!first) {
 			first = 1;
 		} else {
+			if(f)
+				fprintf(f, PATH_SEP_STR);
 			if(dest)
 				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;
 		}
+		if(f)
+			fprintf(f, "%s", endentry->tent->name.s);
 		if(dest)
 			sprintf(dest + *len, "%s", endentry->tent->name.s);
 		(*len) += endentry->tent->name.len;
 	}
 	if(!first) {
+		if(f)
+			fprintf(f, ".");
 		if(dest)
 			sprintf(dest + *len, ".");
 		(*len)++;

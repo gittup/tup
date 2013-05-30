@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -382,7 +382,7 @@ int nodedb_len(struct node_vardb *v, const char *var, int varlen,
 		} else {
 			len += 1;  /* space */
 		}
-		rc = get_relative_dir(NULL, relative_to,
+		rc = get_relative_dir(NULL, NULL, relative_to,
 		                      tlist->tent->tnode.tupid,
 		                      &vlen);
 		if (rc < 0 || vlen < 0)
@@ -412,7 +412,7 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, char **dest,
 			(*dest)[0] = ' ';
 			(*dest)++;
 		}
-		rc = get_relative_dir(*dest, relative_to,
+		rc = get_relative_dir(NULL, *dest, relative_to,
 		                      tlist->tent->tnode.tupid,
 		                      &clen);
 		if (rc < 0 || clen < 0)

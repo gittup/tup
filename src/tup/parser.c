@@ -3523,6 +3523,11 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				return NULL;
 			}
 			clen += nl->globtotlen[0];
+		} else if(*next == 'r') {
+			/* %r is expanded by the updater before executing a
+			 * command.
+			 */
+			clen+=2;
 		} else if(*next == '%') {
 			clen++;
 		} else {
@@ -3627,6 +3632,14 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				memcpy(&s[x], nle->base + nle->glob[0], nle->glob[1]);
 				x += nle->glob[1];
 			}
+		} else if(*next == 'r') {
+			/* %r is expanded by the updater before executing a
+			 * command.
+			 */
+			s[x] = '%';
+			x++;
+			s[x] = 'r';
+			x++;
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
 			return NULL;
@@ -3686,7 +3699,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
-					if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+					if(get_relative_dir(NULL, NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
 						fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
@@ -3798,7 +3811,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
 					int clen = 0;
-					if(get_relative_dir(p, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+					if(get_relative_dir(NULL, p, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
 						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
