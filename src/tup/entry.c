@@ -32,12 +32,14 @@
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <sys/stat.h>
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int list_out = 0;
 static struct tup_entry_head entry_list;
 static int do_verbose = 0;
+static pthread_mutex_t entry_openat_mutex;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len, enum TUP_NODE_TYPE type,
@@ -46,6 +48,15 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
+
+int tup_entry_init(void)
+{
+	if(pthread_mutex_init(&entry_openat_mutex, NULL) != 0) {
+		perror("pthread_mutex_init");
+		return -1;
+	}
+	return 0;
+}
 
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 {
@@ -323,12 +334,7 @@ int tup_entry_resolve_dirs(void)
 	return 0;
 }
 
-int tup_entry_open(struct tup_entry *tent)
-{
-	return tup_entry_openat(tup_top_fd(), tent);
-}
-
-int tup_entry_openat(int root_dfd, struct tup_entry *tent)
+static int entry_openat_internal(int root_dfd, struct tup_entry *tent)
 {
 	int dfd;
 	int newdfd;
@@ -339,7 +345,7 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 		return dup(root_dfd);
 	}
 
-	dfd = tup_entry_openat(root_dfd, tent->parent);
+	dfd = entry_openat_internal(root_dfd, tent->parent);
 	if(dfd < 0)
 		return dfd;
 
@@ -363,6 +369,24 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 		return -1;
 	}
 	return newdfd;
+}
+
+int tup_entry_open(struct tup_entry *tent)
+{
+	return tup_entry_openat(tup_top_fd(), tent);
+}
+
+int tup_entry_openat(int root_dfd, struct tup_entry *tent)
+{
+	int rc;
+	/* This mutex protects against multiple tup_entry_open/openat calls
+	 * from trying to create generated directories at the same time.
+	 * (t4112)
+	 */
+	pthread_mutex_lock(&entry_openat_mutex);
+	rc = entry_openat_internal(root_dfd, tent);
+	pthread_mutex_unlock(&entry_openat_mutex);
+	return rc;
 }
 
 struct variant *tup_entry_variant(struct tup_entry *tent)
