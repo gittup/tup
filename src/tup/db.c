@@ -2377,9 +2377,9 @@ static int generated_nodelist_len(tupid_t dt)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODELIST_LEN];
-	static char s[] = "select sum(length(name) + 2) from node where dir=? and type=?";
+	static char s[] = "select sum(length(name) + 2) from node where dir=? and (type=? or type=?)";
 
-	transaction_check("%s [37m[%lli, %i][0m", s, dt, TUP_NODE_GENERATED);
+	transaction_check("%s [37m[%lli, %i, %i][0m", s, dt, TUP_NODE_GENERATED, TUP_NODE_GENERATED_DIR);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -2394,6 +2394,11 @@ static int generated_nodelist_len(tupid_t dt)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2428,11 +2433,11 @@ static int get_generated_nodelist(char *dest, tupid_t dt, int *total_len)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_NODELIST];
-	static char s[] = "select length(name), name, id from node where dir=? and type=?";
+	static char s[] = "select length(name), name, id from node where dir=? and (type=? or type=?)";
 	char *p;
 	int len;
 
-	transaction_check("%s [37m[%lli, %i][0m", s, dt, TUP_NODE_GENERATED);
+	transaction_check("%s [37m[%lli, %i, %i][0m", s, dt, TUP_NODE_GENERATED, TUP_NODE_GENERATED_DIR);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -2447,6 +2452,11 @@ static int get_generated_nodelist(char *dest, tupid_t dt, int *total_len)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED_DIR) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
