@@ -800,8 +800,12 @@ int get_relative_dir(FILE *f, char *dest, tupid_t start, tupid_t end, int *len)
 		if(!first) {
 			first = 1;
 		} else {
+			/* For resource files, always use '/' as the separator.
+			 * Both cl and cygwin can handle '/', but cygwin can't
+			 * handle '\'.
+			 */
 			if(f)
-				fprintf(f, PATH_SEP_STR);
+				fprintf(f, "/");
 			if(dest)
 				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;
@@ -816,8 +820,9 @@ int get_relative_dir(FILE *f, char *dest, tupid_t start, tupid_t end, int *len)
 		if(!first) {
 			first = 1;
 		} else {
+			/* Resource files always use '/' - see above */
 			if(f)
-				fprintf(f, PATH_SEP_STR);
+				fprintf(f, "/");
 			if(dest)
 				sprintf(dest + *len, PATH_SEP_STR);
 			(*len)++;

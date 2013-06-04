@@ -1813,7 +1813,16 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		len -= 2;
 		snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
 		resfile++;
-		f = fopen(tmpfilename, "w");
+		if(fchdir(tup_top_fd()) < 0) {
+			perror("fchdir");
+			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+			return NULL;
+		}
+		/* Use binary so newlines aren't converted on Windows. Both cl
+		 * and cygwin can handle UNIX line-endings, but cygwin barfs on
+		 * Windows line-endings.
+		 */
+		f = fopen(tmpfilename, "wb");
 		if(!f) {
 			perror(tmpfilename);
 			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");

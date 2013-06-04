@@ -46,14 +46,14 @@ HERE
 
 # Link all the outputs from the root.
 cat > Tupfile << HERE
-: <objs> |> cat %r | xargs gcc -o %o |> myprog
+: <objs> |> cat %r | xargs gcc -o %o |> myprog.exe
 HERE
 
 # Same, but now we need the ../ path to get to the objs.
 tmkdir linked
 cat > linked/Tupfile << HERE
 include_rules
-: \$(MY_ROOT)/<objs> |> cat %r | xargs gcc -o %o |> myprog
+: \$(MY_ROOT)/<objs> |> cat %r | xargs gcc -o %o |> myprog.exe
 HERE
 update
 
@@ -63,7 +63,7 @@ echo 'int marfx;' > foo/newfoo.c
 tup touch foo/newfoo.c
 update
 
-sym_check myprog marfx
-sym_check linked/myprog marfx
+sym_check myprog.exe marfx
+sym_check linked/myprog.exe marfx
 
 eotup
