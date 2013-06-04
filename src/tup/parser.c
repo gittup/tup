@@ -3031,6 +3031,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 	while(!TAILQ_EMPTY(&oplist)) {
 		struct name_list *use_onl;
+		struct tup_entry *dest_tent;
 		char *newpath;
 		pl = TAILQ_FIRST(&oplist);
 
@@ -3107,8 +3108,19 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			}
 		}
 
-		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, pl->dt) < 0)
+		if(tup_entry_add(pl->dt, &dest_tent) < 0)
 			return -1;
+		if(dest_tent->type == TUP_NODE_GENERATED_DIR) {
+			/* Generate dirs are .gitignored in their parent
+			 * directory, rather than having a .gitignore in the
+			 * generated dir itself.
+			 */
+			if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->dt) < 0)
+				return -1;
+		} else {
+			if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
+				return -1;
+		}
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {
