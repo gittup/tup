@@ -33,7 +33,7 @@ cat > bar/Tupfile << HERE
 : ../out/gen.txt |> cat %f |>
 HERE
 tup touch foo/Tupfile bar/Tupfile
-update_fail_msg "Explicitly named file 'out/gen.txt' can't be listed as an input because it was generated from external directory 'foo'"
+update_fail_msg "Explicitly named file 'out.*gen.txt' can't be listed as an input because it was generated from external directory 'foo'"
 
 # case 2: The generated directory is not present when we try to use it as an
 # input

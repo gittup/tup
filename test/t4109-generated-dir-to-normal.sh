@@ -31,7 +31,7 @@ check_exist foo/bar/baz/out.txt
 touch foo/bar/new.txt
 update > .out.txt
 
-for i in foo foo/bar; do
+for i in foo foo.*bar; do
 	if ! grep "Converting $i to a normal directory" .out.txt > /dev/null; then
 		cat .out.txt
 		echo "Error: Expected $i to be converted." 1>&2
