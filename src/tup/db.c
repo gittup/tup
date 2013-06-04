@@ -1532,6 +1532,34 @@ out_reset:
 	return rc;
 }
 
+static int rm_generated_dir(struct tup_entry *tent)
+{
+	if(tent->type == TUP_NODE_GENERATED_DIR) {
+		int dfd;
+		dfd = tup_entry_open(tent->parent);
+		if(dfd < 0) {
+			fprintf(stderr, "tup error: Unable to delete generated directory: ");
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			return -1;
+		}
+		if(unlinkat(dfd, tent->name.s, AT_REMOVEDIR) < 0) {
+			if(errno != ENOENT) {
+				perror(tent->name.s);
+				fprintf(stderr, "tup error: Unable to delete generated directory: ");
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "\n");
+				return -1;
+			}
+		}
+		if(close(dfd) < 0) {
+			perror("close(dfd)");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 int tup_db_delete_node(tupid_t tupid)
 {
 	int rc;
@@ -1556,29 +1584,8 @@ int tup_db_delete_node(tupid_t tupid)
 		return 0;
 	}
 
-	if(tent->type == TUP_NODE_GENERATED_DIR) {
-		int dfd;
-		dfd = tup_entry_open(parent);
-		if(dfd < 0) {
-			fprintf(stderr, "tup error: Unable to delete generated directory: ");
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return -1;
-		}
-		if(unlinkat(dfd, tent->name.s, AT_REMOVEDIR) < 0) {
-			if(errno != ENOENT) {
-				perror(tent->name.s);
-				fprintf(stderr, "tup error: Unable to delete generated directory: ");
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "\n");
-				return -1;
-			}
-		}
-		if(close(dfd) < 0) {
-			perror("close(dfd)");
-			return -1;
-		}
-	}
+	if(rm_generated_dir(tent) < 0)
+		return -1;
 
 	if(delete_node(tupid) < 0)
 		return -1;
@@ -6854,7 +6861,8 @@ static int reclaim_ghosts(void)
 		int rc;
 
 		tent = LIST_FIRST(&ghost_list);
-		if(tent->type != TUP_NODE_GHOST && tent->type != TUP_NODE_GROUP) {
+		if(tent->type != TUP_NODE_GHOST && tent->type != TUP_NODE_GROUP &&
+		   tent->type != TUP_NODE_GENERATED_DIR) {
 			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_list shouldn't be type %i\n", tent->tnode.tupid, tent->type);
 			return -1;
 		}
@@ -6872,6 +6880,8 @@ static int reclaim_ghosts(void)
 			/* Re-check the parent again later */
 			tup_entry_add_ghost_list(tent->parent, &tmp_list);
 
+			if(rm_generated_dir(tent) < 0)
+				return -1;
 			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
 		}
@@ -6888,7 +6898,7 @@ static int ghost_reclaimable(struct tup_entry *tent)
 {
 	int rc1, rc2;
 
-	if(tent->type == TUP_NODE_GHOST) {
+	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED_DIR) {
 		rc1 = ghost_reclaimable1(tent->tnode.tupid);
 		rc2 = ghost_reclaimable2(tent->tnode.tupid);
 	} else {
