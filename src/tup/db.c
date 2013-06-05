@@ -3004,7 +3004,11 @@ int tup_db_unflag_create(tupid_t tupid)
 		return -1;
 	}
 
-	expected_changes++;
+	/* Only factor in the change if we actually remove something. We call
+	 * this for every node in the create graph, even dependent ones that
+	 * aren't actually in the create list.
+	 */
+	expected_changes += sqlite3_changes(tup_db);
 	return 0;
 }
 
