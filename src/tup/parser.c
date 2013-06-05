@@ -3110,17 +3110,14 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 		if(tup_entry_add(pl->dt, &dest_tent) < 0)
 			return -1;
-		if(dest_tent->type == TUP_NODE_GENERATED_DIR) {
-			/* Generate dirs are .gitignored in their parent
-			 * directory, rather than having a .gitignore in the
-			 * generated dir itself.
-			 */
-			if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->dt) < 0)
-				return -1;
-		} else {
-			if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
-				return -1;
+		/* Go up until we find a non-generated dir, so we can try to
+		 * gitignore there.
+		 */
+		while(dest_tent->type == TUP_NODE_GENERATED_DIR) {
+			dest_tent = dest_tent->parent;
 		}
+		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
+			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {
