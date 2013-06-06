@@ -102,6 +102,7 @@ enum {
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
+	DB_SET_SRCID_DIR_FLAGS,
 	DB_SET_DEPENDENT_CONFIG_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_SELECT_NODE_BY_GROUP_LINK,
@@ -1680,8 +1681,8 @@ int tup_db_flag_generated_dirs(tupid_t dt)
 		if(he->type == TUP_NODE_GENERATED_DIR) {
 			if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
 				return -1;
-		} else if(he->type == TUP_NODE_GENERATED) {
-			if(tup_db_modify_cmds_by_output(he->tupid, NULL) < 0)
+		} else if(he->type != TUP_NODE_GHOST) {
+			if(tup_del_id_force(he->tupid, he->type) < 0)
 				return -1;
 		}
 		LIST_REMOVE(he, list);
@@ -4040,6 +4041,43 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_set_srcid_dir_flags(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_SRCID_DIR_FLAGS];
+	static char s[] = "insert or ignore into create_list select srcid from node where dir=? and srcid != -1";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;

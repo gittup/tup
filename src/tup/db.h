@@ -137,6 +137,7 @@ int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
 int tup_db_modify_cmds_by_input(tupid_t input);
 int tup_db_set_dependent_flags(tupid_t tupid);
 int tup_db_set_dependent_dir_flags(tupid_t tupid);
+int tup_db_set_srcid_dir_flags(tupid_t tupid);
 int tup_db_set_dependent_config_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid);

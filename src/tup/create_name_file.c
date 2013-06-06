@@ -313,6 +313,10 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 		return 0;
 
 	if(type == TUP_NODE_GENERATED_DIR) {
+		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
+			return -1;
+		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
+			return -1;
 		if(tup_db_flag_generated_dirs(tupid) < 0)
 			return -1;
 		return 0;
