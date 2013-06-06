@@ -324,6 +324,11 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 
 	if(type == TUP_NODE_DIR) {
 		struct variant *variant;
+
+		/* Flag any directories who write files in our directory. */
+		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
+			return -1;
+
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */

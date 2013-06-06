@@ -4066,9 +4066,9 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_SRCID_DIR_FLAGS];
-	static char s[] = "insert or ignore into create_list select srcid from node where dir=? and srcid != -1";
+	static char s[] = "insert or ignore into create_list select srcid from node where dir=? and type=?";
 
-	transaction_check("%s [37m[%lli][0m", s, tupid);
+	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_GENERATED);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -4078,6 +4078,11 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
