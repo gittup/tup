@@ -1782,122 +1782,146 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	return 0;
 }
 
-#define TMPFILESIZE 128
+#define TMPFILESIZE 32
 static char *expand_command(struct tup_entry *tent, const char *cmd,
 			    struct tupid_entries *group_sticky_root,
-			    struct tupid_entries *used_groups_root,
-			    char *tmpfilename)
+			    struct tupid_entries *used_groups_root)
 {
 	char *expanded_name;
 	int len;
 	const char *percgroup;
 	static int resfile = 0;
+	int group_count = 0;
+	const char *tcmd;
 
-	len = strlen(cmd);
-	percgroup = strstr(cmd, "%<");
-	if(percgroup) {
-		int tmpfilenamelen;
-		int prelen = percgroup - cmd;
-		int postlen;
-		int dotdotlen = 0;
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+		return NULL;
+	}
+
+	tcmd = cmd;
+	while((percgroup = strstr(tcmd, "%<")) != NULL) {
+		tcmd = percgroup + 1;
+		group_count++;
+	}
+	if(group_count) {
 		struct tup_entry *tmp;
-		struct tupid_tree *tt;
+		int dotdotlen = 0;
+		int num_dotdots = 0;
+		int tcmdlen;
 		char *p;
-		FILE *f;
-		const char *groupname;
-		char *endgroup;
-		int grouplen;
-		int group_found = 0;
-
-		endgroup = strchr(percgroup, '>');
-		if(!endgroup) {
-			fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
-			return NULL;
-		}
-		endgroup++;
-
-		groupname = percgroup + 1;
-		grouplen = endgroup - groupname;
-		postlen = cmd + len - endgroup;
 
 		tmp = tent->parent;
 		while(tmp->parent) {
 			dotdotlen += 3;
+			num_dotdots++;
 			tmp = tmp->parent;
 		}
-		len -= endgroup - percgroup;
-		snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
-		resfile++;
-		if(fchdir(tup_top_fd()) < 0) {
-			perror("fchdir");
-			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
-			return NULL;
-		}
-		/* Use binary so newlines aren't converted on Windows. Both cl
-		 * and cygwin can handle UNIX line-endings, but cygwin barfs on
-		 * Windows line-endings.
+
+		/* Each group needs space for the "../../.." to get to the tup
+		 * root, plus the space for ".tup/tmp/res-%i". We don't
+		 * subtract out the space for removing <objs> from the
+		 * command-line string, so the actual space we malloc is a
+		 * little high.
 		 */
-		f = fopen(tmpfilename, "wb");
-		if(!f) {
-			perror(tmpfilename);
-			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
-			return NULL;
-		}
-		RB_FOREACH(tt, tupid_entries, group_sticky_root) {
-			struct tup_entry *group_tent;
-			if(tup_entry_add(tt->tupid, &group_tent) < 0)
-				return NULL;
-
-			if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
-				struct tupid_entries inputs = {NULL};
-				struct tupid_tree *ttinput;
-				int outputlen;
-
-				if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
-					return NULL;
-				if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
-					return NULL;
-				RB_FOREACH(ttinput, tupid_entries, &inputs) {
-					struct tup_entry *input_tent;
-					if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
-						return NULL;
-					if(input_tent->type == TUP_NODE_GENERATED) {
-						if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
-							return NULL;
-						fprintf(f, "\n");
-					}
-				}
-				free_tupid_tree(&inputs);
-				group_found = 1;
-			}
-		}
-		fclose(f);
-		if(!group_found) {
-			fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return NULL;
-		}
-		tmpfilename[TMPFILESIZE-1] = 0;
-		tmpfilenamelen = strlen(tmpfilename);
-		len += tmpfilenamelen;
-		expanded_name = malloc(dotdotlen + len + 1);
+		len = strlen(cmd) + (dotdotlen + TMPFILESIZE) * group_count;
+		expanded_name = malloc(len + 1);
 		if(!expanded_name) {
 			perror("malloc");
 			return NULL;
 		}
-
 		p = expanded_name;
-		memcpy(p, cmd, prelen); p += prelen;
-		tmp = tent->parent;
-		while(tmp->parent) {
-			memcpy(p, "../", 3);
-			p += 3;
-			tmp = tmp->parent;
+
+		tcmd = cmd;
+		while((percgroup = strstr(tcmd, "%<")) != NULL) {
+			char tmpfilename[TMPFILESIZE];
+			int tmpfilenamelen;
+			int prelen = percgroup - tcmd;
+			struct tupid_tree *tt;
+			FILE *f;
+			const char *groupname;
+			char *endgroup;
+			int grouplen;
+			int group_found = 0;
+			int x;
+
+			memcpy(p, tcmd, prelen); p += prelen;
+
+			endgroup = strchr(percgroup, '>');
+			if(!endgroup) {
+				fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
+				return NULL;
+			}
+			endgroup++;
+
+			tcmd = endgroup;
+			groupname = percgroup + 1;
+			grouplen = endgroup - groupname;
+
+			snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
+			resfile++;
+			/* Use binary so newlines aren't converted on Windows.
+			 * Both cl and cygwin can handle UNIX line-endings, but
+			 * cygwin barfs on Windows line-endings.
+			 */
+			f = fopen(tmpfilename, "wb");
+			if(!f) {
+				perror(tmpfilename);
+				fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+				return NULL;
+			}
+			RB_FOREACH(tt, tupid_entries, group_sticky_root) {
+				struct tup_entry *group_tent;
+				if(tup_entry_add(tt->tupid, &group_tent) < 0)
+					return NULL;
+
+				if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
+					struct tupid_entries inputs = {NULL};
+					struct tupid_tree *ttinput;
+					int outputlen;
+
+					if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
+						return NULL;
+					if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+						return NULL;
+					RB_FOREACH(ttinput, tupid_entries, &inputs) {
+						struct tup_entry *input_tent;
+						if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+							return NULL;
+						if(input_tent->type == TUP_NODE_GENERATED) {
+							if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+								return NULL;
+							fprintf(f, "\n");
+						}
+					}
+					free_tupid_tree(&inputs);
+					group_found = 1;
+				}
+			}
+			fclose(f);
+			if(!group_found) {
+				fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
+				print_tup_entry(stderr, tent);
+				fprintf(stderr, "\n");
+				return NULL;
+			}
+			tmpfilename[TMPFILESIZE-1] = 0;
+			tmpfilenamelen = strlen(tmpfilename);
+
+			for(x=0; x<num_dotdots; x++) {
+				memcpy(p, "../", 3);
+				p += 3;
+			}
+			memcpy(p, tmpfilename, tmpfilenamelen); p += tmpfilenamelen;
 		}
-		memcpy(p, tmpfilename, tmpfilenamelen); p += tmpfilenamelen;
-		memcpy(p, endgroup, postlen); p += postlen;
+		tcmdlen = strlen(tcmd);
+		memcpy(p, tcmd, tcmdlen); p += tcmdlen;
 		*p = 0;
+		if(p - expanded_name > len) {
+			fprintf(stderr, "tup internal error: expanded_name sized incorrectly.\n");
+			return NULL;
+		}
 	} else {
 		expanded_name = strdup(cmd);
 	}
@@ -1918,7 +1942,6 @@ static int update(struct node *n)
 	struct timespan ts;
 	int do_chroot = full_deps;
 	struct tupid_entries used_groups_root = {NULL};
-	char tmpfilename[TMPFILESIZE];
 
 	timespan_start(&ts);
 	if(name[0] == '^') {
@@ -1974,7 +1997,7 @@ static int update(struct node *n)
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
 	if(rc == 0) {
-		expanded_name = expand_command(n->tent, name, &group_sticky_root, &used_groups_root, tmpfilename);
+		expanded_name = expand_command(n->tent, name, &group_sticky_root, &used_groups_root);
 		if(!expanded_name)
 			rc = -1;
 	}
@@ -1989,8 +2012,6 @@ static int update(struct node *n)
 		pthread_mutex_unlock(&display_mutex);
 		goto err_close_dfd;
 	}
-	if(!RB_EMPTY(&used_groups_root))
-		unlink(tmpfilename);
 	free(expanded_name);
 	environ_free(&newenv);
 	if(close(dfd) < 0) {
@@ -2006,6 +2027,7 @@ static int update(struct node *n)
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
 	free_tupid_tree(&group_sticky_root);
+	free_tupid_tree(&used_groups_root);
 	if(server_postexec(&s) < 0)
 		return -1;
 	return rc;
