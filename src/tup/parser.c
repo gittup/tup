@@ -3532,11 +3532,11 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				return NULL;
 			}
 			clen += nl->globtotlen[0];
-		} else if(*next == 'r') {
-			/* %r is expanded by the updater before executing a
-			 * command.
+		} else if(*next == '<') {
+			/* %<group> is expanded by the updater before executing
+			 * a command.
 			 */
-			clen+=2;
+			clen += 2;
 		} else if(*next == '%') {
 			clen++;
 		} else {
@@ -3641,13 +3641,13 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				memcpy(&s[x], nle->base + nle->glob[0], nle->glob[1]);
 				x += nle->glob[1];
 			}
-		} else if(*next == 'r') {
-			/* %r is expanded by the updater before executing a
-			 * command.
+		} else if(*next == '<') {
+			/* %<group> is expanded by the updater before executing
+			 * a command.
 			 */
 			s[x] = '%';
 			x++;
-			s[x] = 'r';
+			s[x] = '<';
 			x++;
 		} else {
 			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);

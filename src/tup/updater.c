@@ -1788,20 +1788,34 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 {
 	char *expanded_name;
 	int len;
-	const char *percr;
+	const char *percgroup;
 	static int resfile = 0;
 
 	len = strlen(cmd);
-	percr = strstr(cmd, "%r");
-	if(percr) {
+	percgroup = strstr(cmd, "%<");
+	if(percgroup) {
 		int tmpfilenamelen;
-		int prelen = percr - cmd;
-		int postlen = cmd + len - percr - 2;
+		int prelen = percgroup - cmd;
+		int postlen;
 		int dotdotlen = 0;
 		struct tup_entry *tmp;
 		struct tupid_tree *tt;
 		char *p;
 		FILE *f;
+		const char *groupname;
+		char *endgroup;
+		int grouplen;
+
+		endgroup = strchr(percgroup, '>');
+		if(!endgroup) {
+			fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
+			return NULL;
+		}
+		endgroup++;
+
+		groupname = percgroup + 1;
+		grouplen = endgroup - groupname;
+		postlen = cmd + len - endgroup;
 
 		*used_groups = 1;
 
@@ -1810,7 +1824,7 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 			dotdotlen += 3;
 			tmp = tmp->parent;
 		}
-		len -= 2;
+		len -= endgroup - percgroup;
 		snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
 		resfile++;
 		if(fchdir(tup_top_fd()) < 0) {
@@ -1829,22 +1843,28 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 			return NULL;
 		}
 		RB_FOREACH(tt, tupid_entries, group_sticky_root) {
-			struct tupid_entries inputs = {NULL};
-			struct tupid_tree *ttinput;
-			int outputlen;
-			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+			struct tup_entry *group_tent;
+			if(tup_entry_add(tt->tupid, &group_tent) < 0)
 				return NULL;
-			RB_FOREACH(ttinput, tupid_entries, &inputs) {
-				struct tup_entry *input_tent;
-				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+
+			if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
+				struct tupid_entries inputs = {NULL};
+				struct tupid_tree *ttinput;
+				int outputlen;
+				if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
 					return NULL;
-				if(input_tent->type == TUP_NODE_GENERATED) {
-					if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+				RB_FOREACH(ttinput, tupid_entries, &inputs) {
+					struct tup_entry *input_tent;
+					if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
 						return NULL;
-					fprintf(f, "\n");
+					if(input_tent->type == TUP_NODE_GENERATED) {
+						if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+							return NULL;
+						fprintf(f, "\n");
+					}
 				}
+				free_tupid_tree(&inputs);
 			}
-			free_tupid_tree(&inputs);
 		}
 		fclose(f);
 		tmpfilename[TMPFILESIZE-1] = 0;
@@ -1865,7 +1885,7 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 			tmp = tmp->parent;
 		}
 		memcpy(p, tmpfilename, tmpfilenamelen); p += tmpfilenamelen;
-		memcpy(p, percr + 2, postlen); p += postlen;
+		memcpy(p, endgroup, postlen); p += postlen;
 		*p = 0;
 	} else {
 		expanded_name = strdup(cmd);

@@ -16,22 +16,25 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Expand a group in the command-line at runtime.
+# Make sure we only get the group we ask for.
 . ./tup.sh
 
 cat > Tuprules.tup << HERE
+!cc = |> gcc -c %f -o %o |> %B.o | \$(MY_ROOT)/<objs>
 MY_ROOT = \$(TUP_CWD)
 HERE
 
 tmkdir foo
 tmkdir bar
+tmkdir sub
 cat > foo/Tupfile << HERE
 include_rules
-: foreach *.c |> gcc -c %f -o %o |> %B.o | \$(MY_ROOT)/<objs>
+: foreach *.c |> !cc |>
+: |> echo hey > %o |> tmp.txt | \$(MY_ROOT)/<txt>
 HERE
 cat > bar/Tupfile << HERE
 include_rules
-: foreach *.c |> gcc -c %f -o %o |> %B.o | \$(MY_ROOT)/<objs>
+: foreach *.c |> !cc |>
 HERE
 cat > foo/main.c << HERE
 int bar(void);
@@ -44,26 +47,19 @@ cat > bar/bar.c << HERE
 int bar(void) {return 0;}
 HERE
 
-# Link all the outputs from the root.
 cat > Tupfile << HERE
-: <objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
-HERE
-
-# Same, but now we need the ../ path to get to the objs.
-tmkdir linked
-cat > linked/Tupfile << HERE
-include_rules
-: \$(MY_ROOT)/<objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
+: <txt> <objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
 HERE
 update
 
-# Make sure if we add a new file to the group, the things using the group
-# are re-executed.
-echo 'int marfx;' > foo/newfoo.c
-tup touch foo/newfoo.c
+cat > Tupfile << HERE
+: foo/*.o bar/*.o |> gcc %f -o %o |> myprog.exe
+HERE
+cat > Tuprules.tup << HERE
+!cc = |> gcc -c %f -o %o |> %B.o
+MY_ROOT = \$(TUP_CWD)
+HERE
+tup touch Tupfile Tuprules.tup
 update
-
-sym_check myprog.exe marfx
-sym_check linked/myprog.exe marfx
 
 eotup

@@ -47,7 +47,7 @@ int bar(void) {return 0;}
 HERE
 
 cat > Tupfile << HERE
-: <objs> |> cat %r | xargs gcc -o %o |> myprog.exe
+: <objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
 HERE
 update
 
