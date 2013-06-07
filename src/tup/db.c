@@ -6169,6 +6169,12 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			}
 			if(link_remove(cmdid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
+
+			/* Any commands that use the group as a resource file
+			 * need to be re-executed.
+			 */
+			if(tup_db_add_modify_list((*old_group)->tnode.tupid) < 0)
+				return -1;
 			/* Possibly clean up this group if there are no more references. */
 			tup_entry_add_ghost_list(*old_group, &ghost_list);
 		}
@@ -6925,6 +6931,11 @@ static int reclaim_ghosts(void)
 
 			if(rm_generated_dir(tent) < 0)
 				return -1;
+
+			/* Groups can be in the modify list (ghosts can't) */
+			if(tent->type == TUP_NODE_GROUP)
+				if(tup_db_unflag_modify(tent->tnode.tupid) < 0)
+					return -1;
 			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
 		}
