@@ -52,14 +52,7 @@ cat > Tupfile << HERE
 HERE
 update
 
-cat > Tupfile << HERE
-: foo/*.o bar/*.o |> gcc %f -o %o |> myprog.exe
-HERE
-cat > Tuprules.tup << HERE
-!cc = |> gcc -c %f -o %o |> %B.o
-MY_ROOT = \$(TUP_CWD)
-HERE
-tup touch Tupfile Tuprules.tup
-update
+tup_dep_exist . '<objs>' . 'cat %<objs> | xargs gcc -o myprog.exe'
+tup_dep_no_exist . '<txt>' . 'cat %<objs> | xargs gcc -o myprog.exe'
 
 eotup

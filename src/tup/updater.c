@@ -1704,7 +1704,8 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *sticky_root,
 			  struct tupid_entries *normal_root,
 			  struct tupid_entries *group_sticky_root,
-			  struct timespan *ts, int used_groups)
+			  struct timespan *ts,
+			  struct tupid_entries *used_groups_root)
 {
 	FILE *f;
 	int is_err = 1;
@@ -1726,7 +1727,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1738,7 +1739,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -1749,7 +1750,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
-		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups) < 0) {
+		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 			fprintf(f, " *** Additionally, command %lli failed to process input dependencies.", tent->tnode.tupid);
 		}
 	} else {
@@ -1784,7 +1785,8 @@ static int process_output(struct server *s, struct tup_entry *tent,
 #define TMPFILESIZE 128
 static char *expand_command(struct tup_entry *tent, const char *cmd,
 			    struct tupid_entries *group_sticky_root,
-			    int *used_groups, char *tmpfilename)
+			    struct tupid_entries *used_groups_root,
+			    char *tmpfilename)
 {
 	char *expanded_name;
 	int len;
@@ -1816,8 +1818,6 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		groupname = percgroup + 1;
 		grouplen = endgroup - groupname;
 		postlen = cmd + len - endgroup;
-
-		*used_groups = 1;
 
 		tmp = tent->parent;
 		while(tmp->parent) {
@@ -1851,6 +1851,9 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 				struct tupid_entries inputs = {NULL};
 				struct tupid_tree *ttinput;
 				int outputlen;
+
+				if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
+					return NULL;
 				if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
 					return NULL;
 				RB_FOREACH(ttinput, tupid_entries, &inputs) {
@@ -1906,7 +1909,7 @@ static int update(struct node *n)
 	struct tup_env newenv;
 	struct timespan ts;
 	int do_chroot = full_deps;
-	int used_groups = 0;
+	struct tupid_entries used_groups_root = {NULL};
 	char tmpfilename[TMPFILESIZE];
 
 	timespan_start(&ts);
@@ -1963,7 +1966,7 @@ static int update(struct node *n)
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
 	if(rc == 0) {
-		expanded_name = expand_command(n->tent, name, &group_sticky_root, &used_groups, tmpfilename);
+		expanded_name = expand_command(n->tent, name, &group_sticky_root, &used_groups_root, tmpfilename);
 		if(!expanded_name)
 			rc = -1;
 	}
@@ -1978,7 +1981,7 @@ static int update(struct node *n)
 		pthread_mutex_unlock(&display_mutex);
 		goto err_close_dfd;
 	}
-	if(used_groups)
+	if(!RB_EMPTY(&used_groups_root))
 		unlink(tmpfilename);
 	free(expanded_name);
 	environ_free(&newenv);
@@ -1989,7 +1992,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, used_groups);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free_tupid_tree(&sticky_root);
