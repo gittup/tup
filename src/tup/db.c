@@ -6964,7 +6964,7 @@ static int group_reclaimable1(tupid_t tupid)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GROUP_RECLAIMABLE1];
-	static char s[] = "select exists(select 1 from normal_link where to_id=?)";
+	static char s[] = "select exists(select 1 from normal_link where from_id=? or to_id=?)";
 
 	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
@@ -6976,6 +6976,11 @@ static int group_reclaimable1(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -7020,7 +7025,7 @@ static int group_reclaimable2(tupid_t tupid)
 	sqlite3_stmt **stmt = &stmts[_DB_GROUP_RECLAIMABLE2];
 	static char s[] = "select exists(select 1 from sticky_link where from_id=?)";
 
-	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
+	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
