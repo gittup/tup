@@ -1807,6 +1807,7 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		const char *groupname;
 		char *endgroup;
 		int grouplen;
+		int group_found = 0;
 
 		endgroup = strchr(percgroup, '>');
 		if(!endgroup) {
@@ -1867,9 +1868,16 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 					}
 				}
 				free_tupid_tree(&inputs);
+				group_found = 1;
 			}
 		}
 		fclose(f);
+		if(!group_found) {
+			fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
+			return NULL;
+		}
 		tmpfilename[TMPFILESIZE-1] = 0;
 		tmpfilenamelen = strlen(tmpfilename);
 		len += tmpfilenamelen;
