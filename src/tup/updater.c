@@ -1096,8 +1096,9 @@ static int process_create_nodes(void)
 		}
 		if(rc == 0 && !RB_EMPTY(&g.normal_dir_root)) {
 			int msg_shown = 0;
-			RB_FOREACH(tt, tupid_entries, &g.normal_dir_root) {
+			while(!RB_EMPTY(&g.normal_dir_root)) {
 				int dbrc;
+				tt = RB_MIN(tupid_entries, &g.normal_dir_root);
 				dbrc = tup_db_is_generated_dir(tt->tupid);
 				if(dbrc < 0)
 					return -1;
@@ -1114,9 +1115,13 @@ static int process_create_nodes(void)
 					printf(" to a generated directory.\n");
 					if(tup_db_normal_dir_to_generated(tent) < 0)
 						return -1;
+					/* Also check the parent. */
+					if(tupid_tree_add_dup(&g.normal_dir_root, tent->dt) < 0)
+						return -1;
 				}
+				tupid_tree_rm(&g.normal_dir_root, tt);
+				free(tt);
 			}
-			free_tupid_tree(&g.normal_dir_root);
 		}
 		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
 			tup_show_message("Generating .gitignore files...\n");

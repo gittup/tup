@@ -293,6 +293,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		return -1;
 	}
 
+	/* We may need to convert normal dirs back to generated dirs,
+	 * so add this one to check.
+	 */
+	if(tupid_tree_add_dup(&g->normal_dir_root, n->tent->tnode.tupid) < 0)
+		return -1;
+
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
@@ -3110,13 +3116,6 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 		if(tup_entry_add(pl->dt, &dest_tent) < 0)
 			return -1;
-		/* We may need to convert normal dirs back to generated dirs,
-		 * so add this one to check.
-		 */
-		if(pl->dt != tf->tupid && dest_tent->type == TUP_NODE_DIR) {
-			if(tupid_tree_add_dup(&tf->g->normal_dir_root, pl->dt) < 0)
-				return -1;
-		}
 
 		/* Go up until we find a non-generated dir, so we can try to
 		 * gitignore there.

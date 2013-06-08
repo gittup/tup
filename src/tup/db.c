@@ -99,7 +99,8 @@ enum {
 	DB_DIRTYPE_TO_TREE,
 	DB_SRCID_TO_TREE,
 	DB_TYPE_TO_TREE,
-	DB_IS_GENERATED_DIR,
+	_DB_IS_GENERATED_DIR1,
+	_DB_IS_GENERATED_DIR2,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -3933,11 +3934,11 @@ int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TY
 	return rc;
 }
 
-int tup_db_is_generated_dir(tupid_t dt)
+static int is_generated_dir1(tupid_t dt)
 {
 	int rc = -1;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_IS_GENERATED_DIR];
+	sqlite3_stmt **stmt = &stmts[_DB_IS_GENERATED_DIR1];
 	static char s[] = "select exists(select 1 from node where dir=? and (type=? or type=?))";
 
 	transaction_check("%s [37m[%lli, %i, %i][0m", s, dt, TUP_NODE_FILE, TUP_NODE_DIR);
@@ -3967,7 +3968,7 @@ int tup_db_is_generated_dir(tupid_t dt)
 
 	rc = sqlite3_step(*stmt);
 	if(rc == SQLITE_DONE) {
-		fprintf(stderr, "tup error: Expected tup_db_is_generated_dir() to get an SQLite row returned.\n");
+		fprintf(stderr, "tup error: Expected is_generated_dir1() to get an SQLite row returned.\n");
 		goto out_reset;
 	}
 	if(rc != SQLITE_ROW) {
@@ -3976,7 +3977,7 @@ int tup_db_is_generated_dir(tupid_t dt)
 		goto out_reset;
 	}
 	dbrc = sqlite3_column_int(*stmt, 0);
-	/* If the exists clause returns 0, then we are a generated dir,
+	/* If the exists clause returns 0, then we could be a generated dir,
 	 * otherwise we are a normal dir.
 	 */
 	if(dbrc == 0) {
@@ -3984,7 +3985,7 @@ int tup_db_is_generated_dir(tupid_t dt)
 	} else if(dbrc == 1) {
 		rc = 0;
 	} else {
-		fprintf(stderr, "tup error: Expected tup_db_is_generated_dir() to get a 0 or 1 from SQLite\n");
+		fprintf(stderr, "tup error: Expected is_generated_dir1() to get a 0 or 1 from SQLite\n");
 		goto out_reset;
 	}
 
@@ -3996,6 +3997,91 @@ out_reset:
 	}
 
 	return rc;
+}
+
+static int is_generated_dir2(tupid_t dt)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_IS_GENERATED_DIR2];
+	static char s[] = "select exists(select 1 from node where dir=? and srcid!=dir and (type=? or type=?))";
+
+	transaction_check("%s [37m[%lli, %i, %i][0m", s, dt, TUP_NODE_GENERATED, TUP_NODE_GENERATED_DIR);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_GENERATED) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected is_generated_dir2() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 1, then we could be a generated dir,
+	 * otherwise we are a normal dir.
+	 */
+	if(dbrc == 1) {
+		rc = 1;
+	} else if(dbrc == 0) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected is_generated_dir2() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_is_generated_dir(tupid_t dt)
+{
+	int rc1, rc2;
+	/* We are a generated dir if we have no normal files / directories
+	 * under us...
+	 */
+	rc1 = is_generated_dir1(dt);
+	if(rc1 < 0)
+		return -1;
+	/* ... and we have some generated files coming from other dirs or
+	 * generated subdirs
+	 */
+	rc2 = is_generated_dir2(dt);
+	if(rc2 < 0)
+		return -1;
+	if(rc1 == 1 && rc2 == 1)
+		return 1;
+	return 0;
 }
 
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified)
