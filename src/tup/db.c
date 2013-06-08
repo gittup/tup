@@ -4073,6 +4073,9 @@ int tup_db_is_generated_dir(tupid_t dt)
 	rc1 = is_generated_dir1(dt);
 	if(rc1 < 0)
 		return -1;
+	if(rc1 == 0)
+		return 0;
+
 	/* ... and we have some generated files coming from other dirs or
 	 * generated subdirs
 	 */
@@ -7117,9 +7120,13 @@ static int ghost_reclaimable(struct tup_entry *tent)
 
 	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED_DIR) {
 		rc1 = ghost_reclaimable1(tent->tnode.tupid);
+		if(rc1 == 0)
+			return 0;
 		rc2 = ghost_reclaimable2(tent->tnode.tupid);
 	} else {
 		rc1 = group_reclaimable1(tent->tnode.tupid);
+		if(rc1 == 0)
+			return 0;
 		rc2 = group_reclaimable2(tent->tnode.tupid);
 	}
 
