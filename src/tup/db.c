@@ -99,6 +99,7 @@ enum {
 	DB_DIRTYPE_TO_TREE,
 	DB_SRCID_TO_TREE,
 	DB_TYPE_TO_TREE,
+	DB_IS_GENERATED_DIR,
 	DB_MODIFY_CMDS_BY_OUTPUT,
 	DB_MODIFY_CMDS_BY_INPUT,
 	DB_SET_DEPENDENT_DIR_FLAGS,
@@ -3752,6 +3753,17 @@ int tup_db_delete_links(tupid_t tupid)
 	return 0;
 }
 
+int tup_db_normal_dir_to_generated(struct tup_entry *tent)
+{
+	if(add_ghost_checks(tent->tnode.tupid) < 0)
+		return -1;
+	if(delete_normal_links(tent->tnode.tupid) < 0)
+		return -1;
+	if(tup_db_set_type(tent, TUP_NODE_GENERATED_DIR) < 0)
+		return -1;
+	return 0;
+}
+
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
@@ -3912,6 +3924,71 @@ int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TY
 		}
 	}
 
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_is_generated_dir(tupid_t dt)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_IS_GENERATED_DIR];
+	static char s[] = "select exists(select 1 from node where dir=? and (type=? or type=?))";
+
+	transaction_check("%s [37m[%lli, %i, %i][0m", s, dt, TUP_NODE_FILE, TUP_NODE_DIR);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_FILE) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_DIR) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected tup_db_is_generated_dir() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are a generated dir,
+	 * otherwise we are a normal dir.
+	 */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected tup_db_is_generated_dir() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
 	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);

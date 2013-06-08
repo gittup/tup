@@ -3110,6 +3110,14 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 		if(tup_entry_add(pl->dt, &dest_tent) < 0)
 			return -1;
+		/* We may need to convert normal dirs back to generated dirs,
+		 * so add this one to check.
+		 */
+		if(pl->dt != tf->tupid && dest_tent->type == TUP_NODE_DIR) {
+			if(tupid_tree_add_dup(&tf->g->normal_dir_root, pl->dt) < 0)
+				return -1;
+		}
+
 		/* Go up until we find a non-generated dir, so we can try to
 		 * gitignore there.
 		 */

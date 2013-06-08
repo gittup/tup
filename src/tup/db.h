@@ -83,6 +83,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
+int tup_db_normal_dir_to_generated(struct tup_entry *tent);
 int tup_db_print(FILE *stream, tupid_t tupid);
 int tup_db_alloc_generated_nodelist(char **s, int *len, tupid_t dt);
 int tup_db_rebuild_all(void);
@@ -171,6 +172,7 @@ tupid_t env_dt(void);
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_is_generated_dir(tupid_t dt);
 
 /* scanner operations */
 int tup_db_scan_begin(void);

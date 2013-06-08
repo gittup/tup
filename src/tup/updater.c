@@ -1094,6 +1094,30 @@ static int process_create_nodes(void)
 			if(group_circ_check() < 0)
 				rc = -1;
 		}
+		if(rc == 0 && !RB_EMPTY(&g.normal_dir_root)) {
+			int msg_shown = 0;
+			RB_FOREACH(tt, tupid_entries, &g.normal_dir_root) {
+				int dbrc;
+				dbrc = tup_db_is_generated_dir(tt->tupid);
+				if(dbrc < 0)
+					return -1;
+				if(dbrc) {
+					struct tup_entry *tent;
+					if(!msg_shown) {
+						msg_shown = 1;
+						tup_show_message("Converting normal directories to generated directories...\n");
+					}
+					if(tup_entry_add(tt->tupid, &tent) < 0)
+						return -1;
+					printf("tup: Converting ");
+					print_tup_entry(stdout, tent);
+					printf(" to a generated directory.\n");
+					if(tup_db_normal_dir_to_generated(tent) < 0)
+						return -1;
+				}
+			}
+			free_tupid_tree(&g.normal_dir_root);
+		}
 		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
 			tup_show_message("Generating .gitignore files...\n");
 			RB_FOREACH(tt, tupid_entries, &g.parse_gitignore_root) {
