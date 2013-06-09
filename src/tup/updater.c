@@ -1118,6 +1118,11 @@ static int process_create_nodes(void)
 					/* Also check the parent. */
 					if(tupid_tree_add_dup(&g.normal_dir_root, tent->dt) < 0)
 						return -1;
+					/* And check if the parent needs us in
+					 * gitignore.
+					 */
+					if(tupid_tree_add_dup(&g.parse_gitignore_root, tent->dt) < 0)
+						return -1;
 				}
 				tupid_tree_rm(&g.normal_dir_root, tt);
 				free(tt);

@@ -24,13 +24,18 @@ tmkdir foo
 tmkdir foo/bar
 tmkdir foo/bar/baz
 cat > Tupfile << HERE
+.gitignore
 : |> touch %o |> foo/bar/baz/gen.txt
 HERE
 tup touch foo/bar/baz/ok.txt
 update
 
+gitignore_bad foo .gitignore
+
 rm foo/bar/baz/ok.txt
 update
+
+gitignore_good foo .gitignore
 
 check_exist foo
 
