@@ -72,7 +72,6 @@ enum {
 	DB_REBUILD_ALL,
 	_DB_NODELIST_LEN,
 	_DB_GET_NODELIST,
-	DB_ADD_DIR_CREATE_LIST,
 	DB_MAYBE_ADD_CONFIG_LIST,
 	DB_ADD_CONFIG_LIST,
 	DB_MAYBE_ADD_CREATE_LIST,
@@ -2626,43 +2625,6 @@ int tup_db_get_node_flags(tupid_t tupid)
 		flags |= TUP_FLAGS_MODIFY;
 
 	return flags;
-}
-
-int tup_db_add_dir_create_list(tupid_t tupid)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_ADD_DIR_CREATE_LIST];
-	static char s[] = "insert or ignore into create_list select dir from node where id=?";
-
-	transaction_check("%s [37m[%lli][0m", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return 0;
 }
 
 int tup_db_maybe_add_config_list(tupid_t tupid)

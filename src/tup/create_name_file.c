@@ -456,7 +456,7 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 			/* Re-parse the current Tupfile (the updater
 			 * automatically parses any dependent directories).
 			 */
-			if(tup_db_add_dir_create_list(tupid) < 0)
+			if(tup_db_add_create_list(tent->dt) < 0)
 				return -1;
 		}
 	}
