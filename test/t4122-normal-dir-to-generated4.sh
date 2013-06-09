@@ -16,7 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Similar to t4122, but now we remove normal files instead of generated files.
+# Similar to t4121, but now we remove normal files instead of generated files.
 
 . ./tup.sh
 
