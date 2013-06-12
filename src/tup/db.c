@@ -1672,6 +1672,13 @@ int tup_db_delete_dir(tupid_t dt, int force)
 int tup_db_flag_generated_dirs(tupid_t dt)
 {
 	struct half_entry_head subdir_list;
+	struct tup_entry *tent;
+
+	if(tup_entry_add(dt, &tent) < 0)
+		return -1;
+	if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
+		return -1;
+	tup_entry_add_ghost_list(tent, &ghost_list);
 
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(dt, &subdir_list) < 0)

@@ -252,7 +252,7 @@ static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
 	}
 	free(pel);
 
-	if(tent->type == TUP_NODE_DIR) {
+	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
 		/* We don't track dependencies on directory nodes for commands. Note that
 		 * some directory accesses may create ghost nodes as placeholders for the
 		 * directory until a real directory is created there (eg: t5077). In this
