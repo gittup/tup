@@ -405,6 +405,7 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 {
 	struct tup_entry_head *prune_list;
+	struct tupid_entries dir_root = {NULL};
 	int x;
 	int dashdash = 0;
 	int do_prune = 0;
@@ -431,10 +432,13 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		if(tent->type == TUP_NODE_DIR) {
 			/* For a directory, we recursively add all generated
 			 * files in that directory, since updating the
-			 * directory itself doesn't make sense for tup.
+			 * directory itself doesn't make sense for tup. This is
+			 * done by putting all directories into dir_root, and
+			 * then we can check all nodes to see if they are under
+			 * one of these directories.
 			 */
-			if(tup_db_get_generated_tup_entries(tent->tnode.tupid, prune_list) < 0)
-				goto out_err;
+			if(tupid_tree_add_dup(&dir_root, tent->tnode.tupid) < 0)
+				return -1;
 		} else {
 			tup_entry_list_add(tent, prune_list);
 		}
@@ -445,10 +449,32 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		struct node *n;
 		struct node *tmp;
 
+		/* For explicit files: Just see if we have the node in the
+		 * PDAG, and if so, mark it.
+		 */
 		LIST_FOREACH(tent, prune_list, list) {
 			n = find_node(g, tent->tnode.tupid);
 			if(n) {
 				mark_nodes(n);
+			}
+		}
+
+		/* For directories, we need to go through the list of nodes,
+		 * and see if they have a parent in the dir tree.
+		 */
+		if(!RB_EMPTY(&dir_root)) {
+			TAILQ_FOREACH(n, &g->node_list, list) {
+				/* If n->parsing is set, we are already marked. */
+				if(!n->parsing && n->tent->type != TUP_NODE_ROOT) {
+					struct tup_entry *dtent;
+					dtent = n->tent->parent;
+					while(dtent) {
+						if(tupid_tree_search(&dir_root, dtent->tnode.tupid) != NULL) {
+							mark_nodes(n);
+						}
+						dtent = dtent->parent;
+					}
+				}
 			}
 		}
 
@@ -458,6 +484,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 					goto out_err;
 		}
 	}
+	free_tupid_tree(&dir_root);
 	tup_entry_release_list();
 	return 0;
 
