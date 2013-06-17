@@ -352,28 +352,30 @@ static void mark_nodes(struct node *n)
 		return;
 
 	n->parsing = 1;
+
+	/* A command node must have all of its outputs marked, or we risk not
+	 * unlinking all of its outputs in the updater before running it
+	 * (t6055).
+	 */
+	if(n->tent->type == TUP_NODE_CMD) {
+		struct edge *e2;
+		LIST_FOREACH(e2, &n->edges, list) {
+			struct node *dest = e2->dest;
+
+			/* Groups are skipped, otherwise we end up
+			 * building everything in the group (t3058).
+			 */
+			if(dest->tent->type != TUP_NODE_GROUP) {
+				mark_nodes(dest);
+			}
+		}
+	}
+
+	/* Mark everything up the PDAG */
 	LIST_FOREACH(e, &n->incoming, destlist) {
 		struct node *mark = e->src;
 
 		mark_nodes(mark);
-
-		/* A command node must have all of its outputs marked, or we
-		 * risk not unlinking all of its outputs in the updater before
-		 * running it (t6055).
-		 */
-		if(mark->tent->type == TUP_NODE_CMD) {
-			struct edge *e2;
-			LIST_FOREACH(e2, &mark->edges, list) {
-				struct node *dest = e2->dest;
-
-				/* Groups are skipped, otherwise we end up
-				 * building everything in the group (t3058).
-				 */
-				if(dest->tent->type != TUP_NODE_GROUP) {
-					mark_nodes(dest);
-				}
-			}
-		}
 	}
 }
 
@@ -429,7 +431,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			fprintf(stderr, "tup: Unable to find tupid for '%s'\n", argv[x]);
 			goto out_err;
 		}
-		if(tent->type == TUP_NODE_DIR) {
+		if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
 			/* For a directory, we recursively add all generated
 			 * files in that directory, since updating the
 			 * directory itself doesn't make sense for tup. This is
