@@ -312,6 +312,19 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 	if(dont_delete)
 		return 0;
 
+	if(type == TUP_NODE_GHOST) {
+		/* Don't want to delete ghosts, since they may still
+		 * link to somewhere useful (t6061)
+		 */
+		return 0;
+	}
+	if(type == TUP_NODE_GROUP) {
+		/* We don't delete groups here - they are reclaimed similar to
+		 * ghosts (t3078)
+		 */
+		return 0;
+	}
+
 	if(type == TUP_NODE_GENERATED_DIR) {
 		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
 			return -1;

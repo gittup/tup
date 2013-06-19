@@ -1655,10 +1655,7 @@ int tup_db_delete_dir(tupid_t dt, int force)
 			 */
 			if(tup_del_id_type(he->tupid, he->type, force, NULL) < 0)
 				return -1;
-		} else if(he->type != TUP_NODE_GHOST) {
-			/* Don't want to delete ghosts, since they may still
-			 * link to somewhere useful (t6061)
-			 */
+		} else {
 			if(tup_del_id_force(he->tupid, he->type) < 0)
 				return -1;
 		}
@@ -1689,7 +1686,7 @@ int tup_db_flag_generated_dirs(tupid_t dt)
 		if(he->type == TUP_NODE_GENERATED_DIR) {
 			if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
 				return -1;
-		} else if(he->type != TUP_NODE_GHOST) {
+		} else {
 			if(tup_del_id_force(he->tupid, he->type) < 0)
 				return -1;
 		}
