@@ -1675,6 +1675,11 @@ int tup_db_flag_generated_dirs(tupid_t dt)
 		return -1;
 	if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 		return -1;
+	/* If the generated dir was converted from a ghost, it may have
+	 * modify set (t4128).
+	 */
+	if(tup_db_unflag_modify(tent->tnode.tupid) < 0)
+		return -1;
 	tup_entry_add_ghost_list(tent, &ghost_list);
 
 	LIST_INIT(&subdir_list);
