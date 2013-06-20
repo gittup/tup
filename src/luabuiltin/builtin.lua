@@ -21,7 +21,7 @@
 
 local realtostring = tostring
 function tostring(t)
-	if type(t) == 'table' then
+	if type(t) == 'table' and not getmetatable(t) then
 		return table.concat(t, ' ')
 	end
 	return realtostring(t)
