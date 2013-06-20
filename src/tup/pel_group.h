@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -34,6 +34,7 @@ TAILQ_HEAD(path_element_head, path_element);
 #define PG_HIDDEN 1
 #define PG_OUTSIDE_TUP 2
 #define PG_ROOT 4
+#define PG_GROUP 8
 struct pel_group {
 	struct path_element_head path_list;
 	int pg_flags;

@@ -2308,9 +2308,6 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			struct pel_group pg;
 			int sotgv = 0;
 
-			if(create_output_dirs)
-				sotgv = SOTGV_CREATE_DIRS;
-
 			if(strchr(p, '<') != NULL) {
 				/* Group */
 				char *endb;
@@ -2329,6 +2326,9 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 				fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
 				return -1;
 			}
+
+			if(create_output_dirs || pg.pg_flags & PG_GROUP)
+				sotgv = SOTGV_CREATE_DIRS;
 			pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
 			if(pl->dt <= 0) {
 				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
