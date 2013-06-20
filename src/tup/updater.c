@@ -1818,18 +1818,107 @@ static int process_output(struct server *s, struct tup_entry *tent,
 }
 
 #define TMPFILESIZE 32
+
+struct expand_info {
+	struct tup_entry *tent;
+	const char *groupname;
+	int grouplen;
+	struct tupid_entries *group_sticky_root;
+	struct tupid_entries *used_groups_root;
+};
+
+static int expand_res_file(struct estring *expanded_name, struct expand_info *info)
+{
+	static int resfile = 0;
+	FILE *f;
+	char tmpfilename[TMPFILESIZE];
+	int tmpfilenamelen;
+	struct tupid_tree *tt;
+	int group_found = 0;
+	int x;
+	int num_dotdots = 0;
+	struct tup_entry *tmp;
+
+	tmp = info->tent->parent;
+	while(tmp->parent) {
+		num_dotdots++;
+		tmp = tmp->parent;
+	}
+
+	snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
+	resfile++;
+	/* Use binary so newlines aren't converted on Windows.
+	 * Both cl and cygwin can handle UNIX line-endings, but
+	 * cygwin barfs on Windows line-endings.
+	 */
+	f = fopen(tmpfilename, "wb");
+	if(!f) {
+		perror(tmpfilename);
+		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+		return -1;
+	}
+	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
+		struct tup_entry *group_tent;
+		if(tup_entry_add(tt->tupid, &group_tent) < 0)
+			return -1;
+
+		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
+			struct tupid_entries inputs = {NULL};
+			struct tupid_tree *ttinput;
+			int outputlen;
+
+			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+				return -1;
+			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+				return -1;
+			RB_FOREACH(ttinput, tupid_entries, &inputs) {
+				struct tup_entry *input_tent;
+				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+					return -1;
+				if(input_tent->type == TUP_NODE_GENERATED) {
+					if(get_relative_dir(f, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+						return -1;
+					fprintf(f, "\n");
+				}
+			}
+			free_tupid_tree(&inputs);
+			group_found = 1;
+		}
+	}
+	fclose(f);
+	if(!group_found) {
+		fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", info->grouplen, info->groupname);
+		print_tup_entry(stderr, info->tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	tmpfilename[TMPFILESIZE-1] = 0;
+	tmpfilenamelen = strlen(tmpfilename);
+
+	for(x=0; x<num_dotdots; x++) {
+		if(estring_append(expanded_name, "../", 3) < 0)
+			return -1;
+	}
+	if(estring_append(expanded_name, tmpfilename, tmpfilenamelen) < 0)
+		return -1;
+	return 0;
+}
+
 static char *expand_command(struct tup_entry *tent, const char *cmd,
 			    struct tupid_entries *group_sticky_root,
 			    struct tupid_entries *used_groups_root)
 {
 	struct estring expanded_name;
 	const char *percgroup;
-	struct tup_entry *tmp;
-	int dotdotlen = 0;
-	int num_dotdots = 0;
 	const char *tcmd;
 	int tcmdlen;
-	static int resfile = 0;
+	struct expand_info info = {
+		.tent = tent,
+		.groupname = NULL,
+		.grouplen = 0,
+		.group_sticky_root = group_sticky_root,
+		.used_groups_root = used_groups_root,
+	};
 
 	if(strstr(cmd, "%<") == NULL) {
 		return strdup(cmd);
@@ -1843,25 +1932,10 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		return NULL;
 	}
 
-	tmp = tent->parent;
-	while(tmp->parent) {
-		dotdotlen += 3;
-		num_dotdots++;
-		tmp = tmp->parent;
-	}
-
 	tcmd = cmd;
 	while((percgroup = strstr(tcmd, "%<")) != NULL) {
-		char tmpfilename[TMPFILESIZE];
-		int tmpfilenamelen;
 		int prelen = percgroup - tcmd;
-		struct tupid_tree *tt;
-		FILE *f;
-		const char *groupname;
 		char *endgroup;
-		int grouplen;
-		int group_found = 0;
-		int x;
 
 		if(estring_append(&expanded_name, tcmd, prelen) < 0)
 			return NULL;
@@ -1873,65 +1947,10 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		}
 		endgroup++;
 
+		info.groupname = percgroup + 1;
+		info.grouplen = endgroup - info.groupname;
 		tcmd = endgroup;
-		groupname = percgroup + 1;
-		grouplen = endgroup - groupname;
-
-		snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
-		resfile++;
-		/* Use binary so newlines aren't converted on Windows.
-		 * Both cl and cygwin can handle UNIX line-endings, but
-		 * cygwin barfs on Windows line-endings.
-		 */
-		f = fopen(tmpfilename, "wb");
-		if(!f) {
-			perror(tmpfilename);
-			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
-			return NULL;
-		}
-		RB_FOREACH(tt, tupid_entries, group_sticky_root) {
-			struct tup_entry *group_tent;
-			if(tup_entry_add(tt->tupid, &group_tent) < 0)
-				return NULL;
-
-			if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
-				struct tupid_entries inputs = {NULL};
-				struct tupid_tree *ttinput;
-				int outputlen;
-
-				if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
-					return NULL;
-				if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
-					return NULL;
-				RB_FOREACH(ttinput, tupid_entries, &inputs) {
-					struct tup_entry *input_tent;
-					if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
-						return NULL;
-					if(input_tent->type == TUP_NODE_GENERATED) {
-						if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
-							return NULL;
-						fprintf(f, "\n");
-					}
-				}
-				free_tupid_tree(&inputs);
-				group_found = 1;
-			}
-		}
-		fclose(f);
-		if(!group_found) {
-			fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
-			print_tup_entry(stderr, tent);
-			fprintf(stderr, "\n");
-			return NULL;
-		}
-		tmpfilename[TMPFILESIZE-1] = 0;
-		tmpfilenamelen = strlen(tmpfilename);
-
-		for(x=0; x<num_dotdots; x++) {
-			if(estring_append(&expanded_name, "../", 3) < 0)
-				return NULL;
-		}
-		if(estring_append(&expanded_name, tmpfilename, tmpfilenamelen) < 0)
+		if(expand_res_file(&expanded_name, &info) < 0)
 			return NULL;
 	}
 	tcmdlen = strlen(tcmd);
