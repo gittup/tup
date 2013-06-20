@@ -46,14 +46,14 @@ HERE
 
 # Link all the outputs from the root.
 cat > Tupfile << HERE
-: <objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
+: <objs> |> gcc %<objs> -o %o |> myprog.exe
 HERE
 
 # Same, but now we need the ../ path to get to the objs.
 tmkdir linked
 cat > linked/Tupfile << HERE
 include_rules
-: \$(MY_ROOT)/<objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
+: \$(MY_ROOT)/<objs> |> gcc %<objs> -o %o |> myprog.exe
 HERE
 update
 

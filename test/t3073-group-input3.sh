@@ -48,11 +48,11 @@ int bar(void) {return 0;}
 HERE
 
 cat > Tupfile << HERE
-: <txt> <objs> |> cat %<objs> | xargs gcc -o %o |> myprog.exe
+: <txt> <objs> |> gcc %<objs> -o %o |> myprog.exe
 HERE
 update
 
-tup_dep_exist . '<objs>' . 'cat %<objs> | xargs gcc -o myprog.exe'
-tup_dep_no_exist . '<txt>' . 'cat %<objs> | xargs gcc -o myprog.exe'
+tup_dep_exist . '<objs>' . 'gcc %<objs> -o myprog.exe'
+tup_dep_no_exist . '<txt>' . 'gcc %<objs> -o myprog.exe'
 
 eotup

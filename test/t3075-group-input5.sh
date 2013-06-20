@@ -45,7 +45,7 @@ include_rules
 HERE
 
 cat > Tupfile << HERE
-: <txt> |> cat %<txt> > %o |> mylist.txt
+: <txt> |> cat %<txt>.res > %o |> mylist.txt
 HERE
 update
 

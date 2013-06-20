@@ -1827,14 +1827,67 @@ struct expand_info {
 	struct tupid_entries *used_groups_root;
 };
 
-static int expand_res_file(struct estring *expanded_name, struct expand_info *info)
+static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
+{
+	int group_found = 0;
+	struct tupid_tree *tt;
+
+	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
+		struct tup_entry *group_tent;
+		if(tup_entry_add(tt->tupid, &group_tent) < 0)
+			return -1;
+
+		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
+			struct tupid_entries inputs = {NULL};
+			struct tupid_tree *ttinput;
+			int outputlen;
+
+			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+				return -1;
+			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+				return -1;
+			RB_FOREACH(ttinput, tupid_entries, &inputs) {
+				struct tup_entry *input_tent;
+				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+					return -1;
+				if(input_tent->type == TUP_NODE_GENERATED) {
+					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+						return -1;
+					if(f)
+						fprintf(f, "\n");
+					if(e)
+						if(estring_append(e, " ", 1) < 0)
+							return -1;
+				}
+			}
+			free_tupid_tree(&inputs);
+			group_found = 1;
+		}
+	}
+	if(!group_found) {
+		fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", info->grouplen, info->groupname);
+		print_tup_entry(stderr, info->tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int expand_group_inline(struct estring *expanded_name,
+			       struct expand_info *info)
+{
+	if(expand_group(NULL, expanded_name, info) < 0)
+		return -1;
+	return 0;
+}
+
+static int expand_res_file(struct estring *expanded_name,
+			   struct expand_info *info)
 {
 	static int resfile = 0;
 	FILE *f;
 	char tmpfilename[TMPFILESIZE];
 	int tmpfilenamelen;
-	struct tupid_tree *tt;
-	int group_found = 0;
 	int x;
 	int num_dotdots = 0;
 	struct tup_entry *tmp;
@@ -1857,41 +1910,9 @@ static int expand_res_file(struct estring *expanded_name, struct expand_info *in
 		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
 		return -1;
 	}
-	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
-		struct tup_entry *group_tent;
-		if(tup_entry_add(tt->tupid, &group_tent) < 0)
-			return -1;
-
-		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
-			struct tupid_entries inputs = {NULL};
-			struct tupid_tree *ttinput;
-			int outputlen;
-
-			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
-				return -1;
-			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
-				return -1;
-			RB_FOREACH(ttinput, tupid_entries, &inputs) {
-				struct tup_entry *input_tent;
-				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
-					return -1;
-				if(input_tent->type == TUP_NODE_GENERATED) {
-					if(get_relative_dir(f, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
-						return -1;
-					fprintf(f, "\n");
-				}
-			}
-			free_tupid_tree(&inputs);
-			group_found = 1;
-		}
-	}
-	fclose(f);
-	if(!group_found) {
-		fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", info->grouplen, info->groupname);
-		print_tup_entry(stderr, info->tent);
-		fprintf(stderr, "\n");
+	if(expand_group(f, NULL, info) < 0)
 		return -1;
-	}
+	fclose(f);
 	tmpfilename[TMPFILESIZE-1] = 0;
 	tmpfilenamelen = strlen(tmpfilename);
 
@@ -1950,8 +1971,14 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		info.groupname = percgroup + 1;
 		info.grouplen = endgroup - info.groupname;
 		tcmd = endgroup;
-		if(expand_res_file(&expanded_name, &info) < 0)
-			return NULL;
+		if(strncmp(tcmd, ".res", 4) == 0) {
+			tcmd += 4;
+			if(expand_res_file(&expanded_name, &info) < 0)
+				return NULL;
+		} else {
+			if(expand_group_inline(&expanded_name, &info) < 0)
+				return NULL;
+		}
 	}
 	tcmdlen = strlen(tcmd);
 	if(estring_append(&expanded_name, tcmd, tcmdlen) < 0)

@@ -382,7 +382,7 @@ int nodedb_len(struct node_vardb *v, const char *var, int varlen,
 		} else {
 			len += 1;  /* space */
 		}
-		rc = get_relative_dir(NULL, NULL, relative_to,
+		rc = get_relative_dir(NULL, NULL, NULL, relative_to,
 		                      tlist->tent->tnode.tupid,
 		                      &vlen);
 		if (rc < 0 || vlen < 0)
@@ -412,7 +412,7 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, char **dest,
 			(*dest)[0] = ' ';
 			(*dest)++;
 		}
-		rc = get_relative_dir(NULL, *dest, relative_to,
+		rc = get_relative_dir(NULL, NULL, *dest, relative_to,
 		                      tlist->tent->tnode.tupid,
 		                      &clen);
 		if (rc < 0 || clen < 0)

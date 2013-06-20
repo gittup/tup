@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> touch %o |> foo <group>
 : |> touch %o |> bar <group2>
-: <group> <group2> |> (for i in \`cat %<group>\`; do echo "Group1: \$i"; done; for i in \`cat %<group2>\`; do echo "Group2: \$i"; done; for i in \`cat %<group>\`; do echo "Group1again: \$i"; done) > %o |> files.txt
+: <group> <group2> |> (for i in %<group>; do echo "Group1: \$i"; done; for i in %<group2>; do echo "Group2: \$i"; done; for i in %<group>; do echo "Group1again: \$i"; done) > %o |> files.txt
 HERE
 update
 

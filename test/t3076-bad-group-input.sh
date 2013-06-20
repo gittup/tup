@@ -22,13 +22,13 @@
 
 cat > Tupfile << HERE
 : |> touch %o |> foo <group>
-: |> cat %<group> > %o |> files.txt
+: |> cat %<group>.res > %o |> files.txt
 HERE
 update_fail_msg "Unable to find group '<group>' as an input"
 
 cat > Tupfile << HERE
 : |> touch %o |> foo <group>
-: <group> |> cat %<group> > %o |> files.txt
+: <group> |> cat %<group>.res > %o |> files.txt
 HERE
 tup touch Tupfile
 update

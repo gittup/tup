@@ -29,6 +29,7 @@
 #include <time.h>
 
 struct variant;
+struct estring;
 
 /* Local cache of the entries in the 'node' database table */
 struct tup_entry {
@@ -103,6 +104,7 @@ TAILQ_HEAD(tent_list_head, tent_list);
 
 void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist);
 void free_tent_list(struct tent_list_head *head);
-int get_relative_dir(FILE *f, char *dest, tupid_t start, tupid_t end, int *len);
+int get_relative_dir(FILE *f, struct estring *e, char *dest,
+		     tupid_t start, tupid_t end, int *len);
 
 #endif
