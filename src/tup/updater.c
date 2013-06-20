@@ -39,6 +39,7 @@
 #include "privs.h"
 #include "variant.h"
 #include "flist.h"
+#include "estring.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1821,145 +1822,124 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 			    struct tupid_entries *group_sticky_root,
 			    struct tupid_entries *used_groups_root)
 {
-	char *expanded_name;
-	int len;
+	struct estring expanded_name;
 	const char *percgroup;
-	static int resfile = 0;
-	int group_count = 0;
+	struct tup_entry *tmp;
+	int dotdotlen = 0;
+	int num_dotdots = 0;
 	const char *tcmd;
+	int tcmdlen;
+	static int resfile = 0;
 
+	if(strstr(cmd, "%<") == NULL) {
+		return strdup(cmd);
+	}
+
+	if(estring_init(&expanded_name) < 0)
+		return NULL;
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
 		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
 		return NULL;
 	}
 
+	tmp = tent->parent;
+	while(tmp->parent) {
+		dotdotlen += 3;
+		num_dotdots++;
+		tmp = tmp->parent;
+	}
+
 	tcmd = cmd;
 	while((percgroup = strstr(tcmd, "%<")) != NULL) {
-		tcmd = percgroup + 1;
-		group_count++;
-	}
-	if(group_count) {
-		struct tup_entry *tmp;
-		int dotdotlen = 0;
-		int num_dotdots = 0;
-		int tcmdlen;
-		char *p;
+		char tmpfilename[TMPFILESIZE];
+		int tmpfilenamelen;
+		int prelen = percgroup - tcmd;
+		struct tupid_tree *tt;
+		FILE *f;
+		const char *groupname;
+		char *endgroup;
+		int grouplen;
+		int group_found = 0;
+		int x;
 
-		tmp = tent->parent;
-		while(tmp->parent) {
-			dotdotlen += 3;
-			num_dotdots++;
-			tmp = tmp->parent;
+		if(estring_append(&expanded_name, tcmd, prelen) < 0)
+			return NULL;
+
+		endgroup = strchr(percgroup, '>');
+		if(!endgroup) {
+			fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
+			return NULL;
 		}
+		endgroup++;
 
-		/* Each group needs space for the "../../.." to get to the tup
-		 * root, plus the space for ".tup/tmp/res-%i". We don't
-		 * subtract out the space for removing <objs> from the
-		 * command-line string, so the actual space we malloc is a
-		 * little high.
+		tcmd = endgroup;
+		groupname = percgroup + 1;
+		grouplen = endgroup - groupname;
+
+		snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
+		resfile++;
+		/* Use binary so newlines aren't converted on Windows.
+		 * Both cl and cygwin can handle UNIX line-endings, but
+		 * cygwin barfs on Windows line-endings.
 		 */
-		len = strlen(cmd) + (dotdotlen + TMPFILESIZE) * group_count;
-		expanded_name = malloc(len + 1);
-		if(!expanded_name) {
-			perror("malloc");
+		f = fopen(tmpfilename, "wb");
+		if(!f) {
+			perror(tmpfilename);
+			fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
 			return NULL;
 		}
-		p = expanded_name;
-
-		tcmd = cmd;
-		while((percgroup = strstr(tcmd, "%<")) != NULL) {
-			char tmpfilename[TMPFILESIZE];
-			int tmpfilenamelen;
-			int prelen = percgroup - tcmd;
-			struct tupid_tree *tt;
-			FILE *f;
-			const char *groupname;
-			char *endgroup;
-			int grouplen;
-			int group_found = 0;
-			int x;
-
-			memcpy(p, tcmd, prelen); p += prelen;
-
-			endgroup = strchr(percgroup, '>');
-			if(!endgroup) {
-				fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
+		RB_FOREACH(tt, tupid_entries, group_sticky_root) {
+			struct tup_entry *group_tent;
+			if(tup_entry_add(tt->tupid, &group_tent) < 0)
 				return NULL;
-			}
-			endgroup++;
 
-			tcmd = endgroup;
-			groupname = percgroup + 1;
-			grouplen = endgroup - groupname;
+			if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
+				struct tupid_entries inputs = {NULL};
+				struct tupid_tree *ttinput;
+				int outputlen;
 
-			snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
-			resfile++;
-			/* Use binary so newlines aren't converted on Windows.
-			 * Both cl and cygwin can handle UNIX line-endings, but
-			 * cygwin barfs on Windows line-endings.
-			 */
-			f = fopen(tmpfilename, "wb");
-			if(!f) {
-				perror(tmpfilename);
-				fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
-				return NULL;
-			}
-			RB_FOREACH(tt, tupid_entries, group_sticky_root) {
-				struct tup_entry *group_tent;
-				if(tup_entry_add(tt->tupid, &group_tent) < 0)
+				if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
 					return NULL;
-
-				if(memcmp(group_tent->name.s, groupname, grouplen) == 0) {
-					struct tupid_entries inputs = {NULL};
-					struct tupid_tree *ttinput;
-					int outputlen;
-
-					if(tupid_tree_add_dup(used_groups_root, tt->tupid) < 0)
+				if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+					return NULL;
+				RB_FOREACH(ttinput, tupid_entries, &inputs) {
+					struct tup_entry *input_tent;
+					if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
 						return NULL;
-					if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
-						return NULL;
-					RB_FOREACH(ttinput, tupid_entries, &inputs) {
-						struct tup_entry *input_tent;
-						if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+					if(input_tent->type == TUP_NODE_GENERATED) {
+						if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
 							return NULL;
-						if(input_tent->type == TUP_NODE_GENERATED) {
-							if(get_relative_dir(f, NULL, tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
-								return NULL;
-							fprintf(f, "\n");
-						}
+						fprintf(f, "\n");
 					}
-					free_tupid_tree(&inputs);
-					group_found = 1;
 				}
+				free_tupid_tree(&inputs);
+				group_found = 1;
 			}
-			fclose(f);
-			if(!group_found) {
-				fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
-				print_tup_entry(stderr, tent);
-				fprintf(stderr, "\n");
-				return NULL;
-			}
-			tmpfilename[TMPFILESIZE-1] = 0;
-			tmpfilenamelen = strlen(tmpfilename);
-
-			for(x=0; x<num_dotdots; x++) {
-				memcpy(p, "../", 3);
-				p += 3;
-			}
-			memcpy(p, tmpfilename, tmpfilenamelen); p += tmpfilenamelen;
 		}
-		tcmdlen = strlen(tcmd);
-		memcpy(p, tcmd, tcmdlen); p += tcmdlen;
-		*p = 0;
-		if(p - expanded_name > len) {
-			fprintf(stderr, "tup internal error: expanded_name sized incorrectly.\n");
+		fclose(f);
+		if(!group_found) {
+			fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", grouplen, groupname);
+			print_tup_entry(stderr, tent);
+			fprintf(stderr, "\n");
 			return NULL;
 		}
-	} else {
-		expanded_name = strdup(cmd);
+		tmpfilename[TMPFILESIZE-1] = 0;
+		tmpfilenamelen = strlen(tmpfilename);
+
+		for(x=0; x<num_dotdots; x++) {
+			if(estring_append(&expanded_name, "../", 3) < 0)
+				return NULL;
+		}
+		if(estring_append(&expanded_name, tmpfilename, tmpfilenamelen) < 0)
+			return NULL;
 	}
-	return expanded_name;
+	tcmdlen = strlen(tcmd);
+	if(estring_append(&expanded_name, tcmd, tcmdlen) < 0)
+		return NULL;
+	if(estring_append(&expanded_name, "\0", 1) < 0)
+		return NULL;
+	return expanded_name.s;
 }
 
 static int update(struct node *n)
