@@ -73,6 +73,7 @@ static int full_deps;
 static int warnings;
 static int show_warnings;
 static int refactoring;
+static int verbose;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -157,6 +158,7 @@ int updater(int argc, char **argv, int phase)
 		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
 			do_keep_going = 0;
 		} else if(strcmp(argv[x], "--verbose") == 0) {
+			verbose = 1;
 			tup_entry_set_verbose(1);
 		} else if(strcmp(argv[x], "--debug-run") == 0) {
 			parser_debug_run();
@@ -1740,7 +1742,8 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *normal_root,
 			  struct tupid_entries *group_sticky_root,
 			  struct timespan *ts,
-			  struct tupid_entries *used_groups_root)
+			  struct tupid_entries *used_groups_root,
+			  const char *expanded_name)
 {
 	FILE *f;
 	int is_err = 1;
@@ -1792,10 +1795,17 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
 
+
 	fflush(f);
 	rewind(f);
 
 	show_result(tent, is_err, show_ts, NULL);
+	if(expanded_name && (is_err || verbose)) {
+		FILE *eout = stdout;
+		if(is_err)
+			eout = stderr;
+		fprintf(eout, "tup: Expanded command string: %s\n", expanded_name);
+	}
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0, NULL) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1925,9 +1935,10 @@ static int expand_res_file(struct estring *expanded_name,
 	return 0;
 }
 
-static char *expand_command(struct tup_entry *tent, const char *cmd,
-			    struct tupid_entries *group_sticky_root,
-			    struct tupid_entries *used_groups_root)
+static int expand_command(char **res,
+			  struct tup_entry *tent, const char *cmd,
+			  struct tupid_entries *group_sticky_root,
+			  struct tupid_entries *used_groups_root)
 {
 	struct estring expanded_name;
 	const char *percgroup;
@@ -1942,15 +1953,16 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 	};
 
 	if(strstr(cmd, "%<") == NULL) {
-		return strdup(cmd);
+		*res = NULL;
+		return 0;
 	}
 
 	if(estring_init(&expanded_name) < 0)
-		return NULL;
+		return -1;
 	if(fchdir(tup_top_fd()) < 0) {
 		perror("fchdir");
 		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
-		return NULL;
+		return -1;
 	}
 
 	tcmd = cmd;
@@ -1959,12 +1971,12 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		char *endgroup;
 
 		if(estring_append(&expanded_name, tcmd, prelen) < 0)
-			return NULL;
+			return -1;
 
 		endgroup = strchr(percgroup, '>');
 		if(!endgroup) {
 			fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
-			return NULL;
+			return -1;
 		}
 		endgroup++;
 
@@ -1974,18 +1986,19 @@ static char *expand_command(struct tup_entry *tent, const char *cmd,
 		if(strncmp(tcmd, ".res", 4) == 0) {
 			tcmd += 4;
 			if(expand_res_file(&expanded_name, &info) < 0)
-				return NULL;
+				return -1;
 		} else {
 			if(expand_group_inline(&expanded_name, &info) < 0)
-				return NULL;
+				return -1;
 		}
 	}
 	tcmdlen = strlen(tcmd);
 	if(estring_append(&expanded_name, tcmd, tcmdlen) < 0)
-		return NULL;
+		return -1;
 	if(estring_append(&expanded_name, "\0", 1) < 0)
-		return NULL;
-	return expanded_name.s;
+		return -1;
+	*res = expanded_name.s;
+	return 0;
 }
 
 static int update(struct node *n)
@@ -1993,6 +2006,7 @@ static int update(struct node *n)
 	int dfd = -1;
 	const char *name = n->tent->name.s;
 	char *expanded_name = NULL;
+	const char *cmd;
 	struct server s;
 	int rc;
 	struct tupid_entries sticky_root = {NULL};
@@ -2038,6 +2052,7 @@ static int update(struct node *n)
 		name++;
 		while(isspace(*name)) name++;
 	}
+	cmd = name;
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
@@ -2057,22 +2072,23 @@ static int update(struct node *n)
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
 	if(rc == 0) {
-		expanded_name = expand_command(n->tent, name, &group_sticky_root, &used_groups_root);
-		if(!expanded_name)
+		if(expand_command(&expanded_name, n->tent, name, &group_sticky_root, &used_groups_root) < 0)
 			rc = -1;
+		if(expanded_name)
+			cmd = expanded_name;
 	}
 	initialize_server_struct(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
 
-	if(server_exec(&s, dfd, expanded_name, &newenv, n->tent->parent, do_chroot) < 0) {
+	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
-		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, expanded_name);
+		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);
+		free(expanded_name);
 		goto err_close_dfd;
 	}
-	free(expanded_name);
 	environ_free(&newenv);
 	if(close(dfd) < 0) {
 		perror("close(dfd)");
@@ -2081,9 +2097,10 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
+	free(expanded_name);
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
 	free_tupid_tree(&group_sticky_root);
