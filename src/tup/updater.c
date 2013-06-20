@@ -1840,6 +1840,7 @@ struct expand_info {
 static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 {
 	int group_found = 0;
+	int first = 1;
 	struct tupid_tree *tt;
 
 	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
@@ -1861,13 +1862,14 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
 					return -1;
 				if(input_tent->type == TUP_NODE_GENERATED) {
+					if(e && !first)
+						if(estring_append(e, " ", 1) < 0)
+							return -1;
 					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");
-					if(e)
-						if(estring_append(e, " ", 1) < 0)
-							return -1;
+					first = 0;
 				}
 			}
 			free_tupid_tree(&inputs);
