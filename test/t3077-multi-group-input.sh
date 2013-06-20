@@ -18,6 +18,7 @@
 
 # Try to use multiple groups on the command line at once.
 . ./tup.sh
+check_no_windows shell
 
 cat > Tupfile << HERE
 : |> touch %o |> foo <group>
