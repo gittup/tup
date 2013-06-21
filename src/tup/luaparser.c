@@ -716,8 +716,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
-		}
-		else {
+		} else {
 			tf->luaerror = TUPLUA_PENDINGERROR;
 			assert(lua_gettop(ls) == 2);
 		}
@@ -731,8 +730,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		if(ownstate) {
 			lua_close(ls);
 			tf->ls = NULL;
-		}
-		else {
+		} else {
 			lua_pop(ls, 2);
 			assert(lua_gettop(ls) == 0);
 		}
@@ -742,8 +740,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	if(ownstate) {
 		lua_close(ls);
 		tf->ls = NULL;
-	}
-	else {
+	} else {
 		lua_pop(ls, 1);
 		assert(lua_gettop(ls) == 0);
 	}
