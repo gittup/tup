@@ -704,7 +704,7 @@ void free_tent_list(struct tent_list_head *head)
  * root tent, meaning that the returned list of tents isn't a correct parent
  * list, but when converted to a path it will refer to the correct file.
  */
-static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
+int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
 	struct tent_list *tlist;
