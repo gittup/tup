@@ -62,6 +62,8 @@ struct tupfile {
 	int luaerror;
 };
 
+#define MAX_GLOBS 10
+
 struct name_list_entry {
 	TAILQ_ENTRY(name_list_entry) list;
 	char *path;
@@ -71,6 +73,13 @@ struct name_list_entry {
 	int baselen;
 	int extlessbaselen;
 	int dirlen;
+	int glob[MAX_GLOBS*2];  /* Array of integer pairs to identify portions of
+	                         * of the name that were the result of glob
+	                         * expansions. The first int is the index of the
+	                         * start of the glob portion, relative to *base.
+	                         * The second int is the length of the glob.
+	                         */
+	int globcnt;            /* Number of globs expanded in this name. */
 	struct tup_entry *tent;
 };
 TAILQ_HEAD(name_list_entry_head, name_list_entry);
@@ -81,6 +90,13 @@ struct name_list {
 	int totlen;
 	int basetotlen;
 	int extlessbasetotlen;
+	int globtotlen[MAX_GLOBS]; /* Array of sums of the glob matches. This has
+	                            * to be an array because a string can have
+	                            * multiple wildcards.
+	                            */
+	int globcnt;               /* Copy of the total glob match count. Useful in
+				    * tup_printf.
+				    */
 };
 
 struct rule {
@@ -89,6 +105,7 @@ struct rule {
 	char *output_pattern;
 	struct bin *bin;
 	const char *command;
+	char *extra_command;
 	int command_len;
 	struct name_list inputs;
 	struct name_list order_only_inputs;

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,6 +42,7 @@ int tupid_tree_insert(struct tupid_entries *root, struct tupid_tree *data);
 int tupid_tree_add(struct tupid_entries *root, tupid_t tupid);
 int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid);
 int tupid_tree_copy(struct tupid_entries *dest, struct tupid_entries *src);
+int tupid_tree_copy_dup(struct tupid_entries *dest, struct tupid_entries *src);
 void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid);
 static inline void tupid_tree_rm(struct tupid_entries *root, struct tupid_tree *tt)
 {

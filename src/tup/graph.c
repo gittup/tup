@@ -662,6 +662,7 @@ int add_group_circ_check(struct tup_entry *tent)
 	}
 	TAILQ_REMOVE(&group_graph.node_list, n, list);
 	TAILQ_INSERT_HEAD(&group_graph.plist, n, list);
+	n->expanded = 1;
 	return 0;
 }
 
