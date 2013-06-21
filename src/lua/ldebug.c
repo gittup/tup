@@ -1,5 +1,5 @@
 /*
-** $Id: ldebug.c,v 2.88 2011/11/30 12:43:51 roberto Exp $
+** $Id: ldebug.c,v 2.90 2012/08/16 17:34:28 roberto Exp $
 ** Debug Interface
 ** See Copyright Notice in lua.h
 */
@@ -28,6 +28,9 @@
 #include "ltm.h"
 #include "lvm.h"
 
+
+
+#define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_TCCL)
 
 
 static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name);
@@ -173,7 +176,7 @@ LUA_API const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n) {
 
 
 static void funcinfo (lua_Debug *ar, Closure *cl) {
-  if (cl == NULL || cl->c.isC) {
+  if (noLuaClosure(cl)) {
     ar->source = "=[C]";
     ar->linedefined = -1;
     ar->lastlinedefined = -1;
@@ -191,9 +194,9 @@ static void funcinfo (lua_Debug *ar, Closure *cl) {
 
 
 static void collectvalidlines (lua_State *L, Closure *f) {
-  if (f == NULL || f->c.isC) {
+  if (noLuaClosure(f)) {
     setnilvalue(L->top);
-    incr_top(L);
+    api_incr_top(L);
   }
   else {
     int i;
@@ -201,7 +204,7 @@ static void collectvalidlines (lua_State *L, Closure *f) {
     int *lineinfo = f->l.p->lineinfo;
     Table *t = luaH_new(L);  /* new table to store active lines */
     sethvalue(L, L->top, t);  /* push it on stack */
-    incr_top(L);
+    api_incr_top(L);
     setbvalue(&v, 1);  /* boolean 'true' to be the value of all indices */
     for (i = 0; i < f->l.p->sizelineinfo; i++)  /* for all lines with code */
       luaH_setint(L, t, lineinfo[i], &v);  /* table[line] = true */
@@ -210,7 +213,7 @@ static void collectvalidlines (lua_State *L, Closure *f) {
 
 
 static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
-                    Closure *f, CallInfo *ci) {
+                       Closure *f, CallInfo *ci) {
   int status = 1;
   for (; *what; what++) {
     switch (*what) {
@@ -224,7 +227,7 @@ static int auxgetinfo (lua_State *L, const char *what, lua_Debug *ar,
       }
       case 'u': {
         ar->nups = (f == NULL) ? 0 : f->c.nupvalues;
-        if (f == NULL || f->c.isC) {
+        if (noLuaClosure(f)) {
           ar->isvararg = 1;
           ar->nparams = 0;
         }
@@ -282,7 +285,7 @@ LUA_API int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar) {
   status = auxgetinfo(L, what, ar, cl, ci);
   if (strchr(what, 'f')) {
     setobjs2s(L, L->top, func);
-    incr_top(L);
+    api_incr_top(L);
   }
   if (strchr(what, 'L'))
     collectvalidlines(L, cl);
@@ -560,7 +563,7 @@ l_noret luaG_errormsg (lua_State *L) {
     if (!ttisfunction(errfunc)) luaD_throw(L, LUA_ERRERR);
     setobjs2s(L, L->top, L->top - 1);  /* move argument */
     setobjs2s(L, L->top - 1, errfunc);  /* push function */
-    incr_top(L);
+    L->top++;
     luaD_call(L, L->top - 2, 1, 0);  /* call it */
   }
   luaD_throw(L, LUA_ERRRUN);
