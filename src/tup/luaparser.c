@@ -611,11 +611,103 @@ static int tuplua_function_concat(struct lua_State *ls)
 	return 1;
 }
 
+static char *get_rooted_dir(tupid_t end, const char *suffix)
+{
+	char *out = NULL;
+	struct tent_list_head endlist;
+	struct tent_list *endentry;
+	int count = 0;
+	int suffixlen = 0;
+	if (suffix) 
+		suffixlen = strlen(suffix);
+
+	int len = 0;
+
+	TAILQ_INIT(&endlist);
+	if(get_full_path_tents(end, &endlist) < 0)
+		return NULL;
+	
+	// Calculate string length
+	TAILQ_FOREACH(endentry, &endlist, list) {
+		if(count >= 2) {
+			len++;
+		}
+		if(count >= 1) {
+			len += endentry->tent->name.len;
+		}
+		count++;
+	}
+	if(count >= 2 && suffix) {
+		len += 1 + suffixlen;
+	}
+
+	out = malloc(len + 1);
+
+	// Repeat list traversal to construct string
+	len = 0;
+	count = 0;
+	
+	TAILQ_FOREACH(endentry, &endlist, list) {
+		if(count >= 2) {
+			sprintf(out + len, PATH_SEP_STR);
+			len++;
+		}
+		if(count >= 1) {
+			sprintf(out + len, "%s", endentry->tent->name.s);
+			len += endentry->tent->name.len;
+		}
+		count++;
+	}
+	if(count >= 2 && suffix) {
+		sprintf(out + len, "%s%s", PATH_SEP_STR, suffix);
+	}
+
+	free_tent_list(&endlist);
+	return out;
+}
+
+static int tuplua_function_getrooted(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+
+	lua_settop(ls, 1);
+
+	if(!tuplua_tostring(ls, -1))
+		return luaL_error(ls, "Must be passed a string referring to a node as argument 1.");
+
+	struct tup_entry *tent;
+	tent = get_tent_dt(tf->curtent->tnode.tupid, tuplua_tostring(ls, 1));
+	if(!tent) {
+		/* didn't find the given file; if using a variant, check the source dir */
+		struct tup_entry *srctent;
+		if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
+			return luaL_error(ls, "tup error: Internal error locating source tup entry for node.");
+		if(srctent)
+			tent = get_tent_dt(srctent->tnode.tupid, tuplua_tostring(ls, 1));
+
+		if(!tent) {
+			return luaL_error(ls, "tup error: Unable to find tup entry for file '%s' to determine rooted path.\n", tuplua_tostring(ls, 1));
+		}
+	}
+
+	if(tent->type != TUP_NODE_FILE && tent->type != TUP_NODE_DIR) {
+		return luaL_error(ls, "tup error: Rooted paths can only be determined for normal files and directories, not a '%s'.\n", tup_db_type(tent->type));
+	}
+
+	lua_pop(ls, 1);
+
+	char *rooted = get_rooted_dir(tent->tnode.tupid, NULL);
+	lua_pushstring(ls, rooted);
+	free(rooted);
+	return 1;
+}
+
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int toplevel)
 {
 	struct tuplua_reader_data lrd;
 	struct lua_State *ls = NULL;
 	int ownstate = 0;
+	char *rootedname = get_rooted_dir(tf->curtent->tnode.tupid, name);
 
 	lrd.read = 0;
 	lrd.b = b;
@@ -632,6 +724,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
 		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
+		tuplua_register_function(ls, "getrooted", tuplua_function_getrooted, tf);
 		tuplua_register_function(ls, "getdirectory", tuplua_function_getdirectory, tf);
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
@@ -677,38 +770,38 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 			fprintf(tf->f, "tup error: Failed to open builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
-			return -1;
+			goto errorexit;
 		}
 		if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
 			fprintf(tf->f, "tup error: Failed to parse builtins:\n%s\n", tuplua_tostring(ls, -1));
 			lua_close(ls);
 			tf->ls = NULL;
-			return -1;
+			goto errorexit;
 		}
 	}
 	else ls = tf->ls;
 
 	if(toplevel && (include_rules(tf) < 0))
-		return -1;
+		goto errorexit;
 
 	lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 
-	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK) {
-		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", name, tuplua_tostring(ls, -1));
+	if(lua_load(ls, &tuplua_reader, &lrd, rootedname, 0) != LUA_OK) {
+		fprintf(tf->f, "tup error: Failed to open %s:\n%s\n", rootedname, tuplua_tostring(ls, -1));
 		if(ownstate) {
 			lua_close(ls);
 			tf->ls = NULL;
 		}
-		return -1;
+		goto errorexit;
 	}
 
 	if(lua_pcall(ls, 0, 0, 1) != LUA_OK) {
-		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", name, tuplua_tostring(ls, -1));
+		fprintf(tf->f, "tup error: Failed to execute %s:\n%s\n", rootedname, tuplua_tostring(ls, -1));
 		if(ownstate) {
 			lua_close(ls);
 			tf->ls = NULL;
 		}
-		return -1;
+		goto errorexit;
 	}
 
 	if(ownstate) {
@@ -716,7 +809,11 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name, int t
 		tf->ls = NULL;
 	}
 
+	free(rootedname);
 	return 0;
+errorexit:
+	free(rootedname);
+	return -1;
 }
 
 void lua_parser_debug_run(void)

@@ -99,6 +99,7 @@ TAILQ_HEAD(tent_list_head, tent_list);
 
 void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist);
 void free_tent_list(struct tent_list_head *head);
+int get_full_path_tents(tupid_t tupid, struct tent_list_head *head);
 int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len);
 
 #endif
