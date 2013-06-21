@@ -161,6 +161,14 @@ static struct vardb envdb = { {NULL}, 0};
 static int transaction = 0;
 static tupid_t local_slash_dt = -1;
 
+/* Simple counter to invalidate the tent->stickies field. If
+ * tent->retrieved_stickies is less than the sticky_count, then we need to
+ * reload the stickies from the database. The sticky links can become stale
+ * when we delete nodes from the database, since the delete_sticky_links()
+ * function doesn't go through all tents to update them.
+ */
+static int sticky_count = 1;
+
 static int version_check(void);
 static int node_select(tupid_t dt, const char *name, int len,
 		       struct tup_entry **entry);
@@ -2474,7 +2482,7 @@ static int db_print(FILE *stream, tupid_t tupid)
 			fprintf(stream, "[47;30m%s[0m", path);
 			break;
 		case TUP_NODE_GROUP:
-			fprintf(stream, "<[36m%s[0m>", path);
+			fprintf(stream, "[36m%s[0m", path);
 			break;
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
@@ -2996,7 +3004,11 @@ int tup_db_unflag_create(tupid_t tupid)
 		return -1;
 	}
 
-	expected_changes++;
+	/* Only factor in the change if we actually remove something. We call
+	 * this for every node in the create graph, even dependent ones that
+	 * aren't actually in the create list.
+	 */
+	expected_changes += sqlite3_changes(tup_db);
 	return 0;
 }
 
@@ -3281,6 +3293,7 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 	if(incoming != -1) {
 		if(tupid_tree_search(delroot, incoming) != NULL) {
 			struct tup_entry *output_group = NULL;
+			struct tup_entry *tent;
 
 			if(get_output_group(incoming, &output_group) < 0)
 				return -1;
@@ -3296,6 +3309,10 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 			if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
 				return -1;
 			incoming = -1;
+
+			if(tup_entry_add(b, &tent) < 0)
+				return -1;
+			tent->incoming = NULL;
 		}
 	}
 	/* See if we already own the link, or if the link doesn't exist yet */
@@ -3381,8 +3398,17 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
 	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tup_entry *tent;
+	struct tup_entry *incoming_tent;
 
 	*incoming = -1;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->incoming) {
+		*incoming = tent->incoming->tnode.tupid;
+		return 0;
+	}
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -3410,6 +3436,10 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 		goto out_reset;
 	}
 	*incoming = sqlite3_column_int64(*stmt, 0);
+
+	if(tup_entry_add(*incoming, &incoming_tent) < 0)
+		return -1;
+	tent->incoming = incoming_tent;
 
 	/* Do a quick double-check to make sure there isn't a duplicate link. */
 	dbrc = sqlite3_step(*stmt);
@@ -3480,6 +3510,8 @@ static int delete_sticky_links(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[_DB_DELETE_STICKY_LINKS];
 	static const char s[] = "delete from sticky_link where from_id=? or to_id=?";
+
+	sticky_count++;
 
 	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
@@ -5222,9 +5254,22 @@ int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 	if(normal_root)
 		if(get_normal_inputs(cmdid, normal_root) < 0)
 			return -1;
-	if(sticky_root)
-		if(get_sticky_inputs(cmdid, sticky_root) < 0)
+	if(sticky_root) {
+		struct tup_entry *tent;
+		if(tup_entry_add(cmdid, &tent) < 0)
 			return -1;
+		if(tent->retrieved_stickies != sticky_count) {
+			free_tupid_tree(&tent->stickies);
+			tent->retrieved_stickies = 0;
+		}
+		if(!tent->retrieved_stickies) {
+			tent->retrieved_stickies = 1;
+			if(get_sticky_inputs(cmdid, &tent->stickies) < 0)
+				return -1;
+		}
+		if(tupid_tree_copy_dup(sticky_root, &tent->stickies) < 0)
+			return -1;
+	}
 	return 0;
 }
 
@@ -6220,6 +6265,16 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 		return -1;
 	}
 
+	if(style == TUP_LINK_STICKY) {
+		struct tup_entry *tent;
+		if(tup_entry_add(b, &tent) < 0)
+			return -1;
+		if(tent->retrieved_stickies) {
+			if(tupid_tree_add(&tent->stickies, a) < 0)
+				return -1;
+		}
+	}
+
 	return 0;
 }
 
@@ -6279,6 +6334,15 @@ static int link_remove(tupid_t a, tupid_t b, int style)
 		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", sql);
 		return -1;
+	}
+
+	if(style == TUP_LINK_STICKY) {
+		struct tup_entry *tent;
+		if(tup_entry_add(b, &tent) < 0)
+			return -1;
+		if(tent->retrieved_stickies) {
+			tupid_tree_remove(&tent->stickies, a);
+		}
 	}
 
 	return 0;

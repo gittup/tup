@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,6 +41,9 @@ struct tup_entry {
 	struct variant *variant;
 	struct string_tree name;
 	struct string_entries entries;
+	struct tupid_entries stickies;
+	int retrieved_stickies;
+	struct tup_entry *incoming;
 	LIST_ENTRY(tup_entry) ghost_list;
 
 	/* Only valid inside of get/release list. The next pointer is used to

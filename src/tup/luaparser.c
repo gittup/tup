@@ -269,6 +269,7 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	r.bin = NULL;
 	r.line_number = 0;
+	r.extra_command = NULL;
 
 	if(execute_rule(tf, &r, NULL) < 0)
 		return luaL_error(ls, "Failed to define rule.");

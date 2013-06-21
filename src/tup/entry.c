@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -165,6 +165,7 @@ static int rm_entry(tupid_t tupid, int safe)
 	if(tent->parent) {
 		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
+	free_tupid_tree(&tent->stickies);
 	free(tent->name.s);
 	free(tent);
 	return 0;
@@ -466,6 +467,9 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->mtime = mtime;
 	tent->srcid = srcid;
 	tent->variant = NULL;
+	RB_INIT(&tent->stickies);
+	tent->retrieved_stickies = 0;
+	tent->incoming = NULL;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {
@@ -736,6 +740,7 @@ static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 	}
 	return 0;
 }
+
 int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len)
 {
 	struct tent_list_head startlist;

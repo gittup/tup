@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/04/24" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/04/29" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -419,6 +419,15 @@ The name of the lowest level of the directory. For example, in foo/bar/Tupfile, 
 
 .fi
 Using this macro in foo/bar/Tupfile would then create foo/bar/libbar.a
+.TP
+.B %g
+The string that a glob operator matched. For example with the files a_text.txt and b_text.txt, the rule:
+.nf
+
+: foreach *_text.txt |> foo %f |> %g_binary.bin
+
+.fi
+will output the filenames a_binary.bin and b_binary.bin. Only the first glob expanded will be substituted in for %g. %g is only valid when there is a single input file or foreach is used.
 .RE
 .RE
 .TP
