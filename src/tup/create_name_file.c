@@ -27,6 +27,7 @@
 #include "entry.h"
 #include "option.h"
 #include "variant.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,6 +82,10 @@ tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 		}
 		fprintf(stderr, "tup error: tup_file_mod() lstat failed.\n");
 		perror(file);
+		return -1;
+	}
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
 		return -1;
 	}
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
