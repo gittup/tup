@@ -36,8 +36,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-int watch_path(tupid_t dt, int dfd, const char *file,
-	       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
+static int watch_path_internal(tupid_t dt, int dfd, const char *file,
+			       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
 {
 	struct flist f = {0, 0, 0};
 	struct stat buf;
@@ -120,7 +120,7 @@ int watch_path(tupid_t dt, int dfd, const char *file,
 			if(f.filename[0] == '.') {
 				continue;
 			}
-			if(watch_path(tent->tnode.tupid, newfd, f.filename, callback) < 0)
+			if(watch_path_internal(tent->tnode.tupid, newfd, f.filename, callback) < 0)
 				return -1;
 		}
 		if(close(newfd) < 0) {
@@ -149,6 +149,17 @@ int watch_path(tupid_t dt, int dfd, const char *file,
 	}
 }
 
+int watch_path(tupid_t dt, int dfd, const char *file,
+	       int (*callback)(tupid_t newdt, int dfd, const char *file, int *skip))
+{
+	int rc;
+	rc = watch_path_internal(dt, dfd, file, callback);
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return -1;
+	}
+	return rc;
+}
 
 static int full_scan_cb(void *arg, struct tup_entry *tent)
 {
