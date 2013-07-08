@@ -163,7 +163,7 @@ tup.frule = function(arguments)
 		local inputreplacement = inputs and table.concat(inputs, ' '):gsub('%%', '%%%%') or ''
 		command = command:gsub('%%f', inputreplacement)
 
-		if not inputs or #inputs > 1 then
+		if not inputs or not inputs[1] then
 			if command:match('%%b') or command:match('%%B') or command:match('%%e') then
 				error 'tup.frule can only use command formatters %b, %B, or %e with exactly one input.'
 			end
