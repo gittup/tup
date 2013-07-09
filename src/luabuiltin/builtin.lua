@@ -189,7 +189,10 @@ tup.frule = function(arguments)
 	end
 	if arguments.input and type(arguments.input) == 'table' and arguments.input.order_only then
 		for k, v in ipairs(arguments.input.order_only) do
-			table.insert(inputs, v)
+			local newinput = tostring(v)
+			newinput = evalGlobals(newinput)
+			newinput = evalConfig(newinput)
+			table.insert(inputs, newinput)
 		end
 	end
 
