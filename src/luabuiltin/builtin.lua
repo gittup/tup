@@ -27,6 +27,14 @@ function tostring(t)
 	return realtostring(t)
 end
 
+local realioopen = io.open
+function io.open(filename, mode)
+	tup.chdir(filename, mode)
+	local f = realioopen(filename, mode)
+	tup.unchdir()
+	return f
+end
+
 local conditionalglob = function(input)
 	if input:match('%*') or input:match('%?') or input:match('%[.*%]') then
 		return tup.glob(input)

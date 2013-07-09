@@ -95,7 +95,10 @@ static int debug_run = 0;
 
 static const char *tuplua_tostring(struct lua_State *ls, int strindex)
 {
-	const char *out = luaL_tolstring(ls, strindex, NULL);
+	const char *out;
+	if(lua_isnoneornil(ls, strindex))
+		return NULL;
+	out = luaL_tolstring(ls, strindex, NULL);
 	if(out != NULL)
 		lua_replace(ls, strindex);
 	return out;
@@ -526,6 +529,44 @@ static int tuplua_function_creategitignore(lua_State *ls)
 	return 0;
 }
 
+#ifdef _WIN32
+#include "open_notify.h"
+#endif
+static int tuplua_function_chdir(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *filename;
+	const char *mode;
+
+	filename = tuplua_tostring(ls, 1);
+	if(!filename)
+		return luaL_error(ls, "chdir() must be passed a filename for Windows dependencies");
+	mode = tuplua_tostring(ls, 2);
+	if(!mode) {
+		mode = "r";
+	}
+	if(strcmp(mode, "r") != 0) {
+		return luaL_error(ls, "io.open in the parser can only open files read-only");
+	}
+#ifdef _WIN32
+	open_notify(ACCESS_READ, filename);
+#endif
+	if(fchdir(tf->cur_dfd) < 0) {
+		perror("fchdir");
+		return luaL_error(ls, "tup error: Unable to chdir into virtual tup directory for io.open");
+	}
+	return 0;
+}
+
+static int tuplua_function_unchdir(lua_State *ls)
+{
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		return luaL_error(ls, "tup error: Unable to chdir back to root tup directory for io.open");
+	}
+	return 0;
+}
+
 static int tuplua_function_nodevariable(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
@@ -546,12 +587,12 @@ static int tuplua_function_nodevariable(lua_State *ls)
 			tent = get_tent_dt(srctent->tnode.tupid, tuplua_tostring(ls, 1));
 
 		if(!tent) {
-			return luaL_error(ls, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", tuplua_tostring(ls, 1));
+			return luaL_error(ls, "tup error: Unable to find tup entry for file '%s' in node reference declaration.", tuplua_tostring(ls, 1));
 		}
 	}
 
 	if(tent->type != TUP_NODE_FILE && tent->type != TUP_NODE_DIR) {
-		return luaL_error(ls, "tup error: Node-variables can only refer to normal files and directories, not a '%s'.\n", tup_db_type(tent->type));
+		return luaL_error(ls, "tup error: Node-variables can only refer to normal files and directories, not a '%s'.", tup_db_type(tent->type));
 	}
 
 	lua_pop(ls, 1);
@@ -644,6 +685,8 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
 		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
+		tuplua_register_function(ls, "chdir", tuplua_function_chdir, tf);
+		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);
 
 		lua_pushlightuserdata(ls, tf);
 		lua_newtable(ls);
@@ -658,10 +701,8 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 
 		lua_setglobal(ls, "tup");
 
-		/* Load some basic libraries.  File-access functions are
-		 * avoided so that accesses must go through the tup methods.
-		 * Load the debug library so tracebacks for errors can be
-		 * formatted nicely
+		/* Load some basic libraries.  Load the debug library so
+		 * tracebacks for errors can be formatted nicely
 		 */
 		luaL_requiref(ls, "_G", luaopen_base, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_TABLIBNAME, luaopen_table, 1); lua_pop(ls, 1);
@@ -669,6 +710,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		luaL_requiref(ls, LUA_BITLIBNAME, luaopen_bit32, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_IOLIBNAME, luaopen_io, 1); lua_pop(ls, 1);
 		lua_pushnil(ls); lua_setglobal(ls, "dofile");
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
