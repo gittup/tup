@@ -1134,60 +1134,68 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
 }
 
 static void append_assignment (LexState *ls, struct LHS_assign *lh) {
-  int line;
   FuncState * fs=ls->fs;
-  expdesc tup_append;
-  expdesc mfunc;
+  TString *appendfunc_name;
+  expdesc appendfunc;
   expdesc var;
   expdesc value;
-  expdesc env;
-  TString *ts;
-  int reg;
+  int base;
 
   luaX_next(ls);
 
   checknext(ls, '=');
 
-  /* Most of the actual work is done by tup_append_assignment in the
-   * builtin.lua file.
-   */
-  ts = luaS_new(ls->L, "tup_append_assignment");
-  codestring(ls, &tup_append, ts);
-  singlevaraux(fs, ls->envn, &env, 1);  /* get environment variable */
-  lua_assert(env.k == VLOCAL || env.k == VUPVAL);
-
-  /* Grab a free register for the tup_append_assignment function call */
-  reg = fs->freereg;
-  luaK_reserveregs(fs, 1);
-
-  /* Find the tup_append_assignment function call using the constant in
-   * tup_append.
-   */
-  init_exp(&mfunc, VNONRELOC, reg);
-  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, env.u.info,
-	       luaK_exp2RK(fs, &tup_append));
-
-  /* First value on register stack after the function call is our variable that
-   * we are appending to.
-   */
-  if((lh->v.k == VINDEXED) && (lh->v.u.ind.vt == VLOCAL))
-    luaK_reserveregs(fs, 1);
-  var = lh->v;
+  /* Push tup_append_assignment onto the stack */
+  /* Note: copied from function call suffixedexp -> primaryexp -> singlevar */
+  appendfunc_name = luaS_new(ls->L, "tup_append_assignment");
+  if (singlevaraux(fs, appendfunc_name, &appendfunc, 1) == VVOID) {
+    /* If tup_append_assignment isn't global, then check _ENV/locals
+     * Note: reuse appendfunc to reference _ENV temporarily
+     */
+    expdesc key;
+    /* Locate _ENV and make it an upvalue if necessary */
+    singlevaraux(fs, ls->envn, &appendfunc, 1);  
+    lua_assert(appendfunc.k == VLOCAL || appendfunc.k == VUPVAL);
+    codestring(ls, &key, appendfunc_name);  /* Make func_name a constant */
+    luaK_indexed(fs, &appendfunc, &key);  /* env[varname] */
+  }
+  luaK_exp2nextreg(fs, &appendfunc);
+  
+  /* Push assignment lhs as first function argument */
+  var = lh->v; /* exp2nextreg disables the expr somehow, so copy it first */
+  if (var.k == VINDEXED) {
+    /* exp2nextreg if INDEXED will try to pop/reuse the source table and 
+     * index stack positions.
+     * Increase freeregs to prevent that.
+     * The conditions need to match those in and around freereg in 
+     * luaK_dischargevars exactly.
+     */
+    if (!ISK(var.u.ind.idx) && var.u.ind.idx >= fs->nactvar) {
+      fs->freereg += 1;
+    }
+    if (var.u.ind.vt == VLOCAL) {
+      if (!ISK(var.u.ind.t) && var.u.ind.t >= fs->nactvar) {
+	fs->freereg += 1;
+      }
+    }
+  }
   luaK_exp2nextreg(fs, &var);
 
-  /* Second value on the register stack is the value being appended. */
+  /* Push original rhs as second function argument */
   expr(ls, &value);
   luaK_exp2nextreg(fs, &value);
+  
+  /* Call the function */
+  /* Note: copied from funcargs */
+  lua_assert(appendfunc.k == VNONRELOC);
+  base = appendfunc.u.info;  /* base register for call */
+  init_exp(&appendfunc, VCALL, 
+	   luaK_codeABC(fs, OP_CALL, base, fs->freereg - (base + 1) + 1, 2));
+  fs->freereg = base + 1;  /* call removes function and arguments and leaves
+			      (unless changed) one result */
 
-  /* Do the function call, with 2 parameters and 1 return value (aka: 3 and 2
-   * because of the 1-offset).
-   */
-  luaK_codeABC(fs, OP_CALL, mfunc.u.info, 3, 2);
-
-  /* Store the result in our original variable. */
-  luaK_storevar(fs, &lh->v, &mfunc);
-
-  fs->freereg = reg;
+  /* Store the call result */
+  luaK_storevar(fs, &lh->v, &appendfunc);
 }
 
 static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
