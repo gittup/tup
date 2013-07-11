@@ -94,6 +94,7 @@ tup.frule = function(arguments)
 
 	if inputs then
 		local newinputs = {}
+		local duplicates = {}
 		for index, input in ipairs(inputs) do
 			-- Explicitly convert to string for node variables.
 			local newinput = tostring(input)
@@ -107,7 +108,10 @@ tup.frule = function(arguments)
 		for index, input in ipairs(inputs) do
 			glob = conditionalglob(input)
 			for globindex, globvalue in ipairs(glob) do
-				table.insert(newinputs, globvalue)
+				if(not duplicates[globvalue]) then
+					duplicates[globvalue] = 1
+					table.insert(newinputs, globvalue)
+				end
 			end
 		end
 		inputs = newinputs
