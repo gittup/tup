@@ -1070,6 +1070,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	int old_dfd = tf->cur_dfd;
 	struct tup_entry *srctent = NULL;
 	struct tup_entry *newtent;
+	char *lua;
 
 	if(get_path_elements(file, &pg) < 0)
 		goto out_err;
@@ -1118,8 +1119,15 @@ static int include_file(struct tupfile *tf, const char *file)
 	if(fslurp_null(fd, &incb) < 0)
 		goto out_close;
 
-	if(parse_tupfile(tf, &incb, file) < 0)
-		goto out_free;
+	lua = strstr(file, ".lua");
+	/* strcmp is to make sure .lua is at the end of the filename */
+	if(lua && strcmp(lua, ".lua") == 0) {
+		if(parse_lua_tupfile(tf, &incb, file) < 0)
+			goto out_free;
+	} else {
+		if(parse_tupfile(tf, &incb, file) < 0)
+			goto out_free;
+	}
 	rc = 0;
 out_free:
 	free(incb.s);

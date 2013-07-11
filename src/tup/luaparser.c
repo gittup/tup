@@ -659,6 +659,36 @@ static int tuplua_function_concat(struct lua_State *ls)
 	return 1;
 }
 
+static void set_vardb(struct tupfile *tf, struct lua_State *ls)
+{
+	struct string_tree *st;
+
+	RB_FOREACH(st, string_entries, &tf->vdb.root) {
+		struct var_entry *ve = container_of(st, struct var_entry, var);
+		const char *value = ve->value;
+		const char *space;
+		int idx = 1;
+
+		lua_newtable(ls);
+		do {
+			space = strchr(value, ' ');
+			if(space) {
+				lua_pushlstring(ls, value, space - value);
+			} else {
+				lua_pushstring(ls, value);
+			}
+			lua_rawseti(ls, -2, idx);
+			idx++;
+			if(space) {
+				while(*space && isspace(*space))
+					space++;
+			}
+			value = space;
+		} while(space != NULL);
+		lua_setglobal(ls, st->s);
+	}
+}
+
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 {
 	struct tuplua_reader_data lrd;
@@ -700,6 +730,8 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		lua_setfield(ls, 1, "nodevariable");
 
 		lua_setglobal(ls, "tup");
+
+		set_vardb(tf, ls);
 
 		/* Load some basic libraries.  Load the debug library so
 		 * tracebacks for errors can be formatted nicely
