@@ -1180,7 +1180,13 @@ struct tup_entry *tup_db_create_node_part(FILE *f, tupid_t dt, const char *name,
 			 * screwing up the Tupfile.
 			 */
 			if(type == TUP_NODE_GENERATED) {
-				fprintf(f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
+				int tmp;
+				fprintf(f, "tup error: Attempting to insert '");
+				if(dt != srcid) {
+					get_relative_dir(f, NULL, NULL, srcid, dt, &tmp);
+					fprintf(f, "/");
+				}
+				fprintf(f, "%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
 				return NULL;
 			}
 
