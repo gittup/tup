@@ -16,13 +16,13 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Order-only for lua with %b.
+# Extra inputs for lua with %b.
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
 pages += 'foo.html'
 pages += 'bar.html'
-pages.order_only += 'menu.inc'
+pages.extra_inputs += 'menu.inc'
 tup.rule(nil, 'echo hey > %o', 'menu.inc')
 tup.foreach_rule(pages, 'cp %f %o', '%b.gen')
 HERE

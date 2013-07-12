@@ -16,14 +16,14 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure order-only variables are evaluated
+# Make sure extra input variables are evaluated
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
 filename = 'foo.c'
 inputs = {filename}
 header = 'foo.h'
-inputs.order_only += '\$(header)'
+inputs.extra_inputs += '\$(header)'
 tup.rule({}, 'touch %o', 'foo.h')
 tup.foreach_rule(inputs, 'gcc -c %f -o %o', '%B.o')
 HERE

@@ -25,7 +25,7 @@ touch output.txt
 HERE
 cat > Tupfile.lua << HERE
 function ld_linux(objlist, obj)
-	objlist.order_only += 'foo.h'
+	objlist.extra_inputs += 'foo.h'
 	tup.rule(objlist, 'sh ok.sh', obj)
 end
 

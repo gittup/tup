@@ -191,8 +191,8 @@ tup.frule = function(arguments)
 		command = evalGlobals(command)
 		command = evalConfig(command)
 	end
-	if arguments.input and type(arguments.input) == 'table' and arguments.input.order_only then
-		for k, v in ipairs(arguments.input.order_only) do
+	if arguments.input and type(arguments.input) == 'table' and arguments.input.extra_inputs then
+		for k, v in ipairs(arguments.input.extra_inputs) do
 			local newinput = tostring(v)
 			newinput = evalGlobals(newinput)
 			newinput = evalConfig(newinput)
@@ -279,7 +279,7 @@ tup.foreach_rule = function(a, b, c)
 
 	for k, v in ipairs(newinput) do
 		local tmpi = {v}
-		tmpi.order_only = input.order_only
+		tmpi.extra_inputs = input.extra_inputs
 		routputs += tup.frule{input = tmpi, command = command, output = output}
 	end
 	return routputs

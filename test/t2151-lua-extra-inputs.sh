@@ -16,12 +16,12 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Order-only for lua.
+# Extra inputs for lua.
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
 files = {'*.c'}
-files.order_only = tup.rule('echo blah > %o', {'foo.h'})
+files.extra_inputs = tup.rule('echo blah > %o', {'foo.h'})
 tup.foreach_rule(files, 'gcc -c %f -o %o', '%B.o')
 HERE
 
