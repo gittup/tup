@@ -48,7 +48,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 16
-#define PARSER_VERSION 9
+#define PARSER_VERSION 10
 
 enum {
 	DB_BEGIN,
@@ -6040,6 +6040,7 @@ static int del_normal_link(tupid_t tupid, void *data)
 }
 
 static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
+				  struct tupid_entries *valid_input_root,
 				  struct tupid_entries *group_root)
 {
 	int found_error = 0;
@@ -6066,6 +6067,10 @@ static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_r
 				connected = 1;
 				break;
 			}
+		}
+		if(!connected) {
+			if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
+				return -1;
 		}
 
 		if(connected) {
@@ -6119,7 +6124,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_input, NULL) < 0)
 		return -1;
 
-	rc = check_generated_inputs(f, &aid.missing_input_root, group_sticky_root);
+	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root, group_sticky_root);
 
 	if(compare_list_tree(readhead, normal_root, &aid,
 			     new_normal_link, del_normal_link) < 0)

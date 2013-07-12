@@ -45,14 +45,6 @@ cat > ok1.sh << HERE
 echo blah
 HERE
 tup touch ok1.sh
-update
-
-cat > Tupfile << HERE
-: |> echo blah > %o |> foo
-: |> ./ok1.sh > %o |> bar
-: bar |> ./ok2.sh |>
-HERE
-tup touch Tupfile
 update_fail_msg "Missing input dependency"
 
 eotup

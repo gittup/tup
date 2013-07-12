@@ -2932,14 +2932,15 @@ static int find_existing_command(struct tupfile *tf, const struct name_list *onl
 	return 0;
 }
 
-static int add_input(struct tupfile *tf, struct tupid_entries *input_root,
-		     tupid_t tupid)
+static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid_t tupid)
 {
 	struct tup_entry *tent;
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
+		struct tupid_entries extra_group_root = {NULL};
+		struct tupid_tree *tt;
 		tupid_t cmdid;
 
 		if(tupid_tree_add_dup(input_root, tupid) < 0)
@@ -2952,8 +2953,19 @@ static int add_input(struct tupfile *tf, struct tupid_entries *input_root,
 			fprintf(tf->f, "\n");
 			return -1;
 		}
-		if(tup_db_get_inputs(cmdid, input_root, NULL, NULL) < 0)
+		if(tup_db_get_inputs(cmdid, &extra_group_root, NULL, NULL) < 0)
 			return -1;
+		RB_FOREACH(tt, tupid_entries, &extra_group_root) {
+			struct tup_entry *extra_tent;
+
+			if(tup_entry_add(tt->tupid, &extra_tent) < 0)
+				return -1;
+			if(extra_tent->type == TUP_NODE_GROUP) {
+				if(tupid_tree_add_dup(input_root, tt->tupid) < 0)
+					return -1;
+			}
+		}
+		free_tupid_tree(&extra_group_root);
 	} else if(tent->type == TUP_NODE_VAR || tent->type == TUP_NODE_GROUP) {
 		if(tupid_tree_add_dup(input_root, tupid) < 0)
 			return -1;
