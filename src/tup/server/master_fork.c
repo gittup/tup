@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,6 +46,7 @@ struct child_waiter {
 	tupid_t sid;
 	int do_chroot;
 	char dev[JOB_MAX];
+	char proc[JOB_MAX];
 };
 
 struct status_tree {
@@ -217,7 +218,8 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 }
 
 static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
-			    const char *dev, int single_output, int do_chroot)
+			    const char *dev, const char *proc, int single_output,
+			    int do_chroot)
 {
 	int ofd, efd;
 	char buf[64];
@@ -292,6 +294,11 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		if(mount("/dev", dev, "tmpfs", MS_BIND, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
+			return -1;
+		}
+		if(mount("/proc", proc, "proc", MS_BIND, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to bind-mount /proc into fuse file-system.\n");
 			return -1;
 		}
 #endif
@@ -446,6 +453,7 @@ static int master_fork_loop(void)
 			exit(1);
 		}
 		snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job);
+		snprintf(waiter->proc, sizeof(waiter->proc), "%s/proc", job);
 
 		pid = fork();
 		if(pid < 0) {
@@ -488,7 +496,7 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, waiter->dev, em.single_output, em.do_chroot) < 0)
+			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.do_chroot) < 0)
 				exit(1);
 			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
@@ -552,6 +560,7 @@ static void *child_waiter(void *arg)
 		rc = unmount(waiter->dev, MNT_FORCE);
 #elif defined(__linux__)
 		rc = umount2(waiter->dev, MNT_FORCE);
+		rc = umount2(waiter->proc, MNT_FORCE);
 #endif
 		if(rc < 0) {
 			perror("umount");
