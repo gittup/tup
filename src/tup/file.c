@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,7 +42,10 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt);
+			    struct tupid_entries *normal_root,
+			    struct tupid_entries *group_sticky_root,
+			    int full_deps, tupid_t vardt,
+			    struct tupid_entries *used_groups_root);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
@@ -132,7 +135,10 @@ int handle_open_file(enum access_type at, const char *filename,
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
+		struct tupid_entries *normal_root,
+		struct tupid_entries *group_sticky_root,
+		int full_deps, tupid_t vardt,
+		struct tupid_entries *used_groups_root)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -158,7 +164,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	tup_entry_release_list();
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, full_deps, vardt);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -246,7 +252,7 @@ static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
 	}
 	free(pel);
 
-	if(tent->type == TUP_NODE_DIR) {
+	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
 		/* We don't track dependencies on directory nodes for commands. Note that
 		 * some directory accesses may create ghost nodes as placeholders for the
 		 * directory until a real directory is created there (eg: t5077). In this
@@ -349,16 +355,9 @@ static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 
 		if(gimme_tent(map->realname, &tent) < 0)
 			return -1;
-		if(!tent || strcmp(tent->name.s, ".gitignore") != 0) {
-			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed. Only a .gitignore file may be created during the parsing stage.\n", map->realname);
+		if(!tent) {
+			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed\n", map->realname);
 			map_bork = 1;
-		} else {
-			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
-				perror("renameat");
-				return -1;
-			}
-			if(file_set_mtime(tent, map->realname) < 0)
-				return -1;
 		}
 		del_map(map);
 	}
@@ -596,9 +595,13 @@ out_skip:
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root, int full_deps, tupid_t vardt)
+			    struct tupid_entries *normal_root,
+			    struct tupid_entries *group_sticky_root,
+			    int full_deps, tupid_t vardt,
+			    struct tupid_entries *used_groups_root)
 {
 	struct file_entry *r;
+	struct tupid_tree *tt;
 
 	while(!LIST_EMPTY(&info->read_list)) {
 		r = LIST_FIRST(&info->read_list);
@@ -616,7 +619,14 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		del_entry(r);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root) < 0)
+	RB_FOREACH(tt, tupid_entries, used_groups_root) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		tup_entry_list_add(tent, entryhead);
+	}
+
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root) < 0)
 		return -1;
 	return 0;
 }

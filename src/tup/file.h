@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -76,7 +76,10 @@ int handle_open_file(enum access_type at, const char *filename,
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root, int full_deps, tupid_t vardt);
+		struct tupid_entries *normal_root,
+		struct tupid_entries *group_sticky_root,
+		int full_deps, tupid_t vardt,
+		struct tupid_entries *used_groups_root);
 int add_config_files(struct file_info *finfo, struct tup_entry *tent);
 int add_parser_files(FILE *f, struct file_info *finfo, struct tupid_entries *root, tupid_t vardt);
 void del_map(struct mapping *map);

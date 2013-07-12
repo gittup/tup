@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -196,6 +196,13 @@ int get_path_elements(const char *path, struct pel_group *pg)
 				pg->pg_flags |= PG_HIDDEN;
 				break;
 			}
+		}
+	}
+
+	if(!TAILQ_EMPTY(&pg->path_list)) {
+		pel = TAILQ_LAST(&pg->path_list, path_element_head);
+		if(pel->path[0] == '<' && pel->path[pel->len-1] == '>') {
+			pg->pg_flags |= PG_GROUP;
 		}
 	}
 	return 0;

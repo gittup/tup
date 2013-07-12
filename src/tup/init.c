@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,6 +35,9 @@ int tup_init(void)
 {
 	if(find_tup_dir() != 0) {
 		fprintf(stderr, "No .tup directory found. Run 'tup init' at the top of your project to create the dependency filesystem.\n");
+		return -1;
+	}
+	if(tup_entry_init() < 0) {
 		return -1;
 	}
 	if(server_pre_init() < 0) {

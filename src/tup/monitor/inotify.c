@@ -86,7 +86,7 @@ LIST_HEAD(moved_from_event_head, moved_from_event);
 
 static int monitor_set_pid(int pid);
 static int monitor_loop(void);
-static int wp_callback(tupid_t newdt, int dfd, const char *file, int *skip);
+static int wp_callback(tupid_t newdt, const char *file, int *skip);
 static int events_queued(void);
 static int queue_event(struct inotify_event *e);
 static int flush_queue(int do_autoupdate);
@@ -454,7 +454,7 @@ static int monitor_loop(void)
 
 	if(tup_db_scan_begin() < 0)
 		return -1;
-	if(watch_path(0, tup_top_fd(), ".", wp_callback) < 0)
+	if(watch_path(0, ".", wp_callback) < 0)
 		return -1;
 	if(tup_db_scan_end() < 0)
 		return -1;
@@ -674,17 +674,13 @@ int stop_monitor(int restarting)
 	return 0;
 }
 
-static int wp_callback(tupid_t newdt, int dfd, const char *file, int *skip)
+static int wp_callback(tupid_t newdt, const char *file, int *skip)
 {
 	int wd;
 	uint32_t mask;
 
 	DEBUGP("add watch: '%s'\n", file);
 
-	if(fchdir(dfd) < 0) {
-		perror("fchdir");
-		return -1;
-	}
 	mask = IN_MODIFY | IN_ATTRIB | IN_CREATE | IN_DELETE | IN_MOVE;
 	wd = inotify_add_watch(inot_fd, file, mask);
 	if(wd < 0) {
@@ -841,12 +837,6 @@ static int autoupdate(const char *cmd)
 	if(pid == 0) {
 		char **args;
 		int x;
-
-		/* Make sure we start at a valid working directory (t7046) */
-		if(fchdir(tup_top_fd()) < 0) {
-			perror("fchdir");
-			exit(1);
-		}
 
 		args = malloc((sizeof *args) * (update_argc + 3));
 		if(!args) {
@@ -1101,7 +1091,6 @@ static int handle_event(struct monitor_event *m, int *modified)
 		}
 		if(m->e.mask & IN_ISDIR) {
 			struct tup_entry *tent;
-			int fd;
 			int rc;
 
 			if(tup_db_select_tent(from_dc->dt_node.tupid, mfe->m->e.name, &tent) < 0)
@@ -1110,19 +1099,16 @@ static int handle_event(struct monitor_event *m, int *modified)
 				return -1;
 			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt_node.tupid) < 0)
 				return -1;
-			fd = tup_db_open_tupid(dc->dt_node.tupid);
-			if(fd < 0)
+			if(tup_db_chdir(dc->dt_node.tupid) < 0) {
+				fprintf(stderr, "tup error: Unable to chdir to directory for tupid %lli\n", dc->dt_node.tupid);
 				return -1;
+			}
 			/* Existing watches will be replaced by the
 			 * inotify_add_watch calls that happen here. No sense
 			 * in removing them all and re-creating them. The
 			 * dircache already handles this case.
 			 */
-			rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
-			if(close(fd) < 0) {
-				perror("close(fd)");
-				return -1;
-			}
+			rc = watch_path(dc->dt_node.tupid, m->e.name, wp_callback);
 			if(rc < 0) {
 				return -1;
 			}
@@ -1141,18 +1127,14 @@ static int handle_event(struct monitor_event *m, int *modified)
 	 * they are IN_CREATE.
 	 */
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
-		int fd;
 		int rc;
 		struct tup_entry *tent;
 
-		fd = tup_db_open_tupid(dc->dt_node.tupid);
-		if(fd < 0)
-			return -1;
-		rc = watch_path(dc->dt_node.tupid, fd, m->e.name, wp_callback);
-		if(close(fd) < 0) {
-			perror("close(fd)");
+		if(tup_db_chdir(dc->dt_node.tupid) < 0) {
+			fprintf(stderr, "tup error: Unable to chdir to directory for tupid %lli\n", dc->dt_node.tupid);
 			return -1;
 		}
+		rc = watch_path(dc->dt_node.tupid, m->e.name, wp_callback);
 		/* Only new files (not generated files) should set the modified flag.
 		 * The first time we run a command, we will get IN_MOVED_TO events
 		 * for new files, but we don't want an autoupdate to trigger in

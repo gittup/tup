@@ -27,6 +27,7 @@
 #include "entry.h"
 #include "option.h"
 #include "variant.h"
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,10 +43,21 @@ static void (*rmdir_callback)(tupid_t tupid);
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry)
 {
+	struct tup_entry *dtent;
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
 	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
+	while(dtent && dtent->type == TUP_NODE_GENERATED_DIR) {
+		printf("tup: Converting ");
+		print_tup_entry(stdout, dtent);
+		printf(" to a normal directory.\n");
+		if(tup_db_set_type(dtent, TUP_NODE_DIR) < 0)
+			return -1;
+		dtent = dtent->parent;
+	}
 	return 0;
 }
 
@@ -60,33 +72,23 @@ tupid_t create_command_file(tupid_t dt, const char *cmd)
 
 tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 {
-	int fd;
 	struct stat buf;
 
-	fd = tup_db_open_tupid(dt);
-	if(fd == -ENOENT)
-		goto enoent;
-	if(fd < 0)
+	if(tup_db_chdir(dt) < 0)
 		return -1;
-	if(fstatat(fd, file, &buf, AT_SYMLINK_NOFOLLOW) != 0) {
-		if(errno == ENOENT)
-			goto enoent;
-		fprintf(stderr, "tup error: tup_file_mod() fstatat failed.\n");
+	if(lstat(file, &buf) != 0) {
+		if(errno == ENOENT) {
+			return tup_file_del(dt, file, -1, modified);
+		}
+		fprintf(stderr, "tup error: tup_file_mod() lstat failed.\n");
 		perror(file);
 		return -1;
 	}
-	if(close(fd) < 0) {
-		perror("close(fd)");
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
 		return -1;
 	}
 	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
-
-enoent:
-	if(close(fd) < 0) {
-		perror("close(fd)");
-		return -1;
-	}
-	return tup_file_del(dt, file, -1, modified);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
@@ -104,6 +106,10 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			return -1;
 		new = 1;
 	} else {
+		/* Always ignore generated files when it's a .gitignore file, since that happens during parsing. */
+		if(strcmp(file, ".gitignore") == 0)
+			ignore_generated = 1;
+
 		/* If we are ignoring generated files (ie: from the monitor when it catches
 		 * an event from the updater creating output files), then disable force.
 		 * In this case we only want to mark the generated files again if the user
@@ -297,8 +303,34 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 	if(dont_delete)
 		return 0;
 
+	if(type == TUP_NODE_GHOST) {
+		/* Don't want to delete ghosts, since they may still
+		 * link to somewhere useful (t6061)
+		 */
+		return 0;
+	}
+	if(type == TUP_NODE_GROUP) {
+		/* We don't delete groups here - they are reclaimed similar to
+		 * ghosts (t3078)
+		 */
+		return 0;
+	}
+
+	if(type == TUP_NODE_GENERATED_DIR) {
+		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
+			return -1;
+		if(tup_db_flag_generated_dirs(tupid) < 0)
+			return -1;
+		return 0;
+	}
+
 	if(type == TUP_NODE_DIR) {
 		struct variant *variant;
+
+		/* Flag any directories who write files in our directory. */
+		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
+			return -1;
+
 		/* Recurse and kill anything below this dir. Note that
 		 * tup_db_delete_dir() calls back to this function.
 		 */
@@ -354,6 +386,12 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 					}
 				}
 			}
+
+			/* Flag our parent directory in case it needs to become
+			 * a generated directory (t4124)
+			 */
+			if(tup_db_add_create_list(tent->dt) < 0)
+				return -1;
 		}
 	}
 
@@ -420,7 +458,7 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 			/* Re-parse the current Tupfile (the updater
 			 * automatically parses any dependent directories).
 			 */
-			if(tup_db_add_dir_create_list(tupid) < 0)
+			if(tup_db_add_create_list(tent->dt) < 0)
 				return -1;
 		}
 	}
@@ -545,7 +583,15 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 			curdt = tent->tnode.tupid;
 			if(tup_db_select_tent_part(curdt, pel->path, pel->len, &tent) < 0)
 				return -1;
-			if(!tent) {
+			if(tent) {
+				if(sotgv == SOTGV_CREATE_DIRS && tent->type == TUP_NODE_GHOST) {
+					if(tup_db_set_type(tent, TUP_NODE_GENERATED_DIR) < 0)
+						return -1;
+					if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+						return -1;
+				}
+			} else {
+				int type = TUP_NODE_GHOST;
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
 					fprintf(f, "tup error: Expected node '%.*s' to be in directory '", pel->len, pel->path);
@@ -553,7 +599,9 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 					fprintf(f, "', but it is not there.\n");
 					return -1;
 				}
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, TUP_NODE_GHOST, -1, -1, &tent) < 0)
+				if(sotgv == SOTGV_CREATE_DIRS)
+					type = TUP_NODE_GENERATED_DIR;
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, -1, -1, &tent) < 0)
 					return -1;
 			}
 		}

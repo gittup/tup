@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2012-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -339,7 +339,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	 */
 	finfo = get_finfo(path);
 	if(finfo) {
-		if(strcmp(peeled, ".tup") == 0 || strstr(peeled, "/.tup") != NULL) {
+		if(strcmp(peeled, ".tup/mnt") == 0 || strstr(peeled, "/.tup/mnt") != NULL) {
 			/* t6056 - don't allow sub-processes to mess with our
 			 * data.
 			 */

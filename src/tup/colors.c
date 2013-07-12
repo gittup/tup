@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -95,6 +95,9 @@ const char *color_type(enum TUP_NODE_TYPE type)
 			break;
 		case TUP_NODE_GROUP:
 			color="[36";
+			break;
+		case TUP_NODE_GENERATED_DIR:
+			color="[33;1";
 			break;
 		case TUP_NODE_VAR:
 		case TUP_NODE_FILE:

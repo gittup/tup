@@ -39,6 +39,7 @@
 #include "privs.h"
 #include "variant.h"
 #include "flist.h"
+#include "estring.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,6 +73,7 @@ static int full_deps;
 static int warnings;
 static int show_warnings;
 static int refactoring;
+static int verbose;
 
 static pthread_mutex_t db_mutex;
 static pthread_mutex_t display_mutex;
@@ -156,6 +158,7 @@ int updater(int argc, char **argv, int phase)
 		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
 			do_keep_going = 0;
 		} else if(strcmp(argv[x], "--verbose") == 0) {
+			verbose = 1;
 			tup_entry_set_verbose(1);
 		} else if(strcmp(argv[x], "--debug-run") == 0) {
 			parser_debug_run();
@@ -902,11 +905,78 @@ static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
 	return 0;
 }
 
+static int gitignore(tupid_t tupid)
+{
+	int fd;
+	int dfd;
+	struct tup_entry *tent;
+	struct tup_entry *gitignore_tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tup_db_select_tent(tupid, ".gitignore", &gitignore_tent) < 0)
+		return -1;
+	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
+		char *s;
+		int len;
+		struct stat buf;
+		if(tup_db_alloc_generated_nodelist(&s, &len, tupid) < 0)
+			return -1;
+		dfd = tup_entry_open(tent);
+		if(dfd < 0)
+			return -1;
+		fd = openat(dfd, ".gitignore", O_CREAT|O_WRONLY|O_TRUNC, 0666);
+		if(fd < 0) {
+			perror(".gitignore");
+			goto err_out;
+		}
+		if(tupid == 1) {
+			if(write(fd, ".tup\n", 5) < 0) {
+				perror("write");
+				goto err_close;
+			}
+		}
+		if(s && len) {
+			if(write(fd, s, len) < 0) {
+				perror("write");
+				goto err_close;
+			}
+		}
+		if(close(fd) < 0) {
+			perror("close(fd)");
+			goto err_out;
+		}
+
+		if(fstatat(dfd, ".gitignore", &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+			perror("fstatat(.gitignore)");
+			goto err_out;
+		}
+		if(tup_db_set_mtime(gitignore_tent, buf.MTIME) < 0)
+			goto err_out;
+
+		if(s) {
+			free(s); /* Freeze gopher! */
+		}
+		close(dfd);
+	}
+	return 0;
+
+err_close:
+	close(fd);
+err_out:
+	close(dfd);
+	fprintf(stderr, "tup error: Unable to create the .gitignore file in directory: ");
+	print_tup_entry(stderr, tent);
+	fprintf(stderr, "\n");
+	return -1;
+}
+
 static int process_create_nodes(void)
 {
 	struct graph g;
 	struct node *n;
 	struct node *tmp;
+	struct tupid_tree *tt;
 	int rc;
 	int old_changes = 0;
 
@@ -1013,6 +1083,7 @@ static int process_create_nodes(void)
 	compat_lock_disable();
 	rc = execute_graph(&g, 0, 1, create_work);
 	compat_lock_enable();
+
 	if(rc == 0) {
 		if(g.gen_delete_count) {
 			tup_main_progress("Deleting files...\n");
@@ -1025,6 +1096,50 @@ static int process_create_nodes(void)
 			tup_show_message("Checking circular dependencies among groups...\n");
 			if(group_circ_check() < 0)
 				rc = -1;
+		}
+		if(rc == 0 && !RB_EMPTY(&g.normal_dir_root)) {
+			int msg_shown = 0;
+			while(!RB_EMPTY(&g.normal_dir_root)) {
+				int dbrc;
+				tt = RB_MIN(tupid_entries, &g.normal_dir_root);
+				dbrc = tup_db_is_generated_dir(tt->tupid);
+				if(dbrc < 0)
+					return -1;
+				if(dbrc) {
+					struct tup_entry *tent;
+					if(!msg_shown) {
+						msg_shown = 1;
+						tup_show_message("Converting normal directories to generated directories...\n");
+					}
+					if(tup_entry_add(tt->tupid, &tent) < 0)
+						return -1;
+					printf("tup: Converting ");
+					print_tup_entry(stdout, tent);
+					printf(" to a generated directory.\n");
+					if(tup_db_normal_dir_to_generated(tent) < 0)
+						return -1;
+					/* Also check the parent. */
+					if(tupid_tree_add_dup(&g.normal_dir_root, tent->dt) < 0)
+						return -1;
+					/* And check if the parent needs us in
+					 * gitignore.
+					 */
+					if(tupid_tree_add_dup(&g.parse_gitignore_root, tent->dt) < 0)
+						return -1;
+				}
+				tupid_tree_rm(&g.normal_dir_root, tt);
+				free(tt);
+			}
+		}
+		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
+			tup_show_message("Generating .gitignore files...\n");
+			RB_FOREACH(tt, tupid_entries, &g.parse_gitignore_root) {
+				if(gitignore(tt->tupid) < 0) {
+					rc = -1;
+					break;
+				}
+			}
+			free_tupid_tree(&g.parse_gitignore_root);
 		}
 	}
 	if(rc < 0) {
@@ -1591,13 +1706,29 @@ static int unlink_outputs(int dfd, struct node *n)
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
 		if(output->tent->type != TUP_NODE_GROUP) {
-			if(unlinkat(dfd, output->tent->name.s, 0) < 0) {
+			int output_dfd = dfd;
+			if(output->tent->dt != n->tent->dt) {
+				output_dfd = tup_entry_open(output->tent->parent);
+				if(output_dfd < 0) {
+					fprintf(stderr, "tup error: Unable to open directory to unlink previous output files: ");
+					print_tup_entry(stderr, output->tent->parent);
+					fprintf(stderr, "\n");
+					return -1;
+				}
+			}
+			if(unlinkat(output_dfd, output->tent->name.s, 0) < 0) {
 				if(errno != ENOENT) {
 					pthread_mutex_lock(&display_mutex);
 					show_result(n->tent, 1, NULL, NULL);
 					perror("unlinkat");
 					fprintf(stderr, "tup error: Unable to unlink previous output file: %s\n", output->tent->name.s);
 					pthread_mutex_unlock(&display_mutex);
+					return -1;
+				}
+			}
+			if(output->tent->dt != n->tent->dt) {
+				if(close(output_dfd) < 0) {
+					perror("close(output_dfd)");
 					return -1;
 				}
 			}
@@ -1609,7 +1740,10 @@ static int unlink_outputs(int dfd, struct node *n)
 static int process_output(struct server *s, struct tup_entry *tent,
 			  struct tupid_entries *sticky_root,
 			  struct tupid_entries *normal_root,
-			  struct timespan *ts)
+			  struct tupid_entries *group_sticky_root,
+			  struct timespan *ts,
+			  struct tupid_entries *used_groups_root,
+			  const char *expanded_name)
 {
 	FILE *f;
 	int is_err = 1;
@@ -1631,7 +1765,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -1643,7 +1777,7 @@ static int process_output(struct server *s, struct tup_entry *tent,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -1654,17 +1788,24 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
-		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, full_deps, tup_entry_vardt(tent)) < 0) {
+		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
 			fprintf(f, " *** Additionally, command %lli failed to process input dependencies.", tent->tnode.tupid);
 		}
 	} else {
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
 
+
 	fflush(f);
 	rewind(f);
 
 	show_result(tent, is_err, show_ts, NULL);
+	if(expanded_name && (is_err || verbose)) {
+		FILE *eout = stdout;
+		if(is_err)
+			eout = stderr;
+		fprintf(eout, "tup: Expanded command string: %s\n", expanded_name);
+	}
 	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0, NULL) < 0)
 		return -1;
 	if(close(s->output_fd) < 0) {
@@ -1686,17 +1827,197 @@ static int process_output(struct server *s, struct tup_entry *tent,
 	return 0;
 }
 
+#define TMPFILESIZE 32
+
+struct expand_info {
+	struct tup_entry *tent;
+	const char *groupname;
+	int grouplen;
+	struct tupid_entries *group_sticky_root;
+	struct tupid_entries *used_groups_root;
+};
+
+static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
+{
+	int group_found = 0;
+	int first = 1;
+	struct tupid_tree *tt;
+
+	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
+		struct tup_entry *group_tent;
+		if(tup_entry_add(tt->tupid, &group_tent) < 0)
+			return -1;
+
+		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
+			struct tupid_entries inputs = {NULL};
+			struct tupid_tree *ttinput;
+			int outputlen;
+
+			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+				return -1;
+			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+				return -1;
+			RB_FOREACH(ttinput, tupid_entries, &inputs) {
+				struct tup_entry *input_tent;
+				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
+					return -1;
+				if(input_tent->type == TUP_NODE_GENERATED) {
+					if(e && !first)
+						if(estring_append(e, " ", 1) < 0)
+							return -1;
+					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+						return -1;
+					if(f)
+						fprintf(f, "\n");
+					first = 0;
+				}
+			}
+			free_tupid_tree(&inputs);
+			group_found = 1;
+		}
+	}
+	if(!group_found) {
+		fprintf(stderr, "tup error: Unable to find group '%.*s' as an input for use as a resource file. Make sure it is listed as an input to the command: ", info->grouplen, info->groupname);
+		print_tup_entry(stderr, info->tent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int expand_group_inline(struct estring *expanded_name,
+			       struct expand_info *info)
+{
+	if(expand_group(NULL, expanded_name, info) < 0)
+		return -1;
+	return 0;
+}
+
+static int expand_res_file(struct estring *expanded_name,
+			   struct expand_info *info)
+{
+	static int resfile = 0;
+	FILE *f;
+	char tmpfilename[TMPFILESIZE];
+	int tmpfilenamelen;
+	int x;
+	int num_dotdots = 0;
+	struct tup_entry *tmp;
+
+	tmp = info->tent->parent;
+	while(tmp->parent) {
+		num_dotdots++;
+		tmp = tmp->parent;
+	}
+
+	snprintf(tmpfilename, TMPFILESIZE, ".tup/tmp/res-%i", resfile);
+	resfile++;
+	/* Use binary so newlines aren't converted on Windows.
+	 * Both cl and cygwin can handle UNIX line-endings, but
+	 * cygwin barfs on Windows line-endings.
+	 */
+	f = fopen(tmpfilename, "wb");
+	if(!f) {
+		perror(tmpfilename);
+		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+		return -1;
+	}
+	if(expand_group(f, NULL, info) < 0)
+		return -1;
+	fclose(f);
+	tmpfilename[TMPFILESIZE-1] = 0;
+	tmpfilenamelen = strlen(tmpfilename);
+
+	for(x=0; x<num_dotdots; x++) {
+		if(estring_append(expanded_name, "../", 3) < 0)
+			return -1;
+	}
+	if(estring_append(expanded_name, tmpfilename, tmpfilenamelen) < 0)
+		return -1;
+	return 0;
+}
+
+static int expand_command(char **res,
+			  struct tup_entry *tent, const char *cmd,
+			  struct tupid_entries *group_sticky_root,
+			  struct tupid_entries *used_groups_root)
+{
+	struct estring expanded_name;
+	const char *percgroup;
+	const char *tcmd;
+	int tcmdlen;
+	struct expand_info info = {
+		.tent = tent,
+		.groupname = NULL,
+		.grouplen = 0,
+		.group_sticky_root = group_sticky_root,
+		.used_groups_root = used_groups_root,
+	};
+
+	if(strstr(cmd, "%<") == NULL) {
+		*res = NULL;
+		return 0;
+	}
+
+	if(estring_init(&expanded_name) < 0)
+		return -1;
+	if(fchdir(tup_top_fd()) < 0) {
+		perror("fchdir");
+		fprintf(stderr, "tup error: Unable to create temporary resource file.\n");
+		return -1;
+	}
+
+	tcmd = cmd;
+	while((percgroup = strstr(tcmd, "%<")) != NULL) {
+		int prelen = percgroup - tcmd;
+		char *endgroup;
+
+		if(estring_append(&expanded_name, tcmd, prelen) < 0)
+			return -1;
+
+		endgroup = strchr(percgroup, '>');
+		if(!endgroup) {
+			fprintf(stderr, "tup error: Unable to find end-group marker '>' for %%<group> flag.\n");
+			return -1;
+		}
+		endgroup++;
+
+		info.groupname = percgroup + 1;
+		info.grouplen = endgroup - info.groupname;
+		tcmd = endgroup;
+		if(strncmp(tcmd, ".res", 4) == 0) {
+			tcmd += 4;
+			if(expand_res_file(&expanded_name, &info) < 0)
+				return -1;
+		} else {
+			if(expand_group_inline(&expanded_name, &info) < 0)
+				return -1;
+		}
+	}
+	tcmdlen = strlen(tcmd);
+	if(estring_append(&expanded_name, tcmd, tcmdlen) < 0)
+		return -1;
+	if(estring_append(&expanded_name, "\0", 1) < 0)
+		return -1;
+	*res = expanded_name.s;
+	return 0;
+}
+
 static int update(struct node *n)
 {
 	int dfd = -1;
 	const char *name = n->tent->name.s;
+	char *expanded_name = NULL;
+	const char *cmd;
 	struct server s;
 	int rc;
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
+	struct tupid_entries group_sticky_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
 	int do_chroot = full_deps;
+	struct tupid_entries used_groups_root = {NULL};
 
 	timespan_start(&ts);
 	if(name[0] == '^') {
@@ -1733,6 +2054,7 @@ static int update(struct node *n)
 		name++;
 		while(isspace(*name)) name++;
 	}
+	cmd = name;
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
@@ -1748,18 +2070,25 @@ static int update(struct node *n)
 		goto err_close_dfd;
 
 	pthread_mutex_lock(&db_mutex);
-	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root);
+	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
+	if(rc == 0) {
+		if(expand_command(&expanded_name, n->tent, name, &group_sticky_root, &used_groups_root) < 0)
+			rc = -1;
+		if(expanded_name)
+			cmd = expanded_name;
+	}
 	initialize_server_struct(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
 
-	if(server_exec(&s, dfd, name, &newenv, n->tent->parent, do_chroot) < 0) {
+	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
-		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, name);
+		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);
+		free(expanded_name);
 		goto err_close_dfd;
 	}
 	environ_free(&newenv);
@@ -1770,11 +2099,14 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &ts);
+	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
+	free(expanded_name);
 	free_tupid_tree(&sticky_root);
 	free_tupid_tree(&normal_root);
+	free_tupid_tree(&group_sticky_root);
+	free_tupid_tree(&used_groups_root);
 	if(server_postexec(&s) < 0)
 		return -1;
 	return rc;

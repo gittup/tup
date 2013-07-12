@@ -307,7 +307,7 @@ static int tuplua_function_getcwd(lua_State *ls)
 
 	lua_settop(ls, 0);
 
-	if(get_relative_dir(NULL, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
+	if(get_relative_dir(NULL, NULL, NULL, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
 		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 		tup_db_print(tf->f, tf->tupid);
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
@@ -320,7 +320,7 @@ static int tuplua_function_getcwd(lua_State *ls)
 	}
 
 	dir = malloc(dir_size + 1);
-	if(get_relative_dir(dir, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
+	if(get_relative_dir(NULL, NULL, dir, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
 		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 		tup_db_print(tf->f, tf->tupid);
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
@@ -624,11 +624,11 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 	stackid = lua_touserdata(ls, 1);
 	tid = *(tupid_t *)stackid;
 
-	rc = get_relative_dir(NULL, tf->curtent->tnode.tupid, tid, &slen);
+	rc = get_relative_dir(NULL, NULL, NULL, tf->curtent->tnode.tupid, tid, &slen);
 	if(rc < 0 || slen < 0) return 0;
 
 	value = malloc(slen + 1);
-	rc = get_relative_dir(value, tf->curtent->tnode.tupid, tid, &slen);
+	rc = get_relative_dir(NULL, NULL, value, tf->curtent->tnode.tupid, tid, &slen);
 	if(rc < 0 || slen < 0) {
 		free(value);
 		return 0;

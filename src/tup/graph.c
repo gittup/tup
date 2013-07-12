@@ -139,6 +139,8 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 	RB_INIT(&g->cmd_delete_root);
 	g->cmd_delete_count = 0;
 
+	RB_INIT(&g->normal_dir_root);
+	RB_INIT(&g->parse_gitignore_root);
 	RB_INIT(&g->node_root);
 
 	g->cur = g->root = create_node(g, &root_entry);
@@ -320,7 +322,7 @@ int add_graph_stickies(struct graph *g)
 			struct tupid_tree *tt;
 			struct node *inputn;
 
-			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL) < 0)
+			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL, NULL) < 0)
 				return -1;
 			RB_FOREACH(tt, tupid_entries, &sticky_root) {
 				inputn = find_node(g, tt->tupid);
@@ -350,28 +352,30 @@ static void mark_nodes(struct node *n)
 		return;
 
 	n->parsing = 1;
+
+	/* A command node must have all of its outputs marked, or we risk not
+	 * unlinking all of its outputs in the updater before running it
+	 * (t6055).
+	 */
+	if(n->tent->type == TUP_NODE_CMD) {
+		struct edge *e2;
+		LIST_FOREACH(e2, &n->edges, list) {
+			struct node *dest = e2->dest;
+
+			/* Groups are skipped, otherwise we end up
+			 * building everything in the group (t3058).
+			 */
+			if(dest->tent->type != TUP_NODE_GROUP) {
+				mark_nodes(dest);
+			}
+		}
+	}
+
+	/* Mark everything up the PDAG */
 	LIST_FOREACH(e, &n->incoming, destlist) {
 		struct node *mark = e->src;
 
 		mark_nodes(mark);
-
-		/* A command node must have all of its outputs marked, or we
-		 * risk not unlinking all of its outputs in the updater before
-		 * running it (t6055).
-		 */
-		if(mark->tent->type == TUP_NODE_CMD) {
-			struct edge *e2;
-			LIST_FOREACH(e2, &mark->edges, list) {
-				struct node *dest = e2->dest;
-
-				/* Groups are skipped, otherwise we end up
-				 * building everything in the group (t3058).
-				 */
-				if(dest->tent->type != TUP_NODE_GROUP) {
-					mark_nodes(dest);
-				}
-			}
-		}
 	}
 }
 
@@ -403,6 +407,7 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 {
 	struct tup_entry_head *prune_list;
+	struct tupid_entries dir_root = {NULL};
 	int x;
 	int dashdash = 0;
 	int do_prune = 0;
@@ -426,13 +431,16 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 			fprintf(stderr, "tup: Unable to find tupid for '%s'\n", argv[x]);
 			goto out_err;
 		}
-		if(tent->type == TUP_NODE_DIR) {
+		if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
 			/* For a directory, we recursively add all generated
 			 * files in that directory, since updating the
-			 * directory itself doesn't make sense for tup.
+			 * directory itself doesn't make sense for tup. This is
+			 * done by putting all directories into dir_root, and
+			 * then we can check all nodes to see if they are under
+			 * one of these directories.
 			 */
-			if(tup_db_get_generated_tup_entries(tent->tnode.tupid, prune_list) < 0)
-				goto out_err;
+			if(tupid_tree_add_dup(&dir_root, tent->tnode.tupid) < 0)
+				return -1;
 		} else {
 			tup_entry_list_add(tent, prune_list);
 		}
@@ -443,10 +451,32 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		struct node *n;
 		struct node *tmp;
 
+		/* For explicit files: Just see if we have the node in the
+		 * PDAG, and if so, mark it.
+		 */
 		LIST_FOREACH(tent, prune_list, list) {
 			n = find_node(g, tent->tnode.tupid);
 			if(n) {
 				mark_nodes(n);
+			}
+		}
+
+		/* For directories, we need to go through the list of nodes,
+		 * and see if they have a parent in the dir tree.
+		 */
+		if(!RB_EMPTY(&dir_root)) {
+			TAILQ_FOREACH(n, &g->node_list, list) {
+				/* If n->parsing is set, we are already marked. */
+				if(!n->parsing && n->tent->type != TUP_NODE_ROOT) {
+					struct tup_entry *dtent;
+					dtent = n->tent->parent;
+					while(dtent) {
+						if(tupid_tree_search(&dir_root, dtent->tnode.tupid) != NULL) {
+							mark_nodes(n);
+						}
+						dtent = dtent->parent;
+					}
+				}
 			}
 		}
 
@@ -456,6 +486,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 					goto out_err;
 		}
 	}
+	free_tupid_tree(&dir_root);
 	tup_entry_release_list();
 	return 0;
 
@@ -556,6 +587,7 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 			shape = "rectangle";
 			break;
 		case TUP_NODE_DIR:
+		case TUP_NODE_GENERATED_DIR:
 			if(!show_dirs)
 				return;
 			shape = "diamond";

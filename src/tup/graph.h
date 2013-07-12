@@ -72,6 +72,8 @@ struct graph {
 	int gen_delete_count;
 	struct tupid_entries cmd_delete_root;
 	int cmd_delete_count;
+	struct tupid_entries normal_dir_root;
+	struct tupid_entries parse_gitignore_root;
 	int style;
 };
 

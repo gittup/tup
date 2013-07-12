@@ -29,6 +29,7 @@
 #include <time.h>
 
 struct variant;
+struct estring;
 
 /* Local cache of the entries in the 'node' database table */
 struct tup_entry {
@@ -42,6 +43,7 @@ struct tup_entry {
 	struct string_tree name;
 	struct string_entries entries;
 	struct tupid_entries stickies;
+	struct tupid_entries group_stickies;
 	int retrieved_stickies;
 	struct tup_entry *incoming;
 	LIST_ENTRY(tup_entry) ghost_list;
@@ -55,6 +57,7 @@ struct tup_entry {
 
 LIST_HEAD(tup_entry_head, tup_entry);
 
+int tup_entry_init(void);
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
 			       struct tup_entry **dest);
@@ -66,7 +69,6 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
 		      time_t mtime, tupid_t srcid, const char *name);
 int tup_entry_resolve_dirs(void);
-int tup_entry_change_name(tupid_t tupid, const char *new_name);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
@@ -102,6 +104,7 @@ TAILQ_HEAD(tent_list_head, tent_list);
 
 void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist);
 void free_tent_list(struct tent_list_head *head);
-int get_relative_dir(char *dest, tupid_t start, tupid_t end, int *len);
+int get_relative_dir(FILE *f, struct estring *e, char *dest,
+		     tupid_t start, tupid_t end, int *len);
 
 #endif
