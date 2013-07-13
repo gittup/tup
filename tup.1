@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/04/29" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/07/13" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -241,9 +241,12 @@ Set to '1' to show ghost nodes. Some commands may try to read from many files th
 .TP
 .B graph.environment (default '0')
 Set to '1' to show the environment nodes (such as PATH) and their dependencies. By default the environment variables are not shown since nearly everything will depend on PATH.
+.TP
+.B graph.combine (default '0')
+Set to '1' to try to combine similar nodes in the graph. For example, instead of showing 10 separate compilation commands that all have one .c file input and one .o file output, this will combine them into one command to more easily see the whole structure of the graph. By default all nodes are shown separately.
 .RE
 .TP
-.B graph [--dirs] [--ghosts] [--env] [<output_1> ... <output_n>]
+.B graph [--dirs] [--ghosts] [--env] [--combine] [--normal] [<output_1> ... <output_n>]
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. This is generally used for debugging tup -- you may or may not find it helpful for trying to look at the structure of your program.
 .RS
 .TP

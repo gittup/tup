@@ -84,6 +84,7 @@ static struct option {
 	{"graph.dirs", "0", NULL},
 	{"graph.ghosts", "0", NULL},
 	{"graph.environment", "0", NULL},
+	{"graph.combine", "0", NULL},
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 

@@ -619,7 +619,7 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 		perror(realfile);
 		return;
 	}
-	dump_graph(g, f, 1, 0, 0);
+	dump_graph(g, f, 1, 0, 0, 0);
 	fclose(f);
 }
 
@@ -636,8 +636,16 @@ static void print_name(FILE *f, const char *s, char c)
 	}
 }
 
+struct node_details {
+	struct tupid_tree hashtnode;
+	struct tupid_tree nodetnode;
+	struct node *n;
+	int count;
+};
+
 static void dump_node(FILE *f, struct graph *g, struct node *n,
-		      int show_dirs, int show_env, int show_ghosts)
+		      int show_dirs, int show_env, int show_ghosts,
+		      struct tupid_entries *node_root)
 {
 	int color;
 	int fontcolor;
@@ -646,6 +654,9 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	char *s;
 	struct edge *e;
 	int flags;
+	struct tupid_tree *tt;
+	tupid_t data;
+	const char *datastring;
 
 	if(n == g->root)
 		return;
@@ -731,7 +742,25 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	} else {
 		print_name(f, s, 0);
 	}
-	fprintf(f, "\\n%lli\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", n->tnode.tupid, shape, color, fontcolor, style);
+	tt = tupid_tree_search(node_root, n->tent->tnode.tupid);
+	if(tt) {
+		struct node_details *nd;
+		nd = container_of(tt, struct node_details, nodetnode);
+		data = nd->count;
+		if(n->tent->type == TUP_NODE_CMD)
+			datastring = " commands";
+		else
+			datastring = " files";
+	} else {
+		data = n->tnode.tupid;
+		datastring = "";
+	}
+	fprintf(f, "\\n");
+	if(data != 1)
+		fprintf(f, "%lli%s", data, datastring);
+	fprintf(f, "\" shape=\"%s\" color=\"#%06x\" fontcolor=\"#%06x\" style=%s];\n", shape, color, fontcolor, style);
+
+
 	if(show_dirs && n->tent->dt) {
 		struct node *tmp;
 		tmp = find_node(g, n->tent->dt);
@@ -744,16 +773,159 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	}
 }
 
-void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts)
+static tupid_t get_hash(tupid_t hash, tupid_t id, int style)
+{
+	return hash * 31 + (id * style);
+}
+
+static tupid_t command_hash_func(struct node *n)
+{
+	char *space;
+	int len;
+	int x;
+	struct edge *e2;
+	struct edge *e;
+	tupid_t hash = 1;
+
+	/* Hash the command string up to the first
+	 * space, so eg: all "gcc" commands can
+	 * potentially be joined.
+	 */
+	space = strchr(n->tent->name.s, ' ');
+	if(space) {
+		len = space - n->tent->name.s;
+	} else {
+		len = strlen(n->tent->name.s);
+	}
+	for(x=0; x<len; x++) {
+		hash = get_hash(hash, n->tent->name.s[x], 1);
+	}
+
+	LIST_FOREACH(e, &n->edges, list) {
+		LIST_FOREACH(e2, &e->dest->edges, list) {
+			hash = get_hash(hash, e2->dest->tnode.tupid, e2->style);
+		}
+	}
+
+	LIST_FOREACH(e, &n->incoming, destlist) {
+		LIST_FOREACH(e2, &e->src->incoming, destlist) {
+			hash = get_hash(hash, -e2->src->tnode.tupid, e2->style);
+		}
+	}
+	return hash;
+}
+
+static tupid_t file_hash_func(struct node *n)
+{
+	struct edge *e;
+	tupid_t hash = 1;
+	LIST_FOREACH(e, &n->edges, list) {
+		hash = get_hash(hash, e->dest->tnode.tupid, e->style);
+	}
+	LIST_FOREACH(e, &n->incoming, destlist) {
+		/* incoming links add negative values
+		 * to the hash, so A -> B has a
+		 * different has from B -> C (ie: the
+		 * input and output to a command should
+		 * evaluate differently).
+		 */
+		hash = get_hash(hash, -e->src->tnode.tupid, e->style);
+	}
+
+	return hash;
+}
+
+static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*hash_func)(struct node *n),
+			 struct tupid_entries *hash_root, struct tupid_entries *node_root)
 {
 	struct node *n;
+	struct node *tmp;
+
+	TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
+		/* Funky since we do commands in one pass, then
+		 * generated/normal files in another pass (which have multiple
+		 * types)
+		 */
+		if((type == TUP_NODE_CMD && n->tent->type == TUP_NODE_CMD) ||
+		   (type != TUP_NODE_CMD && n->tent->type != TUP_NODE_CMD)) {
+			struct tupid_tree *tt;
+			struct node_details *nd;
+			tupid_t hash;
+
+			hash = hash_func(n);
+
+			tt = tupid_tree_search(hash_root, hash);
+			if(tt == NULL) {
+				nd = malloc(sizeof *nd);
+				if(!nd) {
+					perror("malloc");
+					return -1;
+				}
+				nd->hashtnode.tupid = hash;
+				nd->nodetnode.tupid = n->tent->tnode.tupid;
+				nd->count = 1;
+				nd->n = n;
+				tupid_tree_insert(hash_root, &nd->hashtnode);
+				tupid_tree_insert(node_root, &nd->nodetnode);
+			} else {
+				nd = container_of(tt, struct node_details, hashtnode);
+				nd->count++;
+				if(n->tent->type == TUP_NODE_CMD) {
+					struct edge *e;
+					/* When we combine a command, we move
+					 * its inputs/outputs over to the
+					 * command in the same hash bin so we
+					 * can count them properly.
+					 */
+					LIST_FOREACH(e, &n->edges, list) {
+						if(create_edge(nd->n, e->dest, e->style) < 0)
+							return -1;
+					}
+					LIST_FOREACH(e, &n->incoming, destlist) {
+						if(create_edge(e->src, nd->n, e->style) < 0)
+							return -1;
+					}
+				}
+				remove_node_internal(g, n);
+			}
+		}
+	}
+	return 0;
+}
+
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts, int combine)
+{
+	struct node *n;
+	struct tupid_entries hash_root = {NULL};
+	struct tupid_entries node_root = {NULL};
+
+	if(combine) {
+		if(combine_nodes(g, TUP_NODE_CMD, command_hash_func, &hash_root, &node_root) < 0)
+			return;
+
+		/* This also does generated nodes */
+		if(combine_nodes(g, TUP_NODE_FILE, file_hash_func, &hash_root, &node_root) < 0)
+			return;
+	}
 
 	fprintf(f, "digraph G {\n");
 	TAILQ_FOREACH(n, &g->node_list, list) {
-		dump_node(f, g, n, show_dirs, show_env, show_ghosts);
+		if(RB_EMPTY(&node_root) || tupid_tree_search(&node_root, n->tent->tnode.tupid) != NULL) {
+			dump_node(f, g, n, show_dirs, show_env, show_ghosts, &node_root);
+		}
 	}
 	TAILQ_FOREACH(n, &g->plist, list) {
-		dump_node(f, g, n, show_dirs, show_env, show_ghosts);
+		dump_node(f, g, n, show_dirs, show_env, show_ghosts, &node_root);
+	}
+
+	while(!RB_EMPTY(&hash_root)) {
+		struct tupid_tree *tt;
+		struct node_details *nd;
+		tt = RB_MIN(tupid_entries, &hash_root);
+		nd = container_of(tt, struct node_details, hashtnode);
+		tupid_tree_rm(&hash_root, &nd->hashtnode);
+		tupid_tree_rm(&node_root, &nd->nodetnode);
+		free(nd);
 	}
 	fprintf(f, "}\n");
 }

@@ -431,7 +431,9 @@ static int graph(int argc, char **argv)
 	int show_dirs;
 	int show_ghosts;
 	int show_env;
+	int combine;
 	int default_graph = 1;
+	int stickies = 1;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -440,6 +442,7 @@ static int graph(int argc, char **argv)
 	show_dirs = tup_option_get_int("graph.dirs");
 	show_ghosts = tup_option_get_int("graph.ghosts");
 	show_env = tup_option_get_int("graph.environment");
+	combine = tup_option_get_int("graph.combine");
 
 	if(create_graph(&g, 0) < 0)
 		return -1;
@@ -461,6 +464,14 @@ static int graph(int argc, char **argv)
 		}
 		if(strcmp(argv[x], "--env") == 0) {
 			show_env = 1;
+			continue;
+		}
+		if(strcmp(argv[x], "--combine") == 0) {
+			combine = 1;
+			continue;
+		}
+		if(strcmp(argv[x], "--normal") == 0) {
+			stickies = 0;
 			continue;
 		}
 
@@ -502,10 +513,11 @@ static int graph(int argc, char **argv)
 				return -1;
 	}
 
-	if(add_graph_stickies(&g) < 0)
-		return -1;
+	if(stickies)
+		if(add_graph_stickies(&g) < 0)
+			return -1;
 
-	dump_graph(&g, stdout, show_dirs, show_env, show_ghosts);
+	dump_graph(&g, stdout, show_dirs, show_env, show_ghosts, combine);
 
 	destroy_graph(&g);
 	if(tup_db_commit() < 0)
