@@ -27,8 +27,7 @@ tup touch foo.c bar.c baz.c
 echo "int main(void) {return 0;}" > foo.c
 update
 
-tup touch *.c
-tup graph --combine > ok.dot
+tup graph . --combine > ok.dot
 gitignore_good 'node.*\.o.*3 files' ok.dot
 gitignore_good 'node.*\.c.*3 files' ok.dot
 gitignore_good 'node.*gcc -c.*3 commands' ok.dot

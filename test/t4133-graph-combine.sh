@@ -29,9 +29,9 @@ HERE
 tup touch in1.txt in2.txt Tupfile
 update
 
-tup touch in1.txt in2.txt
-tup graph --combine > ok.dot
-gitignore_good 'node.*in.*2 files' ok.dot
+tup graph . --combine > ok.dot
+# 3 in files is in1.txt, in2.txt, ok.sh
+gitignore_good 'node.*in.*3 files' ok.dot
 gitignore_good 'node.*out.*3 files' ok.dot
 
 eotup
