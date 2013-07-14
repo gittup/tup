@@ -923,6 +923,9 @@ void dump_graph(struct graph *g, FILE *f, int show_dirs, int combine)
 				 )
 				)
 				rmnode = 1;
+			else if(n->tent->type == TUP_NODE_GENERATED &&
+				strcmp(n->tent->name.s, ".gitignore") == 0)
+				rmnode = 1;
 			if(rmnode)
 				remove_node_internal(g, n);
 		}

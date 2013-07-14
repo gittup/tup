@@ -21,6 +21,7 @@
 
 tmkdir sub
 cat > sub/Tupfile << HERE
+.gitignore
 : in.txt |> cp %f %o |> out.txt
 HERE
 tup touch sub/Tupfile sub/in.txt
@@ -31,9 +32,11 @@ tup graph --dirs . > ok-dirs.dot
 gitignore_good 'node.*label=.*in.txt' ok.dot
 gitignore_good 'node.*label=.*out.txt' ok.dot
 gitignore_bad 'node.*label=.*sub' ok.dot
+gitignore_bad 'node.*label=.*gitignore' ok.dot
 
 gitignore_good 'node.*label=.*in.txt' ok-dirs.dot
 gitignore_good 'node.*label=.*out.txt' ok-dirs.dot
 gitignore_good 'node.*label=.*sub' ok-dirs.dot
+gitignore_good 'node.*label=.*gitignore' ok-dirs.dot
 
 eotup
