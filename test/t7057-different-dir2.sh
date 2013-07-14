@@ -37,10 +37,12 @@ cat > Tupfile << HERE
 HERE
 
 # Touch the output file, so the monitor goes into that directory.
+sleep 1
 touch foo/out.txt
 update
 
 check_exist bar/out.txt
-check_not_exist foo
+# foo/out.txt still exists because we overwrote it with the 'touch'
+check_exist foo/out.txt
 
 eotup
