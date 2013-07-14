@@ -819,6 +819,28 @@ static tupid_t file_hash_func(struct node *n)
 	return hash;
 }
 
+static int find_edge(struct edge_head *eh, struct node *n, int style)
+{
+	struct edge *e;
+
+	LIST_FOREACH(e, eh, list) {
+		if(e->dest == n && e->style == style)
+			return 1;
+	}
+	return 0;
+}
+
+static int find_incoming_edge(struct edge_head *eh, struct node *n, int style)
+{
+	struct edge *e;
+
+	LIST_FOREACH(e, eh, destlist) {
+		if(e->src == n && e->style == style)
+			return 1;
+	}
+	return 0;
+}
+
 static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*hash_func)(struct node *n),
 			 struct tupid_entries *hash_root, struct tupid_entries *node_root)
 {
@@ -862,12 +884,16 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 					 * can count them properly.
 					 */
 					LIST_FOREACH(e, &n->edges, list) {
-						if(create_edge(nd->n, e->dest, e->style) < 0)
-							return -1;
+						if(!find_edge(&nd->n->edges, e->dest, e->style)) {
+							if(create_edge(nd->n, e->dest, e->style) < 0)
+								return -1;
+						}
 					}
 					LIST_FOREACH(e, &n->incoming, destlist) {
-						if(create_edge(e->src, nd->n, e->style) < 0)
-							return -1;
+						if(!find_incoming_edge(&nd->n->incoming, e->src, e->style)) {
+							if(create_edge(e->src, nd->n, e->style) < 0)
+								return -1;
+						}
 					}
 				}
 				remove_node_internal(g, n);
