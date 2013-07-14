@@ -399,10 +399,30 @@ err_close:
 	return -1;
 }
 
+static int show_dirs;
+static int show_ghosts;
+static int show_env;
 static int graph_cb(void *arg, struct tup_entry *tent)
 {
 	struct graph *g = arg;
 	struct node *n;
+
+	if(!show_ghosts && tent->type == TUP_NODE_GHOST)
+		return 0;
+	if(!show_env) {
+		if(tent->tnode.tupid == env_dt() ||
+		   tent->dt == env_dt())
+			return 0;
+	}
+	/* We need to load dirs/generated dirs when !g->cur, because that is
+	 * how we get 'tup graph dir' to load all nodes/sub-nodes of the
+	 * directory - the actual dir nodes are pruned in dump_graph():
+	 */
+	if(!show_dirs && g->cur) {
+		if(tent->type == TUP_NODE_DIR ||
+		   tent->type == TUP_NODE_GENERATED_DIR)
+			return 0;
+	}
 
 	n = find_node(g, tent->tnode.tupid);
 	if(n != NULL)
@@ -428,9 +448,6 @@ static int graph(int argc, char **argv)
 	int x;
 	struct graph g;
 	struct node *n;
-	int show_dirs;
-	int show_ghosts;
-	int show_env;
 	int combine;
 	int default_graph = 1;
 	int stickies = 1;
@@ -516,7 +533,7 @@ static int graph(int argc, char **argv)
 		if(add_graph_stickies(&g) < 0)
 			return -1;
 
-	dump_graph(&g, stdout, show_dirs, show_env, show_ghosts, combine);
+	dump_graph(&g, stdout, show_dirs, combine);
 
 	destroy_graph(&g);
 	if(tup_db_commit() < 0)

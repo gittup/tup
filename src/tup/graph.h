@@ -96,7 +96,7 @@ int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
 			int *connected);
 void trim_graph(struct graph *g);
 void save_graph(FILE *err, struct graph *g, const char *filename);
-void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts, int combine);
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int combine);
 
 int group_need_circ_check(void);
 int add_group_circ_check(struct tup_entry *tent);

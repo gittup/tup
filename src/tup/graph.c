@@ -619,7 +619,7 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 		perror(realfile);
 		return;
 	}
-	dump_graph(g, f, 1, 0, 0, 0);
+	dump_graph(g, f, 1, 0);
 	fclose(f);
 }
 
@@ -644,8 +644,7 @@ struct node_details {
 };
 
 static void dump_node(FILE *f, struct graph *g, struct node *n,
-		      int show_dirs, int show_env, int show_ghosts,
-		      struct tupid_entries *node_root)
+		      int show_dirs, struct tupid_entries *node_root)
 {
 	int color;
 	int fontcolor;
@@ -661,23 +660,12 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	if(n == g->root)
 		return;
 
-	if(!show_env) {
-		if(n->tent->tnode.tupid == env_dt() ||
-		   n->tent->dt == env_dt())
-			return;
-	}
-
 	style = "solid";
 	color = 0;
 	fontcolor = 0;
 	switch(n->tent->type) {
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
-			/* Skip Tupfiles in no-dirs mode since they
-			 * point to directories.
-			 */
-			if(!show_dirs && strcmp(n->tent->name.s, "Tupfile") == 0)
-				return;
 			shape = "oval";
 			break;
 		case TUP_NODE_CMD:
@@ -685,16 +673,12 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 			break;
 		case TUP_NODE_DIR:
 		case TUP_NODE_GENERATED_DIR:
-			if(!show_dirs)
-				return;
 			shape = "diamond";
 			break;
 		case TUP_NODE_VAR:
 			shape = "octagon";
 			break;
 		case TUP_NODE_GHOST:
-			if(!show_ghosts)
-				return;
 			/* Ghost nodes won't have flags set */
 			color = 0x888888;
 			fontcolor = 0x888888;
@@ -893,11 +877,30 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 	return 0;
 }
 
-void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_ghosts, int combine)
+void dump_graph(struct graph *g, FILE *f, int show_dirs, int combine)
 {
 	struct node *n;
 	struct tupid_entries hash_root = {NULL};
 	struct tupid_entries node_root = {NULL};
+
+	if(!show_dirs) {
+		struct node *tmp;
+		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
+			int rmnode = 0;
+			if(n->tent->type == TUP_NODE_DIR ||
+			   n->tent->type == TUP_NODE_GENERATED_DIR)
+				rmnode = 1;
+			else if(n->tent->type == TUP_NODE_FILE &&
+				(strcmp(n->tent->name.s, "Tupfile") == 0 ||
+				 strcmp(n->tent->name.s, "Tupfile.lua") == 0 ||
+				 strcmp(n->tent->name.s, "Tupdefault.lua") == 0
+				 )
+				)
+				rmnode = 1;
+			if(rmnode)
+				remove_node_internal(g, n);
+		}
+	}
 
 	if(combine) {
 		if(combine_nodes(g, TUP_NODE_CMD, command_hash_func, &hash_root, &node_root) < 0)
@@ -911,11 +914,11 @@ void dump_graph(struct graph *g, FILE *f, int show_dirs, int show_env, int show_
 	fprintf(f, "digraph G {\n");
 	TAILQ_FOREACH(n, &g->node_list, list) {
 		if(RB_EMPTY(&node_root) || tupid_tree_search(&node_root, n->tent->tnode.tupid) != NULL) {
-			dump_node(f, g, n, show_dirs, show_env, show_ghosts, &node_root);
+			dump_node(f, g, n, show_dirs, &node_root);
 		}
 	}
 	TAILQ_FOREACH(n, &g->plist, list) {
-		dump_node(f, g, n, show_dirs, show_env, show_ghosts, &node_root);
+		dump_node(f, g, n, show_dirs, &node_root);
 	}
 
 	while(!RB_EMPTY(&hash_root)) {
