@@ -28,19 +28,9 @@ echo "int main(void) {return 0;}" > foo.c
 update
 
 tup touch *.c
-tup scan
 tup graph --combine > ok.dot
-if ! grep 'node.*\.o.*3 files' ok.dot > /dev/null; then
-	echo "Error: Expected objects to be combined" 1>&2
-	exit 1
-fi
-if ! grep 'node.*\.c.*3 files' ok.dot > /dev/null; then
-	echo "Error: Expected sources to be combined" 1>&2
-	exit 1
-fi
-if ! grep 'node.*gcc -c.*3 commands' ok.dot > /dev/null; then
-	echo "Error: Expected commands to be combined" 1>&2
-	exit 1
-fi
+gitignore_good 'node.*\.o.*3 files' ok.dot
+gitignore_good 'node.*\.c.*3 files' ok.dot
+gitignore_good 'node.*gcc -c.*3 commands' ok.dot
 
 eotup

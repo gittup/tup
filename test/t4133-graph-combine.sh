@@ -30,15 +30,8 @@ tup touch in1.txt in2.txt Tupfile
 update
 
 tup touch in1.txt in2.txt
-tup scan
 tup graph --combine > ok.dot
-if ! grep 'node.*in.*2 files' ok.dot > /dev/null; then
-	echo "Error: Expected inputs to be combined" 1>&2
-	exit 1
-fi
-if ! grep 'node.*out.*3 files' ok.dot > /dev/null; then
-	echo "Error: Expected outputs to be combined" 1>&2
-	exit 1
-fi
+gitignore_good 'node.*in.*2 files' ok.dot
+gitignore_good 'node.*out.*3 files' ok.dot
 
 eotup

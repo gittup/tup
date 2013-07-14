@@ -401,7 +401,7 @@ check_no_updates()
 
 gitignore_bad()
 {
-	if grep $1 $2 > /dev/null; then
+	if grep "$1" $2 > /dev/null; then
 		echo "Error: $1 found in $2" 1>&2
 		exit 1
 	fi
@@ -409,7 +409,7 @@ gitignore_bad()
 
 gitignore_good()
 {
-	if grep $1 $2 > /dev/null; then
+	if grep "$1" $2 > /dev/null; then
 		:
 	else
 		echo "Error: $1 not found in $2" 1>&2
