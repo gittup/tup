@@ -508,9 +508,8 @@ static int graph(int argc, char **argv)
 
 		tupid = g.cur->tnode.tupid;
 		g.cur = NULL;
-		if(show_dirs)
-			if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
-				return -1;
+		if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
+			return -1;
 	}
 
 	if(stickies)
