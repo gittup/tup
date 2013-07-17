@@ -845,59 +845,76 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 			 struct tupid_entries *hash_root, struct tupid_entries *node_root)
 {
 	struct node *n;
-	struct node *tmp;
+	struct node_details *nd;
+	struct tupid_tree *tt;
+	struct tupid_tree *tmp;
+	struct tupid_entries tmproot = {NULL};
 
-	TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
+	/* First calculate all hashes */
+	TAILQ_FOREACH(n, &g->node_list, list) {
 		/* Funky since we do commands in one pass, then
 		 * generated/normal files in another pass (which have multiple
 		 * types)
 		 */
 		if((type == TUP_NODE_CMD && n->tent->type == TUP_NODE_CMD) ||
 		   (type != TUP_NODE_CMD && n->tent->type != TUP_NODE_CMD)) {
-			struct tupid_tree *tt;
-			struct node_details *nd;
 			tupid_t hash;
 
 			hash = hash_func(n);
 
-			tt = tupid_tree_search(hash_root, hash);
-			if(tt == NULL) {
-				nd = malloc(sizeof *nd);
-				if(!nd) {
-					perror("malloc");
-					return -1;
-				}
-				nd->hashtnode.tupid = hash;
-				nd->nodetnode.tupid = n->tent->tnode.tupid;
-				nd->count = 1;
-				nd->n = n;
-				tupid_tree_insert(hash_root, &nd->hashtnode);
-				tupid_tree_insert(node_root, &nd->nodetnode);
-			} else {
-				nd = container_of(tt, struct node_details, hashtnode);
-				nd->count++;
-				if(n->tent->type == TUP_NODE_CMD) {
-					struct edge *e;
-					/* When we combine a command, we move
-					 * its inputs/outputs over to the
-					 * command in the same hash bin so we
-					 * can count them properly.
-					 */
-					LIST_FOREACH(e, &n->edges, list) {
-						if(!find_edge(&nd->n->edges, e->dest, e->style)) {
-							if(create_edge(nd->n, e->dest, e->style) < 0)
-								return -1;
-						}
-					}
-					LIST_FOREACH(e, &n->incoming, destlist) {
-						if(!find_incoming_edge(&nd->n->incoming, e->src, e->style)) {
-							if(create_edge(e->src, nd->n, e->style) < 0)
-								return -1;
-						}
-					}
-				}
-				remove_node_internal(g, n);
+			nd = malloc(sizeof *nd);
+			if(!nd) {
+				perror("malloc");
+				return -1;
 			}
+			nd->hashtnode.tupid = hash;
+			nd->nodetnode.tupid = n->tent->tnode.tupid;
+			nd->count = 1;
+			nd->n = n;
+			tupid_tree_insert(&tmproot, &nd->nodetnode);
+		}
+	}
+
+	/* Then keep only the first node of each hash value */
+	RB_FOREACH_SAFE(tt, tupid_entries, &tmproot, tmp) {
+		struct tupid_tree *hashtt;
+		nd = container_of(tt, struct node_details, nodetnode);
+		n = nd->n;
+
+		hashtt = tupid_tree_search(hash_root, nd->hashtnode.tupid);
+		if(hashtt == NULL) {
+			tupid_tree_rm(&tmproot, &nd->nodetnode);
+			tupid_tree_insert(hash_root, &nd->hashtnode);
+			tupid_tree_insert(node_root, &nd->nodetnode);
+		} else {
+			struct node_details *count_nd;
+
+			count_nd = container_of(hashtt, struct node_details, hashtnode);
+			count_nd->count++;
+
+			if(n->tent->type == TUP_NODE_CMD) {
+				struct edge *e;
+				/* When we combine a command, we move
+				 * its inputs/outputs over to the
+				 * command in the same hash bin so we
+				 * can count them properly.
+				 */
+				LIST_FOREACH(e, &n->edges, list) {
+					if(!find_edge(&count_nd->n->edges, e->dest, e->style)) {
+						if(create_edge(count_nd->n, e->dest, e->style) < 0)
+							return -1;
+					}
+				}
+				LIST_FOREACH(e, &n->incoming, destlist) {
+					if(!find_incoming_edge(&count_nd->n->incoming, e->src, e->style)) {
+						if(create_edge(e->src, count_nd->n, e->style) < 0)
+							return -1;
+					}
+				}
+			}
+			tupid_tree_rm(&tmproot, &nd->nodetnode);
+			remove_node_internal(g, n);
+			free(nd);
 		}
 	}
 	return 0;
