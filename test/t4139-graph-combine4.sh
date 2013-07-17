@@ -19,9 +19,12 @@
 # Try to combine a chain of commands
 . ./tup.sh
 
+cat > ok.sh << HERE
+cat \$1; touch \$2
+HERE
 cat > Tupfile << HERE
-: |> cat foo.idl; touch %o |> foo.h
-: |> cat bar.idl; touch %o |> bar.h
+: |> sh ok.sh foo.idl %o |> foo.h
+: |> sh ok.sh bar.idl %o |> bar.h
 : foo.h |> cp %f %o |> outdir/%b | <generated-headers>
 : bar.h |> cp %f %o |> outdir/%b | <generated-headers>
 HERE
@@ -29,8 +32,8 @@ tup touch foo.idl bar.idl Tupfile
 update
 
 tup graph . --combine > ok.dot
-gitignore_good 'node.*\.idl.*2 files' ok.dot
-gitignore_good 'node.*cat.*idl.*2 commands' ok.dot
+gitignore_good 'node.*\.idl.*3 files' ok.dot
+gitignore_good 'node.*sh ok.sh.*idl.*2 commands' ok.dot
 gitignore_good 'node.*\.h.*2 files' ok.dot
 gitignore_good 'node.*cp.*\.h.*2 commands' ok.dot
 

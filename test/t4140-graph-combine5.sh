@@ -19,12 +19,15 @@
 # Try to combine commands that have different numbers of incoming commands.
 . ./tup.sh
 
+cat > ok.sh << HERE
+cat \$1 \$2; touch \$3
+HERE
 cat > Tupfile << HERE
 : |> touch %o |> foo.h
 : |> touch %o |> bar.h
 : |> touch %o |> baz.h
-: foo.h |> cat %f; touch %o |> out1.txt
-: bar.h baz.h |> cat %f; touch %o |> out2.txt
+: foo.h |> sh ok.sh foo.h foo.h %o |> out1.txt
+: bar.h baz.h |> sh ok.sh bar.h baz.h %o |> out2.txt
 HERE
 tup touch Tupfile
 update
@@ -32,7 +35,7 @@ update
 tup graph . --combine > ok.dot
 gitignore_good 'node.*touch.*\.h.*3 commands' ok.dot
 gitignore_good 'node.*\.h.*3 files' ok.dot
-gitignore_good 'node.*cat.*touch.*2 commands' ok.dot
+gitignore_good 'node.*sh ok.sh.*2 commands' ok.dot
 gitignore_good 'node.*out.*txt.*2 files' ok.dot
 
 eotup
