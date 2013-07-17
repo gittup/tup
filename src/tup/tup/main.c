@@ -450,7 +450,7 @@ static int graph(int argc, char **argv)
 	struct node *n;
 	int combine;
 	int default_graph = 1;
-	int stickies = 1;
+	int stickies = 0;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -487,8 +487,8 @@ static int graph(int argc, char **argv)
 			combine = 1;
 			continue;
 		}
-		if(strcmp(argv[x], "--normal") == 0) {
-			stickies = 0;
+		if(strcmp(argv[x], "--stickies") == 0) {
+			stickies = 1;
 			continue;
 		}
 
