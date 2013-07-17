@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 static struct graph group_graph;
 static int group_graph_inited = 0;
@@ -769,20 +770,29 @@ static tupid_t command_hash_func(struct node *n)
 	int x;
 	struct edge *e2;
 	struct edge *e;
+	const char *name;
 	tupid_t hash = 1;
 
 	/* Hash the command string up to the first
 	 * space, so eg: all "gcc" commands can
 	 * potentially be joined.
 	 */
-	space = strchr(n->tent->name.s, ' ');
+	name = n->tent->name.s;
+	if(name[0] == '^') {
+		name++;
+		while(!isspace(*name))
+			name++;
+		while(isspace(*name))
+			name++;
+	}
+	space = strchr(name, ' ');
 	if(space) {
-		len = space - n->tent->name.s;
+		len = space - name;
 	} else {
-		len = strlen(n->tent->name.s);
+		len = strlen(name);
 	}
 	for(x=0; x<len; x++) {
-		hash = get_hash(hash, n->tent->name.s[x], 1);
+		hash = get_hash(hash, name[x], 1);
 	}
 
 	LIST_FOREACH(e, &n->edges, list) {

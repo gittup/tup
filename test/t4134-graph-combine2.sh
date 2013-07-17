@@ -20,8 +20,8 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o |> gcc %f -o %o |> prog.exe
+: foreach *.c |> ^ GCC %f^ gcc -c %f -o %o |> %B.o
+: *.o |> ^ GCC %f^ gcc %f -o %o |> prog.exe
 HERE
 tup touch foo.c bar.c baz.c
 echo "int main(void) {return 0;}" > foo.c
@@ -30,6 +30,6 @@ update
 tup graph . --combine > ok.dot
 gitignore_good 'node.*\.o.*3 files' ok.dot
 gitignore_good 'node.*\.c.*3 files' ok.dot
-gitignore_good 'node.*gcc -c.*3 commands' ok.dot
+gitignore_good 'node.*GCC.*3 commands' ok.dot
 
 eotup
