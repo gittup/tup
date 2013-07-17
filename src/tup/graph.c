@@ -763,7 +763,8 @@ static tupid_t get_hash(tupid_t hash, tupid_t id, int style)
 	return hash * 31 + (id * style);
 }
 
-static tupid_t command_name_hash(tupid_t hash, const char *name)
+static tupid_t command_name_hash(tupid_t hash, const char *name,
+				 struct string_entries *root, int mult)
 {
 	const char *space;
 	int len;
@@ -786,50 +787,103 @@ static tupid_t command_name_hash(tupid_t hash, const char *name)
 	} else {
 		len = strlen(name);
 	}
+
+	if(root) {
+		struct string_tree *st;
+		if(string_tree_search(root, name, len) != NULL)
+			return hash;
+		st = malloc(sizeof *st);
+		if(!st) {
+			perror("malloc");
+			return -1;
+		}
+		st->s = malloc(len + 1);
+		strncpy(st->s, name, len);
+		st->s[len] = 0;
+		st->len = len;
+		if(string_tree_insert(root, st) < 0)
+			return -1;
+	}
+
 	for(x=0; x<len; x++) {
-		hash = get_hash(hash, name[x], 1);
+		hash = get_hash(hash, name[x], mult);
 	}
 	return hash;
+}
+
+static void free_string_tree(struct string_entries *root)
+{
+	struct string_tree *st;
+	while(!RB_EMPTY(root)) {
+		st = RB_MIN(string_entries, root);
+		string_tree_free(root, st);
+		free(st);
+	}
 }
 
 static tupid_t command_outgoing_hash(tupid_t hash, struct node *n)
 {
 	struct edge *e;
-	if(n->tent->type == TUP_NODE_CMD) {
-		hash = command_name_hash(hash, n->tent->name.s);
-	}
+	struct edge *e2;
+	struct string_entries root = {NULL};
+
 	LIST_FOREACH(e, &n->edges, list) {
-		hash = command_outgoing_hash(hash, e->dest);
+		LIST_FOREACH(e2, &e->dest->edges, list) {
+			if(e2->dest->tent->type == TUP_NODE_CMD) {
+				hash = command_name_hash(hash, e2->dest->tent->name.s, &root, 1);
+			}
+		}
 	}
+
+	LIST_FOREACH(e, &n->edges, list) {
+		LIST_FOREACH(e2, &e->dest->edges, list) {
+			if(e2->dest->tent->type == TUP_NODE_CMD) {
+				hash = command_outgoing_hash(hash, e2->dest);
+			}
+		}
+	}
+	free_string_tree(&root);
 	return hash;
 }
 
 static tupid_t command_incoming_hash(tupid_t hash, struct node *n)
 {
 	struct edge *e;
-	if(n->tent->type == TUP_NODE_CMD) {
-		hash = command_name_hash(hash, n->tent->name.s);
-	}
+	struct edge *e2;
+	struct string_entries root = {NULL};
+
 	LIST_FOREACH(e, &n->incoming, destlist) {
-		hash = command_incoming_hash(hash, e->src);
+		LIST_FOREACH(e2, &e->src->incoming, destlist) {
+			if(e2->src->tent->type == TUP_NODE_CMD) {
+				hash = command_name_hash(hash, e2->src->tent->name.s, &root, -1);
+			}
+		}
 	}
+
+	LIST_FOREACH(e, &n->incoming, destlist) {
+		LIST_FOREACH(e2, &e->src->incoming, destlist) {
+			if(e2->src->tent->type == TUP_NODE_CMD) {
+				hash = command_incoming_hash(hash, e2->src);
+			}
+		}
+	}
+
+	free_string_tree(&root);
 	return hash;
 }
 
 static tupid_t command_hash_func(struct node *n)
 {
-	struct edge *e;
 	tupid_t hash = 1;
 
-	hash = command_name_hash(hash, n->tent->name.s);
+	/* Command hash is our name... */
+	hash = command_name_hash(hash, n->tent->name.s, NULL, 1);
 
-	LIST_FOREACH(e, &n->edges, list) {
-		hash = command_outgoing_hash(hash, e->dest);
-	}
+	/* Plus the hashes of all unique commands that follow... */
+	hash = command_outgoing_hash(hash, n);
 
-	LIST_FOREACH(e, &n->incoming, destlist) {
-		hash = command_incoming_hash(hash, e->src);
-	}
+	/* Plus the hashes of all unique input commands */
+	hash = command_incoming_hash(hash, n);
 	return hash;
 }
 
