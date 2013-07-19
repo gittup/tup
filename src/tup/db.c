@@ -3308,8 +3308,7 @@ out_reset:
 	return rc;
 }
 
-int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
-			      struct tupid_entries *root)
+int tup_db_create_unique_link(tupid_t a, tupid_t b)
 {
 	int rc;
 	tupid_t incoming;
@@ -3317,43 +3316,29 @@ int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entrie
 	rc = tup_db_get_incoming_link(b, &incoming);
 	if(rc < 0)
 		return -1;
-	if(incoming != -1) {
-		if(tupid_tree_search(delroot, incoming) != NULL) {
-			struct tup_entry *output_group = NULL;
-			struct tup_entry *tent;
+	if(incoming != -1 && incoming != a) {
+		struct tup_entry *output_group = NULL;
+		struct tup_entry *tent;
 
-			if(get_output_group(incoming, &output_group) < 0)
-				return -1;
-			if(output_group) {
-				/* Make sure we remove the old group for the
-				 * output (t3065)
-				 */
-				if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
-					return -1;
-				tup_entry_add_ghost_list(output_group, &ghost_list);
-			}
-			/* Delete any old links (t6029) */
-			if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
-				return -1;
-			incoming = -1;
-
-			if(tup_entry_add(b, &tent) < 0)
-				return -1;
-			tent->incoming = NULL;
-		}
-	}
-	/* See if we already own the link, or if the link doesn't exist yet */
-	if(a == incoming || incoming == -1) {
-		if(tupid_tree_add(root, b) < 0)
+		if(get_output_group(incoming, &output_group) < 0)
 			return -1;
-		return 0;
+		if(output_group) {
+			/* Make sure we remove the old group for the
+			 * output (t3065)
+			 */
+			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+				return -1;
+			tup_entry_add_ghost_list(output_group, &ghost_list);
+		}
+		/* Delete any old links (t6029) */
+		if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
+			return -1;
+
+		if(tup_entry_add(b, &tent) < 0)
+			return -1;
+		tent->incoming = NULL;
 	}
-	/* Otherwise, someone else got the girl. Err, output file. */
-	fprintf(f, "tup error: Unable to create a unique link from %lli to %lli because the destination is already linked to by node %lli.\n", a, b, incoming);
-	tup_db_print(f, incoming);
-	tup_db_print(f, a);
-	tup_db_print(f, b);
-	return -1;
+	return 0;
 }
 
 int tup_db_link_exists(tupid_t a, tupid_t b, int style,

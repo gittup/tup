@@ -16,58 +16,41 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Same as t4103, but one of the directories outputs locally.
+# Like t4104, but now we have multiple outputs, so find_existing_command
+# and tup_db_create_unique_link don't get called on the same files.
 
 . ./tup.sh
 
 tmkdir foo
 tmkdir bar
+tmkdir baz
 echo foo > foo/foo.txt
 echo bar > bar/bar.txt
-cat > foo/Tupfile << HERE
-: |> cp foo.txt %o |> ../bar/out.txt
-HERE
-cat > bar/Tupfile << HERE
-: |> cp bar.txt %o |> out.txt
-HERE
-tup touch foo/Tupfile bar/Tupfile
-update_fail_msg "Unable to create output file 'out.txt'"
-
-# Correctly create foo.txt
-cat > bar/Tupfile << HERE
-HERE
-tup touch bar/Tupfile
-update
-
-echo foo | diff - bar/out.txt
-
-# Switch from foo to bar - this should work.
+echo baz > baz/baz.txt
 cat > foo/Tupfile << HERE
 HERE
 cat > bar/Tupfile << HERE
-: |> cp bar.txt %o |> out.txt
+: |> cp bar.txt %o |> barout.txt
 HERE
-tup touch foo/Tupfile bar/Tupfile
+cat > baz/Tupfile << HERE
+: |> cp baz.txt %o |> bazout.txt
+HERE
+tup touch foo/Tupfile bar/Tupfile baz/Tupfile
 update
 
-echo bar | diff - bar/out.txt
+echo bar | diff - bar/barout.txt
+echo baz | diff - baz/bazout.txt
 
-# Switch from bar to foo - this should work.
+# Switch bar&baz to foo - this should work.
+cat > foo/ok.sh << HERE
+cp foo.txt ../bar/barout.txt
+cp foo.txt ../baz/bazout.txt
+HERE
 cat > foo/Tupfile << HERE
-: |> cp foo.txt %o |> ../bar/out.txt
+: |> sh ok.sh |> ../bar/barout.txt ../baz/bazout.txt
 HERE
-cat > bar/Tupfile << HERE
-HERE
-tup touch foo/Tupfile bar/Tupfile
+tup touch foo/Tupfile
+rm bar/Tupfile baz/Tupfile
 update
-
-echo foo | diff - bar/out.txt
-
-# Back to both - should get a failure.
-cat > bar/Tupfile << HERE
-: |> cp bar.txt %o |> out.txt
-HERE
-tup touch bar/Tupfile
-update_fail_msg "Unable to create output file 'out.txt'"
 
 eotup

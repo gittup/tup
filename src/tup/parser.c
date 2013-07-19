@@ -2884,9 +2884,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int find_existing_command(struct tupfile *tf, const struct name_list *onl,
-				 struct tupid_entries *del_root,
-				 tupid_t *cmdid)
+static int find_existing_command(const struct name_list *onl, tupid_t *cmdid)
 {
 	struct name_list_entry *onle;
 	TAILQ_FOREACH(onle, &onl->entries, list) {
@@ -2896,36 +2894,9 @@ static int find_existing_command(struct tupfile *tf, const struct name_list *onl
 		rc = tup_db_get_incoming_link(onle->tent->tnode.tupid, &incoming);
 		if(rc < 0)
 			return -1;
-		/* Only want commands that are still in the del_root. Any
-		 * command not in the del_root will mean it has already been
-		 * parsed, and so will probably cause an error later in the
-		 * duplicate link check.
-		 *
-		 * For outputs in other directories, we can also check if the
-		 * owner of the output file also needs to be re-parsed, since
-		 * the command may have moved to a different directory (t4103).
-		 */
 		if(incoming != -1) {
-			int available = 0;
-
-			if(tupid_tree_search(del_root, incoming) != NULL)
-				available = 1;
-			if(!available) {
-				struct tup_entry *tent;
-				if(tup_entry_add(incoming, &tent) < 0)
-					return -1;
-				if(tent->dt != tf->tupid) {
-					struct node *n;
-					n = find_node(tf->g, tent->dt);
-					if(n != NULL && !n->already_used) {
-						available = 1;
-					}
-				}
-			}
-			if(available) {
-				*cmdid = incoming;
-				return 0;
-			}
+			*cmdid = incoming;
+			return 0;
 		}
 	}
 	*cmdid = -1;
@@ -2973,7 +2944,8 @@ static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid
 	return 0;
 }
 
-static int validate_output(struct tupfile *tf, tupid_t dt, const char *name)
+static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
+			   const char *fullname, struct tupid_entries *del_root)
 {
 	struct tup_entry *tent;
 
@@ -2981,6 +2953,29 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name)
 		return -1;
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED) {
+			int available = 0;
+			int rc;
+			tupid_t incoming;
+
+			rc = tup_db_get_incoming_link(tent->tnode.tupid, &incoming);
+			if(rc < 0)
+				return -1;
+			if(incoming != -1) {
+				if(tupid_tree_search(del_root, incoming) != NULL)
+					available = 1;
+				if(!available) {
+					struct node *n;
+					n = find_node(tf->g, tent->srcid);
+					if(n != NULL && !n->parsing) {
+						available = 1;
+					}
+				}
+				if(!available) {
+					fprintf(tf->f, "tup error: Unable to create output file '%s' because it is already owned by command %lli.\n", fullname, incoming);
+					tup_db_print(tf->f, incoming);
+					return -1;
+				}
+			}
 		} else {
 			int tmp;
 			fprintf(tf->f, "tup error: Attempting to insert '");
@@ -3148,13 +3143,17 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
 			return -1;
 
-		if(validate_output(tf, pl->dt, onle->base) < 0)
+		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
+			return -1;
+		}
+		if(tupid_tree_add(&output_root, onle->tent->tnode.tupid) < 0) {
+			fprintf(tf->f, "tup error: The output file '%s' is listed multiple times in a command.\n", onle->path);
 			return -1;
 		}
 
@@ -3200,7 +3199,7 @@ out_pl:
 			return -1;
 		}
 	} else {
-		if(find_existing_command(tf, &onl, &tf->g->cmd_delete_root, &cmdid) < 0)
+		if(find_existing_command(&onl, &cmdid) < 0)
 			return -1;
 		if(cmdid == -1) {
 			if(tf->refactoring) {
@@ -3246,8 +3245,7 @@ out_pl:
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
 
-		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &output_root) < 0) {
-			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
 			return -1;
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
@@ -3257,8 +3255,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &output_root) < 0) {
-			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
+		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
 			return -1;
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,

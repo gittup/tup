@@ -39,6 +39,6 @@ generated_headers = foo.h
 HERE
 echo 'int main(void) {return 0;}' > errors.c
 tup touch errors.c Tupfile
-update_fail_msg "Attempted to add duplicate command ID"
+update_fail_msg "Unable to create output file 'errors.o'"
 
 eotup

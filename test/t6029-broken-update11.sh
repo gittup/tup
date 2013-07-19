@@ -32,6 +32,6 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> output
 HERE
 tup touch Tupfile
-update_fail_msg "Unable to create a unique link"
+update_fail_msg "Unable to create output file 'output'"
 
 eotup

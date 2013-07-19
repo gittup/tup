@@ -109,8 +109,7 @@ int tup_db_unflag_variant(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
-int tup_db_create_unique_link(FILE *f, tupid_t a, tupid_t b, struct tupid_entries *delroot,
-			      struct tupid_entries *root);
+int tup_db_create_unique_link(tupid_t a, tupid_t b);
 int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
