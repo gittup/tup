@@ -2128,7 +2128,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		while(tmp_nle.extlesslen > 0 && tmp_nle.path[tmp_nle.extlesslen] != '.')
 			tmp_nle.extlesslen--;
 
-		tmp_nle.tent = tup_db_create_node_part(tf->f, tf->tupid, tmp_nle.path, -1,
+		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
 						       TUP_NODE_GENERATED, -1, NULL);
 		if(!tmp_nle.tent)
 			return -1;
@@ -2517,7 +2517,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
 			if(pl->pel->path[0] == '<') {
-				tent = tup_db_create_node_part(tf->f, pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 				if(!tent) {
 					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
 					return -1;
@@ -2973,6 +2973,28 @@ static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid
 	return 0;
 }
 
+static int validate_output(struct tupfile *tf, tupid_t dt, const char *name)
+{
+	struct tup_entry *tent;
+
+	if(tup_db_select_tent(dt, name, &tent) < 0)
+		return -1;
+	if(tent) {
+		if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED) {
+		} else {
+			int tmp;
+			fprintf(tf->f, "tup error: Attempting to insert '");
+			if(dt != tf->tupid) {
+				get_relative_dir(tf->f, NULL, NULL, tf->tupid, dt, &tmp);
+				fprintf(tf->f, "/");
+			}
+			fprintf(tf->f, "%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl)
 {
@@ -3047,7 +3069,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 			}
 
-			group = tup_db_create_node_part(tf->f, pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!group)
 				return -1;
 			goto out_pl;
@@ -3125,7 +3147,10 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
 			return -1;
-		onle->tent = tup_db_create_node_part(tf->f, pl->dt, onle->base, -1,
+
+		if(validate_output(tf, pl->dt, onle->base) < 0)
+			return -1;
+		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
 		if(!onle->tent) {
 			free(onle->path);
@@ -3220,6 +3245,7 @@ out_pl:
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
+
 		if(tup_db_create_unique_link(tf->f, cmdid, onle->tent->tnode.tupid, &tf->g->cmd_delete_root, &output_root) < 0) {
 			fprintf(tf->f, "tup error: You may have multiple commands trying to create file '%s'\n", onle->path);
 			return -1;

@@ -53,7 +53,7 @@ const char *tup_db_type(enum TUP_NODE_TYPE type);
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type);
 struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type,
 					   tupid_t srcid, int *node_changed);
-struct tup_entry *tup_db_create_node_part(FILE *f, tupid_t dt, const char *name, int len,
+struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed);
 struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
 				     int len, enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid);

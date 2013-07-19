@@ -1101,16 +1101,16 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 
 struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type)
 {
-	return tup_db_create_node_part(stderr, dt, name, -1, type, -1, NULL);
+	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
 }
 
 struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
 					   int *node_changed)
 {
-	return tup_db_create_node_part(stderr, dt, name, -1, type, srcid, node_changed);
+	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
 }
 
-struct tup_entry *tup_db_create_node_part(FILE *f, tupid_t dt, const char *name, int len,
+struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
@@ -1175,21 +1175,6 @@ struct tup_entry *tup_db_create_node_part(FILE *f, tupid_t dt, const char *name,
 			return tent;
 		}
 		if(tent->type != type) {
-			/* Try to provide a more sane error message in this
-			 * case, since a user might come across it just by
-			 * screwing up the Tupfile.
-			 */
-			if(type == TUP_NODE_GENERATED) {
-				int tmp;
-				fprintf(f, "tup error: Attempting to insert '");
-				if(dt != srcid) {
-					get_relative_dir(f, NULL, NULL, srcid, dt, &tmp);
-					fprintf(f, "/");
-				}
-				fprintf(f, "%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
-				return NULL;
-			}
-
 			/* If we have a generated dir in the tup db, the
 			 * scanner will report TUP_NODE_DIR. In this case we
 			 * don't want to change the type.
