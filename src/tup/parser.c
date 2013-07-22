@@ -46,6 +46,7 @@
 
 #define SYNTAX_ERROR -2
 #define CIRCULAR_DEPENDENCY_ERROR -3
+#define ERROR_DIRECTIVE_ERROR -4
 
 #define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
 
@@ -109,6 +110,7 @@ static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
+static int error_directive(struct tupfile *tf, char *cmdline);
 static int include_rules(struct tupfile *tf);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
@@ -560,6 +562,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 				rc = if_add(&ifs, !rc);
 		} else if(!if_true(&ifs)) {
 			/* Skip the false part of an if block */
+		} else if(strncmp(line, "error ", 6) == 0) {
+			rc = error_directive(tf, line+6);
 		} else if(strncmp(line, "include ", 8) == 0) {
 			char *file;
 
@@ -591,6 +595,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			rc = set_variable(tf, line);
 		}
 
+		if(rc == ERROR_DIRECTIVE_ERROR) {
+			fprintf(tf->f, "tup error: Found 'error' command parsing %s line %i. Quitting.\n", filename, lno);
+			return -1;
+		}
 		if(rc == SYNTAX_ERROR) {
 			fprintf(tf->f, "tup error: Syntax error parsing %s line %i\n  Line was: '%s'\n", filename, lno, line_debug);
 			return -1;
@@ -675,6 +683,16 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 		return -1;
 	return rc;
+}
+
+static int error_directive(struct tupfile *tf, char *cmdline) {
+	fprintf(tf->f, "Error:\n  ");
+	if (strlen(cmdline)==0) {
+		fprintf(tf->f, "Empty error directive\n");
+	} else {
+		fprintf(tf->f, "%s\n", cmdline);
+	}
+	return ERROR_DIRECTIVE_ERROR;
 }
 
 static int include_rules(struct tupfile *tf)
