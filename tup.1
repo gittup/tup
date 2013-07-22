@@ -489,6 +489,9 @@ Toggles the true/false-ness of the previous if-statement.
 .B endif
 Ends the previous ifeq/ifdef/ifndef. Note that only 8 levels of nesting if-statements is supported.
 .TP
+.B error [message]
+Causes tup to stop parsing and fail, printing \fBmessage\fP to the user as explanation.
+.TP
 .B !macro = [inputs] | [order-only inputs] |> command |> [outputs]
 Set the !-macro to the given command string. This syntax is very similar to the :-rule, since a !-macro is basically a macro for those rules. The !-macro is not expanded until it is used in the command string of a :-rule. As such, the primary use of the !-macro is to have a place to store command strings with %-flags that may be re-used. For example, we could have a !cc macro in a top-level Tuprules.tup file like so:
 .nf
