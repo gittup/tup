@@ -584,11 +584,19 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 			if(tup_db_select_tent_part(curdt, pel->path, pel->len, &tent) < 0)
 				return -1;
 			if(tent) {
-				if(sotgv == SOTGV_CREATE_DIRS && tent->type == TUP_NODE_GHOST) {
-					if(tup_db_set_type(tent, TUP_NODE_GENERATED_DIR) < 0)
+				if(sotgv == SOTGV_CREATE_DIRS) {
+					if(tent->type == TUP_NODE_GHOST) {
+						if(tup_db_set_type(tent, TUP_NODE_GENERATED_DIR) < 0)
+							return -1;
+						if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+							return -1;
+					} else if(tent->type != TUP_NODE_DIR &&
+						  tent->type != TUP_NODE_GENERATED_DIR) {
+						fprintf(stderr, "tup error: Unable to output to a different directory because '");
+						print_tup_entry(stderr, tent);
+						fprintf(stderr, "' is a %s\n", tup_db_type(tent->type));
 						return -1;
-					if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
-						return -1;
+					}
 				}
 			} else {
 				int type = TUP_NODE_GHOST;
@@ -636,10 +644,13 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 
 static int ghost_to_file(struct tup_entry *tent)
 {
+	tup_entry_del_ghost_list(tent);
 	if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 		return -1;
-	if(tup_db_add_create_list(tent->dt) < 0)
-		return -1;
+	/* Only add dirs, not generated dirs, to the create list. */
+	if(tent->parent->type == TUP_NODE_DIR)
+		if(tup_db_add_create_list(tent->dt) < 0)
+			return -1;
 	if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
 		return -1;
 	return 0;
