@@ -673,8 +673,10 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 			shape = "rectangle";
 			break;
 		case TUP_NODE_DIR:
-		case TUP_NODE_GENERATED_DIR:
 			shape = "diamond";
+			break;
+		case TUP_NODE_GENERATED_DIR:
+			shape = "house";
 			break;
 		case TUP_NODE_VAR:
 			shape = "octagon";
