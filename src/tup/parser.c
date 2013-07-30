@@ -115,7 +115,7 @@ static int include_rules(struct tupfile *tf);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
-static int gitignore(struct tupfile *tf);
+static int gitignore(struct tupfile *tf, tupid_t dt);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -316,7 +316,15 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			goto out_free_bs;
 	}
 	if(tf.ign) {
-		if(gitignore(&tf) < 0) {
+		if(!tf.variant->root_variant) {
+			if(n->tent->srcid == DOT_DT) {
+				if(gitignore(&tf, n->tent->srcid) < 0) {
+					rc = -1;
+					goto out_free_bs;
+				}
+			}
+		}
+		if(gitignore(&tf, tf.tupid) < 0) {
 			rc = -1;
 			goto out_free_bs;
 		}
@@ -977,18 +985,18 @@ int export(struct tupfile *tf, const char *cmdline)
 	return 0;
 }
 
-static int gitignore(struct tupfile *tf)
+static int gitignore(struct tupfile *tf, tupid_t dt)
 {
 	struct tup_entry *tent;
 
-	if(tup_db_select_tent(tf->tupid, ".gitignore", &tent) < 0)
+	if(tup_db_select_tent(dt, ".gitignore", &tent) < 0)
 		return -1;
 	if(!tent) {
 		if(tf->refactoring) {
 			fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
 			return -1;
 		}
-		if(tup_db_node_insert_tent(tf->tupid, ".gitignore", -1, TUP_NODE_GENERATED, -1, tf->tupid, &tent) < 0)
+		if(tup_db_node_insert_tent(dt, ".gitignore", -1, TUP_NODE_GENERATED, -1, dt, &tent) < 0)
 			return -1;
 	} else {
 		tree_entry_remove(&tf->g->gen_delete_root,
@@ -1002,7 +1010,7 @@ static int gitignore(struct tupfile *tf)
 				return -1;
 		}
 	}
-	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, tf->tupid) < 0)
+	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dt) < 0)
 		return -1;
 	return 0;
 }

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -37,21 +37,27 @@ echo "int main(void) {return 0;}" > foo.c
 tup touch Tupfile foo.c build-default/tup.config build-debug/tup.config sub/bar.c
 update
 
-for i in foo.o sub/bar.o prog .gitignore sub/.gitignore; do
+for i in foo.o sub/bar.o prog sub/.gitignore; do
 	check_exist build-debug/$i
 	check_exist build-default/$i
 	check_not_exist $i
 done
+check_exist build-debug/.gitignore
+check_exist build-default/.gitignore
+check_exist .gitignore
 
 tup touch tup.config
 rm build-debug/tup.config
 tup parse > .output.txt
 
-for i in foo.o sub/bar.o prog .gitignore sub/.gitignore; do
+for i in foo.o sub/bar.o prog sub/.gitignore; do
 	check_not_exist build-debug/$i
 	check_exist build-default/$i
 	check_not_exist $i
 done
+check_not_exist build-debug/.gitignore
+check_exist build-default/.gitignore
+check_exist .gitignore
 
 if grep "build-default/sub" .output.txt > /dev/null; then
 	cat .output.txt
