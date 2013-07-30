@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/07/17" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/07/30" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -85,7 +85,7 @@ Errors are reported for adding or removing any of the following: commands, input
 
 .TP
 .B monitor
-Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor. The following arguments can be given on the command line. Any additional arguments not handled by the monitor will be passed along to the updater if either monitor.autoupdate or monitor.autoparse are enabled. For example, you could run the monitor as 'tup monitor -f -a -j2' to run the monitor in the foreground, and automatically update with 2 jobs when changes are detected. See also the option secondary command below.
+*LINUX ONLY* Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup upd' does not need to do the initial scan, and can start constructing the build graph immediately. The "Scanning filesystem..." time from 'tup upd' is approximately equal to the time you would save by running the monitor. When the monitor is running, a 'tup upd' with no file changes should only take a few milliseconds (on my machines I get about 2 or 3ms when everything is in the disk cache). If you restart your computer, you will need to restart the monitor. The following arguments can be given on the command line. Any additional arguments not handled by the monitor will be passed along to the updater if either monitor.autoupdate or monitor.autoparse are enabled. For example, you could run the monitor as 'tup monitor -f -a -j2' to run the monitor in the foreground, and automatically update with 2 jobs when changes are detected. See also the option secondary command below.
 .RS
 .TP
 .B -d
