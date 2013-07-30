@@ -222,8 +222,10 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	/* We may need to convert normal dirs back to generated dirs,
 	 * so add this one to check.
 	 */
-	if(tupid_tree_add_dup(&g->normal_dir_root, n->tent->tnode.tupid) < 0)
-		return -1;
+	if(tf.variant->root_variant) {
+		if(tupid_tree_add_dup(&g->normal_dir_root, n->tent->tnode.tupid) < 0)
+			return -1;
+	}
 
 	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
 	ps.s.id = n->tnode.tupid;
