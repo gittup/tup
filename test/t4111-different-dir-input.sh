@@ -30,6 +30,7 @@ HERE
 
 tmkdir bar
 cat > bar/Tupfile << HERE
+: |> touch %o |> ../out/tmp.txt
 : ../out/gen.txt |> cat %f |>
 HERE
 tup touch foo/Tupfile bar/Tupfile

@@ -236,6 +236,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	RB_INIT(&tf.bang_root);
 	RB_INIT(&tf.input_root);
 	RB_INIT(&tf.chain_root);
+	RB_INIT(&tf.directory_root);
 	RB_INIT(&ps.directories);
 
 	if(refactoring) {
@@ -390,6 +391,7 @@ out_server_stop:
 	free_chain_tree(&tf.chain_root);
 	free_tupid_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
+	free_tupid_tree(&tf.directory_root);
 	free_bang_tree(&tf.bang_root);
 	free_tupid_tree(&tf.input_root);
 
@@ -2452,7 +2454,17 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 		 */
 		if(!pl->bin && pl->dt != tf->tupid && !pl->group) {
 			struct node *n;
+			struct tup_entry *dtent;
 
+			if(tup_entry_add(pl->dt, &dtent) < 0)
+				return -1;
+			if(dtent->type == TUP_NODE_GENERATED_DIR) {
+				if(tupid_tree_search(&tf->directory_root, pl->dt) == NULL) {
+					fprintf(tf->f, "tup error: Unable to use inputs from a generated directory (%lli) that isn't written to by this Tupfile.\n", pl->dt);
+					tup_db_print(tf->f, pl->dt);
+					return -1;
+				}
+			}
 			n = find_node(tf->g, pl->dt);
 			if(n != NULL && !n->already_used) {
 				int rc;
@@ -3172,6 +3184,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 
 		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0)
+			return -1;
+		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
 						     TUP_NODE_GENERATED, tf->tupid, NULL);
