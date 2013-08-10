@@ -390,8 +390,10 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 			/* Flag our parent directory in case it needs to become
 			 * a generated directory (t4124)
 			 */
-			if(tup_db_add_create_list(tent->dt) < 0)
-				return -1;
+			if(tent->parent->type == TUP_NODE_DIR) {
+				if(tup_db_add_create_list(tent->dt) < 0)
+					return -1;
+			}
 		}
 	}
 
