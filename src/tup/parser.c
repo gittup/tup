@@ -3578,10 +3578,14 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				}
 				clen += strlen(dirstring);
 			} else {
+				struct tup_entry *tent;
+				if(tup_entry_add(tf->tupid, &tent) < 0)
+					return NULL;
 				/* Anywhere else in the hierarchy can just use
-				 * the last tup entry as the %d replacement.
+				 * the last tup entry of the parsed directory
+				 * as the %d replacement.
 				 */
-				clen += tf->curtent->name.len;
+				clen += tent->name.len;
 			}
 		} else if(*next == 'g') {
 			/* g: Expands to the "glob" portion of an *, ?, [] expansion.
@@ -3702,11 +3706,15 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				memcpy(&s[x], dirstring, len);
 				x += len;
 			} else {
+				struct tup_entry *tent;
+				if(tup_entry_add(tf->tupid, &tent) < 0)
+					return NULL;
 				/* Anywhere else in the hierarchy can just use
-				 * the last tup entry as the %d replacement.
+				 * the last tup entry of the parsed directory
+				 * as the %d replacement.
 				 */
-				memcpy(&s[x], tf->curtent->name.s, tf->curtent->name.len);
-				x += tf->curtent->name.len;
+				memcpy(&s[x], tent->name.s, tent->name.len);
+				x += tent->name.len;
 			}
 		} else if(*next == 'g') {
 			TAILQ_FOREACH(nle, &nl->entries, list) {
