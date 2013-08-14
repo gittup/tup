@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2012  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2013  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -19,6 +19,12 @@
 # Like t5013, but now with execvp.
 
 . ./tup.sh
+
+# After updating cygwin, apparently the execvp causes the WaitForSingleObject()
+# call to return immediately, even though prog.exe is still running and
+# has the .tup/tmp/output-%i file open.
+check_no_windows execvp
+
 cat > Tupfile << HERE
 : foreach exec_test.c prog.c |> gcc %f -o %o |> %B.exe
 : exec_test.exe prog.exe |> ./exec_test.exe && touch %o |> test_passed
