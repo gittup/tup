@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -31,7 +31,7 @@ void progress_init(void);
 void tup_show_message(const char *s);
 void tup_main_progress(const char *s);
 void start_progress(int new_total, int new_total_time, int new_max_jobs);
-void skip_result(void);
+void skip_result(struct tup_entry *tent);
 void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, const char *extra_text);
 void show_progress(int active, enum TUP_NODE_TYPE type);
 void clear_active(FILE *f);

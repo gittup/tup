@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -149,9 +149,12 @@ void start_progress(int new_total, int new_total_time, int new_max_jobs)
 	timespan_start(&gts);
 }
 
-void skip_result(void)
+void skip_result(struct tup_entry *tent)
 {
 	sum++;
+	if(tent) {
+		total_time -= tent->mtime;
+	}
 }
 
 static int percent_complete(void)

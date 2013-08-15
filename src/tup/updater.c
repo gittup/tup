@@ -386,7 +386,7 @@ static int delete_files(struct graph *g)
 			goto out_err;
 		if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
 			goto out_err;
-		skip_result();
+		skip_result(NULL);
 		/* Use TUP_NODE_GENERATED to make the bar purple since
 		 * we are deleting (not executing) commands.
 		 */
@@ -1633,7 +1633,7 @@ static void *update_work(void *arg)
 				pthread_mutex_unlock(&display_mutex);
 			} else {
 				pthread_mutex_lock(&display_mutex);
-				show_result(n->tent, 0, NULL, "(skipped)");
+				skip_result(n->tent);
 				show_progress(jobs_active, TUP_NODE_CMD);
 				pthread_mutex_unlock(&display_mutex);
 			}
