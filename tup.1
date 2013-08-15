@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/07/30" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/08/15" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -378,11 +378,14 @@ In a command string that uses the ^\ TEXT^ sequence, flag characters can be plac
 : bar.c |> ^c^ gcc --coverage %f -o %o |> bar | bar.gcno
 
 .fi
-In the foo.c case, the command is run in a chroot and will display "CC foo.c". In the bar.c case, the command is run in a chroot and the "gcc --coverage bar.c -o bar" string is displayed.  There is currently only one supported flag character:
+In the foo.c case, the command is run in a chroot and will display "CC foo.c". In the bar.c case, the command is run in a chroot and the "gcc --coverage bar.c -o bar" string is displayed. These are the supported flag characters:
 .RS
 .TP
 .B c
 The 'c' flag causes the command to run inside a chroot on Linux and OSX, so that the fake working directory that tup uses is not visible to the sub-process. This may be necessary for commands that read the current working directory and write that information in any output files. For example, gcc with the --coverage flag will use the current working directory as the location of where to put the .gcda file. Use the 'c' flag to always run this command in a chroot. This is only supported if the tup binary is suid root so that it can setup the chroot environment.
+.TP
+.B o
+The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran.
 .RE
 
 .TP
