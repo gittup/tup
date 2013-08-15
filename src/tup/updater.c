@@ -1593,10 +1593,12 @@ static int modify_outputs(struct node *n)
 	int rc = 0;
 
 	LIST_FOREACH(e, &n->edges, list) {
-		if(e->style & TUP_LINK_NORMAL &&
-		   e->dest->tent->type == TUP_NODE_CMD) {
-			if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
-				rc = -1;
+		if(e->style & TUP_LINK_NORMAL) {
+			if(e->dest->tent->type == TUP_NODE_CMD) {
+				if(tup_db_add_modify_list(e->dest->tnode.tupid) < 0)
+					rc = -1;
+			}
+			e->dest->skip = 0;
 		}
 	}
 	return rc;
@@ -1617,17 +1619,24 @@ static void *update_work(void *arg)
 			break;
 
 		if(n->tent->type == TUP_NODE_CMD) {
-			pthread_mutex_lock(&display_mutex);
-			jobs_active++;
-			show_progress(jobs_active, TUP_NODE_CMD);
-			pthread_mutex_unlock(&display_mutex);
+			if(!n->skip) {
+				pthread_mutex_lock(&display_mutex);
+				jobs_active++;
+				show_progress(jobs_active, TUP_NODE_CMD);
+				pthread_mutex_unlock(&display_mutex);
 
-			rc = update(n);
+				rc = update(n);
 
-			pthread_mutex_lock(&display_mutex);
-			jobs_active--;
-			show_progress(jobs_active, TUP_NODE_CMD);
-			pthread_mutex_unlock(&display_mutex);
+				pthread_mutex_lock(&display_mutex);
+				jobs_active--;
+				show_progress(jobs_active, TUP_NODE_CMD);
+				pthread_mutex_unlock(&display_mutex);
+			} else {
+				pthread_mutex_lock(&display_mutex);
+				show_result(n->tent, 0, NULL, "(skipped)");
+				show_progress(jobs_active, TUP_NODE_CMD);
+				pthread_mutex_unlock(&display_mutex);
+			}
 
 			/* If the command succeeds, mark any next commands (ie:
 			 * our output files' output links) as modify in case we
@@ -1640,9 +1649,10 @@ static void *update_work(void *arg)
 			if(rc == 0) {
 				pthread_mutex_lock(&db_mutex);
 				LIST_FOREACH(e, &n->edges, list) {
-					if(e->dest->tent->type == TUP_NODE_GENERATED)
+					if(!e->dest->skip) {
 						if(modify_outputs(e->dest) < 0)
 							rc = -1;
+					}
 				}
 				if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 					rc = -1;
@@ -1653,8 +1663,10 @@ static void *update_work(void *arg)
 			/* Mark the next nodes as modify in case we hit
 			 * an error - we'll need to pick up there (t6006).
 			 */
-			if(modify_outputs(n) < 0)
-				rc = -1;
+			if(!n->skip) {
+				if(modify_outputs(n) < 0)
+					rc = -1;
+			}
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
 
@@ -1699,6 +1711,186 @@ static void *todo_work(void *arg)
 	return NULL;
 }
 
+static int move_outputs(struct node *n)
+{
+	struct edge *e;
+	struct node *output;
+	char curpath[PATH_MAX];
+	char tmppath[PATH_MAX];
+
+	LIST_FOREACH(e, &n->edges, list) {
+		output = e->dest;
+		if(output->tent->type != TUP_NODE_GROUP) {
+			curpath[0] = '.';
+			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
+				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(snprintf(tmppath, sizeof(tmppath), ".tup/tmp/backup-%lli", output->tent->tnode.tupid) >= (int)sizeof(tmppath)) {
+				fprintf(stderr, "tup error: tmppath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(rename(curpath, tmppath) < 0) {
+				/* ENOENT is ok, since the file may not exist
+				 * yet (first time we run the command, for
+				 * example).
+				 */
+				if(errno != ENOENT) {
+					perror(tmppath);
+					fprintf(stderr, "tup error: Unable to move output file '%s' to temporary location '%s'\n", curpath, tmppath);
+					return -1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+static int restore_outputs(struct node *n)
+{
+	struct edge *e;
+	struct node *output;
+	char curpath[PATH_MAX];
+	char tmppath[PATH_MAX];
+
+	LIST_FOREACH(e, &n->edges, list) {
+		output = e->dest;
+		if(output->tent->type != TUP_NODE_GROUP) {
+			curpath[0] = '.';
+			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
+				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(snprintf(tmppath, sizeof(tmppath), ".tup/tmp/backup-%lli", output->tent->tnode.tupid) >= (int)sizeof(tmppath)) {
+				fprintf(stderr, "tup error: tmppath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(rename(tmppath, curpath) < 0) {
+				/* ENOENT is ok, since the file may not exist
+				 * yet (first time we run the command, for
+				 * example).
+				 */
+				if(errno != ENOENT) {
+					perror(curpath);
+					fprintf(stderr, "tup error: Unable to move output from temporary location '%s' back to '%s'\n", tmppath, curpath);
+					return -1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+static int compare_files(const char *path1, const char *path2, int *eq)
+{
+	struct stat buf1;
+	struct stat buf2;
+	char b1[4096];
+	char b2[4096];
+	int fd1;
+	int fd2;
+
+	*eq = 0;
+	if(lstat(path1, &buf1) < 0) {
+		if(errno == ENOENT)
+			return 0;
+		perror(path1);
+		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
+		return -1;
+	}
+	if(lstat(path2, &buf2) < 0) {
+		if(errno == ENOENT)
+			return 0;
+		perror(path2);
+		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
+		return -1;
+	}
+	if(buf1.st_size != buf2.st_size)
+		return 0;
+	if(buf1.st_mode != buf2.st_mode)
+		return 0;
+
+	/* TODO: Compare symlinks with readlink */
+	fd1 = open(path1, O_RDONLY);
+	if(fd1 < 0) {
+		perror(path1);
+		fprintf(stderr, "tup error: Unable to open file for comparison.\n");
+		return -1;
+	}
+	fd2 = open(path2, O_RDONLY);
+	if(fd2 < 0) {
+		perror(path2);
+		fprintf(stderr, "tup error: Unable to open file for comparison.\n");
+		return -1;
+	}
+	do {
+		int rc1;
+		int rc2;
+		rc1 = read(fd1, b1, sizeof(b1));
+		if(rc1 < 0) {
+			perror("read");
+			fprintf(stderr, "tup error: Unable to read from file for comparison.\n");
+			return -1;
+		}
+		rc2 = read(fd2, b2, sizeof(b2));
+		if(rc2 < 0) {
+			perror("read");
+			fprintf(stderr, "tup error: Unable to read from file for comparison.\n");
+			return -1;
+		}
+		if(rc1 != rc2)
+			goto out_close;
+		if(rc1 == 0)
+			break;
+		if(memcmp(b1, b2, rc1) != 0)
+			goto out_close;
+	} while(1);
+
+	*eq = 1;
+
+out_close:
+	if(close(fd1) < 0) {
+		perror("close(fd1)");
+		return -1;
+	}
+	if(close(fd2) < 0) {
+		perror("close(fd2)");
+		return -1;
+	}
+	return 0;
+}
+
+static int check_outputs(struct node *n)
+{
+	struct edge *e;
+	struct node *output;
+	char curpath[PATH_MAX];
+	char tmppath[PATH_MAX];
+
+	LIST_FOREACH(e, &n->edges, list) {
+		output = e->dest;
+		if(output->tent->type != TUP_NODE_GROUP) {
+			int eq = 0;
+
+			curpath[0] = '.';
+			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
+				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(snprintf(tmppath, sizeof(tmppath), ".tup/tmp/backup-%lli", output->tent->tnode.tupid) >= (int)sizeof(tmppath)) {
+				fprintf(stderr, "tup error: tmppath sized incorrectly in move_outputs()\n");
+				return -1;
+			}
+			if(compare_files(tmppath, curpath, &eq) < 0)
+				return -1;
+			if(!eq) {
+				output->skip = 0;
+			}
+		}
+	}
+	return 0;
+}
+
 static int unlink_outputs(int dfd, struct node *n)
 {
 	struct edge *e;
@@ -1707,6 +1899,7 @@ static int unlink_outputs(int dfd, struct node *n)
 		output = e->dest;
 		if(output->tent->type != TUP_NODE_GROUP) {
 			int output_dfd = dfd;
+			output->skip = 0;
 			if(output->tent->dt != n->tent->dt) {
 				output_dfd = tup_entry_open(output->tent->parent);
 				if(output_dfd < 0) {
@@ -1737,18 +1930,20 @@ static int unlink_outputs(int dfd, struct node *n)
 	return 0;
 }
 
-static int process_output(struct server *s, struct tup_entry *tent,
+static int process_output(struct server *s, struct node *n,
 			  struct tupid_entries *sticky_root,
 			  struct tupid_entries *normal_root,
 			  struct tupid_entries *group_sticky_root,
 			  struct timespan *ts,
 			  struct tupid_entries *used_groups_root,
-			  const char *expanded_name)
+			  const char *expanded_name,
+			  int compare_outputs)
 {
 	FILE *f;
 	int is_err = 1;
 	struct timespan *show_ts = NULL;
 	time_t ms = -1;
+	struct tup_entry *tent = n->tent;
 	int *warning_dest;
 
 	if(show_warnings)
@@ -1795,6 +1990,15 @@ static int process_output(struct server *s, struct tup_entry *tent,
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
 
+	if(compare_outputs) {
+		if(is_err) {
+			if(restore_outputs(n) < 0)
+				return -1;
+		} else {
+			if(check_outputs(n) < 0)
+				return -1;
+		}
+	}
 
 	fflush(f);
 	rewind(f);
@@ -2017,6 +2221,7 @@ static int update(struct node *n)
 	struct tup_env newenv;
 	struct timespan ts;
 	int do_chroot = full_deps;
+	int compare_outputs = 0;
 	struct tupid_entries used_groups_root = {NULL};
 
 	timespan_start(&ts);
@@ -2033,6 +2238,9 @@ static int update(struct node *n)
 						return -1;
 					}
 					do_chroot = 1;
+					break;
+				case 'o':
+					compare_outputs = 1;
 					break;
 				default:
 					pthread_mutex_lock(&display_mutex);
@@ -2066,8 +2274,13 @@ static int update(struct node *n)
 		goto err_out;
 	}
 
-	if(unlink_outputs(dfd, n) < 0)
-		goto err_close_dfd;
+	if(compare_outputs) {
+		if(move_outputs(n) < 0)
+			goto err_close_dfd;
+	} else {
+		if(unlink_outputs(dfd, n) < 0)
+			goto err_close_dfd;
+	}
 
 	pthread_mutex_lock(&db_mutex);
 	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
@@ -2099,7 +2312,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n->tent, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name);
+	rc = process_output(&s, n, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name, compare_outputs);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free(expanded_name);

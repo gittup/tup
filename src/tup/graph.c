@@ -64,6 +64,7 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	n->expanded = 0;
 	n->parsing = 0;
 	n->marked = 0;
+	n->skip = 1;
 	TAILQ_INSERT_TAIL(&g->node_list, n, list);
 
 	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
@@ -220,6 +221,9 @@ edge_create:
 		expand_node(g, n);
 	}
 
+	if(g->cur == g->root) {
+		n->skip = 0;
+	}
 	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	return 0;
