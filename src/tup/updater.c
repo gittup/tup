@@ -1783,34 +1783,11 @@ static int restore_outputs(struct node *n)
 
 static int compare_files(const char *path1, const char *path2, int *eq)
 {
-	struct stat buf1;
-	struct stat buf2;
-	char b1[4096];
-	char b2[4096];
 	int fd1;
 	int fd2;
+	char b1[4096];
+	char b2[4096];
 
-	*eq = 0;
-	if(lstat(path1, &buf1) < 0) {
-		if(errno == ENOENT)
-			return 0;
-		perror(path1);
-		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
-		return -1;
-	}
-	if(lstat(path2, &buf2) < 0) {
-		if(errno == ENOENT)
-			return 0;
-		perror(path2);
-		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
-		return -1;
-	}
-	if(buf1.st_size != buf2.st_size)
-		return 0;
-	if(buf1.st_mode != buf2.st_mode)
-		return 0;
-
-	/* TODO: Compare symlinks with readlink */
 	fd1 = open(path1, O_RDONLY);
 	if(fd1 < 0) {
 		perror(path1);
@@ -1860,6 +1837,65 @@ out_close:
 	return 0;
 }
 
+static int compare_links(const char *path1, const char *path2, int *eq)
+{
+	char b1[4096];
+	char b2[4096];
+	int rc1;
+	int rc2;
+
+	rc1 = readlinkat(tup_top_fd(), path1, b1, sizeof(b1));
+	if(rc1 < 0) {
+		perror("readlinkat");
+		fprintf(stderr, "tup error: Unable to call readlinkat on path %s\n", path1);
+		return -1;
+	}
+	rc2 = readlinkat(tup_top_fd(), path2, b2, sizeof(b2));
+	if(rc2 < 0) {
+		perror("readlinkat");
+		fprintf(stderr, "tup error: Unable to call readlinkat on path %s\n", path2);
+		return -1;
+	}
+	if(rc1 != rc2)
+		return 0;
+	if(memcmp(b1, b2, rc1) != 0)
+		return 0;
+	*eq = 1;
+	return 0;
+}
+
+static int compare_paths(const char *path1, const char *path2, int *eq)
+{
+	struct stat buf1;
+	struct stat buf2;
+
+	*eq = 0;
+	if(lstat(path1, &buf1) < 0) {
+		if(errno == ENOENT)
+			return 0;
+		perror(path1);
+		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
+		return -1;
+	}
+	if(lstat(path2, &buf2) < 0) {
+		if(errno == ENOENT)
+			return 0;
+		perror(path2);
+		fprintf(stderr, "tup error: Unable to lstat() for comparison.\n");
+		return -1;
+	}
+	if(buf1.st_size != buf2.st_size)
+		return 0;
+	if(buf1.st_mode != buf2.st_mode)
+		return 0;
+
+	if(S_ISLNK(buf1.st_mode)) {
+		return compare_links(path1, path2, eq);
+	} else {
+		return compare_files(path1, path2, eq);
+	}
+}
+
 static int check_outputs(struct node *n)
 {
 	struct edge *e;
@@ -1881,7 +1917,7 @@ static int check_outputs(struct node *n)
 				fprintf(stderr, "tup error: tmppath sized incorrectly in move_outputs()\n");
 				return -1;
 			}
-			if(compare_files(tmppath, curpath, &eq) < 0)
+			if(compare_paths(tmppath, curpath, &eq) < 0)
 				return -1;
 			if(!eq) {
 				output->skip = 0;
