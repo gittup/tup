@@ -52,9 +52,10 @@ struct node {
 	struct tup_entry *tent;
 
 	char state;
-	char already_used;
-	char expanded;
-	char parsing;
+	unsigned char already_used :1;
+	unsigned char expanded :1;
+	unsigned char parsing :1;
+	unsigned char marked :1;
 };
 TAILQ_HEAD(node_head, node);
 

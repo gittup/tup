@@ -63,6 +63,7 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
+	n->marked = 0;
 	TAILQ_INSERT_TAIL(&g->node_list, n, list);
 
 	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
@@ -426,19 +427,16 @@ out_cleanup:
 
 /* Marks the node and everything that links to it, on up to the root node.
  * Everything that is marked will stay in the PDAG; the rest are pruned.
- *
- * Note that this abuses the 'parsing' flag, since that flag is normally only
- * used in the parsing phase, and this is only used during the update phase.
  */
 static void mark_nodes(struct node *n)
 {
 	struct edge *e;
 
 	/* If we're already marked, no need to go any further. */
-	if(n->parsing)
+	if(n->marked)
 		return;
 
-	n->parsing = 1;
+	n->marked = 1;
 
 	/* A command node must have all of its outputs marked, or we risk not
 	 * unlinking all of its outputs in the updater before running it
@@ -553,8 +551,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		 */
 		if(!RB_EMPTY(&dir_root)) {
 			TAILQ_FOREACH(n, &g->node_list, list) {
-				/* If n->parsing is set, we are already marked. */
-				if(!n->parsing && n->tent->type != TUP_NODE_ROOT) {
+				if(!n->marked && n->tent->type != TUP_NODE_ROOT) {
 					struct tup_entry *dtent;
 					dtent = n->tent->parent;
 					while(dtent) {
@@ -568,7 +565,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 		}
 
 		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
-			if(!n->parsing && n != g->root)
+			if(!n->marked && n != g->root)
 				if(prune_node(g, n, num_pruned) < 0)
 					goto out_err;
 		}
