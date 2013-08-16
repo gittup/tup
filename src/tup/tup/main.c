@@ -90,16 +90,16 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if(!cmd) {
-		if(argc > 1) {
-			if(strcmp(argv[1], "--version") == 0 ||
-			   strcmp(argv[1], "-v") == 0) {
-				version();
-				return 0;
-			}
+	if(NULL == cmd) {
+		cmd = "upd";
+	}
+
+	if(argc > 1) {
+		if(strcmp(argv[1], "--version") == 0 ||
+		   strcmp(argv[1], "-v") == 0) {
+			version();
+			return 0;
 		}
-		usage();
-		return 1;
 	}
 
 	if(compat_init() < 0) {
@@ -252,8 +252,11 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "privileged") == 0) {
 		rc = tup_privileged();
 	} else {
-		fprintf(stderr, "Unknown tup command: %s\n", cmd);
-		rc = 1;
+		argc++;
+		argv--;
+		rc = updater(argc, argv, 0);
+		if (rc != 0)
+			usage();
 	}
 
 	if(clear_autoupdate) {
@@ -1132,9 +1135,6 @@ static void version(void)
 
 static void usage(void)
 {
-	printf("tup %s usage: tup command [args]\n", tup_version());
-	printf("Where command is:\n");
-	printf("  init		Initialize the tup database in .tup/\n");
-	printf("  upd		Update everything according to the Tupfiles\n");
+	printf("tup %s usage: tup [args]\n", tup_version());
 	printf("For information on Tupfiles and other commands, see the tup(1) man page.\n");
 }
