@@ -1721,6 +1721,20 @@ static int move_outputs(struct node *n)
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
 		if(output->tent->type != TUP_NODE_GROUP) {
+			int output_dfd;
+			/* TODO: This is only required to create generated
+			 * directories. This should probably be moved
+			 * somewhere else.
+			 */
+			output_dfd = tup_entry_open(output->tent->parent);
+			if(output_dfd < 0) {
+				fprintf(stderr, "tup error: Unable to open directory to rename previous output files: ");
+				print_tup_entry(stderr, output->tent->parent);
+				fprintf(stderr, "\n");
+				return -1;
+			}
+			close(output_dfd);
+
 			curpath[0] = '.';
 			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
 				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");

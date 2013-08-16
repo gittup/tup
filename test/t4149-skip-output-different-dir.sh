@@ -16,39 +16,52 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Similar to t4147, but with symlinks.
+# Combine ^o with outputs in different directories.
 
 . ./tup.sh
-check_no_windows symlink
 
 cat > ok.sh << HERE
-ln -s linka a
-ln -s linkb b
-ln -s linkc c
+echo stringa > a/out.txt
+echo stringb > b/out.txt
 HERE
 
 cat > Tupfile << HERE
-: |> ^o sh ok.sh^ sh ok.sh |> a b c
-: a |> readlink a |>
-: b |> readlink b |>
-: c |> readlink c |>
+: |> ^o sh ok.sh^ sh ok.sh |> a/out.txt b/out.txt
+: a/out.txt |> cat a/out.txt |>
+: b/out.txt |> cat b/out.txt |>
 HERE
 update > .output.txt
 
-gitignore_good linka .output.txt
-gitignore_good linkb .output.txt
-gitignore_good linkc .output.txt
+gitignore_good stringa .output.txt
+gitignore_good stringb .output.txt
 
 cat > ok.sh << HERE
-ln -s linka a
-ln -s linkb b
-ln -s clink c
+echo stringa > a/out.txt
+echo bstring > b/out.txt
 HERE
 tup touch ok.sh
 update > .output.txt
 
-gitignore_bad linka .output.txt
-gitignore_bad linkb .output.txt
-gitignore_good clink .output.txt
+gitignore_bad stringa .output.txt
+gitignore_good bstring .output.txt
+
+cat > ok.sh << HERE
+echo stringa > a/out.txt
+echo bstring > b/out.txt
+echo cstring > c/out.txt
+HERE
+
+cat > Tupfile << HERE
+: |> ^o sh ok.sh^ sh ok.sh |> a/out.txt b/out.txt c/out.txt
+: a/out.txt |> cat a/out.txt |>
+: b/out.txt |> cat b/out.txt |>
+: c/out.txt |> cat c/out.txt |>
+HERE
+tup touch ok.sh Tupfile
+update > .output.txt
+
+gitignore_bad stringa .output.txt
+gitignore_bad bstring .output.txt
+gitignore_good cstring .output.txt
 
 eotup
