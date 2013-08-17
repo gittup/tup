@@ -6243,6 +6243,13 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			RB_FOREACH(tt, tupid_entries, &output_root) {
 				if(link_remove(tt->tupid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 					return -1;
+
+				/* Explicitly add any dependent commands to the
+				 * modify_list, so they aren't skipped in case
+				 * our outputs are the same (t5078).
+				 */
+				if(tup_db_modify_cmds_by_input(tt->tupid) < 0)
+					return -1;
 			}
 			if(link_remove(cmdid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
