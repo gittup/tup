@@ -373,6 +373,18 @@ static int virt_tup_close(struct parser_server *ps)
 	return 0;
 }
 
+static void server_lock(struct server *s)
+{
+	if(s->error_mutex)
+		pthread_mutex_lock(s->error_mutex);
+}
+
+static void server_unlock(struct server *s)
+{
+	if(s->error_mutex)
+		pthread_mutex_unlock(s->error_mutex);
+}
+
 static int exec_internal(struct server *s, const char *cmd, struct tup_env *newenv,
 			 struct tup_entry *dtent, int single_output, int do_chroot)
 {
@@ -382,6 +394,8 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	char dir[PATH_MAX];
 	struct execmsg em;
 	struct variant *variant;
+	int check_count = 0;
+	int oldnum = -1;
 
 	memset(&em, 0, sizeof(em));
 	em.sid = s->id;
@@ -400,37 +414,70 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 				       sizeof(dir) - em.dirlen - 1,
 				       dtent) + 1;
 	if(em.joblen >= JOB_MAX || em.dirlen >= PATH_MAX) {
-		pthread_mutex_lock(s->error_mutex);
+		server_lock(s);
 		fprintf(stderr, "tup error: Directory for tup entry %lli is too long.\n", dtent->tnode.tupid);
 		print_tup_entry(stderr, dtent);
-		pthread_mutex_unlock(s->error_mutex);
+		server_unlock(s);
 		return -1;
 	}
 	em.cmdlen = strlen(cmd) + 1;
 	variant = tup_entry_variant(dtent);
 	em.vardictlen = variant->vardict_len;
 	if(master_fork_exec(&em, job, dir, cmd, newenv->envblock, variant->vardict_file, &status) < 0) {
-		pthread_mutex_lock(s->error_mutex);
+		server_lock(s);
 		fprintf(stderr, "tup error: Unable to fork sub-process.\n");
-		pthread_mutex_unlock(s->error_mutex);
+		server_unlock(s);
 		return -1;
+	}
+
+	/* Make sure FUSE gets all releases for this job before continuing. */
+	while(1) {
+		struct timespec ts = {0, 100000};
+		int num;
+
+		finfo_lock(&s->finfo);
+		num = s->finfo.open_count;
+		finfo_unlock(&s->finfo);
+		if(!num)
+			break;
+		if(num < 0) {
+			server_lock(s);
+			fprintf(stderr, "tup internal error: open_count shouldn't be negative.\n");
+			server_unlock(s);
+			return -1;
+		}
+
+		/* Reset check counter as long as files are being released. */
+		if(num == oldnum) {
+			check_count++;
+		} else {
+			check_count = 0;
+		}
+		oldnum = num;
+		if(check_count >= 10000) {
+			server_lock(s);
+			fprintf(stderr, "tup error: FUSE did not appear to release all file descriptors after the sub-process closed.\n");
+			server_unlock(s);
+			return -1;
+		}
+		nanosleep(&ts, NULL);
 	}
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
 	buf[sizeof(buf)-1] = 0;
 	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
 	if(s->output_fd < 0) {
-		pthread_mutex_lock(s->error_mutex);
+		server_lock(s);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
-		pthread_mutex_unlock(s->error_mutex);
+		server_unlock(s);
 		return -1;
 	}
 	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
-		pthread_mutex_lock(s->error_mutex);
+		server_lock(s);
 		perror(buf);
 		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
-		pthread_mutex_unlock(s->error_mutex);
+		server_unlock(s);
 		return -1;
 	}
 
@@ -439,17 +486,17 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		buf[sizeof(buf)-1] = 0;
 		s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
 		if(s->error_fd < 0) {
-			pthread_mutex_lock(s->error_mutex);
+			server_lock(s);
 			perror(buf);
 			fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
-			pthread_mutex_unlock(s->error_mutex);
+			server_unlock(s);
 			return -1;
 		}
 		if(unlinkat(tup_top_fd(), buf, 0) < 0) {
-			pthread_mutex_lock(s->error_mutex);
+			server_lock(s);
 			perror(buf);
 			fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
-			pthread_mutex_unlock(s->error_mutex);
+			server_unlock(s);
 			return -1;
 		}
 	}
@@ -461,9 +508,9 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		s->signalled = 1;
 		s->exit_sig = WTERMSIG(status);
 	} else {
-		pthread_mutex_lock(s->error_mutex);
+		server_lock(s);
 		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", status);
-		pthread_mutex_unlock(s->error_mutex);
+		server_unlock(s);
 		return -1;
 	}
 	return 0;
@@ -510,7 +557,9 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.exited = 0;
 	s.exit_status = 0;
 	s.signalled = 0;
+	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
+	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir);
 	if(exec_internal(&s, cmdline, &te, tent, 0, full_deps) < 0)
 		return -1;
 	environ_free(&te);

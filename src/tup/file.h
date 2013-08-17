@@ -64,6 +64,7 @@ struct file_info {
 	struct tmpdir_head tmpdir_list;
 	const char *variant_dir;
 	int server_fail;
+	int open_count;
 };
 
 int init_file_info(struct file_info *info, const char *variant_dir);

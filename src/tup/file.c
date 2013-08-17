@@ -69,6 +69,7 @@ int init_file_info(struct file_info *info, const char *variant_dir)
 	else
 		info->variant_dir = NULL;
 	info->server_fail = 0;
+	info->open_count = 0;
 	return 0;
 }
 

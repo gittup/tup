@@ -1064,10 +1064,16 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 static int tup_fs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	int rc;
+	struct file_info *finfo;
 	rc = mknod_internal(path, mode, fi->flags, 0);
 	if(rc < 0)
 		return -errno;
-	fi->fh = rc;
+	finfo = get_finfo(path);
+	if(finfo) {
+		finfo->open_count++;
+		fi->fh = rc;
+		put_finfo(finfo);
+	}
 	return 0;
 }
 
@@ -1097,25 +1103,29 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 			/* Only try the base dir if it's not a mapped file */
 			variant_dir = finfo->variant_dir;
 		}
-		put_finfo(finfo);
-	}
 
-	if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
-		at = ACCESS_WRITE;
-	res = openat(tup_top_fd(), openfile, fi->flags);
-	if(res < 0 && variant_dir) {
-		stripped = prefix_strip(peeled, variant_dir);
-		if(stripped) {
-			res = openat(tup_top_fd(), stripped, fi->flags);
+		if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
+			at = ACCESS_WRITE;
+		res = openat(tup_top_fd(), openfile, fi->flags);
+		if(res < 0 && variant_dir) {
+			stripped = prefix_strip(peeled, variant_dir);
+			if(stripped) {
+				res = openat(tup_top_fd(), stripped, fi->flags);
+			}
 		}
-	}
 
-	if(res < 0) {
-		res = -errno;
-	}
-	fi->fh = res;
+		if(res < 0) {
+			res = -errno;
+		} else {
+			fi->fh = res;
+		}
+		finfo->open_count++;
 
-	tup_fuse_handle_file(path, stripped, at);
+		put_finfo(finfo);
+		tup_fuse_handle_file(path, stripped, at);
+	} else {
+		return -EPERM;
+	}
 	return 0;
 }
 
@@ -1196,27 +1206,25 @@ static int tup_fs_flush(const char *path, struct fuse_file_info *fi)
 	 * timestamp since data is still being written out. (The file is
 	 * written correctly, but our mtime that we store in the db is already
 	 * out of date).
-	 *
-	 * This implementation just mimics what fusexmp_fh does, though the
-	 * close(dup()) doesn't seem to actually be necessary to fix the above
-	 * behavior in tup.
 	 */
-	int rc;
 	if(path) {}
-
-	rc = close(dup(fi->fh));
-	if(rc < 0)
-		return -errno;
+	if(fi) {}
 	return 0;
 }
 
 static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 {
-	if(path) {}
-	if(context_check() < 0)
-		return -EPERM;
-	if(close(fi->fh) < 0)
-		return -errno;
+	struct file_info *finfo;
+	if(fi->fh != 0) {
+		if(close(fi->fh) < 0)
+			return -errno;
+	}
+
+	finfo = get_finfo(path);
+	if(finfo) {
+		finfo->open_count--;
+		put_finfo(finfo);
+	}
 	return 0;
 }
 
