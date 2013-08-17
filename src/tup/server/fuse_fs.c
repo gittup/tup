@@ -1079,7 +1079,8 @@ static int tup_fs_create(const char *path, mode_t mode, struct fuse_file_info *f
 
 static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 {
-	int res;
+	int res = 0;
+	int fd;
 	enum access_type at = ACCESS_READ;
 	const char *peeled;
 	const char *openfile;
@@ -1106,27 +1107,27 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 
 		if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
 			at = ACCESS_WRITE;
-		res = openat(tup_top_fd(), openfile, fi->flags);
-		if(res < 0 && variant_dir) {
+		fd = openat(tup_top_fd(), openfile, fi->flags);
+		if(fd < 0 && variant_dir) {
 			stripped = prefix_strip(peeled, variant_dir);
 			if(stripped) {
-				res = openat(tup_top_fd(), stripped, fi->flags);
+				fd = openat(tup_top_fd(), stripped, fi->flags);
 			}
 		}
 
-		if(res < 0) {
+		if(fd < 0) {
 			res = -errno;
 		} else {
-			fi->fh = res;
+			fi->fh = fd;
+			finfo->open_count++;
 		}
-		finfo->open_count++;
 
 		put_finfo(finfo);
 		tup_fuse_handle_file(path, stripped, at);
 	} else {
-		return -EPERM;
+		res = -EPERM;
 	}
-	return 0;
+	return res;
 }
 
 static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
