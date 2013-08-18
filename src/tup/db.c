@@ -6270,6 +6270,13 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			return -1;
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
+		if(group) {
+			/* Explicitly add the group to the modify list in case
+			 * we are skipping outputs (t5079).
+			 */
+			if(tup_db_add_modify_list(group->tnode.tupid) < 0)
+				return -1;
+		}
 	}
 	free_tupid_tree(&output_root);
 	return 0;
