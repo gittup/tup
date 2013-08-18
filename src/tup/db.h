@@ -184,7 +184,8 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
-			       struct tupid_entries *group_sticky_root);
+			       struct tupid_entries *group_sticky_root,
+			       int *important_link_removed);
 int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 
 #endif

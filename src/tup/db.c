@@ -5942,6 +5942,7 @@ struct actual_input_data {
 	struct tupid_entries *sticky_root;
 	struct tupid_entries output_root;
 	struct tupid_entries missing_input_root;
+	int important_link_removed;
 };
 
 static int new_input(tupid_t tupid, void *data)
@@ -5998,6 +5999,18 @@ static int new_normal_link(tupid_t tupid, void *data)
 static int del_normal_link(tupid_t tupid, void *data)
 {
 	struct actual_input_data *aid = data;
+	struct tup_entry *tent;
+
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->type == TUP_NODE_GENERATED) {
+		/* A dependent command may be relying on us for
+		 * having this file as a dependency. Make sure they
+		 * are not skipped if our outputs are the same.
+		 * (t5080).
+		 */
+		aid->important_link_removed = 1;
+	}
 
 	if(link_remove(tupid, aid->cmdid, TUP_LINK_NORMAL) < 0)
 		return -1;
@@ -6066,7 +6079,8 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
-			       struct tupid_entries *group_sticky_root)
+			       struct tupid_entries *group_sticky_root,
+			       int *important_link_removed)
 {
 	struct tupid_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
@@ -6075,6 +6089,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		.sticky_root = sticky_root,
 		.output_root = {NULL},
 		.missing_input_root = {NULL},
+		.important_link_removed = 0,
 	};
 	int rc;
 	struct tup_entry *cmd_tent;
@@ -6102,6 +6117,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	free_tupid_tree(&sticky_copy);
 	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
+	*important_link_removed = aid.important_link_removed;
 	return rc;
 }
 

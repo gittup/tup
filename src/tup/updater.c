@@ -1910,6 +1910,18 @@ static int compare_paths(const char *path1, const char *path2, int *eq)
 	}
 }
 
+static int unskip_outputs(struct node *n)
+{
+	struct edge *e;
+	struct node *output;
+
+	LIST_FOREACH(e, &n->edges, list) {
+		output = e->dest;
+		output->skip = 0;
+	}
+	return 0;
+}
+
 static int check_outputs(struct node *n)
 {
 	struct edge *e;
@@ -1995,6 +2007,7 @@ static int process_output(struct server *s, struct node *n,
 	time_t ms = -1;
 	struct tup_entry *tent = n->tent;
 	int *warning_dest;
+	int important_link_removed = 0;
 
 	if(show_warnings)
 		warning_dest = &warnings;
@@ -2010,7 +2023,7 @@ static int process_output(struct server *s, struct node *n,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
 				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
 			} else {
 				timespan_end(ts);
@@ -2022,7 +2035,7 @@ static int process_output(struct server *s, struct node *n,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
 				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
 			}
 		}
@@ -2033,7 +2046,7 @@ static int process_output(struct server *s, struct node *n,
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
-		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root) < 0) {
+		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
 			fprintf(f, " *** Additionally, command %lli failed to process input dependencies.", tent->tnode.tupid);
 		}
 	} else {
@@ -2045,8 +2058,13 @@ static int process_output(struct server *s, struct node *n,
 			if(restore_outputs(n) < 0)
 				return -1;
 		} else {
-			if(check_outputs(n) < 0)
-				return -1;
+			if(important_link_removed) {
+				if(unskip_outputs(n) < 0)
+					return -1;
+			} else {
+				if(check_outputs(n) < 0)
+					return -1;
+			}
 		}
 	}
 

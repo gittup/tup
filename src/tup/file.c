@@ -45,7 +45,8 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
 			    int full_deps, tupid_t vardt,
-			    struct tupid_entries *used_groups_root);
+			    struct tupid_entries *used_groups_root,
+			    int *important_link_removed);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
@@ -138,7 +139,8 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		struct tupid_entries *normal_root,
 		struct tupid_entries *group_sticky_root,
 		int full_deps, tupid_t vardt,
-		struct tupid_entries *used_groups_root)
+		struct tupid_entries *used_groups_root,
+		int *important_link_removed)
 {
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
@@ -164,7 +166,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	tup_entry_release_list();
 
 	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root);
+	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root, important_link_removed);
 	tup_entry_release_list();
 	finfo_unlock(info);
 
@@ -598,7 +600,8 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
 			    int full_deps, tupid_t vardt,
-			    struct tupid_entries *used_groups_root)
+			    struct tupid_entries *used_groups_root,
+			    int *important_link_removed)
 {
 	struct file_entry *r;
 	struct tupid_tree *tt;
@@ -626,7 +629,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		tup_entry_list_add(tent, entryhead);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root, important_link_removed) < 0)
 		return -1;
 	return 0;
 }
