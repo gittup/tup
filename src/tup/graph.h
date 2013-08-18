@@ -51,12 +51,12 @@ struct node {
 	struct tupid_tree tnode;
 	struct tup_entry *tent;
 
-	unsigned char state :2;
-	unsigned char already_used :1;
-	unsigned char expanded :1;
-	unsigned char parsing :1;
-	unsigned char marked :1;
-	unsigned char skip :1;
+	unsigned char state;
+	unsigned char already_used;
+	unsigned char expanded;
+	unsigned char parsing;
+	unsigned char marked;
+	unsigned char skip;
 };
 TAILQ_HEAD(node_head, node);
 
