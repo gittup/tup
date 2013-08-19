@@ -45,13 +45,6 @@
 
 #define TUP_MNT ".tup/mnt"
 
-static struct fuse_server {
-	pthread_t pid;
-	struct fuse *fuse;
-	struct fuse_chan *ch;
-	int failed;
-} fs;
-
 static void sighandler(int sig);
 
 static struct sigaction sigact = {
@@ -63,16 +56,41 @@ static int server_inited = 0;
 static int null_fd = -1;
 static struct parser_server *curps;
 static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t fuse_tid;
 
 static void *fuse_thread(void *arg)
 {
+	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	if(arg) {}
 
-	if(fuse_loop(fs.fuse) < 0) {
-		perror("fuse_loop");
-		fs.failed = 1;
+	/* Need a garbage arg first to count as the process name */
+	if(fuse_opt_add_arg(&args, "tup") < 0)
+		return NULL;
+	if(fuse_opt_add_arg(&args, "-s") < 0)
+		return NULL;
+	if(fuse_opt_add_arg(&args, "-f") < 0)
+		return NULL;
+	if(fuse_opt_add_arg(&args, TUP_MNT) < 0)
+		return NULL;
+	if(server_debug_enabled()) {
+		if(fuse_opt_add_arg(&args, "-d") < 0)
+			return NULL;
 	}
-	fuse_destroy(fs.fuse);
+	if(tup_privileged()) {
+		if(fuse_opt_add_arg(&args, "-oallow_root") < 0)
+			return NULL;
+	}
+#ifdef __APPLE__
+	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)
+		return NULL;
+#endif
+#ifdef __FreeBSD__
+	if(fuse_opt_add_arg(&args, "-ouse_ino") < 0)
+		return NULL;
+#endif
+
+	fuse_main(args.argc, args.argv, &tup_fs_oper, NULL);
+	fuse_opt_free_args(&args);
 	return NULL;
 }
 
@@ -128,7 +146,6 @@ static int tup_unmount(void)
 
 int server_init(enum server_mode mode)
 {
-	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
 	struct flist f = {0, 0, 0};
 
 	tup_fuse_set_parser_mode(mode);
@@ -240,42 +257,12 @@ int server_init(enum server_mode mode)
 		return -1;
 	}
 
-	/* Need a garbage arg first to count as the process name */
-	if(fuse_opt_add_arg(&args, "tup") < 0)
-		return -1;
-	if(server_debug_enabled()) {
-		if(fuse_opt_add_arg(&args, "-d") < 0)
-			return -1;
-	}
-	if(tup_privileged()) {
-		if(fuse_opt_add_arg(&args, "-oallow_root") < 0)
-			return -1;
-	}
-#ifdef __APPLE__
-	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)
-		return -1;
-#endif
-#ifdef __FreeBSD__
-	if(fuse_opt_add_arg(&args, "-ouse_ino") < 0)
-		return -1;
-#endif
-
-	fs.ch = fuse_mount(TUP_MNT, &args);
-	if(!fs.ch) {
-		perror("fuse_mount");
+	if(pthread_create(&fuse_tid, NULL, fuse_thread, NULL) != 0) {
+		perror("pthread_create");
 		goto err_out;
 	}
-	fs.fuse = fuse_new(fs.ch, &args, &tup_fs_oper, sizeof(tup_fs_oper), NULL);
-	fuse_opt_free_args(&args);
-	if(!fs.fuse) {
-		perror("fuse_new");
-		goto err_unmount;
-	}
-
-	if(pthread_create(&fs.pid, NULL, fuse_thread, NULL) != 0) {
-		perror("pthread_create");
-		goto err_unmount;
-	}
+	if(tup_fs_inited() < 0)
+		goto err_out;
 
 #ifdef __FreeBSD__
 	/* FreeBSD has a race condition between mounting the fuse fs and the first request.
@@ -303,8 +290,6 @@ int server_init(enum server_mode mode)
 	server_inited = 1;
 	return 0;
 
-err_unmount:
-	fuse_unmount(TUP_MNT, fs.ch);
 err_out:
 	fprintf(stderr, "tup error: Unable to mount FUSE on %s\n", TUP_MNT);
 	return -1;
@@ -320,9 +305,7 @@ int server_quit(void)
 
 	if(tup_unmount() < 0)
 		return -1;
-	pthread_join(fs.pid, NULL);
-	fs.fuse = NULL;
-	memset(&fs, 0, sizeof(fs));
+	pthread_join(fuse_tid, NULL);
 	return 0;
 }
 

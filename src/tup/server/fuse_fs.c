@@ -1220,6 +1220,44 @@ static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
+static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t init_cond = PTHREAD_COND_INITIALIZER;
+static int fuse_inited = 0;
+
+static void *tup_fs_init(struct fuse_conn_info *conn)
+{
+	if(conn) {}
+	pthread_mutex_lock(&init_lock);
+	fuse_inited = 1;
+	pthread_cond_signal(&init_cond);
+	pthread_mutex_unlock(&init_lock);
+	return NULL;
+}
+
+int tup_fs_inited(void)
+{
+	struct timespec ts;
+
+	ts.tv_sec = time(NULL) + 5;
+	ts.tv_nsec = 0;
+	pthread_mutex_lock(&init_lock);
+	while(!fuse_inited) {
+		int rc;
+		rc = pthread_cond_timedwait(&init_cond, &init_lock, &ts);
+		if(rc != 0) {
+			pthread_mutex_unlock(&init_lock);
+			if(rc == ETIMEDOUT) {
+				fprintf(stderr, "tup error: Timed out waiting for the FUSE file-system to be ready.\n");
+				return -1;
+			}
+			perror("pthread_cond_timedwait");
+			return -1;
+		}
+	}
+	pthread_mutex_unlock(&init_lock);
+	return 0;
+}
+
 struct fuse_operations tup_fs_oper = {
 	.getattr = tup_fs_getattr,
 	.flush = tup_fs_flush,
@@ -1243,4 +1281,5 @@ struct fuse_operations tup_fs_oper = {
 	.write = tup_fs_write,
 	.statfs = tup_fs_statfs,
 	.release = tup_fs_release,
+	.init = tup_fs_init,
 };
