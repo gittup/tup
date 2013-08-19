@@ -282,6 +282,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			return -1;
 		}
 #ifdef __APPLE__
+		if(proc) {/* unused */}
 		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");

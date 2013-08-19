@@ -264,27 +264,34 @@ int server_init(enum server_mode mode)
 	if(tup_fs_inited() < 0)
 		goto err_out;
 
-#ifdef __FreeBSD__
-	/* FreeBSD has a race condition between mounting the fuse fs and the first request.
-	 * Adding an init() hook makes this less likely, but still does not prevent the
-	 * race condition. The only thing that seems to work is to make an initial request,
-	 * and if it fails with ENODEV just ignore it. The next request should work.
+#if defined(__FreeBSD__) || defined(__APPLE__)
+	/* OSX and FreeBSD have a race condition between mounting the fuse fs
+	 * and the first request.  Adding an init() hook makes this less
+	 * likely, but still does not prevent the race condition. The only
+	 * thing that seems to work is to poll for a special file in
+	 * our FUSE fs.
 	 */
 	{
-		int fd;
-		fd = open(TUP_MNT, O_RDONLY);
-		if(fd >= 0) {
-			close(fd);
-		} else if(fd < 0 && errno == ENODEV) {
-			/* This is ok - the first time we will get ENODEV, and
-			 * then it should work afterwards.
-			 */
-		} else {
-			perror(TUP_MNT);
-			fprintf(stderr, "tup error: Expecting TUP_MNT open to succeed or fail with ENODEV on FreeBSD.\n");
-			goto err_unmount;
+		int x;
+		char filename[PATH_MAX];
+		snprintf(filename, sizeof(filename), ".tup/mnt%s/@tup@", get_tup_top());
+		filename[sizeof(filename)-1] = 0;
+		for(x=0; x<5000; x++) {
+			struct timespec ts = {0, 1000000};
+			if(access(filename, R_OK) == 0) {
+				goto out_ok;
+			}
+			nanosleep(&ts, NULL);
 		}
+		fprintf(stderr, "tup error: FUSE file-system does not appear to be mounted properly.\n");
+		return -1;
+out_ok:
+		;
 	}
+	/* For some reason OSXFUSE sets this to SIG_IGN, but we need it
+	 * to wait for the master_fork thread.
+	 */
+	signal(SIGCHLD, SIG_DFL);
 #endif
 
 	server_inited = 1;
