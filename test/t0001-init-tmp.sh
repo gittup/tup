@@ -32,6 +32,7 @@ trap cleanup INT TERM
 cleanup
 mkdir $tmpdir
 cd $tmpdir
+touch Tupfile.ini
 tup init
 for i in db object shared tri; do
 	if [ ! -f ".tup/$i" ]; then
