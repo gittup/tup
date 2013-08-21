@@ -239,15 +239,19 @@ set_leak_check()
 __update()
 {
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=${leak_check-full} tup upd"
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=${leak_check-full} tup"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup upd"
+		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup"
 	else
-		cmd="tup upd"
+		cmd="tup"
 	fi
 
 	set +e
-	$cmd "$@"
+	if [ -z $@ ]; then
+		$cmd "$@"
+	else
+		$cmd upd "$@"
+	fi
 	rc=$?
 	set -e
 
