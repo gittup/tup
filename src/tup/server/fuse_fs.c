@@ -37,6 +37,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 
 #if defined(__FreeBSD__)
 /* FreeBSD doessn't support AT_SYMLINK_NOFOLLOW in faccessat() */
@@ -48,10 +49,22 @@ static int access_flags = AT_SYMLINK_NOFOLLOW;
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
 static pid_t ourpgid;
+static int max_open_files = 128;
 
 void tup_fuse_fs_init(void)
 {
+	struct rlimit rlim;
 	ourpgid = getpgid(0);
+	if(getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+		if(rlim.rlim_cur < rlim.rlim_max) {
+			rlim.rlim_cur = rlim.rlim_max;
+			if(setrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+				max_open_files = rlim.rlim_cur / 2;
+			}
+		} else {
+			max_open_files = rlim.rlim_cur / 2;
+		}
+	}
 }
 
 int tup_fuse_add_group(int id, struct file_info *finfo)
@@ -1070,8 +1083,13 @@ static int tup_fs_create(const char *path, mode_t mode, struct fuse_file_info *f
 		return -errno;
 	finfo = get_finfo(path);
 	if(finfo) {
+		if(finfo->open_count >= max_open_files) {
+			close(rc);
+			fi->fh = 0;
+		} else {
+			fi->fh = rc;
+		}
 		finfo->open_count++;
-		fi->fh = rc;
 		put_finfo(finfo);
 	}
 	return 0;
@@ -1118,7 +1136,12 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 		if(fd < 0) {
 			res = -errno;
 		} else {
-			fi->fh = fd;
+			if(finfo->open_count >= max_open_files) {
+				close(fd);
+				fi->fh = 0;
+			} else {
+				fi->fh = fd;
+			}
 			finfo->open_count++;
 		}
 
@@ -1134,15 +1157,40 @@ static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
 		       struct fuse_file_info *fi)
 {
 	int res;
-
-	if(path) {}
+	int fd;
 
 	if(context_check() < 0)
 		return -EPERM;
 
-	res = pread(fi->fh, buf, size, offset);
+	if(fi->fh == 0) {
+		struct file_info *finfo;
+		const char *openfile;
+
+		openfile = peel(path);
+		finfo = get_finfo(path);
+		if(finfo) {
+			struct mapping *map;
+			map = find_mapping(finfo, path);
+			if(map) {
+				openfile = map->tmpname;
+			}
+			put_finfo(finfo);
+		}
+
+		fd = openat(tup_top_fd(), openfile, O_RDONLY);
+		if(fd < 0)
+			return -errno;
+	} else {
+		fd = fi->fh;
+	}
+
+	res = pread(fd, buf, size, offset);
 	if (res == -1)
 		res = -errno;
+
+	if(fi->fh == 0) {
+		close(fd);
+	}
 
 	return res;
 }
@@ -1151,15 +1199,39 @@ static int tup_fs_write(const char *path, const char *buf, size_t size,
 			off_t offset, struct fuse_file_info *fi)
 {
 	int res;
-
-	if(path) {}
+	int fd = -1;
 
 	if(context_check() < 0)
 		return -EPERM;
 
-	res = pwrite(fi->fh, buf, size, offset);
+	if(fi->fh == 0) {
+		struct file_info *finfo;
+		finfo = get_finfo(path);
+		if(finfo) {
+			struct mapping *map;
+			map = find_mapping(finfo, path);
+			if(map) {
+				fd = openat(tup_top_fd(), map->tmpname, O_WRONLY);
+				if(fd < 0) {
+					put_finfo(finfo);
+					return -errno;
+				}
+			}
+			put_finfo(finfo);
+		}
+		if(fd < 0)
+			return -EPERM;
+	} else {
+		fd = fi->fh;
+	}
+
+	res = pwrite(fd, buf, size, offset);
 	if (res == -1)
 		res = -errno;
+
+	if(fi->fh == 0) {
+		close(fd);
+	}
 
 	return res;
 }
