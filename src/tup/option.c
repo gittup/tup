@@ -256,10 +256,9 @@ static int parse_callback(void *user, const char *section, const char *name,
 		if(strcmp(options[x].name, opt) == 0)
 			goto set_var;
 	}
-	fprintf(stderr, "tup error: Option '%s' in section '%s' does not correspond to a valid option. Please set one of the following:\n\n", name, section);
-	tup_option_show();
-	fprintf(stderr, "\nSee the tup.1 man page for details on how to properly set the options.\n");
-	return 0; /* inih error code */
+
+	fprintf(stderr, "tup warning: Option '%s' in section '%s' is unknown to this version of tup. It will be ignored.", name, section);
+	return 1; /* inih success, keep going and ignore unknowns to future-proof */
 
 set_var:
 	if(vardb_set(vdb, opt, value, NULL) < 0)
