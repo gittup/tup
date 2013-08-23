@@ -18,19 +18,10 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_option_h
-#define tup_option_h
+#ifndef tup_hooks_h
+#define tup_hooks_h
 
-#include "compat.h"
-
-int tup_option_process_ini(const char* cmd, int real_argc, char **real_argv);
-int tup_option_init(void);
-int tup_option_get_int(const char *opt);
-int tup_option_get_flag(const char *opt);
-const char *tup_option_get_string(const char *opt);
-const char *tup_option_get_location(const char *opt);
-int tup_option_show(void);
-
-#define TUP_OPTIONS_FILE ".tup" PATH_SEP_STR "options"
+int run_pre_init_hooks(void);
+int run_post_init_hooks(void);
 
 #endif

@@ -42,6 +42,7 @@
 #include "tup/option.h"
 #include "tup/privs.h"
 #include "tup/flist.h"
+#include "tup/hooks.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -51,7 +52,7 @@ static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
-static int variant(int argc, char **argv);
+       int variant_command(int argc, char **argv);
 static int node_exists(int argc, char **argv);
 static int link_exists(int argc, char **argv);
 static int touch(int argc, char **argv);
@@ -124,41 +125,28 @@ int main(int argc, char **argv)
 	}
 
 	/* Commands that should run before running an implicit `tup init' */
-	if(strcmp(cmd, "init") == 0) {
-		if(tup_drop_privs() < 0)
-			return 1;
-		return init_command(argc, argv);
-	} else if(strcmp(cmd, "version") == 0) {
+	if(strcmp(cmd, "version") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
 		version();
 		return 0;
 	}
 
-	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */
-	tup_temporarily_drop_privs();
-	if(tup_option_process_ini() != 0)
-		return 1;
-	tup_restore_privs();
+	/* Tupfile.ini parsing, `tup init', and find_tup_dir */
+	rc = tup_early_init(cmd, argc, argv);
+	if (rc < 0)
+		return rc;
 
 	/* Commands that don't use a normal tup_init() */
 	if(strcmp(cmd, "stop") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
-		if(find_tup_dir() < 0) {
-			fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
-			return -1;
-		}
 		if(open_tup_top() < 0)
 			return -1;
 		return stop_monitor(TUP_MONITOR_SHUTDOWN);
 	} else if(strcmp(cmd, "waitmon") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
-		if(find_tup_dir() < 0) {
-			fprintf(stderr, "No .tup directory found - unable to stop the file monitor.\n");
-			return -1;
-		}
 		if(open_tup_top() < 0)
 			return -1;
 		if(waitmon() < 0)
@@ -168,6 +156,19 @@ int main(int argc, char **argv)
 
 	if(tup_init() < 0)
 		return 1;
+
+	if (rc > 0) {
+		if (run_post_init_hooks() != 0) {
+			fprintf(stderr, "tup error: post_init hooks failed\n");
+			rc = -1;
+			goto main_cleanup;
+		}
+
+		if(strcmp(cmd, "init") == 0) {
+			rc = 0;
+			goto main_cleanup;
+		}
+	}
 
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
@@ -210,7 +211,7 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "todo") == 0) {
 		rc = todo(argc, argv);
 	} else if(strcmp(cmd, "variant") == 0) {
-		rc = variant(argc, argv);
+		rc = variant_command(argc, argv);
 	} else if(strcmp(cmd, "node_exists") == 0) {
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "normal_exists") == 0 ||
@@ -266,6 +267,7 @@ int main(int argc, char **argv)
 			return -1;
 	}
 
+main_cleanup:
 	if(tup_cleanup() < 0)
 		rc = 1;
 	tup_valgrind_cleanup();
@@ -568,7 +570,8 @@ static int create_variant(const char *config_path)
 	return 0;
 }
 
-static int variant(int argc, char **argv)
+/* Symbol is exported so that post-init hook can call it to automatically */
+int variant_command(int argc, char **argv)
 {
 	int x;
 

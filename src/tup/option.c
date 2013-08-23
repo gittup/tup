@@ -97,6 +97,7 @@ static struct option {
 	{"graph.ghosts", "0", NULL},
 	{"graph.environment", "0", NULL},
 	{"graph.combine", "0", NULL},
+	{"post_init.variants", NULL, NULL},
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
@@ -114,16 +115,41 @@ static struct sigaction sigact = {
 };
 #endif
 
-int tup_option_process_ini(void) {
+/* atexit handler */
+static void tup_option_ini_exit(void)
+{
+	struct dynamic_config_file_list *c = dynamic_configs;
+
+	while (c != NULL) {
+		struct dynamic_config_file_list *temp = c;
+
+		free((char *) c->dynamic_config.file);
+		c = c->next;
+		free(temp);
+	}
+	dynamic_configs = NULL;
+}
+
+/* Returns < 0 on error, >= 0 on success. Returns 1 if init_command ran */
+int tup_option_process_ini(const char* cmd, int real_argc, char **real_argv)
+{
+	int error = 0;
 	int cur_dir;
 	int best_root = -1; // file descriptor -> best root candidate
 	int found_tup_dir = 0;
+	int command_was_init = (strcmp(cmd, "init") == 0);
+	int ran_init = 0;
 
 	cur_dir = open(".", 0);
 	if (cur_dir < 0) {
 		perror("open(\".\", 0)");
 		fprintf(stderr, "tup error: Could not get reference to current directory?\n");
-		exit(1);
+		return -1;
+	}
+
+	if (atexit(tup_option_ini_exit) != 0) {
+		fprintf(stderr, "tup error: atexit registration failed?\n");
+		return -1;
 	}
 
 	for(;;) {
@@ -136,7 +162,8 @@ int tup_option_process_ini(void) {
 			if (errno != ENOENT) {
 				perror("fopen");
 				fprintf(stderr, "tup error: Unexpected error opening ini file\n");
-				exit(1);
+				error = -1;
+				break;
 			}
 		} else {
 			parse_ini_file(f);
@@ -159,7 +186,8 @@ int tup_option_process_ini(void) {
 		if (chdir("..")) {
 			perror("chdir");
 			fprintf(stderr, "tup error: Unexpected error traversing directory tree\n");
-			exit(1);
+			error = -1;
+			break;
 		}
 
 		if (NULL == getcwd(path_buf, sizeof(path_buf))) {
@@ -175,41 +203,43 @@ int tup_option_process_ini(void) {
 		}
 	}
 
+	if (error != 0)
+		goto ini_cleanup;
+
 	if (best_root == -1) {
 		goto ini_cleanup;
 	}
 
-	if (!found_tup_dir) {
-		int rc;
-		int argc = 1;
-		char argv0[] = "init";
-		char *argv[] = {argv0, NULL};
+	if (!found_tup_dir && !command_was_init) {
+		int fake_argc = 1;
+		char fake_argv0[] = "init";
+		char *fake_argv[] = {fake_argv0, NULL};
 		char root_path[PATH_MAX];
 
 		if (fchdir(best_root) < 0) {
 			perror("fchdir(best_root)");
 			fprintf(stderr, "tup error: Could not chdir to root candidate?\n");
-			exit(1);
+			error = -1;
+			goto best_root_cleanup;
 		}
 
 		if (NULL == getcwd(root_path, sizeof(root_path))) {
 			if (errno != ERANGE) {
 				perror("getcwd");
 				fprintf(stderr, "tup error: Unexpected error getting root path\n");
-				exit(1);
+				error = -1;
+				goto best_root_cleanup;
 			}
 			printf("Initilizing .tup directory\n");
 		} else {
 			printf("Initilizing .tup in %s\n", root_path);
 		}
 
-		rc = init_command(argc, argv);
-		if (0 != rc) {
-			fprintf(stderr, "tup error: `tup init' failed unexpectedly\n");
-			exit(rc);
-		}
+		error = init_command(fake_argc, fake_argv);
+		ran_init = 1;
 	}
 
+best_root_cleanup:
 	if(close(best_root) < 0) {
 		perror("close(best_root");
 	}
@@ -225,7 +255,25 @@ ini_cleanup:
 		fprintf(stderr, "tup error: Unexpected error closing current directory file descriptor\n");
 		exit(1);
 	}
-	return 0;
+
+	if ((error == 0) && command_was_init) {
+		error = init_command(real_argc, real_argv);
+		ran_init = 1;
+	}
+
+	if (error != 0)
+		return error;
+	return ran_init;
+}
+
+/* atexit handler */
+static void tup_option_exit(void)
+{
+	unsigned int x;
+
+	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+		vardb_close(&static_configs[x].root);
+	}
 }
 
 int tup_option_init(void)
@@ -245,6 +293,11 @@ int tup_option_init(void)
 	if(init_home_loc() < 0)
 		return -1;
 
+	if (atexit(tup_option_exit) != 0) {
+		fprintf(stderr, "tup error: atexit registration failed?\n");
+		return -1;
+	}
+
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		if(vardb_init(&static_configs[x].root) < 0)
 			return -1;
@@ -256,27 +309,9 @@ int tup_option_init(void)
 	sigemptyset(&sigact.sa_mask);
 	sigaction(SIGWINCH, &sigact, NULL);
 #endif
+
 	inited = 1;
 	return 0;
-}
-
-void tup_option_exit(void)
-{
-	struct dynamic_config_file_list *c = dynamic_configs;
-	unsigned int x;
-
-	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		vardb_close(&static_configs[x].root);
-	}
-
-	while (c != NULL) {
-		struct dynamic_config_file_list *temp = c;
-
-		free((char *) c->dynamic_config.file);
-		c = c->next;
-		free(temp);
-	}
-	dynamic_configs = NULL;
 }
 
 static int tup_boolify_flag(const char *value) {
