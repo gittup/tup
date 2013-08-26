@@ -54,7 +54,6 @@ struct status_tree {
 	int status;
 	int set;
 	pthread_cond_t cond;
-	pthread_mutex_t lock;
 };
 
 static pthread_mutex_t statuslock = PTHREAD_MUTEX_INITIALIZER;
@@ -155,10 +154,6 @@ int master_fork_exec(struct execmsg *em, const char *job, const char *dir,
 	st.tnode.tupid = em->sid;
 	if(pthread_cond_init(&st.cond, NULL) != 0) {
 		perror("pthread_cond_init");
-		return -1;
-	}
-	if(pthread_mutex_init(&st.lock, NULL) != 0) {
-		perror("pthread_mutex_init");
 		return -1;
 	}
 	st.status = 0;
@@ -597,12 +592,10 @@ static void *child_wait_notifier(void *arg)
 			return NULL;
 		}
 		st = container_of(tt, struct status_tree, tnode);
-		pthread_mutex_lock(&st->lock);
 		tupid_tree_rm(&status_root, tt);
 		st->status = rcm.status;
 		st->set = 1;
 		pthread_cond_signal(&st->cond);
-		pthread_mutex_unlock(&st->lock);
 		pthread_mutex_unlock(&statuslock);
 	}
 	return NULL;
@@ -611,12 +604,12 @@ static void *child_wait_notifier(void *arg)
 static int wait_for_my_sid(struct status_tree *st)
 {
 	int status;
-	pthread_mutex_lock(&st->lock);
+	pthread_mutex_lock(&statuslock);
 	while(st->set == 0) {
-		pthread_cond_wait(&st->cond, &st->lock);
+		pthread_cond_wait(&st->cond, &statuslock);
 	}
 	status = st->status;
-	pthread_mutex_unlock(&st->lock);
+	pthread_mutex_unlock(&statuslock);
 	return status;
 }
 
