@@ -1177,7 +1177,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	if(build_graph(&g) < 0)
 		return -1;
 
-	if(prune_graph(&g, argc, argv, num_pruned) < 0)
+	if(prune_graph(&g, argc, argv, num_pruned, verbose) < 0)
 		return -1;
 
 	if(g.num_nodes) {
@@ -1298,7 +1298,7 @@ static int check_update_todo(int argc, char **argv)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(prune_graph(&g, argc, argv, &num_pruned) < 0)
+	if(prune_graph(&g, argc, argv, &num_pruned, verbose) < 0)
 		return -1;
 	if(g.num_nodes) {
 		printf("Tup phase 3: The following %i command%s will be executed:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");

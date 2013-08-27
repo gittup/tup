@@ -468,7 +468,7 @@ static void mark_nodes(struct node *n)
 	}
 }
 
-static int prune_node(struct graph *g, struct node *n, int *num_pruned)
+static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verbose)
 {
 	if(n->tent->type == g->count_flags && n->expanded) {
 		g->num_nodes--;
@@ -488,12 +488,18 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned)
 		 */
 		if(tup_db_add_modify_list(n->tent->tnode.tupid) < 0)
 			return -1;
+		if(verbose) {
+			printf("Skipping: ");
+			print_tup_entry(stdout, n->tent);
+			printf("\n");
+		}
 	}
 	remove_node_internal(g, n);
 	return 0;
 }
 
-int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
+int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
+		int verbose)
 {
 	struct tup_entry_head *prune_list;
 	struct tupid_entries dir_root = {NULL};
@@ -570,7 +576,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned)
 
 		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
 			if(!n->marked && n != g->root)
-				if(prune_node(g, n, num_pruned) < 0)
+				if(prune_node(g, n, num_pruned, verbose) < 0)
 					goto out_err;
 		}
 	}
