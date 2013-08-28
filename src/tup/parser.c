@@ -2046,10 +2046,8 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
-				printf("Old output pattern: %s\n", old_output_pattern);
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
-				printf("New output pattern: %s\n", r->output_pattern);
 			}
 			/* The extension in do_rule() does not include the
 			 * leading '.'
