@@ -34,6 +34,7 @@ srcs += loadlib.c
 srcs += linit.c
 
 CFLAGS += -DLUA_COMPAT_ALL
+CFLAGS += -DLUA_USE_MKSTEMP
 CFLAGS += -w
 
 : foreach $(srcs) |> !cc |> {objs}
