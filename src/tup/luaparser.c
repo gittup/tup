@@ -242,6 +242,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	struct rule r;
 	struct bin_head bl;
 	size_t command_len = 0;
+	char *separator;
 
 	LIST_INIT(&bl);
 
@@ -253,6 +254,15 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	if(tuplua_table_to_string(ls, "outputs", tf, &r.output_pattern) < 0) {
 		return luaL_error(ls, "Error while parsing 'outputs'.");
+	}
+	separator = strchr(r.output_pattern, '|');
+	if(separator) {
+		r.extra_outputs = separator + 1;
+		while(isspace(*r.extra_outputs))
+			r.extra_outputs++;
+		*separator = 0;
+	} else {
+		r.extra_outputs = NULL;
 	}
 
 	if(r.input_pattern[0] == 0)

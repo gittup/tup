@@ -111,6 +111,7 @@ struct rule {
 	struct name_list inputs;
 	struct name_list order_only_inputs;
 	struct name_list bang_oo_inputs;
+	char *extra_outputs;
 	char *bang_extra_outputs;
 	int empty_input;
 	int line_number;

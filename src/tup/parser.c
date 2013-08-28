@@ -1124,6 +1124,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	struct rule r;
 	int rc;
 	int swapio;
+	char *separator;
 
 	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin, &swapio) < 0)
 		return -1;
@@ -1152,7 +1153,18 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		r.empty_input = 1;
 	}
 	r.input_pattern = input;
+
 	r.output_pattern = output;
+	separator = strchr(output, '|');
+	if(separator) {
+		r.extra_outputs = separator + 1;
+		while(isspace(*r.extra_outputs))
+			r.extra_outputs++;
+		*separator = 0;
+	} else {
+		r.extra_outputs = NULL;
+	}
+
 	r.command = cmd;
 	r.command_len = cmd_len;
 	r.extra_command = NULL;
@@ -2034,8 +2046,10 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				old_command = r->command;
 				old_command_len = r->command_len;
 				old_output_pattern = r->output_pattern;
+				printf("Old output pattern: %s\n", old_output_pattern);
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
+				printf("New output pattern: %s\n", r->output_pattern);
 			}
 			/* The extension in do_rule() does not include the
 			 * leading '.'
@@ -2176,6 +2190,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		tmpr.foreach = 0;
 		tmpr.input_pattern = input_pattern;
 		tmpr.output_pattern = tmp_nle.path;
+		tmpr.extra_outputs = NULL;
 		tmpr.bin = r->bin;
 		tmpr.command = r->command;
 		tmpr.extra_command = NULL;
@@ -3039,6 +3054,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *toutput;
 	char *output_pattern;
 	char *extra_pattern = NULL;
+	char *bang_extra_pattern = NULL;
 	char *tcmd;
 	char *cmd;
 	struct path_list *pl;
@@ -3080,14 +3096,21 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL, 1) < 0)
 		return -1;
-	if(r->bang_extra_outputs) {
-		/* Insert a fake separator in case the rule doesn't have one */
-		if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0) < 0)
-			return -1;
-		extra_pattern = eval(tf, r->bang_extra_outputs, DISALLOW_NODES);
+	/* Insert a fake separator */
+	if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0) < 0)
+		return -1;
+	if(r->extra_outputs) {
+		extra_pattern = eval(tf, r->extra_outputs, DISALLOW_NODES);
 		if(!extra_pattern)
 			return -1;
 		if(get_path_list(tf, extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
+			return -1;
+	}
+	if(r->bang_extra_outputs) {
+		bang_extra_pattern = eval(tf, r->bang_extra_outputs, DISALLOW_NODES);
+		if(!bang_extra_pattern)
+			return -1;
+		if(get_path_list(tf, bang_extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
 			return -1;
 	}
 	while(!TAILQ_EMPTY(&oplist)) {
@@ -3217,6 +3240,7 @@ out_pl:
 	/* Has to be freed after use of oplist */
 	free(output_pattern);
 	free(extra_pattern);
+	free(bang_extra_pattern);
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
 	if(!tcmd)
