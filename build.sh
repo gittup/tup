@@ -54,7 +54,7 @@ cd build
 
 for i in ../src/lua/*.c; do
 	echo "  bootstrap CC $CFLAGS $i"
-	$CC $CFLAGS -c $i
+	$CC $CFLAGS -DLUA_USE_MKSTEMP -c $i
 done
 
 rm lua.o
