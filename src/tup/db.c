@@ -5218,7 +5218,7 @@ tupid_t env_dt(void)
 	return local_env_dt;
 }
 
-tupid_t slash_dt(void)
+static tupid_t slash_dt_no_create(void)
 {
 	struct tup_entry *slashtent;
 
@@ -5227,15 +5227,27 @@ tupid_t slash_dt(void)
 
 	if(tup_entry_add(DOT_DT, NULL) < 0)
 		return -1;
-	if(tup_db_select_tent(DOT_DT, "/", &slashtent) < 0) {
+	if(tup_db_select_tent(DOT_DT, "/", &slashtent) < 0)
 		return -1;
+	if(slashtent) {
+		local_slash_dt = slashtent->tnode.tupid;
 	}
+	return local_slash_dt;
+}
+
+tupid_t slash_dt(void)
+{
+	struct tup_entry *slashtent;
+	tupid_t tupid;
+
+	tupid = slash_dt_no_create();
+	if(tupid != -1)
+		return tupid;
+
+	slashtent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
 	if(!slashtent) {
-		slashtent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
-		if(!slashtent) {
-			fprintf(stderr, "tup error: Unable to create virtual '/' directory for paths outside the tup hierarchy.\n");
-			return -1;
-		}
+		fprintf(stderr, "tup error: Unable to create virtual '/' directory for paths outside the tup hierarchy.\n");
+		return -1;
 	}
 	local_slash_dt = slashtent->tnode.tupid;
 	return local_slash_dt;
@@ -6364,7 +6376,9 @@ struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name, int len,
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent(dt, name, len, type, mtime, srcid, &tent) < 0)
 		return NULL;
-	if(tent->type == TUP_NODE_DIR && tent->tnode.tupid != env_dt()) {
+	if(tent->type == TUP_NODE_DIR &&
+	   tent->tnode.tupid != env_dt() &&
+	   tent->tnode.tupid != slash_dt_no_create()) {
 		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 			return NULL;
 	}
