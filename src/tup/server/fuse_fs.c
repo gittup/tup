@@ -967,6 +967,8 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 {
 	struct mapping *map;
 	struct file_info *finfo;
+	const char *peeled;
+	struct tmpdir *tmpdir;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -980,6 +982,13 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		}
+		peeled = peel(path);
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				put_finfo(finfo);
+				return 0;
+			}
 		}
 		put_finfo(finfo);
 	}
@@ -1243,6 +1252,7 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	const char *peeled;
 	struct mapping *map;
 	struct file_info *finfo;
+	struct tmpdir *tmpdir;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -1252,8 +1262,18 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
-		if(map)
+		if(map) {
 			peeled = map->tmpname;
+		} else {
+			LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+				if(strcmp(tmpdir->dirname, peeled) == 0) {
+					if(fstatvfs(tup_top_fd(), stbuf) < 0)
+						rc = -errno;
+					put_finfo(finfo);
+					return rc;
+				}
+			}
+		}
 		put_finfo(finfo);
 	}
 
