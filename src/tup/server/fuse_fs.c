@@ -88,6 +88,13 @@ void tup_fuse_set_parser_mode(int mode)
 	server_mode = mode;
 }
 
+static int is_hidden(const char *path)
+{
+	if(strstr(path, "/.") != NULL)
+		return 1;
+	return 0;
+}
+
 static struct file_info *get_finfo(const char *path)
 {
 	struct thread_tree *tt;
@@ -1049,6 +1056,12 @@ static int tup_fs_truncate(const char *path, off_t size)
 			return rc;
 		}
 		put_finfo(finfo);
+	}
+	if(is_hidden(path)) {
+		const char *peeled = peel(path);
+		if(truncate(peeled, size) < 0)
+			return -errno;
+		return 0;
 	}
 	fprintf(stderr, "tup error: Unable to truncate() files not created by this job.\n");
 	return -EPERM;
