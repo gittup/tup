@@ -1092,6 +1092,12 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 		}
 		put_finfo(finfo);
 	}
+	if(is_hidden(path)) {
+		peeled = peel(path);
+		if(utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW) < 0)
+			return -errno;
+		return 0;
+	}
 	fprintf(stderr, "tup error: Unable to utimens() files not created by this job.\n");
 	return -EPERM;
 }
