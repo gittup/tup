@@ -1744,6 +1744,8 @@ static int move_outputs(struct node *n)
 				fprintf(stderr, "tup error: tmppath sized incorrectly in move_outputs()\n");
 				return -1;
 			}
+			if(fchdir(tup_top_fd()) < 0)
+				return -1;
 			if(rename(curpath, tmppath) < 0) {
 				/* ENOENT is ok, since the file may not exist
 				 * yet (first time we run the command, for
