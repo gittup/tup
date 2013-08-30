@@ -56,12 +56,17 @@ void tup_fuse_fs_init(void)
 	struct rlimit rlim;
 	ourpgid = getpgid(0);
 	if(getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-		if(rlim.rlim_cur < rlim.rlim_max) {
-			rlim.rlim_cur = rlim.rlim_max;
-			if(setrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-				max_open_files = rlim.rlim_cur / 2;
-			}
-		} else {
+		int x;
+		for(x=0; x<10; x++) {
+			/* Keep doubling until we hit the real limit, whatever
+			 * that is. OSX sets rlim.rlim_max to -1 for some
+			 * reason, so we have no idea what the limit is.
+			 */
+			rlim.rlim_cur *= 2;
+			if(setrlimit(RLIMIT_NOFILE, &rlim) != 0)
+				break;
+		}
+		if(getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
 			max_open_files = rlim.rlim_cur / 2;
 		}
 	}
