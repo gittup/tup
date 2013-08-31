@@ -42,6 +42,7 @@ static BOOL WINAPI console_handler(DWORD cevent);
 static sig_atomic_t event_got = -1;
 
 static char tuptmpdir[PATH_MAX];
+static char wintmpdir[PATH_MAX];
 
 int server_pre_init(void)
 {
@@ -65,8 +66,10 @@ int server_init(enum server_mode mode)
 	if(server_inited)
 		return 0;
 
-	if (GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
+	if(GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
 		return -1;
+
+	GetTempPath(sizeof(wintmpdir), wintmpdir);
 
 	mycwd[PATH_MAX - 1] = '\0';
 	slash = strrchr(mycwd, '\\');
@@ -233,6 +236,8 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	HANDLE h;
 	struct variant *variant;
 	unsigned int x;
+	struct file_entry *fent;
+	struct file_entry *tmp;
 
 	int have_shell = strncmp(cmd, "sh ", 3) == 0
 		|| strncmp(cmd, "bash ", 5) == 0
@@ -356,6 +361,12 @@ end:
 
 	if(process_depfile(s, h) < 0) {
 		return -1;
+	}
+
+	LIST_FOREACH_SAFE(fent, &s->finfo.write_list, list, tmp) {
+		if(strncmp(fent->filename, wintmpdir, strlen(wintmpdir)) == 0) {
+			del_file_entry(fent);
+		}
 	}
 
 	return rc;

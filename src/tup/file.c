@@ -33,7 +33,6 @@
 #include <sys/stat.h>
 
 static struct file_entry *new_entry(const char *filename);
-static void del_entry(struct file_entry *fent);
 static void check_unlink_list(const struct pel_group *pg,
 			      struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
@@ -307,7 +306,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 			tup_entry_list_del(tmp);
 		}
 
-		del_entry(r);
+		del_file_entry(r);
 	}
 	if(tup_db_check_config_inputs(tent, entrylist) < 0)
 		return -1;
@@ -331,14 +330,14 @@ static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 		r = LIST_FIRST(&finfo->read_list);
 		if(add_node_to_list(f, DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
 			return -1;
-		del_entry(r);
+		del_file_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
 		if(add_node_to_list(f, vardt, &r->pg, entrylist, 0, NULL) < 0)
 			return -1;
-		del_entry(r);
+		del_file_entry(r);
 	}
 	LIST_FOREACH(tent, entrylist, list) {
 		if(strcmp(tent->name.s, ".gitignore") != 0)
@@ -350,7 +349,7 @@ static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 	/* TODO: write_list not needed here? */
 	while(!LIST_EMPTY(&finfo->write_list)) {
 		r = LIST_FIRST(&finfo->write_list);
-		del_entry(r);
+		del_file_entry(r);
 	}
 
 	while(!LIST_EMPTY(&finfo->mapping_list)) {
@@ -394,7 +393,7 @@ static struct file_entry *new_entry(const char *filename)
 	return fent;
 }
 
-static void del_entry(struct file_entry *fent)
+void del_file_entry(struct file_entry *fent)
 {
 	LIST_REMOVE(fent, list);
 	del_pel_group(&fent->pg);
@@ -463,7 +462,7 @@ static void check_unlink_list(const struct pel_group *pg,
 
 	LIST_FOREACH_SAFE(fent, u_head, list, tmp) {
 		if(pg_eq(&fent->pg, pg)) {
-			del_entry(fent);
+			del_file_entry(fent);
 		}
 	}
 }
@@ -477,16 +476,16 @@ static void handle_unlink(struct file_info *info)
 
 		LIST_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
 			if(pg_eq(&fent->pg, &u->pg)) {
-				del_entry(fent);
+				del_file_entry(fent);
 			}
 		}
 		LIST_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
 			if(pg_eq(&fent->pg, &u->pg)) {
-				del_entry(fent);
+				del_file_entry(fent);
 			}
 		}
 
-		del_entry(u);
+		del_file_entry(u);
 	}
 }
 
@@ -508,7 +507,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		/* Remove duplicate write entries */
 		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
 			if(r != w && pg_eq(&w->pg, &r->pg)) {
-				del_entry(r);
+				del_file_entry(r);
 			}
 		}
 
@@ -562,7 +561,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		}
 
 out_skip:
-		del_entry(w);
+		del_file_entry(w);
 	}
 
 	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork) < 0)
@@ -612,7 +611,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		if(add_node_to_list(f, DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
 			return -1;
-		del_entry(r);
+		del_file_entry(r);
 	}
 
 	while(!LIST_EMPTY(&info->var_list)) {
@@ -620,7 +619,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		if(add_node_to_list(f, vardt, &r->pg, entryhead, 0, NULL) < 0)
 			return -1;
-		del_entry(r);
+		del_file_entry(r);
 	}
 
 	RB_FOREACH(tt, tupid_entries, used_groups_root) {
