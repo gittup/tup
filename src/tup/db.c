@@ -92,6 +92,7 @@ enum {
 	DB_LINK_EXISTS2,
 	DB_GET_INCOMING_LINK,
 	_DB_DELETE_NORMAL_LINKS,
+	_DB_DELETE_NORMAL_INPUTS,
 	_DB_DELETE_STICKY_LINKS,
 	_DB_FLAG_GROUP_USERS1,
 	_DB_FLAG_GROUP_USERS2,
@@ -3517,6 +3518,42 @@ static int delete_normal_links(tupid_t tupid)
 	return 0;
 }
 
+static int delete_normal_inputs(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[_DB_DELETE_NORMAL_INPUTS];
+	static const char s[] = "delete from normal_link where to_id=?";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int delete_sticky_links(tupid_t tupid)
 {
 	int rc;
@@ -5745,7 +5782,6 @@ struct write_input_data {
 	tupid_t groupid;
 	int new_groups;
 	int normal_links_invalid;
-	struct tupid_entries *normal_root;
 	struct tupid_entries *delete_root;
 	struct tupid_entries *env_root;
 	int refactoring;
@@ -5794,6 +5830,7 @@ static int rm_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
 	struct tup_entry *tent;
+	int exists = 0;
 
 	if(wid->refactoring) {
 		if(tup_entry_add(tupid, &tent) < 0)
@@ -5808,7 +5845,9 @@ static int rm_sticky(tupid_t tupid, void *data)
 	if(link_remove(tupid, wid->cmdid, TUP_LINK_STICKY) < 0)
 		return -1;
 
-	if(tupid_tree_search(wid->normal_root, tupid) != NULL) {
+	if(tup_db_link_exists(tupid, wid->cmdid, TUP_LINK_NORMAL, &exists) < 0)
+		return -1;
+	if(exists) {
 		if(tupid_tree_search(wid->delete_root, tupid) != NULL) {
 			/* The node is in the delete list and we are no longer
 			 * claiming it as a dependency. Make sure the normal
@@ -5842,32 +5881,11 @@ static int rm_sticky(tupid_t tupid, void *data)
 				return -1;
 		}
 
-		/* Removing a group input invalidates all file inputs. We
-		 * can't remove all normal links because we want to keep
-		 * environment links, and we can't just remove all normal links
-		 * that are in the group, because the group may have changed
-		 * since we last used it.
+		/* Removing a group input invalidates all file inputs. We can't
+		 * just remove all normal links that are in the group, because
+		 * the group may have changed since we last used it.
 		 */
 		wid->normal_links_invalid = 1;
-	}
-	return 0;
-}
-
-static int delete_normal_file_links(tupid_t cmdid, struct tupid_entries *root)
-{
-	struct tupid_tree *tt;
-
-	if(tup_db_add_modify_list(cmdid) < 0)
-		return -1;
-	RB_FOREACH(tt, tupid_entries, root) {
-		struct tup_entry *tent;
-
-		if(tup_entry_add(tt->tupid, &tent) < 0)
-			return -1;
-		if(tent->type == TUP_NODE_GENERATED || tent->type == TUP_NODE_GROUP) {
-			if(link_remove(tt->tupid, cmdid, TUP_LINK_NORMAL) < 0)
-				return -1;
-		}
 	}
 	return 0;
 }
@@ -5880,11 +5898,9 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 			int refactoring)
 {
 	struct tupid_entries sticky_root = {NULL};
-	struct tupid_entries normal_root = {NULL};
 	struct write_input_data wid = {
 		.f = f,
 		.cmdid = cmdid,
-		.normal_root = &normal_root,
 		.delete_root = delete_root,
 		.env_root = env_root,
 		.groupid = -1,
@@ -5898,17 +5914,25 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 		wid.groupid = group->tnode.tupid;
 	}
 
-	if(tup_db_get_inputs(cmdid, &sticky_root, &normal_root, NULL) < 0)
+	if(tup_db_get_inputs(cmdid, &sticky_root, NULL, NULL) < 0)
 		return -1;
 	if(compare_trees(input_root, &sticky_root, &wid,
 			 add_sticky, rm_sticky) < 0)
 		return -1;
 	if(wid.normal_links_invalid) {
-		if(delete_normal_file_links(cmdid, &normal_root) < 0)
+		struct tupid_tree *tt;
+
+		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
+		if(delete_normal_inputs(cmdid) < 0)
+			return -1;
+		/* Need to re-add the environment links as normal links (t3082) */
+		RB_FOREACH(tt, tupid_entries, env_root) {
+			if(link_insert(tt->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+				return -1;
+		}
 	}
 	free_tupid_tree(&sticky_root);
-	free_tupid_tree(&normal_root);
 
 	if(group != old_group) {
 		if(old_group) {
