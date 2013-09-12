@@ -5793,10 +5793,9 @@ static int add_sticky(tupid_t tupid, void *data)
 static int rm_sticky(tupid_t tupid, void *data)
 {
 	struct write_input_data *wid = data;
+	struct tup_entry *tent;
 
 	if(wid->refactoring) {
-		struct tup_entry *tent;
-
 		if(tup_entry_add(tupid, &tent) < 0)
 			return -1;
 		wid->refactoring_failed = 1;
@@ -5809,37 +5808,7 @@ static int rm_sticky(tupid_t tupid, void *data)
 	if(link_remove(tupid, wid->cmdid, TUP_LINK_STICKY) < 0)
 		return -1;
 
-	if(tupid_tree_search(wid->normal_root, tupid) == NULL) {
-		/* Not a normal link, just check for groups that might need to
-		 * be removed.
-		 */
-		struct tup_entry *tent;
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
-		if(tent->type == TUP_NODE_GROUP) {
-			/* Removing an input group means we need to check if
-			 * the group also needs to be removed from the
-			 * database.
-			 */
-			tup_entry_add_ghost_list(tent, &ghost_list);
-
-			/* If this command also writes to a group, we need to
-			 * remove the group_link for this input group.
-			 */
-			if(wid->groupid != -1) {
-				if(group_link_remove(tupid, wid->groupid, wid->cmdid) < 0)
-					return -1;
-			}
-
-			/* Removing a group input invalidates all file inputs.
-			 * We can't remove all normal links because we want to
-			 * keep environment links, and we can't just remove all
-			 * normal links that are in the group, because the
-			 * group may have changed since we last used it.
-			 */
-			wid->normal_links_invalid = 1;
-		}
-	} else {
+	if(tupid_tree_search(wid->normal_root, tupid) != NULL) {
 		if(tupid_tree_search(wid->delete_root, tupid) != NULL) {
 			/* The node is in the delete list and we are no longer
 			 * claiming it as a dependency. Make sure the normal
@@ -5855,6 +5824,32 @@ static int rm_sticky(tupid_t tupid, void *data)
 		if(tup_db_add_modify_list(wid->cmdid) < 0)
 			return -1;
 	}
+
+	/* Also check for groups that might need to be removed. */
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+	if(tent->type == TUP_NODE_GROUP) {
+		/* Removing an input group means we need to check if the group
+		 * also needs to be removed from the database.
+		 */
+		tup_entry_add_ghost_list(tent, &ghost_list);
+
+		/* If this command also writes to a group, we need to remove
+		 * the group_link for this input group.
+		 */
+		if(wid->groupid != -1) {
+			if(group_link_remove(tupid, wid->groupid, wid->cmdid) < 0)
+				return -1;
+		}
+
+		/* Removing a group input invalidates all file inputs. We
+		 * can't remove all normal links because we want to keep
+		 * environment links, and we can't just remove all normal links
+		 * that are in the group, because the group may have changed
+		 * since we last used it.
+		 */
+		wid->normal_links_invalid = 1;
+	}
 	return 0;
 }
 
@@ -5869,7 +5864,7 @@ static int delete_normal_file_links(tupid_t cmdid, struct tupid_entries *root)
 
 		if(tup_entry_add(tt->tupid, &tent) < 0)
 			return -1;
-		if(tent->type == TUP_NODE_GENERATED) {
+		if(tent->type == TUP_NODE_GENERATED || tent->type == TUP_NODE_GROUP) {
 			if(link_remove(tt->tupid, cmdid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
