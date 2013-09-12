@@ -1795,12 +1795,20 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 		output++;
 	ce[1] = 0;
 
-	brace = strchr(output, '{');
-	if(brace) {
+	brace = output;
+	while(1) {
+		brace = strchr(brace, '{');
+		if(!brace)
+			break;
 		ebrace = brace - 1;
-		if(!isspace(*ebrace)) {
-			fprintf(tf->f, "tup error: Expected whitespace before '{' character in output list.\n");
-			return -1;
+
+		/* If the character before the '{' is not a space (and we're
+		 * not the first character in the output string), then it's
+		 * part of a filename.
+		 */
+		if(brace != output && !isspace(*ebrace)) {
+			brace++;
+			continue;
 		}
 		while(isspace(*ebrace) && ebrace > output)
 			ebrace--;
@@ -1817,6 +1825,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			fprintf(tf->f, "tup error: bin must be at the end of the output list.\n");
 			return -1;
 		}
+		break;
 	}
 
 	*o_input = input;
