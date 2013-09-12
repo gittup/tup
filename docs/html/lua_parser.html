@@ -1,0 +1,118 @@
+<h1>Introduction</h1>
+<p>Tup supports writing build definitions using <a href="http://www.lua.org/">Lua</a>.  Tup uses a modified Lua 5.2 parser that supports all standard Lua syntax, with the addition of a new <span class="cmd">+=</span> operator.  The statement <span class="cmd">a += b</span> is equivalent to <span class="cmd">a = tup_append_assignment(a, b)</span> where <span class="cmd">tup_append_assignment</span> is a Lua function that, by default, concatenates strings or appends to tables.  Tup also defines the <span class="cmd">tostring(argument)</span> operation on tables with no metatable as <span class="cmd">table.concat(argument, ' ')</span>.</p>
+
+<h1>File structure</h1>
+<p>For each directory Tup scans, Tup looks for <span class="filename">Tupfile.lua</span>, or, if not present, a <span class="filename">Tupdefault.lua</span> file in the current directory or any parent directory up to the Tup root.</p>
+<p>If a <span class="filename">Tupfile.lua</span> or <span class="filename">Tupdefault.lua</span> is found, Tup creates a Lua state and runs any <span class="filename">Tuprules.lua</span> files in the current directory and all parent directories up to the Tup root, then runs the located <span class="filename">Tupfile.lua</span> or <span class="filename">Tupdefault.lua</span>.<p>
+<p>Non-Lua <span class="filename">Tupfile</span>s can include Lua files, which are able to read non-Lua variables when run.</p>
+
+<h1>API</h1>
+<p>Only a subset of the standard Lua library is defined, in order to prevent untracked dependencies.  The standard library methods are filtered as follows:</p>
+<ul>
+	<li>The base functions are defined, excluding <span class="cmd">dofile</span>, <span class="cmd">loadfile</span>, <span class="cmd">load</span>, and <span class="cmd">require</span>.</li>
+	<li><span class="cmd">table</span> is defined.</li>
+	<li><span class="cmd">string</span> is defined.</li>
+	<li><span class="cmd">bit32</span> is defined.</li>
+	<li><span class="cmd">math</span> is defined.</li>
+	<li><span class="cmd">debug</span> is defined.</li>
+	<li><span class="cmd">io</span> is defined.</li>
+</ul>
+<p>Tup-specific functions are provided in the <span class="cmd">tup</span> table.  In the following documentation, <dfn>PROCESSING</dfn> refers to the directory Tup is currently processing, and <dfn>RUNNING</dfn> refers to the directory of the build definition file Tup is currently running.  When Tup enters <span class="filename">Tupfile.lua</span>, PROCESSING and RUNNING are the same.  When running <span class="filename">Tuprules.lua</span>, <span class="filename">Tupdefault.lua</span>, or an included file, PROCESSING AND RUNNING may be different.</p>
+<dl>
+	<dt><b>tup.include(path)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: none</div>
+		<p>Parses and runs the Lua file at <span class="cmd">path</span>.</p>
+	</dd>
+	<dt><b>tup.definerule{inputs = {'', ...}, command = '', outputs = {'', ...}}</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: none</div>
+		<p>Defines a rule.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information on rules.  <span class="cmd">command</span> will be executed without any modifications, either directly or in a shell, in the directory PROCESSING.  <span class="cmd">inputs</span> and <span class="cmd">outputs</span> are optional and are used to determine dependencies.</p>
+	</dd>
+	<dt><b>tup.frule{inputs = {'', ...}, commands = '', outputs = {'', ...}}</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: table of strings</div>
+		<p>A wrapper for <span class="cmd">tup.definerule</span> that performs substitutions on all parameters based on format patterns.  Returns a table containing the filenames of all outputs.</p>
+		<p>If there is a single input, it can be specified as a string argument <span class="cmd">input</span> or <span class="cmd">inputs</span>, and a single output can be specified as string argument <span class="cmd">output</span> or <span class="cmd">outputs</span>.  In addition to sequential, numerically indexed elements, <span class="cmd">input</span> can contain a table at index <span class="cmd">'extra_inputs'</span>, the elements of which are treated like normal inputs but are not used when susbtituting <span class="cmd">%f</span>.</p>
+		<p>The substitutions are roughly the same as the substitutions in non-Lua Tupfile rules.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information on the format specifiers.</p>
+		<ul>
+			<li>If a glob character appears in an input, the input string is replaced by its glob results.</li>
+			<li>Global variable and config variable values are substuted for <span class="cmd">$()</span> and <span class="cmd">@()</span> respectively.</li>
+			<li><span class="cmd">%d</span> is replaced in input strings.</li>
+			<li><span class="cmd">%d</span>, <span class="cmd">%f</span>, <span class="cmd">%b</span>, and <span class="cmd">%B</span> are replaced in output strings.</li>
+			<li><span class="cmd">%d</span>, <span class="cmd">%f</span>, <span class="cmd">%b</span>, <span class="cmd">%B</span>, and <span class="cmd">%o</span> are replaced in the command string.</li>
+		</ul>
+	</dd>
+	<dt><b>tup.rule(command)</b></dt>
+	<dt><b>tup.rule(command, outputs)</b></dt>
+	<dt><b>tup.rule(inputs, command)</b></dt>
+	<dt><b>tup.rule(inputs, command, outputs)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: table of strings</div>
+		<p>A forwarding wrapper around <span class="cmd">tup.frule</span>.  <span class="cmd">inputs</span> and <span class="cmd">outputs</span> must always be tables, and <span class="cmd">command</span> must be a string.  Returns the result of <span class="cmd">tup.frule</span>.</p>
+	</dd>
+	<dt><b>tup.foreach_rule(inputs, command)</b></dt>
+	<dt><b>tup.foreach_rule(inputs, command, outputs)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: table of strings</div>
+		<p>A forwarding wrapper around <span class="cmd">tup.frule</span>.  <span class="cmd">inputs</span> and <span class="cmd">outputs</span> must always be tables, and <span class="cmd">command</span> must be a string.  For each input <dfn>INPUT</dfn>, runs <span class="cmd">tup.frule</span> with an input table containing INPUT and <span class="cmd">inputs.extra_inputs</span> if present. Returns the aggregate result of all <span class="cmd">tup.frule</span> calls.</p>
+	</dd>
+	<dt><b>tup.export(variable)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: none</div>
+		<p>Adds the environment variable named <span class="cmd">variable</span> to the export list for future rules.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information.</p>
+	</dd>
+	<dt><b>tup.creategitignore()</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: none</div>
+		<p>Tells Tup to automatically generate a <span class="filename">.gitignore</span> file in PROCESSING which contains a list of the output files that are generated by Tup.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information.</p>
+	</dd>
+	<dt><b>tup.getcwd()</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Returns the relative path from PROCESSING to RUNNING.</p>
+		<p>Example: If <span class="filename">/a/b/Tupfile.lua</span> included <span class="filename">/a/include.lua</span>, <span class="cmd">tup.getcwd()</span> would return the path <span class="filename">../</span>.</p>
+	</dd>
+	<dt><b>tup.getdirectory()</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Returns the name of RUNNING within RUNNING's parent directory.</p>
+		<p>Example: Running <span class="cmd">tup.getdirectory()</span> in <span class="filename">/a/b/Tupfile.lua</span> would return <span class="filename">b</span>.</p>
+	</dd>
+	<dt><b>tup.nodevariable(path)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: node variable</div>
+		<p>Returns a node variable referencing a file indicated by <span class="cmd">path</span> relative to RUNNING.  Calling <span class="cmd">tostring</span> or concatenating the node variable with a string will convert the node variable to the relative path from RUNNING to the referenced file.</p>
+		<p>Example: A node variable created from path <span class="filename">./data.txt</span> in <span class="filename">/a/b/Tupfile.lua</span> would resolve to <span class="filename">../b/data.txt</span> in <span class="filename">/a/c/Tupfile.lua</span>.</p>
+	</dd>
+	<dt><b>tup.getconfig(name)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Returns the value of the config item named <span class="cmd">'CONFIG_' .. name</span> or the empty string if the config item does not exist.</p>
+	</dd>
+	<dt><b>tup.glob(pattern)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: table of strings</div>
+		<p>Returns a table of the relative paths of all files matching glob pattern <span class="cmd">pattern</span>.</p>
+	</dd>
+	<dt><b>tup.append_table(a, b)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: none</div>
+		<p>Modifies <span class="cmd">a</span> by appending all elements of <span class="cmd">b</span>.</p>
+	</dd>
+	<dt><b>tup.file(filename)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Strips all parent directories from the path string <span class="cmd">filename</span> and returns the result.</p>
+	</dd>
+	<dt><b>tup.base(filename)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Strips all parent directories from the path string <span class="cmd">filename</span> and the file extension (including the <span class="filename">.</span>), and returns the result.</p>
+	</dd>
+	<dt><b>tup.ext(filename)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Returns the extension in the filename <span class="cmd">filename</span> (excluding the <span class="filename">.</span>) or the empty string if there is no extension.</p>
+	</dd>
+</dl>
