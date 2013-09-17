@@ -57,14 +57,14 @@ for i in ../src/lua/*.c; do
 	$CC $CFLAGS -DLUA_USE_MKSTEMP -c $i
 done
 
-rm lua.o
-echo "  link luac"
-$CC *.o -o luac $LDFLAGS
 rm luac.o
+echo "  link lua"
+$CC *.o -o lua $LDFLAGS
+rm lua.o
 
 cp ../src/luabuiltin/builtin.lua builtin.lua
 mkdir luabuiltin
-xxd -i builtin.lua luabuiltin/luabuiltin.h
+./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
 
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"

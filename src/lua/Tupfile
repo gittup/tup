@@ -43,7 +43,7 @@ CFLAGS += -w
 : {objs} |> !ar |> liblua.a
 : {mingwobjs} |> !mingwar |> liblua-mingw.a
 
-: foreach luac.c |> !cc |>
+: foreach lua.c |> !cc |>
 
 LDFLAGS += -lm
-: liblua.a *.o |> !ld |> luac
+: lua.o liblua.a |> !ld |> lua
