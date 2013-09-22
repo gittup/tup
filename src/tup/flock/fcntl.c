@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 int tup_flock(int fd)
 {
@@ -33,6 +34,25 @@ int tup_flock(int fd)
 	};
 
 	if(fcntl(fd, F_SETLKW, &fl) < 0) {
+		perror("fcntl F_WRLCK");
+		return -1;
+	}
+	return 0;
+}
+
+/* Returns: -1 error, 0 got lock, 1 would block */
+int tup_try_flock(int fd)
+{
+	struct flock fl = {
+		.l_type = F_WRLCK,
+		.l_whence = SEEK_SET,
+		.l_start = 0,
+		.l_len = 0,
+	};
+
+	if(fcntl(fd, F_SETLK, &fl) < 0) {
+		if (errno == EAGAIN)
+			return 1;
 		perror("fcntl F_WRLCK");
 		return -1;
 	}
