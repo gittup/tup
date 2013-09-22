@@ -81,12 +81,19 @@ static int tri_lock;
 
 int tup_lock_init(void)
 {
+	int ret;
+
 	sh_lock = openat(tup_top_fd(), TUP_SHARED_LOCK, O_RDWR);
 	if(sh_lock < 0) {
 		perror(TUP_SHARED_LOCK);
 		return -1;
 	}
-	if(tup_flock(sh_lock) < 0) {
+	ret = tup_try_flock(sh_lock);
+	if(ret > 0) {
+		printf("Waiting for another tup process (or an autoupdate) to finish...\n");
+		ret = tup_flock(sh_lock);
+	}
+	if(ret < 0) {
 		return -1;
 	}
 
