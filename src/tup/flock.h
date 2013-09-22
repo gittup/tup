@@ -23,6 +23,7 @@
 
 /* Wrappers for fcntl */
 int tup_flock(int fd);
+int tup_try_flock(int fd); /* Returns: -1 error, 0 got lock, 1 would block */
 int tup_unflock(int fd);
 int tup_wait_flock(int fd);
 
