@@ -42,6 +42,7 @@
 #include "server.h"
 #include "timespan.h"
 #include "variant.h"
+#include "estring.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -369,6 +370,28 @@ static int tuplua_function_getdirectory(lua_State *ls)
 		lua_pushlstring(ls, tf->curtent->name.s, tf->curtent->name.len);
 		return 1;
 	}
+}
+
+static int tuplua_function_getrelativedir(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *dirname;
+	tupid_t dest;
+	struct estring e;
+	int len;
+
+	if(estring_init(&e) < 0)
+		return -1;
+
+	dirname = tuplua_tostring(ls, -1);
+	dest = find_dir_tupid_dt(tf->tupid, dirname, NULL, 0, 0);
+	if(dest < 0)
+		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
+	if(get_relative_dir(NULL, &e, NULL, dest, tf->tupid, &len) < 0)
+		return -1;
+	lua_pushlstring(ls, e.s, e.len);
+	free(e.s);
+	return 1;
 }
 
 static int tuplua_function_getconfig(lua_State *ls)
@@ -732,6 +755,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
 		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
 		tuplua_register_function(ls, "getdirectory", tuplua_function_getdirectory, tf);
+		tuplua_register_function(ls, "getrelativedir", tuplua_function_getrelativedir, tf);
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);

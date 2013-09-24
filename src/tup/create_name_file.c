@@ -550,10 +550,6 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 		pel = TAILQ_LAST(&pg->path_list, path_element_head);
 		*last = pel;
 		TAILQ_REMOVE(&pg->path_list, pel, list);
-	} else {
-		/* TODO */
-		fprintf(stderr, "[31mBork[0m\n");
-		exit(1);
 	}
 
 	if(pg->pg_flags & PG_ROOT)
@@ -573,8 +569,10 @@ tupid_t find_dir_tupid_dt_pg(FILE *f, tupid_t dt, struct pel_group *pg,
 				 * success since we don't keep track of files
 				 * in the great beyond.
 				 */
-				free(*last);
-				*last = NULL;
+				if(last) {
+					free(*last);
+					*last = NULL;
+				}
 				del_pel_group(pg);
 				return 0;
 			}
