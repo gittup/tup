@@ -378,7 +378,6 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	const char *dirname;
 	tupid_t dest;
 	struct estring e;
-	int len;
 
 	if(estring_init(&e) < 0)
 		return -1;
@@ -387,7 +386,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	dest = find_dir_tupid_dt(tf->tupid, dirname, NULL, 0, 0);
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
-	if(get_relative_dir(NULL, &e, NULL, dest, tf->tupid, &len) < 0)
+	if(get_relative_dir(NULL, &e, NULL, dest, tf->tupid, NULL) < 0)
 		return -1;
 	lua_pushlstring(ls, e.s, e.len);
 	free(e.s);

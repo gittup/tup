@@ -2125,7 +2125,6 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
 			struct tupid_entries inputs = {NULL};
 			struct tupid_tree *ttinput;
-			int outputlen;
 
 			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
 				return -1;
@@ -2139,7 +2138,7 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 					if(e && !first)
 						if(estring_append(e, " ", 1) < 0)
 							return -1;
-					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, &outputlen) < 0)
+					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, NULL) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");
