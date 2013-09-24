@@ -123,6 +123,8 @@ struct path_list_head;
 
 int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
+int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
+		    struct bin_head *bl);
 int export(struct tupfile *tf, const char *cmdline);
 
 struct node;

@@ -240,11 +240,8 @@ static int tuplua_function_definerule(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	struct rule r;
-	struct bin_head bl;
 	size_t command_len = 0;
 	char *separator;
-
-	LIST_INIT(&bl);
 
 	if(!lua_istable(ls, -1))
 		return luaL_error(ls, "This function must be passed a table containing parameters");
@@ -577,6 +574,20 @@ static int tuplua_function_unchdir(lua_State *ls)
 	return 0;
 }
 
+static int tuplua_function_run(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *cmdline;
+	struct bin_head bl;
+	LIST_INIT(&bl);
+
+	cmdline = tuplua_tostring(ls, 1);
+	if(!cmdline)
+		return luaL_error(ls, "run() must be passed a string for the command-line to run");
+
+	return exec_run_script(tf, cmdline, 0, &bl);
+}
+
 static int tuplua_function_nodevariable(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
@@ -727,6 +738,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
 		tuplua_register_function(ls, "chdir", tuplua_function_chdir, tf);
 		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);
+		tuplua_register_function(ls, "run", tuplua_function_run, tf);
 
 		lua_pushlightuserdata(ls, tf);
 		lua_newtable(ls);

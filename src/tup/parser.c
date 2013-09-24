@@ -904,17 +904,26 @@ static int preload(struct tupfile *tf, char *cmdline)
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl)
 {
-	char *eval_cmdline;
-	char *rules;
-	char *p;
-	int rslno = 0;
 	int rc;
-	struct tupid_tree *tt;
+	char *eval_cmdline;
 
 	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
 	if(!eval_cmdline) {
 		return -1;
 	}
+	rc = exec_run_script(tf, eval_cmdline, lno, bl);
+	free(eval_cmdline);
+	return rc;
+}
+
+int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
+		    struct bin_head *bl)
+{
+	char *rules;
+	char *p;
+	int rslno = 0;
+	int rc;
+	struct tupid_tree *tt;
 
 	pthread_mutex_lock(&tf->ps->lock);
 	rc = gen_dir_list(tf, tf->tupid);
@@ -923,7 +932,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		return -1;
 
 	if(debug_run)
-		fprintf(tf->f, " --- run script output from '%s'\n", eval_cmdline);
+		fprintf(tf->f, " --- run script output from '%s'\n", cmdline);
 
 	/* Make sure we have a dependency on each environment variable, since
 	 * these are passed to the run script.
@@ -932,8 +941,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		if(tupid_tree_add_dup(&tf->input_root, tt->tupid) < 0)
 			return -1;
 	}
-	rc = server_run_script(tf->f, tf->tupid, eval_cmdline, &tf->env_root, &rules);
-	free(eval_cmdline);
+	rc = server_run_script(tf->f, tf->tupid, cmdline, &tf->env_root, &rules);
 	if(rc < 0)
 		return -1;
 
