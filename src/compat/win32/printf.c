@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -135,5 +135,6 @@ int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap)
 	else
 		rc = __real___mingw_vfprintf(stream, format, ap);
 
+	fflush(stream);
 	return rc;
 }

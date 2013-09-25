@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -75,19 +75,16 @@
  * locks I don't get those issues.
  */
 
-static int sh_lock;
-static int obj_lock;
-static int tri_lock;
+static tup_lock_t sh_lock;
+static tup_lock_t obj_lock;
+static tup_lock_t tri_lock;
 
 int tup_lock_init(void)
 {
 	int ret;
 
-	sh_lock = openat(tup_top_fd(), TUP_SHARED_LOCK, O_RDWR);
-	if(sh_lock < 0) {
-		perror(TUP_SHARED_LOCK);
+	if(tup_lock_open(TUP_SHARED_LOCK, &sh_lock) < 0)
 		return -1;
-	}
 	ret = tup_try_flock(sh_lock);
 	if(ret > 0) {
 		printf("Waiting for another tup process (or an autoupdate) to finish...\n");
@@ -97,59 +94,46 @@ int tup_lock_init(void)
 		return -1;
 	}
 
-	obj_lock = openat(tup_top_fd(), TUP_OBJECT_LOCK, O_RDWR);
-	if(obj_lock < 0) {
-		perror(TUP_OBJECT_LOCK);
+	if(tup_lock_open(TUP_OBJECT_LOCK, &obj_lock) < 0)
 		return -1;
-	}
-	if(tup_flock(obj_lock) < 0) {
+	if(tup_flock(obj_lock) < 0)
 		return -1;
-	}
 
-	tri_lock = openat(tup_top_fd(), TUP_TRI_LOCK, O_RDWR);
-	if(tri_lock < 0) {
-		perror(TUP_TRI_LOCK);
+	if(tup_lock_open(TUP_TRI_LOCK, &tri_lock) < 0)
 		return -1;
-	}
 	return 0;
 }
 
 void tup_lock_exit(void)
 {
 	tup_unflock(obj_lock);
-	if(close(obj_lock) < 0)
-		perror("close(obj_lock)");
+	tup_lock_close(obj_lock);
 	/* Wait for the monitor to pick up the object lock */
 	tup_flock(tri_lock);
 	tup_unflock(tri_lock);
-	if(close(tri_lock) < 0)
-		perror("close(tri_lock)");
+	tup_lock_close(tri_lock);
 	tup_unflock(sh_lock);
-	if(close(sh_lock) < 0)
-		perror("close(sh_lock)");
+	tup_lock_close(sh_lock);
 }
 
-void tup_lock_close(void)
+void tup_lock_closeall(void)
 {
-	if(close(obj_lock) < 0)
-		perror("close(obj_lock)");
-	if(close(tri_lock) < 0)
-		perror("close(tri_lock)");
-	if(close(sh_lock) < 0)
-		perror("close(sh_lock)");
+	tup_lock_close(obj_lock);
+	tup_lock_close(tri_lock);
+	tup_lock_close(sh_lock);
 }
 
-int tup_sh_lock(void)
+tup_lock_t tup_sh_lock(void)
 {
 	return sh_lock;
 }
 
-int tup_obj_lock(void)
+tup_lock_t tup_obj_lock(void)
 {
 	return obj_lock;
 }
 
-int tup_tri_lock(void)
+tup_lock_t tup_tri_lock(void)
 {
 	return tri_lock;
 }

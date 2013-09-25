@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,13 +18,36 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#define _ATFILE_SOURCE
 #include "tup/flock.h"
+#include "tup/config.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 
-int tup_flock(int fd)
+int tup_lock_open(const char *lockname, tup_lock_t *lock)
+{
+	int fd;
+
+	fd = openat(tup_top_fd(), lockname, O_RDWR);
+	if(fd < 0) {
+		perror(lockname);
+		fprintf(stderr, "tup error: Unable to open lockfile.\n");
+		return -1;
+	}
+	*lock = fd;
+	return 0;
+}
+
+void tup_lock_close(tup_lock_t lock)
+{
+	if(close(lock) < 0) {
+		perror("close(lock)");
+	}
+}
+
+int tup_flock(tup_lock_t fd)
 {
 	struct flock fl = {
 		.l_type = F_WRLCK,
@@ -41,7 +64,7 @@ int tup_flock(int fd)
 }
 
 /* Returns: -1 error, 0 got lock, 1 would block */
-int tup_try_flock(int fd)
+int tup_try_flock(tup_lock_t fd)
 {
 	struct flock fl = {
 		.l_type = F_WRLCK,
@@ -59,7 +82,7 @@ int tup_try_flock(int fd)
 	return 0;
 }
 
-int tup_unflock(int fd)
+int tup_unflock(tup_lock_t fd)
 {
 	struct flock fl = {
 		.l_type = F_UNLCK,
@@ -75,7 +98,7 @@ int tup_unflock(int fd)
 	return 0;
 }
 
-int tup_wait_flock(int fd)
+int tup_wait_flock(tup_lock_t fd)
 {
 	struct flock fl;
 

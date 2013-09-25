@@ -273,7 +273,7 @@ int monitor(int argc, char **argv)
 				return -1;
 			if(monitor_set_pid(-1) < 0)
 				return -1;
-			tup_lock_close();
+			tup_lock_closeall();
 
 			if(fchdir(tup_top_fd()) < 0) {
 				perror("fchdir tup_top");

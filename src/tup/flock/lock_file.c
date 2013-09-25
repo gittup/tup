@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,19 +20,40 @@
 
 #include "tup/flock.h"
 #include <windows.h>
+#include <stdio.h>
 #include <errno.h>
 
-int tup_flock(int fd)
+int tup_lock_open(const char *lockname, tup_lock_t *lock)
 {
 	HANDLE h;
-	long int tmp;
+
+	h = CreateFile(lockname,
+		       GENERIC_READ | GENERIC_WRITE,
+		       FILE_SHARE_READ | FILE_SHARE_WRITE,
+		       NULL,
+		       OPEN_EXISTING,
+		       0,
+		       NULL);
+	if(h == INVALID_HANDLE_VALUE) {
+		perror(lockname);
+		fprintf(stderr, "tup error: Unable to open lockfile.\n");
+		return -1;
+	}
+	*lock = h;
+	return 0;
+}
+
+void tup_lock_close(tup_lock_t lock)
+{
+	CloseHandle(lock);
+}
+
+int tup_flock(tup_lock_t fd)
+{
 	OVERLAPPED wtf;
 
-	tmp = _get_osfhandle(fd);
-	h = (HANDLE)tmp;
-
 	memset(&wtf, 0, sizeof(wtf));
-	if(LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &wtf) == 0) {
+	if(LockFileEx(fd, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &wtf) == 0) {
 		errno = EIO;
 		return -1;
 	}
@@ -40,21 +61,16 @@ int tup_flock(int fd)
 }
 
 /* Returns: -1 error, 0 got lock, 1 would block */
-int tup_try_flock(int fd)
+int tup_try_flock(tup_lock_t fd)
 {
-	HANDLE h;
-	long int tmp;
 	OVERLAPPED wtf;
 
-	tmp = _get_osfhandle(fd);
-	h = (HANDLE)tmp;
-
 	memset(&wtf, 0, sizeof(wtf));
-	if(LockFileEx(h, LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &wtf) == 0) {
+	if(LockFileEx(fd, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &wtf) == 0) {
 		DWORD last_error;
 
 		last_error = GetLastError();
-		if (last_error == ERROR_IO_PENDING) {
+		if(last_error == ERROR_LOCK_VIOLATION) {
 			errno = EAGAIN;
 			return 1;
 		}
@@ -64,21 +80,16 @@ int tup_try_flock(int fd)
 	return 0;
 }
 
-int tup_unflock(int fd)
+int tup_unflock(tup_lock_t fd)
 {
-	HANDLE h;
-	long int tmp;
-
-	tmp = _get_osfhandle(fd);
-	h = (HANDLE)tmp;
-	if(UnlockFile(h, 0, 0, 1, 0) == 0) {
+	if(UnlockFile(fd, 0, 0, 1, 0) == 0) {
 		errno = EIO;
 		return -1;
 	}
 	return 0;
 }
 
-int tup_wait_flock(int fd)
+int tup_wait_flock(tup_lock_t fd)
 {
 	if(fd) {}
 	/* Unsupported - only used by inotify file monitor */
