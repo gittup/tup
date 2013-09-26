@@ -607,7 +607,10 @@ static int tuplua_function_run(lua_State *ls)
 	if(!cmdline)
 		return luaL_error(ls, "run() must be passed a string for the command-line to run");
 
-	return exec_run_script(tf, cmdline, 0, &bl);
+	if(exec_run_script(tf, cmdline, 0, &bl) < 0)
+		return luaL_error(ls, "tup error: Failed to run external script.\n");
+
+	return 0;
 }
 
 static int tuplua_function_nodevariable(lua_State *ls)
