@@ -1564,6 +1564,8 @@ static int ignore_file_w(const wchar_t* file)
 		return 1;
 	if (wcsstr(file, L"$") != NULL)
 		return 1;
+	if (wcsncmp(file, L"\\\\", 2) == 0)
+		return 1;
 	return 0;
 }
 
