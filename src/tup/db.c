@@ -1564,6 +1564,14 @@ int tup_db_delete_node(tupid_t tupid)
 		return -1;
 	parent = tent->parent;
 
+	if(tent->srcid >= 0) {
+		/* We may need to remove the directory that created us if it
+		 * was also removed.
+		 */
+		if(add_ghost(tent->srcid) < 0)
+			return -1;
+	}
+
 	rc = node_has_ghosts(tupid);
 	if(rc < 0)
 		return -1;
@@ -4178,8 +4186,11 @@ int tup_db_set_dependent_dir_flags(tupid_t tupid)
 int tup_db_set_srcid_dir_flags(tupid_t tupid)
 {
 	int rc;
+	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_SRCID_DIR_FLAGS];
-	static char s[] = "insert or ignore into create_list select srcid from node where dir=? and type=?";
+	static char s[] = "select srcid from node where dir=? and type=?";
+	struct tupid_entries root = {NULL};
+	struct tupid_tree *tt;
 
 	transaction_check("%s [37m[%lli, %i][0m", s, tupid, TUP_NODE_GENERATED);
 	if(!*stmt) {
@@ -4201,20 +4212,45 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 		return -1;
 	}
 
-	rc = sqlite3_step(*stmt);
+	while(1) {
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			goto out_reset;
+		}
+
+		if(tupid_tree_add_dup(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+	}
+
+out_reset:
 	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
 
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
+	RB_FOREACH(tt, tupid_entries, &root) {
+		struct tup_entry *tent;
 
-	return 0;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(tent->type == TUP_NODE_DIR) {
+			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+				return -1;
+		}
+	}
+	free_tupid_tree(&root);
+
+	return rc;
 }
 
 int tup_db_set_dependent_config_flags(tupid_t tupid)
@@ -6859,14 +6895,14 @@ static int node_has_ghosts(tupid_t tupid)
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_NODE_HAS_GHOSTS];
-	static char s[] = "select id from node where dir=?";
+	static char s[] = "select id from node where dir=? or srcid=?";
 
 	/* This is used to determine if we need to make a real node into a
 	 * ghost node. We only need to do that if some other node references it
 	 * via dir. We don't care about links because nothing will have a link
 	 * to a ghost.
 	 */
-	transaction_check("%s [37m[%lli][0m", s, tupid);
+	transaction_check("%s [37m[%lli, %lli][0m", s, tupid, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -6876,6 +6912,11 @@ static int node_has_ghosts(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -7236,9 +7277,9 @@ static int ghost_reclaimable1(tupid_t tupid)
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GHOST_RECLAIMABLE1];
-	static char s[] = "select exists(select 1 from node where dir=?)";
+	static char s[] = "select exists(select 1 from node where dir=? or srcid=?)";
 
-	transaction_check("%s [37m[%lli][0m", s, tupid);
+	transaction_check("%s [37m[%lli, %i][0m", s, tupid, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -7248,6 +7289,11 @@ static int ghost_reclaimable1(tupid_t tupid)
 	}
 
 	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
