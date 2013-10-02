@@ -584,6 +584,16 @@ check_no_windows()
 	esac
 }
 
+check_no_osx()
+{
+	case $tupos in
+	Darwin*)
+		echo "Not supported in OSX. Skipping test."
+		eotup
+		;;
+	esac
+}
+
 check_tup_no_suid()
 {
 	if ! tup privileged; then

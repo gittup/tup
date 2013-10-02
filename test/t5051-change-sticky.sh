@@ -70,7 +70,7 @@ tup_object_no_exist headers bar.h
 cat > headers/Tupfile << HERE
 HERE
 tup touch headers/Tupfile
-update_fail_msg "headers/foo.h: No such file or directory"
+update_fail_msg "headers/foo.h.*\(No such file or directory\|file not found\)"
 
 # Fix the C file and re-build
 echo '' > foo.c
