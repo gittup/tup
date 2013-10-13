@@ -1521,6 +1521,8 @@ static int ignore_file(const char* file)
 		return 0;
 	if (stricmp(file, "nul") == 0)
 		return 1;
+	if (stricmp(file, "nul:") == 0)
+		return 1;
 	if (stricmp(file, "prn") == 0)
 		return 1;
 	if (stricmp(file, "aux") == 0)
@@ -1549,6 +1551,8 @@ static int ignore_file_w(const wchar_t* file)
 	if (!file)
 		return 0;
 	if (wcsicmp(file, L"nul") == 0)
+		return 1;
+	if (wcsicmp(file, L"nul:") == 0)
 		return 1;
 	if (wcsicmp(file, L"prn") == 0)
 		return 1;
