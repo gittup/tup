@@ -47,7 +47,7 @@
 #define mkdir(a,b) mkdir(a)
 #endif
 
-static int init(int argc, char **argv);
+       int init_command(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
@@ -125,17 +125,26 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	/* Commands that don't use a normal tup_init() */
+	/* Commands that should run before running an implicit `tup init' */
 	if(strcmp(cmd, "init") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
-		return init(argc, argv);
+		return init_command(argc, argv);
 	} else if(strcmp(cmd, "version") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
 		version();
 		return 0;
-	} else if(strcmp(cmd, "stop") == 0) {
+	}
+
+	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */
+	tup_temporarily_drop_privs();
+	if(tup_option_process_ini() != 0)
+		return 1;
+	tup_restore_privs();
+
+	/* Commands that don't use a normal tup_init() */
+	if(strcmp(cmd, "stop") == 0) {
 		if(tup_drop_privs() < 0)
 			return 1;
 		if(find_tup_dir() < 0) {
@@ -306,7 +315,8 @@ static int mkdirtree(const char *dirname)
 	return 0;
 }
 
-static int init(int argc, char **argv)
+/* Symbol is exported so that option can call it to automatically run tup init */
+int init_command(int argc, char **argv)
 {
 	int x;
 	int db_sync = 1;
@@ -346,15 +356,18 @@ static int init(int argc, char **argv)
 		char wd[PATH_MAX];
 		if(getcwd(wd, sizeof(wd)) == NULL) {
 			perror("getcwd");
-			fprintf(stderr, "tup error: database already exists somewhere up the tree.\n");
+			fprintf(stderr, "tup warning: database already exists somewhere up the tree.\n");
 		} else {
-			fprintf(stderr, "tup error: database already exists in directory: %s\n", wd);
+			fprintf(stderr, "tup warning: database already exists in directory: %s\n", wd);
 		}
-		goto err_close;
+		close(fd);
+		return 0;
 	}
+
 	if(fchdir(fd) < 0) {
 		perror("fchdir");
-		goto err_close;
+		close(fd);
+		return -1;
 	}
 	if(close(fd) < 0) {
 		perror("close(fd)");
@@ -393,10 +406,6 @@ static int init(int argc, char **argv)
 		fclose(f);
 	}
 	return 0;
-
-err_close:
-	close(fd);
-	return -1;
 }
 
 static int show_dirs;
