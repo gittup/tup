@@ -49,20 +49,26 @@
 
 static char home_loc[PATH_MAX];
 
-static struct {
+static struct config_file {
 	const char *file;
 	struct vardb root;
 	int exists;
-} locations[] = {
+} static_configs[] = {
 	{ .file = TUP_OPTIONS_FILE },
 	{ .file = home_loc },
 #ifndef _WIN32
 	{ .file = "/etc/tup/options" },
 #endif
 };
-#define NUM_OPTION_LOCATIONS (sizeof(locations) / sizeof(locations[0]))
+#define NUM_OPTION_LOCATIONS (sizeof(static_configs) / sizeof(static_configs[0]))
+
+static struct dynamic_config_file_list {
+	struct dynamic_config_file_list *next;
+	struct config_file dynamic_config;
+} *dynamic_configs = NULL;
 
 static int parse_option_file(int x);
+static void parse_ini_file(FILE *f);
 static const char *cpu_number(void);
 static const char *stdout_isatty(void);
 static const char *get_console_width(void);
@@ -133,6 +139,8 @@ int tup_option_process_ini(void) {
 				exit(1);
 			}
 		} else {
+			parse_ini_file(f);
+
 			if (best_root != -1)
 				close(best_root);
 			/* open can never fail as we have
@@ -238,7 +246,7 @@ int tup_option_init(void)
 		return -1;
 
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		if(vardb_init(&locations[x].root) < 0)
+		if(vardb_init(&static_configs[x].root) < 0)
 			return -1;
 		if(parse_option_file(x) < 0)
 			return -1;
@@ -254,25 +262,39 @@ int tup_option_init(void)
 
 void tup_option_exit(void)
 {
+	struct dynamic_config_file_list *c = dynamic_configs;
 	unsigned int x;
+
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		vardb_close(&locations[x].root);
+		vardb_close(&static_configs[x].root);
 	}
+
+	while (c != NULL) {
+		struct dynamic_config_file_list *temp = c;
+
+		free((char *) c->dynamic_config.file);
+		c = c->next;
+		free(temp);
+	}
+	dynamic_configs = NULL;
+}
+
+static int tup_boolify_flag(const char *value) {
+	if(strcasecmp(value, "true") == 0)
+		return 1;
+	if(strcasecmp(value, "yes") == 0)
+		return 1;
+	if(strcasecmp(value, "false") == 0)
+		return 0;
+	if(strcasecmp(value, "no") == 0)
+		return 0;
+	return atoi(value);
 }
 
 int tup_option_get_flag(const char *opt)
 {
 	const char *value = tup_option_get_string(opt);
-
-	if(strcmp(value, "true") == 0)
-		return 1;
-	if(strcmp(value, "yes") == 0)
-		return 1;
-	if(strcmp(value, "false") == 0)
-		return 0;
-	if(strcmp(value, "no") == 0)
-		return 0;
-	return atoi(value);
+	return tup_boolify_flag(value);
 }
 
 int tup_option_get_int(const char *opt)
@@ -284,13 +306,25 @@ const char *tup_option_get_string(const char *opt)
 {
 	unsigned int x;
 	int len = strlen(opt);
+	struct dynamic_config_file_list *c = dynamic_configs;
+
 	if(!inited) {
 		fprintf(stderr, "tup internal error: Called tup_option_get_string(%s) before the options were initialized.\n", opt);
 		exit(1);
 	}
+
+	while(c != NULL) {
+		struct var_entry *ve;
+		ve = vardb_get(&c->dynamic_config.root, opt, len);
+		if(ve) {
+			return ve->value;
+		}
+		c = c->next;
+	}
+
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		struct var_entry *ve;
-		ve = vardb_get(&locations[x].root, opt, len);
+		ve = vardb_get(&static_configs[x].root, opt, len);
 		if(ve) {
 			return ve->value;
 		}
@@ -319,9 +353,9 @@ const char *tup_option_get_location(const char *opt)
 	}
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
 		struct var_entry *ve;
-		ve = vardb_get(&locations[x].root, opt, len);
+		ve = vardb_get(&static_configs[x].root, opt, len);
 		if(ve) {
-			return locations[x].file;
+			return static_configs[x].file;
 		}
 	}
 	return "compiled-in defaults";
@@ -332,27 +366,43 @@ int tup_option_show(void)
 	unsigned int x;
 	printf(" --- Option files:\n");
 	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
-		if(locations[x].exists) {
-			printf("Parsed option file: %s\n", locations[x].file);
+		if(static_configs[x].exists) {
+			printf("Parsed option file: %s\n", static_configs[x].file);
 		} else {
-			printf("Option file does not exist: %s\n", locations[x].file);
+			printf("Option file does not exist: %s\n", static_configs[x].file);
 		}
 	}
 	printf(" --- Option settings:\n");
 	for(x=0; x<NUM_OPTIONS; x++) {
-		unsigned int y;
 		const char *value = options[x].default_value;
 		const char *location = "default values";
 		int len = strlen(options[x].name);
+		int found_option = 0;
 
-		for(y=0; y<NUM_OPTION_LOCATIONS; y++) {
+		struct dynamic_config_file_list *c = dynamic_configs;
+		unsigned int y;
+
+		while (!found_option && (c != NULL)) {
 			struct var_entry *ve;
-			ve = vardb_get(&locations[y].root, options[x].name, len);
+			ve = vardb_get(&c->dynamic_config.root, options[x].name, len);
 			if(ve) {
-				location = locations[y].file;
+				location = c->dynamic_config.file;
 				value = ve->value;
-				break;
+				found_option = 1;
 			}
+			c = c->next;
+		}
+
+		y = 0;
+		while (!found_option && (y < NUM_OPTION_LOCATIONS)) {
+			struct var_entry *ve;
+			ve = vardb_get(&static_configs[y].root, options[x].name, len);
+			if(ve) {
+				location = static_configs[y].file;
+				value = ve->value;
+				found_option = 1;
+			}
+			y++;
 		}
 		printf("%s = '%s' from %s\n", options[x].name, value, location);
 	}
@@ -389,18 +439,64 @@ static int parse_option_file(int x)
 	FILE *f;
 	int rc;
 
-	f = fopen(locations[x].file, "r");
+	f = fopen(static_configs[x].file, "r");
 	if(!f) {
 		/* Don't care if the file's not there or we can't read it */
-		locations[x].exists = 0;
+		static_configs[x].exists = 0;
 		return 0;
 	}
-	locations[x].exists = 1;
-	rc = ini_parse_file(f, parse_callback, &locations[x].root);
+	static_configs[x].exists = 1;
+	rc = ini_parse_file(f, parse_callback, &static_configs[x].root);
 	fclose(f);
 	if(rc == 0)
 		return 0;
 	return -1;
+}
+
+static void parse_ini_file(FILE *f) {
+	struct dynamic_config_file_list *c = dynamic_configs;
+	int rc;
+	const char* ini_name = "Tupfile.ini";
+	/* strlen("Tupfile.ini") == 11. Some compilers don't grok const ints */
+	char file_path[PATH_MAX + 1 + 11] = {0};
+
+	if (c == NULL) {
+		dynamic_configs = malloc(sizeof(struct dynamic_config_file_list));
+		c = dynamic_configs;
+	} else {
+		while (c->next != NULL)
+			c = c->next;
+		c->next = malloc(sizeof(struct dynamic_config_file_list));
+		c = c->next;
+	}
+	assert(c && "malloc config struct");
+	c->next = NULL;
+
+	if (NULL == getcwd(file_path, PATH_MAX)) {
+		perror("getcwd");
+		fprintf(stderr, "tup error: Unexpected error getting current directory\n");
+		exit(1);
+	}
+	file_path[strlen(file_path)] = PATH_SEP; // note: still \0-terminated from array init
+	strcpy(file_path+strlen(file_path), ini_name);
+	c->dynamic_config.file = strdup(file_path);
+	if (c->dynamic_config.file == NULL) {
+		perror("strdup");
+		fprintf(stderr, "tup error: Unexpected error allocating memory for file path\n");
+		exit(1);
+	}
+
+	if(vardb_init(&c->dynamic_config.root) < 0) {
+		fprintf(stderr, "tup internal error: Failed to initialize vardb for .ini config entry\n");
+		exit(1);
+	}
+
+	rc = ini_parse_file(f, parse_callback, &c->dynamic_config.root);
+
+	if (rc != 0) {
+		fprintf(stderr, "tup error: Failed to parse ini file\n");
+		exit(1);
+	}
 }
 
 static const char *cpu_number(void)
