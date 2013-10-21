@@ -36,6 +36,16 @@ int tup_drop_privs(void)
 {
 	return 0;
 }
+
+int tup_temporarily_drop_privs(void)
+{
+	return 0;
+}
+
+int tup_restore_privs(void)
+{
+	return 0;
+}
 #else
 static int privileges_dropped = 0;
 
@@ -58,6 +68,43 @@ int tup_drop_privs(void)
 			return -1;
 		}
 		privileges_dropped = 1;
+	}
+	return 0;
+}
+
+static int temporarily_dropped_privileges = 0;
+static gid_t original_egid;
+static uid_t original_euid;
+
+int tup_temporarily_drop_privs(void)
+{
+	if (geteuid() == 0) {
+		original_egid = getegid();
+		original_euid = geteuid();
+		if (setegid(getgid()) != 0) {
+			perror("setegid dropping");
+			return -1;
+		}
+		if (seteuid(getuid()) != 0) {
+			perror("seteuid dropping");
+			return -1;
+		}
+		temporarily_dropped_privileges = 1;
+	}
+	return 0;
+}
+
+int tup_restore_privs(void)
+{
+	if (temporarily_dropped_privileges) {
+		if (setegid(original_egid) != 0) {
+			perror("setegid restoring");
+			return -1;
+		}
+		if (seteuid(original_euid) != 0) {
+			perror("seteuid restoring");
+			return -1;
+		}
 	}
 	return 0;
 }

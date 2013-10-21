@@ -23,5 +23,7 @@
 
 int tup_privileged(void);
 int tup_drop_privs(void);
+int tup_temporarily_drop_privs(void);
+int tup_restore_privs(void);
 
 #endif

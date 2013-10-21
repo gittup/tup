@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,12 +27,17 @@
 #include <shlobj.h>
 #endif
 
+#include "compat.h"
 #include "option.h"
 #include "vardb.h"
 #include "inih/ini.h"
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #ifndef _WIN32
 #include <signal.h>
@@ -101,6 +106,121 @@ static struct sigaction sigact = {
 	.sa_flags = SA_RESTART,
 };
 #endif
+
+/* From tup/main.c, used to invoke `tup init' */
+int init_command(int argc, char **argv);
+
+int tup_option_process_ini(void) {
+	int cur_dir;
+	int best_root = -1; // file descriptor -> best root candidate
+	int found_tup_dir = 0;
+
+	cur_dir = open(".", 0);
+	if (cur_dir < 0) {
+		perror("open(\".\", 0)");
+		fprintf(stderr, "tup error: Could not get reference to current directory?\n");
+		exit(1);
+	}
+
+	for(;;) {
+		FILE *f;
+		struct stat st;
+		char path_buf[8];
+
+		f = fopen("Tupfile.ini", "r");
+		if (f == NULL) {
+			if (errno != ENOENT) {
+				perror("fopen");
+				fprintf(stderr, "tup error: Unexpected error opening ini file\n");
+				exit(1);
+			}
+		} else {
+			if (best_root != -1)
+				close(best_root);
+			/* open can never fail as we have
+			   already read a file from this dir */
+			best_root = open(".", 0);
+			assert(best_root >= 0);
+
+			fclose(f);
+		}
+
+		if (stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
+			found_tup_dir = 1;
+			break;
+		}
+
+		if (chdir("..")) {
+			perror("chdir");
+			fprintf(stderr, "tup error: Unexpected error traversing directory tree\n");
+			exit(1);
+		}
+
+		if (NULL == getcwd(path_buf, sizeof(path_buf))) {
+			if (errno != ERANGE) {
+				perror("getcwd");
+				fprintf(stderr, "tup error: Unexpected error getting directory while traversing the tree\n");
+			}
+		} else {
+			const char root_path[] = {PATH_SEP, '\0'};
+			if (0 == strcmp(root_path, path_buf)) {
+				break;
+			}
+		}
+	}
+
+	if (best_root == -1) {
+		goto ini_cleanup;
+	}
+
+	if (!found_tup_dir) {
+		int rc;
+		int argc = 1;
+		char argv0[] = "init";
+		char *argv[] = {argv0, NULL};
+		char root_path[PATH_MAX];
+
+		if (fchdir(best_root) < 0) {
+			perror("fchdir(best_root)");
+			fprintf(stderr, "tup error: Could not chdir to root candidate?\n");
+			exit(1);
+		}
+
+		if (NULL == getcwd(root_path, sizeof(root_path))) {
+			if (errno != ERANGE) {
+				perror("getcwd");
+				fprintf(stderr, "tup error: Unexpected error getting root path\n");
+				exit(1);
+			}
+			printf("Initilizing .tup directory\n");
+		} else {
+			printf("Initilizing .tup in %s\n", root_path);
+		}
+
+		rc = init_command(argc, argv);
+		if (0 != rc) {
+			fprintf(stderr, "tup error: `tup init' failed unexpectedly\n");
+			exit(rc);
+		}
+	}
+
+	if(close(best_root) < 0) {
+		perror("close(best_root");
+	}
+
+ini_cleanup:
+	if (fchdir(cur_dir) < 0) {
+		perror("fchdir(cur_dir)");
+		fprintf(stderr, "tup error: Could not chdir back to original working directory?\n");
+		exit(1);
+	}
+	if (close(cur_dir) < 0) {
+		perror("close");
+		fprintf(stderr, "tup error: Unexpected error closing current directory file descriptor\n");
+		exit(1);
+	}
+	return 0;
+}
 
 int tup_option_init(void)
 {
