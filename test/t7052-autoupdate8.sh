@@ -38,9 +38,9 @@ HERE
 tup flush
 check_exist prog
 
-if ! cat .monitor.output | grep Updated | wc -l | grep 1 > /dev/null; then
+if ! cat .monitor.output | grep Updated | wc -l | grep 2 > /dev/null; then
 	sleep 0.5
-	if ! cat .monitor.output | grep Updated | wc -l | grep 1 > /dev/null; then
+	if ! cat .monitor.output | grep Updated | wc -l | grep 2 > /dev/null; then
 		echo "Monitor output:" 1>&2
 		cat .monitor.output 1>&2
 		echo "Error: tup should only update once" 1>&2

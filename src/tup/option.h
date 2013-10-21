@@ -23,6 +23,7 @@
 
 #include "compat.h"
 
+int tup_option_process_ini(void);
 int tup_option_init(void);
 void tup_option_exit(void);
 int tup_option_get_int(const char *opt);
