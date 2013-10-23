@@ -31,6 +31,7 @@
 #include "option.h"
 #include "vardb.h"
 #include "inih/ini.h"
+#include "init.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -106,9 +107,6 @@ static struct sigaction sigact = {
 	.sa_flags = SA_RESTART,
 };
 #endif
-
-/* From tup/main.c, used to invoke `tup init' */
-int init_command(int argc, char **argv);
 
 int tup_option_process_ini(void) {
 	int cur_dir;
