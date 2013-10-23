@@ -68,7 +68,6 @@ static int flush(void);
 static int ghost_check(void);
 
 static void version(void);
-static void usage(void);
 
 int main(int argc, char **argv)
 {
@@ -255,8 +254,6 @@ int main(int argc, char **argv)
 		argc++;
 		argv--;
 		rc = updater(argc, argv, 0);
-		if (rc != 0)
-			usage();
 	}
 
 	if(clear_autoupdate) {
@@ -1131,10 +1128,4 @@ static int ghost_check(void)
 static void version(void)
 {
 	printf("tup %s\n", tup_version());
-}
-
-static void usage(void)
-{
-	printf("tup %s usage: tup [args]\n", tup_version());
-	printf("For information on Tupfiles and other commands, see the tup(1) man page.\n");
 }
