@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2013  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -33,7 +33,15 @@ int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpat
 	}
 
 	dir_mutex_lock(olddirfd);
+#ifdef _WIN32
+	if(MoveFileEx(oldpath, newpath, MOVEFILE_REPLACE_EXISTING)) {
+		rc = 0;
+	} else {
+		rc = -1;
+	}
+#else
 	rc = rename(oldpath, newpath);
+#endif
 	dir_mutex_unlock();
 	return rc;
 }
