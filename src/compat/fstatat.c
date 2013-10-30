@@ -24,7 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "dir_mutex.h"
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 #include "open_notify.h"
 #endif
 
@@ -33,15 +33,12 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 	int rc;
 
 	dir_mutex_lock(dirfd);
-	if(flags & AT_SYMLINK_NOFOLLOW) {
-#ifdef _WIN32
-		open_notify(ACCESS_READ, pathname);
+#if defined(_WIN32) || defined(__APPLE__)
+	open_notify(ACCESS_READ, pathname);
 #endif
+	if(flags & AT_SYMLINK_NOFOLLOW) {
 		rc = lstat(pathname, buf);
 	} else {
-#ifdef _WIN32
-		open_notify(ACCESS_READ, pathname);
-#endif
 		rc = stat(pathname, buf);
 	}
 	dir_mutex_unlock();

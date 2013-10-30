@@ -26,6 +26,8 @@
 #include "string_tree.h"
 #include <pthread.h>
 
+#define TUP_TMP ".tup/tmp"
+
 struct tupid_entries;
 struct tup_entry;
 struct tup_env;

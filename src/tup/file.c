@@ -266,6 +266,17 @@ static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
 	}
 	tup_entry_list_add(tent, head);
 
+	/* TODO: This seems to fix t2033 - is it acceptable? For some reason
+	   Windows gives us events on secret and secret/ghost, but OSX only
+	   has the event on secret/ghost.
+	 */
+	while(tent->type == TUP_NODE_GHOST) {
+		tent = tent->parent;
+		if(tent->type == TUP_NODE_DIR)
+			break;
+		tup_entry_list_add(tent, head);
+	}
+
 	return 0;
 }
 
@@ -584,6 +595,8 @@ out_skip:
 			/* tent may not be set (in the case of hidden files) */
 			if(file_set_mtime(map->tent, map->realname) < 0)
 				return -1;
+		} else {
+			printf(" [31m - NO TENT[0m\n");
 		}
 		del_map(map);
 	}

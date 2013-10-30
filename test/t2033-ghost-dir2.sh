@@ -32,7 +32,9 @@ chmod +x ok.sh
 tup touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
-tup_dep_exist . secret . './ok.sh > output.txt'
+if ! tup_dep_exist . secret . './ok.sh > output.txt'; then
+	tup_dep_exist secret ghost . './ok.sh > output.txt'
+fi
 
 # Create 'secret' as a file - this will cause the command to run
 echo 'foo' > secret

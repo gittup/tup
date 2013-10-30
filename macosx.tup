@@ -1,6 +1,12 @@
 # Build for the future as this is the direction Apple is moving to
 CC = clang
 
+FPIC = -fPIC
+ifeq (@(TUP_ARCH),x86_64)
+  FPIC += -arch i386 -arch x86_64
+endif
+SHARED = -dynamiclib
+
 CFLAGS += -DAT_SYMLINK_NOFOLLOW=0x100
 CFLAGS += -DAT_REMOVEDIR=0x200
 

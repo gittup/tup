@@ -29,6 +29,7 @@
 #include "compat/win32/dirpath.h"
 #include "compat/win32/open_notify.h"
 #include "compat/dir_mutex.h"
+#include "process_depfile.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -453,100 +454,15 @@ static int initialize_depfile(struct server *s, char *depfile, HANDLE *h)
 	return 0;
 }
 
-static int process_depfile(struct server *s, HANDLE h)
+static int win_process_depfile(struct server *s, HANDLE h)
 {
-	char event1[PATH_MAX];
-	char event2[PATH_MAX];
-	int fd;
-	FILE *f;
-
 	fd = _open_osfhandle((intptr_t)h, 0);
 	if(fd < 0) {
 		perror("open_osfhandle() in process_depfile");
 		fprintf(stderr, "tup error: Unable to call open_osfhandle when processing the dependency file.\n");
 		return -1;
 	}
-	f = fdopen(fd, "rb");
-	if(!f) {
-		perror("fdopen");
-		fprintf(stderr, "tup error: Unable to open dependency file for post-processing.\n");
-		return -1;
-	}
-	while(1) {
-		struct access_event event;
-
-		if(fread(&event, sizeof(event), 1, f) != 1) {
-			if(!feof(f)) {
-				perror("fread");
-				fprintf(stderr, "tup error: Unable to read the access_event structure from the dependency file.\n");
-				return -1;
-			}
-			break;
-		}
-
-		if(!event.len)
-			continue;
-
-		if(event.len >= PATH_MAX - 1) {
-			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len);
-			return -1;
-		}
-		if(event.len2 >= PATH_MAX - 1) {
-			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len2);
-			return -1;
-		}
-
-		if(fread(&event1, event.len + 1, 1, f) != 1) {
-			perror("fread");
-			fprintf(stderr, "tup error: Unable to read the first event from the dependency file.\n");
-			return -1;
-		}
-		if(fread(&event2, event.len2 + 1, 1, f) != 1) {
-			perror("fread");
-			fprintf(stderr, "tup error: Unable to read the second event from the dependency file.\n");
-			return -1;
-		}
-
-		if(event1[event.len] != '\0' || event2[event.len2] != '\0') {
-			fprintf(stderr, "tup error: Missing null terminator in access_event\n");
-			return -1;
-		}
-
-		if(event.at == ACCESS_WRITE) {
-			struct mapping *map;
-
-			map = malloc(sizeof *map);
-			if(!map) {
-				perror("malloc");
-				return -1;
-			}
-			map->realname = strdup(event1);
-			if(!map->realname) {
-				perror("strdup");
-				return -1;
-			}
-			map->tmpname = strdup(event1);
-			if(!map->tmpname) {
-				perror("strdup");
-				return -1;
-			}
-			map->tent = NULL; /* This is used when saving deps */
-			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
-		}
-		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
-			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
-			return -1;
-		}
-	}
-
-	/* Since this file is FILE_FLAG_DELETE_ON_CLOSE, the temporary file
-	 * goes away after this fclose.
-	 */
-	if(fclose(f) < 0) {
-		perror("fclose");
-		return -1;
-	}
-	return 0;
+	return process_depfile(s, fd);
 }
 
 static BOOL WINAPI console_handler(DWORD cevent)

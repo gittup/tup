@@ -1,1 +1,5 @@
 TUP_MONITOR = inotify
+LDFLAGS += `pkg-config fuse --libs`
+
+export PKG_CONFIG_PATH
+CFLAGS += `pkg-config fuse --cflags`

@@ -276,14 +276,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup internal error: Trying to run sub-process in a chroot, but tup is not privileged.\n");
 			return -1;
 		}
-#ifdef __APPLE__
-		if(proc) {/* unused */}
-		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
-			perror("mount");
-			fprintf(stderr, "tup error: Unable to mount /dev into fuse file-system.\n");
-			return -1;
-		}
-#elif defined(__linux__)
+#if defined(__linux__)
 		/* The "tmpfs" argument is ignored since we use MS_BIND, but
 		 * valgrind complains about it if we use NULL.
 		 */
@@ -297,6 +290,9 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup error: Unable to bind-mount /proc into fuse file-system.\n");
 			return -1;
 		}
+#else
+		if(proc) {/* unused */}
+		if(dev) {/* unused */}
 #endif
 		if(chroot(job) < 0) {
 			perror("chroot");
@@ -315,10 +311,12 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			if(tup_drop_privs() < 0)
 				return -1;
 		}
-		if(chdir(job) < 0) {
-			perror("chdir");
-			fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
-			return -1;
+		if(job && job[0]) {
+			if(chdir(job) < 0) {
+				perror("chdir");
+				fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
+				return -1;
+			}
 		}
 	}
 	if(chdir(dir) < 0) {
@@ -406,6 +404,8 @@ static int master_fork_loop(void)
 		if(em.sid == -1)
 			break;
 
+		job[0] = 0;
+		dir[0] = 0;
 		if(read_all(msd[0], job, em.joblen) < 0)
 			return -1;
 		if(read_all(msd[0], dir, em.dirlen) < 0)
@@ -551,10 +551,8 @@ static void *child_waiter(void *arg)
 		perror("waitpid");
 	}
 	if(waiter->do_chroot && tup_privileged()) {
-		int rc;
-#ifdef __APPLE__
-		rc = unmount(waiter->dev, MNT_FORCE);
-#elif defined(__linux__)
+		int rc = 0;
+#if defined(__linux__)
 		rc = umount2(waiter->dev, MNT_FORCE);
 		rc = umount2(waiter->proc, MNT_FORCE);
 #endif

@@ -22,7 +22,7 @@
 #include <windows.h>
 #include <fcntl.h>
 #include "dirpath.h"
-#include "open_notify.h"
+#include "compat/open_notify.h"
 
 int __wrap_open(const char *pathname, int flags, ...);
 

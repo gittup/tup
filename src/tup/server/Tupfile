@@ -1,3 +1,8 @@
 include_rules
+ifeq (@(TUP_PLATFORM),macosx)
+: foreach socketpair.c process_depfile.c master_fork.c |> !cc |>
+else
 : foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
-: windepfile.c |> !mingwcc |>
+endif
+
+: windepfile.c process_depfile.c |> !mingwcc |>

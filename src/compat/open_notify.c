@@ -23,6 +23,8 @@
 #include "tup/file.h"
 #include "tup/db.h"
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 struct finfo_list {
@@ -48,6 +50,7 @@ int open_notify_push(struct file_info *finfo)
 int open_notify_pop(struct file_info *finfo)
 {
 	struct finfo_list *flist;
+	flist = malloc(sizeof *flist);
 	if(LIST_EMPTY(&finfo_list_head)) {
 		fprintf(stderr, "tup internal error: finfo_list is empty.\n");
 		return -1;

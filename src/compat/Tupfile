@@ -15,6 +15,8 @@ endif
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += clearenv.c
 srcs += dir_mutex.c
+srcs += open_notify.c
+srcs += macosx_open.c
 
 srcs += faccessat.c
 srcs += fchmodat.c
@@ -44,4 +46,5 @@ mingwsrcs += mkdirat.c
 mingwsrcs += openat.c
 mingwsrcs += renameat.c
 mingwsrcs += unlinkat.c
+mingwsrcs += open_notify.c
 : foreach $(mingwsrcs) |> !mingwcc |>

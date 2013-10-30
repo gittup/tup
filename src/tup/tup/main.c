@@ -26,6 +26,7 @@
 #include <errno.h>
 #include "tup/config.h"
 #include "tup/lock.h"
+#include "tup/getexecwd.h"
 #include "tup/monitor.h"
 #include "tup/fileio.h"
 #include "tup/pel_group.h"
@@ -103,6 +104,12 @@ int main(int argc, char **argv)
 	if(compat_init() < 0) {
 		fprintf(stderr, "tup error: Unable to initialize compatibility lib\n");
 		return -1;
+	}
+
+	if(init_getexecwd(argv[0]) < 0) {
+		fprintf(stderr, "Error: Unable to determine tup's "
+			"execution directory for shared libs.\n");
+		return 1;
 	}
 
 	argc = argc - cmd_arg;

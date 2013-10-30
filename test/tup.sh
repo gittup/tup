@@ -175,7 +175,7 @@ dep_exist_internal()
 		:
 	elif [ "$rc" = "0" ]; then
 		echo "*** Dependency from $2 [$1] -> $4 [$3] does not exist" 1>&2
-		exit 1
+		return 1
 	else
 		echo "*** link_exists() failed." 1>&2
 		exit 1
