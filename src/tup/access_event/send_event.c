@@ -52,9 +52,15 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 		exit(1);
 	}
 
-	get_full_path(path1, file);
-	get_full_path(path2, file2);
-	event.at = at;
+	if(strncmp(file, "@tup@/", 6) == 0) {
+		strcpy(path1, file+6);
+		path2[0] = 0;
+		event.at = ACCESS_VAR;
+	} else {
+		get_full_path(path1, file);
+		get_full_path(path2, file2);
+		event.at = at;
+	}
 	event.len = strlen(path1);
 	event.len2 = strlen(path2);
 	if(write(depsfd, &event, sizeof(event)) < 0)

@@ -36,6 +36,7 @@ int varsed(int argc, char **argv)
 	int x;
 	int binmode = 0;
 	int input_found = 0;
+	FILE *input = NULL;
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "-h") == 0 ||
@@ -48,12 +49,13 @@ int varsed(int argc, char **argv)
 		} else {
 			if(!input_found) {
 				if(strcmp(argv[x], "-") != 0) {
-					ifd = open(argv[x], O_RDONLY);
-					if(ifd < 0) {
+					input = fopen(argv[x], "r");
+					if(!input) {
 						fprintf(stderr, "Error opening input file.\n");
 						perror(argv[x]);
 						return 1;
 					}
+					ifd = fileno(input);
 				}
 				input_found = 1;
 			} else {

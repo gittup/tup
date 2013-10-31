@@ -585,6 +585,11 @@ check_no_windows()
 		echo "Not supported in Windows. Skipping test."
 		eotup
 		;;
+	Darwin)
+		if [ "$1" = "run-script" -o "$1" = "variant" -o "$1" = "client" ]; then
+			echo "Not supported on Darwin. Skipping test."
+			eotup
+		fi
 	esac
 }
 

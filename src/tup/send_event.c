@@ -32,5 +32,5 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 		return;
 	}
 
-	open(path, O_RDONLY);
+	fopen(path, "r");
 }

@@ -19,7 +19,7 @@
 # Try to use a python client in a run script and use @-variables
 
 . ./tup.sh
-check_no_windows client, run-script
+check_no_windows client run-script
 check_python
 
 cat > foo.py << HERE
