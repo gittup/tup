@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 {
@@ -16,6 +17,43 @@ static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 		}
 	}
 	return NULL;
+}
+
+static int handle_symlinks(const char *file, struct file_info *finfo)
+{
+	char path[PATH_MAX];
+	char lpath[PATH_MAX];
+	const char *p = file;
+	if(*p == '/')
+		p++;
+	while(p) {
+		int rc;
+		p = strchr(p, '/');
+		if(!p) {
+			strcpy(path, file);
+		} else {
+			memcpy(path, file, p-file);
+			path[p-file] = 0;
+			p++;
+		}
+		rc = readlink(path, lpath, sizeof(lpath));
+		if(rc >= (signed)sizeof(lpath)) {
+			fprintf(stderr, "tup error: Incorrectly sized link path in handle_symlinks()\n");
+			return -1;
+		}
+		if(rc < 0) {
+			if(errno != ENOENT && errno != EINVAL & errno != ENOTDIR) {
+				perror(path);
+				return -1;
+			}
+		} else {
+			if(handle_file(ACCESS_READ, lpath, "", finfo) < 0) {
+				fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", file);
+				return -1;
+			}
+		}
+	}
+	return 0;
 }
 
 int process_depfile(struct server *s, int fd)
@@ -125,6 +163,9 @@ int process_depfile(struct server *s, int fd)
 		}
 		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
 			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
+			return -1;
+		}
+		if(handle_symlinks(event1, &s->finfo) < 0) {
 			return -1;
 		}
 	}

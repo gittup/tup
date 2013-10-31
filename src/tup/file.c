@@ -548,7 +548,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 			/* t5038 - Need to clean up files until Windows supports tmpfiles properly. */
 			fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
 			unlink(w->filename);
