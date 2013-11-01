@@ -23,7 +23,7 @@ ifeq (@(TUP_SUDO_SUID),y)
 suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
-LDFLAGS += `pkg-config fuse --libs`
+LDFLAGS += `pkg-config osxfuse --libs`
 LDFLAGS += -lm
 : src/tup/tup/main.o libtup.a src/lua/liblua.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
 
