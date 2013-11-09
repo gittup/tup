@@ -21,6 +21,8 @@
 # will succeed to support that.
 
 . ./tup.sh
+# Test no longer valid?
+eotup
 check_no_windows OSX-specific
 
 cat > ok.c << HERE
