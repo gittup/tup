@@ -18,6 +18,7 @@ static int (*s_open)(const char *, int, ...);
 static FILE *(*s_fopen)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
 static int (*s_creat)(const char *, mode_t);
+static int (*s_access)(const char *, int);
 static int (*s_symlink)(const char *, const char *);
 static int (*s_rename)(const char*, const char*);
 static int (*s_mkstemp)(char *template);
@@ -52,7 +53,6 @@ int open(const char *pathname, int flags, ...)
 	mode_t mode = 0;
 	int at = ACCESS_READ;
 
-	fprintf(stderr, "OPEN: %s\n", pathname);
 	WRAP(s_open, "open");
 	if(flags & O_CREAT) {
 		va_list ap;
@@ -97,6 +97,25 @@ int creat(const char *pathname, mode_t mode)
 	if(rc >= 0)
 		handle_file(pathname, "", ACCESS_WRITE);
 	return rc;
+}
+
+int access(const char *path, int amode)
+{
+	int rc;
+
+	WRAP(s_access, "access");
+	rc = s_access(path, amode);
+	handle_file(path, "", ACCESS_READ);
+	return rc;
+}
+
+int link(const char *path1, const char *path2)
+{
+	if(path1) {}
+	if(path2) {}
+	fprintf(stderr, "tup error: hard links are not supported.\n");
+	errno = ENOSYS;
+	return -1;
 }
 
 int symlink(const char *oldpath, const char *newpath)
