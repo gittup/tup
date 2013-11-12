@@ -47,6 +47,7 @@ static int handle_symlinks(const char *file, struct file_info *finfo)
 				return -1;
 			}
 		} else {
+			lpath[rc] = 0;
 			if(handle_file(ACCESS_READ, lpath, "", finfo) < 0) {
 				fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", file);
 				return -1;

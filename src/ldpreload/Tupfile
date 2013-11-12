@@ -4,6 +4,5 @@ ifeq (@(TUP_PLATFORM),macosx)
 CFLAGS += $(FPIC)
 srcs += *.c
 srcs += ../tup/access_event/send_event.c
-srcs += ../tup/flock/fcntl.c
 : foreach $(srcs) |> !cc |> %B.o
 endif

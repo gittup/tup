@@ -18,6 +18,12 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 	struct access_event event;
 	char path1[PATH_MAX];
 	char path2[PATH_MAX];
+	struct flock fl = {
+		.l_type = F_WRLCK,
+		.l_whence = SEEK_SET,
+		.l_start = 0,
+		.l_len = 0,
+	};
 
 	if(len || len2) {/* unused */}
 
@@ -48,7 +54,8 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 		}
 	}
 
-	if(tup_flock(depsfd) < 0) {
+	if(fcntl(depsfd, F_SETLKW, &fl) < 0) {
+		perror("fcntl F_WRLCK");
 		exit(1);
 	}
 
@@ -69,8 +76,12 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 		exit(1);
 	if(write(depsfd, path2, event.len2 + 1) < 0)
 		exit(1);
-	if(tup_unflock(depsfd) < 0)
+
+	fl.l_type = F_UNLCK;
+	if(fcntl(depsfd, F_SETLKW, &fl) < 0) {
+		perror("fcntl F_UNLCK");
 		exit(1);
+	}
 	pthread_mutex_unlock(&mutex);
 }
 
