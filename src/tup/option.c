@@ -189,9 +189,9 @@ int tup_option_process_ini(void) {
 				fprintf(stderr, "tup error: Unexpected error getting root path\n");
 				exit(1);
 			}
-			printf("Initilizing .tup directory\n");
+			printf("Initializing .tup directory\n");
 		} else {
-			printf("Initilizing .tup in %s\n", root_path);
+			printf("Initializing .tup in %s\n", root_path);
 		}
 
 		rc = init_command(argc, argv);
