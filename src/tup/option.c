@@ -160,8 +160,7 @@ int tup_option_process_ini(void) {
 				fprintf(stderr, "tup error: Unexpected error getting directory while traversing the tree\n");
 			}
 		} else {
-			const char root_path[] = {PATH_SEP, '\0'};
-			if (0 == strcmp(root_path, path_buf)) {
+			if(is_root_path(path_buf)) {
 				break;
 			}
 		}
