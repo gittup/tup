@@ -226,10 +226,8 @@ static int server_setenv(struct execmsg *em, const char *deps, struct tup_env *e
 
 	size = snprintf(extrablock, sizeof(extrablock),
 			"%s=%s%c"
-			"DYLD_FORCE_FLAT_NAMESPACE=%c"
 			"DYLD_INSERT_LIBRARIES=%s",
 			TUP_SERVER_NAME, deps, 0,
-			0,
 			ldpreload_path);
 	/* The 3 new entries are the deps file, and 2 DYLD_* variables.  */
 	num_entries = 3;

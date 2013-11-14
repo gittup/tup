@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include <pthread.h>
 
-int real_open(const char *pathname, int flags);
-
 static void get_full_path(char *path, const char *file);
 
 void tup_send_event(const char *file, int len, const char *file2, int len2, int at)
@@ -46,7 +44,7 @@ void tup_send_event(const char *file, int len, const char *file2, int len2, int 
 				"path from the environment.\n", TUP_SERVER_NAME);
 			exit(1);
 		}
-		depsfd = real_open(path, O_WRONLY | O_APPEND);
+		depsfd = open(path, O_WRONLY | O_APPEND);
 		if(depsfd < 0) {
 			perror(path);
 			fprintf(stderr, "tup error: Unable to open dependency file.\n");
