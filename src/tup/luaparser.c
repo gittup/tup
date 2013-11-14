@@ -500,8 +500,8 @@ static int tuplua_function_creategitignore(lua_State *ls)
 	return 0;
 }
 
-#ifdef _WIN32
-#include "open_notify.h"
+#if defined(_WIN32) || defined(__APPLE__)
+#include "compat/open_notify.h"
 #endif
 static int tuplua_function_chdir(lua_State *ls)
 {
@@ -519,7 +519,7 @@ static int tuplua_function_chdir(lua_State *ls)
 	if(strcmp(mode, "r") != 0) {
 		return luaL_error(ls, "io.open in the parser can only open files read-only");
 	}
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 	open_notify(ACCESS_READ, filename);
 #endif
 	if(fchdir(tf->cur_dfd) < 0) {
