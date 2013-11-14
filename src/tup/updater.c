@@ -2418,6 +2418,7 @@ static int update(struct node *n)
 
 	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, do_chroot) < 0) {
 		pthread_mutex_lock(&display_mutex);
+		show_result(n->tent, 1, NULL, NULL);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);
 		free(expanded_name);

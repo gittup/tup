@@ -2,6 +2,7 @@
 #include "tup/access_event.h"
 #include "tup/file.h"
 #include "tup/server.h"
+#include "tup/pel_group.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -10,13 +11,27 @@
 static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 {
 	struct mapping *map;
+	struct pel_group pga, pgb;
 
+	if(get_path_elements(path, &pga) < 0)
+		return NULL;
+
+	/* TODO: Cache pel_group in the map structure? */
 	LIST_FOREACH(map, &finfo->mapping_list, list) {
-		if(strcmp(path, map->realname) == 0) {
-			return map;
+		int found = 0;
+		if(get_path_elements(map->realname, &pgb) < 0)
+			return NULL;
+		if(pg_eq(&pga, &pgb)) {
+			found = 1;
 		}
+		del_pel_group(&pgb);
+		if(found)
+			goto out;
 	}
-	return NULL;
+	map = NULL;
+out:
+	del_pel_group(&pga);
+	return map;
 }
 
 static int handle_symlinks(const char *file, struct file_info *finfo)
@@ -139,6 +154,7 @@ int process_depfile(struct server *s, int fd)
 
 			map = find_mapping(&s->finfo, event1);
 			if(!map) {
+				fprintf(stderr, "tup error: Unable to find map object for rename()\n");
 				return -1;
 			}
 
