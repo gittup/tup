@@ -34,11 +34,18 @@ out:
 	return map;
 }
 
-static int handle_symlinks(const char *file, struct file_info *finfo)
+static int handle_symlinks(const char *file, struct file_info *finfo, int offset,
+			   int nloop)
 {
 	char path[PATH_MAX];
 	char lpath[PATH_MAX];
-	const char *p = file;
+	const char *p = file + offset;
+
+	if(nloop > 10) {
+		fprintf(stderr, "tup error: too many symbolic links\n");
+		return -1;
+	}
+
 	if(*p == '/')
 		p++;
 	while(p) {
@@ -62,10 +69,39 @@ static int handle_symlinks(const char *file, struct file_info *finfo)
 				return -1;
 			}
 		} else {
+			char newpath[PATH_MAX];
 			lpath[rc] = 0;
+
 			if(handle_file(ACCESS_READ, lpath, "", finfo) < 0) {
 				fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", file);
 				return -1;
+			}
+
+			/* Recursively process the new symlink */
+			if(lpath[0] == '/') {
+				if(handle_file(ACCESS_READ, lpath, "", finfo) < 0) {
+					fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", lpath);
+					return -1;
+				}
+				if(handle_symlinks(lpath, finfo, 0, nloop+1) < 0)
+					return -1;
+				return 0;
+			} else {
+				char *lastslash;
+				lastslash = strrchr(path, '/');
+				if(!lastslash) {
+					printf("TODO: No slash in path\n");
+					return -1;
+				}
+				snprintf(newpath, sizeof(newpath), "%.*s/%s/%s", (int)(lastslash-path), path, lpath, p);
+				newpath[sizeof(newpath)-1] = 0;
+
+				if(handle_symlinks(newpath, finfo, lastslash-path, nloop+1) < 0)
+					return -1;
+				if(handle_file(ACCESS_READ, newpath, "", finfo) < 0) {
+					fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", newpath);
+					return -1;
+				}
 			}
 		}
 	}
@@ -182,7 +218,7 @@ int process_depfile(struct server *s, int fd)
 			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
 			return -1;
 		}
-		if(handle_symlinks(event1, &s->finfo) < 0) {
+		if(handle_symlinks(event1, &s->finfo, 0, 0) < 0) {
 			return -1;
 		}
 	}
