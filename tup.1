@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/10/27" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2013/11/24" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -339,7 +339,7 @@ These are also used as inputs for the command, but will not appear in any of the
 This will add the foo.h dependency to the gcc commands for foo.c and bar.c, so tup will know to generate the header before trying to compile. The foreach command will iterate over the regular inputs (here, foo.c and bar.c), not the order-only inputs (foo.h). If you forget to add such a dependency, tup will report an error when the command is executed. Note that the foo.h dependency is only listed here because it is created by another command -- normal headers do not need to be specified.
 .TP
 .B command
-The command string that will be passed to the system(3) call by tup. This command is allowed to read from any file specified as an input or order-only input, as well as any other file in the tup hierarchy that is not the output of another command. In other words, a command cannot read from another command's output unless it is specified as an input. This restriction is what allows tup to be parallel safe. Additionally, the command must write to all of the output files specified by the "outputs" section, if any. All of the output files must be in the current directory.
+The command string that will be passed to the system(3) call by tup. This command is allowed to read from any file specified as an input or order-only input, as well as any other file in the tup hierarchy that is not the output of another command. In other words, a command cannot read from another command's output unless it is specified as an input. This restriction is what allows tup to be parallel safe. Additionally, the command must write to all of the output files specified by the "outputs" section, if any.
 .IP
 When executed, the command's file accesses are monitored by tup to ensure that they conform to these rules. Any files opened for reading that were generated from another command but not specfied as inputs are reported as errors. Similarly, any files opened for writing that are not specified as outputs are reported as errors. All files opened for reading are recorded as dependencies to the command. If any of these files change, tup will re-execute the command during the next update. Note that if an input listed in the Tupfile changes, it does not necessarily cause the command to re-execute, unless the command actually read from that input during the prior execution. Inputs listed in the Tupfile only enforce ordering among the commands, while file accesses during execution determine when commands are re-executed.
 .IP
