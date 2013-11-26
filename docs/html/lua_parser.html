@@ -29,7 +29,7 @@
 		<div class="spec"><em>Returns</em>: none</div>
 		<p>Defines a rule.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information on rules.  <span class="cmd">command</span> will be executed without any modifications, either directly or in a shell, in the directory PROCESSING.  <span class="cmd">inputs</span> and <span class="cmd">outputs</span> are optional and are used to determine dependencies.</p>
 	</dd>
-	<dt><b>tup.frule{inputs = {'', ...}, commands = '', outputs = {'', ...}}</b></dt>
+	<dt><b>tup.frule{inputs = {'', ...}, command = '', outputs = {'', ...}}</b></dt>
 	<dd>
 		<div class="spec"><em>Returns</em>: table of strings</div>
 		<p>A wrapper for <span class="cmd">tup.definerule</span> that performs substitutions on all parameters based on format patterns.  Returns a table containing the filenames of all outputs.</p>
