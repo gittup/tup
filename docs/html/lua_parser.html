@@ -33,7 +33,11 @@
 	<dd>
 		<div class="spec"><em>Returns</em>: table of strings</div>
 		<p>A wrapper for <span class="cmd">tup.definerule</span> that performs substitutions on all parameters based on format patterns.  Returns a table containing the filenames of all outputs.</p>
-		<p>If there is a single input, it can be specified as a string argument <span class="cmd">input</span> or <span class="cmd">inputs</span>, and a single output can be specified as string argument <span class="cmd">output</span> or <span class="cmd">outputs</span>.  In addition to sequential, numerically indexed elements, <span class="cmd">input</span> can contain a table at index <span class="cmd">'extra_inputs'</span>, the elements of which are treated like normal inputs but are not used when susbtituting <span class="cmd">%f</span>.</p>
+		<p>If there is a single input, it can be specified as a string argument <span class="cmd">input</span> or <span class="cmd">inputs</span>, and a single output can be specified as string argument <span class="cmd">output</span> or <span class="cmd">outputs</span>.  In addition to sequential, numerically indexed elements, <span class="cmd">input</span> can contain a table at index <span class="cmd">'extra_inputs'</span>, the elements of which are treated like normal inputs but are not used when susbtituting <span class="cmd">%f</span>.
+		Likewise, <span class="cmd">output</span> can contain a table at index <span class="cmd">'extra_outputs'</span>, the elements of which are treated like normal outputs but are not used when susbtituting <span class="cmd">%o</span>.
+		Be aware that you are using input and output as an argument to frule in that case, rather than inputs and outputs!
+		</p>
+
 		<p>The substitutions are roughly the same as the substitutions in non-Lua Tupfile rules.  See the <a href="http://gittup.org/tup/manual.html">Tup manual</a> for more information on the format specifiers.</p>
 		<ul>
 			<li>If a glob character appears in an input, the input string is replaced by its glob results.</li>
