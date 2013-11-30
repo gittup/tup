@@ -191,12 +191,22 @@ tup.frule = function(arguments)
 		command = evalGlobals(command)
 		command = evalConfig(command)
 	end
+
+	-- We only check arguments.input / arguments.output for extra
 	if arguments.input and type(arguments.input) == 'table' and arguments.input.extra_inputs then
 		for k, v in ipairs(arguments.input.extra_inputs) do
 			local newinput = tostring(v)
 			newinput = evalGlobals(newinput)
 			newinput = evalConfig(newinput)
 			table.insert(inputs, newinput)
+		end
+	end
+	if arguments.output and type(arguments.output) == 'table' and arguments.output.extra_outputs then
+		for k, v in ipairs(arguments.output.extra_outputs) do
+			local newoutput = tostring(v)
+			newoutput = evalGlobals(newoutput)
+			newoutput = evalConfig(newoutput)
+			table.insert(outputs, newoutput)
 		end
 	end
 
