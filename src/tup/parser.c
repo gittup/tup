@@ -3176,8 +3176,17 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			strcpy(onle->base, newpath);
 			free(newpath);
 		} else {
+			char *lastslash;
 			onle->path = newpath;
-			onle->base = onle->path;
+			lastslash = strrchr(newpath, '/');
+			if(lastslash) {
+				struct path_element *pel;
+				onle->base = lastslash + 1;
+				pl->dt = find_dir_tupid_dt(pl->dt, onle->path, &pel, 0, 0);
+				free(pel);
+			} else {
+				onle->base = onle->path;
+			}
 		}
 		if(!onle->path) {
 			free(onle);
@@ -3589,6 +3598,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			}
 			clen += onl->totlen + (onl->num_entries-1);
 		} else if(*next == 'O') {
+			struct name_list_entry *onle;
 			if(!onl) {
 				fprintf(tf->f, "tup error: %%O can only be used in the extra outputs section.\n");
 				return NULL;
@@ -3597,7 +3607,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: %%O can only be used if there is exactly one output specified.\n");
 				return NULL;
 			}
-			clen += onl->extlessbasetotlen;
+			onle = TAILQ_FIRST(&onl->entries);
+			clen += onle->extlesslen;
 		} else if(*next == 'd') {
 			if(tf->tupid == DOT_DT) {
 				/* At the top of the tup-hierarchy, we get the
@@ -3723,8 +3734,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			}
 		} else if(*next == 'O') {
 			nle = TAILQ_FIRST(&onl->entries);
-			memcpy(&s[x], nle->path, nle->extlessbaselen);
-			x += nle->extlessbaselen;
+			memcpy(&s[x], nle->path, nle->extlesslen);
+			x += nle->extlesslen;
 		} else if(*next == '%') {
 			s[x] = '%';
 			x++;
