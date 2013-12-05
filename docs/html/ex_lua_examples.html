@@ -1,0 +1,338 @@
+<p>In these examples, we will present the basic Lua Tupfile API and show how it relates to several small projects, then give an introduction to some of the helper API methods.  A reference for all Lua API methods can be found here - not all API methods are demonstrated in the examples below.</p>
+
+<h3>Compiling a Single Program</h3>
+
+<p>In this example, we will write a Lua Tupfile that compiles a small C program.  The two key requirements for using Tup are 1. running <span class="cmd">tup init</span> at the top of the project, and 2. <span class="filename">Tupfile.lua</span>.</p>
+<p>In a new directory, run:</p>
+<pre>
+<span class="prompt">$</span> tup init
+</pre>
+
+<p>and create the following files in the same directory:</p>
+
+<span class="fileheader">hello.c</span>
+<pre class="code">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf("Hello, world!\n");
+	return 0;
+}
+</pre>
+
+<span class="fileheader">Tupfile.lua</span>
+<pre class="code">tup.definerule{ inputs = {'hello.c'}, command = 'gcc hello.c -o hello', outputs = {'hello'} }</pre>
+
+<p>Now, everything is prepared to compile.  The current directory structure looks like this:</p>
+
+<pre>
+<span class="prompt">$</span> ls -a
+.  ..  hello.c  .tup  Tupfile.lua
+</pre>
+
+<p>Compile the project by running:</p>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] [0.134s] Scanning filesystem...
+[ tup ] [0.252s] Reading in new environment variables...
+[ tup ] [0.369s] Parsing Tupfiles...
+ 1) [0.008s] .
+ [ ] 100%
+[ tup ] [0.388s] No files to delete.
+[ tup ] [0.388s] Generating .gitignore files...
+[ tup ] [0.530s] Executing Commands...
+ 1) [0.095s] gcc hello.c -o hello
+ [ ] 100%
+[ tup ] [0.740s] Updated.
+<span class="prompt">$</span> ls -a
+.  ..  hello  hello.c  .tup  Tupfile.lua
+<span class="prompt">$</span> ./hello
+Hello, world!
+</pre>
+
+<h3>Compiling Multiple Programs</h3>
+<p>In this example, we will build off the previous project to build the similar program <span class="filename">goodbye</span> in addition to <span class="filename">hello</span>, using Lua functions to generalize build rule definition.</p>
+
+<p>Create the following file in the same directory as the previous example:</p>
+
+<span class="fileheader">goodbye.c</span>
+<pre class="code">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf("Goodbye, world!\n");
+	return 0;
+}
+</pre>
+
+<p>Replace the rules file with this new one:</p>
+<span class="fileheader">Tupfile.lua</span>
+<pre class="code">function compile(source, output)
+	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+end
+
+compile('hello.c', 'hello')
+compile('goodbye.c', 'goodbye')
+</pre>
+
+<p>The current directory structure looks like this:</p>
+
+<pre>
+<span class="prompt">$</span> ls -a
+.  ..  goodbye.c  hello  hello.c  .tup  Tupfile.lua
+</pre>
+
+<p>Build and test the programs:</p>
+
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] [0.000s] Scanning filesystem...
+[ tup ] [0.252s] Reading in new environment variables...
+[ tup ] [0.253s] Parsing Tupfiles...
+ 1) [0.006s] .
+ [ ] 100%
+[ tup ] [0.264s] No files to delete.                                                                                       
+[ tup ] [0.264s] Generating .gitignore files...
+[ tup ] [0.509s] Executing Commands...
+ 1) [0.071s] gcc goodbye.c -o goodbye                                                                                      
+ [ ] 100%
+[ tup ] [0.788s] Updated.                                                                                                  
+<span class="prompt">$</span> ls -a
+.  ..  goodbye  goodbye.c  hello  hello.c  .tup  Tupfile.lua
+<span class="prompt">$</span> ./hello
+Hello, world!
+<span class="prompt">$</span> ./goodbye
+Goodbye, world!
+</pre>
+
+<p>Note that (if you copied everything verbatim) the command to build <span class="filename">hello</span> didn't change, nor did any of its dependencies, so Tup didn't rebuild it.</p>
+
+<h3>Working With Multiple Directories</h3>
+<p>In this example, we place and build the program source files in their own directories for organizational purposes.  We will use Tuprules.lua to store our common compile method to avoid duplicating it in each build directory.</p>
+
+<p>Create directories and move the source files to get the following project structure:</p>
+
+<pre>
+<span class="prompt">$</span> rm hello goodbye # They are in the way of the next steps
+<span class="prompt">$</span> rm Tupfile.lua
+<span class="prompt">$</span> mkdir hello
+<span class="prompt">$</span> mkdir goodbye
+<span class="prompt">$</span> mv hello.c hello/
+<span class="prompt">$</span> mv goodbye.c goodbye/
+</pre>
+
+<span class="fileheader">Tuprules.lua</span>
+<pre class="code">function compile(source, output)
+	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+end
+</pre>
+
+<span class="fileheader">hello/Tupfile.lua</span>
+<pre class="code">
+compile('hello.c', 'hello')
+</pre>
+
+<span class="fileheader">goodbye/Tupfile.lua</span>
+<pre class="code">
+compile('goodbye.c', 'goodbye')
+</pre>
+
+<p>The final directory structure should look like this:</p>
+
+<pre class="code">
+<span class="prompt">$</span> ls -a
+.  ..  goodbye  hello  .tup  Tuprules.lua
+<span class="prompt">$</span> ls -a hello
+.  ..  hello.c  Tupfile.lua
+<span class="prompt">$</span> ls -a goodbye
+.  ..  goodbye.c  Tupfile.lua
+</pre>
+
+<p><span class="filename">Tupfile.lua</span> automatically includes <span class="filename">Tuprules.lua</span> in its current directory and parent directories, so we can access compile in <span class="filename">hello/Tupfile.lua</span> and <span class="filename">goodbye/Tupfile.lua</span>.</p>
+
+<p>Build and test the programs.  You can run <span class="cmd">tup upd</span> from any location under where you ran <span class="cmd">tup init</span>, but for the following listing we run everything in the top directory.</p>
+<pre>
+<span class="prompt">$</span> $tup upd
+[ tup ] [0.000s] Scanning filesystem...
+[ tup ] [0.286s] Reading in new environment variables...
+[ tup ] [0.287s] Parsing Tupfiles...
+ 1) [0.001s] .
+ 2) [0.001s] goodbye                                                                                                       
+ 3) [0.001s] hello                                                                                                         
+ [   ] 100%
+[ tup ] [0.296s] No files to delete.                                                                                       
+[ tup ] [0.296s] Deleting 2 commands...
+ [  ] 100%                                                                                                                 
+[ tup ] [0.297s] Generating .gitignore files...
+[ tup ] [0.532s] Executing Commands...                                                                                     
+ 1) [0.107s] goodbye: gcc goodbye.c -o goodbye                                                                             
+ 2) [0.111s] hello: gcc hello.c -o hello                                                                                   
+ [  ] 100%
+[ tup ] [0.877s] Updated.                                                                                                  
+<span class="prompt">$</span> $ls -a
+.  ..  goodbye  hello  .tup  Tuprules.lua
+<span class="prompt">$</span> $ls -a hello/
+.  ..  hello  hello.c  Tupfile.lua
+<span class="prompt">$</span> $ls -a goodbye/
+.  ..  goodbye  goodbye.c  Tupfile.lua
+<span class="prompt">$</span> $./hello/hello 
+Hello, world!
+<span class="prompt">$</span> $./goodbye/goodbye 
+Goodbye, world!
+</pre>
+
+<h3>Configuration And Selectively Sharing Code</h3>
+<p>You can split Lua Tupfiles as you see fit and selectively combine them using <span class="cmd">tup.include</span>.  In this example, we read the tup.config file to determine which modules to build, and only include the module's build definitions if enabled.</p>
+
+<p>In a new directory, run:</p>
+<pre>
+<span class="prompt">$</span> tup init
+</pre>
+
+<p>and create the following files in the same directory:</p>
+
+<span class="fileheader">module1.c</span>
+<pre class="code">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf("Module 1 run.\n");
+	return 0;
+}
+</pre>
+
+<span class="fileheader">module2.c</span>
+<pre class="code">#include &lt;stdio.h&gt;
+
+int main(void)
+{
+	printf("Module 2 run.\n");
+	return 0;
+}
+</pre>
+
+<span class="fileheader">module1.lua</span>
+<pre class="code">compile('module1.c', 'module1')
+</pre>
+
+<span class="fileheader">module2.lua</span>
+<pre class="code">compile('module2.c', 'module2')
+</pre>
+
+<span class="fileheader">Tupfile.lua</span>
+<pre class="code">
+function compile(source, output)
+	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+end
+
+if tup.getconfig('MODULE1') == 'y' then
+	tup.include('module1.lua')
+end
+
+if tup.getconfig('MODULE2') == 'y' then
+	tup.include('module2.lua')
+end
+
+</pre>
+
+<span class="fileheader">tup.config</span>
+<pre class="code">CONFIG_MODULE1=n
+CONFIG_MODULE2=y
+</pre>
+
+<p>This will cause the module 2 build rule to be included and built, but not module 1.  Note that <span class="cmd">tup.getconfig</span> returns an empty string if the specified config value is missing.  The way <span class="filename">Tupfile.lua</span> is set up, all modules are disabled by default.</p>
+
+<p>The directory structure should look like this:</p>
+<pre>
+<span class="prompt">$</span> ls -a
+.  ..  module1.c  module1.lua  module2.c  module2.lua  .tup  tup.config  Tupfile.lua
+</pre>
+
+<p>As usual, build and test with the following:</p>
+<pre>
+<span class="prompt">$</span> tup upd
+[ tup ] [0.298s] Scanning filesystem...
+[ tup ] [0.917s] Reading in new configuration/environment variables...
+ 1) new variant: tup.config
+ [ ] 100%
+[ tup ] [2.435s] Parsing Tupfiles...                                                                                       
+ 1) [0.007s] .
+ [ ] 100%
+[ tup ] [2.442s] No files to delete.                                                                                       
+[ tup ] [2.443s] Generating .gitignore files...
+[ tup ] [3.755s] Executing Commands...
+ 1) [0.071s] gcc module2.c -o module2                                                                                      
+ [ ] 100%
+[ tup ] [4.283s] Updated.                                                                                                  
+<span class="prompt">$</span> $./module1
+bash: ./module1: No such file or directory
+<span class="prompt">$</span> $./module2 
+Module 2 run.
+</pre>
+
+<h3>Helper API Methods</h3>
+<p>The following are not complete examples, but snippets and descriptions of their results when run.</p>
+
+<hr />
+
+<pre class="code">
+out = tup.frule{inputs = {'hello.c'}, command = 'gcc %f -o %o', outputs = {'%B'}}
+out = tup.frule{input = 'hello.c', command = 'gcc %f -o %o', output = '%B'}
+out = tup.rule('hello.c', 'gcc %f -o %o', '%B')
+</pre>
+<p>All of these are equivalent to <span class="cmd">tup.definerule{inputs = {'hello.c'}, command = 'gcc hello.c -o hello', outputs = {'hello'}}</span>.  <span class="cmd">out</span> is <span class="cmd">{'hello'}</span>.</p>
+
+<hr />
+
+<pre class="code">
+tup.frule{inputs = {'file1.c', 'file2.c'}, command = 'gcc %f -o %o', output = 'app'}
+</pre>
+<p>This is equivalent to <span class="cmd">tup.definerule{inputs = {'file1.c', 'file2.c'}, command = 'gcc file1.c file2.c -o app', outputs = {'app'}}</span>.</p>
+
+<hr />
+
+<pre class="code">
+header = tup.rule('./generateheader.sh', {'generatedheader.h'})
+objects = tup.foreach_rule(
+	{
+		'file1.c', 
+		'file2.c', 
+		extra_inputs = header
+	}, 
+	'gcc %f -c -o %o', 
+	{'%B.o'}
+)
+tup.rule(objects, 'gcc %f -o %o', {'app'})
+</pre>
+<p>This is equivalent to:</p>
+<pre class="code">
+tup.definerule{
+	inputs = {'file1.c', 'generatedheader.h'}, 
+	command = 'gcc file1.c -c -o file1.o', 
+	outputs = {'file1.o'}
+}
+tup.definerule{
+	inputs = {'file2.c', 'generatedheader.h'}, 
+	command = 'gcc file2.c -c -o file2.o', 
+	outputs = {'file2.o'}
+}
+tup.definerule{
+	inputs = {'file1.o', 'file2.o'}, 
+	command = 'gcc file1.o file2.o -c -o app',
+	outputs = {'app'}
+}
+</pre>
+
+<h3>Environment Variables And Globbing</h3>
+<p>Like the previous section, the following are not complete examples, but snippets and descriptions of their results when run.</p>
+<pre class="code">
+tup.export('SDK_PREFIX')
+tup.rule(tup.glob('*.c'), 'gcc %f -o %o -L$SDK_PREFIX/lib -lsdklib', {'app'})
+</pre>
+<p>In a directory with the files <span class="filename">file1.c</span> and <span class="filename">file2.c</span>, this is equivalent to:</p>
+<pre class="code">
+tup.definerule{inputs = {'file1.c', 'file2.c'}, command = 'gcc file1.c file2.c -o app -L$SDK_PREFIX -lsdklib', outputs = {'app'}}
+</pre>
+<p>Note that <span class="cmd">$SDK_PREFIX</span> is expanded by the shell and is treated the same as any other command substring by Tup.  <span class="cmd">tup.export</span> simply passes the value in the shell that invokes Tup to the shell that Tup invokes.</p>
+

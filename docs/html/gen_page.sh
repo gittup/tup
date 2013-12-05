@@ -10,6 +10,11 @@ if [ $1 = "-x" ]; then
 	example=1
 	shift
 fi
+luaexample=0
+if [ $1 = "-l" ]; then
+	luaexample=1
+	shift
+fi
 text=`./gen_text.sh $1`
 cat << HERE
 <html>
@@ -28,6 +33,8 @@ HERE
 
 if [ $example = "1" ]; then
 cat menu-examples.inc
+elif [ $luaexample = "1" ]; then
+cat menu-luaexamples.inc
 else
 cat menu.inc
 echo "<h1>$text</h1>"

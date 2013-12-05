@@ -6,6 +6,12 @@ if [ $1 = "-x" ]; then
 	shift
 fi
 
+luaexample=0
+if [ $1 = "-l" ]; then
+	luaexample=1
+	shift
+fi
+
 cat << HERE
   <ul id="menu">
     <li class="menu-header">Site Map</li>
@@ -16,6 +22,11 @@ for i in $@; do
 	if [ "$i" = "examples.html" ]; then
 		if [ $example = "1" ]; then
 			cat examples.inc
+		fi
+	fi
+	if [ "$i" = "lua_parser.html" ]; then
+		if [ $luaexample = "1" ]; then
+			cat luaexamples.inc
 		fi
 	fi
 done
