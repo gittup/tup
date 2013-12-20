@@ -1201,6 +1201,16 @@ struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 			if(tup_db_set_srcid(tent, srcid) < 0)
 				return NULL;
 		}
+
+		/* Windows has case-insensitive matching, but we want
+		 * to update the name if it has changed.
+		 */
+		if(strcmp(name, tent->name.s) != 0) {
+			if(tup_db_set_name(tent->tnode.tupid, name, tent->dt) < 0)
+				return NULL;
+			if(node_changed)
+				*node_changed = 1;
+		}
 		return tent;
 	}
 
@@ -2101,7 +2111,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	if(strcmp(tent->name.s, new_name) == 0 && tent->dt == new_dt)
 		return 0;
 
-	transaction_check("%s [37m['%s', %lli][0m", s, new_name, tupid);
+	transaction_check("%s [37m['%s', %lli, %lli][0m", s, new_name, new_dt, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -2139,10 +2149,6 @@ int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	}
 
 	if(tup_entry_change_name_dt(tupid, new_name, new_dt) < 0)
-		return -1;
-
-	/* Since we changed the name, we have to run the command again. */
-	if(tup_db_add_modify_list(tupid) < 0)
 		return -1;
 
 	return 0;
@@ -6279,13 +6285,13 @@ static int rm_output(tupid_t tupid, void *data)
 int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
-			 int refactoring)
+			 int refactoring, int command_modified)
 {
 	struct tupid_entries output_root = {NULL};
 	struct parse_output_data pod = {
 		.f = f,
 		.cmdid = cmdid,
-		.outputs_differ = 0,
+		.outputs_differ = command_modified,
 		.group = NULL,
 		.refactoring = refactoring,
 	};

@@ -3083,6 +3083,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
+	int command_modified = 0;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -3234,7 +3235,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
-						     TUP_NODE_GENERATED, tf->tupid, NULL);
+						     TUP_NODE_GENERATED, tf->tupid, &command_modified);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
@@ -3277,11 +3278,12 @@ out_pl:
 	 * Otherwise, we try to find an existing command of a different
 	 * name that points to the output files we are trying to create.
 	 * If neither of those cases apply, we just create a new command
-	 * node.
+	 * node. Note we require a case-sensitive comparison, since we want to
+	 * re-run the command if the case of a string or filename has changed.
 	 */
 	if(tup_db_select_tent(tf->tupid, cmd, &tmptent) < 0)
 		return -1;
-	if(tmptent) {
+	if(tmptent && strcmp(tmptent->name.s, cmd) == 0) {
 		cmdid = tmptent->tnode.tupid;
 		if(tmptent->type != TUP_NODE_CMD) {
 			fprintf(tf->f, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
@@ -3308,6 +3310,11 @@ out_pl:
 			}
 			if(tup_db_set_name(cmdid, cmd, tf->tupid) < 0)
 				return -1;
+
+			/* Since we changed the name, we have to run the
+			 * command again.
+			 */
+			command_modified = 1;
 		}
 	}
 
@@ -3352,7 +3359,7 @@ out_pl:
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring) < 0)
+	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring, command_modified) < 0)
 		return -1;
 	free_tupid_tree(&output_root);
 
