@@ -48,23 +48,6 @@
 #define CIRCULAR_DEPENDENCY_ERROR -3
 #define ERROR_DIRECTIVE_ERROR -4
 
-#define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
-
-#define DISALLOW_NODES 0
-#define ALLOW_NODES 1
-
-struct path_list {
-	TAILQ_ENTRY(path_list) list;
-	/* For files: */
-	char *path;
-	struct path_element *pel;
-	int group;
-	tupid_t dt;
-	/* For bins: */
-	struct bin *bin;
-};
-TAILQ_HEAD(path_list_head, path_list);
-
 struct bang_rule {
 	struct string_tree st;
 	int foreach;
@@ -149,8 +132,6 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs);
 static void make_path_list_unique(struct path_list_head *plist);
-static void free_path_list(struct path_list_head *plist);
-static void del_pl(struct path_list *pl, struct path_list_head *head);
 static void make_name_list_unique(struct name_list *nl);
 static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			 struct name_list *nl, int required);
@@ -2303,8 +2284,25 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	return 0;
 }
 
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl, int create_output_dirs)
+struct path_list *new_pl(struct tupfile *tf)
+{
+	struct path_list *pl;
+
+	pl = malloc(sizeof *pl);
+	if(!pl) {
+		parser_error(tf, "malloc");
+		return NULL;
+	}
+	pl->path = NULL;
+	pl->pel = NULL;
+	pl->group = 0;
+	pl->dt = 0;
+	pl->bin = NULL;
+	return pl;
+}
+
+int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+		  tupid_t dt, struct bin_head *bl, int create_output_dirs)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -2318,16 +2316,10 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 		if(spc_index == 0)
 			goto skip_empty_space;
 
-		pl = malloc(sizeof *pl);
+		pl = new_pl(tf);
 		if(!pl) {
-			parser_error(tf, "malloc");
 			return -1;
 		}
-		pl->path = NULL;
-		pl->pel = NULL;
-		pl->group = 0;
-		pl->dt = 0;
-		pl->bin = NULL;
 
 		if(p[0] == '{') {
 			/* Bin */
@@ -2429,7 +2421,7 @@ static void make_path_list_unique(struct path_list_head *plist)
 	}
 }
 
-static void free_path_list(struct path_list_head *plist)
+void free_path_list(struct path_list_head *plist)
 {
 	struct path_list *pl, *tmp;
 
@@ -2438,7 +2430,7 @@ static void free_path_list(struct path_list_head *plist)
 	}
 }
 
-static void del_pl(struct path_list *pl, struct path_list_head *head)
+void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
 	free(pl->pel);

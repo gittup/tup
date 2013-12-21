@@ -30,6 +30,11 @@
 #define TUPLUA_PENDINGERROR 1
 #define TUPLUA_ERRORSHOWN 2
 
+#define DISALLOW_NODES 0
+#define ALLOW_NODES 1
+
+#define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
+
 struct variant;
 struct tup_entry;
 struct graph;
@@ -118,6 +123,18 @@ struct rule {
 	struct name_list *output_nl;
 };
 
+struct path_list {
+	TAILQ_ENTRY(path_list) list;
+	/* For files: */
+	char *path;
+	struct path_element *pel;
+	int group;
+	tupid_t dt;
+	/* For bins: */
+	struct bin *bin;
+};
+TAILQ_HEAD(path_list_head, path_list);
+
 struct bin_head;
 struct path_list_head;
 
@@ -126,6 +143,9 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 		    struct bin_head *bl);
 int export(struct tupfile *tf, const char *cmdline);
+void free_path_list(struct path_list_head *plist);
+struct path_list *new_pl(struct tupfile *tf);
+void del_pl(struct path_list *pl, struct path_list_head *head);
 
 struct node;
 struct graph;
