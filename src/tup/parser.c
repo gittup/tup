@@ -119,6 +119,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				 struct name_list *output_nl);
 static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
@@ -133,21 +134,17 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs);
 static void make_path_list_unique(struct path_list_head *plist);
 static void make_name_list_unique(struct name_list *nl);
-static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
-			 struct name_list *nl, int required);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required);
 static int nl_add_bin(struct bin *b, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
-static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *ext, int extlen,
-		   struct name_list *output_nl);
-static void init_name_list(struct name_list *nl);
+static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
+				  struct name_list *nl, const char *ext, int extlen,
+				  struct name_list *output_nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
-static void delete_name_list(struct name_list *nl);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
@@ -1868,7 +1865,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
+static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
 	struct name_list output_nl;
 	struct name_list_entry *nle;
@@ -2050,7 +2047,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 			/* The extension in do_rule() does not include the
 			 * leading '.'
 			 */
-			if(do_rule(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
+			if(do_rule_output_pattern(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
@@ -2075,8 +2072,8 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 		 * Also note that we check that the original user string is
 		 * empty (r->empty_input), not the eval'd string. This way if
 		 * the user specifies the input as $(foo) and it evaluates to
-		 * empty, we won't try to execute do_rule(). But an empty user
-		 * string implies that no input is required.
+		 * empty, we won't try to execute do_rule_output_pattern(). But
+		 * an empty user string implies that no input is required.
 		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
@@ -2084,7 +2081,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 					return -1;
 			}
 
-			if(do_rule(tf, r, &r->inputs, NULL, 0, output_nl) < 0)
+			if(do_rule_output_pattern(tf, r, &r->inputs, NULL, 0, output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -2101,7 +2098,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 				if(rc < 0)
 					return -1;
 				if(rc == 0) {
-					if(do_rule(tf, r, &r->inputs,
+					if(do_rule_output_pattern(tf, r, &r->inputs,
 						   NULL, 0, output_nl) < 0)
 						return -1;
 				}
@@ -2284,7 +2281,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	return 0;
 }
 
-struct path_list *new_pl(struct tupfile *tf)
+struct path_list *new_pl(struct tupfile *tf, char *mem)
 {
 	struct path_list *pl;
 
@@ -2295,6 +2292,7 @@ struct path_list *new_pl(struct tupfile *tf)
 	}
 	pl->path = NULL;
 	pl->pel = NULL;
+	pl->mem = mem;
 	pl->group = 0;
 	pl->dt = 0;
 	pl->bin = NULL;
@@ -2316,7 +2314,7 @@ int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
 		if(spc_index == 0)
 			goto skip_empty_space;
 
-		pl = new_pl(tf);
+		pl = new_pl(tf, NULL);
 		if(!pl) {
 			return -1;
 		}
@@ -2433,6 +2431,7 @@ void free_path_list(struct path_list_head *plist)
 void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
+	free(pl->mem);
 	free(pl->pel);
 	free(pl);
 }
@@ -2516,8 +2515,8 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 	return 0;
 }
 
-static int get_name_list(struct tupfile *tf, struct path_list_head *plist,
-			 struct name_list *nl, int required)
+int get_name_list(struct tupfile *tf, struct path_list_head *plist,
+		  struct name_list *nl, int required)
 {
 	struct path_list *pl;
 
@@ -3051,49 +3050,19 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 	return 0;
 }
 
-static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-		   const char *ext, int extlen, struct name_list *output_nl)
+static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
+				  struct name_list *nl, const char *ext, int extlen,
+				  struct name_list *output_nl)
 {
-	struct name_list onl;
-	struct name_list extra_onl;
-	struct name_list_entry *nle, *onle;
+	struct path_list_head oplist;
 	char *toutput;
 	char *output_pattern;
 	char *extra_pattern = NULL;
 	char *bang_extra_pattern = NULL;
-	char *tcmd;
-	char *cmd;
-	struct path_list *pl;
-	struct tupid_tree *tt;
-	struct tupid_tree *cmd_tt;
-	tupid_t cmdid = -1;
-	struct path_list_head oplist;
-	struct tupid_entries input_root = {NULL};
-	struct tupid_entries output_root = {NULL};
-	int extra_outputs = 0;
 	char sep[] = "|";
-	struct tup_entry *tmptent = NULL;
-	struct tup_entry *group = NULL;
-	struct tup_entry *old_group = NULL;
-	int command_modified = 0;
+	int rc;
 
-	/* t3017 - empty rules are just pass-through to get the input into the
-	 * bin.
-	 */
-	if(r->command_len == 0) {
-		if(r->bin) {
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
-					return -1;
-			}
-		}
-		return 0;
-	}
-
-	init_name_list(&onl);
-	init_name_list(&extra_onl);
 	TAILQ_INIT(&oplist);
-
 	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, NULL);
 	if(!toutput)
 		return -1;
@@ -3120,11 +3089,58 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(get_path_list(tf, bang_extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
 			return -1;
 	}
-	while(!TAILQ_EMPTY(&oplist)) {
+	rc = do_rule(tf, r, nl, &oplist, ext, extlen, output_nl);
+
+	free_path_list(&oplist);
+	/* Has to be freed after use of oplist */
+	free(output_pattern);
+	free(extra_pattern);
+	free(bang_extra_pattern);
+	return rc;
+}
+
+int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+	    struct path_list_head *oplist,
+	    const char *ext, int extlen, struct name_list *output_nl)
+{
+	struct name_list onl;
+	struct name_list extra_onl;
+	struct name_list_entry *nle, *onle;
+	char *tcmd;
+	char *cmd;
+	struct path_list *pl;
+	struct tupid_tree *tt;
+	struct tupid_tree *cmd_tt;
+	tupid_t cmdid = -1;
+	struct tupid_entries input_root = {NULL};
+	struct tupid_entries output_root = {NULL};
+	int extra_outputs = 0;
+	struct tup_entry *tmptent = NULL;
+	struct tup_entry *group = NULL;
+	struct tup_entry *old_group = NULL;
+	int command_modified = 0;
+
+	/* t3017 - empty rules are just pass-through to get the input into the
+	 * bin.
+	 */
+	if(r->command_len == 0) {
+		if(r->bin) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
+					return -1;
+			}
+		}
+		return 0;
+	}
+
+	init_name_list(&onl);
+	init_name_list(&extra_onl);
+
+	while(!TAILQ_EMPTY(oplist)) {
 		struct name_list *use_onl;
 		struct tup_entry *dest_tent;
 		char *newpath;
-		pl = TAILQ_FIRST(&oplist);
+		pl = TAILQ_FIRST(oplist);
 
 		if(pl->pel->path[0] == '<') {
 			if(group) {
@@ -3251,12 +3267,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 
 out_pl:
-		del_pl(pl, &oplist);
+		del_pl(pl, oplist);
 	}
-	/* Has to be freed after use of oplist */
-	free(output_pattern);
-	free(extra_pattern);
-	free(bang_extra_pattern);
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
 	if(!tcmd)
@@ -3338,7 +3350,11 @@ out_pl:
 		}
 		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
-		move_name_list_entry(output_nl, &onl, onle);
+		if(output_nl) {
+			move_name_list_entry(output_nl, &onl, onle);
+		} else {
+			delete_name_list_entry(&onl, onle);
+		}
 	}
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
@@ -3390,7 +3406,7 @@ out_pl:
 	return 0;
 }
 
-static void init_name_list(struct name_list *nl)
+void init_name_list(struct name_list *nl)
 {
 	TAILQ_INIT(&nl->entries);
 	nl->num_entries = 0;
@@ -3438,7 +3454,7 @@ static void add_name_list_entry(struct name_list *nl,
 	nl->globcnt = nle->globcnt;
 }
 
-static void delete_name_list(struct name_list *nl)
+void delete_name_list(struct name_list *nl)
 {
 	struct name_list_entry *nle;
 	while(!TAILQ_EMPTY(&nl->entries)) {

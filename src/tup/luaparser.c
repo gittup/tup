@@ -159,58 +159,26 @@ static int tuplua_function_include(lua_State *ls)
 	return 0;
 }
 
-static int tuplua_table_to_string(lua_State *ls, const char *table, struct tupfile *tf, char **out)
+static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist)
 {
-	size_t len = 0;
-	char *res;
-
 	lua_getfield(ls, 1, table);
 	if(!lua_istable(ls, -1)) {
 		lua_pop(ls, 1);
-		*out = strdup("");
 		return 0;
 	}
-	lua_pushnil(ls);
-	while(lua_next(ls, -2)) {
-		size_t tmplen;
-		if(tuplua_tolstring(ls, -1, &tmplen) == NULL) {
-			fprintf(tf->f, "Element in table '%s' is not a string.  All entries must be path strings.\n", table);
-			return -1;
-		}
 
-		/* Account for ' ' */
-		if(len) len++;
-		len += tmplen;
-		lua_pop(ls, 1);
-	}
-	lua_pop(ls, 1);
-
-	res = malloc(len + 1);
-	if(!res) {
-		perror("malloc");
-		return -1;
-	}
-	*res = '\0';
-	*out = res;
 	lua_getfield(ls, 1, table);
 	lua_pushnil(ls);
 	while(lua_next(ls, -2)) {
-		size_t tmplen;
-		const char *str;
+		char *path;
 
-		str = tuplua_tolstring(ls, -1, &tmplen);
-		if(!str) {
-			fprintf(tf->f, "Element in table '%s' is not a string.  All entries must be path strings.\n", table);
+		path = tuplua_strdup(ls, -1);
+		if(!path) {
+			perror("strdup");
 			return -1;
 		}
-
-		if(*out != res) {
-			*res = ' ';
-			res++;
-		}
-		memcpy(res, str, tmplen);
-		res += tmplen;
-		*res = '\0';
+		if(get_path_list(tf, path, plist, tf->tupid) < 0)
+			return -1;
 		lua_pop(ls, 1);
 	}
 	lua_pop(ls, 1);
@@ -222,32 +190,31 @@ static int tuplua_function_definerule(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	struct rule r;
+	struct path_list_head input_path_list;
+	struct path_list_head output_path_list;
+	struct name_list nl;
 	size_t command_len = 0;
-	char *separator;
+
+	init_name_list(&nl);
 
 	if(!lua_istable(ls, -1))
 		return luaL_error(ls, "This function must be passed a table containing parameters");
 
-	if(tuplua_table_to_string(ls, "inputs", tf, &r.input_pattern) < 0)
+	TAILQ_INIT(&input_path_list);
+	TAILQ_INIT(&output_path_list);
+	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
-
-	if(tuplua_table_to_string(ls, "outputs", tf, &r.output_pattern) < 0) {
+	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
-	}
-	separator = strchr(r.output_pattern, '|');
-	if(separator) {
-		r.extra_outputs = separator + 1;
-		while(isspace(*r.extra_outputs))
-			r.extra_outputs++;
-		*separator = 0;
-	} else {
-		r.extra_outputs = NULL;
-	}
 
-	if(r.input_pattern[0] == 0)
-		r.empty_input = 1;
-	else
-		r.empty_input = 0;
+	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
+		return luaL_error(ls, "Error while parsing dependent Tupfiles");
+	if(get_name_list(tf, &input_path_list, &nl, 1) < 0)
+		return -1;
+
+	init_name_list(&r.inputs);
+	init_name_list(&r.order_only_inputs);
+	init_name_list(&r.bang_oo_inputs);
 
 	lua_getfield(ls, 1, "foreach");
 	r.foreach = lua_toboolean(ls, -1);
@@ -263,11 +230,12 @@ static int tuplua_function_definerule(lua_State *ls)
 	r.line_number = 0;
 	r.extra_command = NULL;
 
-	if(execute_rule(tf, &r, NULL) < 0)
+	if(do_rule(tf, &r, &nl, &output_path_list, NULL, 0, NULL) < 0)
 		return luaL_error(ls, "Failed to define rule.");
 
-	free(r.input_pattern);
-	free(r.output_pattern);
+	delete_name_list(&nl);
+	free_path_list(&input_path_list);
+	free_path_list(&output_path_list);
 
 	return 0;
 }
@@ -468,7 +436,6 @@ static int tuplua_function_glob(lua_State *ls)
 	if(parse_dependent_tupfiles(&plist, tf) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to process glob directory for pattern '%s'.", __FILE__, __LINE__, pattern);
 		free_path_list(&plist);
-		free(pattern);
 		return lua_error(ls);
 	}
 
@@ -481,39 +448,33 @@ static int tuplua_function_glob(lua_State *ls)
 	if(tup_entry_add(pl->dt, &dtent) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to add tup entry when processing glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		free_path_list(&plist);
-		free(pattern);
 		return lua_error(ls);
 	}
 	if(dtent->type == TUP_NODE_GHOST) {
 		lua_pushfstring(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->path);
 		free(pl->pel);
-		free(pattern);
 		return lua_error(ls);
 	}
 	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
 		lua_pushfstring(ls, "Failed to glob for pattern '%s' in build(?) tree.", pattern);
 		free_path_list(&plist);
-		free(pattern);
 		return lua_error(ls);
 	}
 
 	if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0) {
 		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern '%s'.", pattern);
 		free(pl->pel);
-		free(pattern);
 		return lua_error(ls);
 	}
 	if(srctent) {
 		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
 			lua_pushfstring(ls, "Failed to glob for pattern '%s' in source(?) tree.", pattern);
 			free_path_list(&plist);
-			free(pattern);
 			return lua_error(ls);
 		}
 	}
 
 	free_path_list(&plist);
-	free(pattern);
 	return 1;
 }
 
@@ -998,7 +959,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 	struct path_list *pl;
 	struct pel_group pg;
 
-	pl = new_pl(tf);
+	pl = new_pl(tf, p);
 	if(!pl)
 		return -1;
 

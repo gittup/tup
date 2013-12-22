@@ -130,6 +130,7 @@ struct path_list {
 	struct path_element *pel;
 	int group;
 	tupid_t dt;
+	char *mem; /* Can be NULL if the path is freed elsewhere */
 	/* For bins: */
 	struct bin *bin;
 };
@@ -138,14 +139,20 @@ TAILQ_HEAD(path_list_head, path_list);
 struct bin_head;
 struct path_list_head;
 
-int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 		    struct bin_head *bl);
 int export(struct tupfile *tf, const char *cmdline);
 void free_path_list(struct path_list_head *plist);
-struct path_list *new_pl(struct tupfile *tf);
+struct path_list *new_pl(struct tupfile *tf, char *mem);
 void del_pl(struct path_list *pl, struct path_list_head *head);
+void init_name_list(struct name_list *nl);
+void delete_name_list(struct name_list *nl);
+int get_name_list(struct tupfile *tf, struct path_list_head *plist,
+		  struct name_list *nl, int required);
+int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+	    struct path_list_head *oplist,
+	    const char *ext, int extlen, struct name_list *output_nl);
 
 struct node;
 struct graph;
