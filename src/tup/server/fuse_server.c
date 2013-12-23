@@ -209,7 +209,7 @@ int server_init(enum server_mode mode)
 		/* MacOSX is a wayward beast. On a filesystem mount event it notifies several processes such as
 		 * antivirus scanner, file content indexer.
 		 * The content indexer (Spotlight) creates a root-owned directory that keeps index data (.tup/mnt/.Spotlight-V100).
-		 * To prevent it we use "nobrowse" fuse4x flag - it tells Spotlight to skip the fs.
+		 * To prevent it we use "nobrowse" osxfuse flag - it tells Spotlight to skip the fs.
 		 * Unfortunately it does not help in case of a short-living filesystems (e.g. in tup tests).
 		 * Tup mounts and then quickly unmounts the fs and when Sportlight checks "nobrowse" flag on a filesystem
 		 * using statfs() - it gets data of the local filesystem (fuse fs is already unmount at this time).

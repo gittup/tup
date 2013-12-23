@@ -21,7 +21,7 @@
 . ./tup.sh
 check_no_windows mkfifo
 if [ "$tupos" = "Darwin" ]; then
-	echo "[33mFIFOs currently unsupported in fuse4x. Skipping test.[0m"
+	echo "[33mFIFOs currently unsupported in osxfuse. Skipping test.[0m"
 	eotup
 fi
 if [ "$tupos" = "FreeBSD" ]; then
