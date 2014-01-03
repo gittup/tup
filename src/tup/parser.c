@@ -3140,6 +3140,7 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		struct name_list *use_onl;
 		struct tup_entry *dest_tent;
 		char *newpath;
+		char *lastslash;
 		pl = TAILQ_FIRST(oplist);
 
 		if(pl->pel->path[0] == '<') {
@@ -3174,28 +3175,23 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			use_onl = NULL;
 		}
 		newpath = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
+		lastslash = strrchr(newpath, PATH_SEP);
+		if(lastslash) {
+			struct path_element *pel;
+			pl->dt = find_dir_tupid_dt(pl->dt, newpath, &pel, SOTGV_CREATE_DIRS, 0);
+			free(pel);
+		}
 		if(pl->path) {
 			int plpathlen;
 			plpathlen = strlen(pl->path);
 			onle->path = malloc(plpathlen + strlen(newpath) + 2);
 			strcpy(onle->path, pl->path);
-			onle->path[plpathlen] = '/';
+			onle->path[plpathlen] = PATH_SEP;
 			onle->path[plpathlen + 1] = 0;
-			onle->base = &onle->path[plpathlen + 1];
-			strcpy(onle->base, newpath);
+			strcpy(onle->path + plpathlen + 1, newpath);
 			free(newpath);
 		} else {
-			char *lastslash;
 			onle->path = newpath;
-			lastslash = strrchr(newpath, '/');
-			if(lastslash) {
-				struct path_element *pel;
-				onle->base = lastslash + 1;
-				pl->dt = find_dir_tupid_dt(pl->dt, onle->path, &pel, 0, 0);
-				free(pel);
-			} else {
-				onle->base = onle->path;
-			}
 		}
 		if(!onle->path) {
 			free(onle);
@@ -3238,6 +3234,7 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
 			return -1;
 
+		set_nle_base(onle);
 		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0)
 			return -1;
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
@@ -3254,7 +3251,6 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 
-		set_nle_base(onle);
 		if(extra_outputs) {
 			add_name_list_entry(&extra_onl, onle);
 		} else {
@@ -3604,7 +3600,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			clen += extlen;
 		} else if(*next == 'o') {
 			if(!onl) {
-				fprintf(tf->f, "tup error: %%o can only be used in a command string.\n");
+				fprintf(tf->f, "tup error: %%o can only be used in a command string or extra outputs section.\n");
 				return NULL;
 			}
 			if(onl->num_entries == 0) {

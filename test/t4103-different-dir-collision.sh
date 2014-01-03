@@ -33,7 +33,7 @@ cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> ../baz/baz.txt
 HERE
 tup touch foo/Tupfile bar/Tupfile
-update_fail_msg "Unable to create output file '../baz/baz.txt'"
+update_fail_msg "Unable to create output file '../baz.baz.txt'"
 
 # Correctly create foo.txt
 cat > bar/Tupfile << HERE
@@ -70,6 +70,6 @@ cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> ../baz/baz.txt
 HERE
 tup touch bar/Tupfile
-update_fail_msg "Unable to create output file '../baz/baz.txt'"
+update_fail_msg "Unable to create output file '../baz.baz.txt'"
 
 eotup
