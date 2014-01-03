@@ -1,3 +1,10 @@
+tup (0.7.1) precise; urgency=low
+
+  [ Mike Shal ]
+  * version 0.7.1
+
+ -- Mike Shal <marfey@gmail.com>  Fri, 03 Jan 2014 09:43:06 -0500
+
 tup (0.5-0ubuntu1) lucid; urgency=low
 
   [ Anatol Pomozov ]
