@@ -5778,12 +5778,17 @@ static int extra_output(tupid_t tupid, void *data)
 static int missing_output(tupid_t tupid, void *data)
 {
 	struct tup_entry *tent;
+	struct tup_entry *cmdtent;
 	struct actual_output_data *aod = data;
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
-	fprintf(aod->f, "tup error: Expected to write to file '%s' from cmd %lli but didn't\n", tent->name.s, aod->cmdid);
+	if(tup_entry_add(aod->cmdid, &cmdtent) < 0)
+		return -1;
+	fprintf(aod->f, "tup error: Expected to write to file '");
+	get_relative_dir(aod->f, NULL, NULL, cmdtent->dt, tent->tnode.tupid, NULL);
+	fprintf(aod->f, "' from cmd %lli but didn't\n", aod->cmdid);
 
 	if(!(aod->output_error & 2)) {
 		aod->output_error |= 2;
