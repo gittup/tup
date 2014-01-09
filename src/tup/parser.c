@@ -3175,6 +3175,9 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			use_onl = NULL;
 		}
 		newpath = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
+		if(!newpath) {
+			return -1;
+		}
 		lastslash = strrchr(newpath, PATH_SEP);
 		if(lastslash) {
 			struct path_element *pel;
