@@ -999,7 +999,7 @@ static int gitignore(tupid_t tupid)
 			perror("fstatat(.gitignore)");
 			goto err_out;
 		}
-		if(tup_db_set_mtime(gitignore_tent, buf.MTIME) < 0)
+		if(tup_db_set_mtime(gitignore_tent, MTIME(buf)) < 0)
 			goto err_out;
 
 		if(s) {

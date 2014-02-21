@@ -41,7 +41,7 @@ void compat_lock_disable(void);
 #define name_cmp stricmp
 #define name_cmp_n strnicmp
 /* Windows uses mtime, since ctime there is the creation time, not change time */
-#define MTIME st_mtime
+#define MTIME(b) b.st_mtime
 #else
 #define is_path_sep(ch) ((ch)[0] == '/')
 #define is_full_path is_path_sep
@@ -51,10 +51,20 @@ void compat_lock_disable(void);
 #define SQL_NAME_COLLATION ""
 #define name_cmp strcmp
 #define name_cmp_n strncmp
+
+#ifdef __APPLE__
+/* OSX needs to check both ctime and mtime. "chmod" only affects ctime, while
+ * saving a file using exchangedata() only affects mtime. Most other operations
+ * affect both.
+ */
+#define MTIME_MAX(x,y) ((x)>(y) ? (x) : (y))
+#define MTIME(b) MTIME_MAX(b.st_ctime, b.st_mtime)
+#else
 /* Use ctime on other platforms, since chmod will affect ctime, but not mtime.
  * Also on Linux, ctime will be updated when a file is renamed (t6058).
  */
-#define MTIME st_ctime
+#define MTIME(b) b.st_ctime
+#endif
 #endif
 
 #endif

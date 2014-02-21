@@ -88,7 +88,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 		perror("fchdir");
 		return -1;
 	}
-	return tup_file_mod_mtime(dt, file, buf.MTIME, 1, 1, modified);
+	return tup_file_mod_mtime(dt, file, MTIME(buf), 1, 1, modified);
 }
 
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,

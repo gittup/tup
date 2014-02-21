@@ -57,7 +57,7 @@ static int watch_path_internal(tupid_t dt, const char *file,
 
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
-		tupid = tup_file_mod_mtime(dt, file, buf.MTIME, 0, 0, NULL);
+		tupid = tup_file_mod_mtime(dt, file, MTIME(buf), 0, 0, NULL);
 		if(tupid < 0)
 			return -1;
 		return 0;
@@ -208,7 +208,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 						 * future nodes are assumed to be un-openable as well.
 						 */
 					} else {
-						mtime = buf.MTIME;
+						mtime = MTIME(buf);
 					}
 				}
 			}

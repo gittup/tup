@@ -239,7 +239,7 @@ static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
 		if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
 			struct stat buf;
 			if(lstat(full_path, &buf) == 0) {
-				mtime = buf.MTIME;
+				mtime = MTIME(buf);
 			}
 			if(set_directories_to_zero(new_dt, slash_dt()) < 0)
 				return -1;
@@ -281,7 +281,7 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 		fprintf(stderr, "tup error: Unable to create a FIFO as an output file. They can only be used as temporary files.\n");
 		return -1;
 	}
-	if(tup_db_set_mtime(tent, buf.MTIME) < 0)
+	if(tup_db_set_mtime(tent, MTIME(buf)) < 0)
 		return -1;
 	return 0;
 }
