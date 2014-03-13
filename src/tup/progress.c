@@ -40,6 +40,7 @@ static int is_active = 0;
 static int color_len;
 static int got_error = 0;
 static int display_progress;
+static int quiet;
 static int display_job_numbers;
 static int display_job_time;
 static struct timespan gts;
@@ -68,12 +69,20 @@ void progress_init(void)
 	display_progress = tup_option_get_int("display.progress");
 	display_job_numbers = tup_option_get_int("display.job_numbers");
 	display_job_time = tup_option_get_int("display.job_time");
+	quiet = tup_option_get_int("display.quiet");
 	timespan_start(&main_ts);
+}
+
+void progress_quiet(void)
+{
+	quiet = 1;
 }
 
 void tup_show_message(const char *s)
 {
 	const char *tup = " tup ";
+	if(quiet)
+		return;
 	clear_progress();
 	color_set(stdout);
 	/* If we get to the end, show a green bar instead of grey. */
@@ -172,7 +181,7 @@ static int percent_complete(void)
 	return (sum*100)/total;
 }
 
-void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, const char *extra_text)
+void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, const char *extra_text, int always_display)
 {
 	FILE *f;
 	float tdiff = 0.0;
@@ -184,6 +193,10 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	}
 
 	sum++;
+
+	if(quiet && !always_display)
+		return;
+
 	if(is_error) {
 		got_error = 1;
 		f = stderr;

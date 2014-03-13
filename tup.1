@@ -1,4 +1,4 @@
-.TH "tup" "1" "2013/11/24" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2014/03/12" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -27,6 +27,9 @@ Temporarily override the updater.num_jobs option to 'N'. This will run up to N j
 .TP
 .B --verbose
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
+.TP
+.B --quiet
+Temporarily override the display.quiet option to '1'. See the option secondary command below.
 .TP
 .B -k
 .PD 0
@@ -282,6 +285,9 @@ Set to '0' to avoid displaying the "N) " string before the results of a job. The
 .TP
 .B display.job_time (default '1')
 Set to '0' to avoid displaying the runtime of a job along with the results. The default is to display the runtime. Note that the runtime displayed includes the time that tup takes to save the dependencies. Therefore, this runtime will likely be larger than the runtime when executing the same job manually in the shell.
+.TP
+.B display.quiet (default '0')
+Set to '1' to prevent tup from displaying most output. Tup will still display a banner and output from any job that writes to stdout/stderr, or any job that returns a non-zero exit code. The progress bar is still displayed; see also display.progress for really quiet output.
 .TP
 .B monitor.autoupdate (default '0')
 Set to '1' to automatically rebuild if a file change is detected. This only has an effect if the monitor is running. The default is '0', which means you have to type 'tup' when you are ready to update.
