@@ -399,6 +399,11 @@ static int parse_option_file(int x)
 	fclose(f);
 	if(rc == 0)
 		return 0;
+	if(rc == -1) {
+		fprintf(stderr, "tup error: Failed to read options file: %s\n", locations[x].file);
+	} else {
+		fprintf(stderr, "tup error: Failed to parse options file (%s) on line %i.\n", locations[x].file, rc);
+	}
 	return -1;
 }
 
