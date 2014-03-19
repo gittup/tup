@@ -796,6 +796,15 @@ static int mknod_internal(const char *path, mode_t mode, int flags, int close_fd
 			if(rc < 0)
 				return -errno;
 		}
+	} else if S_ISSOCK(mode) {
+		map = add_mapping(path);
+		if(!map) {
+			return -ENOMEM;
+		} else {
+			rc = mknod(map->tmpname, mode, 0);
+			if(rc < 0)
+				return -errno;
+		}
 	} else {
 		/* Other things (eg: actual device nodes) are not
 		 * permitted.
