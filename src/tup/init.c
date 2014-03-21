@@ -224,7 +224,7 @@ int init_command(int argc, char **argv)
 		return -1;
 	}
 
-	if(tup_db_create(db_sync) != 0) {
+	if(tup_db_create(db_sync, 0) != 0) {
 		return -1;
 	}
 

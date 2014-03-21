@@ -286,10 +286,11 @@ int tup_db_close(void)
 	return 0;
 }
 
-int tup_db_create(int db_sync)
+int tup_db_create(int db_sync, int memory_db)
 {
 	int rc;
 	int x;
+	const char *dbname;
 	const char *sql[] = {
 		"create table node (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, srcid integer not null, name varchar(4096), unique(dir, name))",
 		"create table normal_link (from_id integer, to_id integer, unique(from_id, to_id))",
@@ -309,7 +310,12 @@ int tup_db_create(int db_sync)
 		"insert into node values(1, 0, 2, -1, -1, '.')",
 	};
 
-	rc = sqlite3_open(TUP_DB_FILE, &tup_db);
+	if(memory_db) {
+		dbname = ":memory:";
+	} else {
+		dbname = TUP_DB_FILE;
+	}
+	rc = sqlite3_open(dbname, &tup_db);
 	if(rc == 0) {
 		printf(".tup repository initialized.\n");
 	} else {
@@ -5045,8 +5051,9 @@ int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 			 compare_vars, vardt) < 0)
 		return -1;
 
-	if(save_vardict_file(&file_tree, vardict_file) < 0)
-		return -1;
+	if(vardict_file)
+		if(save_vardict_file(&file_tree, vardict_file) < 0)
+			return -1;
 
 	vardb_close(&file_tree);
 	vardb_close(&db_tree);

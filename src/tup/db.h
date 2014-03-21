@@ -39,7 +39,7 @@ struct mapping_head;
 /* General operations */
 int tup_db_open(void);
 int tup_db_close(void);
-int tup_db_create(int db_sync);
+int tup_db_create(int db_sync, int memory_db);
 int tup_db_begin(void);
 int tup_db_commit(void);
 int tup_db_changes(void);

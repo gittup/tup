@@ -64,6 +64,7 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 
 static void *create_work(void *arg);
 static void *update_work(void *arg);
+static void *generate_work(void *arg);
 static void *todo_work(void *arg);
 static int update(struct node *n);
 
@@ -218,6 +219,95 @@ out:
 	if(server_quit() < 0)
 		rc = -1;
 	return rc; /* Profit! */
+}
+
+static struct tup_entry *generate_cwd;
+static FILE *generate_f;
+int generate(int argc, char **argv)
+{
+	struct graph g;
+	struct node *n;
+	struct node *tmp;
+	struct tup_entry *vartent;
+	int rc;
+
+	argc--;
+	argv++;
+	if(!argc) {
+		fprintf(stderr, "Usage: tup generate script_name.sh\n");
+		return -1;
+	}
+	if(tup_entry_init() < 0)
+		return -1;
+	if(tup_db_create(0, 1) < 0)
+		return -1;
+	if(tup_option_init() < 0)
+		return -1;
+	if(open_tup_top() < 0)
+		return -1;
+	printf("Scanning...\n");
+	if(tup_scan() < 0)
+		return -1;
+
+	tup_db_begin();
+	printf("Reading tup.config...\n");
+	if(tup_db_get_tup_config_tent(&vartent) < 0)
+		return -1;
+	if(variant_add(vartent, 1, NULL) < 0)
+		return -1;
+	if(tup_db_read_vars(tup_top_fd(), vartent->dt, vartent->name.s, vartent->tnode.tupid, NULL) < 0)
+		return -1;
+
+	printf("Parsing...\n");
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
+		return -1;
+
+	/* The parsing nodes have to be removed so that we know if dependent
+	 * Tupfiles have already been parsed.
+	 */
+	n = TAILQ_FIRST(&g.node_list);
+	TAILQ_REMOVE(&g.node_list, n, list);
+	remove_node(&g, n);
+
+	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
+		if(parse(n, &g, NULL, 0, 0) < 0)
+			return -1;
+		TAILQ_REMOVE(&g.plist, n, list);
+		remove_node(&g, n);
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+
+	printf("Generate: %s\n", argv[0]);
+	generate_f = fopen(argv[0], "w");
+	if(!generate_f) {
+		perror(argv[0]);
+		fprintf(stderr, "tup error: Unable to open script for writing.\n");
+		return -1;
+	}
+	fprintf(generate_f, "#! /bin/sh -ex\n");
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
+		return -1;
+	if(build_graph(&g) < 0)
+		return -1;
+
+	if(tup_entry_add(DOT_DT, &generate_cwd) < 0)
+		return -1;
+	rc = execute_graph(&g, 0, 1, generate_work);
+	if(rc < 0)
+		return -1;
+	fclose(generate_f);
+	chmod(argv[0], 0755);
+	if(destroy_graph(&g) < 0)
+		return -1;
+	tup_db_commit();
+	if(tup_db_close() < 0)
+		return -1;
+	return 0;
 }
 
 int todo(int argc, char **argv)
@@ -1618,7 +1708,7 @@ static void *create_work(void *arg)
 				if(n->already_used) {
 					rc = 0;
 				} else {
-					rc = parse(n, g, NULL, refactoring);
+					rc = parse(n, g, NULL, refactoring, 1);
 				}
 				show_progress(-1, TUP_NODE_DIR);
 			}
@@ -1738,6 +1828,50 @@ static void *update_work(void *arg)
 			pthread_mutex_unlock(&db_mutex);
 		}
 
+		worker_ret(wt, rc);
+	}
+	return NULL;
+}
+
+static void *generate_work(void *arg)
+{
+	struct worker_thread *wt = arg;
+	struct node *n;
+
+	while(1) {
+		int rc = 0;
+
+		n = worker_wait(wt);
+		if(n == (void*)-1)
+			break;
+
+		if(n->tent->type == TUP_NODE_CMD) {
+			const char *name;
+			if(generate_cwd != n->tent->parent) {
+				fprintf(generate_f, "cd '");
+				if(get_relative_dir(generate_f, NULL, NULL, generate_cwd->tnode.tupid, n->tent->dt, NULL) < 0) {
+					rc = -1;
+				} else {
+					fprintf(generate_f, "'\n");
+					generate_cwd = n->tent->parent;
+				}
+			}
+			name = n->tent->name.s;
+			if(name[0] == '^') {
+				name = strchr(name+1, '^');
+				if(!name) {
+					fprintf(stderr, "tup error: Expected string '%s' to have two ^ characters.\n", n->tent->name.s);
+					rc = -1;
+				} else {
+					name++;
+					while(isspace(*name)) name++;
+				}
+			}
+			if(name)
+				fprintf(generate_f, "%s\n", name);
+		} else {
+			rc = 0;
+		}
 		worker_ret(wt, rc);
 	}
 	return NULL;

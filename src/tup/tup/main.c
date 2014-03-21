@@ -133,6 +133,10 @@ int main(int argc, char **argv)
 			return 1;
 		version();
 		return 0;
+	} else if(strcmp(cmd, "generate") == 0) {
+		if(generate(argc, argv) < 0)
+			return 1;
+		return 0;
 	}
 
 	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */

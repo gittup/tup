@@ -66,6 +66,7 @@ struct tupfile {
 	char circular_dep_error;
 	struct lua_State *ls;
 	int luaerror;
+	int use_server;
 };
 
 #define MAX_GLOBS 10
@@ -159,6 +160,6 @@ struct graph;
 struct timespan;
 
 void parser_debug_run(void);
-int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring);
+int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server);
 
 #endif

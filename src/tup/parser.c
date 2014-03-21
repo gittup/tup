@@ -166,7 +166,7 @@ void parser_debug_run(void)
 	lua_parser_debug_run();
 }
 
-int parse(struct node *n, struct graph *g, struct timespan *retts, int refactoring)
+int parse(struct node *n, struct graph *g, struct timespan *retts, int refactoring, int use_server)
 {
 	struct tupfile tf;
 	int fd;
@@ -196,6 +196,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	}
 	tf.ls = NULL;
 	tf.luaerror = TUPLUA_NOERROR;
+	tf.use_server = use_server;
 
 	/* We may need to convert normal dirs back to generated dirs,
 	 * so add this one to check.
@@ -221,8 +222,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		RB_INIT(&tf.refactoring_cmd_delete_root);
 	}
 
-	if(server_parser_start(&ps) < 0)
-		return -1;
+	if(use_server) {
+		if(server_parser_start(&ps) < 0)
+			return -1;
+	} else {
+		ps.root_fd = tup_top_fd();
+	}
 
 	tf.tupid = n->tnode.tupid;
 	tf.curtent = tup_entry_get(tf.tupid);
@@ -339,8 +344,9 @@ out_close_node_db:
 	if(nodedb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
-	if(server_parser_stop(&ps) < 0)
-		rc = -1;
+	if(use_server)
+		if(server_parser_stop(&ps) < 0)
+			rc = -1;
 
 	if(rc == 0) {
 		if(refactoring) {
@@ -2491,7 +2497,7 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 				int rc;
 				struct timespan ts;
 				n->already_used = 1;
-				rc = parse(n, tf->g, &ts, tf->refactoring);
+				rc = parse(n, tf->g, &ts, tf->refactoring, tf->use_server);
 				if(rc < 0) {
 					if(rc == CIRCULAR_DEPENDENCY_ERROR) {
 						fprintf(tf->f, "tup error: Unable to parse dependent Tupfile due to circular directory-level dependencies: ");
