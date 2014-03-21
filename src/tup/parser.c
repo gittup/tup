@@ -736,36 +736,35 @@ out_free:
 }
 
 struct readdir_parser_params {
-	struct parser_entry_head *head;
+	struct string_entries *root;
 };
 
 static int readdir_parser_cb(void *arg, struct tup_entry *tent)
 {
 	struct readdir_parser_params *rpp = arg;
-	struct parser_entry *pe;
+	struct string_tree *st;
 
-	pe = malloc(sizeof *pe);
-	if(!pe) {
-		perror("malloc");
-		return -1;
+	/* Skip '$' */
+	if(tent->tnode.tupid == env_dt())
+		return 0;
+
+	st = malloc(sizeof *st);
+	if(string_tree_add(rpp->root, st, tent->name.s) < 0) {
+		/* string_tree_add will fail if there is a dup. Just
+		 * free our st and return.
+		 */
+		free(st);
 	}
-	pe->name = strdup(tent->name.s);
-	if(!pe->name) {
-		perror("strdup");
-		return -1;
-	}
-	LIST_INSERT_HEAD(rpp->head, pe, list);
 	return 0;
 }
 
 static void free_dir_list(struct string_entries *root, struct parser_directory *pd)
 {
-	struct parser_entry *pe;
-	while(!LIST_EMPTY(&pd->file_list)) {
-		pe = LIST_FIRST(&pd->file_list);
-		LIST_REMOVE(pe, list);
-		free(pe->name);
-		free(pe);
+	struct string_tree *st;
+	while(!RB_EMPTY(&pd->files)) {
+		st = RB_MIN(string_entries, &pd->files);
+		string_tree_free(&pd->files, st);
+		free(st);
 	}
 	string_tree_free(root, &pd->st);
 	free(pd);
@@ -798,9 +797,9 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 		perror("malloc");
 		return -1;
 	}
-	LIST_INIT(&pd->file_list);
+	RB_INIT(&pd->files);
 
-	rpp.head = &pd->file_list;
+	rpp.root = &pd->files;
 
 	if(snprint_tup_entry(path, sizeof(path), tent) >= (signed)sizeof(path)) {
 		fprintf(tf->f, "tup internal error: ps.path is sized incorrectly in gen_dir_list()\n");

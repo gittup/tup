@@ -42,17 +42,10 @@ struct server {
 	pthread_mutex_t *error_mutex;
 };
 
-struct parser_entry {
-	/* parser_directory gets one of these for each file in a directory */
-	char *name;
-	LIST_ENTRY(parser_entry) list;
-};
-LIST_HEAD(parser_entry_head, parser_entry);
-
 struct parser_directory {
 	/* parser_server gets one of these for each directory that is preloaded with files. */
 	struct string_tree st;
-	struct parser_entry_head file_list;
+	struct string_entries files;
 };
 
 struct parser_server {
