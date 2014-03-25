@@ -272,8 +272,9 @@ int generate(int argc, char **argv)
 	remove_node(&g, n);
 
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
-		if(parse(n, &g, NULL, 0, 0) < 0)
-			return -1;
+		if(!n->already_used)
+			if(parse(n, &g, NULL, 0, 0) < 0)
+				return -1;
 		TAILQ_REMOVE(&g.plist, n, list);
 		remove_node(&g, n);
 	}
