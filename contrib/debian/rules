@@ -11,6 +11,8 @@ build: build-stamp
 build-stamp:
 	dh_testdir
 	./build.sh
+	./build/tup generate runme.sh
+	./runme.sh
 	touch $@
 
 clean:
@@ -23,7 +25,7 @@ install: build
 	dh_testroot
 	dh_prep
 	dh_installdirs
-	install build/tup $(CURDIR)/debian/tup/usr/bin
+	install tup $(CURDIR)/debian/tup/usr/bin
 
 binary-indep: install
 
