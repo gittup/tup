@@ -99,6 +99,7 @@ static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
 static int gitignore(struct tupfile *tf, tupid_t dt);
+static int check_toplevel_gitignore(struct tupfile *tf);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -172,7 +173,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	int fd;
 	int rc = -1;
 	int parser_lua = 0;
-	struct buf b;
+	struct buf b = {NULL, 0};
 	struct parser_server ps;
 	struct timeval orig_start;
 	char luafilename[PATH_MAX];
@@ -282,44 +283,46 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(fd < 0) {
 		if(errno == ENOENT) {
 			/* No Tupfile means we have nothing to do */
-			rc = 0;
-			goto out_close_dfd;
+			if(n->tent->tnode.tupid == DOT_DT) {
+				/* Check to see if the top-level rules file would .gitignore. We disable
+				 * tf.tupid so no rules get created.
+				 */
+				if(check_toplevel_gitignore(&tf) < 0)
+					goto out_close_dfd;
+			}
 		} else {
 			parser_error(&tf, luafilename);
 			goto out_close_dfd;
 		}
-	}
-
-	if(fslurp_null(fd, &b) < 0)
-		goto out_close_file;
-	if(!parser_lua) {
-		if(parse_tupfile(&tf, &b, "Tupfile") < 0)
-			goto out_free_bs;
 	} else {
-		if(parse_lua_tupfile(&tf, &b, luafilename) < 0)
-			goto out_free_bs;
+		if(fslurp_null(fd, &b) < 0)
+			goto out_close_file;
+		if(!parser_lua) {
+			if(parse_tupfile(&tf, &b, "Tupfile") < 0)
+				goto out_free_bs;
+		} else {
+			if(parse_lua_tupfile(&tf, &b, luafilename) < 0)
+				goto out_free_bs;
+		}
 	}
 	if(tf.ign) {
 		if(!tf.variant->root_variant) {
 			if(n->tent->srcid == DOT_DT) {
 				if(gitignore(&tf, n->tent->srcid) < 0) {
-					rc = -1;
 					goto out_free_bs;
 				}
 			}
 		}
 		if(gitignore(&tf, tf.tupid) < 0) {
-			rc = -1;
 			goto out_free_bs;
 		}
 	} else {
 		if(refactoring) {
 			struct tup_entry *tent;
 			if(tup_db_select_tent(tf.tupid, ".gitignore", &tent) < 0)
-				return -1;
+				goto out_free_bs;
 			if(tent && tent->type == TUP_NODE_GENERATED) {
 				fprintf(tf.f, "tup refactoring error: Attempting to remove the .gitignore file.\n");
-				rc = -1;
 				goto out_free_bs;
 			}
 		}
@@ -328,7 +331,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 out_free_bs:
 	free(b.s);
 out_close_file:
-	if(close(fd) < 0) {
+	if(fd >= 0 && close(fd) < 0) {
 		parser_error(&tf, "close(fd)");
 		rc = -1;
 	}
@@ -1006,6 +1009,100 @@ static int gitignore(struct tupfile *tf, tupid_t dt)
 	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dt) < 0)
 		return -1;
 	return 0;
+}
+
+static int check_toplevel_gitignore(struct tupfile *tf)
+{
+	int fd;
+	struct buf incb;
+	struct tup_entry *tent = NULL;
+	char *p;
+	char *e;
+	char *line;
+	int rc;
+
+	/* This mimics pieces of include_tuprules and parse_tupfile(), but all
+	 * we're looking for is a .gitignore directive. We don't want to
+	 * actually do include_rules(), since we'll potentially pick up real
+	 * :-rules from Tuprules.tup, which would be confusing since there is
+	 * no actual Tupfile. This isn't perfect, sicne it wouldn't handle a
+	 * .gitignore directive inside a conditional, but that doesn't really
+	 * make sense anyway.
+	 */
+	if(tup_db_select_tent(tf->tupid, "Tuprules.tup", &tent) < 0)
+		return -1;
+	if(!tent)
+		return 0;
+	fd = tup_entry_openat(tf->root_fd, tent);
+	if(fd < 0) {
+		parser_error(tf, "Tuprules.tup");
+		return -1;
+	}
+	if(fslurp_null(fd, &incb) < 0)
+		goto out_close;
+
+	p = incb.s;
+	e = incb.s + incb.len;
+	while(p < e) {
+		char *newline;
+
+		/* Skip leading whitespace and empty lines */
+		while(p < e && isspace(*p)) {
+			p++;
+		}
+		/* If we just had empty lines at the end, we're done */
+		if(p == e)
+			break;
+
+		line = p;
+		newline = get_newline(p);
+		if(!newline) {
+			fprintf(tf->f, "tup error: Unable to find trailing nul-byte.\n");
+			fprintf(tf->f, "  Line was: '%s'\n", line);
+			goto out_free;
+		}
+		while(newline[-1] == '\\' || (newline[-2] == '\\' && newline[-1] == '\r')) {
+			if (newline[-1] == '\r') {
+				newline[-2] = ' ';
+			}
+			newline[-1] = ' ';
+			newline[0] = ' ';
+			newline = get_newline(p);
+			if(!newline) {
+				fprintf(tf->f, "tup error: Unable to find trailing nul-byte.\n");
+				fprintf(tf->f, "  Line was: '%s'\n", line);
+				goto out_free;
+			}
+		}
+
+		p = newline + 1;
+
+		/* Remove trailing whitespace */
+		while(newline > line && isspace(newline[-1])) {
+			newline--;
+		}
+		*newline = 0;
+
+		if(line[0] == '#') {
+			/* Skip comments */
+			continue;
+		}
+
+		if(strcmp(line, ".gitignore") == 0) {
+			tf->ign = 1;
+			break;
+		}
+	}
+	rc = 0;
+
+out_free:
+	free(incb.s);
+out_close:
+	if(close(fd) < 0) {
+		parser_error(tf, "close(fd)");
+		rc = -1;
+	}
+	return rc;
 }
 
 static int include_file(struct tupfile *tf, const char *file)
