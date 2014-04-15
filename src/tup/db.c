@@ -3358,6 +3358,22 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 		if(tup_entry_add(b, &tent) < 0)
 			return -1;
 		tent->incoming = NULL;
+	} else if(incoming == -1) {
+		/* It's possible the output was orphaned when a command was
+		 * wiped out because its source directory was removed, but the
+		 * output can still point to its old group because the output
+		 * lives in a different directory. We need to check for the old
+		 * group and remove it (t6071).
+		 */
+		struct tup_entry *output_group = NULL;
+
+		if(get_output_group(b, &output_group) < 0)
+			return -1;
+		if(output_group) {
+			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+				return -1;
+			tup_entry_add_ghost_list(output_group, &ghost_list);
+		}
 	}
 	return 0;
 }
