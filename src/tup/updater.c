@@ -259,7 +259,7 @@ int generate(int argc, char **argv)
 		return -1;
 
 	printf("Parsing...\n");
-	if(create_graph(&g, TUP_NODE_DIR) < 0)
+	if(create_graph(&g, TUP_NODE_DIR, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -289,7 +289,7 @@ int generate(int argc, char **argv)
 		return -1;
 	}
 	fprintf(generate_f, "#! /bin/sh -ex\n");
-	if(create_graph(&g, TUP_NODE_CMD) < 0)
+	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -548,7 +548,7 @@ out_err:
 static int delete_in_tree(void)
 {
 	struct graph g;
-	if(create_graph(&g, TUP_NODE_FILE) < 0)
+	if(create_graph(&g, TUP_NODE_FILE, -1) < 0)
 		return -1;
 	if(tup_db_type_to_tree(&g.cmd_delete_root, &g.cmd_delete_count, TUP_NODE_CMD) < 0)
 		return -1;
@@ -694,7 +694,7 @@ static int process_config_nodes(int environ_check)
 	if(tup_db_begin() < 0)
 		return -1;
 	/* Use TUP_NODE_ROOT to count everything */
-	if(create_graph(&g, TUP_NODE_ROOT) < 0)
+	if(create_graph(&g, TUP_NODE_ROOT, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1128,7 +1128,7 @@ static int process_create_nodes(void)
 		old_changes = tup_db_changes();
 
 	tup_db_begin();
-	if(create_graph(&g, TUP_NODE_DIR) < 0)
+	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -1314,7 +1314,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	int rc = 0;
 
 	tup_db_begin();
-	if(create_graph(&g, TUP_NODE_CMD) < 0)
+	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -1373,7 +1373,7 @@ static int check_config_todo(void)
 	int stuff_todo = 0;
 
 	/* Use TUP_NODE_ROOT to count everything */
-	if(create_graph(&g, TUP_NODE_ROOT) < 0)
+	if(create_graph(&g, TUP_NODE_ROOT, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1405,7 +1405,7 @@ static int check_create_todo(void)
 	int rc;
 	int stuff_todo = 0;
 
-	if(create_graph(&g, TUP_NODE_DIR) < 0)
+	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -1436,7 +1436,7 @@ static int check_update_todo(int argc, char **argv)
 	int stuff_todo = 0;
 	int num_pruned = 0;
 
-	if(create_graph(&g, TUP_NODE_CMD) < 0)
+	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -1704,7 +1704,7 @@ static void *create_work(void *arg)
 		if(n == (void*)-1)
 			break;
 
-		if(n->tent->type == TUP_NODE_DIR) {
+		if(n->tent->type == TUP_NODE_DIR || n->tent->type == TUP_NODE_GHOST) {
 			if(tup_entry_variant(n->tent)->enabled) {
 				if(n->already_used) {
 					rc = 0;

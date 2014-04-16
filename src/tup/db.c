@@ -1595,6 +1595,14 @@ int tup_db_delete_node(tupid_t tupid)
 		/* We're but a ghost now. This can happen if a directory is
 		 * removed that contains a ghost (t6061).
 		 */
+		if(tent->type == TUP_NODE_DIR) {
+			/* Make sure we "reparse" the directory so that files
+			 * generated in other directories can be properly
+			 * cleaned up.
+			 */
+			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+				return -1;
+		}
 		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
@@ -7155,6 +7163,11 @@ static int reclaim_ghosts(void)
 			if(tent->type == TUP_NODE_GROUP)
 				if(tup_db_unflag_modify(tent->tnode.tupid) < 0)
 					return -1;
+			/* Ghost nodes can be in the create list when cleaning up outputs in
+			 * other directories.
+			 */
+			if(tup_db_unflag_create(tent->tnode.tupid) < 0)
+				return -1;
 			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
 		}

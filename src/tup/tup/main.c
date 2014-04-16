@@ -340,7 +340,7 @@ static int graph(int argc, char **argv)
 	show_env = tup_option_get_int("graph.environment");
 	combine = tup_option_get_int("graph.combine");
 
-	if(create_graph(&g, 0) < 0)
+	if(create_graph(&g, -1, -1) < 0)
 		return -1;
 
 	sub_dir_dt = get_sub_dir_dt();

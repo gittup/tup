@@ -197,7 +197,11 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	}
 	tf.ls = NULL;
 	tf.luaerror = TUPLUA_NOERROR;
-	tf.use_server = use_server;
+	if(n->tent->type == TUP_NODE_GHOST) {
+		tf.use_server = 0;
+	} else {
+		tf.use_server = use_server;
+	}
 
 	/* We may need to convert normal dirs back to generated dirs,
 	 * so add this one to check.
@@ -223,7 +227,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		RB_INIT(&tf.refactoring_cmd_delete_root);
 	}
 
-	if(use_server) {
+	if(tf.use_server) {
 		if(server_parser_start(&ps) < 0)
 			return -1;
 	} else {
@@ -264,37 +268,43 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			goto out_close_vdb;
 	}
 
-	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
-	if(tf.cur_dfd < 0) {
-		fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
-		goto out_close_vdb;
-	}
-
-	fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
-	if(fd < 0) {
-		if(errno == ENOENT) {
-			parser_lua = 1;
-			fd = open_lua_tupfile(&tf, n->tent, luafilename);
-		} else {
-			parser_error(&tf, "Tupfile");
-			goto out_close_dfd;
-		}
-	}
-	if(fd < 0) {
-		if(errno == ENOENT) {
-			/* No Tupfile means we have nothing to do */
-			if(n->tent->tnode.tupid == DOT_DT) {
-				/* Check to see if the top-level rules file would .gitignore. We disable
-				 * tf.tupid so no rules get created.
-				 */
-				if(check_toplevel_gitignore(&tf) < 0)
-					goto out_close_dfd;
-			}
-		} else {
-			parser_error(&tf, luafilename);
-			goto out_close_dfd;
-		}
+	if(n->tent->type == TUP_NODE_GHOST) {
+		fd = -1;
+		tf.cur_dfd = -1;
 	} else {
+		tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
+		if(tf.cur_dfd < 0) {
+			fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
+			goto out_close_vdb;
+		}
+
+		fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
+		if(fd < 0) {
+			if(errno == ENOENT) {
+				parser_lua = 1;
+				fd = open_lua_tupfile(&tf, n->tent, luafilename);
+				if(fd < 0) {
+					if(errno == ENOENT) {
+						/* No Tupfile means we have nothing to do */
+						if(n->tent->tnode.tupid == DOT_DT) {
+							/* Check to see if the top-level rules file would .gitignore. We disable
+							 * tf.tupid so no rules get created.
+							 */
+							if(check_toplevel_gitignore(&tf) < 0)
+								goto out_close_dfd;
+						}
+					} else {
+						parser_error(&tf, luafilename);
+						goto out_close_dfd;
+					}
+				}
+			} else {
+				parser_error(&tf, "Tupfile");
+				goto out_close_dfd;
+			}
+		}
+	}
+	if(fd >= 0) {
 		if(fslurp_null(fd, &b) < 0)
 			goto out_close_file;
 		if(!parser_lua) {
@@ -336,7 +346,7 @@ out_close_file:
 		rc = -1;
 	}
 out_close_dfd:
-	if(close(tf.cur_dfd) < 0) {
+	if(tf.cur_dfd >= 0 && close(tf.cur_dfd) < 0) {
 		parser_error(&tf, "close(tf.cur_dfd)");
 		rc = -1;
 	}
@@ -347,7 +357,7 @@ out_close_node_db:
 	if(nodedb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
-	if(use_server)
+	if(tf.use_server)
 		if(server_parser_stop(&ps) < 0)
 			rc = -1;
 

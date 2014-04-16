@@ -123,7 +123,7 @@ void remove_edge(struct edge *e)
 	free(e);
 }
 
-int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
+int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_TYPE count_flags2)
 {
 	root_entry.tnode.tupid = 0;
 	root_entry.dt = 0;
@@ -151,6 +151,7 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 		return -1;
 	g->num_nodes = 0;
 	g->count_flags = count_flags;
+	g->count_flags2 = count_flags2;
 	g->total_mtime = 0;
 	if(count_flags == TUP_NODE_GROUP)
 		g->style = TUP_LINK_GROUP;
@@ -209,7 +210,7 @@ edge_create:
 	}
 	if(n->expanded == 0) {
 		/* TUP_NODE_ROOT means we count everything */
-		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
+		if(n->tent->type == g->count_flags || n->tent->type == g->count_flags2 || g->count_flags == TUP_NODE_ROOT) {
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
 				if(n->tent->mtime == -1)
@@ -384,7 +385,7 @@ int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
 	struct graph g;
 	struct node *n;
 
-	if(create_graph(&g, TUP_NODE_CMD) < 0)
+	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	n = create_node(&g, src);
 	if(!n)
@@ -1085,7 +1086,7 @@ int add_group_circ_check(struct tup_entry *tent)
 {
 	struct node *n;
 	if(!group_graph_inited) {
-		if(create_graph(&group_graph, TUP_NODE_GROUP) < 0)
+		if(create_graph(&group_graph, TUP_NODE_GROUP, -1) < 0)
 			return -1;
 		group_graph_inited = 1;
 	}
