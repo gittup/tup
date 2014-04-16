@@ -193,6 +193,9 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	}
 
 	sum++;
+	if(sum > total) {
+		fprintf(stderr, "tup internal error: progress bar is sized incorrectly.\n");
+	}
 
 	if(quiet && !always_display)
 		return;
