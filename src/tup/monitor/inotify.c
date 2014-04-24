@@ -177,11 +177,26 @@ int monitor(int argc, char **argv)
 	update_argc = argc;
 	update_argv = argv;
 
-	sigemptyset(&sigact.sa_mask);
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGTERM, &sigact, NULL);
-	sigaction(SIGHUP, &sigact, NULL);
-	sigaction(SIGUSR1, &sigact, NULL);
+	if(sigemptyset(&sigact.sa_mask) < 0) {
+		perror("sigemptyset");
+		return -1;
+	}
+	if(sigaction(SIGINT, &sigact, NULL) < 0) {
+		perror("sigaction");
+		return -1;
+	}
+	if(sigaction(SIGTERM, &sigact, NULL) < 0) {
+		perror("sigaction");
+		return -1;
+	}
+	if(sigaction(SIGHUP, &sigact, NULL) < 0) {
+		perror("sigaction");
+		return -1;
+	}
+	if(sigaction(SIGUSR1, &sigact, NULL) < 0) {
+		perror("sigaction");
+		return -1;
+	}
 
 	if(stop_monitor(TUP_MONITOR_RESTARTING) < 0) {
 		fprintf(stderr, "tup error: Unable to stop the current monitor process.\n");

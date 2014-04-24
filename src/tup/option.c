@@ -245,8 +245,14 @@ int tup_option_init(void)
 	}
 
 #ifndef _WIN32
-	sigemptyset(&sigact.sa_mask);
-	sigaction(SIGWINCH, &sigact, NULL);
+	if(sigemptyset(&sigact.sa_mask) < 0) {
+		perror("sigemptyset");
+		return -1;
+	}
+	if(sigaction(SIGWINCH, &sigact, NULL) < 0) {
+		perror("sigaction");
+		return -1;
+	}
 #endif
 	inited = 1;
 	return 0;
