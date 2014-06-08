@@ -1077,7 +1077,7 @@ static int tup_fs_truncate(const char *path, off_t size)
 			return -errno;
 		return 0;
 	}
-	fprintf(stderr, "tup error: Unable to truncate() files not created by this job.\n");
+	fprintf(stderr, "tup error: Unable to truncate() files not created by this job: %s\n", path);
 	return -EPERM;
 }
 
