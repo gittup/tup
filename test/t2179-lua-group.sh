@@ -16,25 +16,15 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure parsing foo/ after writing another file there doesn't fail, now
-# with gitignore.
+# Support <groups> in lua
 
 . ./tup.sh
-
-tmkdir foo
-cat > Tupfile << HERE
-: |> echo hey > %o |> foo/bar.txt
+cat > Tupfile.lua << HERE
+tup.foreach_rule('*.c', 'gcc -c %f -o %o', {'%B.o', '<objs>'})
+tup.rule('<objs>', 'gcc %<objs> -o %o', 'prog.exe')
 HERE
+echo 'int main(void) {return 0;}' > main.c
+touch foo.c bar.c
 update
-
-cat > foo/Tupfile << HERE
-.gitignore
-: |> echo foo > %o |> baz.txt
-HERE
-tup touch foo/Tupfile
-update
-
-gitignore_good baz.txt foo/.gitignore
-gitignore_good bar.txt foo/.gitignore
 
 eotup

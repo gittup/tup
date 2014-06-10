@@ -2411,8 +2411,8 @@ struct path_list *new_pl(struct tupfile *tf, char *mem)
 	return pl;
 }
 
-int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-		  tupid_t dt, struct bin_head *bl, int create_output_dirs)
+static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+			 tupid_t dt, struct bin_head *bl, int create_output_dirs)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -2453,51 +2453,8 @@ int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
 			}
 		} else {
 			/* Path */
-			struct pel_group pg;
-			int sotgv = 0;
-
-			if(strchr(p, '<') != NULL) {
-				/* Group */
-				char *endb;
-				endb = strchr(p, '>');
-				if(!endb) {
-					fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
-					return -1;
-				}
-				pl->group = 1;
-			}
-			pl->path = p;
-
-			if(get_path_elements(p, &pg) < 0)
+			if(get_pl(tf, p, pl, dt, create_output_dirs) < 0)
 				return -1;
-			if(pg.pg_flags & PG_HIDDEN) {
-				fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
-				return -1;
-			}
-
-			if(create_output_dirs || pg.pg_flags & PG_GROUP)
-				sotgv = SOTGV_CREATE_DIRS;
-			pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
-			if(pl->dt <= 0) {
-				fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
-				return -1;
-			}
-			if(!pl->pel) {
-				if(strcmp(pl->path, ".") == 0) {
-					fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
-					return -1;
-				}
-				fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
-				return -1;
-			}
-			if(pl->path == pl->pel->path) {
-				pl->path = NULL;
-			} else {
-				/* File points to somewhere later in the path,
-				 * so set the last '/' to 0.
-				 */
-				pl->path[pl->pel->path - pl->path - 1] = 0;
-			}
 		}
 		TAILQ_INSERT_TAIL(plist, pl, list);
 
@@ -2505,6 +2462,57 @@ skip_empty_space:
 		p += spc_index + 1;
 	} while(!last_entry);
 
+	return 0;
+}
+
+int get_pl(struct tupfile *tf, char *p, struct path_list *pl,
+	   tupid_t dt, int create_output_dirs)
+{
+	struct pel_group pg;
+	int sotgv = 0;
+
+	if(strchr(p, '<') != NULL) {
+		/* Group */
+		char *endb;
+		endb = strchr(p, '>');
+		if(!endb) {
+			fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
+			return -1;
+		}
+		pl->group = 1;
+	}
+	pl->path = p;
+
+	if(get_path_elements(p, &pg) < 0)
+		return -1;
+	if(pg.pg_flags & PG_HIDDEN) {
+		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
+		return -1;
+	}
+
+	if(create_output_dirs || pg.pg_flags & PG_GROUP)
+		sotgv = SOTGV_CREATE_DIRS;
+	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
+	if(pl->dt <= 0) {
+		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
+		return -1;
+	}
+	if(!pl->pel) {
+		if(strcmp(pl->path, ".") == 0) {
+			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
+			return -1;
+		}
+		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
+		return -1;
+	}
+	if(pl->path == pl->pel->path) {
+		pl->path = NULL;
+	} else {
+		/* File points to somewhere later in the path,
+		 * so set the last '/' to 0.
+		 */
+		pl->path[pl->pel->path - pl->path - 1] = 0;
+	}
 	return 0;
 }
 

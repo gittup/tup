@@ -42,6 +42,22 @@ local conditionalglob = function(input)
 	return {input}
 end
 
+local concat_filenames = function(files)
+	local res = ''
+	if files then
+		for k, v in ipairs(files) do
+			-- <groups> are ignored in %f/%o/etc
+			if not v:find('<') then
+				if res != '' then
+					res = res .. ' '
+				end
+				res = res .. v:gsub('%%', '%%%%')
+			end
+		end
+	end
+	return res
+end
+
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
 	return (string.gsub(filename, '[^/\\]*[/\\]', ''))
@@ -169,10 +185,10 @@ tup.frule = function(arguments)
 	if arguments.command then
 		command = arguments.command
 
-		local outputreplacement = (outputs and table.concat(outputs, ' '):gsub('%%', '%%%%') or '')
+		local outputreplacement = concat_filenames(outputs)
 		command = command:gsub('%%o', outputreplacement)
 
-		local inputreplacement = inputs and table.concat(inputs, ' '):gsub('%%', '%%%%') or ''
+		local inputreplacement = concat_filenames(inputs)
 		command = command:gsub('%%f', inputreplacement)
 
 		if not inputs or not inputs[1] then

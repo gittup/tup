@@ -154,6 +154,7 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	    struct path_list_head *oplist,
 	    const char *ext, int extlen, struct name_list *output_nl);
+int get_pl(struct tupfile *tf, char *p, struct path_list *pl, tupid_t dt, int create_output_dirs);
 
 struct node;
 struct graph;

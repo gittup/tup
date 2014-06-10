@@ -71,7 +71,7 @@ struct tuplua_glob_data {
 static int include_rules(struct tupfile *tf);
 static int include_file(struct tupfile *tf, const char *file);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt);
+			 tupid_t dt, int create_output_dirs);
 
 static int debug_run = 0;
 
@@ -159,7 +159,7 @@ static int tuplua_function_include(lua_State *ls)
 	return 0;
 }
 
-static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist)
+static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist, int create_output_dirs)
 {
 	lua_getfield(ls, 1, table);
 	if(!lua_istable(ls, -1)) {
@@ -177,7 +177,7 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 			perror("strdup");
 			return -1;
 		}
-		if(get_path_list(tf, path, plist, tf->tupid) < 0)
+		if(get_path_list(tf, path, plist, tf->tupid, create_output_dirs) < 0)
 			return -1;
 		lua_pop(ls, 1);
 	}
@@ -202,9 +202,9 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	TAILQ_INIT(&input_path_list);
 	TAILQ_INIT(&output_path_list);
-	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list) < 0)
+	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, 0) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
-	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list) < 0)
+	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list, 1) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
 
 	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
@@ -425,7 +425,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
 	lua_pop(ls, 1);
 
-	if(get_path_list(tf, pattern, &plist, tf->tupid) < 0) {
+	if(get_path_list(tf, pattern, &plist, tf->tupid, 0) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		free(pattern);
 		return lua_error(ls);
@@ -954,44 +954,16 @@ out_err:
 }
 
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt)
+			 tupid_t dt, int create_output_dirs)
 {
 	struct path_list *pl;
-	struct pel_group pg;
 
 	pl = new_pl(tf, p);
 	if(!pl)
 		return -1;
 
-	pl->path = p;
-
-	if(get_path_elements(p, &pg) < 0)
+	if(get_pl(tf, p, pl, dt, create_output_dirs) < 0)
 		return -1;
-	if(pg.pg_flags & PG_HIDDEN) {
-		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
-		return -1;
-	}
-	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, 0, 0);
-	if(pl->dt <= 0) {
-		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
-		return -1;
-	}
-	if(!pl->pel) {
-		if(strcmp(pl->path, ".") == 0) {
-			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
-			return -1;
-		}
-		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
-		return -1;
-	}
-	if(pl->path == pl->pel->path) {
-		pl->path = NULL;
-	} else {
-		/* File points to somewhere later in the path,
-		 * so set the last '/' to 0.
-		 */
-		pl->path[pl->pel->path - pl->path - 1] = 0;
-	}
 	TAILQ_INSERT_TAIL(plist, pl, list);
 
 	return 0;

@@ -16,25 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure parsing foo/ after writing another file there doesn't fail, now
-# with gitignore.
+# Write to a file in a different directory with the Lua parser.
 
 . ./tup.sh
 
-tmkdir foo
-cat > Tupfile << HERE
-: |> echo hey > %o |> foo/bar.txt
+cat > Tupfile.lua << HERE
+tup.rule('echo hey > %o', {'foo/bar.txt'})
 HERE
 update
 
-cat > foo/Tupfile << HERE
-.gitignore
-: |> echo foo > %o |> baz.txt
-HERE
-tup touch foo/Tupfile
+echo hey | diff - foo/bar.txt
+rm Tupfile.lua
 update
-
-gitignore_good baz.txt foo/.gitignore
-gitignore_good bar.txt foo/.gitignore
+check_not_exist foo
 
 eotup
