@@ -1543,6 +1543,8 @@ static int ignore_file(const char* file)
 		return 1;
 	if (strncmp(file, "\\\\", 2) == 0)
 		return 1;
+	if (strcasestr(file, "SQM\\sqmcpp.log") != NULL)
+		return 1;
 	return 0;
 }
 
@@ -1569,6 +1571,8 @@ static int ignore_file_w(const wchar_t* file)
 	if (wcsstr(file, L"$") != NULL)
 		return 1;
 	if (wcsncmp(file, L"\\\\", 2) == 0)
+		return 1;
+	if (wcscasestr(file, L"SQM\\sqmcpp.log") != NULL)
 		return 1;
 	return 0;
 }
