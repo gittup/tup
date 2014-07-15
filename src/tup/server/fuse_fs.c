@@ -260,17 +260,21 @@ static int context_check(void)
 	 */
 	pgid = getpgid(fuse_get_context()->pid);
 
-#ifdef __APPLE__
 	/* OSX will fail to return a valid pgid for a zombie process.  However,
 	 * for some reason when using 'ar' to create archives, a zombie libtool
 	 * process will call 'unlink' on the .fuse_hidden file. If we ignore
 	 * that check, then tup will save the .fuse_hidden file as a separate
 	 * output because hidden files are ignored.
+	 *
+	 * Separately, Linux running in a container will have a bogus fuse
+	 * context pid, so getpgid() always fails. There doesn't seem to be
+	 * much we can do in this case. Fortunately, if lxc is working that
+	 * probably means we're using a separate mount namespace anyway, making
+	 * this check moot.
 	 */
 	if(pgid == -1 && errno == ESRCH) {
 		return 0;
 	}
-#endif
 
 	if(ourpgid != pgid) {
 		if(server_debug_enabled()) {
