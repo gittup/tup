@@ -152,6 +152,11 @@ int get_path_elements(const char *path, struct pel_group *pg)
 {
 	struct path_element *pel;
 
+	if(!path) {
+		fprintf(stderr, "tup internal error: 'path' is NULL in get_path_elements()\n");
+		return -1;
+	}
+
 	init_pel_group(pg);
 	if(split_path_elements(path, pg) < 0)
 		return -1;

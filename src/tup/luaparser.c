@@ -332,6 +332,8 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 		return -1;
 
 	dirname = tuplua_tostring(ls, -1);
+	if(!dirname)
+		return luaL_error(ls, "tup.getrelativedir() called with a nil path");
 	dest = find_dir_tupid_dt(tf->tupid, dirname, NULL, 0, 0);
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
