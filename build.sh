@@ -5,8 +5,8 @@ os=`uname -s`
 plat_cflags="`pkg-config fuse --cflags`"
 plat_ldflags="`pkg-config fuse --libs`"
 plat_files=""
-LDFLAGS="-lm"
-CC=gcc
+LDFLAGS="$LDFLAGS -lm"
+: ${CC:=gcc}
 case "$os" in
 	Linux)
 	plat_files="$plat_files ../src/compat/dummy.c"
