@@ -137,6 +137,8 @@ int main(int argc, char **argv)
 		if(generate(argc, argv) < 0)
 			return 1;
 		return 0;
+	} else if(strcmp(cmd, "privileged") == 0) {
+		return tup_privileged();
 	}
 
 	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */
@@ -251,8 +253,6 @@ int main(int argc, char **argv)
 		rc = ghost_check();
 	} else if(strcmp(cmd, "monitor_supported") == 0) {
 		rc = monitor_supported();
-	} else if(strcmp(cmd, "privileged") == 0) {
-		rc = tup_privileged();
 	} else {
 		argc++;
 		argv--;
