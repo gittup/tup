@@ -29,6 +29,7 @@
 
 #include <windows.h>
 #include <ntdef.h>
+#include <wow64.h>
 #ifndef STATUS_SUCCESS
 #include <ntstatus.h>
 #endif
@@ -39,6 +40,9 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <shlwapi.h>
+
+#define __DBG_W64		0
+#define __DBG_W32		0
 
 #ifndef __in
 #define __in
@@ -1122,8 +1126,10 @@ BOOL WINAPI CreateProcessA_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL
+	   || strcasestr(lpApplicationName, "tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1166,8 +1172,10 @@ BOOL WINAPI CreateProcessW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL
+	   || wcscasestr(lpApplicationName, L"tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1211,8 +1219,10 @@ BOOL WINAPI CreateProcessAsUserA_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || strcasestr(lpApplicationName, "mspdbsrv.exe") == NULL
+	   || strcasestr(lpApplicationName, "tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1256,8 +1266,10 @@ BOOL WINAPI CreateProcessAsUserW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL
+	   || wcscasestr(lpApplicationName, L"tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1301,8 +1313,10 @@ BOOL WINAPI CreateProcessWithLogonW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL
+	   || wcscasestr(lpApplicationName, L"tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1342,8 +1356,10 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	}
 
 	/* Ignore mspdbsrv.exe, since it continues to run in the background */
-	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL)
+	if(!lpApplicationName || wcscasestr(lpApplicationName, L"mspdbsrv.exe") == NULL
+	   || wcscasestr(lpApplicationName, L"tup32detect.exe") == NULL) {
 		tup_inject_dll(lpProcessInformation, s_depfilename, s_vardict_file);
+	}
 
 	if ((dwCreationFlags & CREATE_SUSPENDED) != 0)
 		return 1;
@@ -1390,6 +1406,8 @@ int remove_hook(const char *pathname)
 typedef HMODULE (WINAPI *LoadLibraryA_t)(const char*);
 typedef FARPROC (WINAPI *GetProcAddress_t)(HMODULE, const char*);
 
+
+
 struct remote_thread_t
 {
 	LoadLibraryA_t load_library;
@@ -1400,6 +1418,19 @@ struct remote_thread_t
 	char dll_name[MAX_PATH];
 	char func_name[256];
 };
+
+struct remote_thread32_t
+{
+	uint32_t load_library;
+	uint32_t get_proc_address;
+	char depfilename[MAX_PATH];
+	char vardict_file[MAX_PATH];
+	char execdir[MAX_PATH];
+	char dll_name[MAX_PATH];
+	char func_name[256];
+}__attribute__((packed));
+
+
 
 
 #define HOOK(name) { MODULE_NAME, #name, name##_hook, (void**)&name##_orig, 0 }
@@ -1765,7 +1796,7 @@ DWORD tup_inject_init(remote_thread_t* r)
 		r->func_name,
 		r->depfilename);
 
-	DEBUG_HOOK("%d: %s\n", GetCurrentProcessId(), GetCommandLineA());
+	DEBUG_HOOK(" - injected into %d: %s\n", GetCurrentProcessId(), GetCommandLineA());
 
 	tup_inject_setexecdir(r->execdir);
 
@@ -1808,18 +1839,51 @@ DWORD tup_inject_init(remote_thread_t* r)
 	return 0;
 }
 
+#ifdef _WIN64
 int remote_stub(void);
 __asm(
-  ".globl _remote_stub\n"
-  "_remote_stub:\n"
-  "pushl $0xDEADBEEF\n"    // return address, [1]
-  "pushfl\n"
-  "pushal\n"
-  "pushl $0xDEADBEEF\n"    // function parameter, [8]
-  "movl $0xDEADBEEF, %eax\n" // function to call, [13]
-  "call *%eax\n"
-  "popal\n"
-  "popfl\n"
+  ".globl remote_stub\n"
+  "remote_stub:\n"
+  "subq $8, %rsp\n"
+  "movl $0x556677, (%rsp)\n"		// return address, [0x7]
+  "movl $0x11223344, 4(%rsp)\n"		// return address, [0xf]
+  "pushf\n"
+  "push %r15\n"
+  "push %r14\n"
+  "push %r13\n"
+  "push %r12\n"
+  "push %r11\n"
+  "push %r10\n"
+  "push %r9\n"
+  "push %r8\n"
+  "push %rbp\n"
+  "push %rdi\n"
+  "push %rsi\n"
+  "push %rdx\n"
+  "push %rcx\n"
+  "push %rbx\n"
+  "push %rax\n"
+  "xorq %rcx, %rcx\n"
+  "movq $0x1100000055667788, %rcx\n"	// function parameter [0x30]
+  "xorq %rax, %rax\n"
+  "movq $0x9900000055667788, %rax\n" 	// function to call, [0x3d]
+  "call *%rax\n"
+  "pop %rax\n"
+  "pop %rbx\n"
+  "pop %rcx\n"
+  "pop %rdx\n"
+  "pop %rsi\n"
+  "pop %rdi\n"
+  "pop %rbp\n"
+  "pop %r8\n"
+  "pop %r9\n"
+  "pop %r10\n"
+  "pop %r11\n"
+  "pop %r12\n"
+  "pop %r13\n"
+  "pop %r14\n"
+  "pop %r15\n"
+  "popf\n"
   "ret"
 );
 
@@ -1841,87 +1905,393 @@ static void WINAPI remote_init( remote_thread_t *r )
 static void remote_end(void)
 {
 }
+#endif
+
+
+#if __DBG_W64 == 1
+static void printHex(const void *lpvbits, const unsigned int n)
+{
+    char* data = (char*) lpvbits;
+    unsigned int i = 0;
+    char line[17] = {};
+    printf("%.8X | ", (unsigned char*)data);
+    while ( i < n ) {
+        line[i%16] = *(data+i);
+        if ((line[i%16] < 32) || (line[i%16] > 126)) {
+            line[i%16] = '.';
+        }
+        printf("%.2X", (unsigned char)*(data+i));
+        i++;
+        if (i%4 == 0) {
+            if (i%16 == 0) {
+                if (i < n-1)
+                    printf(" | %s\n%.8X | ", &line, data+i);
+            } else {
+                printf(" ");
+            }
+        }
+    }
+    while (i%16 > 0) {
+        (i%4 == 0)?printf("   "):printf("  ");
+        line[i%16] = ' ';
+        i++;
+    }
+    printf(" | %s\n", &line);
+}
+#endif
+
+inline long long unsigned int low32(long long unsigned int tall)
+{
+        return tall & 0x00000000ffffffff;
+}
+inline long long unsigned int high32(long long unsigned int tall)
+{
+        return tall >> 32;
+}
+
+struct remote_stub_t {
+	uint8_t stub[23];
+	uint8_t fileA_Hook[39];
+	uint8_t fileW_Hook[39];
+	uint8_t remote_init[60];
+}__attribute__((packed));
+
+static struct remote_stub_t remote_stub32 = {
+	.stub = {
+0x68, 0x00, 0x00, 0x00, 0x00,
+0x9c,
+0x60,
+0x68, 0xef, 0xbe, 0xad, 0xde,
+0xb8, 0xef, 0xbe, 0xad, 0xde,
+0xff, 0xd0,
+0x61,
+0x9d,
+0xc3
+},
+	.fileA_Hook = {
+0x55,
+0x89, 0xe5,
+0x83, 0xec, 0x18,
+0x8b, 0x45, 0x0c,
+0x89, 0x44, 0x24, 0x04,
+0x8b, 0x45, 0x08,
+0x89, 0x04, 0x24,
+0xff, 0x15, 0x78, 0x00, 0x00, 0x00,
+0x85, 0xc0,
+0x52,
+0x0f, 0x95, 0xc0,
+0x52,
+0x0f, 0xb6, 0xc0,
+0xc9,
+0xc2, 0x08, 0x00
+},
+
+	.fileW_Hook = {
+0x55,
+0x89, 0xe5,
+0x83, 0xec, 0x18,
+0x8b, 0x45, 0x0c,
+0x89, 0x44, 0x24, 0x04,
+0x8b, 0x45, 0x08,
+0x89, 0x04, 0x24,
+0xff, 0x15, 0x7c, 0x00, 0x00, 0x00,
+0x85, 0xc0,
+0x51,
+0x0f, 0x95, 0xc0,
+0x51,
+0x0f, 0xb6, 0xc0,
+0xc9,
+0xc2, 0x08, 0x00
+},
+
+	.remote_init = {
+0x55,
+0x89, 0xe5,
+0x53,
+0x83, 0xec, 0x14,
+0x8b, 0x5d, 0x08,
+0x8d, 0x83, 0x14, 0x03, 0x00, 0x00,
+0x89, 0x04, 0x24,
+0xff, 0x13,
+0x85, 0xc0,
+0x51,
+0x74, 0x1b,				// JE 0x1b
+0x8d, 0x93, 0x18, 0x04, 0x00, 0x00,
+0x89, 0x54, 0x24, 0x04,
+0x89, 0x04, 0x24,
+0xff, 0x53, 0x04,
+0x85, 0xc0,
+0x52,
+0x52,
+0x74, 0x05,				// JE 0x05
+0x89, 0x1c, 0x24,
+0xff, 0xd0,
+0x8b, 0x5d, 0xfc,
+0xc9,
+0xc2, 0x04, 0x00}
+};
+
+static uint32_t LOAD_LIBRARY_32 = 0;
+static uint32_t GET_PROC_ADDRESS_32 = 0;
+
+#define BUFSIZE 4096
+
+BOOL get_wow64_addresses(void)
+{
+	DWORD dwRead;
+	CHAR chBuf[BUFSIZE];
+	PROCESS_INFORMATION piProcInfo;
+	STARTUPINFO  siStartInfo;
+	BOOL ret;
+
+	TCHAR szCmdline[]=TEXT("tup32detect.exe");
+
+	HANDLE g_hChildStd_OUT_Rd = NULL;
+	HANDLE g_hChildStd_OUT_Wr = NULL;
+
+	SECURITY_ATTRIBUTES saAttr;
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = NULL;
+
+	// Pipe stdout
+	if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) )
+		return FALSE;
+
+	// Ensure the read handle to the pipe for STDOUT is not inherited.
+	if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+		return FALSE;
+
+	// create process
+	memset(&siStartInfo, 0, sizeof(STARTUPINFO));
+	siStartInfo.cb = sizeof(STARTUPINFO);
+	siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
+	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+	memset(&piProcInfo, 0, sizeof(PROCESS_INFORMATION));
+
+	// Detect and avoid inception!
+	if (CreateProcessA_orig != NULL)
+		ret = CreateProcessA_orig(
+				NULL,
+				szCmdline,
+				NULL,
+				NULL,
+				TRUE,
+				0,
+				NULL,
+				NULL,
+				&siStartInfo,
+				&piProcInfo);
+	else
+		ret = CreateProcessA(
+				NULL,
+				szCmdline,
+				NULL,
+				NULL,
+				TRUE,
+				0,
+				NULL,
+				NULL,
+				&siStartInfo,
+				&piProcInfo);
+
+	if (!ret) {
+		DEBUG_HOOK("Unable to spawn tup32detect.exe\n");
+		return FALSE;
+	}
+
+	ret = ReadFile( g_hChildStd_OUT_Rd, chBuf, BUFSIZE, &dwRead, NULL);
+	if (!ret || dwRead == 0)
+		return FALSE;
+
+	if (sscanf(chBuf, "%x-%x", &LOAD_LIBRARY_32, &GET_PROC_ADDRESS_32) != 2)
+		return FALSE;
+
+	DEBUG_HOOK("Got addresses: %x, %x\n", LOAD_LIBRARY_32, GET_PROC_ADDRESS_32);
+	CloseHandle(piProcInfo.hProcess);
+	CloseHandle(piProcInfo.hThread);
+
+	return TRUE;
+}
+
+
 
 int tup_inject_dll(
 	LPPROCESS_INFORMATION lpProcessInformation,
 	const char *depfilename,
 	const char *vardict_file)
 {
-	remote_thread_t remote;
 	char* remote_data;
 	size_t code_size;
 	DWORD old_protect;
 	HANDLE process;
-	HMODULE kernel32;
+	BOOL bWow64 = 0;
 
-	memset(&remote, 0, sizeof(remote));
-	kernel32 = LoadLibraryA("kernel32.dll");
-	remote.load_library = (LoadLibraryA_t) GetProcAddress(kernel32, "LoadLibraryA");
-	remote.get_proc_address = (GetProcAddress_t) GetProcAddress(kernel32, "GetProcAddress");
-	strcpy(remote.depfilename, depfilename);
-	strcpy(remote.vardict_file, vardict_file);
-	strcat(remote.execdir, execdir);
-	strcat(remote.dll_name, execdir);
-	strcat(remote.dll_name, "\\");
-	strcat(remote.dll_name, "tup-dllinject.dll");
-	strcat(remote.func_name, "tup_inject_init");
+	IsWow64Process(lpProcessInformation->hProcess, &bWow64);
 
-	CONTEXT ctx;
-	ctx.ContextFlags = CONTEXT_CONTROL;
-	if( !GetThreadContext( lpProcessInformation->hThread, &ctx ) )
+	// WOW64
+	DEBUG_HOOK("%s is WOW64: %i\n", GetCommandLineA(), bWow64);
+	if (bWow64) {
+		remote_thread32_t remote;
+
+		if (GET_PROC_ADDRESS_32 == 0) {
+			if ( ! get_wow64_addresses() ) {
+				printf("Unable to retrieve WOW64 info\n");
+				return -1;
+			}
+		}
+
+		memset(&remote, 0, sizeof(remote));
+		remote.load_library = LOAD_LIBRARY_32;
+		remote.get_proc_address = GET_PROC_ADDRESS_32;
+		strcpy(remote.depfilename, depfilename);
+		strcpy(remote.vardict_file, vardict_file);
+		strcat(remote.execdir, execdir);
+		strcat(remote.dll_name, execdir);
+		strcat(remote.dll_name, "\\");
+		strcat(remote.dll_name, "tup-dllinject32.dll");
+		strcat(remote.func_name, "tup_inject_init");
+
+		WOW64_CONTEXT ctx;
+		ctx.ContextFlags = WOW64_CONTEXT_CONTROL;
+		if ( !Wow64GetThreadContext( lpProcessInformation->hThread, &ctx ) )
+			return -1;
+
+		/* Align code_size to a 16 byte boundary */
+		code_size = (sizeof(remote_stub32) + 0x0F) & ~0x0F;
+
+		DEBUG_HOOK("Injecting dll '%s' '%s' %s' '%s'\n",
+			remote.execdir,
+			remote.dll_name,
+			remote.func_name,
+			remote.depfilename,
+			remote.vardict_file);
+
+		process = lpProcessInformation->hProcess;
+
+		if (!WaitForInputIdle(process, INFINITE))
+			return -1;
+
+		remote_data = (char*) VirtualAllocEx(
+			process,
+			NULL,
+			code_size + sizeof(remote),
+			MEM_COMMIT | MEM_RESERVE,
+			PAGE_EXECUTE_READWRITE);
+
+		if (!remote_data)
+			return -1;
+
+		if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_READWRITE, &old_protect))
+			return -1;
+
+		unsigned char code[code_size];
+
+		memcpy( code, &remote_stub32, code_size );
+
+		*(DWORD*)(code + 0x1) = ctx.Eip;											// Return addr
+		*(DWORD*)(code + 0x8) = (DWORD)((DWORD_PTR)remote_data + code_size);							// Arg (ptr to remote (TCB))
+		*(DWORD*)(code + 0xd) = (DWORD)((DWORD_PTR)remote_data + ((DWORD_PTR)&remote_stub32.remote_init - (DWORD_PTR)&remote_stub32));	// Func (ptr to remote_init)
+
+		if (!WriteProcessMemory(process, remote_data, code, code_size, NULL))
+			return -1;
+
+		if (!WriteProcessMemory(process, remote_data + code_size, &remote, sizeof(remote), NULL))
+			return -1;
+
+		if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_EXECUTE_READ, &old_protect))
+			return -1;
+
+		if (!FlushInstructionCache(process, remote_data, code_size + sizeof(remote)))
+			return -1;
+
+		ctx.Eip = (DWORD_PTR)remote_data;
+		ctx.ContextFlags = WOW64_CONTEXT_CONTROL;
+		if( !Wow64SetThreadContext( lpProcessInformation->hThread, &ctx ) )
+			return -1;
+	} else {
+#ifdef _WIN64
+		HMODULE kernel32;
+		remote_thread_t remote;
+
+		memset(&remote, 0, sizeof(remote));
+		kernel32 = LoadLibraryA("kernel32.dll");
+		remote.load_library = (LoadLibraryA_t) GetProcAddress(kernel32, "LoadLibraryA");
+		remote.get_proc_address = (GetProcAddress_t) GetProcAddress(kernel32, "GetProcAddress");
+		strcpy(remote.depfilename, depfilename);
+		strcpy(remote.vardict_file, vardict_file);
+		strcat(remote.execdir, execdir);
+		strcat(remote.dll_name, execdir);
+		strcat(remote.dll_name, "\\");
+		strcat(remote.dll_name, "tup-dllinject.dll");
+		strcat(remote.func_name, "tup_inject_init");
+
+		CONTEXT ctx;
+		ctx.ContextFlags = CONTEXT_CONTROL;
+		if( !GetThreadContext( lpProcessInformation->hThread, &ctx ) )
+			return -1;
+
+		/* Align code_size to a 16 byte boundary */
+		code_size = (  (uintptr_t) &remote_end
+			     - (uintptr_t) &remote_stub + 0x0F)
+			  & ~0x0F;
+
+
+		DEBUG_HOOK("Injecting dll '%s' '%s' %s' '%s'\n",
+			remote.execdir,
+			remote.dll_name,
+			remote.func_name,
+			remote.depfilename,
+			remote.vardict_file);
+
+		process = lpProcessInformation->hProcess;
+
+		if (!WaitForInputIdle(process, INFINITE))
+			return -1;
+
+		remote_data = (char*) VirtualAllocEx(
+			process,
+			NULL,
+			code_size + sizeof(remote),
+			MEM_COMMIT | MEM_RESERVE,
+			PAGE_EXECUTE_READWRITE);
+
+		if (!remote_data)
+			return -1;
+
+		if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_READWRITE, &old_protect))
+			return -1;
+
+		unsigned char code[code_size];
+
+		memcpy( code, &remote_stub, code_size );
+		*(DWORD*)(code + 0x7) = low32(ctx.Rip);
+		*(DWORD*)(code + 0xf) = high32(ctx.Rip);
+		*(DWORD64*)(code + 0x30) = (long long unsigned int)(remote_data + code_size);
+		*(DWORD64*)(code + 0x3d) = (long long unsigned int)(DWORD_PTR)remote_data + ((DWORD_PTR)&remote_init - (DWORD_PTR)&remote_stub);
+
+		if (!WriteProcessMemory(process, remote_data, code, code_size, NULL))
+			return -1;
+
+		if (!WriteProcessMemory(process, remote_data + code_size, &remote, sizeof(remote), NULL))
+			return -1;
+
+		if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_EXECUTE_READ, &old_protect))
+			return -1;
+
+		if (!FlushInstructionCache(process, remote_data, code_size + sizeof(remote)))
+			return -1;
+
+		ctx.Rip = (DWORD_PTR)remote_data;
+		ctx.ContextFlags = CONTEXT_CONTROL;
+		if( !SetThreadContext( lpProcessInformation->hThread, &ctx ) )
+			return -1;
+#else
+		DEBUG_HOOK("Error: Shouldn't be hooking here for the 32-bit dll.\n");
 		return -1;
-
-	DEBUG_HOOK("Injecting dll '%s' '%s' %s' '%s'\n",
-		remote.execdir,
-		remote.dll_name,
-		remote.func_name,
-		remote.depfilename,
-		remote.vardict_file);
-
-	process = lpProcessInformation->hProcess;
-
-	if (!WaitForInputIdle(process, INFINITE))
-		return -1;
-
-	/* Align code_size to a 16 byte boundary */
-	code_size = (  (uintptr_t) &remote_end
-		     - (uintptr_t) &remote_stub + 0x0F)
-		  & ~0x0F;
-
-	remote_data = (char*) VirtualAllocEx(
-		process,
-		NULL,
-		code_size + sizeof(remote),
-		MEM_COMMIT | MEM_RESERVE,
-		PAGE_EXECUTE_READWRITE);
-
-	if (!remote_data)
-		return -1;
-
-	if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_READWRITE, &old_protect))
-		return -1;
-
-	unsigned char code[code_size];
-	memcpy( code, &remote_stub, code_size );
-	*(DWORD*)(code + 1) = ctx.Eip;
-	*(DWORD*)(code + 8) = (DWORD)remote_data + code_size;
-	*(DWORD*)(code + 13) = (DWORD)remote_data + ( (DWORD)&remote_init - (DWORD)&remote_stub );
-	if (!WriteProcessMemory(process, remote_data, code, code_size, NULL))
-		return -1;
-
-	if (!WriteProcessMemory(process, remote_data + code_size, &remote, sizeof(remote), NULL))
-		return -1;
-
-	if (!VirtualProtectEx(process, remote_data, code_size + sizeof(remote), PAGE_EXECUTE_READ, &old_protect))
-		return -1;
-
-	if (!FlushInstructionCache(process, remote_data, code_size + sizeof(remote)))
-		return -1;
-
-	ctx.Eip = (DWORD)remote_data;
-	ctx.ContextFlags = CONTEXT_CONTROL;
-	if( !SetThreadContext( lpProcessInformation->hThread, &ctx ) )
-        return -1;
+#endif
+	}
 
 	return 0;
 }

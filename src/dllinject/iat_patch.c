@@ -32,7 +32,7 @@ static void do_hook(void* fphook, void** fporig, IMAGE_THUNK_DATA* cur)
 		return;
 	}
 
-	cur->u1.Function = (DWORD)fphook;
+	cur->u1.Function = (DWORD_PTR)fphook;
 
 	if(!VirtualProtect(cur, sizeof(IMAGE_THUNK_DATA), old_protect, &old_protect)) {
 		return;

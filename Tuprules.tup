@@ -60,9 +60,11 @@ MINGWCFLAGS += -DAT_REMOVEDIR=0x200
 !cp = |> ^ CP %f -> %o^ cp %f %o |>
 ifeq (@(TUP_MINGW),)
 !mingwcc = |> |>
+!mingwcc32 = |> |>
 !mingwar = |> |>
 else
-!mingwcc = |> ^ MINGW32CC %f^ @(TUP_MINGW)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw
+!mingwcc = |> ^ MINGWCC %f^ @(TUP_MINGW)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw
+!mingwcc32 = |> ^ MINGW32CC %f^ @(TUP_MINGW32)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw32
 !mingwar = |> ^ MINGWAR %o^ @(TUP_MINGW)-ar crs %o %f |>
 endif
 

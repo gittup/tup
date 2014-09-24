@@ -1,0 +1,5 @@
+include_rules
+
+# Disable warnings - we don't care about the pointer conversion error.
+CFLAGS = -w
+: foreach *.c |> !mingwcc32 |>

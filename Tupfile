@@ -28,7 +28,8 @@ LDFLAGS += -lm
 : src/tup/tup/main.o libtup.a src/lua/liblua.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
 
 ifneq (@(TUP_MINGW),)
-: src/dllinject/*.omingw |> ^ MINGW32LINK %o^ @(TUP_MINGW)-gcc -shared -static-libgcc %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
+: src/dllinject/*.omingw |> ^ MINGWLINK %o^ @(TUP_MINGW)-gcc -shared -static-libgcc %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
+: src/dllinject/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc -shared -static-libgcc %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject32.dll
 
 mingwsrcs = src/tup/*.omingw
 mingwsrcs += src/tup/monitor/*.omingw
@@ -45,5 +46,6 @@ MINGWLDFLAGS += -Wl,--wrap=tmpfile
 MINGWLDFLAGS += -Wl,--wrap=dup
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vfprintf
-: $(mingwsrcs) tup-dllinject.dll src/lua/liblua-mingw.a |> ^ MINGW32LINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc -static-libgcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
+: $(mingwsrcs) tup-dllinject.dll src/lua/liblua-mingw.a |> ^ MINGWLINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc -static-libgcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
+: src/compat/win32/detect/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc %f -o %o -m32 |> tup32detect.exe
 endif

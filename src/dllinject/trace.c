@@ -43,7 +43,7 @@ void debug_hook(const char* format, ...)
 	va_list ap;
 	if(debugf == NULL && !opening) {
 		opening = 1;
-		debugf = fopen("c:\\cygwin\\home\\marf\\ok.txt", "a");
+		debugf = fopen("ok.txt", "a");
 		fflush(stdout);
 	}
 	if(debugf == NULL) {

@@ -36,6 +36,8 @@ extern "C" {
 DLLINJECT_API BOOL WINAPI DllMain(HANDLE HDllHandle, DWORD Reason, LPVOID Reserved);
 
 typedef struct remote_thread_t remote_thread_t;
+typedef struct remote_thread32_t remote_thread32_t;
+
 DLLINJECT_API DWORD tup_inject_init(remote_thread_t *r);
 
 DLLINJECT_API void tup_inject_setexecdir(const char *dir);
