@@ -889,6 +889,7 @@ static int tup_fs_rmdir(const char *path)
 	struct tmpdir *tmpdir;
 	const char *peeled;
 	struct file_info *finfo;
+	struct mapping *map;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -896,6 +897,23 @@ static int tup_fs_rmdir(const char *path)
 	finfo = get_finfo(path);
 	if(finfo) {
 		peeled = peel(path);
+		size_t len = strlen(peeled);
+
+		// Ensure that there are no subdirectories
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			if(strncmp(tmpdir->dirname, peeled, len) == 0 && tmpdir->dirname[len] == '/') {
+				put_finfo(finfo);
+				return -ENOTEMPTY;
+			}
+		}
+		// Ensure that there are no files in the directory
+		LIST_FOREACH(map, &finfo->mapping_list, list) {
+			if (strncmp(map->realname, peeled, len) == 0 && map->realname[len] == '/') {
+				put_finfo(finfo);
+				return -ENOTEMPTY;
+			}
+		}
+
 		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				LIST_REMOVE(tmpdir, list);
