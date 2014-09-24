@@ -23,27 +23,39 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "tup/compat.h"
 #include "dir_mutex.h"
-#ifdef _WIN32
-#include "open_notify.h"
-#endif
 
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 {
 	int rc;
 
+#ifdef _WINDOWS
+	char cwd[PATH_MAX];
+	getcwd(cwd, PATH_MAX);
+#endif
 	dir_mutex_lock(dirfd);
+	// No symlinks on windows...
 	if(flags & AT_SYMLINK_NOFOLLOW) {
-#ifdef _WIN32
-		open_notify(ACCESS_READ, pathname);
-#endif
+#if defined(_WIN64)
+		rc = _stat64(pathname, buf);
+#elif defined(_WIN32)
+		rc = _stat32(pathname, buf);
+#else
 		rc = lstat(pathname, buf);
-	} else {
-#ifdef _WIN32
-		open_notify(ACCESS_READ, pathname);
 #endif
+	} else {
+#if defined(_WIN64)
+		rc = _stat64(pathname, buf);
+#elif defined(_WIN32)
+		rc = _stat32(pathname, buf);
+#else
 		rc = stat(pathname, buf);
+#endif
 	}
+#ifdef _WINDOWS
+	chdir(cwd);
+#endif
 	dir_mutex_unlock();
 	return rc;
 }

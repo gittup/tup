@@ -22,13 +22,17 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "tup/compat.h"
 #include "dir_mutex.h"
 
 int openat(int dirfd, const char *pathname, int flags, ...)
 {
 	int fd;
 	mode_t mode = 0;
-
+#ifdef _WINDOWS
+	char cwd[PATH_MAX];
+	getcwd(cwd, PATH_MAX);
+#endif
 	dir_mutex_lock(dirfd);
 	if(flags & O_CREAT) {
 		va_list ap;
@@ -37,6 +41,9 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 	fd = open(pathname, flags, mode);
+#ifdef _WINDOWS
+	chdir(cwd);
+#endif
 	dir_mutex_unlock();
 	return fd;
 }
