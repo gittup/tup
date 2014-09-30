@@ -51,6 +51,8 @@
 
 #define MAX_JOBS 65535
 
+typedef int(*worker_function)(struct graph *g, struct node *n);
+
 static int check_full_deps_rebuild(void);
 static int run_scan(int do_scan);
 static int process_config_nodes(int environ_check);
@@ -60,12 +62,14 @@ static int check_config_todo(void);
 static int check_create_todo(void);
 static int check_update_todo(int argc, char **argv);
 static int execute_graph(struct graph *g, int keep_going, int jobs,
-			 void *(*work_func)(void *));
+			 worker_function work_func);
 
-static void *create_work(void *arg);
-static void *update_work(void *arg);
-static void *generate_work(void *arg);
-static void *todo_work(void *arg);
+static void *run_thread(void *arg);
+
+static int create_work(struct graph *g, struct node *n);
+static int update_work(struct graph *g, struct node *n);
+static int generate_work(struct graph *g, struct node *n);
+static int todo_work(struct graph *g, struct node *n);
 static int update(struct node *n);
 
 static int do_keep_going;
@@ -112,6 +116,7 @@ struct worker_thread {
 	LIST_ENTRY(worker_thread) list;
 	pthread_t pid;
 	struct graph *g; /* Not for update_work() since it isn't sync'd */
+	worker_function fn;
 
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
@@ -1490,7 +1495,7 @@ static void pop_node(struct graph *g, struct node *n)
  *  -2: a system call failed (some work threads may still be active)
  */
 static int execute_graph(struct graph *g, int keep_going, int jobs,
-			 void *(*work_func)(void *))
+			 worker_function work_func)
 {
 	struct node *root;
 	struct worker_thread *workers;
@@ -1540,9 +1545,10 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 		workers[x].retn = NULL;
 		workers[x].rc = -1;
 		workers[x].quit = 0;
+		workers[x].fn = work_func;
 		LIST_INSERT_HEAD(&free_list, &workers[x], list);
 
-		if(pthread_create(&workers[x].pid, NULL, work_func, &workers[x]) < 0) {
+		if(pthread_create(&workers[x].pid, NULL, &run_thread, &workers[x]) < 0) {
 			perror("pthread_create");
 			return -2;
 		}
@@ -1691,44 +1697,49 @@ static void worker_ret(struct worker_thread *wt, int rc)
 	pthread_mutex_unlock(wt->list_mutex);
 }
 
-static void *create_work(void *arg)
+static void *run_thread(void *arg)
 {
 	struct worker_thread *wt = arg;
 	struct graph *g = wt->g;
 	struct node *n;
+	int rc;
 
 	while(1) {
-		int rc = 0;
-
 		n = worker_wait(wt);
 		if(n == (void*)-1)
 			break;
-
-		if(n->tent->type == TUP_NODE_DIR || n->tent->type == TUP_NODE_GHOST) {
-			if(tup_entry_variant(n->tent)->enabled) {
-				if(n->already_used) {
-					rc = 0;
-				} else {
-					rc = parse(n, g, NULL, refactoring, 1);
-				}
-				show_progress(-1, TUP_NODE_DIR);
-			}
-		} else if(n->tent->type == TUP_NODE_VAR ||
-			  n->tent->type == TUP_NODE_FILE ||
-			  n->tent->type == TUP_NODE_GENERATED ||
-			  n->tent->type == TUP_NODE_GROUP ||
-			  n->tent->type == TUP_NODE_CMD) {
-			rc = 0;
-		} else {
-			fprintf(stderr, "tup error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
-			rc = -1;
-		}
-		if(tup_db_unflag_create(n->tnode.tupid) < 0)
-			rc = -1;
-
+		rc = wt->fn(g, n);
 		worker_ret(wt, rc);
 	}
 	return NULL;
+}
+
+static int create_work(struct graph *g, struct node *n)
+{
+	int rc = 0;
+	if(n->tent->type == TUP_NODE_DIR || n->tent->type == TUP_NODE_GHOST) {
+		if(tup_entry_variant(n->tent)->enabled) {
+			if(n->already_used) {
+				rc = 0;
+			} else {
+				rc = parse(n, g, NULL, refactoring, 1);
+			}
+			show_progress(-1, TUP_NODE_DIR);
+		}
+	} else if(n->tent->type == TUP_NODE_VAR ||
+		  n->tent->type == TUP_NODE_FILE ||
+		  n->tent->type == TUP_NODE_GENERATED ||
+		  n->tent->type == TUP_NODE_GROUP ||
+		  n->tent->type == TUP_NODE_CMD) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Unknown node type %i with ID %lli named '%s' in create graph.\n", n->tent->type, n->tnode.tupid, n->tent->name.s);
+		rc = -1;
+	}
+	if(tup_db_unflag_create(n->tnode.tupid) < 0)
+		rc = -1;
+
+	return rc;
 }
 
 static int modify_outputs(struct node *n)
@@ -1748,155 +1759,128 @@ static int modify_outputs(struct node *n)
 	return rc;
 }
 
-static void *update_work(void *arg)
+static int update_work(struct graph *g, struct node *n)
 {
-	struct worker_thread *wt = arg;
-	struct node *n;
 	static int jobs_active = 0;
 
-	while(1) {
-		struct edge *e;
-		int rc = 0;
+	struct edge *e;
+	int rc = 0;
+	if(g) {/* unused */}
 
-		n = worker_wait(wt);
-		if(n == (void*)-1)
-			break;
+	if(n->tent->type == TUP_NODE_CMD) {
+		if(!n->skip) {
+			pthread_mutex_lock(&display_mutex);
+			jobs_active++;
+			show_progress(jobs_active, TUP_NODE_CMD);
+			pthread_mutex_unlock(&display_mutex);
 
-		if(n->tent->type == TUP_NODE_CMD) {
-			if(!n->skip) {
-				pthread_mutex_lock(&display_mutex);
-				jobs_active++;
-				show_progress(jobs_active, TUP_NODE_CMD);
-				pthread_mutex_unlock(&display_mutex);
+			rc = update(n);
 
-				rc = update(n);
-
-				pthread_mutex_lock(&display_mutex);
-				jobs_active--;
-				show_progress(jobs_active, TUP_NODE_CMD);
-				pthread_mutex_unlock(&display_mutex);
-			} else {
-				pthread_mutex_lock(&display_mutex);
-				skip_result(n->tent);
-				show_progress(jobs_active, TUP_NODE_CMD);
-				pthread_mutex_unlock(&display_mutex);
-			}
-
-			/* If the command succeeds, mark any next commands (ie:
-			 * our output files' output links) as modify in case we
-			 * hit an error. Note we don't just mark the output
-			 * file as modify since we aren't actually changing the
-			 * file. Doing so would muddy the semantics of the
-			 * modify list, which is needed in order to convert
-			 * generated files to normal files (t6035).
-			 */
-			if(rc == 0) {
-				pthread_mutex_lock(&db_mutex);
-				LIST_FOREACH(e, &n->edges, list) {
-					if(!e->dest->skip) {
-						if(modify_outputs(e->dest) < 0)
-							rc = -1;
-					}
-				}
-				if(tup_db_unflag_modify(n->tnode.tupid) < 0)
-					rc = -1;
-				pthread_mutex_unlock(&db_mutex);
-			}
+			pthread_mutex_lock(&display_mutex);
+			jobs_active--;
+			show_progress(jobs_active, TUP_NODE_CMD);
+			pthread_mutex_unlock(&display_mutex);
 		} else {
+			pthread_mutex_lock(&display_mutex);
+			skip_result(n->tent);
+			show_progress(jobs_active, TUP_NODE_CMD);
+			pthread_mutex_unlock(&display_mutex);
+		}
+
+		/* If the command succeeds, mark any next commands (ie:
+		 * our output files' output links) as modify in case we
+		 * hit an error. Note we don't just mark the output
+		 * file as modify since we aren't actually changing the
+		 * file. Doing so would muddy the semantics of the
+		 * modify list, which is needed in order to convert
+		 * generated files to normal files (t6035).
+		 */
+		if(rc == 0) {
 			pthread_mutex_lock(&db_mutex);
-			/* Mark the next nodes as modify in case we hit
-			 * an error - we'll need to pick up there (t6006).
-			 */
-			if(!n->skip) {
-				if(modify_outputs(n) < 0)
-					rc = -1;
+			LIST_FOREACH(e, &n->edges, list) {
+				if(!e->dest->skip) {
+					if(modify_outputs(e->dest) < 0)
+						rc = -1;
+				}
 			}
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
-
-			/* For environment variables, if there are no more
-			 * out-going edges, then this variable is no longer
-			 * needed and we can remove it. Note this is a lazy
-			 * removal, since this is triggered only if an
-			 * environment variable has been modified.
-			 */
-			if(n->tent->type == TUP_NODE_VAR &&
-			   n->tent->dt == env_dt() &&
-			   LIST_EMPTY(&n->edges) &&
-			   rc == 0) {
-				rc = delete_name_file(n->tent->tnode.tupid);
-			}
 			pthread_mutex_unlock(&db_mutex);
 		}
+	} else {
+		pthread_mutex_lock(&db_mutex);
+		/* Mark the next nodes as modify in case we hit
+		 * an error - we'll need to pick up there (t6006).
+		 */
+		if(!n->skip) {
+			if(modify_outputs(n) < 0)
+				rc = -1;
+		}
+		if(tup_db_unflag_modify(n->tnode.tupid) < 0)
+			rc = -1;
 
-		worker_ret(wt, rc);
+		/* For environment variables, if there are no more
+		 * out-going edges, then this variable is no longer
+		 * needed and we can remove it. Note this is a lazy
+		 * removal, since this is triggered only if an
+		 * environment variable has been modified.
+		 */
+		if(n->tent->type == TUP_NODE_VAR &&
+		   n->tent->dt == env_dt() &&
+		   LIST_EMPTY(&n->edges) &&
+		   rc == 0) {
+			rc = delete_name_file(n->tent->tnode.tupid);
+		}
+		pthread_mutex_unlock(&db_mutex);
 	}
-	return NULL;
+
+	return rc;
 }
 
-static void *generate_work(void *arg)
+static int generate_work(struct graph *g, struct node *n)
 {
-	struct worker_thread *wt = arg;
-	struct node *n;
+	int rc = 0;
+	if(g) {/* unused */}
 
-	while(1) {
-		int rc = 0;
-
-		n = worker_wait(wt);
-		if(n == (void*)-1)
-			break;
-
-		if(n->tent->type == TUP_NODE_CMD) {
-			const char *name;
-			if(generate_cwd != n->tent->parent) {
-				fprintf(generate_f, "cd '");
-				if(get_relative_dir(generate_f, NULL, NULL, generate_cwd->tnode.tupid, n->tent->dt, NULL) < 0) {
-					rc = -1;
-				} else {
-					fprintf(generate_f, "'\n");
-					generate_cwd = n->tent->parent;
-				}
+	if(n->tent->type == TUP_NODE_CMD) {
+		const char *name;
+		if(generate_cwd != n->tent->parent) {
+			fprintf(generate_f, "cd '");
+			if(get_relative_dir(generate_f, NULL, NULL, generate_cwd->tnode.tupid, n->tent->dt, NULL) < 0) {
+				rc = -1;
+			} else {
+				fprintf(generate_f, "'\n");
+				generate_cwd = n->tent->parent;
 			}
-			name = n->tent->name.s;
-			if(name[0] == '^') {
-				name = strchr(name+1, '^');
-				if(!name) {
-					fprintf(stderr, "tup error: Expected string '%s' to have two ^ characters.\n", n->tent->name.s);
-					rc = -1;
-				} else {
-					name++;
-					while(isspace(*name)) name++;
-				}
-			}
-			if(name)
-				fprintf(generate_f, "%s\n", name);
-		} else {
-			rc = 0;
 		}
-		worker_ret(wt, rc);
+		name = n->tent->name.s;
+		if(name[0] == '^') {
+			name = strchr(name+1, '^');
+			if(!name) {
+				fprintf(stderr, "tup error: Expected string '%s' to have two ^ characters.\n", n->tent->name.s);
+				rc = -1;
+			} else {
+				name++;
+				while(isspace(*name)) name++;
+			}
+		}
+		if(name)
+			fprintf(generate_f, "%s\n", name);
+	} else {
+		rc = 0;
 	}
-	return NULL;
+
+	return rc;
 }
 
-static void *todo_work(void *arg)
+static int todo_work(struct graph *g, struct node *n)
 {
-	struct worker_thread *wt = arg;
-	struct graph *g = wt->g;
-	struct node *n;
-
-	while(1) {
-		n = worker_wait(wt);
-		if(n == (void*)-1)
-			break;
-
-		/* TUP_NODE_ROOT means we count everything */
-		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
-			show_result(n->tent, 0, NULL, NULL, 1);
-		}
-
-		worker_ret(wt, 0);
+	/* TUP_NODE_ROOT means we count everything */
+	if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
+		show_result(n->tent, 0, NULL, NULL, 1);
 	}
-	return NULL;
+
+	return 0;
 }
 
 static int move_outputs(struct node *n)
