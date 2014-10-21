@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include "dir_mutex.h"
 
+#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101000
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
 	int rc;
@@ -32,3 +33,4 @@ int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 	dir_mutex_unlock();
 	return rc;
 }
+#endif
