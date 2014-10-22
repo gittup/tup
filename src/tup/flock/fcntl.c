@@ -30,7 +30,7 @@ int tup_lock_open(const char *lockname, tup_lock_t *lock)
 {
 	int fd;
 
-	fd = openat(tup_top_fd(), lockname, O_RDWR);
+	fd = openat(tup_top_fd(), lockname, O_RDWR|O_CLOEXEC);
 	if(fd < 0) {
 		perror(lockname);
 		fprintf(stderr, "tup error: Unable to open lockfile.\n");

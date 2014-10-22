@@ -452,7 +452,7 @@ static int master_fork_loop(void)
 			return -1;
 		if(read_all(msd[0], vardict_file, em.vardictlen) < 0)
 			return -1;
-		vardict_fd = open(vardict_file, O_RDONLY);
+		vardict_fd = open(vardict_file, O_RDONLY|O_CLOEXEC);
 		if(vardict_fd < 0) {
 			if(errno != ENOENT) {
 				perror(vardict_file);
