@@ -2032,13 +2032,13 @@ static int compare_links(const char *path1, const char *path2, int *eq)
 	int rc1;
 	int rc2;
 
-	rc1 = readlinkat(tup_top_fd(), path1, b1, sizeof(b1));
+	rc1 = readlinkat1(tup_top_fd(), path1, b1, sizeof(b1));
 	if(rc1 < 0) {
 		perror("readlinkat");
 		fprintf(stderr, "tup error: Unable to call readlinkat on path %s\n", path1);
 		return -1;
 	}
-	rc2 = readlinkat(tup_top_fd(), path2, b2, sizeof(b2));
+	rc2 = readlinkat1(tup_top_fd(), path2, b2, sizeof(b2));
 	if(rc2 < 0) {
 		perror("readlinkat");
 		fprintf(stderr, "tup error: Unable to call readlinkat on path %s\n", path2);
