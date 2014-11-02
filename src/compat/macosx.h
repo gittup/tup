@@ -25,7 +25,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-/* MacOSX 10.6 does not have *at() functions */
+/* MacOSX 10.6 does not have *at() functions, but MacOSX 10.10 adds them */
+#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101000
 DIR *fdopendir(int fd);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
@@ -41,5 +42,6 @@ int utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 
 /* clearenv also seems to be missing */
 int clearenv(void);
+#endif
 
 #endif
