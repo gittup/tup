@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include "dir_mutex.h"
 
-int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
+int readlinkat1(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
 	int rc;
 

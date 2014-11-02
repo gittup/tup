@@ -33,7 +33,7 @@ int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flag
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
 int openat(int dirfd, const char *pathname, int flags, ...);
-int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
+int readlinkat1(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int unlinkat(int dirfd, const char *pathname, int flags);
