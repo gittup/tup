@@ -366,10 +366,7 @@ ULONG_PTR AttributeList
 );
 
 
-typedef int (*access_t)(const char *pathname, int mode);
-typedef FILE *(*fopen_t)(const char *path, const char *mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
-typedef int (*remove_t)(const char *pathname);
 
 static OpenFile_t			OpenFile_orig;
 static CreateFileA_t			CreateFileA_orig;
@@ -413,10 +410,7 @@ static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
 static NtCreateUserProcess_t		NtCreateUserProcess_orig;
-static access_t				_access_orig;
-static fopen_t				fopen_orig;
 static rename_t				rename_orig;
-static remove_t				remove_orig;
 
 #define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES)
 /* Including ddk/wdm.h causes other issues, and this is all we need... */
@@ -1430,37 +1424,10 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	return ResumeThread(lpProcessInformation->hThread) != 0xFFFFFFFF;
 }
 
-int _access_hook(const char *pathname, int mode)
-{
-	handle_file(pathname, NULL, ACCESS_READ);
-	return _access_orig(pathname, mode);
-}
-
-FILE *fopen_hook(const char *path, const char *mode)
-{
-	DEBUG_HOOK("fopen mode = %s\n", mode );
-
-	FILE *ret = fopen_orig(path, mode);
-	if(strchr(mode, 'w') == NULL &&
-	   strchr(mode, 'a') == NULL &&
-	   ( strchr(mode, '+') == NULL || ret == NULL ) ) {
-		handle_file(path, NULL, ACCESS_READ);
-	} else {
-		handle_file(path, NULL, ACCESS_WRITE);
-	}
-	return ret;
-}
-
 int rename_hook(const char *oldpath, const char *newpath)
 {
 	handle_file(oldpath, newpath, ACCESS_RENAME);
 	return rename_orig(oldpath, newpath);
-}
-
-int remove_hook(const char *pathname)
-{
-	handle_file(pathname, NULL, ACCESS_UNLINK);
-	return remove_orig(pathname);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1547,10 +1514,7 @@ static struct patch_entry patch_table[] = {
 	HOOK(NtCreateUserProcess),
 #undef MODULE_NAME
 #define MODULE_NAME "msvcrt.dll"
-	HOOK(_access),
-	HOOK(fopen),
 	HOOK(rename),
-	HOOK(remove)
 };
 #undef HOOK
 #undef MODULE_NAME
