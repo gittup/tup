@@ -20,4 +20,4 @@ digraph g {
 	cparse -> {parse_c parse_h} [dir=back];
 	{parse_h parse_c} -> bison [dir=back];
 	bison -> parse_y [dir=back];
-};
+}

@@ -6,4 +6,4 @@ digraph g {
 	System [style="filled" fillcolor="#ffffff"];
 	Tup -> Build;
 	Build -> System;
-};
+}
