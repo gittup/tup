@@ -210,7 +210,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
 	if(get_name_list(tf, &input_path_list, &nl, 1) < 0)
-		return -1;
+		return luaL_error(ls, "Error while scanning 'inputs'.");
 
 	init_name_list(&r.inputs);
 	init_name_list(&r.order_only_inputs);
@@ -329,7 +329,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	struct estring e;
 
 	if(estring_init(&e) < 0)
-		return -1;
+		return luaL_error(ls, "No memory");
 
 	dirname = tuplua_tostring(ls, -1);
 	if(!dirname)
@@ -338,7 +338,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
 	if(get_relative_dir(NULL, &e, NULL, dest, tf->tupid, NULL) < 0)
-		return -1;
+		return luaL_error(ls, "get_relative_dir() failed");
 	lua_pushlstring(ls, e.s, e.len);
 	free(e.s);
 	return 1;
@@ -359,7 +359,7 @@ static int tuplua_function_getconfig(lua_State *ls)
 		return luaL_error(ls, "Must be passed an config variable name as an argument.");
 	value_size = tup_db_get_varlen(tf->variant, name, name_size) + 1;
 	if(value_size < 0)
-		luaL_error(ls, "Failed to get config variable length.");
+		return luaL_error(ls, "Failed to get config variable length.");
 	value = malloc(value_size);
 	value_as_argument = value;
 
