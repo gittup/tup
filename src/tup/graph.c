@@ -116,6 +116,51 @@ int create_edge(struct node *n1, struct node *n2, int style)
 	return 0;
 }
 
+static int create_edge_sorted(struct node *n1, struct node *n2, int style)
+{
+	struct edge *e;
+	struct edge *e2;
+	struct edge *last;
+
+	e = malloc(sizeof *e);
+	if(!e) {
+		perror("malloc");
+		return -1;
+	}
+
+	e->dest = n2;
+	e->src = n1;
+	e->style = style;
+
+	last = NULL;
+	LIST_FOREACH(e2, &n1->edges, list) {
+		if(n2->tnode.tupid > e2->dest->tnode.tupid) {
+			break;
+		}
+		last = e2;
+	}
+	if(last) {
+		LIST_INSERT_AFTER(last, e, list);
+	} else {
+		LIST_INSERT_HEAD(&n1->edges, e, list);
+	}
+
+	last = NULL;
+	LIST_FOREACH(e2, &n2->incoming, destlist) {
+		if(n1->tnode.tupid > e2->src->tnode.tupid) {
+			break;
+		}
+		last = e2;
+	}
+	if(last) {
+		LIST_INSERT_AFTER(last, e, destlist);
+	} else {
+		LIST_INSERT_HEAD(&n2->incoming, e, destlist);
+	}
+
+	return 0;
+}
+
 void remove_edge(struct edge *e)
 {
 	LIST_REMOVE(e, list);
@@ -999,13 +1044,13 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 				 */
 				LIST_FOREACH(e, &n->edges, list) {
 					if(!find_edge(&count_nd->n->edges, e->dest, e->style)) {
-						if(create_edge(count_nd->n, e->dest, e->style) < 0)
+						if(create_edge_sorted(count_nd->n, e->dest, e->style) < 0)
 							return -1;
 					}
 				}
 				LIST_FOREACH(e, &n->incoming, destlist) {
 					if(!find_incoming_edge(&count_nd->n->incoming, e->src, e->style)) {
-						if(create_edge(e->src, count_nd->n, e->style) < 0)
+						if(create_edge_sorted(e->src, count_nd->n, e->style) < 0)
 							return -1;
 					}
 				}
