@@ -330,6 +330,7 @@ static int graph(int argc, char **argv)
 	int combine;
 	int default_graph = 1;
 	int stickies = 0;
+	int pruned = -1;
 	tupid_t tupid;
 	tupid_t sub_dir_dt;
 
@@ -369,6 +370,10 @@ static int graph(int argc, char **argv)
 		if(strcmp(argv[x], "--stickies") == 0) {
 			stickies = 1;
 			continue;
+		}
+		if(strcmp(argv[x], "--prune") == 0) {
+			pruned = x;
+			break;
 		}
 
 		tent = get_tent_dt(sub_dir_dt, argv[x]);
@@ -412,6 +417,11 @@ static int graph(int argc, char **argv)
 		if(add_graph_stickies(&g) < 0)
 			return -1;
 
+	if(pruned != -1) {
+		int num_pruned;
+		if(prune_graph(&g, argc-pruned, argv+pruned, &num_pruned, 0) < 0)
+			return -1;
+	}
 	dump_graph(&g, stdout, show_dirs, combine);
 
 	destroy_graph(&g);
