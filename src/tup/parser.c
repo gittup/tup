@@ -3978,6 +3978,30 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 						return NULL;
 					}
 					len += clen;
+                                } else if(rparen-var == 7 &&
+				   strncmp(var, "TUP_RWD", 7) == 0) {
+					tupid_t root;
+					int clen = 0;
+					root = find_dir_tupid(get_tup_top());
+					if(get_relative_dir(NULL, NULL, NULL, root, tf->tupid, &clen) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", root, tf->tupid);
+						tup_db_print(tf->f, root);
+						tup_db_print(tf->f, tf->tupid);
+						return NULL;
+					}
+					len += clen;
+                                } else if(rparen-var == 8 &&
+				   strncmp(var, "TUP_ROOT", 8) == 0) {
+					tupid_t root;
+					int clen = 0;
+					root = find_dir_tupid(get_tup_top());
+					if(get_relative_dir(NULL, NULL, NULL, tf->tupid, root, &clen) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, root);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, root);
+						return NULL;
+					}
+					len += clen;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
@@ -4087,6 +4111,30 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
+					p += clen;
+                                } else if(rparen-var == 7 &&
+				   strncmp(var, "TUP_RWD", 7) == 0) {
+					tupid_t root;
+					int clen = 0;
+					root = find_dir_tupid(get_tup_top());
+					if(get_relative_dir(NULL, NULL, p, root, tf->tupid, &clen) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", root, tf->tupid);
+						tup_db_print(tf->f, root);
+						tup_db_print(tf->f, tf->tupid);
+						return NULL;
+					}
+					p += clen;
+                                } else if(rparen-var == 8 &&
+				   strncmp(var, "TUP_ROOT", 8) == 0) {
+					tupid_t root;
+					int clen = 0;
+					root = find_dir_tupid(get_tup_top());
+					if(get_relative_dir(NULL, NULL, p, tf->tupid, root, &clen) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, root);
+						tup_db_print(tf->f, tf->tupid);
+						tup_db_print(tf->f, root);
 						return NULL;
 					}
 					p += clen;

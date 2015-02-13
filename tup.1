@@ -477,6 +477,12 @@ Append "value" to the end of the current value of "var". If "var" has not been s
 .TP
 .B $(TUP_CWD)
 The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup". For an alternative to $(TUP_CWD) when referring to files, see the section on &-variables below.
+.TP
+.B $(TUP_ROOT)
+The special $-variable TUP_ROOT is always set to the path relative from the Tupfile currently parsed to root directory of a project.
+.TP
+.B $(TUP_RWD)
+The special $-variable TUP_RWD is always set to the path relative from root directory of a project to the Tupfile currently parsed.
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
 .TP
