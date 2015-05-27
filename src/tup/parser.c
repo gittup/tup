@@ -240,10 +240,16 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	tf.g = g;
 	tf.refactoring = refactoring;
 	if(tf.variant->root_variant) {
+		char cmd[] = "!tup-variant = |> |>";
 		tf.srctent = NULL;
+		if(parse_bang_definition(&tf, cmd, 0) < 0)
+			return -1;
 	} else {
+		char cmd[] = "!tup-variant = |> tup-variant |> %b";
 		if(variant_get_srctent(tf.variant, tf.tupid, &tf.srctent) < 0)
 			goto out_server_stop;
+		if(parse_bang_definition(&tf, cmd, 0) < 0)
+			return -1;
 	}
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
@@ -3239,6 +3245,10 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
 	int command_modified = 0;
+	int is_variant_copy = 0;
+
+	if(strcmp(r->command, "tup-variant") == 0)
+		is_variant_copy = 1;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -3335,7 +3345,7 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
 
-		if(tf->srctent) {
+		if(tf->srctent && !is_variant_copy) {
 			struct tup_entry *tent;
 			if(tup_db_select_tent(tf->srctent->tnode.tupid, onle->path, &tent) < 0)
 				return -1;
@@ -3387,6 +3397,46 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 out_pl:
 		del_pl(pl, oplist);
+	}
+
+	if(is_variant_copy) {
+		char *path;
+		int len;
+		int dfd;
+		int rc;
+
+		onle = TAILQ_FIRST(&onl.entries);
+		nle = TAILQ_FIRST(&r->inputs.entries);
+		if(onl.num_entries != 1 || nl->num_entries != 1) {
+			fprintf(tf->f, "tup error: Expected only one input/output for tup-variant copy.\n");
+			return -1;
+		}
+		if(get_relative_dir(NULL, NULL, NULL, onle->tent->tnode.tupid, nle->tent->tnode.tupid, &len) < 0)
+			return -1;
+		path = malloc(len);
+		if(!path) {
+			perror("malloc");
+			return -1;
+		}
+		if(get_relative_dir(NULL, NULL, path, onle->tent->tnode.tupid, nle->tent->tnode.tupid, &len) < 0)
+			return -1;
+		dfd = tup_entry_open(onle->tent->parent);
+		if(dfd < 0)
+			return -1;
+		rc = symlinkat(path, dfd, onle->path);
+		if(close(dfd) < 0) {
+			perror("close(dfd)");
+			return -1;
+		}
+		if(rc < 0) {
+			if(errno == EEXIST)
+				return 0;
+			perror(path);
+			fprintf(tf->f, "tup error: Unable to create symlink for variant copy.\n");
+			return -1;
+		}
+		free(path);
+		return 0;
 	}
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
