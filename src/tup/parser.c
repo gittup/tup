@@ -3418,21 +3418,29 @@ out_pl:
 			perror("malloc");
 			return -1;
 		}
-		if(get_relative_dir(NULL, NULL, path, onle->tent->tnode.tupid, nle->tent->tnode.tupid, &len) < 0)
+		if(get_relative_dir(NULL, NULL, path, onle->tent->tnode.tupid, nle->tent->tnode.tupid, &len) < 0){
+			free(path);
 			return -1;
+		}
 		dfd = tup_entry_open(onle->tent->parent);
-		if(dfd < 0)
+		if(dfd < 0){
+			free(path);
 			return -1;
+		}
 		rc = symlinkat(path, dfd, onle->path);
 		if(close(dfd) < 0) {
 			perror("close(dfd)");
+			free(path);
 			return -1;
 		}
 		if(rc < 0) {
-			if(errno == EEXIST)
+			if(errno == EEXIST){
+				free(path);
 				return 0;
+                           }
 			perror(path);
 			fprintf(tf->f, "tup error: Unable to create symlink for variant copy.\n");
+			free(path);
 			return -1;
 		}
 		free(path);
