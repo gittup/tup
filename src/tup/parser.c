@@ -2689,7 +2689,26 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.globstr = pl->pel->path;
 	args.globstrlen = pl->pel->len;
 	args.tf = tf;
-	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
+	if(pl->pel->len && pl->pel->path[0] == '^') {
+		struct tup_entry *tent;
+		if(tup_db_select_tent_part(pl->dt, pl->pel->path+1, pl->pel->len-1, &tent) < 0)
+			return 0;
+		if(!tent || tent->type == TUP_NODE_GHOST)
+			return 0;
+		struct variant *variant = tup_entry_variant(tent);
+		if(!variant->root_variant && variant != tf->variant)
+			return 0; // from another variant
+		const char* path = set_path(tent->name.s, args.dir, args.dirlen);
+		if(path != NULL) {
+			struct name_list_entry *nle;
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(strcmp(nle->path, path) == 0) {
+					delete_name_list_entry(nl, nle);
+					break;
+				}
+			}
+		}
+	} else if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct variant *variant;
 
