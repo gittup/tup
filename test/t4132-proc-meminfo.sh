@@ -24,9 +24,10 @@ if [ ! "$tupos" = "Linux" ]; then
 	eotup
 fi
 check_tup_suid
+set_full_deps
 
 cat > Tupfile << HERE
-: |> ^c^ cat /proc/meminfo > %o |> output.txt
+: |> cat /proc/meminfo > %o |> output.txt
 HERE
 tup touch Tupfile
 update

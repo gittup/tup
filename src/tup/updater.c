@@ -36,7 +36,6 @@
 #include "monitor.h"
 #include "path.h"
 #include "environ.h"
-#include "privs.h"
 #include "variant.h"
 #include "flist.h"
 #include "estring.h"
@@ -143,11 +142,6 @@ int updater(int argc, char **argv, int phase)
 	full_deps = tup_option_get_int("updater.full_deps");
 	show_warnings = tup_option_get_int("updater.warnings");
 	progress_init();
-
-	if(full_deps && !tup_privileged()) {
-		fprintf(stderr, "tup error: Unable to support full dependencies since the tup executable is not privileged. Please set the tup executable to be suid root, or if that is not possible then disable the 'updater.full_deps' option. (The option is currently enabled in the file %s)\n", tup_option_get_location("updater.full_deps"));
-		return -1;
-	}
 
 	if(check_full_deps_rebuild() < 0)
 		return -1;
@@ -2479,13 +2473,6 @@ static int update(struct node *n)
 		while(*name && *name != ' ' && *name != '^') {
 			switch(*name) {
 				case 'c':
-					if(!tup_privileged()) {
-						pthread_mutex_lock(&display_mutex);
-						show_result(n->tent, 1, NULL, NULL, 1);
-						fprintf(stderr, "tup error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
-						pthread_mutex_unlock(&display_mutex);
-						return -1;
-					}
 					do_chroot = 1;
 					break;
 				case 'o':

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012-2015  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2015  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,21 +16,35 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# When doing a readlink() on /proc/self in a chroot, we need to return the pid
-# of the actual process doing the readlink(), not the fuse process.
+# Same as t4031, but with chgrp.
 
 . ./tup.sh
-if [ ! "$tupos" = "Linux" ]; then
-	echo "Only supported in Linux. Skipping test."
+check_no_windows shell
+if ! whoami | grep marf > /dev/null; then
+	echo "[33mSkip t4172 - you're not marf.[0m"
 	eotup
 fi
-check_tup_suid
-set_full_deps
 
 cat > Tupfile << HERE
-: |> ls -l /proc/self/ > /dev/null |>
+ifeq (@(TUP_PLATFORM),macosx)
+group = staff
+else
+group = marf
+endif
+: |> touch %o; chgrp \$(group) %o |> test1
 HERE
 tup touch Tupfile
 update
+
+cat > Tupfile << HERE
+ifeq (@(TUP_PLATFORM),macosx)
+group = staff
+else
+group = marf
+endif
+: |> chgrp \$(group) test2 |>
+HERE
+tup touch Tupfile test2
+update_fail_msg "tup error.*chown"
 
 eotup

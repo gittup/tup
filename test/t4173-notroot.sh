@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012-2015  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2015  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,21 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# When doing a readlink() on /proc/self in a chroot, we need to return the pid
-# of the actual process doing the readlink(), not the fuse process.
+# Make sure we aren't ever root in a subprocess.
 
 . ./tup.sh
-if [ ! "$tupos" = "Linux" ]; then
-	echo "Only supported in Linux. Skipping test."
-	eotup
-fi
-check_tup_suid
-set_full_deps
 
 cat > Tupfile << HERE
-: |> ls -l /proc/self/ > /dev/null |>
+: |> whoami > %o |> output.txt
 HERE
-tup touch Tupfile
 update
+
+if echo root | diff - output.txt > /dev/null; then
+	echo "Error: 'whoami' shouldn't be root." 1>&2
+	exit 1
+fi
 
 eotup
