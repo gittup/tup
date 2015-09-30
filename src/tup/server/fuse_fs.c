@@ -1228,9 +1228,6 @@ static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
 	int res;
 	int fd;
 
-	if(context_check() < 0)
-		return -EPERM;
-
 	if(fi->fh == 0) {
 		struct file_info *finfo;
 		const char *openfile;
@@ -1269,9 +1266,6 @@ static int tup_fs_write(const char *path, const char *buf, size_t size,
 {
 	int res;
 	int fd = -1;
-
-	if(context_check() < 0)
-		return -EPERM;
 
 	if(fi->fh == 0) {
 		struct file_info *finfo;
