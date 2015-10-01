@@ -982,7 +982,7 @@ int export(struct tupfile *tf, const char *cmdline)
 	}
 
 	/* Pull from tup's environment */
-	if(!tup_db_findenv(cmdline, &tent) < 0) {
+	if(tup_db_findenv(cmdline, &tent) < 0) {
 		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
 		return -1;
 	}
