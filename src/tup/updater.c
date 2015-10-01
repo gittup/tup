@@ -268,6 +268,7 @@ int generate(int argc, char **argv)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
+	start_progress(g.num_nodes, g.total_mtime, 1);
 
 	/* The parsing nodes have to be removed so that we know if dependent
 	 * Tupfiles have already been parsed.
