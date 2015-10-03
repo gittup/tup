@@ -18,7 +18,6 @@
 
 # Make sure touching the Tupfile doesn't delete the tup_preserve files.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

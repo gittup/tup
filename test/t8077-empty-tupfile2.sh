@@ -19,7 +19,6 @@
 # Same as t8076, but with the monitor running (so the monitor sets srcid == -2)
 
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

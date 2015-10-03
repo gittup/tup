@@ -18,7 +18,6 @@
 
 # Try to rename a variant with the monitor running.
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

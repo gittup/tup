@@ -18,7 +18,6 @@
 
 # Like t3071, but in a variant.
 . ./tup.sh
-check_no_windows variant
 
 cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)

@@ -18,7 +18,6 @@
 
 # Make sure we can go from an in-tree build to a variant.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
@@ -26,7 +25,7 @@ tmkdir sub
 cat > Tupfile << HERE
 .gitignore
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 .gitignore
@@ -36,14 +35,14 @@ echo "int main(void) {return 0;}" > foo.c
 tup touch Tupfile foo.c sub/bar.c
 update
 
-check_not_exist build/foo.o build/sub/bar.o build/prog
-check_exist foo.o sub/bar.o prog
+check_not_exist build/foo.o build/sub/bar.o build/prog.exe
+check_exist foo.o sub/bar.o prog.exe
 
 tup touch build/tup.config
 update
 
-check_exist build/foo.o build/sub/bar.o build/prog
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/prog.exe
+check_not_exist foo.o sub/bar.o prog.exe
 
 # Make sure we can still update the variant
 tup touch sub/Tupfile

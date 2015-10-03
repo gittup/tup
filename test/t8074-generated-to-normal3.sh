@@ -19,7 +19,6 @@
 # Same as t8072, but we forget to create the file initially.
 
 . ./tup.sh
-check_no_windows variant
 
 mkdir build
 touch build/tup.config

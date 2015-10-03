@@ -18,7 +18,7 @@
 
 # Use the 'tup variant' command when a variant directory already exists.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir build-debug
 tmkdir configs

@@ -18,7 +18,6 @@
 
 # Try moving a src directory with a variant build using the monitor.
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

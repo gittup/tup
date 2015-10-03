@@ -23,7 +23,7 @@
 # counted correctly.
 
 . ./tup.sh
-check_no_windows variant
+check_no_windows shell
 
 cat .tup/options << HERE
 [display]

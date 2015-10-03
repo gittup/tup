@@ -20,7 +20,6 @@
 # in a variant build.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

@@ -18,7 +18,6 @@
 
 # Make sure a deleted src directory gets propagated to all variants.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir build-debug

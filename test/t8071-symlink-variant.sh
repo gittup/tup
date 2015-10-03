@@ -19,7 +19,8 @@
 # Make sure replacing a directory with a symlink works with variants.
 
 . ./tup.sh
-check_no_windows variant
+check_no_windows symlink
+check_no_ldpreload symlink-dir
 
 mkdir foo
 touch foo/foo.h

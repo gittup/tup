@@ -19,7 +19,6 @@
 # Make sure we can only create a variant in an empty directory (except for
 # tup.config)
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

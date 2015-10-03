@@ -19,7 +19,6 @@
 # Make sure expanding a group in a variant only includes files in that variant.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir sub
 tmkdir sub2
@@ -42,12 +41,13 @@ tup touch build/tup.config
 tup touch build2/tup.config
 update
 
-if ! grep '^[^ ]* [^ ]* [^ ]*$' build/sub3/list.txt > /dev/null; then
+# Windows has an extra space and \r at the end, so ignore trailing whitespace (\s*)
+if ! grep '^[^ ]* [^ ]* [^ ]*\s*$' build/sub3/list.txt > /dev/null; then
 	cat build/sub3/list.txt
 	echo "Error: Expected only 3 files in list.txt" 1>&2
 	exit 1
 fi
-if ! grep '^[^ ]* [^ ]* [^ ]*$' build2/sub3/list.txt > /dev/null; then
+if ! grep '^[^ ]* [^ ]* [^ ]*\s*$' build2/sub3/list.txt > /dev/null; then
 	cat build2/sub3/list.txt
 	echo "Error: Expected only 3 files in list.txt" 1>&2
 	exit 1

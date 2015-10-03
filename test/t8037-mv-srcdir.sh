@@ -18,14 +18,13 @@
 
 # Try moving a src directory with a variant build.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
@@ -35,19 +34,19 @@ echo "CONFIG_FOO=y" > build/tup.config
 touch sub/bar.c
 update
 
-check_exist build/foo.o build/sub/bar.o build/prog
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/prog.exe
+check_not_exist foo.o sub/bar.o prog.exe
 
 mv sub newsub
 update_fail_msg "Failed to find directory ID for dir 'sub/\*.o' relative to 'build'"
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o newsub/*.o |> gcc %f -o %o |> prog
+: *.o newsub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 update
 
-check_exist build/foo.o build/newsub/bar.o build/prog
+check_exist build/foo.o build/newsub/bar.o build/prog.exe
 check_not_exist build/sub
 
 eotup

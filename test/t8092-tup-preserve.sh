@@ -19,7 +19,6 @@
 # !tup_preserve has no effect without variants
 
 . ./tup.sh
-check_no_windows variant
 
 cat > Tupfile << HERE
 : file.txt |> !tup_preserve |>

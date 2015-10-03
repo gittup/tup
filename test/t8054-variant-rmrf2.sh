@@ -18,7 +18,7 @@
 
 # Try to rm -rf multiple variants.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir sub
 tmkdir configs

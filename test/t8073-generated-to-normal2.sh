@@ -21,7 +21,6 @@
 # root directory.
 
 . ./tup.sh
-check_no_windows variant
 
 mkdir build
 touch build/tup.config

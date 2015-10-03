@@ -20,7 +20,6 @@
 # variant has the junk in it from the old variant. Once we delete that out,
 # it should get rebuilt.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build-foo
 tmkdir sub

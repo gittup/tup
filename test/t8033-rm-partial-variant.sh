@@ -18,14 +18,13 @@
 
 # Try removing part of a variant directory.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
@@ -35,8 +34,8 @@ echo "CONFIG_FOO=y" > build/tup.config
 tup touch build/tup.config Tupfile foo.c sub/bar.c
 update
 
-check_exist build/foo.o build/sub/bar.o build/prog
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/prog.exe
+check_not_exist foo.o sub/bar.o prog.exe
 
 rm -rf build/sub
 update > .tupoutput 2>&1

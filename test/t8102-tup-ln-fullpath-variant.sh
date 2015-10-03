@@ -19,7 +19,7 @@
 # Same as t2196, but in a variant.
 
 . ./tup.sh
-check_no_windows variant
+check_no_windows paths
 
 tmkdir sub
 cat > sub/Tupfile << HERE

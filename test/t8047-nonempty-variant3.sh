@@ -18,7 +18,6 @@
 
 # Try to move the tup.config to a srcdir accidentally.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub

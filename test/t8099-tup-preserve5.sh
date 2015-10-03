@@ -18,7 +18,6 @@
 
 # Make sure removing the source file means the variant copy is deleted.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

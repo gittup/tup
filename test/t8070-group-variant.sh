@@ -19,7 +19,6 @@
 # Same as t3053, but with a variant.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir sub
 tmkdir sub2

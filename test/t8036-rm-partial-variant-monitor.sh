@@ -18,7 +18,6 @@
 
 # Try removing part of a variant directory with the monitor running.
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

@@ -18,7 +18,7 @@
 
 # Use a variant with a generated directory.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 touch tup.config
 tmkdir a

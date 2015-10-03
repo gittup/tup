@@ -21,7 +21,6 @@
 # already been deleted.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir foo
 tmkdir foo/bar

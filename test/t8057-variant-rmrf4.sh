@@ -19,7 +19,7 @@
 # Make sure that if we just scan the removal of a variant and re-create it with
 # a different symlink.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir sub
 tmkdir configs

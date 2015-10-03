@@ -18,7 +18,6 @@
 
 # Make sure gitignore files work properly in variants.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 touch build/tup.config

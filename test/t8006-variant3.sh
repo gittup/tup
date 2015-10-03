@@ -18,7 +18,6 @@
 
 # Try a variant with a ghost in the variant dir.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub

@@ -19,14 +19,13 @@
 # Make sure we don't have a '$' directory in the variant after we change an
 # environment variable.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o

@@ -19,7 +19,7 @@
 # Make sure if we have a dir in the variant that is a ghost, we can still
 # create that directory in the src tree and have it work.
 . ./tup.sh
-check_no_windows variant
+check_no_windows shell
 
 tmkdir build
 

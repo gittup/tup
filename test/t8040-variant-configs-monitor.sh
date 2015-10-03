@@ -19,7 +19,6 @@
 # Try variants using symlinks to a directory with config files, then move
 # the directory containing the config files out of the way with the monitor running.
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

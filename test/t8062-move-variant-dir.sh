@@ -18,7 +18,7 @@
 
 # Move a variant directory to the src tree.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir sub
 tmkdir configs

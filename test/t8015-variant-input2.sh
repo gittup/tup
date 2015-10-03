@@ -19,7 +19,6 @@
 # Like t8014, but this time we don't involve the parser. Just try to read
 # straight from the other variant.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 cat > Tupfile << HERE

@@ -18,7 +18,6 @@
 
 # Try rm -rf'ing a variant directory.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir build-debug

@@ -18,7 +18,7 @@
 
 # Use include_rules in a variant Tupfile
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir sub
 tmkdir sub/sub2

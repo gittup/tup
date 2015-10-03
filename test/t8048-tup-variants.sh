@@ -18,7 +18,7 @@
 
 # Use the 'tup variant' command to create variants from existing config files.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir configs
 

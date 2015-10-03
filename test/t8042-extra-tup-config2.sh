@@ -18,7 +18,6 @@
 
 # Try to create an extra tup.config in the root directory while removing a variant.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build-debug
 tmkdir build-default
@@ -27,7 +26,7 @@ tmkdir sub
 cat > Tupfile << HERE
 .gitignore
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 .gitignore
@@ -37,7 +36,7 @@ echo "int main(void) {return 0;}" > foo.c
 tup touch Tupfile foo.c build-default/tup.config build-debug/tup.config sub/bar.c
 update
 
-for i in foo.o sub/bar.o prog sub/.gitignore; do
+for i in foo.o sub/bar.o prog.exe sub/.gitignore; do
 	check_exist build-debug/$i
 	check_exist build-default/$i
 	check_not_exist $i
@@ -50,7 +49,7 @@ tup touch tup.config
 rm build-debug/tup.config
 tup parse > .output.txt
 
-for i in foo.o sub/bar.o prog sub/.gitignore; do
+for i in foo.o sub/bar.o prog.exe sub/.gitignore; do
 	check_not_exist build-debug/$i
 	check_exist build-default/$i
 	check_not_exist $i

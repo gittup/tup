@@ -18,7 +18,6 @@
 
 # Another test of moving the srcdir, this time it isn't used by the root directory.
 . ./tup.sh
-check_no_windows variant
 check_monitor_supported
 
 monitor

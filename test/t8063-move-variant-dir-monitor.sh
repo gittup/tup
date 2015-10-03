@@ -18,7 +18,7 @@
 
 # Move a variant directory to the src tree with the monitor running.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 check_monitor_supported
 
 monitor

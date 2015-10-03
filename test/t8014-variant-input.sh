@@ -18,7 +18,6 @@
 
 # Make sure we can't use a variant file as an input.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 cat > Tupfile << HERE

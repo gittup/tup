@@ -19,7 +19,7 @@
 # Use the 'tup variant' command on config files further down in the
 # directory structure.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir sub
 tmkdir sub/foo

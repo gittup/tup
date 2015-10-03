@@ -19,7 +19,6 @@
 # Make sure the build dir for a new variant is not propagated to other
 # variants.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build1
 tmkdir build2

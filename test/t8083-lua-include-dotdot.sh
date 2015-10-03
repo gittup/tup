@@ -18,7 +18,6 @@
 
 # Make sure we can't use files from outside of the variant when parsing lua.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

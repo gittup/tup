@@ -18,7 +18,6 @@
 
 # Try a variant in lua.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub

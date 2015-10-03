@@ -18,7 +18,7 @@
 
 # Use the 'tup variant' command on config files without any suffix.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 
 tmkdir configs
 

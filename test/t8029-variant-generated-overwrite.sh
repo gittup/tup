@@ -21,7 +21,6 @@
 # since the generated file is going in a different directory than where the
 # normal files are.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build-default
 

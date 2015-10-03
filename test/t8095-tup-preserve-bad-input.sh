@@ -19,7 +19,6 @@
 # Make sure !tup_preserve fails if given the output of another command.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir sub
 cat > sub/Tupfile << HERE

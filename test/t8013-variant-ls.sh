@@ -18,7 +18,6 @@
 
 # Make sure an in-tree build doesn't duplicate files.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir sub
 cat > sub/ok.c << HERE
@@ -40,8 +39,8 @@ int main(void)
 HERE
 
 cat > sub/Tupfile << HERE
-: ok.c |> gcc %f -o %o |> ok
-: ok |> ./ok > %o |> files.txt
+: ok.c |> gcc %f -o %o |> ok.exe
+: ok.exe |> ./ok.exe > %o |> files.txt
 HERE
 tup touch sub/foo.c sub/bar.c sub/Tupfile
 update

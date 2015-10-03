@@ -19,7 +19,6 @@
 # Manually create a directory inside the variant. Tup shouldn't complain here.
 
 . ./tup.sh
-check_no_windows variant
 
 mkdir build
 touch build/tup.config

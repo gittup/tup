@@ -18,7 +18,7 @@
 
 # Move a variant directory outside of the tup hierarchy with the monitor watching.
 . ./tup.sh
-check_no_windows variant
+check_no_windows tup variant
 check_monitor_supported
 
 mkdir tuptest

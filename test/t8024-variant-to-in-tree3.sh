@@ -20,7 +20,7 @@
 # by creating a very long command string, so that if we do try to unlink
 # it, it will fail with a name too long error.
 . ./tup.sh
-check_no_windows variant
+check_no_windows shell
 
 tmkdir build
 

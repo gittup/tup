@@ -19,7 +19,6 @@
 # Make sure !tup_preserve works from lua
 
 . ./tup.sh
-check_no_windows variant
 
 cat > Tupfile.lua << HERE
 tup.rule({'file.txt'}, '!tup_preserve')

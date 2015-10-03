@@ -19,7 +19,6 @@
 # Make sure we can use a preserved file in a subsequent command.
 
 . ./tup.sh
-check_no_windows variant
 
 cat > Tupfile << HERE
 : file.txt |> !tup_preserve |>

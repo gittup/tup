@@ -18,7 +18,6 @@
 
 # Make sure a tup.config not at a top-level doesn't create a new variant.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir build2

@@ -19,7 +19,6 @@
 # Make sure that we can clean up old variant directories, even if the
 # Tupfiles are gone.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

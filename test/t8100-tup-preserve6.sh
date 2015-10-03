@@ -18,7 +18,6 @@
 
 # Try to read from a !tup_preserve file
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

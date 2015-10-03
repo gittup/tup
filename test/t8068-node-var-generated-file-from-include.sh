@@ -21,7 +21,6 @@
 # (t2123 + variants)
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sw

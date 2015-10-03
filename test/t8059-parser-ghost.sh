@@ -19,7 +19,7 @@
 # Make sure we get a sane error message if we try to explicitly list a file
 # in a ghost directory.
 . ./tup.sh
-check_no_windows variant
+check_no_windows shell
 
 tmkdir build
 tmkdir sub

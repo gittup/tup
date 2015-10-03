@@ -26,7 +26,7 @@
 # directory, and in the next case we can find it, but since it is a ghost we
 # can't find the file in it.
 . ./tup.sh
-check_no_windows variant
+check_no_windows shell
 
 tmkdir build
 tmkdir build-debug

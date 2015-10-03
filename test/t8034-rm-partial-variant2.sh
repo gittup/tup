@@ -18,14 +18,13 @@
 
 # Like t8033, but with another level of subdirectory.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
@@ -46,8 +45,8 @@ HERE
 tup touch sub/dir2/bar2.c sub/dir2/dir3/bar3.c
 update
 
-check_exist build/foo.o build/sub/bar.o build/sub/dir2/bar2.o build/sub/dir2/dir3/bar3.o build/prog
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/sub/dir2/bar2.o build/sub/dir2/dir3/bar3.o build/prog.exe
+check_not_exist foo.o sub/bar.o prog.exe
 
 rm -rf build/sub
 update

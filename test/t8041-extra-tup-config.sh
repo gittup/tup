@@ -18,7 +18,6 @@
 
 # Try to create an extra tup.config in the root directory after a variant.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub
@@ -26,7 +25,7 @@ tmkdir sub
 cat > Tupfile << HERE
 .gitignore
 : foreach *.c |> gcc -c %f -o %o |> %B.o
-: *.o sub/*.o |> gcc %f -o %o |> prog
+: *.o sub/*.o |> gcc %f -o %o |> prog.exe
 HERE
 cat > sub/Tupfile << HERE
 .gitignore
@@ -36,13 +35,13 @@ echo "int main(void) {return 0;}" > foo.c
 tup touch Tupfile foo.c build/tup.config sub/bar.c
 update
 
-check_exist build/foo.o build/sub/bar.o build/prog build/.gitignore build/sub/.gitignore
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/prog.exe build/.gitignore build/sub/.gitignore
+check_not_exist foo.o sub/bar.o prog.exe
 
 tup touch tup.config
 update
 
-check_exist build/foo.o build/sub/bar.o build/prog build/.gitignore build/sub/.gitignore
-check_not_exist foo.o sub/bar.o prog
+check_exist build/foo.o build/sub/bar.o build/prog.exe build/.gitignore build/sub/.gitignore
+check_not_exist foo.o sub/bar.o prog.exe
 
 eotup

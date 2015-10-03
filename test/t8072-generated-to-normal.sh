@@ -19,7 +19,6 @@
 # Same as t6053, but in a variant.
 
 . ./tup.sh
-check_no_windows variant
 
 mkdir build
 touch build/tup.config

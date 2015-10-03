@@ -18,7 +18,6 @@
 
 # Create a normal file inside a variant directory after the variant is used.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 tmkdir sub

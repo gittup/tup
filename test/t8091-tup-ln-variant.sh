@@ -19,7 +19,6 @@
 # Like t2188, but in a variant
 
 . ./tup.sh
-check_no_windows variant
 
 cat > Tupfile << HERE
 : foreach *.txt |> !tup_ln |> %B.lnk

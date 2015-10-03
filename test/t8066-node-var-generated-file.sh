@@ -19,7 +19,6 @@
 # Test that a node-variable cannot refer to a generated file in a variant build.
 
 . ./tup.sh
-check_no_windows variant
 
 tmkdir build
 

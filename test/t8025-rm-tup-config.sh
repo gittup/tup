@@ -19,7 +19,6 @@
 # Removing an in-tree tup.config shouldn't re-parse everything that
 # uses an @-variable, just those that would be affected by the change.
 . ./tup.sh
-check_no_windows variant
 
 tmkdir foo
 tmkdir bar
