@@ -49,6 +49,11 @@
 #define CIRCULAR_DEPENDENCY_ERROR -3
 #define ERROR_DIRECTIVE_ERROR -4
 
+#define TUPFILE "Tupfile"
+#define TUPDEFAULT "Tupdefault"
+#define TUPFILE_LUA "Tupfile.lua"
+#define TUPDEFAULT_LUA "Tupdefault.lua"
+
 struct bang_rule {
 	struct string_tree st;
 	int foreach;
@@ -90,8 +95,8 @@ struct build_name_list_args {
 	int orderid;
 };
 
-static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
-			    char *luafilename);
+static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
+			char *path, int *parser_lua);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
@@ -175,7 +180,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	struct buf b = {NULL, 0};
 	struct parser_server ps;
 	struct timeval orig_start;
-	char luafilename[PATH_MAX];
+	char path[PATH_MAX];
 
 	timespan_start(&tf.ts);
 	memcpy(&orig_start, &tf.ts.start, sizeof(orig_start));
@@ -277,28 +282,19 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			goto out_close_vdb;
 		}
 
-		fd = openat(tf.cur_dfd, "Tupfile", O_RDONLY);
+		fd = open_tupfile(&tf, n->tent, path, &parser_lua);
 		if(fd < 0) {
 			if(errno == ENOENT) {
-				parser_lua = 1;
-				fd = open_lua_tupfile(&tf, n->tent, luafilename);
-				if(fd < 0) {
-					if(errno == ENOENT) {
-						/* No Tupfile means we have nothing to do */
-						if(n->tent->tnode.tupid == DOT_DT) {
-							/* Check to see if the top-level rules file would .gitignore. We disable
-							 * tf.tupid so no rules get created.
-							 */
-							if(check_toplevel_gitignore(&tf) < 0)
-								goto out_close_dfd;
-						}
-					} else {
-						parser_error(&tf, luafilename);
+				/* No Tupfile means we have nothing to do */
+				if(n->tent->tnode.tupid == DOT_DT) {
+					/* Check to see if the top-level rules file would .gitignore. We disable
+					 * tf.tupid so no rules get created.
+					 */
+					if(check_toplevel_gitignore(&tf) < 0)
 						goto out_close_dfd;
-					}
 				}
 			} else {
-				parser_error(&tf, "Tupfile");
+				parser_error(&tf, path);
 				goto out_close_dfd;
 			}
 		}
@@ -310,7 +306,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 				goto out_free_bs;
 		} else {
-			if(parse_lua_tupfile(&tf, &b, luafilename) < 0)
+			if(parse_lua_tupfile(&tf, &b, path) < 0)
 				goto out_free_bs;
 		}
 	}
@@ -421,42 +417,50 @@ out_server_stop:
 	return rc;
 }
 
-static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
-			    char *luafilename)
+static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
+			char *path, int *parser_lua)
 {
 	int fd;
 	int n = 0;
 
-	fd = openat(tf->cur_dfd, "Tupfile.lua", O_RDONLY);
+	strcpy(path, TUPFILE);
+	fd = openat(tf->cur_dfd, path, O_RDONLY);
 	if(fd < 0 && errno != ENOENT)
 		return -1;
-	if(fd >= 0) {
-		strcpy(luafilename, "Tupfile.lua");
+	if(fd >= 0)
 		return fd;
-	}
 
-	fd = openat(tf->cur_dfd, "Tupdefault.lua", O_RDONLY);
+	strcpy(path, TUPFILE_LUA);
+	fd = openat(tf->cur_dfd, path, O_RDONLY);
 	if(fd < 0 && errno != ENOENT)
 		return -1;
 	if(fd >= 0) {
-		strcpy(luafilename, "Tupdefault.lua");
+		*parser_lua = 1;
 		return fd;
 	}
-	while(tent->parent) {
+	do {
 		int x;
-
-		n++;
-		for(x=0; x<n; x++) {
-			strcpy(luafilename + x*3, "../");
-		}
-		strcpy(luafilename + n*3, "Tupdefault.lua");
-		fd = openat(tf->cur_dfd, luafilename, O_RDONLY);
+		strcpy(path + n*3, TUPDEFAULT);
+		fd = openat(tf->cur_dfd, path, O_RDONLY);
 		if(fd < 0 && errno != ENOENT)
 			return -1;
 		if(fd >= 0)
 			return fd;
+		strcpy(path + n*3, TUPDEFAULT_LUA);
+		fd = openat(tf->cur_dfd, path, O_RDONLY);
+		if(fd < 0 && errno != ENOENT)
+			return -1;
+		if(fd >= 0) {
+			*parser_lua = 1;
+			return fd;
+		}
+
+		n++;
+		for(x=0; x<n; x++) {
+			strcpy(path + x*3, "../");
+		}
 		tent = tent->parent;
-	}
+	} while(tent);
 	errno = ENOENT;
 	return -1;
 }
