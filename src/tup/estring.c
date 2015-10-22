@@ -34,13 +34,14 @@ int estring_init(struct estring *e)
 		perror("malloc");
 		return -1;
 	}
+	e->s[0] = 0;
 	return 0;
 }
 
 int estring_append(struct estring *e, const char *src, int len)
 {
-	if(e->len + len > e->maxlen) {
-		while(e->len + len > e->maxlen) {
+	if(e->len + len + 1 > e->maxlen) {
+		while(e->len + len + 1 > e->maxlen) {
 			e->maxlen *= 2;
 		}
 		e->s = realloc(e->s, e->maxlen);
@@ -51,5 +52,6 @@ int estring_append(struct estring *e, const char *src, int len)
 	}
 	memcpy(e->s + e->len, src, len);
 	e->len += len;
+	e->s[e->len] = 0;
 	return 0;
 }
