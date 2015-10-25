@@ -37,6 +37,6 @@ tup_object_exist . ghost-dir
 cat > sub/Tupfile << HERE
 : ../ghost-dir/bar |> cat %f |>
 HERE
-parse_fail_msg "Failed to find directory ID for dir '../ghost-dir/bar' relative to 'build/sub'"
+parse_fail_msg "Failed to find directory ID for dir '../ghost-dir/bar' relative to '\[build\] sub'"
 
 eotup
