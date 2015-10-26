@@ -35,6 +35,7 @@
 #include "if_stmt.h"
 #include "server.h"
 #include "variant.h"
+#include "estring.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3657,11 +3658,9 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			const char *extra_command)
 {
 	struct name_list_entry *nle;
-	char *s;
-	int x;
 	const char *p;
 	const char *next;
-	int clen;
+	struct estring e;
 
 	if(!nl) {
 		fprintf(tf->f, "tup internal error: tup_printf called with NULL name_list\n");
@@ -3671,44 +3670,60 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	if(cmd_len == -1) {
 		cmd_len = strlen(cmd);
 	}
-	clen = cmd_len;
 
-	if(extra_command) {
-		clen += strlen(extra_command) + 1;
-	}
+	if(estring_init(&e) < 0)
+		return NULL;
 
 	p = cmd;
 	while((next = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
-		int space_chars;
-
-		clen -= 2;
 		if(next == cmd+cmd_len-1) {
 			fprintf(tf->f, "tup error: Unfinished %%-flag at the end of the string '%s'\n", cmd);
 			return NULL;
 		}
+		estring_append(&e, p, next-p);
 
 		next++;
-		p = next+1;
-		space_chars = nl->num_entries - 1;
+		p = next + 1;
 
 		if(*next == 'f') {
+			int first = 1;
 			if(nl->num_entries == 0) {
 				fprintf(tf->f, "tup error: %%f used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->totlen + space_chars;
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->path, nle->len);
+				first = 0;
+			}
 		} else if(*next == 'b') {
+			int first = 1;
 			if(nl->num_entries == 0) {
 				fprintf(tf->f, "tup error: %%b used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->basetotlen + space_chars;
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->base, nle->baselen);
+				first = 0;
+			}
 		} else if(*next == 'B') {
+			int first = 1;
 			if(nl->num_entries == 0) {
 				fprintf(tf->f, "tup error: %%B used in rule pattern and no input files were specified.\n");
 				return NULL;
 			}
-			clen += nl->extlessbasetotlen + space_chars;
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->base, nle->extlessbaselen);
+				first = 0;
+			}
 		} else if(*next == 'e') {
 			if(!ext) {
 				fprintf(tf->f, "tup error: %%e is only valid with a foreach rule for files that have extensions.\n");
@@ -3720,8 +3735,9 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				}
 				return NULL;
 			}
-			clen += extlen;
+			estring_append(&e, ext, extlen);
 		} else if(*next == 'o') {
+			int first = 1;
 			if(!onl) {
 				fprintf(tf->f, "tup error: %%o can only be used in a command string or extra outputs section.\n");
 				return NULL;
@@ -3730,9 +3746,14 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: %%o used in rule pattern and no output files were specified.\n");
 				return NULL;
 			}
-			clen += onl->totlen + (onl->num_entries-1);
+			TAILQ_FOREACH(nle, &onl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->path, nle->len);
+				first = 0;
+			}
 		} else if(*next == 'O') {
-			struct name_list_entry *onle;
 			if(!onl) {
 				fprintf(tf->f, "tup error: %%O can only be used in the extra outputs section.\n");
 				return NULL;
@@ -3741,8 +3762,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: %%O can only be used if there is exactly one output specified.\n");
 				return NULL;
 			}
-			onle = TAILQ_FIRST(&onl->entries);
-			clen += onle->extlesslen;
+			nle = TAILQ_FIRST(&onl->entries);
+			estring_append(&e, nle->path, nle->extlesslen);
 		} else if(*next == 'd') {
 			if(tf->tupid == DOT_DT) {
 				/* At the top of the tup-hierarchy, we get the
@@ -3751,15 +3772,16 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				 */
 				char *last_slash;
 				const char *dirstring;
+				int len;
 
 				last_slash = strrchr(get_tup_top(), PATH_SEP);
 				if(last_slash) {
-					/* Point to the directory after the last slash */
 					dirstring = last_slash + 1;
 				} else {
 					dirstring = get_tup_top();
 				}
-				clen += strlen(dirstring);
+				len = strlen(dirstring);
+				estring_append(&e, dirstring, len);
 			} else {
 				struct tup_entry *tent;
 				if(tup_entry_add(tf->tupid, &tent) < 0)
@@ -3768,7 +3790,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				 * the last tup entry of the parsed directory
 				 * as the %d replacement.
 				 */
-				clen += tent->name.len;
+				estring_append(&e, tent->name.s, tent->name.len);
 			}
 		} else if(*next == 'g') {
 			/* g: Expands to the "glob" portion of an *, ?, [] expansion.
@@ -3790,149 +3812,29 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: %%g flag found no globs.\n");
 				return NULL;
 			}
-			clen += nl->globtotlen[0];
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				estring_append(&e, nle->base + nle->glob[0], nle->glob[1]);
+			}
 		} else if(*next == '<') {
 			/* %<group> is expanded by the updater before executing
 			 * a command.
 			 */
-			clen += 2;
+			estring_append(&e, "%<", 2);
 		} else if(*next == '%') {
-			clen++;
+			estring_append(&e, "%", 1);
 		} else {
 			fprintf(tf->f, "tup error: Unknown %%-flag: '%c'\n", *next);
 			return NULL;
 		}
 	}
-
-	s = malloc(clen + 1);
-	if(!s) {
-		parser_error(tf, "malloc");
-		return NULL;
-	}
-
-	p = cmd;
-	x = 0;
-	while((next = find_char(p, cmd+cmd_len - p, '%')) !=  NULL) {
-		memcpy(&s[x], p, next-p);
-		x += next-p;
-
-		next++;
-		p = next + 1;
-
-		if(*next == 'f') {
-			int first = 1;
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(!first) {
-					s[x] = ' ';
-					x++;
-				}
-				memcpy(&s[x], nle->path, nle->len);
-				x += nle->len;
-				first = 0;
-			}
-		} else if(*next == 'b') {
-			int first = 1;
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(!first) {
-					s[x] = ' ';
-					x++;
-				}
-				memcpy(&s[x], nle->base, nle->baselen);
-				x += nle->baselen;
-				first = 0;
-			}
-		} else if(*next == 'B') {
-			int first = 1;
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(!first) {
-					s[x] = ' ';
-					x++;
-				}
-				memcpy(&s[x], nle->base, nle->extlessbaselen);
-				x += nle->extlessbaselen;
-				first = 0;
-			}
-		} else if(*next == 'e') {
-			memcpy(&s[x], ext, extlen);
-			x += extlen;
-		} else if(*next == 'o') {
-			int first = 1;
-			TAILQ_FOREACH(nle, &onl->entries, list) {
-				if(!first) {
-					s[x] = ' ';
-					x++;
-				}
-				memcpy(&s[x], nle->path, nle->len);
-				x += nle->len;
-				first = 0;
-			}
-		} else if(*next == 'O') {
-			nle = TAILQ_FIRST(&onl->entries);
-			memcpy(&s[x], nle->path, nle->extlesslen);
-			x += nle->extlesslen;
-		} else if(*next == '%') {
-			s[x] = '%';
-			x++;
-		} else if(*next == 'd') {
-			if(tf->tupid == DOT_DT) {
-				char *last_slash;
-				const char *dirstring;
-				int len;
-
-				last_slash = strrchr(get_tup_top(), PATH_SEP);
-				if(last_slash) {
-					dirstring = last_slash + 1;
-				} else {
-					dirstring = get_tup_top();
-				}
-				len = strlen(dirstring);
-				memcpy(&s[x], dirstring, len);
-				x += len;
-			} else {
-				struct tup_entry *tent;
-				if(tup_entry_add(tf->tupid, &tent) < 0)
-					return NULL;
-				/* Anywhere else in the hierarchy can just use
-				 * the last tup entry of the parsed directory
-				 * as the %d replacement.
-				 */
-				memcpy(&s[x], tent->name.s, tent->name.len);
-				x += tent->name.len;
-			}
-		} else if(*next == 'g') {
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				memcpy(&s[x], nle->base + nle->glob[0], nle->glob[1]);
-				x += nle->glob[1];
-			}
-		} else if(*next == '<') {
-			/* %<group> is expanded by the updater before executing
-			 * a command.
-			 */
-			s[x] = '%';
-			x++;
-			s[x] = '<';
-			x++;
-		} else {
-			fprintf(tf->f, "tup internal error: Unhandled %%-flag '%c'\n", *next);
-			return NULL;
-		}
-	}
-	memcpy(&s[x], p, cmd+cmd_len - p);
-	x += cmd+cmd_len - p;
+	estring_append(&e, p, cmd+cmd_len - p);
 
 	if(extra_command) {
 		int eclen = strlen(extra_command);
-		s[x] = ' ';
-		x++;
-		memcpy(&s[x], extra_command, eclen);
-		x += eclen;
+		estring_append(&e, " ", 1);
+		estring_append(&e, extra_command, eclen);
 	}
-	s[x] = 0;
-	if((signed)strlen(s) != clen) {
-		fprintf(tf->f, "tup internal error: Calculated string length (%i) didn't match actual (%li). String is: '%s'.\n", clen, (long)strlen(s), s);
-		return NULL;
-	}
-	return s;
+	return e.s;
 }
 
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
