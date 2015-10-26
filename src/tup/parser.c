@@ -3652,6 +3652,18 @@ static const char *find_char(const char *s, int len, char c)
 	return NULL;
 }
 
+static struct name_list_entry *get_nth_nle(struct name_list *nl, int n)
+{
+	struct name_list_entry *nle;
+	int x = 0;
+	TAILQ_FOREACH(nle, &nl->entries, list) {
+		x++;
+		if(x >= n)
+			return nle;
+	}
+	return NULL;
+}
+
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen,
@@ -3815,6 +3827,39 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			TAILQ_FOREACH(nle, &nl->entries, list) {
 				estring_append(&e, nle->base + nle->glob[0], nle->glob[1]);
 			}
+		} else if(isdigit(*next)) {
+			char *endp;
+			int num;
+			errno = 0;
+			num = strtol(next, &endp, 10);
+			if(errno) {
+				perror("strtol");
+				fprintf(tf->f, "tup error: Failed to run strtol on %%-flag with a number.\n");
+				return NULL;
+			}
+			if(num <= 0 || num >= 99) {
+				fprintf(tf->f, "tup error: Expected number from 1-99 (base 10) for %%-flag, but got %i\n", num);
+				return NULL;
+			}
+			if(endp[0] == 'f') {
+				nle = get_nth_nle(nl, num);
+				if(!nle) {
+					fprintf(tf->f, "tup error: Invalid entry %i for input list.\n", num);
+					return NULL;
+				}
+			} else if(endp[0] == 'o') {
+				nle = get_nth_nle(onl, num);
+				if(!nle) {
+					fprintf(tf->f, "tup error: Invalid entry %i for output list.\n", num);
+					return NULL;
+				}
+			} else {
+				fprintf(tf->f, "tup error: Expected 'f' or 'o' after number in %%-flag, but got '%c'\n", endp[0]);
+				return NULL;
+			}
+
+			p = endp+1;
+			estring_append(&e, nle->path, nle->len);
 		} else if(*next == '<') {
 			/* %<group> is expanded by the updater before executing
 			 * a command.
