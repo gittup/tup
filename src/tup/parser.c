@@ -3884,138 +3884,27 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 
 static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 {
-	int len = 0;
-	char *ret;
-	char *p;
 	const char *s;
 	const char *var;
 	const char *syntax_msg = "oops";
-	int vlen;
+	struct estring e;
 
-	s = string;
-	while(*s) {
-		if(*s == '\\') {
-			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
-				/* \$( becomes $( */
-				/* \@( becomes @( */
-				len++;
-				s += 2;
-			} else {
-				len++;
-				s++;
-			}
-		} else if(*s == '$') {
-			const char *rparen;
-
-			if(s[1] == '(') {
-				rparen = strchr(s+1, ')');
-				if(!rparen) {
-					syntax_msg = "expected ending variable paren ')'";
-					goto syntax_error;
-				}
-
-				var = s + 2;
-				if(rparen-var == 7 &&
-				   strncmp(var, "TUP_CWD", 7) == 0) {
-					int clen = 0;
-					if(get_relative_dir(NULL, NULL, NULL, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
-						fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
-						tup_db_print(tf->f, tf->tupid);
-						tup_db_print(tf->f, tf->curtent->tnode.tupid);
-						return NULL;
-					}
-					len += clen;
-				} else if(rparen - var > 7 &&
-					  strncmp(var, "CONFIG_", 7) == 0) {
-					const char *atvar;
-					atvar = var+7;
-					vlen = tup_db_get_varlen(tf->variant, atvar, rparen-atvar);
-					if(vlen < 0)
-						return NULL;
-					len += vlen;
-				} else {
-					vlen = vardb_len(&tf->vdb, var, rparen-var);
-					if(vlen < 0)
-						return NULL;
-					len += vlen;
-				}
-				s = rparen + 1;
-			} else {
-				s++;
-				len++;
-			}
-		} else if(*s == '@') {
-			const char *rparen;
-
-			if(s[1] == '(') {
-				rparen = strchr(s+1, ')');
-				if(!rparen) {
-					syntax_msg = "expected ending variable paren ')'";
-					goto syntax_error;
-				}
-
-				var = s + 2;
-				vlen = tup_db_get_varlen(tf->variant, var, rparen-var);
-				if(vlen < 0)
-					return NULL;
-				len += vlen;
-				s = rparen + 1;
-			} else {
-				s++;
-				len++;
-			}
-		} else if(*s == '&') {
-			const char *rparen;
-
-			if(s[1] == '(') {
-				rparen = strchr(s+1, ')');
-				if(!rparen) {
-					syntax_msg = "expected ending variable paren ')'";
-					goto syntax_error;
-				}
-
-				if(allow_nodes != ALLOW_NODES) {
-					syntax_msg = "&-variables not allowed here";
-					goto syntax_error;
-				}
-
-				var = s + 2;
-				vlen = nodedb_len(&tf->node_db, var, rparen-var,
-				                  tf->curtent->tnode.tupid);
-				if (vlen < 0)
-					return NULL;
-				len += vlen;
-				s = rparen + 1;
-			} else {
-				s++;
-				len++;
-			}
-		} else {
-			s++;
-			len++;
-		}
-	}
-
-	ret = malloc(len+1);
-	if(!ret) {
-		parser_error(tf, "malloc");
+	if(estring_init(&e) < 0)
 		return NULL;
-	}
-
-	p = ret;
 	s = string;
 	while(*s) {
 		if(*s == '\\') {
 			if((s[1] == '$' || s[1] == '@') && s[2] == '(') {
 				/* \$( becomes $( */
 				/* \@( becomes @( */
-				*p = s[1];
+				if(estring_append(&e, &s[1], 1) < 0)
+					return NULL;
 				s += 2;
 			} else {
-				*p = *s;
+				if(estring_append(&e, s, 1) < 0)
+					return NULL;
 				s++;
 			}
-			p++;
 		} else if(*s == '$') {
 			const char *rparen;
 
@@ -4029,33 +3918,31 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				var = s + 2;
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
-					int clen = 0;
-					if(get_relative_dir(NULL, NULL, p, tf->tupid, tf->curtent->tnode.tupid, &clen) < 0) {
+					if(get_relative_dir(NULL, &e, NULL, tf->tupid, tf->curtent->tnode.tupid, NULL) < 0) {
 						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
 					}
-					p += clen;
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
 					struct tup_entry *tent;
 					atvar = var+7;
 
-					tent = tup_db_get_var(tf->variant, atvar, rparen-atvar, &p);
+					tent = tup_db_get_var(tf->variant, atvar, rparen-atvar, &e);
 					if(!tent)
 						return NULL;
 					if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 						return NULL;
 				} else {
-					if(vardb_copy(&tf->vdb, var, rparen-var, &p) < 0)
+					if(vardb_copy(&tf->vdb, var, rparen-var, &e) < 0)
 						return NULL;
 				}
 				s = rparen + 1;
 			} else {
-				*p = *s;
-				p++;
+				if(estring_append(&e, s, 1) < 0)
+					return NULL;
 				s++;
 			}
 		} else if(*s == '@') {
@@ -4070,15 +3957,15 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 
 				var = s + 2;
-				tent = tup_db_get_var(tf->variant, var, rparen-var, &p);
+				tent = tup_db_get_var(tf->variant, var, rparen-var, &e);
 				if(!tent)
 					return NULL;
 				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {
-				*p = *s;
-				p++;
+				if(estring_append(&e, s, 1) < 0)
+					return NULL;
 				s++;
 			}
 		} else if(*s == '&') {
@@ -4090,31 +3977,31 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
+				if(allow_nodes != ALLOW_NODES) {
+					syntax_msg = "&-variables not allowed here";
+					goto syntax_error;
+				}
 
 				var = s + 2;
-				if (nodedb_copy(&tf->node_db, var, rparen-var, &p,
+				if (nodedb_copy(&tf->node_db, var, rparen-var, &e,
 				                tf->curtent->tnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {
-				*p = *s;
-				p++;
+				if(estring_append(&e, s, 1) < 0)
+					return NULL;
 				s++;
 			}
 		} else {
-			*p = *s;
-			p++;
+			if(estring_append(&e, s, 1) < 0)
+				return NULL;
 			s++;
 		}
 	}
-	strcpy(p, s);
-
-	if((signed)strlen(ret) != len) {
-		fprintf(tf->f, "tup internal error: Length mismatch in eval(): expected %i bytes, wrote %li\n", len, (long)strlen(ret));
+	if(estring_append(&e, s, strlen(s)) < 0)
 		return NULL;
-	}
 
-	return ret;
+	return e.s;
 
 syntax_error:
 	fprintf(tf->f, "Syntax error: %s\n", syntax_msg);

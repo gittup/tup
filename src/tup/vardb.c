@@ -157,28 +157,15 @@ int vardb_append(struct vardb *v, const char *var, const char *value)
 	}
 }
 
-int vardb_len(struct vardb *v, const char *var, int varlen)
+int vardb_copy(struct vardb *v, const char *var, int varlen, struct estring *e)
 {
 	struct string_tree *st;
 
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);
-		return ve->vallen;
-	}
-	/* Variable not found: length of "" == 0 */
-	return 0;
-}
-
-int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest)
-{
-	struct string_tree *st;
-
-	st = string_tree_search(&v->root, var, varlen);
-	if(st) {
-		struct var_entry *ve = container_of(st, struct var_entry, var);
-		memcpy(*dest, ve->value, ve->vallen);
-		*dest += ve->vallen;
+		if(estring_append(e, ve->value, ve->vallen) < 0)
+			return -1;
 		return 0;
 	}
 	/* Variable not found: string is "" */
@@ -362,37 +349,7 @@ int nodedb_append(struct node_vardb *v, const char *var, struct tup_entry *tent)
 	}
 }
 
-int nodedb_len(struct node_vardb *v, const char *var, int varlen,
-               tupid_t relative_to)
-{
-	struct node_var_entry *ve = NULL;
-	int len = 0;
-	int vlen = -1;
-	int first = 0;
-	int rc = -1;
-	struct tent_list *tlist = NULL;
-
-	ve = nodedb_get(v, var, varlen);
-	if(!ve)
-		return 0;	/* not found, strlen("") == 0 */
-
-	TAILQ_FOREACH(tlist, &ve->nodes, list) {
-		if(!first) {
-			first = 1;
-		} else {
-			len += 1;  /* space */
-		}
-		rc = get_relative_dir(NULL, NULL, NULL, relative_to,
-		                      tlist->tent->tnode.tupid,
-		                      &vlen);
-		if (rc < 0 || vlen < 0)
-			return -1;
-		len += vlen;
-	}
-	return len;
-}
-
-int nodedb_copy(struct node_vardb *v, const char *var, int varlen, char **dest,
+int nodedb_copy(struct node_vardb *v, const char *var, int varlen, struct estring *e,
                 tupid_t relative_to)
 {
 	struct node_var_entry *ve = NULL;
@@ -409,15 +366,14 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, char **dest,
 		if(!first) {
 			first = 1;
 		} else {
-			(*dest)[0] = ' ';
-			(*dest)++;
+			if(estring_append(e, " ", 1) < 0)
+				return -1;
 		}
-		rc = get_relative_dir(NULL, NULL, *dest, relative_to,
+		rc = get_relative_dir(NULL, e, NULL, relative_to,
 		                      tlist->tent->tnode.tupid,
 		                      &clen);
 		if (rc < 0 || clen < 0)
 			return -1;
-		(*dest) += clen;
 	}
 	return 0;
 }

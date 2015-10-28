@@ -4751,7 +4751,7 @@ static struct var_entry *get_var(struct variant *variant, const char *var, int v
 	return ve;
 }
 
-struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, char **dest)
+struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, struct estring *e)
 {
 	struct var_entry *ve;
 
@@ -4759,9 +4759,9 @@ struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int v
 	if(!ve)
 		return NULL;
 
-	if(dest) {
-		memcpy(*dest, ve->value, ve->vallen);
-		*dest += ve->vallen;
+	if(e) {
+		if(estring_append(e, ve->value, ve->vallen) < 0)
+			exit(1);
 	}
 	return ve->tent;
 }
@@ -4826,16 +4826,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-int tup_db_get_varlen(struct variant *variant, const char *var, int varlen)
-{
-	struct var_entry *ve;
-
-	ve = get_var(variant, var, varlen);
-	if(!ve)
-		return -1;
-	return ve->vallen;
 }
 
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg)

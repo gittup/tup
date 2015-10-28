@@ -23,6 +23,7 @@
 
 #include "tupid.h"
 #include "entry.h"
+#include "estring.h"
 #include "string_tree.h"
 
 struct tup_entry;
@@ -46,8 +47,7 @@ int vardb_set(struct vardb *v, const char *var, const char *value,
 struct var_entry *vardb_set2(struct vardb *v, const char *var, int varlen,
                              const char *value, struct tup_entry *tent);
 int vardb_append(struct vardb *v, const char *var, const char *value);
-int vardb_len(struct vardb *v, const char *var, int varlen);
-int vardb_copy(struct vardb *v, const char *var, int varlen, char **dest);
+int vardb_copy(struct vardb *v, const char *var, int varlen, struct estring *e);
 struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen);
 int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 		  int (*extra_a)(struct var_entry *ve, tupid_t vardt),
@@ -74,10 +74,8 @@ int nodedb_set(struct node_vardb *v, const char *var,
                struct tup_entry *tent);
 int nodedb_append(struct node_vardb *v, const char *var,
                   struct tup_entry *tent);
-int nodedb_len(struct node_vardb *v, const char *var, int varlen,
-               tupid_t relative_to);
 int nodedb_copy(struct node_vardb *v, const char *var, int varlen,
-                char **dest, tupid_t relative_to);
+                struct estring *e, tupid_t relative_to);
 struct node_var_entry *nodedb_get(struct node_vardb *v,
                                   const char *var, int varlen);
 

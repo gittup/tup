@@ -349,30 +349,25 @@ static int tuplua_function_getconfig(lua_State *ls)
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	const char *name = NULL;
 	size_t name_size = 0;
-	char *value = NULL;
-	char *value_as_argument = NULL; /* tup_db_get_var moves the pointer, so this is a throwaway */
-	int value_size = 0;
 	struct tup_entry *tent = NULL;
+	struct estring e;
+
+	if(estring_init(&e) < 0)
+		return luaL_error(ls, "Error allocating memory in tuplua_function_getconfig()");
 
 	name = tuplua_tolstring(ls, -1, &name_size);
 	if(!name)
 		return luaL_error(ls, "Must be passed an config variable name as an argument.");
-	value_size = tup_db_get_varlen(tf->variant, name, name_size) + 1;
-	if(value_size < 0)
-		luaL_error(ls, "Failed to get config variable length.");
-	value = malloc(value_size);
-	value_as_argument = value;
 
-	tent = tup_db_get_var(tf->variant, name, name_size, &value_as_argument);
+	tent = tup_db_get_var(tf->variant, name, name_size, &e);
 	if(!tent)
 		return luaL_error(ls, "Failed to get config variable.");
-	value[value_size - 1] = '\0';
 
 	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
 		return luaL_error(ls, "Failed to get config variable (add_dup).");
 
-	lua_pushstring(ls, value);
-	free(value);
+	lua_pushstring(ls, e.s);
+	free(e.s);
 
 	return 1;
 }
