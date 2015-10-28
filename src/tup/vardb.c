@@ -353,7 +353,6 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, struct estrin
                 tupid_t relative_to)
 {
 	struct node_var_entry *ve = NULL;
-	int clen = 0;
 	int first = 0;
 	int rc = -1;
 	struct tent_list *tlist = NULL;
@@ -369,10 +368,8 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, struct estrin
 			if(estring_append(e, " ", 1) < 0)
 				return -1;
 		}
-		rc = get_relative_dir(NULL, e, NULL, relative_to,
-		                      tlist->tent->tnode.tupid,
-		                      &clen);
-		if (rc < 0 || clen < 0)
+		rc = get_relative_dir(NULL, e, relative_to, tlist->tent->tnode.tupid);
+		if (rc < 0)
 			return -1;
 	}
 	return 0;

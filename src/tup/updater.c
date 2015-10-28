@@ -1841,7 +1841,7 @@ static int generate_work(struct graph *g, struct node *n)
 		const char *name;
 		if(generate_cwd != n->tent->parent) {
 			fprintf(generate_f, "cd '");
-			if(get_relative_dir(generate_f, NULL, NULL, generate_cwd->tnode.tupid, n->tent->dt, NULL) < 0) {
+			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, n->tent->dt) < 0) {
 				rc = -1;
 			} else {
 				fprintf(generate_f, "'\n");
@@ -2312,7 +2312,7 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 					if(e && !first)
 						if(estring_append(e, " ", 1) < 0)
 							return -1;
-					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, NULL) < 0)
+					if(get_relative_dir(f, e, info->tent->parent->tnode.tupid, ttinput->tupid) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");

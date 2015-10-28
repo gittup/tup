@@ -259,35 +259,22 @@ static int tuplua_function_append_table(lua_State *ls)
 static int tuplua_function_getcwd(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
-	int dir_size = 0;
-	char *dir = NULL;
+	struct estring e;
 
 	lua_settop(ls, 0);
 
-	if(get_relative_dir(NULL, NULL, NULL, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
+	if(estring_init(&e) < 0)
+		return luaL_error(ls, "Error allocating memory in tuplua_function_getcwd()");
+
+	if(get_relative_dir(NULL, &e, tf->tupid, tf->curtent->tnode.tupid) < 0) {
 		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 		tup_db_print(tf->f, tf->tupid);
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
 		return luaL_error(ls, "Failed to get directory path length in getcwd.");
 	}
 
-	if(dir_size == 0) {
-		lua_pushstring(ls, "");
-		return 1;
-	}
-
-	dir = malloc(dir_size + 1);
-	if(get_relative_dir(NULL, NULL, dir, tf->tupid, tf->curtent->tnode.tupid, &dir_size) < 0) {
-		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
-		tup_db_print(tf->f, tf->tupid);
-		tup_db_print(tf->f, tf->curtent->tnode.tupid);
-		free(dir);
-		return luaL_error(ls, "Failed to get directory path in getcwd.");
-	}
-	dir[dir_size] = '\0';
-
-	lua_pushlstring(ls, dir, dir_size);
-	free(dir);
+	lua_pushlstring(ls, e.s, e.len);
+	free(e.s);
 	return 1;
 }
 
@@ -337,7 +324,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	dest = find_dir_tupid_dt(tf->tupid, dirname, NULL, 0, 0);
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
-	if(get_relative_dir(NULL, &e, NULL, dest, tf->tupid, NULL) < 0)
+	if(get_relative_dir(NULL, &e, dest, tf->tupid) < 0)
 		return -1;
 	lua_pushlstring(ls, e.s, e.len);
 	free(e.s);
@@ -594,13 +581,10 @@ static int tuplua_function_nodevariable(lua_State *ls)
 static int tuplua_function_nodevariable_tostring(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
-
-	int slen = 0;
 	int rc = -1;
-
 	void *stackid;
 	tupid_t tid;
-	char *value;
+	struct estring e;
 
 	lua_settop(ls, 1);
 
@@ -609,20 +593,17 @@ static int tuplua_function_nodevariable_tostring(lua_State *ls)
 	stackid = lua_touserdata(ls, 1);
 	tid = *(tupid_t *)stackid;
 
-	rc = get_relative_dir(NULL, NULL, NULL, tf->curtent->tnode.tupid, tid, &slen);
-	if(rc < 0 || slen < 0) return 0;
+	if(estring_init(&e) < 0)
+		return luaL_error(ls, "Error allocating memory in tuplua_function_nodevariable_tostring.");
 
-	value = malloc(slen + 1);
-	rc = get_relative_dir(NULL, NULL, value, tf->curtent->tnode.tupid, tid, &slen);
-	if(rc < 0 || slen < 0) {
-		free(value);
-		return 0;
-	}
+	rc = get_relative_dir(NULL, &e, tf->curtent->tnode.tupid, tid);
+	if(rc < 0)
+		return luaL_error(ls, "Error getting relative path tuplua_function_nodevariable_tostring.");
 
 	lua_settop(ls, 0);
 
-	lua_pushlstring(ls, value, slen);
-	free(value);
+	lua_pushlstring(ls, e.s, e.len);
+	free(e.s);
 
 	return 1;
 }

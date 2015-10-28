@@ -5808,7 +5808,7 @@ static int missing_output(tupid_t tupid, void *data)
 	if(tup_entry_add(aod->cmdid, &cmdtent) < 0)
 		return -1;
 	fprintf(aod->f, "tup error: Expected to write to file '");
-	get_relative_dir(aod->f, NULL, NULL, cmdtent->dt, tent->tnode.tupid, NULL);
+	get_relative_dir(aod->f, NULL, cmdtent->dt, tent->tnode.tupid);
 	fprintf(aod->f, "' from cmd %lli but didn't\n", aod->cmdid);
 
 	if(!(aod->output_error & 2)) {

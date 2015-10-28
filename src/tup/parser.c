@@ -3161,7 +3161,7 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 		} else {
 			fprintf(tf->f, "tup error: Attempting to insert '");
 			if(dt != tf->tupid) {
-				get_relative_dir(tf->f, NULL, NULL, tf->tupid, dt, NULL);
+				get_relative_dir(tf->f, NULL, tf->tupid, dt);
 				fprintf(tf->f, "/");
 			}
 			fprintf(tf->f, "%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
@@ -3918,7 +3918,7 @@ static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				var = s + 2;
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
-					if(get_relative_dir(NULL, &e, NULL, tf->tupid, tf->curtent->tnode.tupid, NULL) < 0) {
+					if(get_relative_dir(NULL, &e, tf->tupid, tf->curtent->tnode.tupid) < 0) {
 						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 						tup_db_print(tf->f, tf->tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
