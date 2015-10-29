@@ -150,8 +150,6 @@ static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
-static void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
-				 struct name_list_entry *nle);
 static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
@@ -3268,12 +3266,11 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	while(!TAILQ_EMPTY(oplist)) {
+	TAILQ_FOREACH(pl, oplist, list) {
 		struct name_list *use_onl;
 		struct tup_entry *dest_tent;
 		char *newpath;
 		char *lastslash;
-		pl = TAILQ_FIRST(oplist);
 
 		if(pl->pel->path[0] == '<') {
 			if(group) {
@@ -3286,12 +3283,12 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!group)
 				return -1;
-			goto out_pl;
+			continue;
 		}
 
 		if(pl->pel->len == 1 && pl->pel->path[0] == '|') {
 			extra_outputs = 1;
-			goto out_pl;
+			continue;
 		}
 
 		onle = malloc(sizeof *onle);
@@ -3397,9 +3394,6 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 					return -1;
 			}
 		}
-
-out_pl:
-		del_pl(pl, oplist);
 	}
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
@@ -3614,8 +3608,8 @@ static void delete_name_list_entry(struct name_list *nl,
 	free(nle);
 }
 
-static void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
-				 struct name_list_entry *nle)
+void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
+			  struct name_list_entry *nle)
 {
 	oldnl->num_entries--;
 	oldnl->totlen -= nle->len;

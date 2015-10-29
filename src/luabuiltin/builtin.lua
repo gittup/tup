@@ -35,13 +35,6 @@ function io.open(filename, mode)
 	return f
 end
 
-local conditionalglob = function(input)
-	if input:match('%*') or input:match('%?') or input:match('%[.*%]') then
-		return tup.glob(input)
-	end
-	return {input}
-end
-
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
 	return (string.gsub(filename, '[^/\\]*[/\\]', ''))
@@ -145,23 +138,7 @@ end
 
 tup.foreach_rule = function(a, b, c)
 	local inputs, command, outputs = get_abc(a, b, c)
-	local newinputs = {}
-	local routputs = {}
-
-	for k, v in ipairs(inputs) do
-		local glob
-		glob = conditionalglob(v)
-		for globindex, globvalue in ipairs(glob) do
-			table.insert(newinputs, globvalue)
-		end
-	end
-
-	for k, v in ipairs(newinputs) do
-		local tmpi = {v}
-		tmpi.extra_inputs = inputs.extra_inputs
-		routputs += tup.frule{inputs = tmpi, command = command, outputs = outputs}
-	end
-	return routputs
+	return tup.frule{ inputs = inputs, command = command, outputs = outputs, foreach = 1}
 end
 
 -- This function is called when we do 'a += b' in a Tupfile.lua. It works
