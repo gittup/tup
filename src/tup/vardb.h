@@ -31,6 +31,8 @@ struct tup_entry;
 struct vardb {
 	struct string_entries root;
 	int count;
+	char *(*external_vardb)(void *arg, const char *var, int varlen);
+	void *external_arg;
 };
 
 struct var_entry {

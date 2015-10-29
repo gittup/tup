@@ -161,7 +161,7 @@ static struct tup_entry_head ghost_list;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
-static struct vardb envdb = { {NULL}, 0};
+static struct vardb envdb = { {NULL}, 0, NULL, NULL};
 static int transaction = 0;
 static tupid_t local_slash_dt = -1;
 

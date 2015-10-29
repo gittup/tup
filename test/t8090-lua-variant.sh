@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013-2015  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012-2015  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,18 +16,31 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try extra_outputs in lua
-
+# Try a variant in lua.
 . ./tup.sh
-cat > ok.sh << HERE
-touch \$@ extra.txt
-HERE
+check_no_windows variant
+
+tmkdir build
+tmkdir sub
+
 cat > Tupfile.lua << HERE
-outputs += 'foo.txt'
-outputs += 'bar.txt'
-outputs.extra_outputs += 'extra.txt'
-tup.frule{command='sh ok.sh %o', outputs=outputs}
+objs = tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
+objs += 'sub/*.o'
+tup.rule(objs, 'gcc %f -o %o', 'prog.exe')
 HERE
+cat > sub/Tupfile.lua << HERE
+tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
+HERE
+echo "int main(void) {return 0;}" > foo.c
+echo "CONFIG_FOO=y" > build/tup.config
+tup touch build/tup.config Tupfile.lua foo.c sub/bar.c
 update
+
+check_exist build/foo.o build/sub/bar.o build/prog.exe
+check_not_exist foo.o sub/bar.o prog.exe
+
+tup touch baz.c
+update
+check_exist build/baz.o
 
 eotup

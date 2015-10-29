@@ -30,6 +30,7 @@ int vardb_init(struct vardb *v)
 {
 	RB_INIT(&v->root);
 	v->count = 0;
+	v->external_vardb = NULL;
 	return 0;
 }
 
@@ -161,6 +162,15 @@ int vardb_copy(struct vardb *v, const char *var, int varlen, struct estring *e)
 {
 	struct string_tree *st;
 
+	if(v->external_vardb) {
+		char *value = v->external_vardb(v->external_arg, var, varlen);
+		if(value) {
+			if(estring_append(e, value, strlen(value)) < 0)
+				return -1;
+			free(value);
+			return 0;
+		}
+	}
 	st = string_tree_search(&v->root, var, varlen);
 	if(st) {
 		struct var_entry *ve = container_of(st, struct var_entry, var);

@@ -137,7 +137,6 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
 			 int allow_nodes);
 static void make_path_list_unique(struct path_list_head *plist);
-static void make_name_list_unique(struct name_list *nl);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
@@ -158,7 +157,6 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen,
 			const char *extra_command);
-static char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
 
@@ -388,6 +386,7 @@ out_server_stop:
 	free_dir_lists(&ps.directories);
 	pthread_mutex_unlock(&ps.lock);
 
+	lua_parser_cleanup(&tf);
 	free_chain_tree(&tf.chain_root);
 	free_tupid_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
@@ -2581,7 +2580,7 @@ void del_pl(struct path_list *pl, struct path_list_head *head)
 	free(pl);
 }
 
-static void make_name_list_unique(struct name_list *nl)
+void make_name_list_unique(struct name_list *nl)
 {
 	struct name_list_entry *tmp;
 	struct tup_entry_head *input_list;
@@ -3889,7 +3888,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	return e.s;
 }
 
-static char *eval(struct tupfile *tf, const char *string, int allow_nodes)
+char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 {
 	const char *s;
 	const char *var;

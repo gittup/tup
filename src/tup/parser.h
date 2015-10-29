@@ -157,6 +157,7 @@ void init_name_list(struct name_list *nl);
 void delete_name_list(struct name_list *nl);
 int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 		  struct name_list *nl, int required);
+void make_name_list_unique(struct name_list *nl);
 int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	    struct path_list_head *oplist,
 	    const char *ext, int extlen, struct name_list *output_nl);
@@ -168,5 +169,6 @@ struct timespan;
 
 void parser_debug_run(void);
 int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server);
+char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 #endif
