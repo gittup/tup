@@ -87,6 +87,7 @@ struct name_list_entry {
 	                         * The second int is the length of the glob.
 	                         */
 	int globcnt;            /* Number of globs expanded in this name. */
+	int orderid;
 	struct tup_entry *tent;
 };
 TAILQ_HEAD(name_list_entry_head, name_list_entry);
@@ -126,14 +127,19 @@ struct rule {
 
 struct path_list {
 	TAILQ_ENTRY(path_list) list;
+	int orderid;
+
 	/* For files: */
 	char *path;
 	struct path_element *pel;
 	int group;
 	tupid_t dt;
-	char *mem; /* Can be NULL if the path is freed elsewhere */
+
 	/* For bins: */
 	struct bin *bin;
+
+	/* Copy of the full string */
+	char mem[0];
 };
 TAILQ_HEAD(path_list_head, path_list);
 
@@ -145,7 +151,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 		    struct bin_head *bl);
 int export(struct tupfile *tf, const char *cmdline);
 void free_path_list(struct path_list_head *plist);
-struct path_list *new_pl(struct tupfile *tf, char *mem);
+struct path_list *new_pl(struct tupfile *tf, const char *mem);
 void del_pl(struct path_list *pl, struct path_list_head *head);
 void init_name_list(struct name_list *nl);
 void delete_name_list(struct name_list *nl);
@@ -154,7 +160,7 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	    struct path_list_head *oplist,
 	    const char *ext, int extlen, struct name_list *output_nl);
-int get_pl(struct tupfile *tf, char *p, struct path_list *pl, tupid_t dt, int create_output_dirs);
+int get_pl(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 
 struct node;
 struct graph;

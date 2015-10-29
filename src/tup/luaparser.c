@@ -70,7 +70,7 @@ struct tuplua_glob_data {
 
 static int include_rules(struct tupfile *tf);
 static int include_file(struct tupfile *tf, const char *file);
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, int create_output_dirs);
 
 static int debug_run = 0;
@@ -170,13 +170,11 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 	lua_getfield(ls, 1, table);
 	lua_pushnil(ls);
 	while(lua_next(ls, -2)) {
-		char *path;
+		const char *path;
 
-		path = tuplua_strdup(ls, -1);
-		if(!path) {
-			perror("strdup");
-			return -1;
-		}
+		path = tuplua_tostring(ls, -1);
+		if(!path)
+			return luaL_error(ls, "tuplua_table_to_path_list() called with a nil path");
 		if(get_path_list(tf, path, plist, tf->tupid, create_output_dirs) < 0)
 			return -1;
 		lua_pop(ls, 1);
@@ -388,7 +386,7 @@ static int tuplua_glob_callback(void *arg, struct tup_entry *tent)
 static int tuplua_function_glob(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
-	char *pattern = NULL;
+	const char *pattern = NULL;
 	struct path_list_head plist;
 	struct path_list *pl;
 	struct tuplua_glob_data tgd;
@@ -404,14 +402,13 @@ static int tuplua_function_glob(lua_State *ls)
 
 	lua_settop(ls, 1);
 
-	pattern = tuplua_strdup(ls, -1);
+	pattern = tuplua_tostring(ls, -1);
 	if(pattern == NULL)
 		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
 	lua_pop(ls, 1);
 
 	if(get_path_list(tf, pattern, &plist, tf->tupid, 0) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern '%s'.", __FILE__, __LINE__, pattern);
-		free(pattern);
 		return lua_error(ls);
 	}
 
@@ -931,7 +928,7 @@ out_err:
 	return 0;
 }
 
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, int create_output_dirs)
 {
 	struct path_list *pl;
@@ -940,7 +937,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 	if(!pl)
 		return -1;
 
-	if(get_pl(tf, p, pl, dt, create_output_dirs) < 0)
+	if(get_pl(tf, pl, dt, create_output_dirs) < 0)
 		return -1;
 	TAILQ_INSERT_TAIL(plist, pl, list);
 

@@ -87,6 +87,7 @@ struct build_name_list_args {
 	int globstrlen;       /* Length of the basename */
 	int wildcard;
 	struct tupfile *tf;
+	int orderid;
 };
 
 static int open_lua_tupfile(struct tupfile *tf, struct tup_entry *tent,
@@ -133,12 +134,13 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
 static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl, int create_output_dirs);
+			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
+			 int allow_nodes);
 static void make_path_list_unique(struct path_list_head *plist);
 static void make_name_list_unique(struct name_list *nl);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int required);
-static int nl_add_bin(struct bin *b, struct name_list *nl);
+		       struct name_list *nl, int required, int orderid);
+static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
@@ -845,15 +847,9 @@ static int preload(struct tupfile *tf, char *cmdline)
 {
 	struct path_list_head plist;
 	struct path_list *pl;
-	char *eval_cmdline;
-
-	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
-	if(!eval_cmdline) {
-		return -1;
-	}
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, eval_cmdline, &plist, tf->curtent->tnode.tupid, NULL, 0) < 0)
+	if(get_path_list(tf, cmdline, &plist, tf->curtent->tnode.tupid, NULL, 0, ALLOW_NODES) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -894,7 +890,6 @@ static int preload(struct tupfile *tf, char *cmdline)
 			return -1;
 	}
 	free_path_list(&plist);
-	free(eval_cmdline);
 	return 0;
 }
 
@@ -1940,20 +1935,16 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required)
 {
-	char *eval_pattern;
 	char *oosep;
 
 	if(!input_pattern)
 		return 0;
 
-	eval_pattern = eval(tf, input_pattern, ALLOW_NODES);
-	if(!eval_pattern)
-		return -1;
-	oosep = strchr(eval_pattern, '|');
+	oosep = strchr(input_pattern, '|');
 	if(oosep) {
 		char *p = oosep;
 		*p = 0;
-		while(p >= eval_pattern && isspace(*p)) {
+		while(p >= input_pattern && isspace(*p)) {
 			*p = 0;
 			p--;
 		}
@@ -1966,15 +1957,14 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			return -1;
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, eval_pattern, inputs, bl, required) < 0)
+		if(input_pattern_to_nl(tf, input_pattern, inputs, bl, required) < 0)
 			return -1;
 	} else {
-		if(eval_pattern[0]) {
+		if(input_pattern[0]) {
 			fprintf(tf->f, "tup error: bang rules can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
 			return -1;
 		}
 	}
-	free(eval_pattern);
 	return 0;
 }
 
@@ -2247,7 +2237,7 @@ static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
 		return -1;
 
 	TAILQ_INIT(&oplist);
-	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL, 0) < 0)
+	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
 		return -1;
 	make_path_list_unique(&oplist);
 
@@ -2334,7 +2324,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 	}
 
 	TAILQ_INIT(&inp_list);
-	if(get_path_list(tf, inp, &inp_list, tf->tupid, NULL, 0) < 0)
+	if(get_path_list(tf, inp, &inp_list, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
 		return -1;
 	make_path_list_unique(&inp_list);
 
@@ -2384,7 +2374,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	struct path_list_head plist;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, p, &plist, tf->tupid, bl, 0) < 0)
+	if(get_path_list(tf, p, &plist, tf->tupid, bl, 0, ALLOW_NODES) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -2394,26 +2384,27 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	return 0;
 }
 
-struct path_list *new_pl(struct tupfile *tf, char *mem)
+struct path_list *new_pl(struct tupfile *tf, const char *mem)
 {
 	struct path_list *pl;
 
-	pl = malloc(sizeof *pl);
+	pl = malloc(sizeof(*pl) + strlen(mem) + 1);
 	if(!pl) {
 		parser_error(tf, "malloc");
 		return NULL;
 	}
 	pl->path = NULL;
 	pl->pel = NULL;
-	pl->mem = mem;
 	pl->group = 0;
 	pl->dt = 0;
 	pl->bin = NULL;
+	strcpy(pl->mem, mem);
 	return pl;
 }
 
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl, int create_output_dirs)
+static int get_path_list_internal(struct tupfile *tf, char *p, struct path_list_head *plist,
+				  tupid_t dt, struct bin_head *bl, int create_output_dirs,
+				  int orderid)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -2427,7 +2418,7 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 		if(spc_index == 0)
 			goto skip_empty_space;
 
-		pl = new_pl(tf, NULL);
+		pl = new_pl(tf, p);
 		if(!pl) {
 			return -1;
 		}
@@ -2454,10 +2445,43 @@ static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *pli
 			}
 		} else {
 			/* Path */
-			if(get_pl(tf, p, pl, dt, create_output_dirs) < 0)
+			if(get_pl(tf, pl, dt, create_output_dirs) < 0)
 				return -1;
 		}
+		pl->orderid = orderid;
 		TAILQ_INSERT_TAIL(plist, pl, list);
+
+skip_empty_space:
+		p += spc_index + 1;
+	} while(!last_entry);
+	return 0;
+}
+
+static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
+			 int allow_nodes)
+{
+	int spc_index;
+	int last_entry = 0;
+	int orderid = 1;
+
+	do {
+		char *eval_p;
+		spc_index = strcspn(p, " \t");
+		if(p[spc_index] == 0)
+			last_entry = 1;
+		p[spc_index] = 0;
+		if(spc_index == 0)
+			goto skip_empty_space;
+
+		eval_p = eval(tf, p, allow_nodes);
+		if(!eval_p)
+			return -1;
+
+		if(get_path_list_internal(tf, eval_p, plist, dt, bl, create_output_dirs, orderid) < 0)
+			return -1;
+		free(eval_p);
+		orderid++;
 
 skip_empty_space:
 		p += spc_index + 1;
@@ -2466,11 +2490,12 @@ skip_empty_space:
 	return 0;
 }
 
-int get_pl(struct tupfile *tf, char *p, struct path_list *pl,
+int get_pl(struct tupfile *tf, struct path_list *pl,
 	   tupid_t dt, int create_output_dirs)
 {
 	struct pel_group pg;
 	int sotgv = 0;
+	char *p = pl->mem;
 
 	if(strchr(p, '<') != NULL) {
 		/* Group */
@@ -2552,7 +2577,6 @@ void free_path_list(struct path_list_head *plist)
 void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
-	free(pl->mem);
 	free(pl->pel);
 	free(pl);
 }
@@ -2643,10 +2667,10 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 
 	TAILQ_FOREACH(pl, plist, list) {
 		if(pl->bin) {
-			if(nl_add_bin(pl->bin, nl) < 0)
+			if(nl_add_bin(pl->bin, nl, pl->orderid) < 0)
 				return -1;
 		} else {
-			if(nl_add_path(tf, pl, nl, required) < 0)
+			if(nl_add_path(tf, pl, nl, required, pl->orderid) < 0)
 				return -1;
 		}
 	}
@@ -2667,7 +2691,7 @@ static int char_find(const char *s, int len, const char *list)
 }
 
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int required)
+		       struct name_list *nl, int required, int orderid)
 {
 	struct build_name_list_args args;
 
@@ -2690,6 +2714,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.globstr = pl->pel->path;
 	args.globstrlen = pl->pel->len;
 	args.tf = tf;
+	args.orderid = orderid;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct variant *variant;
@@ -2797,7 +2822,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	return 0;
 }
 
-static int nl_add_bin(struct bin *b, struct name_list *nl)
+static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid)
 {
 	struct bin_entry *be;
 	struct name_list_entry *nle;
@@ -2827,6 +2852,7 @@ static int nl_add_bin(struct bin *b, struct name_list *nl)
 		nle->extlesslen = extlesslen;
 		nle->tent = be->tent;
 		set_nle_base(nle);
+		nle->orderid = orderid;
 
 		add_name_list_entry(nl, nle);
 	}
@@ -2888,6 +2914,7 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	nle->tent = tent;
 	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
+	nle->orderid = args->orderid;
 
 	/* Do the glob parsing for %g */
 	nle->globcnt = glob_parse(args->globstr, args->globstrlen, tent->name.s, nle->glob);
@@ -3177,9 +3204,6 @@ static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
 {
 	struct path_list_head oplist;
 	char *toutput;
-	char *output_pattern;
-	char *extra_pattern = NULL;
-	char *bang_extra_pattern = NULL;
 	char sep[] = "|";
 	int rc;
 
@@ -3187,36 +3211,24 @@ static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
 	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, NULL);
 	if(!toutput)
 		return -1;
-	output_pattern = eval(tf, toutput, DISALLOW_NODES);
-	free(toutput);
-	if(!output_pattern)
-		return -1;
-	if(get_path_list(tf, output_pattern, &oplist, tf->tupid, NULL, 1) < 0)
+	if(get_path_list(tf, toutput, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
 		return -1;
 	/* Insert a fake separator */
-	if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0) < 0)
+	if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
 		return -1;
 	if(r->extra_outputs) {
-		extra_pattern = eval(tf, r->extra_outputs, DISALLOW_NODES);
-		if(!extra_pattern)
-			return -1;
-		if(get_path_list(tf, extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
+		if(get_path_list(tf, r->extra_outputs, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
 			return -1;
 	}
 	if(r->bang_extra_outputs) {
-		bang_extra_pattern = eval(tf, r->bang_extra_outputs, DISALLOW_NODES);
-		if(!bang_extra_pattern)
-			return -1;
-		if(get_path_list(tf, bang_extra_pattern, &oplist, tf->tupid, NULL, 1) < 0)
+		if(get_path_list(tf, r->bang_extra_outputs, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
 			return -1;
 	}
 	rc = do_rule(tf, r, nl, &oplist, ext, extlen, output_nl);
 
 	free_path_list(&oplist);
 	/* Has to be freed after use of oplist */
-	free(output_pattern);
-	free(extra_pattern);
-	free(bang_extra_pattern);
+	free(toutput);
 	return rc;
 }
 
@@ -3288,6 +3300,7 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			parser_error(tf, "malloc");
 			return -1;
 		}
+		onle->orderid = pl->orderid;
 
 		/* tup_printf allows %O if we have an onl and are not a command */
 		if(extra_outputs) {
@@ -3652,18 +3665,6 @@ static const char *find_char(const char *s, int len, char c)
 	return NULL;
 }
 
-static struct name_list_entry *get_nth_nle(struct name_list *nl, int n)
-{
-	struct name_list_entry *nle;
-	int x = 0;
-	TAILQ_FOREACH(nle, &nl->entries, list) {
-		x++;
-		if(x >= n)
-			return nle;
-	}
-	return NULL;
-}
-
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen,
@@ -3828,8 +3829,10 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				estring_append(&e, nle->base + nle->glob[0], nle->glob[1]);
 			}
 		} else if(isdigit(*next)) {
+			struct name_list *tmpnl = NULL;
 			char *endp;
 			int num;
+			int first = 1;
 			errno = 0;
 			num = strtol(next, &endp, 10);
 			if(errno) {
@@ -3842,24 +3845,28 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				return NULL;
 			}
 			if(endp[0] == 'f') {
-				nle = get_nth_nle(nl, num);
-				if(!nle) {
-					fprintf(tf->f, "tup error: Invalid entry %i for input list.\n", num);
-					return NULL;
-				}
+				tmpnl = nl;
 			} else if(endp[0] == 'o') {
-				nle = get_nth_nle(onl, num);
-				if(!nle) {
-					fprintf(tf->f, "tup error: Invalid entry %i for output list.\n", num);
-					return NULL;
-				}
+				tmpnl = onl;
 			} else {
 				fprintf(tf->f, "tup error: Expected 'f' or 'o' after number in %%-flag, but got '%c'\n", endp[0]);
 				return NULL;
 			}
+			TAILQ_FOREACH(nle, &tmpnl->entries, list) {
+				if(nle->orderid == num) {
+					if(!first) {
+						if(estring_append(&e, " ", 1) < 0)
+							return NULL;
+					}
+					if(estring_append(&e, nle->path, nle->len) < 0)
+						return NULL;
+					first = 0;
+				} else if(nle->orderid > num) {
+					break;
+				}
+			}
 
 			p = endp+1;
-			estring_append(&e, nle->path, nle->len);
 		} else if(*next == '<') {
 			/* %<group> is expanded by the updater before executing
 			 * a command.

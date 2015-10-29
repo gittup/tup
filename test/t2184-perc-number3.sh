@@ -16,26 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try some failure cases in %1f
+# Use %1f, etc with variable inputs
 
 . ./tup.sh
-tup touch file1 file2
-tmkdir foo
-tup touch foo/file3
-
 cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %0o |> out1 out2
+files += f1
+files += f2
+files += f3
+libs += l1
+libs += l2
+libs += l3
+libs += l4
+: test1 \$(files) \$(libs) |> cmd T %1f F %2f L %3f O %1o 2 %2o |> \$(empty) out2
 HERE
-parse_fail_msg "Expected number from 1-99"
+tup touch test1 f1 f2 f3 l1 l2 l3 l4
+tup parse
 
-cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %0o |> out1 out2
-HERE
-parse_fail_msg "Expected number from 1-99"
-
-cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %1d |> out1 out2
-HERE
-parse_fail_msg "Expected 'f' or 'o'"
+tup_object_exist . 'cmd T test1 F f1 f2 f3 L l1 l2 l3 l4 O  2 out2'
 
 eotup
