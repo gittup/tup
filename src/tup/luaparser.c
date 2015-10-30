@@ -277,10 +277,18 @@ static int tuplua_function_definerule(lua_State *ls)
 	if(r.foreach) {
 		struct name_list tmp_nl;
 		while(!TAILQ_EMPTY(&nl.entries)) {
+			const char *ext = NULL;
+			int extlen = 0;
 			nle = TAILQ_FIRST(&nl.entries);
+
 			init_name_list(&tmp_nl);
 			move_name_list_entry(&tmp_nl, &nl, nle);
-			if(do_rule(tf, &r, &tmp_nl, &output_path_list, NULL, 0, &return_nl) < 0)
+			if(nle->base && nle->extlessbaselen != nle->baselen) {
+				ext = nle->base + nle->extlessbaselen + 1;
+				extlen = nle->baselen - nle->extlessbaselen - 1;
+			}
+
+			if(do_rule(tf, &r, &tmp_nl, &output_path_list, ext, extlen, &return_nl) < 0)
 				return luaL_error(ls, "Failed to define rule.");
 			delete_name_list(&tmp_nl);
 		}
