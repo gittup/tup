@@ -135,7 +135,6 @@ static void tuplua_register_function(struct lua_State *ls, const char *name, lua
 static int tuplua_function_include(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
-	lua_State *oldls = tf->ls;
 	char *file = NULL;
 
 	file = tuplua_strdup(ls, -1);
@@ -146,7 +145,6 @@ static int tuplua_function_include(lua_State *ls)
 
 	tf->ls = ls;
 	if(include_file(tf, file) < 0) {
-		tf->ls = oldls;
 		if (tf->luaerror == TUPLUA_NOERROR) {
 			luaL_where(ls, 1);
 			lua_pushfstring(ls, "Failed to include file '%s'.", file);
@@ -157,7 +155,6 @@ static int tuplua_function_include(lua_State *ls)
 		return lua_error(ls);
 	}
 	free(file);
-	tf->ls = oldls;
 
 	return 0;
 }
@@ -170,7 +167,6 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 		return 0;
 	}
 
-	lua_getfield(ls, 1, table);
 	lua_pushnil(ls);
 	while(lua_next(ls, -2)) {
 		const char *path;
@@ -187,7 +183,6 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 		free(evalp);
 		lua_pop(ls, 1);
 	}
-	lua_pop(ls, 1);
 
 	return 0;
 }
@@ -215,7 +210,6 @@ static char *tuplua_table_tostring(lua_State *ls)
 			return NULL;
 		lua_pop(ls, 1);
 	}
-	lua_pop(ls, 1);
 
 	return e.s;
 }
