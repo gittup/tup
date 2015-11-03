@@ -2520,7 +2520,9 @@ int get_pl(struct tupfile *tf, struct path_list *pl,
 		sotgv = SOTGV_CREATE_DIRS;
 	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
 	if(pl->dt <= 0) {
-		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to %lli\n", p, dt);
+		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", p);
+		print_tup_entry(tf->f, tup_entry_get(dt));
+		fprintf(tf->f, "'\n");
 		return -1;
 	}
 	if(!pl->pel) {
