@@ -1038,7 +1038,10 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 		return 0;
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
+		if(errno == ENOENT)
+			return 0;
 		parser_error(tf, "Tuprules.tup");
+		fprintf(tf->f, "tup error: Unable to open top-level Tuprules.tup to check for .gitignore directive.\n");
 		return -1;
 	}
 	if(fslurp_null(fd, &incb) < 0)
