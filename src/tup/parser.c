@@ -133,7 +133,7 @@ static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
 			 int allow_nodes);
 static void make_path_list_unique(struct path_list_head *plist);
@@ -2457,24 +2457,29 @@ skip_empty_space:
 	return 0;
 }
 
-static int get_path_list(struct tupfile *tf, char *p, struct path_list_head *plist,
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
 			 int allow_nodes)
 {
 	int spc_index;
 	int last_entry = 0;
 	int orderid = 1;
+	char mem[PATH_MAX];
 
 	do {
 		char *eval_p;
 		spc_index = strcspn(p, " \t");
 		if(p[spc_index] == 0)
 			last_entry = 1;
-		p[spc_index] = 0;
+		if(spc_index >= PATH_MAX) {
+			fprintf(stderr, "tup internal error: mem is too small in get_path_list()\n");
+		}
 		if(spc_index == 0)
 			goto skip_empty_space;
+		strncpy(mem, p, spc_index);
+		mem[spc_index] = 0;
 
-		eval_p = eval(tf, p, allow_nodes);
+		eval_p = eval(tf, mem, allow_nodes);
 		if(!eval_p)
 			return -1;
 
