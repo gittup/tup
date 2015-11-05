@@ -2473,6 +2473,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 			last_entry = 1;
 		if(spc_index >= PATH_MAX) {
 			fprintf(stderr, "tup internal error: mem is too small in get_path_list()\n");
+			return -1;
 		}
 		if(spc_index == 0)
 			goto skip_empty_space;
