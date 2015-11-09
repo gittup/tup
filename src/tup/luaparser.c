@@ -845,8 +845,8 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 				tf->luaerror = TUPLUA_ERRORSHOWN;
 			}
 			return -1;
-	}
-	assert(lua_gettop(ls) == 0);
+		}
+		assert(lua_gettop(ls) == 0);
 	}
 	else ls = tf->ls;
 	assert(lua_gettop(ls) == 0);
@@ -854,6 +854,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	lua_getfield(ls, LUA_REGISTRYINDEX, "tup_traceback");
 
 	if(lua_load(ls, &tuplua_reader, &lrd, name, 0) != LUA_OK) {
+		fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
 		tf->luaerror = TUPLUA_PENDINGERROR;
 		assert(lua_gettop(ls) == 2);
 		return -1;
