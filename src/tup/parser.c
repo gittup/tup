@@ -106,22 +106,19 @@ static void free_bang_tree(struct string_entries *root);
 static void free_dir_lists(struct string_entries *root);
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio);
+			       char **o_bin);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
 static int execute_rule_internal(struct tupfile *tf, struct rule *r);
-static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_head *bl);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
 			 int allow_nodes);
-static void make_path_list_unique(struct path_list_head *plist);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
@@ -1196,10 +1193,9 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	int cmd_len;
 	struct rule r;
 	int rc;
-	int swapio;
 	char *separator;
 
-	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin, &swapio) < 0)
+	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin) < 0)
 		return -1;
 	if(bin) {
 		if((r.bin = bin_add(bin, bl)) == NULL)
@@ -1254,10 +1250,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		}
 	}
 
-	if(swapio)
-		rc = execute_reverse_rule(tf, &r, bl);
-	else
-		rc = execute_rule(tf, &r, bl);
+	rc = execute_rule(tf, &r, bl);
 	return rc;
 }
 
@@ -1325,7 +1318,6 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *value;
 	char *alloc_value;
 	char *bin;
-	int swapio = 0;
 	struct bang_rule *br;
 
 	value = split_eq(p);
@@ -1402,15 +1394,11 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	}
 
 	if(split_input_pattern(tf, alloc_value, &input, &command, &command_len,
-			       &output, &bin, &swapio) < 0)
+			       &output, &bin) < 0)
 		return -1;
 	if(bin != NULL) {
 		fprintf(tf->f, "tup error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
 		return -1;
-	}
-	if(swapio) {
-		fprintf(tf->f, "tup error: !-macro must use '|>' separators\n");
-		return SYNTAX_ERROR;
 	}
 
 	if(input) {
@@ -1672,7 +1660,7 @@ static void free_bang_tree(struct string_entries *root)
 
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio)
+			       char **o_bin)
 {
 	char *input;
 	char *cmd;
@@ -1681,24 +1669,15 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	char *brace;
 	char *ebrace = NULL;
 	char *ie, *ce;
-	char *tmp;
 	const char *marker = "|>";
 
 	input = p;
 	while(isspace(*input))
 		input++;
-	tmp = strstr(p, marker);
-	if(tmp) {
-		*swapio = 0;
-		p = tmp;
-	} else {
-		*swapio = 1;
-		marker = "<|";
-		p = strstr(p, marker);
-		if(!p) {
-			fprintf(tf->f, "tup error: Missing '|>' marker.\n");
-			return -1;
-		}
+	p = strstr(p, marker);
+	if(!p) {
+		fprintf(tf->f, "tup error: Missing '|>' marker.\n");
+		return -1;
 	}
 	if(input < p) {
 		ie = p - 1;
@@ -1965,99 +1944,6 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r)
 	return 0;
 }
 
-static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_head *bl)
-{
-	struct path_list_head oplist;
-	struct path_list *pl;
-	char *eval_pattern;
-	struct name_list tmp_nl;
-	struct name_list_entry tmp_nle;
-
-	if(!r->foreach) {
-		fprintf(tf->f, "tup error: reverse rule must use 'foreach'\n");
-		return -1;
-	}
-	if(!r->input_pattern) {
-		fprintf(tf->f, "tup error: reverse rule must have input list\n");
-		return -1;
-	}
-	eval_pattern = eval(tf, r->input_pattern, DISALLOW_NODES);
-	if(!eval_pattern)
-		return -1;
-
-	TAILQ_INIT(&oplist);
-	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
-		return -1;
-	make_path_list_unique(&oplist);
-
-	while(!TAILQ_EMPTY(&oplist)) {
-		struct rule tmpr;
-		char *tinput;
-		char *input_pattern;
-
-		pl = TAILQ_FIRST(&oplist);
-
-		if(pl->path) {
-			/* Things with paths (eg: foo/built-in.o) get skipped.
-			 * This is pretty much hacked to get linux to work.
-			 */
-			goto out_skip;
-		}
-
-		init_name_list(&tmp_nl);
-		tmp_nle.path = malloc(pl->pel->len + 1);
-		if(!tmp_nle.path) {
-			parser_error(tf, "malloc");
-			return -1;
-		}
-		memcpy(tmp_nle.path, pl->pel->path, pl->pel->len);
-		tmp_nle.path[pl->pel->len] = 0;
-		tmp_nle.len = pl->pel->len;
-		tmp_nle.extlesslen = tmp_nle.len - 1;
-		while(tmp_nle.extlesslen > 0 && tmp_nle.path[tmp_nle.extlesslen] != '.')
-			tmp_nle.extlesslen--;
-
-		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
-						       TUP_NODE_GENERATED, -1, NULL);
-		if(!tmp_nle.tent)
-			return -1;
-		set_nle_base(&tmp_nle);
-		add_name_list_entry(&tmp_nl, &tmp_nle);
-
-		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, NULL);
-		if(!tinput)
-			return -1;
-		input_pattern = eval(tf, tinput, DISALLOW_NODES);
-		free(tinput);
-		if(!input_pattern)
-			return -1;
-
-		tmpr.foreach = 0;
-		tmpr.input_pattern = input_pattern;
-		tmpr.output_pattern = tmp_nle.path;
-		tmpr.extra_outputs = NULL;
-		tmpr.bin = r->bin;
-		tmpr.command = r->command;
-		tmpr.extra_command = NULL;
-		tmpr.command_len = r->command_len;
-		tmpr.empty_input = 0;
-		tmpr.line_number = r->line_number;
-		tmpr.output_nl = &tmp_nl;
-
-		if(execute_rule(tf, &tmpr, bl) < 0)
-			return -1;
-		free(input_pattern);
-		free(tmp_nle.path);
-
-out_skip:
-		del_pl(pl, &oplist);
-	}
-	free(eval_pattern);
-
-	return 0;
-}
-
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required)
@@ -2239,29 +2125,6 @@ int get_pl(struct tupfile *tf, struct path_list *pl,
 		pl->path[pl->pel->path - pl->path - 1] = 0;
 	}
 	return 0;
-}
-
-static void make_path_list_unique(struct path_list_head *plist)
-{
-	/* When make_name_list_unique can't be used, this can make a path_list
-	 * unique in O(n^2) time.
-	 */
-	struct path_list *pl;
-	struct path_list *tmp;
-
-	TAILQ_FOREACH_SAFE(pl, plist, list, tmp) {
-		struct path_list *pl2;
-
-		pl2 = TAILQ_NEXT(pl, list);
-		while(pl2 != NULL) {
-			if(pl->pel->len == pl2->pel->len &&
-			   memcmp(pl->pel->path, pl2->pel->path, pl->pel->len) == 0) {
-				del_pl(pl, plist);
-				break;
-			}
-			pl2 = TAILQ_NEXT(pl2, list);
-		}
-	}
 }
 
 void free_path_list(struct path_list_head *plist)
