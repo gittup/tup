@@ -182,6 +182,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	if(tup_option_init(argc, argv) < 0)
+		return -1;
 	if(tup_init() < 0)
 		return 1;
 
@@ -895,14 +897,9 @@ static int dbconfig(int argc, char **argv)
 
 static int options(int argc, char **argv)
 {
-	if(argv) {}
-	if(argc == 1) {
-		if(tup_option_show() < 0)
-			return -1;
-	} else {
-		fprintf(stderr, "tup error: 'options' doesn't take arguments.\n");
+	if(argc || argv) {}
+	if(tup_option_show() < 0)
 		return -1;
-	}
 	return 0;
 }
 

@@ -63,9 +63,6 @@ int tup_init(void)
 	if(tup_lock_init() < 0) {
 		goto out_err;
 	}
-	if(tup_option_init() < 0) {
-		goto out_unlock;
-	}
 	color_init();
 	if(tup_db_open() != 0) {
 		goto out_unlock;

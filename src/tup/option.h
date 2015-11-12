@@ -24,7 +24,7 @@
 #include "compat.h"
 
 int tup_option_process_ini(void);
-int tup_option_init(void);
+int tup_option_init(int argc, char **argv);
 void tup_option_exit(void);
 int tup_option_get_int(const char *opt);
 int tup_option_get_flag(const char *opt);

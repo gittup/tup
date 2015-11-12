@@ -54,6 +54,7 @@ static struct {
 	struct vardb root;
 	int exists;
 } locations[] = {
+	{ .file = "(command line overrides)" },
 	{ .file = TUP_OPTIONS_FILE },
 	{ .file = home_loc },
 #ifndef _WIN32
@@ -221,9 +222,56 @@ ini_cleanup:
 	return 0;
 }
 
-int tup_option_init(void)
+static int parse_cmdline_options(struct vardb *vdb, int argc, char **argv)
+{
+	int x;
+	const char *opt;
+	const char *value;
+
+	for(x=0; x<argc; x++) {
+		opt = NULL;
+		value = NULL;
+
+		if(strcmp(argv[x], "--keep-going") == 0 ||
+		   strcmp(argv[x], "-k") == 0) {
+			opt = "updater.keep_going";
+			value = "1";
+		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
+			opt = "updater.keep_going";
+			value = "0";
+		} else if(strncmp(argv[x], "-j", 2) == 0) {
+			opt = "updater.num_jobs";
+			value = argv[x]+2;
+		} else if(strcmp(argv[x], "--no-sync") == 0) {
+			opt = "db.sync";
+			value = "0";
+		} else if(strncmp(argv[x], "--display-color", 15) == 0) {
+			if(argv[x][15] != '=') {
+				fprintf(stderr, "tup error: --display-color requires one of {never|always|auto}\n");
+				return -1;
+			}
+			opt = "display.color";
+			value = &argv[x][16];
+			if(strcmp(value, "never") != 0 &&
+			   strcmp(value, "always") != 0 &&
+			   strcmp(value, "auto") != 0) {
+				fprintf(stderr, "tup error: --display-color requires one of {never|always|auto}\n");
+				return -1;
+			}
+		}
+
+		if(opt && value) {
+			if(vardb_set(vdb, opt, value, NULL) < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+int tup_option_init(int argc, char **argv)
 {
 	unsigned int x;
+	if(argc || argv) {/*TODO */}
 
 #ifdef _WIN32
 	if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
@@ -238,7 +286,12 @@ int tup_option_init(void)
 	if(init_home_loc() < 0)
 		return -1;
 
-	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+	vardb_init(&locations[0].root);
+	if(parse_cmdline_options(&locations[0].root, argc, argv) < 0)
+		return -1;
+
+	/* Start at 1 since the first one is command-line overrides */
+	for(x=1; x<NUM_OPTION_LOCATIONS; x++) {
 		if(vardb_init(&locations[x].root) < 0)
 			return -1;
 		if(parse_option_file(x) < 0)
@@ -338,7 +391,8 @@ int tup_option_show(void)
 {
 	unsigned int x;
 	printf(" --- Option files:\n");
-	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+	/* Start at 1 since 0 is the command line overrides */
+	for(x=1; x<NUM_OPTION_LOCATIONS; x++) {
 		if(locations[x].exists) {
 			printf("Parsed option file: %s\n", locations[x].file);
 		} else {

@@ -152,11 +152,6 @@ int updater(int argc, char **argv, int phase)
 	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
-		} else if(strcmp(argv[x], "--keep-going") == 0 ||
-			  strcmp(argv[x], "-k") == 0) {
-			do_keep_going = 1;
-		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
-			do_keep_going = 0;
 		} else if(strcmp(argv[x], "--verbose") == 0) {
 			verbose = 1;
 			tup_entry_set_verbose(1);
@@ -164,8 +159,6 @@ int updater(int argc, char **argv, int phase)
 			parser_debug_run();
 		} else if(strcmp(argv[x], "--no-scan") == 0) {
 			do_scan = 0;
-		} else if(strncmp(argv[x], "-j", 2) == 0) {
-			num_jobs = strtol(argv[x]+2, NULL, 0);
 		} else if(strcmp(argv[x], "--no-environ-check") == 0) {
 			environ_check = 0;
 		} else if(strcmp(argv[x], "--quiet") == 0 ||
@@ -240,7 +233,7 @@ int generate(int argc, char **argv)
 		return -1;
 	if(tup_db_create(0, 1) < 0)
 		return -1;
-	if(tup_option_init() < 0)
+	if(tup_option_init(argc, argv) < 0)
 		return -1;
 	if(open_tup_top() < 0)
 		return -1;

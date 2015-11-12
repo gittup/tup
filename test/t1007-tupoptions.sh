@@ -19,7 +19,7 @@
 # Test out ~/.tupoptions
 check()
 {
-	if tup options | grep "$1.*$2" > /dev/null; then
+	if tup options $3 | grep "$1.*$2" > /dev/null; then
 		:
 	else
 		echo "Error: Expected option value $1 to be set to $2" 1>&2
@@ -51,5 +51,7 @@ HERE
 re_init
 check num_jobs 3
 check keep_going 1
+
+check num_jobs 4 -j4
 
 eotup
