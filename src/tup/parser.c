@@ -78,6 +78,7 @@ struct build_name_list_args {
 	const char *globstr;  /* Pointer to the basename of the filename in the tupfile */
 	int globstrlen;       /* Length of the basename */
 	int wildcard;
+	int excluding;
 	struct tupfile *tf;
 	int orderid;
 };
@@ -2257,6 +2258,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 {
 	struct build_name_list_args args;
 
+	args.excluding = pl->pel->len>0 && pl->pel->path && pl->pel->path[0] == '^';
+	if(args.excluding) {
+		pl->pel->len--;
+		pl->pel->path++;
+	}
+
 	if(pl->path != NULL) {
 		/* Note that dirlen should be pl->pel->path - pl->path - 1,
 		 * but we add 1 to account for the trailing '/' that
@@ -2337,7 +2344,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(tent->type == TUP_NODE_GHOST) {
 			if(!required)
 				return 0;
-			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an %sinput.\n", pl->pel->len, pl->pel->path, args.excluding ? "excluding " : "");
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
@@ -2470,6 +2477,18 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 
+	char* path = set_path(tent->name.s, args->dir, args->dirlen);
+	if(args->excluding && path != NULL) {
+		struct name_list_entry *n;
+		struct name_list_entry *tmp;
+		TAILQ_FOREACH_SAFE(n, &args->nl->entries, list, tmp) {
+			if(strncmp(n->path, path, n->len) == 0) {
+				delete_name_list_entry(args->nl, n);
+			}
+		}
+		free(path);
+		return 0;
+	}
 	len = tent->name.len + args->dirlen;
 	extlesslen = tent->name.len - 1;
 	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
@@ -2481,10 +2500,11 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	nle = malloc(sizeof *nle);
 	if(!nle) {
 		perror("malloc");
+		free(path);
 		return -1;
 	}
 
-	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
+	nle->path = path;
 	if(!nle->path) {
 		free(nle);
 		return -1;

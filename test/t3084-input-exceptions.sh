@@ -20,17 +20,37 @@
 # foreach scope
 
 . ./tup.sh
-cat > Tupfile << HERE
-: a.file |> cat %f > %o |> %f.processed
-: foreach *.file ^a.file ^c.file |> cat %f > %o |> %f.processed
-HERE
-tup touch a.file b.file c.file d.file
+
+echo ': *.file ^c.file |> cat %f > %o |> lines.txt' > Tupfile
+
+for i in a b c d; do
+	echo $i > $i.file
+done
 update
 
-tup_object_exist . 'cat a.file > a.file.processed'
-tup_object_exist . 'cat b.file > b.file.processed'
-tup_object_exist . 'cat d.file > d.file.processed'
-tup_object_no_exist . 'cat c.file > c.file.processed'
-check_not_exist c.file.processed
+gitignore_good a lines.txt
+gitignore_good b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
+
+echo ': *.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
+
+tup touch Tupfile
+update
+
+gitignore_good a lines.txt
+gitignore_bad b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
+
+echo ': *.file ^c.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
+
+tup touch Tupfile
+update
+
+gitignore_good a lines.txt
+gitignore_bad b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
 
 eotup
