@@ -18,6 +18,11 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#ifdef __linux__
+#define _GNU_SOURCE
+#include <sched.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,6 +143,11 @@ int main(int argc, char **argv)
 			return 1;
 		return 0;
 	} else if(strcmp(cmd, "privileged") == 0) {
+#ifdef __linux__
+		if(unshare(CLONE_NEWUSER) == 0) {
+			return 1;
+		}
+#endif
 		return tup_privileged();
 	}
 
@@ -986,9 +996,13 @@ static int flush(void)
 		 * just started but not gotten the lock yet.  So we need to
 		 * release our lock and wait a bit.
 		 */
-		tup_cleanup();
+		tup_db_close();
+		tup_lock_exit();
 		usleep(10000);
-		tup_init();
+		if(tup_lock_init() < 0)
+			return -1;
+		if(tup_db_open() != 0)
+			return -1;
 	}
 	printf("Flushed.\n");
 	return 0;

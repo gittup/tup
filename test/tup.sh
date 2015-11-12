@@ -247,10 +247,10 @@ __update()
 	fi
 
 	set +e
-	if [ -z $@ ]; then
-		$cmd "$@"
+	if [ $# -le 0 ]; then
+		$cmd
 	else
-		$cmd upd "$@"
+		$cmd upd $@
 	fi
 	rc=$?
 	set -e

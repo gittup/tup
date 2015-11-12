@@ -161,7 +161,7 @@ static struct tup_entry_head ghost_list;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
-static struct vardb envdb = { {NULL}, 0};
+static struct vardb envdb = { {NULL}, 0, NULL, NULL};
 static int transaction = 0;
 static tupid_t local_slash_dt = -1;
 
@@ -4751,7 +4751,7 @@ static struct var_entry *get_var(struct variant *variant, const char *var, int v
 	return ve;
 }
 
-struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, char **dest)
+struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, struct estring *e)
 {
 	struct var_entry *ve;
 
@@ -4759,9 +4759,9 @@ struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int v
 	if(!ve)
 		return NULL;
 
-	if(dest) {
-		memcpy(*dest, ve->value, ve->vallen);
-		*dest += ve->vallen;
+	if(e) {
+		if(estring_append(e, ve->value, ve->vallen) < 0)
+			exit(1);
 	}
 	return ve->tent;
 }
@@ -4826,16 +4826,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-int tup_db_get_varlen(struct variant *variant, const char *var, int varlen)
-{
-	struct var_entry *ve;
-
-	ve = get_var(variant, var, varlen);
-	if(!ve)
-		return -1;
-	return ve->vallen;
 }
 
 int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg)
@@ -5818,7 +5808,7 @@ static int missing_output(tupid_t tupid, void *data)
 	if(tup_entry_add(aod->cmdid, &cmdtent) < 0)
 		return -1;
 	fprintf(aod->f, "tup error: Expected to write to file '");
-	get_relative_dir(aod->f, NULL, NULL, cmdtent->dt, tent->tnode.tupid, NULL);
+	get_relative_dir(aod->f, NULL, cmdtent->dt, tent->tnode.tupid);
 	fprintf(aod->f, "' from cmd %lli but didn't\n", aod->cmdid);
 
 	if(!(aod->output_error & 2)) {
