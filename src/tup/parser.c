@@ -85,6 +85,7 @@ struct build_name_list_args {
 	const char *globstr;  /* Pointer to the basename of the filename in the tupfile */
 	int globstrlen;       /* Length of the basename */
 	int wildcard;
+	int excluding;
 	struct tupfile *tf;
 };
 
@@ -2670,6 +2671,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 {
 	struct build_name_list_args args;
 
+	args.excluding = pl->pel->len>0 && pl->pel->path && pl->pel->path[0] == '^';
+	if(args.excluding) {
+		pl->pel->len--;
+		pl->pel->path++;
+	}
+
 	if(pl->path != NULL) {
 		/* Note that dirlen should be pl->pel->path - pl->path - 1,
 		 * but we add 1 to account for the trailing '/' that
@@ -2689,33 +2696,16 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.globstr = pl->pel->path;
 	args.globstrlen = pl->pel->len;
 	args.tf = tf;
-	if(pl->pel->len && pl->pel->path[0] == '^') {
-		struct tup_entry *tent;
-		if(tup_db_select_tent_part(pl->dt, pl->pel->path+1, pl->pel->len-1, &tent) < 0)
-			return 0;
-		if(!tent || tent->type == TUP_NODE_GHOST)
-			return 0;
-		struct variant *variant = tup_entry_variant(tent);
-		if(!variant->root_variant && variant != tf->variant)
-			return 0; // from another variant
-		const char* path = set_path(tent->name.s, args.dir, args.dirlen);
-		if(path != NULL) {
-			struct name_list_entry *nle;
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(strcmp(nle->path, path) == 0) {
-					delete_name_list_entry(nl, nle);
-					break;
-				}
-			}
-		}
-	} else if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
+	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct variant *variant;
 
 		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
-			return -1;
+			return /*args.excluding ? 0 :*/ -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
+			//if(args.excluding)
+			//	return 0;
 			if(pl->pel->path[0] == '<') {
 				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 				if(!tent) {
@@ -2744,12 +2734,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		variant = tup_entry_variant(tent);
 		if(!variant->root_variant && variant != tf->variant) {
 			fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
-			return -1;
+			return /*args.excluding ? 0 :*/ -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {
 			if(!required)
 				return 0;
-			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an %sinput.\n", pl->pel->len, pl->pel->path, args.excluding ? "excluding " : "");
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
@@ -2881,6 +2871,18 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 
+	char* path = set_path(tent->name.s, args->dir, args->dirlen);
+	if(args->excluding && path != NULL) {
+		struct name_list_entry *n;
+		struct name_list_entry *tmp;
+		TAILQ_FOREACH_SAFE(n, &args->nl->entries, list, tmp) {
+			if(strncmp(n->path, path, n->len) == 0) {
+				delete_name_list_entry(args->nl, n);
+			}
+		}
+		free(path);
+		return 0;
+	}
 	len = tent->name.len + args->dirlen;
 	extlesslen = tent->name.len - 1;
 	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
@@ -2892,10 +2894,11 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	nle = malloc(sizeof *nle);
 	if(!nle) {
 		perror("malloc");
+		free(path);
 		return -1;
 	}
 
-	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
+	nle->path = path;
 	if(!nle->path) {
 		free(nle);
 		return -1;

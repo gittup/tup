@@ -20,17 +20,33 @@
 # foreach scope
 
 . ./tup.sh
-cat > Tupfile << HERE
-: a.file |> cat %f > %o |> %f.processed
-: foreach *.file ^a.file ^c.file |> cat %f > %o |> %f.processed
-HERE
-tup touch a.file b.file c.file d.file
+
+echo ': *.file ^c.file |> wc %f > %o |> lines.wc' > Tupfile
+
+tup touch a.file b.file c.file d.file Tupfile
 update
 
-tup_object_exist . 'cat a.file > a.file.processed'
-tup_object_exist . 'cat b.file > b.file.processed'
-tup_object_exist . 'cat d.file > d.file.processed'
-tup_object_no_exist . 'cat c.file > c.file.processed'
-check_not_exist c.file.processed
+echo '0 0 0 a.file
+0 0 0 b.file
+0 0 0 d.file
+0 0 0 total' | diff -u lines.wc -
+
+echo ': *.file ^[bc].file |> wc %f > %o |> lines.wc' > Tupfile
+
+tup touch a.file b.file c.file d.file Tupfile
+update
+
+echo '0 0 0 a.file
+0 0 0 d.file
+0 0 0 total' | diff -u lines.wc -
+
+echo ': *.file ^c.file ^[bc].file |> wc %f > %o |> lines.wc' > Tupfile
+
+tup touch a.file b.file c.file d.file Tupfile
+update
+
+echo '0 0 0 a.file
+0 0 0 d.file
+0 0 0 total' | diff -u lines.wc -
 
 eotup

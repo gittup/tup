@@ -247,8 +247,8 @@ __update()
 	fi
 
 	set +e
-	if [ -z $@ ]; then
-		$cmd "$@"
+	if [ $# -le 1 ]; then
+		$cmd ""
 	else
 		$cmd upd "$@"
 	fi
