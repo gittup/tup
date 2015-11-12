@@ -25,9 +25,10 @@ if [ ! "$tupos" = "Linux" ]; then
 	eotup
 fi
 check_tup_suid
+set_full_deps
 
 cat > Tupfile << HERE
-: |> ^c^ readlink /proc/self/exe > %o |> file.txt
+: |> readlink /proc/self/exe > %o |> file.txt
 HERE
 tup touch Tupfile
 update --debug-fuse 2>~/fuse.txt

@@ -27,8 +27,8 @@ syntax match chain ,^*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match chain ,[^a-zA-Z0-9_-]\*[a-zA-Z0-9_-][a-zA-Z0-9_-]*,
 syntax match separator /|>/
 syntax match reverseseparator /<|/
-syntax match format display "%\([%efoOBbd]\)" contained
-syntax match errfmt display "%\([^%efoOBbd]\)" contained
+syntax match format display "%\([%eOBbd]\|[0-9]\?[0-9]\?[fo]\)" contained
+syntax match errfmt display "%\([^%efoOBbd0-9]\)" contained
 syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match atvar /@([^)]*)/

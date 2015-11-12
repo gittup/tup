@@ -36,7 +36,6 @@
 #include "monitor.h"
 #include "path.h"
 #include "environ.h"
-#include "privs.h"
 #include "variant.h"
 #include "flist.h"
 #include "estring.h"
@@ -143,11 +142,6 @@ int updater(int argc, char **argv, int phase)
 	full_deps = tup_option_get_int("updater.full_deps");
 	show_warnings = tup_option_get_int("updater.warnings");
 	progress_init();
-
-	if(full_deps && !tup_privileged()) {
-		fprintf(stderr, "tup error: Unable to support full dependencies since the tup executable is not privileged. Please set the tup executable to be suid root, or if that is not possible then disable the 'updater.full_deps' option. (The option is currently enabled in the file %s)\n", tup_option_get_location("updater.full_deps"));
-		return -1;
-	}
 
 	if(check_full_deps_rebuild() < 0)
 		return -1;
@@ -268,6 +262,7 @@ int generate(int argc, char **argv)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
+	start_progress(g.num_nodes, g.total_mtime, 1);
 
 	/* The parsing nodes have to be removed so that we know if dependent
 	 * Tupfiles have already been parsed.
@@ -1846,7 +1841,7 @@ static int generate_work(struct graph *g, struct node *n)
 		const char *name;
 		if(generate_cwd != n->tent->parent) {
 			fprintf(generate_f, "cd '");
-			if(get_relative_dir(generate_f, NULL, NULL, generate_cwd->tnode.tupid, n->tent->dt, NULL) < 0) {
+			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, n->tent->dt) < 0) {
 				rc = -1;
 			} else {
 				fprintf(generate_f, "'\n");
@@ -2317,7 +2312,7 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 					if(e && !first)
 						if(estring_append(e, " ", 1) < 0)
 							return -1;
-					if(get_relative_dir(f, e, NULL, info->tent->parent->tnode.tupid, ttinput->tupid, NULL) < 0)
+					if(get_relative_dir(f, e, info->tent->parent->tnode.tupid, ttinput->tupid) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");
@@ -2478,13 +2473,6 @@ static int update(struct node *n)
 		while(*name && *name != ' ' && *name != '^') {
 			switch(*name) {
 				case 'c':
-					if(!tup_privileged()) {
-						pthread_mutex_lock(&display_mutex);
-						show_result(n->tent, 1, NULL, NULL, 1);
-						fprintf(stderr, "tup error: Attempting to run a sub-process in a chroot, but tup is not privileged. Please set the tup executable to be suid root, or if that is not possible then remove the ^c flag in the command: %s\n", n->tent->name.s);
-						pthread_mutex_unlock(&display_mutex);
-						return -1;
-					}
 					do_chroot = 1;
 					break;
 				case 'o':

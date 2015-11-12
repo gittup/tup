@@ -35,29 +35,6 @@ function io.open(filename, mode)
 	return f
 end
 
-local conditionalglob = function(input)
-	if input:match('%*') or input:match('%?') or input:match('%[.*%]') then
-		return tup.glob(input)
-	end
-	return {input}
-end
-
-local concat_filenames = function(files)
-	local res = ''
-	if files then
-		for k, v in ipairs(files) do
-			-- <groups> are ignored in %f/%o/etc
-			if not v:find('<') then
-				if res != '' then
-					res = res .. ' '
-				end
-				res = res .. v:gsub('%%', '%%%%')
-			end
-		end
-	end
-	return res
-end
-
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
 	return (string.gsub(filename, '[^/\\]*[/\\]', ''))
@@ -74,165 +51,34 @@ tup.ext = function(filename)
 	return match and match or ''
 end
 
+function tableize(inp)
+	if type(inp) ~= 'table' then
+		return { inp }
+	end
+	return inp
+end
+
 tup.frule = function(arguments)
-	-- Takes inputs, outputs, and commands as in tup.definerule,
-	-- additionally accepts, input and output which may be either tables or strings
-	-- Replaces $(), @(), and %d in inputs with proper values
-	-- Replaces $(), @(), %d, %f, %b, %B in outputs with proper values
-	-- Replaces $(), @(), %d, %f, %b, %B, %o in command with proper values
-	-- Returns the expanded outputs
-
-	function evalGlobals(text)
-		-- Replace $(VAR) with value of global variable VAR
-		return text:gsub('%$%(([^%)]*)%)',
-			function(var)
-				if _G[var] then return tostring(_G[var]) end
-				return ''
-			end)
-	end
-
-	function evalConfig(text)
-		-- Replace @(VAR) with value of config variable VAR
-		return text:gsub('@%(([^%)]*)%)',
-			function(configvar)
-				return tup.getconfig(configvar)
-			end)
-	end
-
-	local inputs
 	if arguments.inputs then
-		inputs = arguments.inputs
-	elseif arguments.input and type(arguments.input) ~= 'table' then
-		inputs = { arguments.input }
-	elseif arguments.input then
-		inputs = arguments.input
-	end
-
-	if inputs then
-		local newinputs = {}
-		local duplicates = {}
-		for index, input in ipairs(inputs) do
-			-- Explicitly convert to string for node variables.
-			local newinput = tostring(input)
-			newinput = evalGlobals(newinput)
-			newinput = evalConfig(newinput)
-			table.insert(newinputs, newinput)
-		end
-		inputs = newinputs
-
-		newinputs = {}
-		for index, input in ipairs(inputs) do
-			glob = conditionalglob(input)
-			for globindex, globvalue in ipairs(glob) do
-				if(not duplicates[globvalue]) then
-					duplicates[globvalue] = 1
-					table.insert(newinputs, globvalue)
-				end
+		if type(arguments.inputs) == 'table' then
+			if arguments.inputs.extra_inputs then
+				arguments.extra_inputs = tableize(arguments.inputs.extra_inputs)
+				arguments.inputs["extra_inputs"] = nil
 			end
 		end
-		inputs = newinputs
+		arguments.inputs = tableize(arguments.inputs)
 	end
-
-	local outputs
 	if arguments.outputs then
-		outputs = arguments.outputs
-	elseif arguments.output and type(arguments.output) ~= 'table' then
-		if arguments.output == '%f' then
-			outputs = inputs
-		else
-			outputs = {arguments.output}
-		end
-	elseif arguments.output then
-		outputs = arguments.output
-	end
-
-	if outputs then
-		local newoutputs = {}
-		for index, output in ipairs(outputs) do
-			local newoutput = output
-
-			newoutput = evalGlobals(newoutput)
-			newoutput = evalConfig(newoutput)
-
-			if not inputs or not inputs[1] then
-				if output:match('%%b') or output:match('%%B') or output:match('%%e') then
-					error 'tup.frule can only use output formatters %b, %B, or %e with exactly one input.'
-				end
-			else
-				newoutput = newoutput
-					:gsub('%%b', tup.file(inputs[1]))
-					:gsub('%%B', tup.base(inputs[1]))
-					:gsub('%%e', tup.ext(inputs[1]))
-			end
-
-			newoutput = newoutput:gsub('%%d', tup.getdirectory())
-
-			table.insert(newoutputs, newoutput)
-		end
-		outputs = newoutputs
-
-		newoutputs = {}
-		for index, output in ipairs(outputs) do
-			glob = conditionalglob(output)
-			for globindex, globvalue in ipairs(glob) do
-				table.insert(newoutputs, globvalue)
+		if type(arguments.outputs) == 'table' then
+			if arguments.outputs.extra_outputs then
+				arguments.extra_outputs = tableize(arguments.outputs.extra_outputs)
+				arguments.outputs["extra_outputs"] = nil
 			end
 		end
-		outputs = newoutputs
+		arguments.outputs = tableize(arguments.outputs)
 	end
-
-	local command
-	if arguments.command then
-		command = arguments.command
-
-		local outputreplacement = concat_filenames(outputs)
-		command = command:gsub('%%o', outputreplacement)
-
-		local inputreplacement = concat_filenames(inputs)
-		command = command:gsub('%%f', inputreplacement)
-
-		if not inputs or not inputs[1] then
-			if command:match('%%b') or command:match('%%B') or command:match('%%e') then
-				error 'tup.frule can only use command formatters %b, %B, or %e with exactly one input.'
-			end
-		else
-			command = command
-				:gsub('%%b', tup.file(inputs[1]))
-				:gsub('%%B', tup.base(inputs[1]))
-				:gsub('%%e', tup.ext(inputs[1]))
-		end
-
-		command = command:gsub('%%d', tup.getdirectory())
-
-		command = evalGlobals(command)
-		command = evalConfig(command)
-	end
-
-	-- We only check arguments.input / arguments.output for extra
-	if arguments.input and type(arguments.input) == 'table' and arguments.input.extra_inputs then
-		for k, v in ipairs(arguments.input.extra_inputs) do
-			local newinput = tostring(v)
-			newinput = evalGlobals(newinput)
-			newinput = evalConfig(newinput)
-			table.insert(inputs, newinput)
-		end
-	end
-	if arguments.output and type(arguments.output) == 'table' and arguments.output.extra_outputs then
-		for k, v in ipairs(arguments.output.extra_outputs) do
-			local newoutput = tostring(v)
-			newoutput = evalGlobals(newoutput)
-			newoutput = evalConfig(newoutput)
-			table.insert(outputs, newoutput)
-		end
-	end
-
-	--print('Defining tup.frule: ' ..
-	--	'inputs (' ..  (type(inputs) == 'table' and table.concat(inputs, ' ') or tostring(inputs)) ..
-	--	'), outputs = (' .. (type(outputs) == 'table' and table.concat(outputs, ' ') or tostring(outputs)) ..
-	--	'), command = ' .. command)
-	tup.definerule{inputs = inputs, outputs = outputs, command = command}
-
-	return outputs
+	rc = tup.definerule(arguments)
+	return rc
 end
 
 local function set_command(str)
@@ -286,29 +132,13 @@ local function get_abc(a, b, c)
 end
 
 tup.rule = function(a, b, c)
-	local input, command, output = get_abc(a, b, c)
-	return tup.frule{ input = input, command = command, output = output}
+	local inputs, command, outputs = get_abc(a, b, c)
+	return tup.frule{ inputs = inputs, command = command, outputs = outputs}
 end
 
 tup.foreach_rule = function(a, b, c)
-	local input, command, output = get_abc(a, b, c)
-	local newinput = {}
-	local routputs = {}
-
-	for k, v in ipairs(input) do
-		local glob
-		glob = conditionalglob(v)
-		for globindex, globvalue in ipairs(glob) do
-			table.insert(newinput, globvalue)
-		end
-	end
-
-	for k, v in ipairs(newinput) do
-		local tmpi = {v}
-		tmpi.extra_inputs = input.extra_inputs
-		routputs += tup.frule{input = tmpi, command = command, output = output}
-	end
-	return routputs
+	local inputs, command, outputs = get_abc(a, b, c)
+	return tup.frule{ inputs = inputs, command = command, outputs = outputs, foreach = 1}
 end
 
 -- This function is called when we do 'a += b' in a Tupfile.lua. It works

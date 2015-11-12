@@ -1,4 +1,4 @@
-.TH "tup" "1" "2014/03/12" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2015/10/08" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -266,7 +266,7 @@ Set to the maximum number of commands tup will run simultaneously. The default i
 Set to '1' to keep building as much as possible even if errors are encountered. Anything dependent on a failed command will not be executed, but other independent commands will be. The default is '0', which will cause tup to stop after the first failed command. See also the -k option.
 .TP
 .B updater.full_deps (defaults to '0')
-Set to '1' to track dependencies on files outside of the tup hierarchy. The default is '0', which only tracks dependencies within the tup hierarchy. For example, if you want all C files to be re-compiled when gcc is updated on your system, you should set this to '1'. In Linux and OSX, using full dependencies requires that the tup binary is suid as root so that it can run sub-processes in a chroot environment. Note that if this value is set to '1' from '0', tup will rebuild the entire project. Disabling this option when it was previously enabled does not require a full rebuild, but does take some time since the nodes representing external files are cleared out. NOTE: This does not currently work with ccache or other programs that may write to external files due to issues with locking. This may be fixed in the future.
+Set to '1' to track dependencies on files outside of the tup hierarchy. The default is '0', which only tracks dependencies within the tup hierarchy. For example, if you want all C files to be re-compiled when gcc is updated on your system, you should set this to '1'. In Linux and OSX, using full dependencies requires that the tup binary is suid as root so that it can run sub-processes in a chroot environment. Alternatively on Linux, if your kernel supports user namespaces, then you don't need to make the binary suid. Note that if this value is set to '1' from '0', tup will rebuild the entire project. Disabling this option when it was previously enabled does not require a full rebuild, but does take some time since the nodes representing external files are cleared out. NOTE: This does not currently work with ccache or other programs that may write to external files due to issues with locking. This may be fixed in the future.
 .TP
 .B updater.warnings (defaults to '1')
 Set to '0' to disable warnings about writing to hidden files. Tup doesn't track files that have a hidden path component (those that begin with a '.' character). If a sub-process writes to a hidden file, such as ".foo", then by default tup will display a warning that this file was created. By disabling this option, those warnings are not displayed. In either case, writing to hidden files is allowed and is not tracked by tup.
@@ -404,7 +404,7 @@ In the foo.c case, the command is run in a chroot and will display "CC foo.c". I
 .RS
 .TP
 .B c
-The 'c' flag causes the command to run inside a chroot on Linux and OSX, so that the fake working directory that tup uses is not visible to the sub-process. This may be necessary for commands that read the current working directory and write that information in any output files. For example, gcc with the --coverage flag will use the current working directory as the location of where to put the .gcda file. Use the 'c' flag to always run this command in a chroot. This is only supported if the tup binary is suid root so that it can setup the chroot environment.
+The 'c' flag causes the command to fail if tup does not support user namespaces (on Linux) or is not suid root. In these cases, tup runs in a degraded mode where the fake working directories are visible in the sub-processes, and some dependencies may be missed. If these degraded behaviors will break your a particular command in your build, add the 'c' flag so that users know they need to add the suid bit or upgrade their kernel. This flag is ignored on Windows.
 .TP
 .B o
 The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran.

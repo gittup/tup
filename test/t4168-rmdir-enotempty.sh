@@ -27,14 +27,14 @@ expected="rmdir.*/tmp/foo.*Directory not empty"
 
 # contains subdirectory
 cat > Tupfile << HERE
-: |> ^c^ mkdir -p /tmp/foo/bar && rmdir /tmp/foo |>
+: |> mkdir -p /tmp/foo/bar && rmdir /tmp/foo |>
 HERE
 
 update_fail_msg "$expected"
 
 # contains file
 cat > Tupfile << HERE
-: |> ^c^ mkdir -p /tmp/foo && touch /tmp/foo/bar && rmdir /tmp/foo |>
+: |> mkdir -p /tmp/foo && touch /tmp/foo/bar && rmdir /tmp/foo |>
 HERE
 
 update_fail_msg "$expected"

@@ -769,23 +769,13 @@ static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 	return 0;
 }
 
-int get_relative_dir(FILE *f, struct estring *e, char *dest,
-		     tupid_t start, tupid_t end, int *len)
+int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 {
 	struct tent_list_head startlist;
 	struct tent_list_head endlist;
 	struct tent_list *startentry;
 	struct tent_list *endentry;
 	int first = 0;
-
-	if(len) {
-		*len = 0;
-	} else {
-		if(dest) {
-			fprintf(stderr, "tup internal error: get_relative_dir() with a dest also needs a len.\n");
-			return -1;
-		}
-	}
 
 	TAILQ_INIT(&startlist);
 	TAILQ_INIT(&endlist);
@@ -819,20 +809,12 @@ int get_relative_dir(FILE *f, struct estring *e, char *dest,
 			if(e)
 				if(estring_append(e, "/", 1) < 0)
 					return -1;
-			if(dest)
-				sprintf(dest + *len, PATH_SEP_STR);
-			if(len)
-				(*len)++;
 		}
 		if(f)
 			fprintf(f, "..");
 		if(e)
 			if(estring_append(e, "..", 2) < 0)
 				return -1;
-		if(dest)
-			sprintf(dest + *len, "..");
-		if(len)
-			(*len) += 2;
 	}
 	TAILQ_FOREACH(endentry, &endlist, list) {
 		if(!first) {
@@ -844,20 +826,12 @@ int get_relative_dir(FILE *f, struct estring *e, char *dest,
 			if(e)
 				if(estring_append(e, "/", 1) < 0)
 					return -1;
-			if(dest)
-				sprintf(dest + *len, PATH_SEP_STR);
-			if(len)
-				(*len)++;
 		}
 		if(f)
 			fprintf(f, "%s", endentry->tent->name.s);
 		if(e)
 			if(estring_append(e, endentry->tent->name.s, endentry->tent->name.len) < 0)
 				return -1;
-		if(dest)
-			sprintf(dest + *len, "%s", endentry->tent->name.s);
-		if(len)
-			(*len) += endentry->tent->name.len;
 	}
 	if(!first) {
 		if(f)
@@ -865,10 +839,6 @@ int get_relative_dir(FILE *f, struct estring *e, char *dest,
 		if(e)
 			if(estring_append(e, ".", 1) < 0)
 				return -1;
-		if(dest)
-			sprintf(dest + *len, ".");
-		if(len)
-			(*len)++;
 	}
 
 	free_tent_list(&endlist);

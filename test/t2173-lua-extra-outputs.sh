@@ -26,7 +26,7 @@ cat > Tupfile.lua << HERE
 outputs += 'foo.txt'
 outputs += 'bar.txt'
 outputs.extra_outputs += 'extra.txt'
-tup.frule{command='sh ok.sh %o', output=outputs}
+tup.frule{command='sh ok.sh %o', outputs=outputs}
 HERE
 update
 

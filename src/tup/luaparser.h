@@ -27,5 +27,6 @@ struct buf;
 
 void lua_parser_debug_run(void);
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name);
+void lua_parser_cleanup(struct tupfile *tf);
 
 #endif

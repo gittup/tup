@@ -18,12 +18,14 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#define _GNU_SOURCE
 #include "master_fork.h"
 #include "tup/server.h"
 #include "tup/db_types.h"
 #include "tup/tupid_tree.h"
 #include "tup/container.h"
 #include "tup/privs.h"
+#include "tup/config.h"
 #include "tup/debug.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,11 +70,68 @@ static void *child_wait_notifier(void *arg);
 static int wait_for_my_sid(struct status_tree *st);
 static void sighandler(int sig);
 static int inited = 0;
+static int use_namespacing = 1;
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = SA_RESTART,
 };
+
+#ifdef __linux__
+static int deny_setgroups(pid_t pid)
+{
+	int fd;
+	char filename[PATH_MAX];
+
+	snprintf(filename, sizeof(filename), "/proc/%i/setgroups", pid);
+	filename[sizeof(filename)-1] = 0;
+	fd = open(filename, O_WRONLY);
+	if(fd < 0) {
+		if(errno == ENOENT) {
+			/* If this file doesn't exist, it means we're on a
+			 * pre-3.19, and should still work.
+			 */
+			return 0;
+		}
+		perror(filename);
+		fprintf(stderr, "tup error: Unable to deny setgroups when setting up user namespace.\n");
+		return -1;
+	}
+	if(write(fd, "deny", 4) < 0) {
+		perror(filename);
+		fprintf(stderr, "tup error: Unable to write \"deny\" to setgroups.\n");
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+static int update_map(pid_t pid, const char *mapfile, uid_t id)
+{
+	int fd;
+	char filename[PATH_MAX];
+	char map[PATH_MAX];
+
+	snprintf(filename, sizeof(filename), "/proc/%i/%s", pid, mapfile);
+	filename[sizeof(filename)-1] = 0;
+	snprintf(map, sizeof(map), "%i %i 1\n", id, id);
+	map[sizeof(map)-1] = 0;
+	fd = open(filename, O_WRONLY);
+	if(fd < 0) {
+		perror(filename);
+		fprintf(stderr, "tup error: Unable to set the uid/gid map.\n");
+		return -1;
+	}
+
+	if(write(fd, map, strlen(map)) < 0) {
+		perror(filename);
+		fprintf(stderr, "tup error: Unable to write id map info to file.\n");
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+#endif
 
 int server_pre_init(void)
 {
@@ -86,6 +145,26 @@ int server_pre_init(void)
 		return -1;
 	}
 	if(master_fork_pid == 0) {
+#ifdef __linux__
+		if(!tup_privileged()) {
+			uid_t origuid = getuid();
+			uid_t origgid = getgid();
+			pid_t pid = getpid();
+			if(unshare(CLONE_NEWUSER) < 0) {
+				fprintf(stderr, "tup warning: unshare(CLONE_NEWUSER) failed, and tup is not privileged. Subprocesses will have '.tup/mnt' paths for the current working directory and some dependencies may be missed.\n");
+				use_namespacing = 0;
+			} else {
+				if(deny_setgroups(pid) < 0)
+					return -1;
+				if(update_map(pid, "uid_map", origuid) < 0)
+					return -1;
+				if(update_map(pid, "gid_map", origgid) < 0)
+					return -1;
+			}
+		}
+#else
+		use_namespacing = 0;
+#endif
 		close(msd[1]);
 		exit(master_fork_loop());
 	}
@@ -270,10 +349,27 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			return -1;
 		}
 	}
+#ifdef __linux__
+	if(use_namespacing) {
+		if(unshare(CLONE_NEWNS) < 0) {
+			perror("unshare(CLONE_NEWNS)");
+			return -1;
+		}
+		/* We have to remount the root filesystem as private
+		 * (recursively), since systemd stupidly makes all mountpoints
+		 * shared by default.
+		 */
+		if(mount("none", "/", "", MS_REC | MS_PRIVATE, NULL) < 0) {
+			perror("mount");
+			fprintf(stderr, "tup error: Unable to remount the root file-system as a private mount.\n");
+			return -1;
+		}
+	}
+#endif
 
 	if(do_chroot) {
-		if(!tup_privileged()) {
-			fprintf(stderr, "tup internal error: Trying to run sub-process in a chroot, but tup is not privileged.\n");
+		if(!use_namespacing) {
+			fprintf(stderr, "tup error: Trying to run the sub-process in a chroot, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking and the chroot (^c) flag.\n");
 			return -1;
 		}
 #ifdef __APPLE__
@@ -287,12 +383,15 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 		/* The "tmpfs" argument is ignored since we use MS_BIND, but
 		 * valgrind complains about it if we use NULL.
 		 */
-		if(mount("/dev", dev, "tmpfs", MS_BIND, NULL) < 0) {
+		if(mount("/dev", dev, "tmpfs", MS_REC | MS_BIND, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to bind-mount /dev into fuse file-system.\n");
 			return -1;
 		}
-		if(mount("/proc", proc, "proc", MS_BIND, NULL) < 0) {
+		/* On the MS_REC flag, see:
+		 * http://stackoverflow.com/questions/23417521/mounting-proc-in-non-privileged-namespace-sandbox
+		 */
+		if(mount("/proc", proc, "proc", MS_REC | MS_BIND, NULL) < 0) {
 			perror("mount");
 			fprintf(stderr, "tup error: Unable to bind-mount /proc into fuse file-system.\n");
 			return -1;
@@ -307,20 +406,38 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 			fprintf(stderr, "tup error: Unable to chdir to root directory.\n");
 			return -1;
 		}
-		if(tup_drop_privs() < 0) {
-			return -1;
-		}
 	} else {
-		if(tup_privileged()) {
-			if(tup_drop_privs() < 0)
+		if(use_namespacing) {
+#ifdef __linux__
+			char srcmount[PATH_MAX];
+			if(snprintf(srcmount, sizeof(srcmount), "%s%s", job, get_tup_top()) >= (signed)sizeof(srcmount)) {
+				fprintf(stderr, "tup error: srcmount is sized incorrectly.\n");
 				return -1;
-		}
-		if(chdir(job) < 0) {
-			perror("chdir");
-			fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
-			return -1;
+			}
+			/* The "" argument is ignored since we use MS_BIND, but
+			 * valgrind complains about it if we use NULL.
+			 */
+			if(mount(srcmount, get_tup_top(), "", MS_BIND, NULL) < 0) {
+				perror("mount");
+				fprintf(stderr, "tup error: Unable to bind-mount '%s' as '%s'.\n", srcmount, get_tup_top());
+				return -1;
+			}
+			if(chdir("/") < 0) {
+				perror("chdir");
+				fprintf(stderr, "tup error: Unable to chdir to root directory.\n");
+				return -1;
+			}
+#endif
+		} else {
+			if(chdir(job) < 0) {
+				perror("chdir");
+				fprintf(stderr, "tup error: Unable to chdir to '%s'\n", job);
+
+			}
 		}
 	}
+	if(tup_drop_privs() < 0)
+		return -1;
 	if(chdir(dir) < 0) {
 		perror("chdir");
 		fprintf(stderr, "tup error: Unable to chdir to '%s'\n", dir);
@@ -568,19 +685,16 @@ static void *child_waiter(void *arg)
 	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
 		perror("waitpid");
 	}
-	if(waiter->do_chroot && tup_privileged()) {
-		int rc;
 #ifdef __APPLE__
+	if(waiter->do_chroot) {
+		int rc;
 		rc = unmount(waiter->dev, MNT_FORCE);
-#elif defined(__linux__)
-		rc = umount2(waiter->dev, MNT_FORCE);
-		rc = umount2(waiter->proc, MNT_FORCE);
-#endif
 		if(rc < 0) {
 			perror("umount");
 			fprintf(stderr, "tup error: Unable to umount the /dev file-system in the chroot environment. Subprocess pid=%i may not exit properly.\n", waiter->pid);
 		}
 	}
+#endif
 	pthread_mutex_lock(&lock);
 	if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
 		perror("write");
