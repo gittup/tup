@@ -44,14 +44,17 @@ fi
 
 export tupos=`uname -s`
 
+n_failed=0
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
 	if ./$i; then
 		:
 	else
-		echo "[31m *** $i failed[0m"
+		echo "[31m *** $i failed[0m" >&2
 		if [ "$keep_going" = "0" ]; then
 			exit 1
 		fi
+		n_failed=`expr $n_failed + 1`
 	fi
 done
+exit $n_failed
