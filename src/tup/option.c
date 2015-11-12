@@ -109,32 +109,33 @@ static struct sigaction sigact = {
 };
 #endif
 
-int tup_option_process_ini(void) {
+int tup_option_process_ini(void)
+{
 	int cur_dir;
 	int best_root = -1; // file descriptor -> best root candidate
 	int found_tup_dir = 0;
 
 	cur_dir = open(".", 0);
-	if (cur_dir < 0) {
+	if(cur_dir < 0) {
 		perror("open(\".\", 0)");
 		fprintf(stderr, "tup error: Could not get reference to current directory?\n");
 		exit(1);
 	}
 
-	for(;;) {
+	while(1) {
 		FILE *f;
 		struct stat st;
 		char path_buf[8];
 
 		f = fopen("Tupfile.ini", "r");
-		if (f == NULL) {
-			if (errno != ENOENT) {
+		if(f == NULL) {
+			if(errno != ENOENT) {
 				perror("fopen");
 				fprintf(stderr, "tup error: Unexpected error opening ini file\n");
 				exit(1);
 			}
 		} else {
-			if (best_root != -1)
+			if(best_root != -1)
 				close(best_root);
 			/* open can never fail as we have
 			   already read a file from this dir */
@@ -144,19 +145,19 @@ int tup_option_process_ini(void) {
 			fclose(f);
 		}
 
-		if (stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
+		if(stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
 			found_tup_dir = 1;
 			break;
 		}
 
-		if (chdir("..")) {
+		if(chdir("..")) {
 			perror("chdir");
 			fprintf(stderr, "tup error: Unexpected error traversing directory tree\n");
 			exit(1);
 		}
 
-		if (NULL == getcwd(path_buf, sizeof(path_buf))) {
-			if (errno != ERANGE) {
+		if(NULL == getcwd(path_buf, sizeof(path_buf))) {
+			if(errno != ERANGE) {
 				perror("getcwd");
 				fprintf(stderr, "tup error: Unexpected error getting directory while traversing the tree\n");
 			}
@@ -167,25 +168,25 @@ int tup_option_process_ini(void) {
 		}
 	}
 
-	if (best_root == -1) {
+	if(best_root == -1) {
 		goto ini_cleanup;
 	}
 
-	if (!found_tup_dir) {
+	if(!found_tup_dir) {
 		int rc;
 		int argc = 1;
 		char argv0[] = "init";
 		char *argv[] = {argv0, NULL};
 		char root_path[PATH_MAX];
 
-		if (fchdir(best_root) < 0) {
+		if(fchdir(best_root) < 0) {
 			perror("fchdir(best_root)");
 			fprintf(stderr, "tup error: Could not chdir to root candidate?\n");
 			exit(1);
 		}
 
-		if (NULL == getcwd(root_path, sizeof(root_path))) {
-			if (errno != ERANGE) {
+		if(NULL == getcwd(root_path, sizeof(root_path))) {
+			if(errno != ERANGE) {
 				perror("getcwd");
 				fprintf(stderr, "tup error: Unexpected error getting root path\n");
 				exit(1);
@@ -196,23 +197,23 @@ int tup_option_process_ini(void) {
 		}
 
 		rc = init_command(argc, argv);
-		if (0 != rc) {
+		if(0 != rc) {
 			fprintf(stderr, "tup error: `tup init' failed unexpectedly\n");
 			exit(rc);
 		}
 	}
 
 	if(close(best_root) < 0) {
-		perror("close(best_root");
+		perror("close(best_root)");
 	}
 
 ini_cleanup:
-	if (fchdir(cur_dir) < 0) {
+	if(fchdir(cur_dir) < 0) {
 		perror("fchdir(cur_dir)");
 		fprintf(stderr, "tup error: Could not chdir back to original working directory?\n");
 		exit(1);
 	}
-	if (close(cur_dir) < 0) {
+	if(close(cur_dir) < 0) {
 		perror("close");
 		fprintf(stderr, "tup error: Unexpected error closing current directory file descriptor\n");
 		exit(1);
@@ -439,7 +440,7 @@ static const char *cpu_number(void)
 	count = sysinfo.dwNumberOfProcessors;
 #endif
 
-	if (count > 100000 || count < 0)
+	if(count > 100000 || count < 0)
 		count = 1;
 
 	snprintf(buf, sizeof(buf), "%d", count);
