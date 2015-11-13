@@ -33,6 +33,12 @@ HERE
 tup touch Tupfile
 update --debug-fuse 2>~/fuse.txt
 
-echo `which readlink` | diff - file.txt
+rlink=`which readlink`
+if test -h $rlink; then
+	text=`readlink $rlink`
+else
+	text=$rlink
+fi
+echo $text | diff - file.txt
 
 eotup
