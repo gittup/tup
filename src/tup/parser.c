@@ -2739,11 +2739,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		struct variant *variant;
 
 		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
-			return /*args.excluding ? 0 :*/ -1;
+			return -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			//if(args.excluding)
-			//	return 0;
 			if(pl->pel->path[0] == '<') {
 				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 				if(!tent) {
@@ -2772,7 +2770,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		variant = tup_entry_variant(tent);
 		if(!variant->root_variant && variant != tf->variant) {
 			fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
-			return /*args.excluding ? 0 :*/ -1;
+			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {
 			if(!required)
