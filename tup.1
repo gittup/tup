@@ -193,6 +193,21 @@ Do not scan the project for changed files. This is for internal tup testing only
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
 .RE
 .TP
+.B generate script.sh
+The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). For example:
+.nf
+
+git clone ... myproj
+cd myproj
+tup generate build.sh
+\&./build.sh
+# Copy out build artifacts / logs here
+git clean -f -x -d
+
+.fi
+The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation.
+.RE
+.TP
 .B varsed
 The varsed command is used as a subprogram in a Tupfile; you would not run it manually at the command-line. It is used to read one file, and replace any variable references and write the output to a second file. Variable references are of the form @VARIABLE@, and are replaced with the corresponding value of the @-variable. For example, if foo.txt contains:
 .nf
