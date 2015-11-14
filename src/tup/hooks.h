@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2015  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2012  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,9 +18,10 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-int tup_early_init(const char* cmd, int argc, char **argv);
-void tup_early_cleanup(void);
-int tup_init(void);
-int tup_cleanup(void);
-void tup_valgrind_cleanup(void);
-int init_command(int argc, char **argv);
+#ifndef tup_hooks_h
+#define tup_hooks_h
+
+int run_pre_init_hooks(void);
+int run_post_init_hooks(void);
+
+#endif

@@ -21,6 +21,7 @@
 #include "init.h"
 #include "config.h"
 #include "db.h"
+#include "hooks.h"
 #include "lock.h"
 #include "entry.h"
 #include "server.h"
@@ -40,14 +41,35 @@
 #define mkdir(a,b) mkdir(a)
 #endif
 
-int tup_init(void)
+/* Returns < 0 on error, >= 0 on success. Returns 1 if init_command ran */
+int tup_early_init(const char* cmd, int argc, char **argv)
 {
+	int ini_ret;
+
+	if (tup_option_init() != 0) {
+		return -1;
+	}
+
+	tup_temporarily_drop_privs();
+	ini_ret = tup_option_process_ini(cmd, argc, argv);
+	tup_restore_privs();
+
+	if(ini_ret < 0) {
+		return ini_ret;
+	}
+
 	if(find_tup_dir() != 0) {
 		fprintf(stderr, "tup %s usage: tup [args]\n", tup_version());
 		fprintf(stderr, "For information on Tupfiles and other commands, see the tup(1) man page.\n");
 		fprintf(stderr, "No .tup directory found. Either create a Tupfile.ini file at the top of your project, or manually run 'tup init' there.\n");
 		return -1;
 	}
+
+	return ini_ret;
+}
+
+int tup_init(void)
+{
 	if(tup_entry_init() < 0) {
 		return -1;
 	}
@@ -62,9 +84,6 @@ int tup_init(void)
 	}
 	if(tup_lock_init() < 0) {
 		goto out_err;
-	}
-	if(tup_option_init() < 0) {
-		goto out_unlock;
 	}
 	color_init();
 	if(tup_db_open() != 0) {
@@ -82,7 +101,6 @@ out_err:
 int tup_cleanup(void)
 {
 	tup_db_close();
-	tup_option_exit();
 	tup_lock_exit();
 	if(close(tup_top_fd()) < 0)
 		perror("close(tup_top_fd())");
@@ -161,7 +179,7 @@ static int mkdirtree(const char *dirname)
 	return 0;
 }
 
-int init_command(int argc, char **argv)
+static int _init_command(int argc, char **argv)
 {
 	int x;
 	int db_sync = 1;
@@ -249,6 +267,18 @@ int init_command(int argc, char **argv)
 		fprintf(f, "[db]\n");
 		fprintf(f, "\tsync = false\n");
 		fclose(f);
+	}
+	return 0;
+}
+
+int init_command(int argc, char **argv)
+{
+	if (run_pre_init_hooks() != 0) {
+		fprintf(stderr, "tup error: pre_init hooks failed\n");
+		return -1;
+	}
+	if (_init_command(argc, argv) != 0) {
+		return -1;
 	}
 	return 0;
 }

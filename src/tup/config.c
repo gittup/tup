@@ -43,6 +43,9 @@ static int top_fd = -1;
 int find_tup_dir(void)
 {
 	struct stat st;
+	static int found_tup_dir = 0;
+	if (found_tup_dir)
+		return 0;
 
 	if(getcwd(tup_wd, sizeof(tup_wd)) == NULL) {
 		perror("getcwd");
@@ -77,6 +80,7 @@ int find_tup_dir(void)
 			return -1;
 		}
 	}
+	found_tup_dir = 1;
 	return 0;
 }
 

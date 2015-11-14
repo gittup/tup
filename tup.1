@@ -309,6 +309,9 @@ Set to '1' to show the environment nodes (such as PATH) and their dependencies. 
 .TP
 .B graph.combine (default '0')
 Set to '1' to try to combine similar nodes in the graph. For example, instead of showing 10 separate compilation commands that all have one .c file input and one .o file output, this will combine them into one command to more easily see the whole structure of the graph. By default all nodes are shown separately.
+.TP
+.B post_init.variants (default <None>)
+A post-init hook that will automatically set up default variants after init is run. This hook is triggered whenever init runs sucessfully, whether implicitly or from an explicit call to \fBtup init\fR. Multiple variants may be listed as a space-separated list. The value of this entry is passed directly to the \fBtup variant\fR command as its arguments.
 .RE
 .SH "TUPFILES"
 You must create a file called "Tupfile" anywhere in the tup hierarchy that you want to create an output file based on the input files. The input files can be anywhere else in the tup hierarchy, but the output file(s) must be written in the same directory as the Tupfile.
