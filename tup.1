@@ -1,4 +1,4 @@
-.TH "tup" "1" "2015/11/13" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2015/11/16" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -415,7 +415,7 @@ In a command string that uses the ^\ TEXT^ sequence, flag characters can be plac
 : bar.c |> ^c^ gcc --coverage %f -o %o |> bar | bar.gcno
 
 .fi
-In the foo.c case, the command is run in a chroot and will display "CC foo.c". In the bar.c case, the command is run in a chroot and the "gcc --coverage bar.c -o bar" string is displayed. These are the supported flag characters:
+In the foo.c case, the command requires namespaces (or suid) and will display "CC foo.c". In the bar.c case, the command requires namespaces (or suid) and the "gcc --coverage bar.c -o bar" string is displayed. These are the supported flag characters:
 .RS
 .TP
 .B c
