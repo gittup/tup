@@ -39,6 +39,6 @@ int main(int argc, char **argv)
 HERE
 
 tup touch foo.c Tupfile
-update_fail_msg "Trying to run the sub-process in a chroot, but this kernel does not support namespacing and tup is not privileged."
+update_fail_msg "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged."
 
 eotup

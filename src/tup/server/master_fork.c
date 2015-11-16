@@ -27,6 +27,7 @@
 #include "tup/privs.h"
 #include "tup/config.h"
 #include "tup/debug.h"
+#include "tup/option.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,7 +47,6 @@ struct rcmsg {
 struct child_waiter {
 	pid_t pid;
 	int sid;
-	int do_chroot;
 	char dev[JOB_MAX];
 	char proc[JOB_MAX];
 };
@@ -71,6 +71,7 @@ static int wait_for_my_sid(struct status_tree *st);
 static void sighandler(int sig);
 static int inited = 0;
 static int use_namespacing = 1;
+static int full_deps;
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
@@ -135,6 +136,7 @@ static int update_map(pid_t pid, const char *mapfile, uid_t id)
 
 int server_pre_init(void)
 {
+	full_deps = tup_option_get_int("updater.full_deps");
 	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, msd) < 0) {
 		perror("socketpair");
 		return -1;
@@ -293,7 +295,7 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 
 static int setup_subprocess(int sid, const char *job, const char *dir,
 			    const char *dev, const char *proc, int single_output,
-			    int do_chroot)
+			    int need_namespacing)
 {
 	int ofd, efd;
 	char buf[64];
@@ -367,11 +369,18 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	}
 #endif
 
-	if(do_chroot) {
-		if(!use_namespacing) {
-			fprintf(stderr, "tup error: Trying to run the sub-process in a chroot, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking and the chroot (^c) flag.\n");
+	if(!use_namespacing) {
+		if(need_namespacing) {
+			fprintf(stderr, "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support the ^c flag.\n");
 			return -1;
 		}
+		if(full_deps) {
+			fprintf(stderr, "tup error: Trying to run the sub-process in a chroot for full dependency detection, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking.\n");
+			return -1;
+		}
+	}
+
+	if(full_deps) {
 #ifdef __APPLE__
 		if(proc) {/* unused */}
 		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
@@ -627,7 +636,7 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.do_chroot) < 0)
+			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.need_namespacing) < 0)
 				exit(1);
 			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
@@ -641,7 +650,6 @@ static int master_fork_loop(void)
 		}
 		waiter->pid = pid;
 		waiter->sid = em.sid;
-		waiter->do_chroot = em.do_chroot;
 		pthread_create(&pt, &attr, child_waiter, waiter);
 	}
 
@@ -686,7 +694,7 @@ static void *child_waiter(void *arg)
 		perror("waitpid");
 	}
 #ifdef __APPLE__
-	if(waiter->do_chroot) {
+	if(full_deps) {
 		int rc;
 		rc = unmount(waiter->dev, MNT_FORCE);
 		if(rc < 0) {
