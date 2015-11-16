@@ -39,13 +39,13 @@
 #include <signal.h>
 
 struct rcmsg {
-	tupid_t sid;
+	int sid;
 	int status;
 };
 
 struct child_waiter {
 	pid_t pid;
-	tupid_t sid;
+	int sid;
 	int do_chroot;
 	char dev[JOB_MAX];
 	char proc[JOB_MAX];
@@ -291,14 +291,14 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 	return 0;
 }
 
-static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
+static int setup_subprocess(int sid, const char *job, const char *dir,
 			    const char *dev, const char *proc, int single_output,
 			    int do_chroot)
 {
 	int ofd, efd;
 	char buf[64];
 
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", sid);
+	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", sid);
 	buf[sizeof(buf)-1] = 0;
 	ofd = creat(buf, 0600);
 	if(ofd < 0) {
@@ -315,7 +315,7 @@ static int setup_subprocess(tupid_t sid, const char *job, const char *dir,
 	if(single_output) {
 		efd = ofd;
 	} else {
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", sid);
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", sid);
 		buf[sizeof(buf)-1] = 0;
 		efd = creat(buf, 0600);
 		if(efd < 0) {
@@ -719,7 +719,7 @@ static void *child_wait_notifier(void *arg)
 		pthread_mutex_lock(&statuslock);
 		tt = tupid_tree_search(&status_root, rcm.sid);
 		if(!tt) {
-			fprintf(stderr, "tup internal error: Unable to find status root entry for tupid %lli\n", rcm.sid);
+			fprintf(stderr, "tup internal error: Unable to find status root entry for tupid %i\n", rcm.sid);
 			pthread_mutex_unlock(&statuslock);
 			return NULL;
 		}
