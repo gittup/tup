@@ -660,6 +660,16 @@ eotup()
 		stop_monitor
 	fi
 	cd $tupcurdir
+	if [ -f "$tuptestdir/.tup/mnt/.metadata_never_index" ]; then
+		rm "$tuptestdir/.tup/mnt/.metadata_never_index"
+	fi
+	if [ -d "$tuptestdir/.tup/mnt" ]; then
+		mntdir=`find $tuptestdir/.tup/mnt -maxdepth 0 -not -empty`
+		if [ "$mntdir" != "" ]; then
+			echo "Error: $mntdir is not empty yet. Is fuse still mounted?" 1>&2
+			exit 1
+		fi
+	fi
 	rm -rf $tuptestdir
 	exit 0
 }
