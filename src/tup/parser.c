@@ -71,19 +71,6 @@ struct bang_list {
 };
 TAILQ_HEAD(bang_list_head, bang_list);
 
-struct src_chain {
-	TAILQ_ENTRY(src_chain) list;
-	char *input_pattern;
-	struct bang_list_head banglist;
-};
-TAILQ_HEAD(src_chain_head, src_chain);
-
-struct chain {
-	struct string_tree st;
-	struct src_chain_head src_chain_list;
-	struct bang_list_head banglist;
-};
-
 struct build_name_list_args {
 	struct name_list *nl;
 	const char *dir;
@@ -111,38 +98,28 @@ static int check_toplevel_gitignore(struct tupfile *tf);
 static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
-static int parse_chain_definition(struct tupfile *tf, char *p, int lno);
 static int set_variable(struct tupfile *tf, char *line);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			   struct name_list *nl, const char *ext, int extlen);
 static void free_bang_rule(struct string_entries *root, struct bang_rule *br);
 static void free_bang_tree(struct string_entries *root);
-static void free_chain_tree(struct string_entries *root);
-static void free_banglist(struct bang_list_head *head);
 static void free_dir_lists(struct string_entries *root);
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio);
+			       char **o_bin);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
-static int execute_rule_internal(struct tupfile *tf, struct rule *r,
-				 struct name_list *output_nl);
-static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_head *bl);
-static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
-				 struct bin_head *bl,
-				 struct rule *r, const char *ext);
+static int execute_rule_internal(struct tupfile *tf, struct rule *r);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
 			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
 			 int allow_nodes);
-static void make_path_list_unique(struct path_list_head *plist);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
@@ -156,7 +133,6 @@ static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
 static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
-static void move_name_list(struct name_list *newnl, struct name_list *oldnl);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			const char *ext, int extlen,
@@ -224,7 +200,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	RB_INIT(&tf.env_root);
 	RB_INIT(&tf.bang_root);
 	RB_INIT(&tf.input_root);
-	RB_INIT(&tf.chain_root);
 	RB_INIT(&tf.directory_root);
 	RB_INIT(&ps.directories);
 
@@ -382,7 +357,6 @@ out_server_stop:
 	pthread_mutex_unlock(&ps.lock);
 
 	lua_parser_cleanup(&tf);
-	free_chain_tree(&tf.chain_root);
 	free_tupid_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
 	free_tupid_tree(&tf.directory_root);
@@ -603,8 +577,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			rc = parse_rule(tf, line+1, lno, &bl);
 		} else if(line[0] == '!') {
 			rc = parse_bang_definition(tf, line, lno);
-		} else if(line[0] == '*') {
-			rc = parse_chain_definition(tf, line, lno);
 		} else {
 			rc = set_variable(tf, line);
 		}
@@ -1222,10 +1194,9 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	int cmd_len;
 	struct rule r;
 	int rc;
-	int swapio;
 	char *separator;
 
-	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin, &swapio) < 0)
+	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin) < 0)
 		return -1;
 	if(bin) {
 		if((r.bin = bin_add(bin, bl)) == NULL)
@@ -1280,10 +1251,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		}
 	}
 
-	if(swapio)
-		rc = execute_reverse_rule(tf, &r, bl);
-	else
-		rc = execute_rule(tf, &r, bl);
+	rc = execute_rule(tf, &r, bl);
 	return rc;
 }
 
@@ -1351,7 +1319,6 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	char *value;
 	char *alloc_value;
 	char *bin;
-	int swapio = 0;
 	struct bang_rule *br;
 
 	value = split_eq(p);
@@ -1428,15 +1395,11 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	}
 
 	if(split_input_pattern(tf, alloc_value, &input, &command, &command_len,
-			       &output, &bin, &swapio) < 0)
+			       &output, &bin) < 0)
 		return -1;
 	if(bin != NULL) {
 		fprintf(tf->f, "tup error: bins aren't allowed in !-macros. Rule was: %s = %s\n", p, alloc_value);
 		return -1;
-	}
-	if(swapio) {
-		fprintf(tf->f, "tup error: !-macro must use '|>' separators\n");
-		return SYNTAX_ERROR;
 	}
 
 	if(input) {
@@ -1493,115 +1456,6 @@ err_cleanup_br:
 	free(br->value);
 	free(br);
 	return -1;
-}
-
-static int parse_chain_definition(struct tupfile *tf, char *p, int lno)
-{
-	struct string_tree *st;
-	char *value;
-	struct chain *ch;
-	char *lbracket;
-	char *input_pattern = NULL;
-	struct bang_list_head *destlist;
-
-	value = split_eq(p);
-	if(!value) {
-		fprintf(tf->f, "tup error: Parse error line %i: Expecting '=' to set the *-chain.\n", lno);
-		return -1;
-	}
-
-	lbracket = strchr(p, '[');
-	if(lbracket) {
-		char *rbracket;
-		*lbracket = 0;
-		input_pattern = lbracket+1;
-		rbracket = strchr(input_pattern, ']');
-		if(!rbracket) {
-			fprintf(tf->f, "tup error: Parse error line %i: Expecting ']' character in *-chain definition\n", lno);
-			return -1;
-		}
-		*rbracket = 0;
-	}
-	st = string_tree_search(&tf->chain_root, p, strlen(p));
-	if(st) {
-		/* Replace existing *-chain */
-		ch = container_of(st, struct chain, st);
-		if(!input_pattern) {
-			free_banglist(&ch->banglist);
-		}
-	} else {
-		/* Create new *-chain */
-		ch = malloc(sizeof *ch);
-		if(!ch) {
-			parser_error(tf, "malloc");
-			return -1;
-		}
-		TAILQ_INIT(&ch->src_chain_list);
-		TAILQ_INIT(&ch->banglist);
-
-		if(string_tree_add(&tf->chain_root, &ch->st, p) < 0) {
-			fprintf(tf->f, "tup internal error: Error inserting *-chain into tree\n");
-			return -1;
-		}
-	}
-
-	destlist = &ch->banglist;
-	if(input_pattern) {
-		struct src_chain *sc;
-		sc = malloc(sizeof *sc);
-		if(!sc) {
-			parser_error(tf, "malloc");
-			return -1;
-		}
-		sc->input_pattern = strdup(input_pattern);
-		if(!sc->input_pattern) {
-			parser_error(tf, "strdup");
-			free(sc);
-			return -1;
-		}
-		TAILQ_INIT(&sc->banglist);
-		TAILQ_INSERT_TAIL(&ch->src_chain_list, sc, list);
-		destlist = &sc->banglist;
-	}
-
-	do {
-		struct string_tree *bst;
-		struct bang_rule *br;
-		struct bang_list *bal;
-		char *ce;
-		p = strstr(value, "|>");
-		if(p) {
-			ce = p-1;
-			while(isspace(*ce) && ce > value)
-				ce--;
-			ce[1] = 0;
-			p += 2;
-			while(*p && isspace(*p))
-				p++;
-		}
-		if(value[0] != '!') {
-			fprintf(tf->f, "tup error: *-chain must be composed of !-macros, not '%s'\n", value);
-			return -1;
-		}
-		bst = string_tree_search(&tf->bang_root, value, strlen(value));
-		if(!bst) {
-			fprintf(tf->f, "tup error: Unable to find !-macro: '%s'\n", value);
-			return -1;
-		}
-		br = container_of(bst, struct bang_rule, st);
-
-		bal = malloc(sizeof *bal);
-		if(!bal) {
-			parser_error(tf, "malloc");
-			return -1;
-		}
-		bal->br = br;
-		TAILQ_INSERT_TAIL(destlist, bal, list);
-
-		value = p;
-	} while(p != NULL);
-
-	return 0;
 }
 
 static int set_variable(struct tupfile *tf, char *line)
@@ -1805,41 +1659,9 @@ static void free_bang_tree(struct string_entries *root)
 	}
 }
 
-static void free_chain_tree(struct string_entries *root)
-{
-	struct string_tree *st;
-
-	while((st = RB_ROOT(root)) != NULL) {
-		struct chain *ch = container_of(st, struct chain, st);
-		struct src_chain *sc;
-
-		string_tree_free(root, st);
-
-		while(!TAILQ_EMPTY(&ch->src_chain_list)) {
-			sc = TAILQ_FIRST(&ch->src_chain_list);
-			TAILQ_REMOVE(&ch->src_chain_list, sc, list);
-			free_banglist(&sc->banglist);
-			free(sc->input_pattern);
-			free(sc);
-		}
-
-		free_banglist(&ch->banglist);
-		free(ch);
-	}
-}
-
-static void free_banglist(struct bang_list_head *head)
-{
-	while(!TAILQ_EMPTY(head)) {
-		struct bang_list *bal = TAILQ_FIRST(head);
-		TAILQ_REMOVE(head, bal, list);
-		free(bal);
-	}
-}
-
 static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_cmd, int *o_cmdlen, char **o_output,
-			       char **o_bin, int *swapio)
+			       char **o_bin)
 {
 	char *input;
 	char *cmd;
@@ -1848,24 +1670,15 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 	char *brace;
 	char *ebrace = NULL;
 	char *ie, *ce;
-	char *tmp;
 	const char *marker = "|>";
 
 	input = p;
 	while(isspace(*input))
 		input++;
-	tmp = strstr(p, marker);
-	if(tmp) {
-		*swapio = 0;
-		p = tmp;
-	} else {
-		*swapio = 1;
-		marker = "<|";
-		p = strstr(p, marker);
-		if(!p) {
-			fprintf(tf->f, "tup error: Missing '|>' marker.\n");
-			return -1;
-		}
+	p = strstr(p, marker);
+	if(!p) {
+		fprintf(tf->f, "tup error: Missing '|>' marker.\n");
+		return -1;
 	}
 	if(input < p) {
 		ie = p - 1;
@@ -1975,11 +1788,6 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
-	struct name_list output_nl;
-	struct name_list_entry *nle;
-	char *last_output_pattern;
-	char empty_pattern[] = "";
-
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
 	init_name_list(&r->bang_oo_inputs);
@@ -1990,104 +1798,20 @@ static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 
 	make_name_list_unique(&r->inputs);
 
-	init_name_list(&output_nl);
-
-	if(r->command[0] == '*') {
-		struct string_tree *st;
-		struct chain *ch;
-		struct bang_list *bal;
-		struct bang_list_head *banglist;
-
-		last_output_pattern = r->output_pattern;
-		r->output_pattern = empty_pattern;
-
-		st = string_tree_search(&tf->chain_root, r->command, r->command_len);
-		if(!st) {
-			fprintf(tf->f, "tup error: Unable to find *-chain: '%s'\n", r->command);
-			return -1;
-		}
-		ch = container_of(st, struct chain, st);
-
-		banglist = &ch->banglist;
-		if(!r->inputs.num_entries && r->output_nl) {
-			struct src_chain *sc;
-			const char *ext = NULL;
-
-			if(r->output_nl->num_entries > 0) {
-				nle = TAILQ_FIRST(&r->output_nl->entries);
-				if(nle->base &&
-				   nle->extlessbaselen != nle->baselen) {
-					ext = nle->base + nle->extlessbaselen;
-				}
-			}
-			TAILQ_FOREACH(sc, &ch->src_chain_list, list) {
-				char *tinput;
-				char *input_pattern;
-
-				banglist = &sc->banglist;
-
-				tinput = tup_printf(tf, sc->input_pattern, -1, r->output_nl, NULL, NULL, 0, NULL);
-				if(!tinput)
-					return -1;
-				input_pattern = eval(tf, tinput, DISALLOW_NODES);
-				free(tinput);
-				if(!input_pattern)
-					return -1;
-				if(check_recursive_chain(tf, input_pattern, bl, r, ext) < 0)
-					return -1;
-				delete_name_list(&r->order_only_inputs);
-				if(parse_input_pattern(tf, input_pattern, &r->inputs,
-						       &r->order_only_inputs, bl, 0) < 0)
-					return -1;
-				make_name_list_unique(&r->inputs);
-				free(input_pattern);
-				if(r->inputs.num_entries)
-					break;
-			}
-			if(!r->inputs.num_entries) {
-				fprintf(tf->f, "tup error: Unable to find any inputs for the *-chain for output '%s' in rule at line %i\n", last_output_pattern, r->line_number);
-				return -1;
-			}
-		}
-
-		TAILQ_FOREACH(bal, banglist, list) {
-			if(bal == TAILQ_LAST(banglist, bang_list_head)) {
-				/* Apply the output pattern specified in the rule
-				 * to the last !-macro in the *-chain.
-				 */
-				r->output_pattern = last_output_pattern;
-			} else {
-				if(strcmp(bal->br->output_pattern, "") == 0) {
-					fprintf(tf->f, "tup error: Intermediate !-macro '%s' in *-chain '%s' does not specify an output pattern.\n", bal->br->st.s, ch->st.s);
-					return -1;
-				}
-			}
-			r->command = bal->br->st.s;
-			r->command_len = bal->br->st.len;
-
-			if(execute_rule_internal(tf, r, &output_nl) < 0)
-				return -1;
-
-			delete_name_list(&r->inputs);
-			move_name_list(&r->inputs, &output_nl);
-		}
-		delete_name_list(&r->inputs);
-	} else {
-		if(execute_rule_internal(tf, r, &output_nl) < 0)
-			return -1;
-		delete_name_list(&output_nl);
-	}
+	if(execute_rule_internal(tf, r) < 0)
+		return -1;
 
 	return 0;
 }
 
-static int execute_rule_internal(struct tupfile *tf, struct rule *r,
-				 struct name_list *output_nl)
+static int execute_rule_internal(struct tupfile *tf, struct rule *r)
 {
 	struct name_list_entry *nle;
+	struct name_list output_nl;
 	int is_bang = 0;
 	int foreach = 0;
 
+	init_name_list(&output_nl);
 	if(r->command[0] == '!') {
 		struct string_tree *st;
 		struct bang_rule *br;
@@ -2155,7 +1879,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 			/* The extension in do_rule() does not include the
 			 * leading '.'
 			 */
-			if(do_rule_output_pattern(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
+			if(do_rule_output_pattern(tf, r, &tmp_nl, ext+1, extlen-1, &output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
@@ -2189,7 +1913,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 					return -1;
 			}
 
-			if(do_rule_output_pattern(tf, r, &r->inputs, NULL, 0, output_nl) < 0)
+			if(do_rule_output_pattern(tf, r, &r->inputs, NULL, 0, &output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -2207,7 +1931,7 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 					return -1;
 				if(rc == 0) {
 					if(do_rule_output_pattern(tf, r, &r->inputs,
-						   NULL, 0, output_nl) < 0)
+						   NULL, 0, &output_nl) < 0)
 						return -1;
 				}
 			}
@@ -2216,159 +1940,8 @@ static int execute_rule_internal(struct tupfile *tf, struct rule *r,
 
 	delete_name_list(&r->order_only_inputs);
 	delete_name_list(&r->bang_oo_inputs);
+	delete_name_list(&output_nl);
 
-	return 0;
-}
-
-static int execute_reverse_rule(struct tupfile *tf, struct rule *r,
-				struct bin_head *bl)
-{
-	struct path_list_head oplist;
-	struct path_list *pl;
-	char *eval_pattern;
-	struct name_list tmp_nl;
-	struct name_list_entry tmp_nle;
-
-	if(!r->foreach) {
-		fprintf(tf->f, "tup error: reverse rule must use 'foreach'\n");
-		return -1;
-	}
-	if(!r->input_pattern) {
-		fprintf(tf->f, "tup error: reverse rule must have input list\n");
-		return -1;
-	}
-	eval_pattern = eval(tf, r->input_pattern, DISALLOW_NODES);
-	if(!eval_pattern)
-		return -1;
-
-	TAILQ_INIT(&oplist);
-	if(get_path_list(tf, eval_pattern, &oplist, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
-		return -1;
-	make_path_list_unique(&oplist);
-
-	while(!TAILQ_EMPTY(&oplist)) {
-		struct rule tmpr;
-		char *tinput;
-		char *input_pattern;
-
-		pl = TAILQ_FIRST(&oplist);
-
-		if(pl->path) {
-			/* Things with paths (eg: foo/built-in.o) get skipped.
-			 * This is pretty much hacked to get linux to work.
-			 */
-			goto out_skip;
-		}
-
-		init_name_list(&tmp_nl);
-		tmp_nle.path = malloc(pl->pel->len + 1);
-		if(!tmp_nle.path) {
-			parser_error(tf, "malloc");
-			return -1;
-		}
-		memcpy(tmp_nle.path, pl->pel->path, pl->pel->len);
-		tmp_nle.path[pl->pel->len] = 0;
-		tmp_nle.len = pl->pel->len;
-		tmp_nle.extlesslen = tmp_nle.len - 1;
-		while(tmp_nle.extlesslen > 0 && tmp_nle.path[tmp_nle.extlesslen] != '.')
-			tmp_nle.extlesslen--;
-
-		tmp_nle.tent = tup_db_create_node_part(tf->tupid, tmp_nle.path, -1,
-						       TUP_NODE_GENERATED, -1, NULL);
-		if(!tmp_nle.tent)
-			return -1;
-		set_nle_base(&tmp_nle);
-		add_name_list_entry(&tmp_nl, &tmp_nle);
-
-		tinput = tup_printf(tf, r->output_pattern, -1, &tmp_nl, NULL, NULL, 0, NULL);
-		if(!tinput)
-			return -1;
-		input_pattern = eval(tf, tinput, DISALLOW_NODES);
-		free(tinput);
-		if(!input_pattern)
-			return -1;
-
-		tmpr.foreach = 0;
-		tmpr.input_pattern = input_pattern;
-		tmpr.output_pattern = tmp_nle.path;
-		tmpr.extra_outputs = NULL;
-		tmpr.bin = r->bin;
-		tmpr.command = r->command;
-		tmpr.extra_command = NULL;
-		tmpr.command_len = r->command_len;
-		tmpr.empty_input = 0;
-		tmpr.line_number = r->line_number;
-		tmpr.output_nl = &tmp_nl;
-
-		if(execute_rule(tf, &tmpr, bl) < 0)
-			return -1;
-		free(input_pattern);
-		free(tmp_nle.path);
-
-out_skip:
-		del_pl(pl, &oplist);
-	}
-	free(eval_pattern);
-
-	return 0;
-}
-
-static int check_recursive_chain(struct tupfile *tf, const char *input_pattern,
-				 struct bin_head *bl,
-				 struct rule *r, const char *ext)
-{
-	struct path_list_head inp_list;
-	char *inp;
-	struct path_list *pl;
-	int extlen = ext ? strlen(ext) : 0;
-
-	inp = strdup(input_pattern);
-	if(!inp) {
-		parser_error(tf, "strdup");
-		return -1;
-	}
-
-	TAILQ_INIT(&inp_list);
-	if(get_path_list(tf, inp, &inp_list, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
-		return -1;
-	make_path_list_unique(&inp_list);
-
-	while(!TAILQ_EMPTY(&inp_list)) {
-		pl = TAILQ_FIRST(&inp_list);
-
-		if(pl->pel->len > extlen) {
-			if(name_cmp(pl->pel->path + pl->pel->len - extlen, ext) == 0) {
-				struct rule tmpr;
-				char output_pattern[] = "";
-				char *tinput;
-
-				tinput = malloc(pl->pel->len + 1);
-				if(!tinput) {
-					parser_error(tf, "malloc");
-					return -1;
-				}
-				memcpy(tinput, pl->pel->path, pl->pel->len);
-				tinput[pl->pel->len] = 0;
-
-				tmpr.foreach = 1;
-				tmpr.input_pattern = tinput;
-				tmpr.output_pattern = output_pattern;
-				tmpr.bin = NULL;
-				tmpr.command = r->command;
-				tmpr.command_len = r->command_len;
-				tmpr.extra_command = NULL;
-				tmpr.empty_input = 0;
-				tmpr.line_number = r->line_number;
-				tmpr.output_nl = NULL;
-				if(execute_reverse_rule(tf, &tmpr, bl) < 0)
-					return -1;
-				free(tinput);
-			}
-		}
-
-		del_pl(pl, &inp_list);
-	}
-	free(inp);
 	return 0;
 }
 
@@ -2555,29 +2128,6 @@ int get_pl(struct tupfile *tf, struct path_list *pl,
 	return 0;
 }
 
-static void make_path_list_unique(struct path_list_head *plist)
-{
-	/* When make_name_list_unique can't be used, this can make a path_list
-	 * unique in O(n^2) time.
-	 */
-	struct path_list *pl;
-	struct path_list *tmp;
-
-	TAILQ_FOREACH_SAFE(pl, plist, list, tmp) {
-		struct path_list *pl2;
-
-		pl2 = TAILQ_NEXT(pl, list);
-		while(pl2 != NULL) {
-			if(pl->pel->len == pl2->pel->len &&
-			   memcmp(pl->pel->path, pl2->pel->path, pl->pel->len) == 0) {
-				del_pl(pl, plist);
-				break;
-			}
-			pl2 = TAILQ_NEXT(pl2, list);
-		}
-	}
-}
-
 void free_path_list(struct path_list_head *plist)
 {
 	struct path_list *pl, *tmp;
@@ -2734,7 +2284,26 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.globstrlen = pl->pel->len;
 	args.tf = tf;
 	args.orderid = orderid;
-	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
+	if(pl->pel->len && pl->pel->path[0] == '^') {
+		struct tup_entry *tent;
+		if(tup_db_select_tent_part(pl->dt, pl->pel->path+1, pl->pel->len-1, &tent) < 0)
+			return 0;
+		if(!tent || tent->type == TUP_NODE_GHOST)
+			return 0;
+		struct variant *variant = tup_entry_variant(tent);
+		if(!variant->root_variant && variant != tf->variant)
+			return 0; // from another variant
+		const char* path = set_path(tent->name.s, args.dir, args.dirlen);
+		if(path != NULL) {
+			struct name_list_entry *nle;
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(strcmp(nle->path, path) == 0) {
+					delete_name_list_entry(nl, nle);
+					break;
+				}
+			}
+		}
+	} else if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
 		struct variant *variant;
 
@@ -3671,16 +3240,6 @@ void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
 	}
 	newnl->globcnt = nle->globcnt;
 	TAILQ_INSERT_TAIL(&newnl->entries, nle, list);
-}
-
-static void move_name_list(struct name_list *newnl, struct name_list *oldnl)
-{
-	struct name_list_entry *nle;
-
-	while(!TAILQ_EMPTY(&oldnl->entries)) {
-		nle = TAILQ_FIRST(&oldnl->entries);
-		move_name_list_entry(newnl, oldnl, nle);
-	}
 }
 
 static const char *find_char(const char *s, int len, char c)

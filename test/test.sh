@@ -54,7 +54,7 @@ for i in $files; do
 		if [ "$keep_going" = "0" ]; then
 			exit 1
 		fi
-		((n_failed++))
+		n_failed=`expr $n_failed + 1`
 	fi
 done
 exit $n_failed

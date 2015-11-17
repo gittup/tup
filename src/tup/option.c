@@ -54,6 +54,7 @@ static struct {
 	struct vardb root;
 	int exists;
 } locations[] = {
+	{ .file = "(command line overrides)" },
 	{ .file = TUP_OPTIONS_FILE },
 	{ .file = home_loc },
 #ifndef _WIN32
@@ -109,32 +110,33 @@ static struct sigaction sigact = {
 };
 #endif
 
-int tup_option_process_ini(void) {
+int tup_option_process_ini(void)
+{
 	int cur_dir;
 	int best_root = -1; // file descriptor -> best root candidate
 	int found_tup_dir = 0;
 
 	cur_dir = open(".", 0);
-	if (cur_dir < 0) {
+	if(cur_dir < 0) {
 		perror("open(\".\", 0)");
 		fprintf(stderr, "tup error: Could not get reference to current directory?\n");
 		exit(1);
 	}
 
-	for(;;) {
+	while(1) {
 		FILE *f;
 		struct stat st;
 		char path_buf[8];
 
 		f = fopen("Tupfile.ini", "r");
-		if (f == NULL) {
-			if (errno != ENOENT) {
+		if(f == NULL) {
+			if(errno != ENOENT) {
 				perror("fopen");
 				fprintf(stderr, "tup error: Unexpected error opening ini file\n");
 				exit(1);
 			}
 		} else {
-			if (best_root != -1)
+			if(best_root != -1)
 				close(best_root);
 			/* open can never fail as we have
 			   already read a file from this dir */
@@ -144,19 +146,19 @@ int tup_option_process_ini(void) {
 			fclose(f);
 		}
 
-		if (stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
+		if(stat(".tup", &st) == 0 && S_ISDIR(st.st_mode)) {
 			found_tup_dir = 1;
 			break;
 		}
 
-		if (chdir("..")) {
+		if(chdir("..")) {
 			perror("chdir");
 			fprintf(stderr, "tup error: Unexpected error traversing directory tree\n");
 			exit(1);
 		}
 
-		if (NULL == getcwd(path_buf, sizeof(path_buf))) {
-			if (errno != ERANGE) {
+		if(NULL == getcwd(path_buf, sizeof(path_buf))) {
+			if(errno != ERANGE) {
 				perror("getcwd");
 				fprintf(stderr, "tup error: Unexpected error getting directory while traversing the tree\n");
 			}
@@ -167,25 +169,25 @@ int tup_option_process_ini(void) {
 		}
 	}
 
-	if (best_root == -1) {
+	if(best_root == -1) {
 		goto ini_cleanup;
 	}
 
-	if (!found_tup_dir) {
+	if(!found_tup_dir) {
 		int rc;
 		int argc = 1;
 		char argv0[] = "init";
 		char *argv[] = {argv0, NULL};
 		char root_path[PATH_MAX];
 
-		if (fchdir(best_root) < 0) {
+		if(fchdir(best_root) < 0) {
 			perror("fchdir(best_root)");
 			fprintf(stderr, "tup error: Could not chdir to root candidate?\n");
 			exit(1);
 		}
 
-		if (NULL == getcwd(root_path, sizeof(root_path))) {
-			if (errno != ERANGE) {
+		if(NULL == getcwd(root_path, sizeof(root_path))) {
+			if(errno != ERANGE) {
 				perror("getcwd");
 				fprintf(stderr, "tup error: Unexpected error getting root path\n");
 				exit(1);
@@ -196,23 +198,23 @@ int tup_option_process_ini(void) {
 		}
 
 		rc = init_command(argc, argv);
-		if (0 != rc) {
+		if(0 != rc) {
 			fprintf(stderr, "tup error: `tup init' failed unexpectedly\n");
 			exit(rc);
 		}
 	}
 
 	if(close(best_root) < 0) {
-		perror("close(best_root");
+		perror("close(best_root)");
 	}
 
 ini_cleanup:
-	if (fchdir(cur_dir) < 0) {
+	if(fchdir(cur_dir) < 0) {
 		perror("fchdir(cur_dir)");
 		fprintf(stderr, "tup error: Could not chdir back to original working directory?\n");
 		exit(1);
 	}
-	if (close(cur_dir) < 0) {
+	if(close(cur_dir) < 0) {
 		perror("close");
 		fprintf(stderr, "tup error: Unexpected error closing current directory file descriptor\n");
 		exit(1);
@@ -220,9 +222,56 @@ ini_cleanup:
 	return 0;
 }
 
-int tup_option_init(void)
+static int parse_cmdline_options(struct vardb *vdb, int argc, char **argv)
+{
+	int x;
+	const char *opt;
+	const char *value;
+
+	for(x=0; x<argc; x++) {
+		opt = NULL;
+		value = NULL;
+
+		if(strcmp(argv[x], "--keep-going") == 0 ||
+		   strcmp(argv[x], "-k") == 0) {
+			opt = "updater.keep_going";
+			value = "1";
+		} else if(strcmp(argv[x], "--no-keep-going") == 0) {
+			opt = "updater.keep_going";
+			value = "0";
+		} else if(strncmp(argv[x], "-j", 2) == 0) {
+			opt = "updater.num_jobs";
+			value = argv[x]+2;
+		} else if(strcmp(argv[x], "--no-sync") == 0) {
+			opt = "db.sync";
+			value = "0";
+		} else if(strncmp(argv[x], "--display-color", 15) == 0) {
+			if(argv[x][15] != '=') {
+				fprintf(stderr, "tup error: --display-color requires one of {never|always|auto}\n");
+				return -1;
+			}
+			opt = "display.color";
+			value = &argv[x][16];
+			if(strcmp(value, "never") != 0 &&
+			   strcmp(value, "always") != 0 &&
+			   strcmp(value, "auto") != 0) {
+				fprintf(stderr, "tup error: --display-color requires one of {never|always|auto}\n");
+				return -1;
+			}
+		}
+
+		if(opt && value) {
+			if(vardb_set(vdb, opt, value, NULL) < 0)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+int tup_option_init(int argc, char **argv)
 {
 	unsigned int x;
+	if(argc || argv) {/*TODO */}
 
 #ifdef _WIN32
 	if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
@@ -237,7 +286,12 @@ int tup_option_init(void)
 	if(init_home_loc() < 0)
 		return -1;
 
-	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+	vardb_init(&locations[0].root);
+	if(parse_cmdline_options(&locations[0].root, argc, argv) < 0)
+		return -1;
+
+	/* Start at 1 since the first one is command-line overrides */
+	for(x=1; x<NUM_OPTION_LOCATIONS; x++) {
 		if(vardb_init(&locations[x].root) < 0)
 			return -1;
 		if(parse_option_file(x) < 0)
@@ -337,7 +391,8 @@ int tup_option_show(void)
 {
 	unsigned int x;
 	printf(" --- Option files:\n");
-	for(x=0; x<NUM_OPTION_LOCATIONS; x++) {
+	/* Start at 1 since 0 is the command line overrides */
+	for(x=1; x<NUM_OPTION_LOCATIONS; x++) {
 		if(locations[x].exists) {
 			printf("Parsed option file: %s\n", locations[x].file);
 		} else {
@@ -439,7 +494,7 @@ static const char *cpu_number(void)
 	count = sysinfo.dwNumberOfProcessors;
 #endif
 
-	if (count > 100000 || count < 0)
+	if(count > 100000 || count < 0)
 		count = 1;
 
 	snprintf(buf, sizeof(buf), "%d", count);

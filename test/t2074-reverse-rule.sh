@@ -20,12 +20,13 @@
 
 . ./tup.sh
 check_no_windows symlink
-cat > Tupfile << HERE
-link-y += ar
-link-y += vi
-: foreach \$(link-y) <| ln -s %f %o <| busybox
+cat > Tupfile.lua << HERE
+binaries = {'ar', 'vi'}
+for k, v in pairs(binaries) do
+	tup.rule('busybox', 'ln -s %f %o', v)
+end
 HERE
-tup touch busybox Tupfile
+tup touch busybox Tupfile.lua
 update
 
 tup_dep_exist . 'ln -s busybox ar' . ar

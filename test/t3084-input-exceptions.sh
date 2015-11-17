@@ -16,42 +16,41 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test out ~/.tupoptions
-check()
-{
-	if tup options $3 | grep "$1.*$2" > /dev/null; then
-		:
-	else
-		echo "Error: Expected option value $1 to be set to $2" 1>&2
-		exit 1
-	fi
-}
+# Special input syntax to exclude some specific nodes from, for example,
+# foreach scope
 
 . ./tup.sh
-check_no_windows HOME environment variable
 
-# Override HOME so we can control ~/.tupoptions
-export HOME=`pwd`
-re_init
-check keep_going 0
+echo ': *.file ^c.file |> cat %f > %o |> lines.txt' > Tupfile
 
-cat > .tupoptions << HERE
-[updater]
-num_jobs = 2
-HERE
-re_init
-check num_jobs 2
-check keep_going 0
+for i in a b c d; do
+	echo $i > $i.file
+done
+update
 
-cat > .tupoptions << HERE
-[updater]
-num_jobs = 3
-keep_going = 1
-HERE
-re_init
-check num_jobs 3
-check keep_going 1
+gitignore_good a lines.txt
+gitignore_good b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
 
-check num_jobs 4 -j4
+echo ': *.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
+
+tup touch Tupfile
+update
+
+gitignore_good a lines.txt
+gitignore_bad b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
+
+echo ': *.file ^c.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
+
+tup touch Tupfile
+update
+
+gitignore_good a lines.txt
+gitignore_bad b lines.txt
+gitignore_bad c lines.txt
+gitignore_good d lines.txt
 
 eotup

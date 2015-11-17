@@ -1,4 +1,4 @@
-.TH "tup" "1" "2015/10/08" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2015/11/13" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -191,6 +191,21 @@ Do not scan the project for changed files. This is for internal tup testing only
 .TP
 .B --verbose
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
+.RE
+.TP
+.B generate script.sh
+The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). For example:
+.nf
+
+git clone ... myproj
+cd myproj
+tup generate build.sh
+\&./build.sh
+# Copy out build artifacts / logs here
+git clean -f -x -d
+
+.fi
+The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation.
 .RE
 .TP
 .B varsed
@@ -393,7 +408,7 @@ In this case one could use *.o as the input instead, but sometimes it is useful 
 .RE
 .TP
 .B ^-flags
-In a command string that uses the ^\ TEXT^ sequence, flag characters can be placed immediately after the ^ until the first space character or closing carat. For example:
+In a command string that uses the ^\ TEXT^ sequence, flag characters can be placed immediately after the ^ until the first space character or closing caret. For example:
 .nf
 
 : foo.c |> ^c CC %f^ gcc --coverage %f -o %o |> foo | foo.gcno

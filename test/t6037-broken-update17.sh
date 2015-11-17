@@ -26,26 +26,6 @@
 . ./tup.sh
 check_no_windows shell
 
-grep_yes()
-{
-	if grep "$1" output; then
-		:
-	else
-		echo "Error: Expected file $1 in cpio archive" 1>&2
-		exit 1
-	fi
-}
-
-grep_no()
-{
-	if grep "$1" output; then
-		echo "Error: File $1 shouldn't be in cpio archive" 1>&2
-		exit 1
-	else
-		:
-	fi
-}
-
 tmkdir sub
 cat > sub/Tupfile << HERE
 files-y = foo.c
@@ -62,15 +42,15 @@ tup touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
 varsetall BAR=y
 update
 
-grep_yes '^sub$'
-grep_yes '^sub/foo.o$'
-grep_yes '^sub/bar.o$'
+gitignore_good '^sub$' output
+gitignore_good '^sub/foo.o$' output
+gitignore_good '^sub/bar.o$' output
 
 varsetall BAR=n
 update
 
-grep_yes '^sub$'
-grep_yes '^sub/foo.o$'
-grep_no '^sub/bar.o$'
+gitignore_good '^sub$' output
+gitignore_good '^sub/foo.o$' output
+gitignore_bad '^sub/bar.o$' output
 
 eotup

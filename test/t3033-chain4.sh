@@ -19,26 +19,40 @@
 # Try to list duplicate outputs and have them get pruned.
 
 . ./tup.sh
-cat > Tupfile << HERE
-!cc = foreach |> gcc -c %f -o %o |> %B.o
-!ld = |> ld -r %f -o %o |>
+cat > Tupfile.lua << HERE
+function build_objs(t, lib)
+	objs = {}
+	for k, v in pairs(t) do
+		if not objs[v] then
+			objs[v] = 1
+			cc_rule(v)
+		end
+	end
+	return tup.rule(t, 'ld -r %f -o %o', lib)
+end
 
-*chain[%B.c] = !cc
-*chain[\$(%B-y)] = !ld
+function cc_rule(obj)
+	basename = string.match(obj, '(.*)%..*')
+	expanded_objs = _G[basename .. '_y']
+	if expanded_objs then
+		return build_objs(expanded_objs, obj)
+	end
+	return tup.rule(basename .. '.c', 'gcc -c %f -o %o', obj)
+end
 
-obj-y += foo.o
-obj-y += foo.o
-obj-y += bar.o
-bar-y += bar1.o
-bar-y += bar1.o
-bar-y += bar2.o
-: foreach \$(obj-y) <| *chain <|
-: \$(obj-y) |> !ld |> built-in.o
+obj_y += 'foo.o'
+obj_y += 'foo.o'
+obj_y += 'bar.o'
+bar_y += 'bar1.o'
+bar_y += 'bar1.o'
+bar_y += 'bar2.o'
+
+build_objs(obj_y, 'built-in.o')
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 echo 'void bar1(void) {}' > bar1.c
 echo 'void bar2(void) {}' > bar2.c
-tup touch foo.c bar1.c bar2.c Tupfile
+tup touch foo.c bar1.c bar2.c Tupfile.lua
 update
 
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'
