@@ -26,6 +26,6 @@ cat > Tupfile << HERE
 : |> echo hey |>
 HERE
 tup touch Tupfile
-update_fail_msg "tup error: Trying to run the sub-process in a chroot, but this kernel does not support namespacing and tup is not privileged."
+update_fail_msg "tup error: Trying to run the sub-process in a chroot for full dependency detection, but this kernel does not support namespacing and tup is not privileged"
 
 eotup

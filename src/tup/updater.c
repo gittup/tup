@@ -2456,7 +2456,7 @@ static int update(struct node *n)
 	struct tupid_entries group_sticky_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
-	int do_chroot = full_deps;
+	int need_namespacing = 0;
 	int compare_outputs = 0;
 	struct tupid_entries used_groups_root = {NULL};
 
@@ -2466,7 +2466,7 @@ static int update(struct node *n)
 		while(*name && *name != ' ' && *name != '^') {
 			switch(*name) {
 				case 'c':
-					do_chroot = 1;
+					need_namespacing = 1;
 					break;
 				case 'o':
 					compare_outputs = 1;
@@ -2526,7 +2526,7 @@ static int update(struct node *n)
 	if(rc < 0)
 		goto err_close_dfd;
 
-	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, do_chroot) < 0) {
+	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing) < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);

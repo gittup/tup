@@ -35,7 +35,7 @@ struct execmsg {
 	int vardictlen;
 	int num_env_entries;
 	int single_output;
-	int do_chroot;
+	int need_namespacing;
 };
 
 #define JOB_MAX 64
