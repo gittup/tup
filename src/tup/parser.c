@@ -113,7 +113,6 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl);
-static int execute_rule_internal(struct tupfile *tf, struct rule *r);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
@@ -1788,28 +1787,21 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 
 static int execute_rule(struct tupfile *tf, struct rule *r, struct bin_head *bl)
 {
+	struct name_list_entry *nle;
+	struct name_list output_nl;
+	int is_bang = 0;
+	int foreach = 0;
+
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
 	init_name_list(&r->bang_oo_inputs);
+
 	r->bang_extra_outputs = NULL;
 	if(parse_input_pattern(tf, r->input_pattern, &r->inputs,
 			       &r->order_only_inputs, bl, 1) < 0)
 		return -1;
 
 	make_name_list_unique(&r->inputs);
-
-	if(execute_rule_internal(tf, r) < 0)
-		return -1;
-
-	return 0;
-}
-
-static int execute_rule_internal(struct tupfile *tf, struct rule *r)
-{
-	struct name_list_entry *nle;
-	struct name_list output_nl;
-	int is_bang = 0;
-	int foreach = 0;
 
 	init_name_list(&output_nl);
 	if(r->command[0] == '!') {
