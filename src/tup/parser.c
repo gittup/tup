@@ -86,6 +86,7 @@ struct build_name_list_args {
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 			char *path, int *parser_lua);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
+static int parse_internal_definitions(struct tupfile *tf);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
@@ -247,6 +248,10 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(refactoring) {
 		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
 			goto out_close_vdb;
+	}
+
+	if(parse_internal_definitions(&tf) < 0) {
+		goto out_close_vdb;
 	}
 
 	if(n->tent->type == TUP_NODE_GHOST) {
@@ -439,6 +444,16 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 	} while(tent);
 	errno = ENOENT;
 	return -1;
+}
+
+static int parse_internal_definitions(struct tupfile *tf)
+{
+	char tup_ln[] = "!tup_ln = |> !tup_ln %f %o |>";
+	if(parse_bang_definition(tf, tup_ln, 0) < 0) {
+		fprintf(tf->f, "tup error: Unable to parse built-in !tup_ln rule.\n");
+		return -1;
+	}
+	return 0;
 }
 
 static char *get_newline(char *p)

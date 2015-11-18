@@ -2235,10 +2235,12 @@ static int process_output(struct server *s, struct node *n,
 	rewind(f);
 
 	always_display = 0;
-	/* If there's any output, always display the banner. */
-	if(lseek(s->output_fd, 0, SEEK_END))
-		always_display = 1;
-	lseek(s->output_fd, 0, SEEK_SET);
+	if(s->output_fd >= 0) {
+		/* If there's any output, always display the banner. */
+		if(lseek(s->output_fd, 0, SEEK_END))
+			always_display = 1;
+		lseek(s->output_fd, 0, SEEK_SET);
+	}
 
 	show_result(tent, is_err, show_ts, NULL, always_display);
 	if(expanded_name && (is_err || verbose)) {
@@ -2247,11 +2249,13 @@ static int process_output(struct server *s, struct node *n,
 			eout = stderr;
 		fprintf(eout, "tup: Expanded command string: %s\n", expanded_name);
 	}
-	if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0, NULL) < 0)
-		return -1;
-	if(close(s->output_fd) < 0) {
-		perror("close(s->output_fd)");
-		return -1;
+	if(s->output_fd >= 0) {
+		if(display_output(s->output_fd, is_err ? 3 : 0, tent->name.s, 0, NULL) < 0)
+			return -1;
+		if(close(s->output_fd) < 0) {
+			perror("close(s->output_fd)");
+			return -1;
+		}
 	}
 	if(display_output(fileno(f), 2, tent->name.s, 0, NULL) < 0)
 		return -1;
@@ -2443,6 +2447,47 @@ static int expand_command(char **res,
 	return 0;
 }
 
+static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char *cmd)
+{
+	char file1[PATH_MAX];
+	char fileout[PATH_MAX];
+	const char *endp;
+	struct mapping *map;
+
+	while(isspace(*cmd))
+		cmd++;
+	endp = cmd;
+	while(!isspace(*endp))
+		endp++;
+	strncpy(file1, cmd, endp-cmd);
+	file1[endp-cmd] = 0;
+	while(isspace(*endp))
+		endp++;
+	if(server_symlink(s, file1, dfd, endp) < 0)
+		return -1;
+	fileout[0] = '.';
+	snprint_tup_entry(fileout+1, PATH_MAX-1, dtent);
+	strcat(fileout, "/");
+	strcat(fileout, endp);
+	if(handle_file(ACCESS_WRITE, fileout, NULL, &s->finfo) < 0)
+		return -1;
+	map = malloc(sizeof *map);
+	if(!map) {
+		perror("malloc");
+		return -1;
+	}
+	map->realname = strdup(fileout);
+	map->tmpname = strdup(fileout);
+	map->tent = NULL;
+	finfo_lock(&s->finfo);
+	LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
+	finfo_unlock(&s->finfo);
+
+	s->exited = 1;
+	s->exit_status = 0;
+	return 0;
+}
+
 static int update(struct node *n)
 {
 	int dfd = -1;
@@ -2458,6 +2503,7 @@ static int update(struct node *n)
 	struct timespan ts;
 	int need_namespacing = 0;
 	int compare_outputs = 0;
+	int use_server = 0;
 	struct tupid_entries used_groups_root = {NULL};
 
 	timespan_start(&ts);
@@ -2525,8 +2571,15 @@ static int update(struct node *n)
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
-
-	if(server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing) < 0) {
+	if(strncmp(cmd, "!tup_ln ", 8) == 0) {
+		pthread_mutex_lock(&db_mutex);
+		rc = do_ln(&s, n->tent->parent, dfd, cmd + 8);
+		pthread_mutex_unlock(&db_mutex);
+	} else {
+		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing);
+		use_server = 1;
+	}
+	if(rc < 0) {
 		pthread_mutex_lock(&display_mutex);
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);
@@ -2549,8 +2602,9 @@ static int update(struct node *n)
 	free_tupid_tree(&normal_root);
 	free_tupid_tree(&group_sticky_root);
 	free_tupid_tree(&used_groups_root);
-	if(server_postexec(&s) < 0)
-		return -1;
+	if(use_server)
+		if(server_postexec(&s) < 0)
+			return -1;
 	return rc;
 
 err_close_dfd:

@@ -439,6 +439,34 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
+int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath)
+{
+	char depfile[PATH_MAX];
+	char dest[PATH_MAX];
+
+	dir_mutex_lock(dfd);
+	if(snprintf(dest, sizeof(dest), "%s/%s", win32_get_dirpath(dfd), linkpath) >= PATH_MAX) {
+		fprintf(stderr, "tup error: dest path sized too small in symlinkat compat function\n");
+		goto out_err;
+	}
+	if(snprintf(depfile, sizeof(depfile), "%s/%s", win32_get_dirpath(dfd), target) >= PATH_MAX) {
+		fprintf(stderr, "tup error: depfile path sized too small in symlinkat compat function\n");
+		goto out_err;
+	}
+	if(CopyFile(target, dest, 1) == 0) {
+		perror("CopyFile");
+		goto out_err;
+	}
+	dir_mutex_unlock();
+	if(handle_file(ACCESS_READ, depfile, NULL, &s->finfo) < 0)
+		return -1;
+	return 0;
+
+out_err:
+	dir_mutex_unlock();
+	return -1;
+}
+
 static int initialize_depfile(struct server *s, char *depfile, HANDLE *h)
 {
 	snprintf(depfile, PATH_MAX, "%s\\deps-%i", tuptmpdir, s->id);
