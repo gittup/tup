@@ -108,7 +108,6 @@ struct name_list {
 
 struct rule {
 	int foreach;
-	char *input_pattern;
 	char *output_pattern;
 	struct bin *bin;
 	const char *command;
