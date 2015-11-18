@@ -2080,6 +2080,8 @@ int get_pl(struct tupfile *tf, struct path_list *pl,
 	struct pel_group pg;
 	int sotgv = 0;
 	char *p = pl->mem;
+	if(p[0] == '^')
+		p++;
 
 	if(strchr(p, '<') != NULL) {
 		/* Group */
@@ -2258,10 +2260,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 {
 	struct build_name_list_args args;
 
-	args.excluding = pl->pel->len>0 && pl->pel->path && pl->pel->path[0] == '^';
+	args.excluding = pl->mem && pl->mem[0] == '^';
 	if(args.excluding) {
-		pl->pel->len--;
-		pl->pel->path++;
+		required = 0;
 	}
 
 	if(pl->path != NULL) {
