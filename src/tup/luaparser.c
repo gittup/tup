@@ -70,8 +70,7 @@ struct tuplua_glob_data {
 
 static int include_rules(struct tupfile *tf);
 static int include_file(struct tupfile *tf, const char *file);
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 tupid_t dt, int create_output_dirs);
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist);
 
 static int debug_run = 0;
 
@@ -159,7 +158,7 @@ static int tuplua_function_include(lua_State *ls)
 	return 0;
 }
 
-static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist, int create_output_dirs)
+static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
 {
 	lua_getfield(ls, 1, table);
 	if(!lua_istable(ls, -1)) {
@@ -175,10 +174,10 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 		path = tuplua_tostring(ls, -1);
 		if(!path)
 			return luaL_error(ls, "tuplua_table_to_path_list() called with a nil path");
-		evalp = eval(tf, path, create_output_dirs ? DISALLOW_NODES : ALLOW_NODES);
+		evalp = eval(tf, path, allow_nodes);
 		if(!evalp)
 			return luaL_error(ls, "tuplua_table_to_path_list() failed to evaluate string");
-		if(get_path_list(tf, evalp, plist, tf->tupid, create_output_dirs) < 0)
+		if(get_path_list(tf, evalp, plist) < 0)
 			return -1;
 		free(evalp);
 		lua_pop(ls, 1);
@@ -237,15 +236,15 @@ static int tuplua_function_definerule(lua_State *ls)
 	TAILQ_INIT(&input_path_list);
 	TAILQ_INIT(&extra_input_path_list);
 	TAILQ_INIT(&output_path_list);
-	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, 0) < 0)
+	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, DISALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
-	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, 0) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, DISALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_inputs'.");
-	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list, 1) < 0)
+	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
-	if(get_path_list(tf, sep, &output_path_list, tf->tupid, 0) < 0)
+	if(get_path_list(tf, sep, &output_path_list) < 0)
 		return luaL_error(ls, "Error while appending '|' separator in output list.");
-	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &output_path_list, 1) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &output_path_list, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_outputs'.");
 
 	init_name_list(&r.inputs);
@@ -256,6 +255,8 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
 	if(get_name_list(tf, &input_path_list, &nl, 1) < 0)
 		return luaL_error(ls, "Error parsing input list");
+	if(parse_dependent_tupfiles(&extra_input_path_list, tf) < 0)
+		return luaL_error(ls, "Error while parsing dependent Tupfiles");
 	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs, 1) < 0)
 		return luaL_error(ls, "Error parsing extra input list");
 	make_name_list_unique(&nl);
@@ -489,7 +490,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
 	lua_pop(ls, 1);
 
-	if(get_path_list(tf, pattern, &plist, tf->tupid, 0) < 0) {
+	if(get_path_list(tf, pattern, &plist) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		return lua_error(ls);
 	}
@@ -1021,8 +1022,7 @@ out_err:
 	return 0;
 }
 
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 tupid_t dt, int create_output_dirs)
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist)
 {
 	struct path_list *pl;
 
@@ -1030,7 +1030,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 	if(!pl)
 		return -1;
 
-	if(get_pl(tf, pl, dt, create_output_dirs) < 0)
+	if(get_pl(tf, pl) < 0)
 		return -1;
 	TAILQ_INSERT_TAIL(plist, pl, list);
 

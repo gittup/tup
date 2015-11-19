@@ -117,8 +117,8 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
-			 int allow_nodes);
+			 struct bin_head *bl, int allow_nodes);
+static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
@@ -822,7 +822,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	struct path_list *pl;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, cmdline, &plist, tf->curtent->tnode.tupid, NULL, 0, ALLOW_NODES) < 0)
+	if(get_path_list(tf, cmdline, &plist, NULL, ALLOW_NODES) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -832,6 +832,9 @@ static int preload(struct tupfile *tf, char *cmdline)
 	 */
 	TAILQ_FOREACH(pl, &plist, list) {
 		struct tup_entry *tent;
+
+		if(path_list_fill_dt_pel(tf, pl, tf->curtent->tnode.tupid, 0) < 0)
+			return -1;
 		if(pl->pel->len == 2 && strncmp(pl->pel->path, "..", 2) == 0) {
 			if(tup_entry_add(pl->dt, &tent) < 0)
 				return -1;
@@ -1942,7 +1945,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	struct path_list_head plist;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, p, &plist, tf->tupid, bl, 0, ALLOW_NODES) < 0)
+	if(get_path_list(tf, p, &plist, bl, ALLOW_NODES) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -1962,17 +1965,16 @@ struct path_list *new_pl(struct tupfile *tf, const char *mem)
 		return NULL;
 	}
 	pl->path = NULL;
-	pl->pel = NULL;
 	pl->group = 0;
-	pl->dt = 0;
+	pl->dt = -1;
+	pl->pel = NULL;
 	pl->bin = NULL;
 	strcpy(pl->mem, mem);
 	return pl;
 }
 
 static int get_path_list_internal(struct tupfile *tf, char *p, struct path_list_head *plist,
-				  tupid_t dt, struct bin_head *bl, int create_output_dirs,
-				  int orderid)
+				  struct bin_head *bl, int orderid)
 {
 	struct path_list *pl;
 	int spc_index;
@@ -2013,7 +2015,7 @@ static int get_path_list_internal(struct tupfile *tf, char *p, struct path_list_
 			}
 		} else {
 			/* Path */
-			if(get_pl(tf, pl, dt, create_output_dirs) < 0)
+			if(get_pl(tf, pl) < 0)
 				return -1;
 		}
 		pl->orderid = orderid;
@@ -2026,8 +2028,7 @@ skip_empty_space:
 }
 
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 tupid_t dt, struct bin_head *bl, int create_output_dirs,
-			 int allow_nodes)
+			 struct bin_head *bl, int allow_nodes)
 {
 	int spc_index;
 	int last_entry = 0;
@@ -2052,7 +2053,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 		if(!eval_p)
 			return -1;
 
-		if(get_path_list_internal(tf, eval_p, plist, dt, bl, create_output_dirs, orderid) < 0)
+		if(get_path_list_internal(tf, eval_p, plist, bl, orderid) < 0)
 			return -1;
 		free(eval_p);
 		orderid++;
@@ -2064,11 +2065,57 @@ skip_empty_space:
 	return 0;
 }
 
-int get_pl(struct tupfile *tf, struct path_list *pl,
-	   tupid_t dt, int create_output_dirs)
+static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs)
 {
 	struct pel_group pg;
 	int sotgv = 0;
+
+	/* Bins get skipped. */
+	if(pl->bin)
+		return 0;
+
+	/* If we already filled it out, just return. */
+	if(pl->dt != -1)
+		return 0;
+
+	if(get_path_elements(pl->path, &pg) < 0)
+		return -1;
+	if(pg.pg_flags & PG_HIDDEN) {
+		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", pl->path);
+		return -1;
+	}
+
+	if(create_output_dirs || pg.pg_flags & PG_GROUP)
+		sotgv = SOTGV_CREATE_DIRS;
+	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
+	if(pl->dt <= 0) {
+		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", pl->path);
+		print_tup_entry(tf->f, tup_entry_get(dt));
+		fprintf(tf->f, "'\n");
+		return -1;
+	}
+	if(!pl->pel) {
+		if(strcmp(pl->path, ".") == 0) {
+			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
+			return -1;
+		}
+		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
+		return -1;
+	}
+	/* TODO: What's this for? */
+	if(pl->path == pl->pel->path) {
+		pl->path = NULL;
+	} else {
+		/* File points to somewhere later in the path,
+		 * so set the last '/' to 0.
+		 */
+		pl->path[pl->pel->path - pl->path - 1] = 0;
+	}
+	return 0;
+}
+
+int get_pl(struct tupfile *tf, struct path_list *pl)
+{
 	char *p = pl->mem;
 	if(p[0] == '^')
 		p++;
@@ -2084,39 +2131,6 @@ int get_pl(struct tupfile *tf, struct path_list *pl,
 		pl->group = 1;
 	}
 	pl->path = p;
-
-	if(get_path_elements(p, &pg) < 0)
-		return -1;
-	if(pg.pg_flags & PG_HIDDEN) {
-		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", p);
-		return -1;
-	}
-
-	if(create_output_dirs || pg.pg_flags & PG_GROUP)
-		sotgv = SOTGV_CREATE_DIRS;
-	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
-	if(pl->dt <= 0) {
-		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", p);
-		print_tup_entry(tf->f, tup_entry_get(dt));
-		fprintf(tf->f, "'\n");
-		return -1;
-	}
-	if(!pl->pel) {
-		if(strcmp(pl->path, ".") == 0) {
-			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
-			return -1;
-		}
-		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
-		return -1;
-	}
-	if(pl->path == pl->pel->path) {
-		pl->path = NULL;
-	} else {
-		/* File points to somewhere later in the path,
-		 * so set the last '/' to 0.
-		 */
-		pl->path[pl->pel->path - pl->path - 1] = 0;
-	}
 	return 0;
 }
 
@@ -2170,6 +2184,8 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 	struct path_list *pl;
 
 	TAILQ_FOREACH(pl, plist, list) {
+		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 0) < 0)
+			return -1;
 		/* Only care about non-bins, and directories that are not our
 		 * own.
 		 */
@@ -2803,17 +2819,17 @@ static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
 	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, NULL);
 	if(!toutput)
 		return -1;
-	if(get_path_list(tf, toutput, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
+	if(get_path_list(tf, toutput, &oplist, NULL, DISALLOW_NODES) < 0)
 		return -1;
 	/* Insert a fake separator */
-	if(get_path_list(tf, sep, &oplist, tf->tupid, NULL, 0, DISALLOW_NODES) < 0)
+	if(get_path_list(tf, sep, &oplist, NULL, DISALLOW_NODES) < 0)
 		return -1;
 	if(r->extra_outputs) {
-		if(get_path_list(tf, r->extra_outputs, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
+		if(get_path_list(tf, r->extra_outputs, &oplist, NULL, DISALLOW_NODES) < 0)
 			return -1;
 	}
 	if(r->bang_extra_outputs) {
-		if(get_path_list(tf, r->bang_extra_outputs, &oplist, tf->tupid, NULL, 1, DISALLOW_NODES) < 0)
+		if(get_path_list(tf, r->bang_extra_outputs, &oplist, NULL, DISALLOW_NODES) < 0)
 			return -1;
 	}
 	rc = do_rule(tf, r, nl, &oplist, ext, extlen, output_nl);
@@ -2867,7 +2883,10 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		char *newpath;
 		char *lastslash;
 
-		if(pl->pel->path[0] == '<') {
+		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 1) < 0)
+			return -1;
+
+		if(pl->group) {
 			if(group) {
 				fprintf(tf->f, "tup error: Multiple output groups detected: '");
 				print_tup_entry(tf->f, group);

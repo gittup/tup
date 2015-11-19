@@ -129,8 +129,10 @@ struct path_list {
 
 	/* For files: */
 	char *path;
-	struct path_element *pel;
 	int group;
+
+	/* After path_list_fill_dt_pel */
+	struct path_element *pel;
 	tupid_t dt;
 
 	/* For bins: */
@@ -161,7 +163,7 @@ void make_name_list_unique(struct name_list *nl);
 int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	    struct path_list_head *oplist,
 	    const char *ext, int extlen, struct name_list *output_nl);
-int get_pl(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
+int get_pl(struct tupfile *tf, struct path_list *pl);
 
 struct node;
 struct graph;
