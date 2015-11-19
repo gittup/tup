@@ -3390,6 +3390,46 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			}
 			nle = TAILQ_FIRST(&onl->entries);
 			estring_append(&e, nle->path, nle->extlesslen);
+		} else if(*next == '\'' || *next == '"') {
+			if(*p == 'f') {
+				int first = 1;
+				if(nl->num_entries == 0) {
+					fprintf(tf->f, "tup error: %%%cf used in rule pattern and no input files were specified.\n", *next);
+					return NULL;
+				}
+				TAILQ_FOREACH(nle, &nl->entries, list) {
+					if(!first) {
+						estring_append(&e, " ", 1);
+					}
+					estring_append(&e, next, 1);
+					estring_append(&e, nle->path, nle->len);
+					estring_append(&e, next, 1);
+					first = 0;
+				}
+			} else if(*p == 'o') {
+				int first = 1;
+				if(!onl) {
+					fprintf(tf->f, "tup error: %%%co can only be used in a command string or extra outputs section.\n", *next);
+					return NULL;
+				}
+				if(onl->num_entries == 0) {
+					fprintf(tf->f, "tup error: %%%co used in rule pattern and no output files were specified.\n", *next);
+					return NULL;
+				}
+				TAILQ_FOREACH(nle, &onl->entries, list) {
+					if(!first) {
+						estring_append(&e, " ", 1);
+					}
+					estring_append(&e, next, 1);
+					estring_append(&e, nle->path, nle->len);
+					estring_append(&e, next, 1);
+					first = 0;
+				}
+			} else {
+				fprintf(tf->f, "tup error: %%%c must be followed by an 'f' for input files or an 'o' for output files.\n", *next);
+				return NULL;
+			}
+			p++;
 		} else if(*next == 'd') {
 			if(tf->tupid == DOT_DT) {
 				/* At the top of the tup-hierarchy, we get the
