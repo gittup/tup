@@ -219,15 +219,12 @@ static int tuplua_function_definerule(lua_State *ls)
 	struct rule r;
 	struct path_list_head input_path_list;
 	struct path_list_head extra_input_path_list;
-	struct path_list_head output_path_list;
 	struct name_list return_nl;
-	struct name_list nl;
 	struct name_list_entry *nle;
 	size_t command_len = 0;
 	int count = 1;
-	const char sep[] = "|";
 
-	init_name_list(&nl);
+	init_rule(&r);
 	init_name_list(&return_nl);
 
 	if(!lua_istable(ls, -1))
@@ -235,31 +232,26 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	TAILQ_INIT(&input_path_list);
 	TAILQ_INIT(&extra_input_path_list);
-	TAILQ_INIT(&output_path_list);
 	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, DISALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
 	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, DISALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_inputs'.");
-	if(tuplua_table_to_path_list(ls, "outputs", tf, &output_path_list, ALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "outputs", tf, &r.outputs, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
-	if(get_path_list(tf, sep, &output_path_list) < 0)
-		return luaL_error(ls, "Error while appending '|' separator in output list.");
-	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &output_path_list, ALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &r.extra_outputs, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_outputs'.");
-
-	init_name_list(&r.inputs);
-	init_name_list(&r.order_only_inputs);
-	init_name_list(&r.bang_oo_inputs);
 
 	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &input_path_list, &nl, 1) < 0)
+	if(get_name_list(tf, &input_path_list, &r.inputs, 1) < 0)
 		return luaL_error(ls, "Error parsing input list");
 	if(parse_dependent_tupfiles(&extra_input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
 	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs, 1) < 0)
 		return luaL_error(ls, "Error parsing extra input list");
-	make_name_list_unique(&nl);
+
+	if(TAILQ_EMPTY(&input_path_list))
+		r.empty_input = 1;
 
 	lua_getfield(ls, 1, "foreach");
 	r.foreach = lua_toboolean(ls, -1);
@@ -271,37 +263,11 @@ static int tuplua_function_definerule(lua_State *ls)
 	}
 	r.command_len = command_len;
 
-	r.bin = NULL;
-	r.line_number = 0;
-	r.extra_command = NULL;
+	if(execute_rule(tf, &r, &return_nl) < 0)
+		return luaL_error(ls, "Failed to execute rule.");
 
-	if(r.foreach) {
-		struct name_list tmp_nl;
-		while(!TAILQ_EMPTY(&nl.entries)) {
-			const char *ext = NULL;
-			int extlen = 0;
-			nle = TAILQ_FIRST(&nl.entries);
-
-			init_name_list(&tmp_nl);
-			move_name_list_entry(&tmp_nl, &nl, nle);
-			if(nle->base && nle->extlessbaselen != nle->baselen) {
-				ext = nle->base + nle->extlessbaselen + 1;
-				extlen = nle->baselen - nle->extlessbaselen - 1;
-			}
-
-			if(do_rule(tf, &r, &tmp_nl, &output_path_list, ext, extlen, &return_nl) < 0)
-				return luaL_error(ls, "Failed to define rule.");
-			delete_name_list(&tmp_nl);
-		}
-	} else {
-		if(do_rule(tf, &r, &nl, &output_path_list, NULL, 0, &return_nl) < 0)
-			return luaL_error(ls, "Failed to define rule.");
-	}
-
-	delete_name_list(&nl);
 	free_path_list(&input_path_list);
 	free_path_list(&extra_input_path_list);
-	free_path_list(&output_path_list);
 
 	lua_newtable(ls);
 	TAILQ_FOREACH(nle, &return_nl.entries, list) {
@@ -315,6 +281,8 @@ static int tuplua_function_definerule(lua_State *ls)
 		count++;
 		free(e.s);
 	}
+	free_path_list(&r.outputs);
+	free_path_list(&r.extra_outputs);
 	delete_name_list(&return_nl);
 	delete_name_list(&r.order_only_inputs);
 
@@ -1026,12 +994,10 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 {
 	struct path_list *pl;
 
-	pl = new_pl(tf, p);
+	pl = new_pl(tf, p, -1, NULL);
 	if(!pl)
 		return -1;
 
-	if(get_pl(tf, pl) < 0)
-		return -1;
 	TAILQ_INSERT_TAIL(plist, pl, list);
 
 	return 0;

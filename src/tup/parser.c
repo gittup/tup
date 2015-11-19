@@ -61,8 +61,8 @@ struct bang_rule {
 	char *input;
 	char *command;
 	int command_len;
-	char *output_pattern;
-	char *extra_outputs;
+	struct path_list_head outputs;
+	struct path_list_head extra_outputs;
 };
 
 struct bang_list {
@@ -112,21 +112,23 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
 			       struct bin_head *bl, int required);
-static int execute_rule(struct tupfile *tf, struct rule *r);
+static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
+				struct path_list_head *outputs,
+				struct path_list_head *extra_outputs);
+static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+		   const char *ext, int extlen, struct name_list *output_nl);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int required);
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 struct bin_head *bl, int allow_nodes);
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl);
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes);
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
+static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int required, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
-static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
-				  struct name_list *nl, const char *ext, int extlen,
-				  struct name_list *output_nl);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
@@ -822,7 +824,9 @@ static int preload(struct tupfile *tf, char *cmdline)
 	struct path_list *pl;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, cmdline, &plist, NULL, ALLOW_NODES) < 0)
+	if(get_path_list(tf, cmdline, &plist, NULL) < 0)
+		return -1;
+	if(eval_path_list(tf, &plist, ALLOW_NODES) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -1190,13 +1194,32 @@ out_err:
 	return 0;
 }
 
+void init_rule(struct rule *r)
+{
+	r->foreach = 0;
+	r->bin = NULL;
+	r->command = NULL;
+	r->extra_command = NULL;
+	r->command_len = 0;
+	init_name_list(&r->inputs);
+	init_name_list(&r->order_only_inputs);
+	init_name_list(&r->bang_oo_inputs);
+	TAILQ_INIT(&r->outputs);
+	TAILQ_INIT(&r->extra_outputs);
+	TAILQ_INIT(&r->bang_extra_outputs);
+	r->empty_input = 0;
+	r->line_number = -1;
+}
+
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 {
 	char *input, *cmd, *output, *bin;
 	int cmd_len;
 	struct rule r;
+	struct name_list output_nl;
 	int rc;
-	char *separator;
+
+	init_rule(&r);
 
 	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin) < 0)
 		return -1;
@@ -1224,27 +1247,15 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	} else {
 		r.empty_input = 1;
 	}
-	init_name_list(&r.inputs);
-	init_name_list(&r.order_only_inputs);
 	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, 1) < 0)
 		return -1;
 
-	r.output_pattern = output;
-	separator = strchr(output, '|');
-	if(separator) {
-		r.extra_outputs = separator + 1;
-		while(isspace(*r.extra_outputs))
-			r.extra_outputs++;
-		*separator = 0;
-	} else {
-		r.extra_outputs = NULL;
-	}
-
 	r.command = cmd;
 	r.command_len = cmd_len;
-	r.extra_command = NULL;
 	r.line_number = lno;
-	r.output_nl = NULL;
+
+	if(parse_output_pattern(tf, output, &r.outputs, &r.extra_outputs) < 0)
+		return -1;
 
 	if(r.command[0] == '!') {
 		char *space;
@@ -1256,7 +1267,12 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		}
 	}
 
-	rc = execute_rule(tf, &r);
+	init_name_list(&output_nl);
+	rc = execute_rule(tf, &r, &output_nl);
+	delete_name_list(&output_nl);
+	free_path_list(&r.outputs);
+	free_path_list(&r.extra_outputs);
+	free_path_list(&r.bang_extra_outputs);
 	return rc;
 }
 
@@ -1290,27 +1306,9 @@ static struct bang_rule *alloc_br(void)
 	br->value = NULL;
 	br->input = NULL;
 	br->command = NULL;
-	br->output_pattern = NULL;
-	br->extra_outputs = NULL;
+	TAILQ_INIT(&br->outputs);
+	TAILQ_INIT(&br->extra_outputs);
 	return br;
-}
-
-static int set_br_extra_outputs(struct bang_rule *br)
-{
-	char *sep;
-
-	sep = strchr(br->output_pattern, '|');
-	if(sep != NULL) {
-		*sep = 0;
-		br->extra_outputs = strdup(sep + 1);
-		if(!br->extra_outputs) {
-			perror("strdup");
-			return -1;
-		}
-	} else {
-		br->extra_outputs = NULL;
-	}
-	return 0;
 }
 
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
@@ -1369,20 +1367,10 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 			parser_error(tf, "strdup");
 			goto err_cleanup_br;
 		}
-		br->output_pattern = strdup(cur_br->output_pattern);
-		if(!br->output_pattern) {
-			parser_error(tf, "strdup");
+		if(copy_path_list(tf, &br->outputs, &cur_br->outputs) < 0)
 			goto err_cleanup_br;
-		}
-		if(cur_br->extra_outputs) {
-			br->extra_outputs = strdup(cur_br->extra_outputs);
-			if(!br->extra_outputs) {
-				parser_error(tf, "strdup");
-				goto err_cleanup_br;
-			}
-		} else {
-			br->extra_outputs = NULL;
-		}
+		if(copy_path_list(tf, &br->extra_outputs, &cur_br->extra_outputs) < 0)
+			goto err_cleanup_br;
 
 		br->command_len = cur_br->command_len;
 
@@ -1427,9 +1415,9 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		cur_br->input = input;
 		cur_br->command = command;
 		cur_br->command_len = command_len;
-		cur_br->output_pattern = output;
-		free(cur_br->extra_outputs);
-		if(set_br_extra_outputs(cur_br) < 0)
+		free_path_list(&cur_br->outputs);
+		free_path_list(&cur_br->extra_outputs);
+		if(parse_output_pattern(tf, output, &cur_br->outputs, &cur_br->extra_outputs) < 0)
 			return -1;
 	} else {
 		/* Create new !-macro */
@@ -1441,8 +1429,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		br->input = input;
 		br->command = command;
 		br->command_len = command_len;
-		br->output_pattern = output;
-		if(set_br_extra_outputs(br) < 0)
+		if(parse_output_pattern(tf, output, &br->outputs, &br->extra_outputs) < 0)
 			goto err_cleanup_br;
 		br->value = alloc_value;
 
@@ -1454,8 +1441,6 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 	return 0;
 
 err_cleanup_br:
-	free(br->extra_outputs);
-	free(br->output_pattern);
 	free(br->command);
 	free(br->input);
 	free(br->value);
@@ -1586,14 +1571,17 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 	/* If the rule didn't specify any output pattern, use the one from the
 	 * !-macro.
 	 */
-	if(!r->output_pattern[0])
-		r->output_pattern = br->output_pattern;
+	if(TAILQ_EMPTY(&r->outputs)) {
+		if(copy_path_list(tf, &r->outputs, &br->outputs) < 0)
+			return -1;
+	}
 
 	/* Also include any extra outputs from the !-macro. These may specify
 	 * additional outputs that the user of the !-macro doesn't know about
 	 * (such as command side-effects).
 	 */
-	r->bang_extra_outputs = br->extra_outputs;
+	if(copy_path_list(tf, &r->bang_extra_outputs, &br->extra_outputs) < 0)
+		return -1;
 	return 0;
 }
 
@@ -1649,9 +1637,9 @@ static void free_bang_rule(struct string_entries *root, struct bang_rule *br)
 		/* For aliased macros */
 		free(br->input);
 		free(br->command);
-		free(br->output_pattern);
 	}
-	free(br->extra_outputs);
+	free_path_list(&br->outputs);
+	free_path_list(&br->extra_outputs);
 	free(br);
 }
 
@@ -1791,20 +1779,44 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 	return 0;
 }
 
-static int execute_rule(struct tupfile *tf, struct rule *r)
+static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
+				struct path_list_head *outputs,
+				struct path_list_head *extra_outputs)
+{
+	char *oosep;
+
+	if(!output_pattern)
+		return 0;
+
+	oosep = strchr(output_pattern, '|');
+	if(oosep) {
+		char *p = oosep;
+		*p = 0;
+		while(p >= output_pattern && isspace(*p)) {
+			*p = 0;
+			p--;
+		}
+		oosep++;
+		while(*oosep && isspace(*oosep)) {
+			*oosep = 0;
+			oosep++;
+		}
+		if(get_path_list(tf, oosep, extra_outputs, NULL) < 0)
+			return -1;
+	}
+	if(get_path_list(tf, output_pattern, outputs, NULL) < 0)
+		return -1;
+	return 0;
+}
+
+int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl)
 {
 	struct name_list_entry *nle;
-	struct name_list output_nl;
 	int is_bang = 0;
 	int foreach = 0;
 
-	init_name_list(&r->bang_oo_inputs);
-
-	r->bang_extra_outputs = NULL;
-
 	make_name_list_unique(&r->inputs);
 
-	init_name_list(&output_nl);
 	if(r->command[0] == '!') {
 		struct string_tree *st;
 		struct bang_rule *br;
@@ -1831,8 +1843,11 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 		struct name_list tmp_nl;
 		struct name_list_entry tmp_nle;
 		const char *old_command = NULL;
-		char *old_output_pattern = NULL;
+		int outputs_empty = 0;
 		int old_command_len = 0;
+
+		if(TAILQ_EMPTY(&r->outputs))
+			outputs_empty = 1;
 
 		/* For a foreach loop, iterate over each entry in the rule's
 		 * namelist and do a shallow copy over into a single-entry
@@ -1840,9 +1855,6 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 		 * allocating a separate nle, which is why we don't have to do
 		 * a delete_name_list_entry for the temporary list and can just
 		 * reinitialize the pointers using init_name_list.
-		 *
-		 * TODO: Compare ext to previous ext to re-use the bang parsing?
-		 * or would that be a confusing premature optimization?
 		 */
 		while(!TAILQ_EMPTY(&r->inputs.entries)) {
 			const char *ext = NULL;
@@ -1860,26 +1872,29 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 			}
 			if(is_bang) {
 				/* parse_bang_rule overwrites the command and
-				 * output pattern, so save the old pointers to
+				 * output list, so save the old pointers to
 				 * be restored after do_rule().
 				 */
 				old_command = r->command;
 				old_command_len = r->command_len;
-				old_output_pattern = r->output_pattern;
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
 			}
 			/* The extension in do_rule() does not include the
 			 * leading '.'
 			 */
-			if(do_rule_output_pattern(tf, r, &tmp_nl, ext+1, extlen-1, &output_nl) < 0)
+			if(do_rule(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
 				r->command = old_command;
 				r->command_len = old_command_len;
-				r->output_pattern = old_output_pattern;
-				r->bang_extra_outputs = NULL;
+				/* If our outputs were empty, we got a copy of
+				 * the bang rule's, so free our copy.
+				 */
+				if(outputs_empty)
+					free_path_list(&r->outputs);
+				free_path_list(&r->bang_extra_outputs);
 				delete_name_list(&r->bang_oo_inputs);
 			}
 
@@ -1897,8 +1912,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 		 * Also note that we check that the original user string is
 		 * empty (r->empty_input), not the eval'd string. This way if
 		 * the user specifies the input as $(foo) and it evaluates to
-		 * empty, we won't try to execute do_rule_output_pattern(). But
-		 * an empty user string implies that no input is required.
+		 * empty, we won't try to execute do_rule(). But an empty user
+		 * string implies that no input is required.
 		 */
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
@@ -1906,7 +1921,7 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 					return -1;
 			}
 
-			if(do_rule_output_pattern(tf, r, &r->inputs, NULL, 0, &output_nl) < 0)
+			if(do_rule(tf, r, &r->inputs, NULL, 0, output_nl) < 0)
 				return -1;
 
 			delete_name_list(&r->inputs);
@@ -1923,8 +1938,8 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 				if(rc < 0)
 					return -1;
 				if(rc == 0) {
-					if(do_rule_output_pattern(tf, r, &r->inputs,
-						   NULL, 0, &output_nl) < 0)
+					if(do_rule(tf, r, &r->inputs,
+						   NULL, 0, output_nl) < 0)
 						return -1;
 				}
 			}
@@ -1933,7 +1948,6 @@ static int execute_rule(struct tupfile *tf, struct rule *r)
 
 	delete_name_list(&r->order_only_inputs);
 	delete_name_list(&r->bang_oo_inputs);
-	delete_name_list(&output_nl);
 
 	return 0;
 }
@@ -1945,7 +1959,9 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	struct path_list_head plist;
 
 	TAILQ_INIT(&plist);
-	if(get_path_list(tf, p, &plist, bl, ALLOW_NODES) < 0)
+	if(get_path_list(tf, p, &plist, bl) < 0)
+		return -1;
+	if(eval_path_list(tf, &plist, ALLOW_NODES) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -1955,11 +1971,15 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	return 0;
 }
 
-struct path_list *new_pl(struct tupfile *tf, const char *mem)
+struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_head *bl)
 {
 	struct path_list *pl;
+	char *p;
 
-	pl = malloc(sizeof(*pl) + strlen(mem) + 1);
+	if(len == -1)
+		len = strlen(s);
+
+	pl = malloc(sizeof(*pl) + strlen(s) + 1);
 	if(!pl) {
 		parser_error(tf, "malloc");
 		return NULL;
@@ -1969,99 +1989,120 @@ struct path_list *new_pl(struct tupfile *tf, const char *mem)
 	pl->dt = -1;
 	pl->pel = NULL;
 	pl->bin = NULL;
-	strcpy(pl->mem, mem);
+	memcpy(pl->mem, s, len);
+	pl->mem[len] = 0;
+
+	p = pl->mem;
+	if(p[0] == '{') {
+		/* Bin */
+		char *endb;
+
+		if(!bl) {
+			fprintf(tf->f, "tup error: Bins are only usable in an input or output list.\n");
+			return NULL;
+		}
+
+		endb = strchr(p, '}');
+		if(!endb) {
+			fprintf(tf->f, "tup error: Expecting end bracket for input bin.\n");
+			return NULL;
+		}
+		*endb = 0;
+		pl->bin = bin_find(p+1, bl);
+		if(!pl->bin) {
+			fprintf(tf->f, "tup error: Unable to find bin '%s'\n", p+1);
+			return NULL;
+		}
+	} else {
+		/* Path */
+		if(p[0] == '^')
+			p++;
+
+		if(strchr(p, '<') != NULL) {
+			/* Group */
+			char *endb;
+			endb = strchr(p, '>');
+			if(!endb) {
+				fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
+				return NULL;
+			}
+			pl->group = 1;
+		}
+		pl->path = p;
+	}
 	return pl;
 }
 
-static int get_path_list_internal(struct tupfile *tf, char *p, struct path_list_head *plist,
-				  struct bin_head *bl, int orderid)
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl)
 {
-	struct path_list *pl;
 	int spc_index;
 	int last_entry = 0;
+	int orderid = 1;
 
 	do {
+		struct path_list *pl;
+
 		spc_index = strcspn(p, " \t");
 		if(p[spc_index] == 0)
 			last_entry = 1;
-		p[spc_index] = 0;
 		if(spc_index == 0)
 			goto skip_empty_space;
 
-		pl = new_pl(tf, p);
-		if(!pl) {
+		pl = new_pl(tf, p, spc_index, bl);
+		if(!pl)
 			return -1;
-		}
-
-		if(p[0] == '{') {
-			/* Bin */
-			char *endb;
-
-			if(!bl) {
-				fprintf(tf->f, "tup error: Bins are only usable in an input or output list.\n");
-				return -1;
-			}
-
-			endb = strchr(p, '}');
-			if(!endb) {
-				fprintf(tf->f, "tup error: Expecting end bracket for input bin.\n");
-				return -1;
-			}
-			*endb = 0;
-			pl->bin = bin_find(p+1, bl);
-			if(!pl->bin) {
-				fprintf(tf->f, "tup error: Unable to find bin '%s'\n", p+1);
-				return -1;
-			}
-		} else {
-			/* Path */
-			if(get_pl(tf, pl) < 0)
-				return -1;
-		}
 		pl->orderid = orderid;
+		orderid++;
+
 		TAILQ_INSERT_TAIL(plist, pl, list);
 
 skip_empty_space:
 		p += spc_index + 1;
 	} while(!last_entry);
+
 	return 0;
 }
 
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist,
-			 struct bin_head *bl, int allow_nodes)
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
 {
-	int spc_index;
-	int last_entry = 0;
-	int orderid = 1;
-	char mem[PATH_MAX];
+	struct path_list *pl;
+	struct path_list *tmp;
 
-	do {
+	TAILQ_FOREACH_SAFE(pl, plist, list, tmp) {
 		char *eval_p;
-		spc_index = strcspn(p, " \t");
-		if(p[spc_index] == 0)
-			last_entry = 1;
-		if(spc_index >= PATH_MAX) {
-			fprintf(stderr, "tup internal error: mem is too small in get_path_list()\n");
-			return -1;
-		}
-		if(spc_index == 0)
-			goto skip_empty_space;
-		strncpy(mem, p, spc_index);
-		mem[spc_index] = 0;
+		int spc_index;
+		int last_entry = 0;
+		char *p;
 
-		eval_p = eval(tf, mem, allow_nodes);
+		eval_p = eval(tf, pl->mem, allow_nodes);
 		if(!eval_p)
 			return -1;
 
-		if(get_path_list_internal(tf, eval_p, plist, bl, orderid) < 0)
-			return -1;
-		free(eval_p);
-		orderid++;
+		if(strcmp(eval_p, pl->mem) != 0) {
+			p = eval_p;
+			do {
+				struct path_list *newpl;
+
+				spc_index = strcspn(p, " \t");
+				if(p[spc_index] == 0)
+					last_entry = 1;
+				if(spc_index == 0)
+					goto skip_empty_space;
+
+				newpl = new_pl(tf, p, spc_index, NULL);
+				if(!newpl)
+					return -1;
+				newpl->orderid = pl->orderid;
+
+				TAILQ_INSERT_BEFORE(pl, newpl, list);
 
 skip_empty_space:
-		p += spc_index + 1;
-	} while(!last_entry);
-
+				p += spc_index + 1;
+			} while(!last_entry);
+			del_pl(pl, plist);
+		}
+		free(eval_p);
+	}
 	return 0;
 }
 
@@ -2114,23 +2155,17 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 	return 0;
 }
 
-int get_pl(struct tupfile *tf, struct path_list *pl)
+static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src)
 {
-	char *p = pl->mem;
-	if(p[0] == '^')
-		p++;
+	struct path_list *pl;
+	TAILQ_FOREACH(pl, src, list) {
+		struct path_list *newpl;
 
-	if(strchr(p, '<') != NULL) {
-		/* Group */
-		char *endb;
-		endb = strchr(p, '>');
-		if(!endb) {
-			fprintf(tf->f, "tup error: Expecting end angle bracket '>' character for group.\n");
+		newpl = new_pl(tf, pl->mem, -1, NULL);
+		if(!newpl)
 			return -1;
-		}
-		pl->group = 1;
+		TAILQ_INSERT_TAIL(dest, newpl, list);
 	}
-	pl->path = p;
 	return 0;
 }
 
@@ -2806,102 +2841,52 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 	return 0;
 }
 
-static int do_rule_output_pattern(struct tupfile *tf, struct rule *r,
-				  struct name_list *nl, const char *ext, int extlen,
-				  struct name_list *output_nl)
+static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, struct name_list *nl,
+			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
+			   int *command_modified, struct tupid_entries *output_root)
 {
-	struct path_list_head oplist;
-	char *toutput;
-	char sep[] = "|";
-	int rc;
-
-	TAILQ_INIT(&oplist);
-	toutput = tup_printf(tf, r->output_pattern, -1, nl, NULL, ext, extlen, NULL);
-	if(!toutput)
-		return -1;
-	if(get_path_list(tf, toutput, &oplist, NULL, DISALLOW_NODES) < 0)
-		return -1;
-	/* Insert a fake separator */
-	if(get_path_list(tf, sep, &oplist, NULL, DISALLOW_NODES) < 0)
-		return -1;
-	if(r->extra_outputs) {
-		if(get_path_list(tf, r->extra_outputs, &oplist, NULL, DISALLOW_NODES) < 0)
-			return -1;
-	}
-	if(r->bang_extra_outputs) {
-		if(get_path_list(tf, r->bang_extra_outputs, &oplist, NULL, DISALLOW_NODES) < 0)
-			return -1;
-	}
-	rc = do_rule(tf, r, nl, &oplist, ext, extlen, output_nl);
-
-	free_path_list(&oplist);
-	/* Has to be freed after use of oplist */
-	free(toutput);
-	return rc;
-}
-
-int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
-	    struct path_list_head *oplist,
-	    const char *ext, int extlen, struct name_list *output_nl)
-{
-	struct name_list onl;
-	struct name_list extra_onl;
-	struct name_list_entry *nle, *onle;
-	char *tcmd;
-	char *cmd;
 	struct path_list *pl;
-	struct tupid_tree *tt;
-	struct tupid_tree *cmd_tt;
-	tupid_t cmdid = -1;
-	struct tupid_entries input_root = {NULL};
-	struct tupid_entries output_root = {NULL};
-	int extra_outputs = 0;
-	struct tup_entry *tmptent = NULL;
-	struct tup_entry *group = NULL;
-	struct tup_entry *old_group = NULL;
-	int command_modified = 0;
+	struct path_list_head tmplist;
 
-	/* t3017 - empty rules are just pass-through to get the input into the
-	 * bin.
-	 */
-	if(r->command_len == 0) {
-		if(r->bin) {
-			TAILQ_FOREACH(nle, &nl->entries, list) {
-				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
-					return -1;
-			}
-		}
-		return 0;
-	}
-
-	init_name_list(&onl);
-	init_name_list(&extra_onl);
+	TAILQ_INIT(&tmplist);
 
 	TAILQ_FOREACH(pl, oplist, list) {
-		struct name_list *use_onl;
+		struct path_list *newpl;
+		char *toutput;
+
+		/* tup_printf allows %O if we have a name_list (use_onl) and are not a command */
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, 0, NULL);
+		if(!toutput)
+			return -1;
+		newpl = new_pl(tf, toutput, -1, NULL);
+		if(!newpl)
+			return -1;
+		newpl->orderid = pl->orderid;
+		TAILQ_INSERT_TAIL(&tmplist, newpl, list);
+		free(toutput);
+	}
+
+	if(eval_path_list(tf, &tmplist, DISALLOW_NODES) < 0)
+		return -1;
+
+	TAILQ_FOREACH(pl, &tmplist, list) {
 		struct tup_entry *dest_tent;
-		char *newpath;
-		char *lastslash;
+		struct name_list_entry *onle;
 
 		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 1) < 0)
 			return -1;
 
 		if(pl->group) {
-			if(group) {
+			if(*group) {
 				fprintf(tf->f, "tup error: Multiple output groups detected: '");
-				print_tup_entry(tf->f, group);
+				print_tup_entry(tf->f, *group);
 				fprintf(tf->f, "' and '%s/%.*s'\n", pl->path, pl->pel->len, pl->pel->path);
 				return -1;
 			}
 
-			group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
-			if(!group)
+			*group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			if(!*group)
 				return -1;
-			continue;
-		}
-
-		if(pl->pel->len == 1 && pl->pel->path[0] == '|') {
-			extra_outputs = 1;
 			continue;
 		}
 
@@ -2912,37 +2897,27 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		onle->orderid = pl->orderid;
 
-		/* tup_printf allows %O if we have an onl and are not a command */
-		if(extra_outputs) {
-			use_onl = &onl;
-		} else {
-			use_onl = NULL;
-		}
-		newpath = tup_printf(tf, pl->pel->path, pl->pel->len, nl, use_onl, NULL, 0, NULL);
-		if(!newpath) {
-			return -1;
-		}
-		lastslash = strrchr(newpath, PATH_SEP);
-		if(lastslash) {
-			struct path_element *pel;
-			pl->dt = find_dir_tupid_dt(pl->dt, newpath, &pel, SOTGV_CREATE_DIRS, 0);
-			free(pel);
-		}
 		if(pl->path) {
 			int plpathlen;
 			plpathlen = strlen(pl->path);
-			onle->path = malloc(plpathlen + strlen(newpath) + 2);
+			onle->path = malloc(plpathlen + pl->pel->len + 2);
+			if(!onle->path) {
+				perror("malloc");
+				return -1;
+			}
 			strcpy(onle->path, pl->path);
 			onle->path[plpathlen] = PATH_SEP;
 			onle->path[plpathlen + 1] = 0;
-			strcpy(onle->path + plpathlen + 1, newpath);
-			free(newpath);
+			strncpy(onle->path + plpathlen + 1, pl->pel->path, pl->pel->len);
+			onle->path[plpathlen + 1 + pl->pel->len] = 0;
 		} else {
-			onle->path = newpath;
-		}
-		if(!onle->path) {
-			free(onle);
-			return -1;
+			onle->path = malloc(pl->pel->len + 1);
+			if(!onle->path) {
+				perror("malloc");
+				return -1;
+			}
+			strncpy(onle->path, pl->pel->path, pl->pel->len);
+			onle->path[pl->pel->len] = 0;
 		}
 		if(name_cmp(onle->path, "Tupfile") == 0 ||
 		   name_cmp(onle->path, "Tuprules.tup") == 0 ||
@@ -2987,28 +2962,69 @@ int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
-						     TUP_NODE_GENERATED, tf->tupid, &command_modified);
+						     TUP_NODE_GENERATED, tf->tupid, command_modified);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
 			return -1;
 		}
-		if(tupid_tree_add(&output_root, onle->tent->tnode.tupid) < 0) {
+		if(tupid_tree_add(output_root, onle->tent->tnode.tupid) < 0) {
 			fprintf(tf->f, "tup error: The output file '%s' is listed multiple times in a command.\n", onle->path);
 			return -1;
 		}
 
-		if(extra_outputs) {
-			add_name_list_entry(&extra_onl, onle);
-		} else {
-			add_name_list_entry(&onl, onle);
+		add_name_list_entry(onl, onle);
+	}
+	free_path_list(&tmplist);
+	return 0;
+}
 
-			if(r->bin) {
-				if(bin_add_entry(r->bin, onle->path, onle->len, onle->tent) < 0)
+static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
+		   const char *ext, int extlen, struct name_list *output_nl)
+{
+	struct name_list onl;
+	struct name_list extra_onl;
+	struct name_list_entry *nle, *onle;
+	char *tcmd;
+	char *cmd;
+	struct tupid_tree *tt;
+	struct tupid_tree *cmd_tt;
+	tupid_t cmdid = -1;
+	struct tupid_entries input_root = {NULL};
+	struct tupid_entries output_root = {NULL};
+	struct tup_entry *tmptent = NULL;
+	struct tup_entry *group = NULL;
+	struct tup_entry *old_group = NULL;
+	int command_modified = 0;
+
+	/* t3017 - empty rules are just pass-through to get the input into the
+	 * bin.
+	 */
+	if(r->command_len == 0) {
+		if(r->bin) {
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
 					return -1;
 			}
 		}
+		return 0;
 	}
+
+	init_name_list(&onl);
+	init_name_list(&extra_onl);
+
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root) < 0)
+		return -1;
+	if(r->bin) {
+		TAILQ_FOREACH(onle, &onl.entries, list) {
+			if(bin_add_entry(r->bin, onle->path, onle->len, onle->tent) < 0)
+				return -1;
+		}
+	}
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root) < 0)
+		return -1;
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root) < 0)
+		return -1;
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
 	if(!tcmd)

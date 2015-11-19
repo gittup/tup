@@ -48,7 +48,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 16
-#define PARSER_VERSION 11
+#define PARSER_VERSION 12
 
 enum {
 	DB_BEGIN,
