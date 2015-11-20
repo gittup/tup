@@ -4122,9 +4122,10 @@ int tup_db_modify_cmds_by_input(tupid_t input)
 {
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_MODIFY_CMDS_BY_INPUT];
-	static char s[] = "insert or ignore into modify_list select to_id from normal_link, node where from_id=? and to_id=id and type=?";
+	static char s[] = "insert or ignore into modify_list select to_id from normal_link, node where from_id=? and to_id=id and (type=? or type=?)";
 
-	transaction_check("%s [37m[%lli, %i][0m", s, input, TUP_NODE_CMD);
+	/* We also flag groups in case we were removed from a group (t3085) */
+	transaction_check("%s [37m[%lli, %i, %i][0m", s, input, TUP_NODE_CMD, TUP_NODE_GROUP);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -4139,6 +4140,11 @@ int tup_db_modify_cmds_by_input(tupid_t input)
 		return -1;
 	}
 	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_CMD) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GROUP) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
