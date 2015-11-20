@@ -221,12 +221,30 @@ int generate(int argc, char **argv)
 	struct node *n;
 	struct node *tmp;
 	struct tup_entry *vartent;
+	struct tup_entry *varfiletent;
+	char *script_name = NULL;
+	char *config_file = NULL;
+	int x;
 	int rc;
 
-	argc--;
-	argv++;
-	if(!argc) {
-		fprintf(stderr, "Usage: tup generate script_name.sh\n");
+	for(x=1; x<argc; x++) {
+		if(strcmp(argv[x], "--config") == 0) {
+			if(x+1 >= argc) {
+				fprintf(stderr, "--config requires a filename");
+				return -1;
+			}
+			x++;
+			config_file = argv[x];
+			continue;
+		}
+		if(script_name) {
+			fprintf(stderr, "Usage: tup generate [--config config_file] script_name.sh\n");
+			return -1;
+		}
+		script_name = argv[x];
+	}
+	if(!script_name) {
+		fprintf(stderr, "Usage: tup generate [--config config_file] script_name.sh\n");
 		return -1;
 	}
 	if(tup_entry_init() < 0)
@@ -247,7 +265,21 @@ int generate(int argc, char **argv)
 		return -1;
 	if(variant_add(vartent, 1, NULL) < 0)
 		return -1;
-	if(tup_db_read_vars(tup_top_fd(), vartent->dt, vartent->name.s, vartent->tnode.tupid, NULL) < 0)
+	if(config_file) {
+		tupid_t sub_dir_dt;
+
+		sub_dir_dt = get_sub_dir_dt();
+		if(sub_dir_dt < 0)
+			return -1;
+		varfiletent = get_tent_dt(sub_dir_dt, config_file);
+		if(!varfiletent) {
+			fprintf(stderr, "Unable to find tupid for: '%s'\n", config_file);
+				return -1;
+		}
+	} else {
+		varfiletent = vartent;
+	}
+	if(tup_db_read_vars(tup_top_fd(), varfiletent->dt, varfiletent->name.s, vartent->tnode.tupid, NULL) < 0)
 		return -1;
 
 	printf("Parsing...\n");
@@ -274,10 +306,10 @@ int generate(int argc, char **argv)
 	if(destroy_graph(&g) < 0)
 		return -1;
 
-	printf("Generate: %s\n", argv[0]);
-	generate_f = fopen(argv[0], "w");
+	printf("Generate: %s\n", script_name);
+	generate_f = fopen(script_name, "w");
 	if(!generate_f) {
-		perror(argv[0]);
+		perror(script_name);
 		fprintf(stderr, "tup error: Unable to open script for writing.\n");
 		return -1;
 	}
@@ -295,7 +327,7 @@ int generate(int argc, char **argv)
 	if(rc < 0)
 		return -1;
 	fclose(generate_f);
-	chmod(argv[0], 0755);
+	chmod(script_name, 0755);
 	if(destroy_graph(&g) < 0)
 		return -1;
 	tup_db_commit();

@@ -193,7 +193,7 @@ Do not scan the project for changed files. This is for internal tup testing only
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
 .RE
 .TP
-.B generate script.sh
+.B generate [--config config-file] script.sh
 The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). For example:
 .nf
 
@@ -205,7 +205,7 @@ tup generate build.sh
 git clean -f -x -d
 
 .fi
-The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation.
+The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation. This does not support variants, however the top-level tup.config file is used to define the configuration variables. Optionally, a separate configuration file can be passed in with the --config argument.
 .RE
 .TP
 .B varsed
