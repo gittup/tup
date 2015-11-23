@@ -44,13 +44,13 @@ fi
 
 export tupos=`uname -s`
 
-declare -A failed_tests
+failed_tests=()
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
 	if ./$i; then
 		:
 	else
-		failed_tests[$i]=$?
+		failed_tests[${#failed_tests[@]}]=$i
 		echo "[31m *** $i failed[0m" >&2
 		if [ "$keep_going" = "0" ]; then
 			exit 1
@@ -61,8 +61,8 @@ done
 n_failed=${#failed_tests[@]}
 if [ $n_failed -ge 1 ] ; then
     echo -e "\e[33m$n_failed test(s) failed\e[0m:" >&2
-    for t in "${!failed_tests[@]}" ; do
-        echo -e "    \e[31m$t\e[0m  exit code ${failed_tests[$t]}" >&2
+    for t in `seq 0 $n_failed` ; do
+        echo -e "    \e[31m${failed_tests[$t]}\e[0m" >&2
     done
     exit 1
 fi
