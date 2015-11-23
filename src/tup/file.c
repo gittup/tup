@@ -59,6 +59,7 @@ int init_file_info(struct file_info *info, const char *variant_dir)
 	LIST_INIT(&info->mapping_list);
 	LIST_INIT(&info->tmpdir_list);
 	pthread_mutex_init(&info->lock, NULL);
+	pthread_cond_init(&info->cond, NULL);
 	/* Root variant gets a NULL variant_dir so we can skip trying to do the
 	 * same thing twice in the server (eg: we only need a single readdir()
 	 * on the src tree).

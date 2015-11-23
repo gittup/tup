@@ -403,6 +403,37 @@ static void server_unlock(struct server *s)
 		pthread_mutex_unlock(s->error_mutex);
 }
 
+static int finfo_wait_open_count(struct server *s)
+{
+	finfo_lock(&s->finfo);
+	while(s->finfo.open_count > 0) {
+		struct timespec ts;
+		int rc;
+		ts.tv_sec = time(NULL) + 2;
+		ts.tv_nsec = 0;
+		rc = pthread_cond_timedwait(&s->finfo.cond, &s->finfo.lock, &ts);
+		if(rc != 0) {
+			if(rc == ETIMEDOUT) {
+				server_lock(s);
+				fprintf(stderr, "tup error: FUSE did not appear to release all file descriptors after the sub-process closed.\n");
+				server_unlock(s);
+			} else {
+				perror("pthread_cond_timedwait");
+			}
+			finfo_unlock(&s->finfo);
+			return -1;
+		}
+	}
+	if(s->finfo.open_count < 0) {
+		server_lock(s);
+		fprintf(stderr, "tup internal error: open_count shouldn't be negative.\n");
+		server_unlock(s);
+		return -1;
+	}
+	finfo_unlock(&s->finfo);
+	return 0;
+}
+
 static int exec_internal(struct server *s, const char *cmd, struct tup_env *newenv,
 			 struct tup_entry *dtent, int single_output, int need_namespacing)
 {
@@ -412,8 +443,6 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	char dir[PATH_MAX];
 	struct execmsg em;
 	struct variant *variant;
-	int check_count = 0;
-	int oldnum = -1;
 
 	memset(&em, 0, sizeof(em));
 	em.sid = s->id;
@@ -448,38 +477,8 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 		return -1;
 	}
 
-	/* Make sure FUSE gets all releases for this job before continuing. */
-	while(1) {
-		struct timespec ts = {0, 100000};
-		int num;
-
-		finfo_lock(&s->finfo);
-		num = s->finfo.open_count;
-		finfo_unlock(&s->finfo);
-		if(!num)
-			break;
-		if(num < 0) {
-			server_lock(s);
-			fprintf(stderr, "tup internal error: open_count shouldn't be negative.\n");
-			server_unlock(s);
-			return -1;
-		}
-
-		/* Reset check counter as long as files are being released. */
-		if(num == oldnum) {
-			check_count++;
-		} else {
-			check_count = 0;
-		}
-		oldnum = num;
-		if(check_count >= 10000) {
-			server_lock(s);
-			fprintf(stderr, "tup error: FUSE did not appear to release all file descriptors after the sub-process closed.\n");
-			server_unlock(s);
-			return -1;
-		}
-		nanosleep(&ts, NULL);
-	}
+	if(finfo_wait_open_count(s) < 0)
+		return -1;
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
 	buf[sizeof(buf)-1] = 0;

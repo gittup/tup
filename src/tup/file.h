@@ -55,6 +55,7 @@ LIST_HEAD(file_entry_head, file_entry);
 
 struct file_info {
 	pthread_mutex_t lock;
+	pthread_cond_t cond;
 	struct thread_tree tnode;
 	struct file_entry_head read_list;
 	struct file_entry_head write_list;

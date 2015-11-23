@@ -1371,6 +1371,7 @@ static int tup_fs_release(const char *path, struct fuse_file_info *fi)
 	finfo = get_finfo(path);
 	if(finfo) {
 		finfo->open_count--;
+		pthread_cond_signal(&finfo->cond);
 		put_finfo(finfo);
 	}
 	return 0;
