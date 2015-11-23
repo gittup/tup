@@ -136,6 +136,8 @@ static int update_map(pid_t pid, const char *mapfile, uid_t id)
 
 int server_pre_init(void)
 {
+	char c = 0;
+	int rc;
 	full_deps = tup_option_get_int("updater.full_deps");
 	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, msd) < 0) {
 		perror("socketpair");
@@ -168,10 +170,23 @@ int server_pre_init(void)
 		use_namespacing = 0;
 #endif
 		close(msd[1]);
+		if(write(msd[0], "1", 1) < 0) {
+			perror("write");
+			return -1;
+		}
 		exit(master_fork_loop());
 	}
 	if(close(msd[0]) < 0) {
 		perror("close(msd[0])");
+		return -1;
+	}
+	rc = read(msd[1], &c, 1);
+	if(rc < 0) {
+		perror("read");
+		return -1;
+	}
+	if(rc == 0 || c != '1') {
+		fprintf(stderr, "tup error: master_fork server did not start up correctly.\n");
 		return -1;
 	}
 	if(pthread_create(&cw_tid, NULL, child_wait_notifier, NULL) < 0) {
