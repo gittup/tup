@@ -1350,7 +1350,7 @@ static int tup_fs_flush(const char *path, struct fuse_file_info *fi)
 	 * all data and calling release(). Eg, if we have a command that does
 	 * 'cp bigfile.txt newbigfile.txt', where bigfile.txt contains a lot of
 	 * data, then the waitpid() in master_fork returns before release() is
-	 * called. We then end up stating the output file and gettnig a bad
+	 * called. We then end up stating the output file and getting a bad
 	 * timestamp since data is still being written out. (The file is
 	 * written correctly, but our mtime that we store in the db is already
 	 * out of date).
