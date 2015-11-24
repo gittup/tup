@@ -169,6 +169,10 @@ int server_pre_init(void)
 #else
 		use_namespacing = 0;
 #endif
+		if(!use_namespacing && full_deps) {
+			fprintf(stderr, "tup error: Sub-processes require running in a chroot for full dependency detection, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking.\n");
+			return -1;
+		}
 		close(msd[1]);
 		if(write(msd[0], "1", 1) < 0) {
 			perror("write");
@@ -384,15 +388,9 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	}
 #endif
 
-	if(!use_namespacing) {
-		if(need_namespacing) {
-			fprintf(stderr, "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support the ^c flag.\n");
-			return -1;
-		}
-		if(full_deps) {
-			fprintf(stderr, "tup error: Trying to run the sub-process in a chroot for full dependency detection, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking.\n");
-			return -1;
-		}
+	if(need_namespacing && !use_namespacing) {
+		fprintf(stderr, "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support the ^c flag.\n");
+		return -1;
 	}
 
 	if(full_deps) {
