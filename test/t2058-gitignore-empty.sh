@@ -37,6 +37,6 @@ gitignore_good .tup .gitignore
 
 mkdir .git
 update
-gitignore_good .gitignore .gitignore
+gitignore_good /.gitignore .gitignore
 
 eotup
