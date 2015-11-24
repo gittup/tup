@@ -31,7 +31,7 @@ cat > Tupfile << HERE
 : |> readlink /proc/self/exe > %o |> file.txt
 HERE
 tup touch Tupfile
-update --debug-fuse 2>~/fuse.txt
+update
 
 rlink=`which readlink`
 if test -h $rlink; then
