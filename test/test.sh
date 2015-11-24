@@ -45,6 +45,7 @@ fi
 export tupos=`uname -s`
 
 n_failed=0
+fail_text=""
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
 	if ./$i; then
@@ -55,6 +56,14 @@ for i in $files; do
 			exit 1
 		fi
 		n_failed=`expr $n_failed + 1`
+		fail_text="$fail_text *** $i failed\n"
 	fi
 done
-exit $n_failed
+if [ $n_failed -eq "0" ]; then
+	exit 0
+else
+	echo ""
+	echo "Summary of failed tests:" 1>&2
+	echo -n "$fail_text" 1>&2
+	exit 1
+fi
