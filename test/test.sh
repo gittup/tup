@@ -59,9 +59,7 @@ for i in $files; do
 		fail_text="$fail_text *** $i failed\n"
 	fi
 done
-if [ $n_failed -eq "0" ]; then
-	exit 0
-else
+if [ $n_failed -ne 0 ]; then
 	echo ""
 	echo "Summary of failed tests:" 1>&2
 	echo -n "$fail_text" 1>&2
