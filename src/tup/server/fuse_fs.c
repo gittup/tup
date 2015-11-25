@@ -681,6 +681,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 * becomes "bar.txt" if we are doing readdir("sub").
 			 */
 			if(peeled[0] == '.') {
+				/* TODO: ?? */
 				realname = map->realname;
 			} else {
 				int len;

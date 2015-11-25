@@ -20,21 +20,21 @@
 . ./tup.sh
 
 cat > Tupfile << HERE
-: |> echo foo > %o |> .bar
+: |> echo foo > %o |> .git
 HERE
 tup touch Tupfile
-update_fail_msg "You specified a path '.bar'"
+update_fail_msg "You specified a path '.git'"
 
 cat > Tupfile << HERE
-: |> echo foo > %o |> foo/.bar
+: |> echo foo > %o |> foo/.git
 HERE
 tup touch Tupfile
-update_fail_msg "You specified a path 'foo/.bar'"
+update_fail_msg "You specified a path 'foo/.git'"
 
 cat > Tupfile << HERE
-: |> echo foo > %o |> foo/.bar/baz
+: |> echo foo > %o |> foo/.git/baz
 HERE
 tup touch Tupfile
-update_fail_msg "You specified a path 'foo/.bar/baz'"
+update_fail_msg "You specified a path 'foo/.git/baz'"
 
 eotup

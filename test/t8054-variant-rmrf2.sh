@@ -28,7 +28,7 @@ tmkdir build-debug
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch build-default//tup.config build-debug/tup.config sub/Tupfile sub/foo.c sub/bar.c
+tup touch build-default/tup.config build-debug/tup.config sub/Tupfile sub/foo.c sub/bar.c
 
 update
 
@@ -41,9 +41,9 @@ tup variant configs/*.config
 update
 
 rm -rf build-foo build-bar build-baz build-zap build-zng
-update > .tupoutput
+update > .tup/.tupoutput
 
-if ! grep "No Tupfiles to parse" .tupoutput > /dev/null; then
+if ! grep "No Tupfiles to parse" .tup/.tupoutput > /dev/null; then
 	echo "Error: Expected not to parse any Tupfiles" 1>&2
 	exit 1
 fi

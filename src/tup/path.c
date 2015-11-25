@@ -28,6 +28,7 @@
 #include "compat.h"
 #include "entry.h"
 #include "option.h"
+#include "pel_group.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,7 +115,8 @@ static int watch_path_internal(tupid_t dt, const char *file,
 				tupid_tree_remove(&root, subtent->tnode.tupid);
 			}
 			if(f.filename[0] == '.') {
-				continue;
+				if(pel_ignored(f.filename, -1))
+					continue;
 			}
 			if(watch_path_internal(tent->tnode.tupid, f.filename, callback) < 0)
 				return -1;

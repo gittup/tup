@@ -34,7 +34,7 @@ HERE
 
 cat > b/run.sh << HERE
 echo brun
-echo '1' >> .run.count
+echo '1' >> .tup/.run.count
 HERE
 chmod +x a/run.sh b/run.sh
 
@@ -52,7 +52,7 @@ tup upd
 touch Tupfile
 tup upd
 
-if ! cat .run.count | wc -l | grep 1 > /dev/null; then
+if ! cat .tup/.run.count | wc -l | grep 1 > /dev/null; then
 	echo "Error: Expected b/run.sh to only run once." 1>&2
 	exit 1
 fi

@@ -27,6 +27,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+int pel_ignored(const char *path, int len)
+{
+	if(len < 0)
+		len = strlen(path);
+	if(len == 1 && strncmp(path, ".", 1) == 0)
+		return 1;
+	if(len == 2 && strncmp(path, "..", 2) == 0)
+		return 1;
+	if(len == 4 && strncmp(path, ".tup", 4) == 0)
+		return 1;
+	if(len == 4 && strncmp(path, ".git", 4) == 0)
+		return 1;
+	if(len == 3 && strncmp(path, ".hg", 3) == 0)
+		return 1;
+	return 0;
+}
+
 static int add_pel(const char *path, int len, struct pel_group *pg)
 {
 	struct path_element *pel;
@@ -191,12 +208,9 @@ int get_path_elements(const char *path, struct pel_group *pg)
 
 	TAILQ_FOREACH(pel, &pg->path_list, list) {
 		if(pel->path[0] == '.') {
-			if(pel->len == sizeof(".gitignore") - 1 &&
-			   strncmp(pel->path, ".gitignore", pel->len) == 0) {
-				/* .gitignore files are not considered hidden */
-			} else if(pel->len == 2 && strncmp(pel->path, "..", 2) == 0) {
+			if(pel->len == 2 && strncmp(pel->path, "..", 2) == 0) {
 				/* .. paths are ignored */
-			} else {
+			} else if(pel_ignored(pel->path,  pel->len)) {
 				/* Hidden paths have special treatment in tup */
 				pg->pg_flags |= PG_HIDDEN;
 				break;

@@ -16,12 +16,11 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure we can write to hidden output files without tup breaking (it should
-# display a warning message).
+# Make sure we can write to hidden output files without tup breaking.
 
 . ./tup.sh
 cat > Tupfile << HERE
-: |> cat input.txt > .hidden |>
+: |> cat input.txt > .hidden |> .hidden
 HERE
 tup touch Tupfile input.txt
 update

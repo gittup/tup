@@ -22,10 +22,10 @@
 . ./tup.sh
 cat > ok.sh << HERE
 cat input.txt
-touch .hidden
+touch .git
 HERE
 cat > Tupfile << HERE
-: |> sh ok.sh|>
+: |> sh ok.sh |>
 HERE
 tup touch Tupfile input.txt
 update

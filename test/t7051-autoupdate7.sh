@@ -29,7 +29,7 @@ monitor --autoupdate > .monitor.output 2>&1
 
 cat > ok.sh << HERE
 #! /bin/sh
-echo 'executed' >> .run.txt
+echo 'executed' >> .tup/.run.txt
 touch foo
 HERE
 
@@ -39,7 +39,7 @@ HERE
 tup flush
 check_exist foo
 
-if ! cat .run.txt | wc -l | grep 1 > /dev/null; then
+if ! cat .tup/.run.txt | wc -l | grep 1 > /dev/null; then
 	echo "Error: tup should update only once" 1>&2
 	exit 1
 fi
@@ -49,7 +49,7 @@ cat > Tupfile << HERE
 HERE
 tup flush
 
-if ! cat .run.txt | wc -l | grep 2 > /dev/null; then
+if ! cat .tup/.run.txt | wc -l | grep 2 > /dev/null; then
 	echo "Error: tup should update only once" 1>&2
 	exit 1
 fi

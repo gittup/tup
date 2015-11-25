@@ -27,7 +27,8 @@ cat >> .tup/options << HERE
 warnings = 1
 HERE
 cat > Tupfile << HERE
-: |> touch .foo; touch .bar |>
+: |> touch .hg |>
+: |> touch .git |>
 HERE
 if tup upd 2>&1 | grep "Update resulted in 2 warnings" > /dev/null; then
 	:
