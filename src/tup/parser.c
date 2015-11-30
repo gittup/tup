@@ -161,6 +161,10 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	struct timeval orig_start;
 	char path[PATH_MAX];
 
+	/* Skip '$' */
+	if(n->tent->tnode.tupid == env_dt())
+		return 0;
+
 	timespan_start(&tf.ts);
 	memcpy(&orig_start, &tf.ts.start, sizeof(orig_start));
 	if(n->parsing) {
