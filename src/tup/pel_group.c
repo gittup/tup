@@ -41,6 +41,7 @@ int pel_ignored(const char *path, int len)
 		return 1;
 	if(len == 3 && strncmp(path, ".hg", 3) == 0)
 		return 1;
+	/* See also fuse_fs.c:is_hidden() */
 	return 0;
 }
 

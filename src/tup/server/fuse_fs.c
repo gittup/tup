@@ -95,7 +95,11 @@ void tup_fuse_set_parser_mode(int mode)
 
 static int is_hidden(const char *path)
 {
-	if(strstr(path, "/.") != NULL)
+	if(strstr(path, "/.git") != NULL)
+		return 1;
+	if(strstr(path, "/.tup") != NULL)
+		return 1;
+	if(strstr(path, "/.hg") != NULL)
 		return 1;
 	return 0;
 }
