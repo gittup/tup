@@ -419,10 +419,12 @@ static int graph(int argc, char **argv)
 		TAILQ_REMOVE(&g.plist, g.cur, list);
 		TAILQ_INSERT_HEAD(&g.node_list, g.cur, list);
 
-		tupid = g.cur->tnode.tupid;
-		g.cur = NULL;
-		if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
-			return -1;
+		if(strcmp(g.cur->tent->name.s, TUP_CONFIG) != 0) {
+			tupid = g.cur->tnode.tupid;
+			g.cur = NULL;
+			if(tup_db_select_node_dir(graph_cb, &g, tupid) < 0)
+				return -1;
+		}
 	}
 
 	if(stickies)
