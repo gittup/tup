@@ -2112,7 +2112,7 @@ BOOL get_wow64_addresses(void)
 				TRUE,
 				0,
 				NULL,
-				execdir,
+				NULL,
 				&siStartInfo,
 				&piProcInfo);
 	else
@@ -2124,7 +2124,7 @@ BOOL get_wow64_addresses(void)
 				TRUE,
 				0,
 				NULL,
-				execdir,
+				NULL,
 				&siStartInfo,
 				&piProcInfo);
 
