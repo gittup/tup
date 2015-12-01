@@ -44,10 +44,13 @@ void debug_hook(const char* format, ...)
 	if(debugf == NULL && !opening) {
 		opening = 1;
 		debugf = fopen("ok.txt", "a");
+		if(debugf == NULL) {
+			perror("ok.txt");
+			fprintf(stderr, "Unable to open debugging file.\n");
+		}
 		fflush(stdout);
 	}
 	if(debugf == NULL) {
-		printf("No file :(\n");
 		goto exit;
 	}
 	va_start(ap, format);

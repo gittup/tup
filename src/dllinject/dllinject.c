@@ -2071,8 +2071,7 @@ BOOL get_wow64_addresses(void)
 	PROCESS_INFORMATION piProcInfo;
 	STARTUPINFO  siStartInfo;
 	BOOL ret;
-
-	TCHAR szCmdline[]=TEXT("tup32detect.exe");
+	char cmdline[MAX_PATH];
 
 	HANDLE g_hChildStd_OUT_Rd = NULL;
 	HANDLE g_hChildStd_OUT_Wr = NULL;
@@ -2098,29 +2097,34 @@ BOOL get_wow64_addresses(void)
 
 	memset(&piProcInfo, 0, sizeof(PROCESS_INFORMATION));
 
+	if(snprintf(cmdline, MAX_PATH, "%s\\%s", execdir, "tup32detect.exe") >= MAX_PATH) {
+		fprintf(stderr, "tup error: cmdline is sized wrong for tup32detect.exe");
+		return FALSE;
+	}
+
 	// Detect and avoid inception!
 	if (CreateProcessA_orig != NULL)
 		ret = CreateProcessA_orig(
 				NULL,
-				szCmdline,
+				cmdline,
 				NULL,
 				NULL,
 				TRUE,
 				0,
 				NULL,
-				NULL,
+				execdir,
 				&siStartInfo,
 				&piProcInfo);
 	else
 		ret = CreateProcessA(
 				NULL,
-				szCmdline,
+				cmdline,
 				NULL,
 				NULL,
 				TRUE,
 				0,
 				NULL,
-				NULL,
+				execdir,
 				&siStartInfo,
 				&piProcInfo);
 
