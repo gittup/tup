@@ -101,6 +101,10 @@ static int is_hidden(const char *path)
 		return 1;
 	if(strstr(path, "/.hg") != NULL)
 		return 1;
+	if(strstr(path, "/.svn") != NULL)
+		return 1;
+	if(strstr(path, "/.bzr") != NULL)
+		return 1;
 	return 0;
 }
 
