@@ -302,17 +302,17 @@ update_fail()
 update_fail_msg()
 {
 	set_leak_check no
-	if __update 2>.tupoutput; then
+	if __update 2>.tup/.tupoutput; then
 		echo "*** Expected update to fail, but didn't" 1>&2
 		exit 1
 	else
 		while [ $# -gt 0 ]; do
-			if grep "$1" .tupoutput > /dev/null; then
+			if grep "$1" .tup/.tupoutput > /dev/null; then
 				echo "Update expected to fail, and failed for the right reason."
 			else
 				echo "*** Update expected to fail because of: $1" 1>&2
 				echo "*** But failed because of:" 1>&2
-				cat .tupoutput 1>&2
+				cat .tup/.tupoutput 1>&2
 				exit 1
 			fi
 			shift
@@ -323,16 +323,16 @@ update_fail_msg()
 
 parse_fail_msg()
 {
-	if tup parse 2>.tupoutput; then
+	if tup parse 2>.tup/.tupoutput; then
 		echo "*** Expected parsing to fail, but didn't" 1>&2
 		exit 1
 	else
-		if grep "$1" .tupoutput > /dev/null; then
+		if grep "$1" .tup/.tupoutput > /dev/null; then
 			echo "Parsing expected to fail, and failed for the right reason."
 		else
 			echo "*** Parsing expected to fail because of: $1" 1>&2
 			echo "*** But failed because of:" 1>&2
-			cat .tupoutput 1>&2
+			cat .tup/.tupoutput 1>&2
 			exit 1
 		fi
 	fi
@@ -347,16 +347,16 @@ refactor()
 
 refactor_fail_msg()
 {
-	if tup refactor 2>.tupoutput; then
+	if tup refactor 2>.tup/.tupoutput; then
 		echo "*** Expected refactoring to fail, but didn't" 1>&2
 		exit 1
 	else
-		if grep "$1" .tupoutput > /dev/null; then
+		if grep "$1" .tup/.tupoutput > /dev/null; then
 			echo "Refactoring expected to fail, and failed for the right reason."
 		else
 			echo "*** Refactoring expected to fail because of: $1" 1>&2
 			echo "*** But failed because of:" 1>&2
-			cat .tupoutput 1>&2
+			cat .tup/.tupoutput 1>&2
 			exit 1
 		fi
 	fi
