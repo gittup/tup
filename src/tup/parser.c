@@ -137,6 +137,7 @@ static void delete_name_list_entry(struct name_list *nl,
 				   struct name_list_entry *nle);
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
+			struct name_list *ooinput_nl,
 			const char *ext, int extlen,
 			const char *extra_command);
 
@@ -1571,7 +1572,7 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 
 	/* Add any order only inputs to the list */
 	if(nl && br->input) {
-		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, 0, NULL);
+		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, NULL, 0, NULL);
 		if(!tinput)
 			return -1;
 	} else {
@@ -2855,7 +2856,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		char *toutput;
 
 		/* tup_printf allows %O if we have a name_list (use_onl) and are not a command */
-		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, 0, NULL);
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, NULL, 0, NULL);
 		if(!toutput)
 			return -1;
 		newpl = new_pl(tf, toutput, -1, NULL);
@@ -3026,7 +3027,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root) < 0)
 		return -1;
 
-	tcmd = tup_printf(tf, r->command, -1, nl, &onl, ext, extlen, r->extra_command);
+	tcmd = tup_printf(tf, r->command, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, ALLOW_NODES);
@@ -3280,6 +3281,7 @@ static const char *find_char(const char *s, int len, char c)
 
 static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
+			struct name_list *ooinput_nl,
 			const char *ext, int extlen,
 			const char *extra_command)
 {
@@ -3501,8 +3503,14 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				tmpnl = nl;
 			} else if(endp[0] == 'o') {
 				tmpnl = onl;
+			} else if(endp[0] == 'i') {
+				if(!ooinput_nl) {
+					fprintf(tf->f, "tup error: %%%ii is only valid in a command string.\n", num);
+					return NULL;
+				}
+				tmpnl = ooinput_nl;
 			} else {
-				fprintf(tf->f, "tup error: Expected 'f' or 'o' after number in %%-flag, but got '%c'\n", endp[0]);
+				fprintf(tf->f, "tup error: Expected 'f', 'o', or 'i' after number in %%-flag, but got '%c'\n", endp[0]);
 				return NULL;
 			}
 			TAILQ_FOREACH(nle, &tmpnl->entries, list) {
