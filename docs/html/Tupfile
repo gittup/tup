@@ -19,23 +19,15 @@ examples += ex_multiple_directories.html
 
 luaexamples += ex_lua_examples.html
 
-# Use the 'examples' sub-menu for the examples page.
-flags_examples += -x
-flags_lua_parser += -l
-
 ifeq (@(TUP_WWW_ANALYTICS),y)
 flags += -a
 endif
 
-: |> ^ GEN %o^ ./gen_menu.sh $(pages) > %o |> menu.inc
 : |> ^ GEN %o^ ./gen_ex_header.sh $(examples) > %o |> examples.inc
 : |> ^ GEN %o^ ./gen_ex_header.sh $(luaexamples) > %o |> luaexamples.inc
-: examples.inc |> ^ GEN %o^ ./gen_menu.sh -x $(pages) > %o |> menu-examples.inc
-: luaexamples.inc |> ^ GEN %o^ ./gen_menu.sh -l $(pages) > %o |> menu-luaexamples.inc
+: examples.inc luaexamples.inc |> ^ GEN %o^ ./gen_menu.sh -x %1f -l %2f $(pages) > %o |> menu.inc
 : |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
 : ../../tup.1 |> ^ man2html %o^ man2html %f > %o |> manual.html
-: foreach $(pages) | menu.inc menu-examples.inc menu-luaexamples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) $(flags_%B) %f > %o |> %f.gen
-: foreach $(examples) | menu-examples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) -x %f > %o |> %f.gen
-: foreach $(luaexamples) | menu-luaexamples.inc |> ^ GEN %o^ ./gen_page.sh $(flags) -l %f > %o |> %f.gen
+: foreach $(pages) $(examples) $(luaexamples) | menu.inc |> ^ GEN %o^ ./gen_page.sh -m %1i $(flags) %f > %o |> %f.gen
 
 endif

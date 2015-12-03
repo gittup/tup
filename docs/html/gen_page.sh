@@ -5,14 +5,10 @@ if [ $1 = "-a" ]; then
 	analytics=1
 	shift
 fi
-example=0
-if [ $1 = "-x" ]; then
-	example=1
+menu=""
+if [ $1 = "-m" ]; then
 	shift
-fi
-luaexample=0
-if [ $1 = "-l" ]; then
-	luaexample=1
+	menu=$1
 	shift
 fi
 text=`./gen_text.sh $1`
@@ -31,14 +27,8 @@ cat << HERE
 <div id="content">
 HERE
 
-if [ $example = "1" ]; then
-cat menu-examples.inc
-elif [ $luaexample = "1" ]; then
-cat menu-luaexamples.inc
-else
-cat menu.inc
+cat $menu
 echo "<h1>$text</h1>"
-fi
 
 cat $1
 

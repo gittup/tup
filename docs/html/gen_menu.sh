@@ -1,14 +1,16 @@
 #! /bin/sh -e
 
-example=0
+example=""
 if [ $1 = "-x" ]; then
-	example=1
+	shift
+	example=$1
 	shift
 fi
 
-luaexample=0
+luaexample=""
 if [ $1 = "-l" ]; then
-	luaexample=1
+	shift
+	luaexample=$1
 	shift
 fi
 
@@ -20,14 +22,10 @@ for i in $@; do
 	text=`./gen_text.sh $i`
 	echo "    <li class=\"menu-item\"><a href=\"$i\">$text</a></li>"
 	if [ "$i" = "examples.html" ]; then
-		if [ $example = "1" ]; then
-			cat examples.inc
-		fi
+		cat $example
 	fi
 	if [ "$i" = "lua_parser.html" ]; then
-		if [ $luaexample = "1" ]; then
-			cat luaexamples.inc
-		fi
+		cat $luaexample
 	fi
 done
 
