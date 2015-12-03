@@ -61,6 +61,7 @@ CFLAGS += -Wswitch-enum
 CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -fno-common
 CFLAGS += -I$(TUP_CWD)/src
+CFLAGS += -I$(TUP_VARIANTDIR)/src
 
 ifeq (@(TUP_32_BIT),y)
 CFLAGS += -m32

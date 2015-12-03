@@ -1,12 +1,10 @@
 include_rules
-ifeq ($(TARGET),@(TUP_PLATFORM))
-dep = ../lua/lua$(PROGRAM_SUFFIX)
-lua = $(dep)
-else
-lua = lua
-endif
-
 ifeq (@(TUP_PROFILING),y)
 gmon = gmon.out
 endif
-: builtin.lua | $(dep) |> $(lua) xxd.lua %f %o |> luabuiltin.h | $(gmon)
+
+ifeq ($(TARGET),@(TUP_PLATFORM))
+: ../lua/lua$(PROGRAM_SUFFIX) builtin.lua |> %1f xxd.lua %2f %o |> luabuiltin.h | $(gmon)
+else
+: builtin.lua |> lua xxd.lua %f %o |> luabuiltin.h | $(gmon)
+endif

@@ -7,9 +7,10 @@
 CC=$1
 CFLAGS=$2
 LDFLAGS=$3
-output=$4
-files=$5
-version=$6
+output_tup=$4
+output_version=$5
+files=$6
+version=$7
 if [ "$version" = "" ]; then
 	# If we don't pass in a version, try to get one from git
 	version=`git describe 2>/dev/null || true`
@@ -23,5 +24,5 @@ if [ "$version" = "" ]; then
 		fi
 	fi
 fi
-(echo "#include \"tup/version.h\""; echo "const char tup_version[] = \"$version\";") | $CC -x c -c - -o tup-version.o $CFLAGS
-$CC $files tup-version.o -o $output $LDFLAGS
+(echo "#include \"tup/version.h\""; echo "const char tup_version[] = \"$version\";") | $CC -x c -c - -o $output_version $CFLAGS
+$CC $files $output_version -o $output_tup $LDFLAGS

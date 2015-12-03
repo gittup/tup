@@ -6,7 +6,8 @@ if [ $1 = "-m" ]; then
 	menu=$1
 	shift
 fi
-text=`./gen_text.sh $1`
+base=`basename $1`
+text=`./gen_text.sh $base`
 cat << HERE
 <html>
 <head>

@@ -25,6 +25,6 @@ luaexamples += ex_lua_examples.html
 : examples.inc luaexamples.inc |> ^ GEN %o^ ./gen_menu.sh -x %1f -l %2f $(pages) > %o |> menu.inc
 : |> ^ GEN %o^ ./gen_examples.sh $(examples) > %o |> examples.html
 : ../../tup.1 |> ^ man2html %o^ man2html -M "" %f > %o |> manual.html
-: foreach $(pages) $(examples) $(luaexamples) | menu.inc |> ^ GEN %o^ ./gen_page.sh -m %1i %f > %o |> %f.gen
+: foreach $(pages) $(examples) $(luaexamples) | menu.inc |> ^ GEN %o^ ./gen_page.sh -m %1i %f > %o |> %b.gen
 
 endif

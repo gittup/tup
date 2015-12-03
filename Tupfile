@@ -67,4 +67,4 @@ LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 
 LDFLAGS += -Wl,-Bstatic -lpthread -Wl,-Bdynamic
 endif
-: $(srcs) src/lua/liblua.a |> ^ LINK %o^ ./src/tup/link.sh "$(CC)" "$(CFLAGS)" "$(LDFLAGS)" "%o" "%f" $(suid) |> tup$(PROGRAM_SUFFIX) | tup-version.o
+: $(srcs) src/lua/liblua.a |> ^ LINK %o^ ./src/tup/link.sh "$(CC)" "$(CFLAGS)" "$(LDFLAGS)" "%1o" "%2o" "%f" $(suid) |> tup$(PROGRAM_SUFFIX) tup-version.o
