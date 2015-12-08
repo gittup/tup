@@ -294,7 +294,7 @@ void show_progress(int active, enum TUP_NODE_TYPE type)
 
 		clear_active(stdout);
 
-		fill = max * sum / total;
+		fill = max * percent_complete() / 100;
 
 		if(color_len) {
 			memset(buf, ' ', sizeof(buf));
