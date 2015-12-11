@@ -3161,7 +3161,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 	}
-	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, &tf->g->gen_delete_root, group, old_group, tf->refactoring) < 0)
+	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;
 	free_tupid_tree(&input_root);
 	return 0;

@@ -121,7 +121,6 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			 int refactoring, int command_modified);
 int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
-			struct tupid_entries *delete_root,
 			struct tup_entry *group,
 			struct tup_entry *old_group,
 			int refactoring);

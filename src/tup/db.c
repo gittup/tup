@@ -5768,7 +5768,6 @@ struct write_input_data {
 	tupid_t groupid;
 	int new_groups;
 	int normal_links_invalid;
-	struct tupid_entries *delete_root;
 	struct tupid_entries *env_root;
 	int refactoring;
 	int refactoring_failed;
@@ -5834,15 +5833,12 @@ static int rm_sticky(tupid_t tupid, void *data)
 	if(tup_db_link_exists(tupid, wid->cmdid, TUP_LINK_NORMAL, &exists) < 0)
 		return -1;
 	if(exists) {
-		if(tupid_tree_search(wid->delete_root, tupid) != NULL) {
-			/* The node is in the delete list and we are no longer
-			 * claiming it as a dependency. Make sure the normal
-			 * link is removed as well to avoid a circular
-			 * dependency (t6045).
-			 */
-			if(link_remove(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
-				return -1;
-		}
+		 /* Make sure the normal link is removed as well to avoid a circular
+		 * dependency (t6045) and environment issues (t4178).
+		 */
+		if(link_remove(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+			return -1;
+
 		/* Make sure we re-run the command to check for required
 		 * inputs.
 		 */
@@ -5878,7 +5874,6 @@ static int rm_sticky(tupid_t tupid, void *data)
 
 int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root,
 			struct tupid_entries *env_root,
-			struct tupid_entries *delete_root,
 			struct tup_entry *group,
 			struct tup_entry *old_group,
 			int refactoring)
@@ -5887,7 +5882,6 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 	struct write_input_data wid = {
 		.f = f,
 		.cmdid = cmdid,
-		.delete_root = delete_root,
 		.env_root = env_root,
 		.groupid = -1,
 		.new_groups = 0,
