@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 tup scan
-tup parse
+parse
 if tup scan 2>&1 | grep 'tup warning: generated file.*was deleted outside of tup'; then
 	echo "Received warning text from tup scan." 1>&2
 	exit 1

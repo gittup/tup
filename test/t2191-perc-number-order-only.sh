@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 HERE
 echo dat1 > dat1.in
 echo dat2 > dat2.in
-tup parse
+parse
 
 tup_object_exist . 'cat foo.txt; cat dat1.in; cat bar.txt > dat1.out'
 tup_object_exist . 'cat foo.txt; cat dat2.in; cat bar.txt > dat2.out'

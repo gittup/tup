@@ -30,7 +30,7 @@ libs += l4
 : test1 \$(files) \$(libs) |> cmd T %1f F %2f L %3f O %1o 2 %2o |> \$(empty) out2
 HERE
 tup touch test1 f1 f2 f3 l1 l2 l3 l4
-tup parse
+parse
 
 tup_object_exist . 'cmd T test1 F f1 f2 f3 L l1 l2 l3 l4 O  2 out2'
 

@@ -34,7 +34,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch foo.c
-tup parse
+parse
 check_empty_create
 
 tup scan

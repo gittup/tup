@@ -29,7 +29,7 @@ cat > test1.tup << HERE
 cflags += \$(TUP_CWD)
 HERE
 tup touch Tupfile test1.tup
-tup parse
+parse
 tup_object_exist . 'echo . .'
 
 tmkdir foo
@@ -44,13 +44,13 @@ cflags += \$(TUP_CWD)
 : |> echo \$(cflags) |>
 HERE
 tup touch Tupfile
-tup parse
+parse
 tup_object_exist . 'echo foo .'
 
 echo 'include bar/test2.tup' > foo/test1.tup
 echo 'cflags += $(TUP_CWD)' > foo/bar/test2.tup
 tup touch foo/test1.tup foo/bar/test2.tup
-tup parse
+parse
 tup_object_exist . 'echo foo/bar .'
 
 rm Tupfile
@@ -62,7 +62,7 @@ cflags += \$(TUP_CWD)
 HERE
 echo 'cflags += $(TUP_CWD)' > test1.tup
 tup touch foo/Tupfile test1.tup
-tup parse
+parse
 tup_object_exist foo 'echo .. .'
 
 mv foo/Tupfile foo/bar/Tupfile
@@ -71,7 +71,7 @@ tup touch foo/bar/Tupfile
 echo 'include ../test2.tup' > foo/test1.tup
 echo 'cflags += $(TUP_CWD)' > test2.tup
 tup touch foo/test1.tup test2.tup
-tup parse
+parse
 tup_object_exist foo/bar 'echo ../.. .'
 
 eotup

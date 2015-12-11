@@ -42,7 +42,7 @@ HERE
 tup touch fs/Tupfile fs/sub/Tupfile Tuprules.tup fs/Tuprules.tup fs/sub/Tuprules.tup
 tup touch fs/ext1.c fs/ext2.c
 tup touch fs/sub/helper.c
-tup parse
+parse
 
 tup_object_exist fs 'gcc -Wall -DFS=1 -c ext1.c -o ext1.o'
 tup_sticky_exist fs ext1.o fs 'gcc -lfoo ext1.o ext2.o -o prog'

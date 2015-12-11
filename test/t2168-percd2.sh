@@ -31,7 +31,7 @@ tmkdir bar
 cat > bar/Tupfile << HERE
 include ../build.tup
 HERE
-tup parse
+parse
 
 update
 

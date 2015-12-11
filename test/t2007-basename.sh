@@ -27,7 +27,7 @@ HERE
 tmkdir subdir
 tmkdir superlongtest
 tup touch subdir/foo.c subdir/readme.txt Tupfile superlongtest/ok
-tup parse
+parse
 tup_object_exist . foo.o readme.txt
 tup_object_exist . "cp subdir/readme.txt readme.txt"
 tup_object_exist . "gcc -c subdir/foo.c -o foo.o"

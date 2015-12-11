@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile order.h
-tup parse
+parse
 tup_object_no_exist . "nope"
 tup_object_no_exist . "not gonna work"
 tup_object_no_exist . "also not gonna work"

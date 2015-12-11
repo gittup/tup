@@ -36,7 +36,7 @@ input += bar/tab
 HERE
 
 tup touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
-tup parse
+parse
 tup_object_exist . sball.o tab.o
 
 eotup

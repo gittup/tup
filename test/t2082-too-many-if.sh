@@ -39,7 +39,7 @@ endif
 endif
 HERE
 tup touch Tupfile
-tup parse
+parse
 
 cat > Tupfile << HERE
 ifeq (a,1)

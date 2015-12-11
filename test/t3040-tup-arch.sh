@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : |> echo @(TUP_ARCH) |>
 HERE
 tup touch Tupfile
-tup parse
+parse
 
 # Could validate other cpu architectures here if desired - not really necessary.
 if uname -s | grep Linux > /dev/null; then
@@ -37,7 +37,7 @@ if uname -s | grep Linux > /dev/null; then
 fi
 
 varsetall TUP_ARCH=bar
-tup parse
+parse
 tup_object_exist . 'echo bar'
 tup_dep_exist tup.config TUP_ARCH 0 .
 tup_object_no_exist . 'echo x86_64'

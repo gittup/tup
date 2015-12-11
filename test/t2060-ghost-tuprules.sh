@@ -37,7 +37,7 @@ HERE
 
 tup touch fs/sub/Tupfile Tuprules.tup fs/sub/Tuprules.tup
 tup touch fs/sub/helper.c
-tup parse
+parse
 
 tup_object_exist fs/sub 'gcc -Wall -O0 -c helper.c -o helper.o'
 tup_sticky_exist fs/sub helper.o fs/sub 'gcc -lm helper.o -o prog'
@@ -51,7 +51,7 @@ CFLAGS += -DFS=1
 LDFLAGS += -lfoo
 HERE
 tup touch fs/Tuprules.tup
-tup parse
+parse
 
 tup_object_exist fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'
 tup_sticky_exist fs/sub helper.o fs/sub 'gcc -lm -lfoo helper.o -o prog'

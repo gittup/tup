@@ -22,12 +22,12 @@
 cat > Tupdefault.lua << HERE
 tup.rule("echo " .. tup.getconfig("FOO"))
 HERE
-tup parse
+parse
 tup_object_exist . "echo "
 tup_dep_exist tup.config FOO 0 .
 
 varsetall FOO=yo
-tup parse
+parse
 tup_object_exist . "echo yo"
 
 eotup

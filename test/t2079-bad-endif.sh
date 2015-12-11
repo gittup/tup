@@ -38,7 +38,7 @@ endif
 : b.c |> !cc |> b.o
 HERE
 tup touch Tupfile
-tup parse
+parse
 tup_object_exist . "gcc -c b.c -o b.o"
 
 eotup

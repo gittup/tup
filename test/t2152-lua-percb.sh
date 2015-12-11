@@ -28,7 +28,7 @@ tup.foreach_rule(pages, 'cp %f %o', '%b.gen')
 HERE
 
 tup touch Tupfile.lua foo.html bar.html hey.txt
-tup parse
+parse
 
 tup_object_exist . 'cp foo.html foo.html.gen'
 tup_object_exist . 'cp bar.html bar.html.gen'

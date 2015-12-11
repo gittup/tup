@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : *.o |> test %f |>
 HERE
 tup touch foo.c bar.c Tupfile
-tup parse
+parse
 tup_sticky_exist . 'foo.o' . 'gcc foo.o bar.o -o prog'
 tup_sticky_exist . 'bar.o' . 'gcc foo.o bar.o -o prog'
 tup_sticky_exist . 'foo.o' . 'test bar.o foo.o'

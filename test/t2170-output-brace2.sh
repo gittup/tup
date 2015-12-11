@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 : |> touch foo |>{bin}
 HERE
-tup parse
+parse
 
 tup_object_exist . 'touch foo'
 

@@ -31,7 +31,7 @@ HERE
 tup touch fs/Tupfile
 tup touch fs/ok.c
 tup touch fs/sub/helper.c
-tup parse
+parse
 
 tup_object_exist fs 'gcc  -c ok.c -o ok.o'
 
@@ -39,7 +39,7 @@ tup_dep_exist . Tuprules.tup . fs
 
 cp fs/Tupfile fs/sub/Tupfile
 tup touch fs/sub/Tupfile
-tup parse
+parse
 
 tup_object_exist fs/sub 'gcc  -c helper.c -o helper.o'
 

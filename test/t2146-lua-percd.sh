@@ -38,7 +38,7 @@ cat > bar/baz/Tupfile.lua << HERE
 tup.rule('echo %d')
 HERE
 
-tup parse
+parse
 tup_object_exist . 'echo tuptesttmp-t2146-lua-percd'
 tup_object_exist foo 'echo foo'
 tup_object_exist bar 'echo bar'

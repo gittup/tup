@@ -31,7 +31,7 @@ cat > Tupfile << HERE
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
 tup touch Tupfile
-tup parse
+parse
 
 cat > Tupfile << HERE
 : genfile.txt |> cat %f > %o |> output.txt

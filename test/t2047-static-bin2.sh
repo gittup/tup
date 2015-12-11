@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : {objs} |> gcc %f -o %o |> prog
 HERE
 tup touch foo.c bar.S Tupfile
-tup parse
+parse
 tup_sticky_exist . 'foo.o' . 'gcc foo.o bar.o -o prog'
 tup_sticky_exist . 'bar.o' . 'gcc foo.o bar.o -o prog'
 
@@ -38,7 +38,7 @@ cat > Tupfile << HERE
 HERE
 tup touch Tupfile
 # Parse here to remove the old command
-tup parse
+parse
 tup_object_no_exist . 'gcc foo.o bar.o -o prog'
 tup_sticky_exist . 'foo.o' . 'gcc bar.o foo.o -o prog'
 tup_sticky_exist . 'bar.o' . 'gcc bar.o foo.o -o prog'

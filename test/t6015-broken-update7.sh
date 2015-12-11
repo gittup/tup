@@ -27,7 +27,7 @@ HERE
 touch foo.c
 touch bar.c
 tup touch foo.c bar.c Tupfile
-tup parse
+parse
 rm foo.c
 tup rm foo.c
 update

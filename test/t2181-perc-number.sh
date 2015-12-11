@@ -25,7 +25,7 @@ HERE
 tup touch file1 file2
 tmkdir foo
 tup touch foo/file3
-tup parse
+parse
 
 tup_object_exist . 'cmd file1 foo/file3 out2 out1'
 

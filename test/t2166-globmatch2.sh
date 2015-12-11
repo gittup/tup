@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : foreach [abc]_?ext.* |> touch %g_binary.t |> %g_binary.t
 HERE
 tup touch a_text.txt b_text.txt c_text.txt
-tup parse
+parse
 tup_object_exist . a_binary.t b_binary.t c_binary.t
 tup upd
 tup_object_exist . "touch a_binary.t"

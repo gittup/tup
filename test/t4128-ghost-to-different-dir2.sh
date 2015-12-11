@@ -38,7 +38,7 @@ cat > bar/Tupfile << HERE
 : |> touch %o |> ../foo/sub/foo.h | ../<headers>
 HERE
 tup touch bar/Tupfile
-tup parse
+parse
 
 rm bar/Tupfile
 rm Tupfile

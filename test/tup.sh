@@ -247,11 +247,7 @@ __update()
 	fi
 
 	set +e
-	if [ $# -le 0 ]; then
-		$cmd
-	else
-		$cmd upd $@
-	fi
+	$cmd $@
 	rc=$?
 	set -e
 
@@ -319,6 +315,13 @@ update_fail_msg()
 		done
 	fi
 	set_leak_check full
+}
+
+parse()
+{
+	if ! __update parse; then
+		exit 1
+	fi
 }
 
 parse_fail_msg()

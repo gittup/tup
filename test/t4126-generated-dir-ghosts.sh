@@ -24,7 +24,7 @@
 cat > Tupfile << HERE
 : |> touch %o |> out.txt foo/bar/baz.txt out/dir2/3.txt
 HERE
-tup parse
+parse
 
 cat > Tupfile << HERE
 : |> touch %o |> out.txt new/2/3.txt

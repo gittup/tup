@@ -28,7 +28,7 @@ CC = echo \$(CC)
 : *.o |> \$(CC) -o prog %f |> prog
 HERE
 tup touch foo.c bar.c Tupfile
-tup parse
+parse
 tup_object_exist . foo.c bar.c
 tup_object_exist . "echo gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_exist . "echo gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"

@@ -42,7 +42,7 @@ HERE
 cat > sub/c/Tupfile.lua << HERE
 tup.rule('echo yo')
 HERE
-tup parse
+parse
 
 tup_object_exist sub 'echo foo'
 tup_object_no_exist sub 'echo bar'

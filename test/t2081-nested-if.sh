@@ -33,28 +33,28 @@ endif
 HERE
 tup touch Tupfile
 varsetall FOO=y BAR=y
-tup parse
+parse
 tup_object_exist . 'foo y'
 tup_object_exist . 'foobar y'
 tup_object_no_exist . 'foo y bar n'
 tup_object_no_exist . 'foo n'
 
 varsetall FOO=y BAR=n
-tup parse
+parse
 tup_object_exist . 'foo y'
 tup_object_no_exist . 'foobar y'
 tup_object_exist . 'foo y bar n'
 tup_object_no_exist . 'foo n'
 
 varsetall FOO=n BAR=y
-tup parse
+parse
 tup_object_no_exist . 'foo y'
 tup_object_no_exist . 'foobar y'
 tup_object_no_exist . 'foo y bar n'
 tup_object_exist . 'foo n'
 
 varsetall FOO=n BAR=n
-tup parse
+parse
 tup_object_no_exist . 'foo y'
 tup_object_no_exist . 'foobar y'
 tup_object_no_exist . 'foo y bar n'

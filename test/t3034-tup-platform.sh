@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : |> echo @(TUP_PLATFORM) |>
 HERE
 tup touch Tupfile
-tup parse
+parse
 
 # Could validate other platforms here if desired - not really necessary.
 if uname -s | grep Linux > /dev/null; then
@@ -32,7 +32,7 @@ if uname -s | grep Linux > /dev/null; then
 fi
 
 varsetall TUP_PLATFORM=foo
-tup parse
+parse
 tup_object_exist . 'echo foo'
 tup_dep_exist tup.config TUP_PLATFORM 0 .
 tup_object_no_exist . 'echo linux'

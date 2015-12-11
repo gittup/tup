@@ -26,22 +26,22 @@ endif
 : foreach \$(objs-y) |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch foo.c Tupfile
-tup parse
+parse
 tup_object_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_exist tup.config FOO 0 .
 
 varsetall FOO=y
-tup parse
+parse
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_exist tup.config FOO 0 .
 
 varsetall
-tup parse
+parse
 tup_object_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_exist tup.config FOO 0 .
 
 varsetall FOO=n
-tup parse
+parse
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_exist tup.config FOO 0 .
 
@@ -49,7 +49,7 @@ cat > Tupfile << HERE
 : foreach \$(objs-y) |> gcc -c %f -o %o |> %B.o
 HERE
 tup touch Tupfile
-tup parse
+parse
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_dep_no_exist tup.config FOO 0 .
 

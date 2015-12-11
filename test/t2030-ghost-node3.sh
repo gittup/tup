@@ -38,7 +38,7 @@ cat > Tupfile << HERE
 : foreach g* |> cat %f |>
 HERE
 tup touch Tupfile
-tup parse
+parse
 tup_object_no_exist . 'cat ghost'
 update
 

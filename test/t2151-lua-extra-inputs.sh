@@ -26,7 +26,7 @@ tup.foreach_rule(files, 'gcc -c %f -o %o', '%B.o')
 HERE
 
 tup touch Tupfile.lua foo.c bar.c
-tup parse
+parse
 tup_sticky_exist . foo.h . "gcc -c foo.c -o foo.o"
 tup_sticky_exist . foo.h . "gcc -c bar.c -o bar.o"
 

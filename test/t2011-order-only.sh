@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile foo.c bar.c
-tup parse
+parse
 tup_sticky_exist . foo.h . "echo gcc -c foo.c -o foo.o"
 tup_sticky_exist . foo.h . "echo gcc -c bar.c -o bar.o"
 
