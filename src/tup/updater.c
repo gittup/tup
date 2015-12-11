@@ -69,6 +69,10 @@ static int create_work(struct graph *g, struct node *n);
 static int update_work(struct graph *g, struct node *n);
 static int generate_work(struct graph *g, struct node *n);
 static int todo_work(struct graph *g, struct node *n);
+static int expand_command(char **res,
+			  struct tup_entry *tent, const char *cmd,
+			  struct tupid_entries *group_sticky_root,
+			  struct tupid_entries *used_groups_root);
 static int update(struct node *n);
 
 static int do_keep_going;
@@ -1852,6 +1856,11 @@ static int update_work(struct graph *g, struct node *n)
 static int generate_work(struct graph *g, struct node *n)
 {
 	int rc = 0;
+	char *expanded_name = NULL;
+	struct tupid_entries sticky_root = {NULL};
+	struct tupid_entries normal_root = {NULL};
+	struct tupid_entries group_sticky_root = {NULL};
+	struct tupid_entries used_groups_root = {NULL};
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
@@ -1875,6 +1884,15 @@ static int generate_work(struct graph *g, struct node *n)
 				name++;
 				while(isspace(*name)) name++;
 			}
+		}
+		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
+		if (rc == 0) {
+			if(expand_command(&expanded_name, n->tent, name, &group_sticky_root, &used_groups_root) < 0) {
+				fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
+				rc = -1;
+			}
+			if(expanded_name)
+				name = expanded_name;
 		}
 		if(name)
 			fprintf(generate_f, "%s\n", name);
