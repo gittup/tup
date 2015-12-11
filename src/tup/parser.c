@@ -1567,20 +1567,24 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 				    struct string_tree *st, struct name_list *nl)
 {
 	struct bang_rule *br;
-	char *tinput;
 	br = container_of(st, struct bang_rule, st);
 
 	/* Add any order only inputs to the list */
-	if(nl && br->input) {
-		tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, NULL, 0, NULL);
-		if(!tinput)
+	if(br->input) {
+		char *tinput;
+		if(nl) {
+			tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, NULL, 0, NULL);
+			if(!tinput)
+				return -1;
+		} else {
+			tinput = strdup(br->input);
+			if(!tinput) {
+				perror("strdup");
+				return -1;
+			}
+		}
+		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 1) < 0)
 			return -1;
-	} else {
-		tinput = br->input;
-	}
-	if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 1) < 0)
-		return -1;
-	if(nl) {
 		free(tinput);
 	}
 
