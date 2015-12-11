@@ -50,15 +50,12 @@ CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wwrite-strings
 CFLAGS += -Wswitch-enum
 CFLAGS += -fno-common
-CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -I$(TUP_CWD)/src
 
 ifeq (@(TUP_32_BIT),y)
 CFLAGS += -m32
 LDFLAGS += -m32
 endif
-
-export PKG_CONFIG_PATH
 
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
@@ -69,3 +66,17 @@ export PKG_CONFIG_PATH
 TUP_MONITOR = null
 TUP_SUID_GROUP = root
 include $(TARGET).tup
+
+ifeq ($(TUP_SERVER),fuse)
+CFLAGS += -D_FILE_OFFSET_BITS=64
+export PKG_CONFIG_PATH
+endif
+
+ifeq ($(TUP_SERVER),ldpreload)
+FPIC = -fpic
+SHARED = -shared
+
+LDFLAGS_tup-ldpreload.so += $(FPIC)
+LDFLAGS_tup-ldpreload.so += $(SHARED)
+LDFLAGS_tup-ldpreload.so += -ldl
+endif

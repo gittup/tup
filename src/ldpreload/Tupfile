@@ -1,0 +1,19 @@
+include_rules
+
+ifeq ($(TUP_SERVER),ldpreload)
+CFLAGS += $(FPIC)
+
+# __realpath_chk is defined with -Os but undefined without optimization.
+CFLAGS += -Wno-redundant-decls
+
+srcs += *.c
+srcs += ../tup/flock/fcntl.c
+
+ifeq ($(X86_ARCH_SIBLINGS),y)
+  : foreach $(srcs) |> !cc |> %B.64.o
+  CFLAGS += -m32
+  : foreach $(srcs) |> !cc |> %B.32.o
+else
+  : foreach $(srcs) |> !cc |> %B.o
+endif
+endif

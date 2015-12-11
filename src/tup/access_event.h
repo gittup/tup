@@ -23,6 +23,9 @@
 
 #include "compat.h"
 
+/** The filename to write file accesses to. */
+#define TUP_DEPFILE "TUP_DEPFILE"
+
 /** The file descriptor for the variable dictionary. */
 #define TUP_VARDICT_NAME "tup_vardict"
 

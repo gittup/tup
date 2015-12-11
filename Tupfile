@@ -1,5 +1,13 @@
 include_rules
 
+ifeq ($(TUP_SERVER),ldpreload)
+ifeq ($(X86_ARCH_SIBLINGS),y)
+  : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
+else
+  : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
+endif
+endif
+
 ifneq ($(TARGET),win32)
 client_objs += src/tup/vardict.o
 client_objs += src/tup/send_event.o
@@ -26,7 +34,9 @@ ifeq (@(TUP_SUDO_SUID),y)
 suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
+ifeq ($(TUP_SERVER),fuse)
 LDFLAGS += `pkg-config fuse --libs`
+endif
 LDFLAGS += -lm
 LDFLAGS += -lpthread
 else
