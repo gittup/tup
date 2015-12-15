@@ -90,7 +90,6 @@ static int parse_internal_definitions(struct tupfile *tf);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
-static int include_rules(struct tupfile *tf);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
@@ -584,7 +583,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 				free(file);
 			}
 		} else if(strcmp(line, "include_rules") == 0) {
-			rc = include_rules(tf);
+			rc = parser_include_rules(tf, "Tuprules.tup");
 		} else if(strncmp(line, "preload ", 8) == 0) {
 			rc = preload(tf, line+8);
 		} else if(strncmp(line, "run ", 4) == 0) {
@@ -701,10 +700,9 @@ static int error_directive(struct tupfile *tf, char *cmdline) {
 	return ERROR_DIRECTIVE_ERROR;
 }
 
-static int include_rules(struct tupfile *tf)
+int parser_include_rules(struct tupfile *tf, const char *tuprules)
 {
-	char tuprules[] = "Tuprules.tup";
-	int trlen = sizeof(tuprules) - 1;
+	int trlen = strlen(tuprules);
 	int rc = -1;
 	struct stat buf;
 	int num_dotdots;

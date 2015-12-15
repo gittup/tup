@@ -68,7 +68,6 @@ struct tuplua_glob_data {
 	int count;
 };
 
-static int include_rules(struct tupfile *tf);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist);
 
 static int debug_run = 0;
@@ -805,7 +804,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		}
 		lua_pop(ls, 1);
 
-		if(include_rules(tf) < 0) {
+		if(parser_include_rules(tf, "Tuprules.lua") < 0) {
 			if(tf->luaerror == TUPLUA_PENDINGERROR) {
 				assert(lua_gettop(ls) == 2);
 				fprintf(tf->f, "tup error %s\n", tuplua_tostring(ls, -1));
@@ -851,50 +850,6 @@ void lua_parser_cleanup(struct tupfile *tf)
 void lua_parser_debug_run(void)
 {
 	debug_run = 1;
-}
-
-static int include_rules(struct tupfile *tf)
-{
-	char tuprules[] = "Tuprules.lua";
-	int trlen = sizeof(tuprules) - 1;
-	int rc = -1;
-	struct stat buf;
-	int num_dotdots;
-	struct tup_entry *tent;
-	char *path;
-	char *p;
-	int x;
-
-	num_dotdots = 0;
-	tent = tf->curtent;
-	while(tent->tnode.tupid != tf->variant->dtnode.tupid) {
-		tent = tent->parent;
-		num_dotdots++;
-	}
-	path = malloc(num_dotdots * 3 + trlen + 1);
-	if(!path) {
-		parser_error(tf, "malloc");
-		return -1;
-	}
-
-	p = path;
-	for(x=0; x<num_dotdots; x++, p += 3) {
-		strcpy(p, ".." PATH_SEP_STR);
-	}
-	strcpy(path + num_dotdots*3, tuprules);
-
-	p = path;
-	for(x=0; x<=num_dotdots; x++, p += 3) {
-		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
-			if(parser_include_file(tf, p) < 0)
-				goto out_free;
-	}
-	rc = 0;
-
-out_free:
-	free(path);
-
-	return rc;
 }
 
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist)
