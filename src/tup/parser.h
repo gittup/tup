@@ -160,6 +160,7 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 void make_name_list_unique(struct name_list *nl);
 void init_rule(struct rule *r);
 int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl);
+int parser_include_file(struct tupfile *tf, const char *file);
 
 struct node;
 struct graph;

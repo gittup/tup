@@ -20,12 +20,12 @@
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
-tup.include 'Tupfile.lua.vars'
+tup.include 'vars.lua'
 tup.foreach_rule('*.c', '\$(CC) -c %f -o %o \$(CCARGS)', '%B.o')
 tup.rule('*.o', '\$(CC) -o %o %f', 'prog.exe')
 HERE
 
-cat > Tupfile.lua.vars << HERE
+cat > vars.lua << HERE
 CC = 'gcc'
 CCARGS = '-DFOO=1'
 CCARGS += '-DBAR=1'
@@ -33,7 +33,7 @@ HERE
 
 echo "int main(void) {return 0;}" > foo.c
 touch bar.c
-tup touch foo.c bar.c Tupfile.lua Tupfile.lua.vars
+tup touch foo.c bar.c Tupfile.lua vars.lua
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
@@ -42,12 +42,12 @@ tup_object_exist . "gcc -o prog.exe bar.o foo.o"
 
 # Now change the compiler to 'gcc -W' and verify that we re-parse the parent
 # Tupfile.lua to generate new commands and get rid of the old ones.
-cat > Tupfile.lua.vars << HERE
+cat > vars.lua << HERE
 CC = 'gcc -W'
 CCARGS = '-DFOO=1'
 CCARGS += '-DBAR=1'
 HERE
-tup touch Tupfile.lua.vars
+tup touch vars.lua
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_no_exist . "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"

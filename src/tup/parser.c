@@ -96,7 +96,6 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
 static int gitignore(struct tupfile *tf, tupid_t dt);
 static int check_toplevel_gitignore(struct tupfile *tf);
-static int include_file(struct tupfile *tf, const char *file);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int set_variable(struct tupfile *tf, char *line);
@@ -581,7 +580,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			if(!file) {
 				rc = -1;
 			} else {
-				rc = include_file(tf, file);
+				rc = parser_include_file(tf, file);
 				free(file);
 			}
 		} else if(strcmp(line, "include_rules") == 0) {
@@ -735,7 +734,7 @@ static int include_rules(struct tupfile *tf)
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
 		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
-			if(include_file(tf, p) < 0)
+			if(parser_include_file(tf, p) < 0)
 				goto out_free;
 	}
 	rc = 0;
@@ -1114,7 +1113,7 @@ out_close:
 	return rc;
 }
 
-static int include_file(struct tupfile *tf, const char *file)
+int parser_include_file(struct tupfile *tf, const char *file)
 {
 	struct buf incb;
 	int fd;
@@ -1164,7 +1163,7 @@ static int include_file(struct tupfile *tf, const char *file)
 	}
 
 	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
-	if (tf->cur_dfd < 0) {
+	if(tf->cur_dfd < 0) {
 		parser_error(tf, file);
 		goto out_free_pel;
 	}

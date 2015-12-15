@@ -69,7 +69,6 @@ struct tuplua_glob_data {
 };
 
 static int include_rules(struct tupfile *tf);
-static int include_file(struct tupfile *tf, const char *file);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist);
 
 static int debug_run = 0;
@@ -143,7 +142,7 @@ static int tuplua_function_include(lua_State *ls)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
 
 	tf->ls = ls;
-	if(include_file(tf, file) < 0) {
+	if(parser_include_file(tf, file) < 0) {
 		if (tf->luaerror == TUPLUA_NOERROR) {
 			luaL_where(ls, 1);
 			lua_pushfstring(ls, "Failed to include file '%s'.", file);
@@ -887,7 +886,7 @@ static int include_rules(struct tupfile *tf)
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
 		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
-			if(include_file(tf, p) < 0)
+			if(parser_include_file(tf, p) < 0)
 				goto out_free;
 	}
 	rc = 0;
@@ -896,98 +895,6 @@ out_free:
 	free(path);
 
 	return rc;
-}
-
-static int include_file(struct tupfile *tf, const char *file)
-{
-	struct buf incb;
-	int fd;
-	int rc = -1;
-	struct pel_group pg;
-	struct path_element *pel = NULL;
-	struct tup_entry *tent = NULL;
-	tupid_t newdt;
-	struct tup_entry *oldtent = tf->curtent;
-	int old_dfd = tf->cur_dfd;
-	struct tup_entry *srctent = NULL;
-	struct tup_entry *newtent;
-
-	if(get_path_elements(file, &pg) < 0)
-		goto out_err;
-	if(pg.pg_flags & PG_HIDDEN) {
-		fprintf(tf->f, "tup error: Unable to include file with hidden path element.\n");
-		goto out_del_pg;
-	}
-	newdt = find_dir_tupid_dt_pg(tf->f, tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
-	if(newdt <= 0) {
-		fprintf(tf->f, "tup error: Unable to find directory for include file '%s' relative to '", file);
-		print_tup_entry(tf->f, tf->curtent);
-		fprintf(tf->f, "'\n");
-		goto out_del_pg;
-	}
-	if(!pel) {
-		fprintf(tf->f, "tup error: Invalid include filename: '%s'\n", file);
-		goto out_del_pg;
-	}
-
-	newtent = tup_entry_get(newdt);
-	if(tup_entry_variant(newtent) != tf->variant) {
-		fprintf(tf->f, "tup error: Unable to include file '%s' since it is outside of the variant tree.\n", file);
-		return -1;
-	}
-	tf->curtent = newtent;
-
-	if(variant_get_srctent(tf->variant, newdt, &srctent) < 0)
-		return -1;
-	if(!srctent)
-		srctent = tf->curtent;
-	if(tup_db_select_tent_part(srctent->tnode.tupid, pel->path, pel->len, &tent) < 0 || !tent) {
-		fprintf(tf->f, "tup error: Unable to find tup entry for file '%s'\n", file);
-		goto out_free_pel;
-	}
-
-	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
-	if(tf->cur_dfd < 0) {
-		parser_error(tf, file);
-		goto out_free_pel;
-	}
-	fd = tup_entry_openat(tf->root_fd, tent);
-	if(fd < 0) {
-		parser_error(tf, file);
-		goto out_close_dfd;
-	}
-	if(fslurp_null(fd, &incb) < 0)
-		goto out_close;
-
-	if(parse_lua_tupfile(tf, &incb, file) < 0)
-		goto out_free;
-	rc = 0;
-out_free:
-	free(incb.s);
-out_close:
-	if(close(fd) < 0) {
-		parser_error(tf, "close(fd)");
-		rc = -1;
-	}
-out_close_dfd:
-	if(close(tf->cur_dfd) < 0) {
-		parser_error(tf, "close(tf->cur_dfd)");
-		rc = -1;
-	}
-out_free_pel:
-	free(pel);
-out_del_pg:
-	del_pel_group(&pg);
-
-out_err:
-	tf->curtent = oldtent;
-	tf->cur_dfd = old_dfd;
-	if(rc < 0) {
-		fprintf(tf->f, "tup error: Failed to parse included file '%s'\n", file);
-		return -1;
-	}
-
-	return 0;
 }
 
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist)
