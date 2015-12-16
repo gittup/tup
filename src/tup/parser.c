@@ -3544,9 +3544,14 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	estring_append(&e, p, cmd+cmd_len - p);
 
 	if(extra_command) {
-		int eclen = strlen(extra_command);
+		char *textra;
+
+		textra = tup_printf(tf, extra_command, strlen(extra_command), nl, onl, ooinput_nl, ext, extlen, NULL);
+		if(!textra)
+			return NULL;
 		estring_append(&e, " ", 1);
-		estring_append(&e, extra_command, eclen);
+		estring_append(&e, textra, strlen(textra));
+		free(textra);
 	}
 	return e.s;
 }
