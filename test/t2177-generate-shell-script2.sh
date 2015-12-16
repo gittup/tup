@@ -37,8 +37,13 @@ cp Tupfile sub1
 cp Tupfile sub2
 echo ': *.o ../*.o ../sub2/*.o |> ar cr %o %f |> libfoo.a' >> sub1/Tupfile
 
-tup generate build.sh
+tup generate --verbose build.sh
 ./build.sh
 sym_check sub1/libfoo.a foo bar bar2 baz baz2
+
+if ! grep '^#! /bin/sh -ex$' build.sh > /dev/null; then
+	echo "Error: Expected /bin/sh -ex in generated script" 1>&2
+	exit 1
+fi
 
 eotup

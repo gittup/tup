@@ -228,6 +228,7 @@ int generate(int argc, char **argv)
 	struct tup_entry *varfiletent;
 	char *script_name = NULL;
 	char *config_file = NULL;
+	int verbose_script = 0;
 	int x;
 	int rc;
 
@@ -239,6 +240,9 @@ int generate(int argc, char **argv)
 			}
 			x++;
 			config_file = argv[x];
+			continue;
+		} else if(strcmp(argv[x], "--verbose") == 0) {
+			verbose_script = 1;
 			continue;
 		}
 		if(script_name) {
@@ -317,7 +321,7 @@ int generate(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to open script for writing.\n");
 		return -1;
 	}
-	fprintf(generate_f, "#! /bin/sh -ex\n");
+	fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
 	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)

@@ -39,4 +39,9 @@ tup generate build.sh
 ./build.sh
 sym_check libfoo.a foo bar bar2 baz baz2
 
+if ! grep '^#! /bin/sh -e$' build.sh > /dev/null; then
+	echo "Error: Expected /bin/sh -e in generated script" 1>&2
+	exit 1
+fi
+
 eotup
