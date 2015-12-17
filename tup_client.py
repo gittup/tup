@@ -35,16 +35,17 @@ def config_var(key):
         pass
 
     if tup_vardict_num is None:
-        fd = os.getenv('tup_vardict');
-        if fd is None:
+        path = os.getenv('tup_vardict');
+        if path is None:
             raise Exception('tup error: This python module can only be used as a sub-process from tup')
 
-        if int(fd) < 0 or os.fstat(int(fd)).st_size == 0:
-            tup_vardict_num = 0
+        if os.path.exists(path):
+            with open(path) as f:
+                tup_vardict_map = mmap.mmap(f.fileno(), 0, mmap.MAP_PRIVATE, mmap.PROT_READ);
+                tup_vardict_num = struct.unpack("@i", tup_vardict_map.read(4))[0];
+                tup_entry_size = (tup_vardict_num + 1) * 4
         else:
-            tup_vardict_map = mmap.mmap(int(fd), 0, mmap.MAP_PRIVATE, mmap.PROT_READ);
-            tup_vardict_num = struct.unpack("@i", tup_vardict_map.read(4))[0];
-            tup_entry_size = (tup_vardict_num + 1) * 4
+            tup_vardict_num = 0
 
     left = -1
     right = tup_vardict_num

@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
@@ -50,17 +51,22 @@ int tup_vardict_init(void)
 			TUP_VARDICT_NAME);
 		return -1;
 	}
-	fd = strtol(path, NULL, 0);
-	if(fd <= 0) {
-		/* If we don't have a vardict file, it's because there are
-		 * no variables.
-		 */
-		tup_vars.len = 0;
-		tup_vars.num_entries = 0;
-		tup_vars.offsets = NULL;
-		tup_vars.entries = NULL;
-		tup_vars.map = NULL;
-		return 0;
+	fd = open(path, O_RDONLY);
+	if(fd < 0) {
+		if(errno == ENOENT) {
+			/* If we don't have a vardict file, it's because there are
+			 * no variables.
+			 */
+			tup_vars.len = 0;
+			tup_vars.num_entries = 0;
+			tup_vars.offsets = NULL;
+			tup_vars.entries = NULL;
+			tup_vars.map = NULL;
+			return 0;
+		}
+		perror(path);
+		fprintf(stderr, "tup client error: Couldn't open vardict file '%s'\n", path);
+		return -1;
 	}
 
 	if(fstat(fd, &buf) < 0) {

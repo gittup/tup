@@ -473,7 +473,6 @@ static int master_fork_loop(void)
 	struct execmsg em;
 	pthread_attr_t attr;
 	int null_fd;
-	int vardict_fd = -2;
 	char job[PATH_MAX];
 	char dir[PATH_MAX];
 	char vardict_file[PATH_MAX];
@@ -591,14 +590,6 @@ static int master_fork_loop(void)
 			return -1;
 		if(read_all(msd[0], vardict_file, em.vardictlen) < 0)
 			return -1;
-		vardict_fd = open(vardict_file, O_RDONLY);
-		if(vardict_fd < 0) {
-			if(errno != ENOENT) {
-				perror(vardict_file);
-				fprintf(stderr, "tup error: Unable to open the vardict file in master_fork\n");
-				return -1;
-			}
-		}
 
 		waiter = malloc(sizeof *waiter);
 		if(!waiter) {
@@ -617,15 +608,17 @@ static int master_fork_loop(void)
 			char **envp;
 			char **curp;
 			char *curenv;
-			char fd_name[64];
+			char full_vardict_file[PATH_MAX];
 
 			if(close(msd[0]) < 0) {
 				perror("close(msd[0])");
 				exit(1);
 			}
 
-			snprintf(fd_name, sizeof(fd_name), TUP_VARDICT_NAME "=%i", vardict_fd);
-			fd_name[63] = 0;
+			if(snprintf(full_vardict_file, sizeof(full_vardict_file), TUP_VARDICT_NAME "=%s/%s", get_tup_top(), vardict_file) >= (signed)sizeof(full_vardict_file)) {
+				fprintf(stderr, "tup error: full_vardict_file is sized incorrectly.\n");
+				exit(1);
+			}
 
 			/* +1 for the vardict variable, and +1 for the terminating
 			 * NULL pointer.
@@ -645,7 +638,7 @@ static int master_fork_loop(void)
 				curp++;
 				curenv += strlen(curenv) + 1;
 			}
-			*curp = fd_name;
+			*curp = full_vardict_file;
 			curp++;
 			*curp = NULL;
 
@@ -654,12 +647,6 @@ static int master_fork_loop(void)
 			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
 			perror("execl");
 			exit(1);
-		}
-		if(vardict_fd >= 0) {
-			if(close(vardict_fd) < 0) {
-				perror("close(vardict_fd)");
-				return -1;
-			}
 		}
 		waiter->pid = pid;
 		waiter->sid = em.sid;

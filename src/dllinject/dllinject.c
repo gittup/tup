@@ -426,7 +426,6 @@ static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2);
 static char s_depfilename[PATH_MAX];
 static char s_vardict_file[PATH_MAX];
 static HANDLE deph = INVALID_HANDLE_VALUE;
-static HANDLE vardicth = INVALID_HANDLE_VALUE;
 
 static int writef(const char *data, unsigned int len)
 {
@@ -1776,19 +1775,6 @@ static int open_file(const char *depfilename)
 	return 0;
 }
 
-static int open_vardict_file(const char *vardict_file)
-{
-	vardicth = CreateFileA(vardict_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
-	if(vardicth == INVALID_HANDLE_VALUE) {
-		/* Not an error if the file doesn't exist - we may not have a vardict. */
-		if(GetLastError() != ERROR_FILE_NOT_FOUND) {
-			fprintf(stderr, "tup error: Unable to open vardict file '%s' in dllinject. Windows error code: 0x%08lx\n", vardict_file, GetLastError());
-			return -1;
-		}
-	}
-	return 0;
-}
-
 /* -------------------------------------------------------------------------- */
 
 BOOL WINAPI DllMain(HANDLE HDllHandle, DWORD Reason, LPVOID Reserved)
@@ -1806,8 +1792,6 @@ DWORD tup_inject_init(remote_thread_t* r)
 {
 	static int initialised = 0;
 	char filename[MAX_PATH];
-	char vardict_env[64];
-	int vardict_fd = -1;
 	OSVERSIONINFO osinfo;
 
 	if (initialised)
@@ -1832,15 +1816,7 @@ DWORD tup_inject_init(remote_thread_t* r)
 
 	if (open_file(r->depfilename))
 		return 1;
-	if (open_vardict_file(r->vardict_file))
-		return 1;
-
-	if(vardicth != INVALID_HANDLE_VALUE) {
-		vardict_fd = _open_osfhandle((intptr_t)vardicth, 0);
-	}
-	snprintf(vardict_env, sizeof(vardict_env), TUP_VARDICT_NAME "=%i", vardict_fd);
-	vardict_env[sizeof(vardict_env)-1] = 0;
-	putenv(vardict_env);
+	_putenv_s(TUP_VARDICT_NAME, r->vardict_file);
 
 	strcpy(s_depfilename, r->depfilename);
 	strcpy(s_vardict_file, r->vardict_file);
