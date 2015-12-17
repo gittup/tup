@@ -49,7 +49,7 @@
 	<dt><b>tup.rule(inputs, command, outputs)</b></dt>
 	<dd>
 		<div class="spec"><em>Returns</em>: table of strings</div>
-		<p>A forwarding wrapper around <span class="cmd">tup.frule</span>.  <span class="cmd">inputs</span> and <span class="cmd">outputs</span> must always be tables, and <span class="cmd">command</span> must be a string.  Returns the result of <span class="cmd">tup.frule</span>.</p>
+		<p>A forwarding wrapper around <span class="cmd">tup.frule</span>. Except for the 3-argument version, <span class="cmd">inputs</span> and <span class="cmd">outputs</span> must always be tables, and <span class="cmd">command</span> must be a string. In the 3-argument version, <span class="cmd">inputs</span> and <span class="cmd">outputs</span> can be a string for a single input, or a table. Returns the result of <span class="cmd">tup.frule</span>.</p>
 	</dd>
 	<dt><b>tup.foreach_rule(inputs, command)</b></dt>
 	<dt><b>tup.foreach_rule(inputs, command, outputs)</b></dt>
@@ -78,6 +78,11 @@
 		<div class="spec"><em>Returns</em>: string</div>
 		<p>Returns the name of RUNNING within RUNNING's parent directory.</p>
 		<p>Example: Running <span class="cmd">tup.getdirectory()</span> in <span class="filename">/a/b/Tupfile.lua</span> would return <span class="filename">b</span>.</p>
+	</dd>
+	<dt><b>tup.getrelativedir(directoryname)</b></dt>
+	<dd>
+		<div class="spec"><em>Returns</em>: string</div>
+		<p>Returns a path to <span class="cmd">directoryname</span> relative from the active Tupfile.lua file.</p>
 	</dd>
 	<dt><b>tup.nodevariable(path)</b></dt>
 	<dd>
