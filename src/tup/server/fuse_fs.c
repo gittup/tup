@@ -1052,6 +1052,8 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 {
 	struct mapping *map;
 	struct file_info *finfo;
+	const char *peeled;
+	struct tmpdir *tmpdir;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -1065,6 +1067,13 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		}
+		peeled = peel(path);
+		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peeled) == 0) {
+				put_finfo(finfo);
+				return 0;
+			}
 		}
 		put_finfo(finfo);
 	}
