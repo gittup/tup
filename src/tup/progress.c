@@ -32,6 +32,7 @@
 
 static int cur_phase = -1;
 static int sum;
+static int sum_width;
 static int total;
 static int job_time;
 static int total_time;
@@ -130,8 +131,10 @@ void tup_main_progress(const char *s)
 void start_progress(int new_total, int new_total_time, int new_max_jobs)
 {
 	int i;
+	char buf[256];
 
 	sum = 0;
+	sum_width = snprintf(buf, sizeof(buf), "%i", new_total);
 	total = new_total;
 	job_time = 0;
 	total_time = new_total_time;
@@ -217,7 +220,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	 * helpful.
 	 */
 	if(total && !display_progress) fprintf(f, "%3i%% ", percent_complete());
-	if(display_job_numbers) fprintf(f, "%i) ", sum);
+	if(display_job_numbers) fprintf(f, "%*i) ", sum_width, sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
 	}
