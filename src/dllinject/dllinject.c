@@ -760,8 +760,10 @@ ULONG_PTR AttributeList)
                 return rc;
         }
 
-        TCHAR buffer[1024];
-        if (GetModuleFileNameEx(*ProcessHandle,0,buffer,1024)){
+        TCHAR wbuffer[1024];
+        if (GetModuleFileNameEx(*ProcessHandle,0,wbuffer,1024)){
+		char buffer[PATH_MAX];
+		WideCharToMultiByte(CP_UTF8, 0, wbuffer, -1, buffer, PATH_MAX, NULL, NULL);
 		char *exec = strrchr(buffer, '\\');
 		if (exec == NULL) return rc;
 
@@ -1642,7 +1644,7 @@ static int canon_path(const char *file, char *dest)
 		return 0;
 	if(is_full_path(file)) {
 		/* Full path */
-		PathCanonicalize(dest, file);
+		PathCanonicalizeA(dest, file);
 	} else {
 		/* Relative path */
 		char tmp[PATH_MAX];
@@ -1650,7 +1652,7 @@ static int canon_path(const char *file, char *dest)
 		int filelen = strlen(file);
 
 		tmp[0] = 0;
-		if(GetCurrentDirectory(sizeof(tmp), tmp) == 0) {
+		if(GetCurrentDirectoryA(sizeof(tmp), tmp) == 0) {
 			/* TODO: Error handle? */
 			return 0;
 		}
@@ -1661,7 +1663,7 @@ static int canon_path(const char *file, char *dest)
 		}
 		tmp[cwdlen] = '\\';
 		memcpy(tmp + cwdlen + 1, file, filelen + 1);
-		PathCanonicalize(dest, tmp);
+		PathCanonicalizeA(dest, tmp);
 	}
 	return strlen(dest);
 }
@@ -1766,7 +1768,7 @@ exit:
 
 static int open_file(const char *depfilename)
 {
-	deph = CreateFile(depfilename, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	deph = CreateFileA(depfilename, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if(deph == INVALID_HANDLE_VALUE) {
 		fprintf(stderr, "tup error: Unable to open dependency file '%s' in dllinject. Windows error code: 0x%08lx\n", depfilename, GetLastError());
 		return -1;
@@ -1776,7 +1778,7 @@ static int open_file(const char *depfilename)
 
 static int open_vardict_file(const char *vardict_file)
 {
-	vardicth = CreateFile(vardict_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
+	vardicth = CreateFileA(vardict_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if(vardicth == INVALID_HANDLE_VALUE) {
 		/* Not an error if the file doesn't exist - we may not have a vardict. */
 		if(GetLastError() != ERROR_FILE_NOT_FOUND) {
@@ -2069,7 +2071,7 @@ BOOL get_wow64_addresses(void)
 	DWORD dwRead;
 	CHAR chBuf[BUFSIZE];
 	PROCESS_INFORMATION piProcInfo;
-	STARTUPINFO  siStartInfo;
+	STARTUPINFOA  siStartInfo;
 	BOOL ret;
 	char cmdline[MAX_PATH];
 

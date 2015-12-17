@@ -508,7 +508,7 @@ static int mlink(int argc, char **argv)
 
 static int dir_empty(const char *dirname)
 {
-	struct flist f = {0, 0, 0};
+	struct flist f = FLIST_INITIALIZER;
 	if(chdir(dirname) < 0) {
 		perror(dirname);
 		fprintf(stderr, "tup error: Unable to chdir to variant directory.\n");

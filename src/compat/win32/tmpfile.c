@@ -15,6 +15,7 @@ FILE *__wrap_tmpfile(void)
 	static int num = 0;
 	int fd;
 	char filename[64];
+	wchar_t wfilename[64];
 	FILE *f = NULL;
 	HANDLE h;
 
@@ -25,7 +26,8 @@ FILE *__wrap_tmpfile(void)
 	num++;
 
 	/* Need to use CreateFile to be able to set it delete-on-close */
-	h = CreateFile(filename, GENERIC_WRITE | GENERIC_READ, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+	MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, PATH_MAX);
+	h = CreateFile(wfilename, GENERIC_WRITE | GENERIC_READ, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
 	if(h == INVALID_HANDLE_VALUE)
 		goto err_out;
 

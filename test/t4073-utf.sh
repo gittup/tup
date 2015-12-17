@@ -20,12 +20,6 @@
 
 . ./tup.sh
 case $tupos in
-CYGWIN*)
-	# In Windows, maybe need to modify all filesystem functions to convert from
-	# UTF-16 to UTF-8 and back.
-	echo "[33mTODO: Unicode currently broken on this platform.[0m" 1>&2
-	eotup
-	;;
 Darwin)
 	# In OSX, it uses UTF-8 but in a different style. Eg it uses:
 	# insert[föo]: 66 6f cc 88 6f

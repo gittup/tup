@@ -28,6 +28,28 @@
   * utility library.
   */
 
+#ifdef _WIN32
+
+#include <windows.h>
+struct flist {
+	char filename[PATH_MAX];
+	HANDLE *_h;
+	WIN32_FIND_DATA _dat;
+};
+
+/* NOTE: Path is ignored on Windows, we just assume "*" */
+/* NOTE: This skips the first file "." */
+#define flist_foreach(f, p) \
+	for((f)->_h=FindFirstFile(L"*", &(f)->_dat);\
+		((f)->_h!=0 &&\
+		 (FindNextFile((f)->_h, &(f)->_dat)) &&\
+		 WideCharToMultiByte(CP_UTF8, 0, (f)->_dat.cFileName, -1, (f)->filename, PATH_MAX, NULL, NULL)) ||\
+		((f)->_h!=0 && FindClose((f)->_h) && 0);)
+
+#define FLIST_INITIALIZER {"", NULL, {0}}
+
+#else
+
 #include <dirent.h>
 
 /** Used to iterate through a list of files
@@ -58,5 +80,9 @@ struct flist {
 		 ((f)->_ent=readdir((f)->_d))!=0 &&\
 		 ((f)->filename=(f)->_ent->d_name)!=0) ||\
 		((f)->_d!=0 && closedir((f)->_d) && 0);)
+
+#define FLIST_INITIALIZER {0, 0, 0}
+
+#endif
 
 #endif

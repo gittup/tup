@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2015  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2015  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,35 +18,16 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include "dir_mutex.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <windows.h>
+#include "tup/compat.h"
 
-int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath)
+int win_lstat(const char *pathname, struct stat *buf)
 {
 	int rc;
-
-	if(olddirfd != newdirfd) {
-		fprintf(stderr, "tup compat renameat error: olddirfd=%i but newdirfd=%i\n", olddirfd, newdirfd);
-		return -1;
-	}
-
-	dir_mutex_lock(olddirfd);
-#ifdef _WIN32
-	wchar_t woldpath[PATH_MAX];
-	wchar_t wnewpath[PATH_MAX];
-	MultiByteToWideChar(CP_UTF8, 0, oldpath, -1, woldpath, PATH_MAX);
-	MultiByteToWideChar(CP_UTF8, 0, newpath, -1, wnewpath, PATH_MAX);
-
-	if(MoveFileEx(woldpath, wnewpath, MOVEFILE_REPLACE_EXISTING)) {
-		rc = 0;
-	} else {
-		rc = -1;
-	}
-#else
-	rc = rename(oldpath, newpath);
-#endif
-	dir_mutex_unlock();
+	wchar_t wpathname[PATH_MAX];
+	MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wpathname, PATH_MAX);
+	rc = _wstat64(wpathname, buf);
 	return rc;
 }

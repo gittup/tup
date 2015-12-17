@@ -45,13 +45,16 @@ MINGWCFLAGS += -D_GNU_SOURCE
 
 # No symlinks on windows
 MINGWCFLAGS += -D'S_ISLNK(a)=0'
-MINGWCFLAGS += -Dlstat=stat
 
 # No sig_atomic_t on windows
 MINGWCFLAGS += -Dsig_atomic_t=int
 
 # Use the same value as linux here. The logic is in src/compat/unlinkat.c
 MINGWCFLAGS += -DAT_REMOVEDIR=0x200
+
+# Use wchar functions for Windows (we use UTF8 internally)
+MINGWCFLAGS += -DUNICODE
+MINGWCFLAGS += -D_UNICODE
 
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>

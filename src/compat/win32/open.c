@@ -34,6 +34,7 @@ int __wrap_open(const char *pathname, int flags, ...)
 	SECURITY_ATTRIBUTES sec;
 	DWORD desiredAccess;
 	DWORD creationDisposition;
+	wchar_t wpathname[PATH_MAX];
 
 	if(flags & O_WRONLY || flags & O_RDWR)
 		at = ACCESS_WRITE;
@@ -83,7 +84,8 @@ int __wrap_open(const char *pathname, int flags, ...)
 	 * sub-process' stdout file to inheritable and set handle inheritance
 	 * on the process itself.
 	 */
-	h = CreateFile(pathname, desiredAccess, 0, &sec, creationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
+	MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wpathname, PATH_MAX);
+	h = CreateFile(wpathname, desiredAccess, 0, &sec, creationDisposition, FILE_ATTRIBUTE_NORMAL, NULL);
 	if(h == INVALID_HANDLE_VALUE) {
 		errno = GetLastError();
 		return -1;

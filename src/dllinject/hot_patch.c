@@ -64,7 +64,9 @@ int hot_patch(struct patch_entry *begin, struct patch_entry *end)
 {
 	struct patch_entry *i;
 	for(i = begin; i != end; i++) {
-		HMODULE mod = GetModuleHandle(i->module);
+		wchar_t wmodule[PATH_MAX];
+		MultiByteToWideChar(CP_UTF8, 0, i->module, -1, wmodule, PATH_MAX);
+		HMODULE mod = GetModuleHandle(wmodule);
 		if(!mod)
 			continue;
 

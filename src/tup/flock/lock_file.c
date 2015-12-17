@@ -26,8 +26,11 @@
 int tup_lock_open(const char *lockname, tup_lock_t *lock)
 {
 	HANDLE h;
+	wchar_t wlockname[PATH_MAX];
 
-	h = CreateFile(lockname,
+	MultiByteToWideChar(CP_UTF8, 0, lockname, -1, wlockname, PATH_MAX);
+
+	h = CreateFile(wlockname,
 		       GENERIC_READ | GENERIC_WRITE,
 		       FILE_SHARE_READ | FILE_SHARE_WRITE,
 		       NULL,

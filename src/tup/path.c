@@ -40,7 +40,7 @@
 static int watch_path_internal(tupid_t dt, const char *file,
 			       int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
-	struct flist f = {0, 0, 0};
+	struct flist f = FLIST_INITIALIZER;
 	struct stat buf;
 
 	if(lstat(file, &buf) != 0) {

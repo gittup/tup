@@ -532,10 +532,12 @@ static int init_home_loc(void)
 {
 #if defined(_WIN32)
 	char folderpath[MAX_PATH];
-	if(!SHGetSpecialFolderPath(NULL, folderpath, CSIDL_COMMON_APPDATA, 0)) {
+	wchar_t wfolderpath[MAX_PATH];
+	if(!SHGetSpecialFolderPath(NULL, wfolderpath, CSIDL_COMMON_APPDATA, 0)) {
 		fprintf(stderr, "tup error: Unable to get Application Data path.\n");
 		return -1;
 	}
+	WideCharToMultiByte(CP_UTF8, 0, wfolderpath, -1, folderpath, MAX_PATH, NULL, NULL);
 	if(snprintf(home_loc, sizeof(home_loc), "%s\\tup\\tup.ini", folderpath) >= (signed)sizeof(home_loc)) {
 			fprintf(stderr, "tup internal error: user-level options file string is too small.\n");
 			return -1;

@@ -610,7 +610,7 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 static int check_empty_variant(struct tup_entry *tent)
 {
 	int fd;
-	struct flist f = {0, 0, 0};
+	struct flist f = FLIST_INITIALIZER;
 	int displayed_error = 0;
 
 	fd = tup_entry_open(tent);

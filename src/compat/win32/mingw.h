@@ -27,6 +27,9 @@
 
 struct stat;
 
+#define lstat(a, b) win_lstat(a, b)
+int win_lstat(const char *pathname, struct stat *buf);
+
 int fchdir(int fd);
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 int mkstemp(char *template);

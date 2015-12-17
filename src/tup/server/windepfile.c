@@ -58,8 +58,9 @@ int server_init(enum server_mode mode)
 {
 	char *slash;
 	char mycwd[PATH_MAX];
-	struct flist f = {0, 0, 0};
+	struct flist f = FLIST_INITIALIZER;
 	int cwdlen;
+	wchar_t wwintmpdir[PATH_MAX];
 
 	if(mode) {/* unused */}
 
@@ -69,7 +70,8 @@ int server_init(enum server_mode mode)
 	if(GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
 		return -1;
 
-	GetTempPath(sizeof(wintmpdir), wintmpdir);
+	GetTempPath(PATH_MAX, wwintmpdir);
+	WideCharToMultiByte(CP_UTF8, 0, wwintmpdir, -1, wintmpdir, PATH_MAX, NULL, NULL);
 
 	mycwd[PATH_MAX - 1] = '\0';
 	slash = strrchr(mycwd, '\\');
@@ -157,10 +159,12 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 			  struct tup_env *newenv,
 			  PROCESS_INFORMATION *pi)
 {
-	STARTUPINFOA sa;
+	STARTUPINFOW sa;
 	SECURITY_ATTRIBUTES sec;
 	BOOL ret;
-	char buf[64];
+	wchar_t buf[64];
+	wchar_t *wcmdline;
+	int len;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.cb = sizeof(STARTUPINFOW);
@@ -175,11 +179,10 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 		fprintf(stderr, "tup error: Unable to chdir to the project root directory to create a temporary output file.\n");
 		return -1;
 	}
-	snprintf(buf, sizeof(buf), ".tup\\tmp\\output-%i", s->id);
-	buf[sizeof(buf)-1] = 0;
+	swprintf(buf, 64, L".tup\\tmp\\output-%i", s->id);
+	buf[63] = 0;
 	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
-		perror(buf);
 		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
 		return -1;
 	}
@@ -191,7 +194,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 
 	/* Passing in the directory to lpCurrentDirectory is insufficient
 	 * because the command may run as './foo.exe', so we need to change to
-	 * the correct directory before calling CreateProcessA. This may just
+	 * the correct directory before calling CreateProcessW. This may just
 	 * happen to work in most cases because the unlinkat() called to remove
 	 * the outputs will usually change to the correct directory anyway.
 	 * This isn't necessarily the case if the command has no outputs, and
@@ -201,9 +204,16 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 		fprintf(stderr, "tup error: Unable to change working directory to '%s'\n", win32_get_dirpath(dfd));
 		return -1;
 	}
-	ret = CreateProcessA(
+	len = MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, NULL, 0);
+	wcmdline = malloc(sizeof(*wcmdline) * (len + 1));
+	if(!wcmdline) {
+		perror("malloc");
+		return -1;
+	}
+	MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wcmdline, len);
+	ret = CreateProcessW(
 		NULL,
-		cmdline,
+		wcmdline,
 		NULL,
 		NULL,
 		TRUE,
@@ -213,6 +223,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 		&sa,
 		pi);
 	CloseHandle(sa.hStdOutput);
+	free(wcmdline);
 
 	if(!ret)
 		return -1;
@@ -443,6 +454,8 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 {
 	char depfile[PATH_MAX];
 	char dest[PATH_MAX];
+	wchar_t wtarget[PATH_MAX];
+	wchar_t wdest[PATH_MAX];
 
 	dir_mutex_lock(dfd);
 	if(snprintf(dest, sizeof(dest), "%s/%s", win32_get_dirpath(dfd), linkpath) >= PATH_MAX) {
@@ -453,7 +466,9 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 		fprintf(stderr, "tup error: depfile path sized too small in symlinkat compat function\n");
 		goto out_err;
 	}
-	if(CopyFile(target, dest, 1) == 0) {
+	MultiByteToWideChar(CP_UTF8, 0, target, -1, wtarget, PATH_MAX);
+	MultiByteToWideChar(CP_UTF8, 0, dest, -1, wdest, PATH_MAX);
+	if(CopyFile(wtarget, wdest, 1) == 0) {
 		perror("CopyFile");
 		goto out_err;
 	}
@@ -469,10 +484,12 @@ out_err:
 
 static int initialize_depfile(struct server *s, char *depfile, HANDLE *h)
 {
+	wchar_t wdepfile[PATH_MAX];
 	snprintf(depfile, PATH_MAX, "%s\\deps-%i", tuptmpdir, s->id);
 	depfile[PATH_MAX-1] = 0;
 
-	*h = CreateFile(depfile, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+	MultiByteToWideChar(CP_UTF8, 0, depfile, -1, wdepfile, PATH_MAX);
+	*h = CreateFile(wdepfile, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_DELETE_ON_CLOSE, NULL);
 	if(*h == INVALID_HANDLE_VALUE) {
 		perror(depfile);
 		fprintf(stderr, "tup error: Unable to create temporary file for dependency storage\n");
