@@ -1,9 +1,18 @@
 digraph G {
+	node_12 [label="./test.sh > output.txt\n12" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_11 -> node_12 [dir=back,style="solid",arrowtail="empty"]
+	node_8 [label="echo \"generated text\" > generated.txt\n8" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_7 -> node_8 [dir=back,style="solid",arrowtail="empty"]
+	node_10 [label="echo \"unused text\" > unused.txt\n10" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_9 -> node_10 [dir=back,style="solid",arrowtail="empty"]
+	node_7 [label="generated.txt\n7" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_7 [dir=back,style="dotted",arrowtail="normal"]
+	node_12 -> node_7 [dir=back,style="solid",arrowtail="empty"]
 	node_14 [label="header.txt\n14" shape="oval" color="#000000" fontcolor="#000000" style=solid];
-	node_13 -> node_14 [dir=back,style="solid",arrowtail="empty"]
-	node_12 [label="output.txt\n12" shape="oval" color="#000000" fontcolor="#000000" style=solid];
-	node_13 [label="./test.sh > output.txt\n13" shape="rectangle" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_14 [dir=back,style="solid",arrowtail="empty"]
+	node_11 [label="output.txt\n11" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_13 [label="test.sh\n13" shape="oval" color="#000000" fontcolor="#000000" style=solid];
 	node_12 -> node_13 [dir=back,style="solid",arrowtail="empty"]
-	node_3 [label="test.sh\n3" shape="oval" color="#000000" fontcolor="#000000" style=solid];
-	node_13 -> node_3 [dir=back,style="solid",arrowtail="empty"]
+	node_9 [label="unused.txt\n9" shape="oval" color="#000000" fontcolor="#000000" style=solid];
+	node_12 -> node_9 [dir=back,style="dotted",arrowtail="normal"]
 }

@@ -100,7 +100,7 @@ Output from test.sh
 <p>Similar to the <a href="ex_a_first_tupfile.html">first Tupfile example</a>, tup has executed the script in such a way that it can track file accesses. Tup sees that the script read from <span class="filename">header.txt</span> and automatically adds the dependency. We can see this from the dependency graph:</p>
 
 <pre>
-<span class="prompt">$</span> tup graph . | dot -Tpng &gt; ~/ex_deps_1.png
+<span class="prompt">$</span> tup graph --stickies . | dot -Tpng &gt; ~/ex_deps_1.png
 </pre>
 <div class="img"><img src="ex_deps_1.png"></div>
 
