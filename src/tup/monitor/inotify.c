@@ -203,7 +203,7 @@ int monitor(int argc, char **argv)
 		return -1;
 	}
 
-	inot_fd = inotify_init();
+	inot_fd = inotify_init1(IN_CLOEXEC);
 	if(inot_fd < 0) {
 		perror("inotify_init");
 		return -1;
