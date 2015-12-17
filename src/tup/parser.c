@@ -690,12 +690,21 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	return rc;
 }
 
-static int error_directive(struct tupfile *tf, char *cmdline) {
-	fprintf(tf->f, "Error:\n  ");
-	if (strlen(cmdline)==0) {
-		fprintf(tf->f, "Empty error directive\n");
+static int error_directive(struct tupfile *tf, char *cmdline)
+{
+	char *eval_cmdline;
+	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
+	if(eval_cmdline) {
+		fprintf(tf->f, "Error:\n  ");
+		if(strlen(cmdline)==0) {
+			fprintf(tf->f, "Empty error directive\n");
+		} else {
+			fprintf(tf->f, "%s\n", eval_cmdline);
+
+		}
+		free(eval_cmdline);
 	} else {
-		fprintf(tf->f, "%s\n", cmdline);
+		fprintf(tf->f, "Unable to expand 'error' message. Raw error string:\n  %s\n", cmdline);
 	}
 	return ERROR_DIRECTIVE_ERROR;
 }

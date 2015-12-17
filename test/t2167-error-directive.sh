@@ -24,4 +24,15 @@ error Foo
 HERE
 update_fail_msg "Found 'error' command parsing Tupfile"
 
+cat > Tupfile << HERE
+error @(FOO) is not valid
+HERE
+varsetall FOO=boo
+update_fail_msg "boo is not valid"
+
+cat > Tupfile << HERE
+error @(FOO is not valid
+HERE
+update_fail_msg "Unable to expand 'error' message"
+
 eotup
