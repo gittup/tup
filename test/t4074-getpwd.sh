@@ -40,7 +40,7 @@ int main(void)
 HERE
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
-: foo |> ./foo > %o |> output.txt
+: foo |> ^c^ ./foo > %o |> output.txt
 HERE
 tup touch foo.c Tupfile
 update

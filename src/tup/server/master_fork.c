@@ -47,6 +47,7 @@ struct rcmsg {
 struct child_waiter {
 	pid_t pid;
 	int sid;
+	int umount_dev;
 	char dev[JOB_MAX];
 	char proc[JOB_MAX];
 };
@@ -71,6 +72,7 @@ static int wait_for_my_sid(struct status_tree *st);
 static void sighandler(int sig);
 static int inited = 0;
 static int use_namespacing = 1;
+static int privileged = 0;
 static int full_deps;
 
 static struct sigaction sigact = {
@@ -168,8 +170,9 @@ int server_pre_init(void)
 		}
 #else
 		use_namespacing = 0;
+		privileged = tup_privileged();
 #endif
-		if(!use_namespacing && full_deps) {
+		if(full_deps && !use_namespacing && !privileged) {
 			fprintf(stderr, "tup error: Sub-processes require running in a chroot for full dependency detection, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support full dependency tracking.\n");
 			return -1;
 		}
@@ -318,6 +321,7 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 {
 	int ofd, efd;
 	char buf[64];
+	int do_chroot;
 
 	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", sid);
 	buf[sizeof(buf)-1] = 0;
@@ -388,12 +392,19 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	}
 #endif
 
-	if(need_namespacing && !use_namespacing) {
+	if(need_namespacing && !use_namespacing && !privileged) {
 		fprintf(stderr, "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support the ^c flag.\n");
 		return -1;
 	}
 
+	do_chroot = 0;
 	if(full_deps) {
+		do_chroot = 1;
+	} else if(need_namespacing && privileged && !use_namespacing) {
+		do_chroot = 1;
+	}
+
+	if(do_chroot) {
 #ifdef __APPLE__
 		if(proc) {/* unused */}
 		if(mount("devfs", dev, MNT_DONTBROWSE, NULL) < 0) {
@@ -596,8 +607,14 @@ static int master_fork_loop(void)
 			perror("malloc");
 			exit(1);
 		}
+		waiter->umount_dev = 0;
 		snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job);
 		snprintf(waiter->proc, sizeof(waiter->proc), "%s/proc", job);
+#ifdef __APPLE__
+		if(full_deps || (em.need_namespacing && privileged)) {
+			waiter->umount_dev = 1;
+		}
+#endif
 
 		pid = fork();
 		if(pid < 0) {
@@ -694,7 +711,7 @@ static void *child_waiter(void *arg)
 		perror("waitpid");
 	}
 #ifdef __APPLE__
-	if(full_deps) {
+	if(waiter->umount_dev) {
 		int rc;
 		rc = unmount(waiter->dev, MNT_FORCE);
 		if(rc < 0) {
