@@ -1971,7 +1971,7 @@ int tup_db_chdir(tupid_t tupid)
 	char *path;
 
 	if(tupid == 0) {
-		fprintf(stderr, "tup error: Trying to tup_db_open_tupid(0)\n");
+		fprintf(stderr, "tup error: Trying to tup_db_chdir(0)\n");
 		return -1;
 	}
 	if(tupid == 1) {
