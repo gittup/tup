@@ -314,10 +314,10 @@ static int tuplua_function_getcwd(lua_State *ls)
 		return luaL_error(ls, "Error allocating memory in tuplua_function_getcwd()");
 
 	if(get_relative_dir(NULL, &e, tf->tupid, tf->curtent->tnode.tupid) < 0) {
-		fprintf(tf->f, "tup internal error: Unable to find relative directory length from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
+		fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
 		tup_db_print(tf->f, tf->tupid);
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
-		return luaL_error(ls, "Failed to get directory path length in getcwd.");
+		return luaL_error(ls, "Failed to get relative directory in getcwd.");
 	}
 
 	lua_pushlstring(ls, e.s, e.len);
