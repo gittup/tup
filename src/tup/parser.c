@@ -2858,14 +2858,16 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 {
 	struct path_list *pl;
 	struct path_list_head tmplist;
+	struct path_list_head tmplist2;
 
 	TAILQ_INIT(&tmplist);
+	TAILQ_INIT(&tmplist2);
 
+	/* first expand any %-flags before eval so things like $(flags_%f) work */
 	TAILQ_FOREACH(pl, oplist, list) {
 		struct path_list *newpl;
 		char *toutput;
 
-		/* tup_printf allows %O if we have a name_list (use_onl) and are not a command */
 		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, NULL, 0, NULL);
 		if(!toutput)
 			return -1;
@@ -2877,10 +2879,31 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		free(toutput);
 	}
 
+	/* Then eval the list so all $-variables are expanded */
 	if(eval_path_list(tf, &tmplist, DISALLOW_NODES) < 0)
 		return -1;
 
+	/* Use tup_printf again in case $-variables reference %-flags.
+	 * tup_printf allows %O if we have a name_list (use_onl) and are not a
+	 * command.
+	 */
 	TAILQ_FOREACH(pl, &tmplist, list) {
+		struct path_list *newpl;
+		char *toutput;
+
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, NULL, 0, NULL);
+		if(!toutput)
+			return -1;
+		newpl = new_pl(tf, toutput, -1, NULL);
+		if(!newpl)
+			return -1;
+		newpl->orderid = pl->orderid;
+		TAILQ_INSERT_TAIL(&tmplist2, newpl, list);
+		free(toutput);
+	}
+	free_path_list(&tmplist);
+
+	TAILQ_FOREACH(pl, &tmplist2, list) {
 		struct tup_entry *dest_tent;
 		struct name_list_entry *onle;
 
@@ -2986,7 +3009,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 
 		add_name_list_entry(onl, onle);
 	}
-	free_path_list(&tmplist);
+	free_path_list(&tmplist2);
 	return 0;
 }
 
