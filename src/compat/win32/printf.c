@@ -23,11 +23,8 @@
 #include <windows.h>
 
 int __wrap___mingw_vprintf(const char *format, va_list ap);
-int __real___mingw_vprintf(const char *format, va_list ap);
-
 int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
 int __real___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
-
 
 static char * handle_color( HANDLE output, char *p )
 {
@@ -82,6 +79,16 @@ static char * handle_color( HANDLE output, char *p )
 	return p;
 }
 
+static void mwrite(HANDLE output, const char *s, int len)
+{
+	wchar_t tmp[PATH_MAX];
+	int nchars;
+	DWORD dummy;
+
+	nchars = MultiByteToWideChar(CP_UTF8, 0, s, len, tmp, PATH_MAX);
+	WriteConsoleW(output, tmp, nchars, &dummy, NULL );
+}
+
 static void parse( HANDLE output, char *p )
 {
 	char *out = p;
@@ -89,8 +96,7 @@ static void parse( HANDLE output, char *p )
 		if( *p++ != ''  )
 			continue;
 
-		DWORD dummy;
-		WriteConsole( output, out, p - 1 - out, &dummy, NULL );
+		mwrite(output, out, p - 1 - out);
 
 		if( *p == '[' )
 			p++;
@@ -108,8 +114,7 @@ static void parse( HANDLE output, char *p )
 		out = p;
 	}
 
-	DWORD dummy;
-	WriteConsole( output, out, p - out, &dummy, NULL );
+	mwrite(output, out, p - out);
 }
 
 int __wrap___mingw_vprintf(const char *format, va_list ap)
