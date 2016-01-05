@@ -59,48 +59,6 @@ typedef HFILE (WINAPI *OpenFile_t)(
     __inout LPOFSTRUCT lpReOpenBuff,
     __in    UINT uStyle);
 
-typedef HANDLE (WINAPI *CreateFileA_t)(
-    __in     LPCSTR lpFileName,
-    __in     DWORD dwDesiredAccess,
-    __in     DWORD dwShareMode,
-    __in_opt LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in     DWORD dwCreationDisposition,
-    __in     DWORD dwFlagsAndAttributes,
-    __in_opt HANDLE hTemplateFile);
-
-typedef HANDLE (WINAPI *CreateFileW_t)(
-    __in     LPCWSTR lpFileName,
-    __in     DWORD dwDesiredAccess,
-    __in     DWORD dwShareMode,
-    __in_opt LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in     DWORD dwCreationDisposition,
-    __in     DWORD dwFlagsAndAttributes,
-    __in_opt HANDLE hTemplateFile);
-
-typedef HANDLE (WINAPI *CreateFileTransactedA_t)(
-    __in       LPCSTR lpFileName,
-    __in       DWORD dwDesiredAccess,
-    __in       DWORD dwShareMode,
-    __in_opt   LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in       DWORD dwCreationDisposition,
-    __in       DWORD dwFlagsAndAttributes,
-    __in_opt   HANDLE hTemplateFile,
-    __in       HANDLE hTransaction,
-    __in_opt   PUSHORT pusMiniVersion,
-    __reserved PVOID  lpExtendedParameter);
-
-typedef HANDLE (WINAPI *CreateFileTransactedW_t)(
-    __in       LPCWSTR lpFileName,
-    __in       DWORD dwDesiredAccess,
-    __in       DWORD dwShareMode,
-    __in_opt   LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in       DWORD dwCreationDisposition,
-    __in       DWORD dwFlagsAndAttributes,
-    __in_opt   HANDLE hTemplateFile,
-    __in       HANDLE hTransaction,
-    __in_opt   PUSHORT pusMiniVersion,
-    __reserved PVOID  lpExtendedParameter);
-
 typedef BOOL (WINAPI *DeleteFileA_t)(
     __in LPCSTR lpFileName);
 
@@ -369,10 +327,6 @@ ULONG_PTR AttributeList
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
 
 static OpenFile_t			OpenFile_orig;
-static CreateFileA_t			CreateFileA_orig;
-static CreateFileW_t			CreateFileW_orig;
-static CreateFileTransactedA_t		CreateFileTransactedA_orig;
-static CreateFileTransactedW_t		CreateFileTransactedW_orig;
 static DeleteFileA_t			DeleteFileA_orig;
 static DeleteFileW_t			DeleteFileW_orig;
 static DeleteFileTransactedA_t		DeleteFileTransactedA_orig;
@@ -443,8 +397,6 @@ static int writef(const char *data, unsigned int len)
 	return rc;
 }
 
-/* -------------------------------------------------------------------------- */
-
 static HFILE WINAPI OpenFile_hook(
     __in    LPCSTR lpFileName,
     __inout LPOFSTRUCT lpReOpenBuff,
@@ -462,142 +414,6 @@ static HFILE WINAPI OpenFile_hook(
 		lpFileName,
 		lpReOpenBuff,
 		uStyle);
-}
-
-/* -------------------------------------------------------------------------- */
-
-static HANDLE WINAPI CreateFileA_hook(
-    __in     LPCSTR lpFileName,
-    __in     DWORD dwDesiredAccess,
-    __in     DWORD dwShareMode,
-    __in_opt LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in     DWORD dwCreationDisposition,
-    __in     DWORD dwFlagsAndAttributes,
-    __in_opt HANDLE hTemplateFile)
-{
-	HANDLE h = CreateFileA_orig(
-		lpFileName,
-		dwDesiredAccess,
-		dwShareMode,
-		lpSecurityAttributes,
-		dwCreationDisposition,
-		dwFlagsAndAttributes,
-		hTemplateFile);
-
-	DEBUG_HOOK("CreateFileA '%s', %p:%x, %x, %x, %x, %x\n",
-		lpFileName,
-		h,
-		GetLastError(),
-		dwDesiredAccess,
-		dwShareMode,
-		dwCreationDisposition,
-		dwFlagsAndAttributes);
-
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-		handle_file(lpFileName, NULL, ACCESS_WRITE);
-	} else {
-		handle_file(lpFileName, NULL, ACCESS_READ);
-	}
-
-	return h;
-}
-
-
-/* -------------------------------------------------------------------------- */
-
-static HANDLE WINAPI CreateFileW_hook(
-    __in     LPCWSTR lpFileName,
-    __in     DWORD dwDesiredAccess,
-    __in     DWORD dwShareMode,
-    __in_opt LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in     DWORD dwCreationDisposition,
-    __in     DWORD dwFlagsAndAttributes,
-    __in_opt HANDLE hTemplateFile)
-{
-	HANDLE h = CreateFileW_orig(
-		lpFileName,
-		dwDesiredAccess,
-		dwShareMode,
-		lpSecurityAttributes,
-		dwCreationDisposition,
-		dwFlagsAndAttributes,
-		hTemplateFile);
-
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
-	} else {
-		handle_file_w(lpFileName, NULL, ACCESS_READ);
-	}
-
-	return h;
-}
-
-/* -------------------------------------------------------------------------- */
-
-HANDLE WINAPI CreateFileTransactedA_hook(
-    __in       LPCSTR lpFileName,
-    __in       DWORD dwDesiredAccess,
-    __in       DWORD dwShareMode,
-    __in_opt   LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in       DWORD dwCreationDisposition,
-    __in       DWORD dwFlagsAndAttributes,
-    __in_opt   HANDLE hTemplateFile,
-    __in       HANDLE hTransaction,
-    __in_opt   PUSHORT pusMiniVersion,
-    __reserved PVOID  lpExtendedParameter)
-{
-	HANDLE h = CreateFileTransactedA_orig(
-		lpFileName,
-		dwDesiredAccess,
-		dwShareMode,
-		lpSecurityAttributes,
-		dwCreationDisposition,
-		dwFlagsAndAttributes,
-		hTemplateFile,
-		hTransaction,
-		pusMiniVersion,
-		lpExtendedParameter);
-
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-		handle_file(lpFileName, NULL, ACCESS_WRITE);
-	} else {
-		handle_file(lpFileName, NULL, ACCESS_READ);
-	}
-
-	return h;
-}
-
-HANDLE WINAPI CreateFileTransactedW_hook(
-    __in       LPCWSTR lpFileName,
-    __in       DWORD dwDesiredAccess,
-    __in       DWORD dwShareMode,
-    __in_opt   LPSECURITY_ATTRIBUTES lpSecurityAttributes,
-    __in       DWORD dwCreationDisposition,
-    __in       DWORD dwFlagsAndAttributes,
-    __in_opt   HANDLE hTemplateFile,
-    __in       HANDLE hTransaction,
-    __in_opt   PUSHORT pusMiniVersion,
-    __reserved PVOID  lpExtendedParameter)
-{
-	HANDLE h = CreateFileTransactedW_orig(
-		lpFileName,
-		dwDesiredAccess,
-		dwShareMode,
-		lpSecurityAttributes,
-		dwCreationDisposition,
-		dwFlagsAndAttributes,
-		hTemplateFile,
-		hTransaction,
-		pusMiniVersion,
-		lpExtendedParameter);
-
-	if (h != INVALID_HANDLE_VALUE && dwDesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-		handle_file_w(lpFileName, NULL, ACCESS_WRITE);
-	} else {
-		handle_file_w(lpFileName, NULL, ACCESS_READ);
-	}
-
-	return h;
 }
 
 static char *unicode_to_ansi(PUNICODE_STRING uni)
@@ -1468,10 +1284,6 @@ struct remote_thread32_t
 static struct patch_entry patch_table[] = {
 #define MODULE_NAME "kernel32.dll"
 	HOOK(OpenFile),
-	HOOK(CreateFileA),
-	HOOK(CreateFileW),
-	HOOK(CreateFileTransactedA),
-	HOOK(CreateFileTransactedW),
 	HOOK(DeleteFileA),
 	HOOK(DeleteFileW),
 	HOOK(DeleteFileTransactedA),
