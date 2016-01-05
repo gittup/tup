@@ -1451,16 +1451,28 @@ static int ignore_file_w(const wchar_t* file)
 
 static int canon_path(const char *file, char *dest)
 {
+	char tmpfile[PATH_MAX];
+	int x;
 	if(!file)
 		return 0;
-	if(is_full_path(file)) {
+	x = 0;
+	while(file[x]) {
+		if(file[x] == '/')
+			tmpfile[x] = '\\';
+		else
+			tmpfile[x] = file[x];
+		x++;
+	}
+	tmpfile[x] = 0;
+
+	if(is_full_path(tmpfile)) {
 		/* Full path */
-		PathCanonicalizeA(dest, file);
+		PathCanonicalizeA(dest, tmpfile);
 	} else {
 		/* Relative path */
 		char tmp[PATH_MAX];
 		int cwdlen;
-		int filelen = strlen(file);
+		int filelen = strlen(tmpfile);
 
 		tmp[0] = 0;
 		if(GetCurrentDirectoryA(sizeof(tmp), tmp) == 0) {
@@ -1473,7 +1485,7 @@ static int canon_path(const char *file, char *dest)
 			return 0;
 		}
 		tmp[cwdlen] = '\\';
-		memcpy(tmp + cwdlen + 1, file, filelen + 1);
+		memcpy(tmp + cwdlen + 1, tmpfile, filelen + 1);
 		PathCanonicalizeA(dest, tmp);
 	}
 	return strlen(dest);
