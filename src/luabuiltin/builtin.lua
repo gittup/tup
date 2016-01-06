@@ -3,7 +3,7 @@
 -- tup - A file-based build system
 --
 -- Copyright (C) 2013  Rendaw <rendaw@zarbosoft.com>
--- Copyright (C) 2013-2015  Mike Shal <marfey@gmail.com>
+-- Copyright (C) 2013-2016  Mike Shal <marfey@gmail.com>
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License version 2 as
