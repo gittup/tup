@@ -1,3 +1,8 @@
 include_rules
+
+fuse_cflags = `pkg-config fuse --cflags`
+CFLAGS_fuse_server.c += $(fuse_cflags)
+CFLAGS_fuse_fs.c += $(fuse_cflags)
+
 : foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
 : windepfile.c |> !mingwcc |>

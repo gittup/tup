@@ -26,6 +26,7 @@ CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wwrite-strings
 CFLAGS += -Wswitch-enum
 CFLAGS += -fno-common
+CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -I$(TUP_CWD)/src
 
 ifeq (@(TUP_32_BIT),y)
@@ -34,7 +35,6 @@ LDFLAGS += -m32
 endif
 
 export PKG_CONFIG_PATH
-CFLAGS += `pkg-config fuse --cflags`
 
 # Compatibility function prototypes and include path for wrapper functions
 MINGWCFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
