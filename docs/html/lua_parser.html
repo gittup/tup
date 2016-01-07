@@ -17,7 +17,7 @@
 	<li><span class="cmd">debug</span> is defined.</li>
 	<li><span class="cmd">io</span> is defined.</li>
 </ul>
-<p>Tup-specific functions are provided in the <span class="cmd">tup</span> table.  In the following documentation, <dfn>PROCESSING</dfn> refers to the directory Tup is currently processing, and <dfn>RUNNING</dfn> refers to the directory of the build definition file Tup is currently running.  When Tup enters <span class="filename">Tupfile.lua</span>, PROCESSING and RUNNING are the same.  When running <span class="filename">Tuprules.lua</span>, <span class="filename">Tupdefault.lua</span>, or an included file, PROCESSING AND RUNNING may be different.</p>
+<p>Tup-specific functions are provided in the <span class="cmd">tup</span> table.  In the following documentation, <dfn>PROCESSING</dfn> refers to the directory Tup is currently processing, and <dfn>RUNNING</dfn> refers to the directory of the build definition file Tup is currently running.  When Tup enters <span class="filename">Tupfile.lua</span>, PROCESSING and RUNNING are the same.  When running <span class="filename">Tuprules.lua</span> or an explicitly included file, PROCESSING AND RUNNING may be different.</p>
 <dl>
 	<dt><b>tup.include(path)</b></dt>
 	<dd>
