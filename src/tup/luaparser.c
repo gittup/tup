@@ -176,7 +176,7 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 		if(!evalp)
 			return luaL_error(ls, "tuplua_table_to_path_list() failed to evaluate string");
 		if(get_path_list(tf, evalp, plist) < 0)
-			return -1;
+			return luaL_error(ls, "tuplua_table_to_path_list() failed in get_path_list()");
 		free(evalp);
 		lua_pop(ls, 1);
 	}
@@ -363,7 +363,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	struct estring e;
 
 	if(estring_init(&e) < 0)
-		return -1;
+		return luaL_error(ls, "tup.getrelativedir() failed to initialize an estring");
 
 	dirname = tuplua_tostring(ls, -1);
 	if(!dirname)
@@ -372,7 +372,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
 	if(get_relative_dir(NULL, &e, dest, tf->tupid) < 0)
-		return -1;
+		return luaL_error(ls, "tup.getrelativedir() failed to get relative path from tupid %lli to %lli", dest, tf->tupid);
 	lua_pushlstring(ls, e.s, e.len);
 	free(e.s);
 	return 1;
