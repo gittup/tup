@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmpdir="/tmp/tup-t4159"
+tmpdir="/tmp/tup-t4159-$$"
 cleanup()
 {
 	cd /tmp

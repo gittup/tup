@@ -21,7 +21,7 @@
 
 . ./tup.sh
 
-tmpdir="/tmp/tup-t0001"
+tmpdir="/tmp/tup-t0001-$$"
 cleanup()
 {
 	cd /tmp
