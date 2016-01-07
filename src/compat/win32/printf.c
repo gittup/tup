@@ -79,24 +79,15 @@ static char * handle_color(HANDLE output, char *p)
 	return p;
 }
 
-static void mwrite(HANDLE output, const char *s, int len)
-{
-	wchar_t tmp[PATH_MAX];
-	int nchars;
-	DWORD dummy;
-
-	nchars = MultiByteToWideChar(CP_UTF8, 0, s, len, tmp, PATH_MAX);
-	WriteConsoleW(output, tmp, nchars, &dummy, NULL);
-}
-
 static void parse(HANDLE output, char *p)
 {
 	char *out = p;
+	DWORD dummy;
 	while(*p) {
 		if(*p++ != '' )
 			continue;
 
-		mwrite(output, out, p - 1 - out);
+		WriteConsoleA(output, out, p - 1 - out, &dummy, NULL);
 
 		if(*p == '[')
 			p++;
@@ -114,7 +105,7 @@ static void parse(HANDLE output, char *p)
 		out = p;
 	}
 
-	mwrite(output, out, p - out);
+	WriteConsoleA(output, out, p - out, &dummy, NULL);
 }
 
 int __wrap___mingw_vprintf(const char *format, va_list ap)
@@ -130,6 +121,11 @@ int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap)
 		HANDLE h;
 		intptr_t v;
 	} handle;
+	static int inited = 0;
+	if(!inited) {
+		SetConsoleOutputCP(CP_UTF8);
+		inited = 1;
+	}
 	handle.v = _get_osfhandle(fileno(stream));
 	if(GetConsoleMode(handle.h, &dummy)) {
 		char buf[32 * 1024];
