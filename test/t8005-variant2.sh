@@ -30,6 +30,8 @@ echo "CONFIG_FOO=y" > build/tup.config
 tup touch build/tup.config Tupfile foo.c
 
 git init
+git config user.email test@example.com
+git config user.name test
 git add .
 git commit -m "First commit"
 git tag -a -m "First version" v0.1
