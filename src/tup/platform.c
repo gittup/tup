@@ -31,6 +31,8 @@ const char *tup_platform = "macosx";
 const char *tup_platform = "win32";
 #elif __FreeBSD__
 const char *tup_platform = "freebsd";
+#elif defined(__NetBSD__)
+const char *tup_platform = "netbsd";
 #else
 #error Unsupported platform. Please add support in tup/platform.c
 #endif

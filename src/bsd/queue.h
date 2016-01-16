@@ -30,6 +30,25 @@
  * $FreeBSD: head/sys/sys/queue.h 221843 2011-05-13 15:49:23Z mdf $
  */
 
+#if defined(__NetBSD__)
+/* NetBSD and FreeBSD implementations differ in details.
+ * pullin the native one otherwise system headers won't build */
+#include <sys/queue.h>
+
+#ifndef LIST_SWAP /* Missed as of NetBSD-7.99.25 */
+#define LIST_SWAP(head1, head2, type, field) do {                       \
+        struct type *swap_tmp = LIST_FIRST((head1));                    \
+        LIST_FIRST((head1)) = LIST_FIRST((head2));                      \
+        LIST_FIRST((head2)) = swap_tmp;                                 \
+        if ((swap_tmp = LIST_FIRST((head1))) != NULL)                   \
+                swap_tmp->field.le_prev = &LIST_FIRST((head1));         \
+        if ((swap_tmp = LIST_FIRST((head2))) != NULL)                   \
+                swap_tmp->field.le_prev = &LIST_FIRST((head2));         \
+} while (0)
+#endif
+
+#else
+
 #ifndef _SYS_QUEUE_H_
 #define _SYS_QUEUE_H_
 
@@ -638,3 +657,5 @@ struct {                                                                \
 } while (0)
 
 #endif /* !_SYS_QUEUE_H_ */
+
+#endif /* defined(__NetBSD__) */

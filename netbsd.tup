@@ -1,0 +1,1 @@
+CFLAGS += -include compat/netbsd.h

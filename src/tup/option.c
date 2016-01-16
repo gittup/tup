@@ -474,7 +474,7 @@ static const char *cpu_number(void)
 	static char buf[10];
 
 	int count = 1;
-#if defined(__linux__) || defined(__sun__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__sun__) || defined(__FreeBSD__) || defined(__NetBSD__)
 	count = sysconf(_SC_NPROCESSORS_ONLN);
 #elif defined(__APPLE__)
 	int nm[2];

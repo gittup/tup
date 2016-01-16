@@ -12,6 +12,11 @@ ifeq (@(TUP_PLATFORM),freebsd)
 	srcs += clearenv.c
 endif
 
+ifeq (@(TUP_PLATFORM),netbsd)
+	srcs += dummy.c
+	srcs += clearenv.c
+endif
+
 ifeq (@(TUP_PLATFORM),macosx)
 srcs += clearenv.c
 srcs += dir_mutex.c

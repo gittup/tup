@@ -27,6 +27,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(__NetBSD__)
+/* NetBSD and FreeBSD implementations differ in details.
+ * pullin the native one otherwise system headers won't build */
+#include <sys/tree.h>
+
+#else
+
 #ifndef _SYS_TREE_H_
 #define _SYS_TREE_H_
 
@@ -761,3 +768,5 @@ name##_RB_MINMAX(struct name *head, int val)                            \
 	     (x) = (y))
 
 #endif  /* _SYS_TREE_H_ */
+
+#endif /* defined(__NetBSD__) */
