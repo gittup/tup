@@ -52,6 +52,11 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/utimensat_linux.c"
 	plat_files="$plat_files ../src/compat/clearenv.c"
 	;;
+	NetBSD)
+	plat_files="$plat_files ../src/compat/dummy.c"
+	plat_files="$plat_files ../src/compat/clearenv.c"
+	plat_cflags="$plat_cflags -include ../src/compat/netbsd.h"
+	;;
 esac
 
 rm -rf build

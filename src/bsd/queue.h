@@ -30,6 +30,13 @@
  * $FreeBSD: head/sys/sys/queue.h 221843 2011-05-13 15:49:23Z mdf $
  */
 
+#if defined(__NetBSD__)
+/* NetBSD and FreeBSD implementations differ in details.
+ * pullin the native one otherwise system headers won't build */
+#include <sys/queue.h>
+
+#else
+
 #ifndef _SYS_QUEUE_H_
 #define _SYS_QUEUE_H_
 
@@ -633,3 +640,5 @@ struct {                                                                \
 } while (0)
 
 #endif /* !_SYS_QUEUE_H_ */
+
+#endif /* defined(__NetBSD__) */

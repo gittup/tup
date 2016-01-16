@@ -12,6 +12,11 @@ ifeq ($(TARGET),freebsd)
 	srcs += clearenv.c
 endif
 
+ifeq ($(TARGET),netbsd)
+	srcs += dummy.c
+	srcs += clearenv.c
+endif
+
 ifeq ($(TARGET),macosx)
 srcs += dummy.c
 srcs += clearenv.c

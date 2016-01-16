@@ -131,6 +131,15 @@ static int os_unmount(void)
 	}
 	return rc;
 }
+#elif defined(__NetBSD__)
+static int os_unmount(void)
+{
+	if(unmount(TUP_MNT, MNT_FORCE) < 0) {
+		perror("unmount");
+		return -1;
+	}
+	return 0;
+}
 #else
 #error Unsupported platform. Please add unmounting code to fuse_server.c
 #endif
