@@ -27,12 +27,15 @@ function tostring(t)
 	return realtostring(t)
 end
 
+local function unchdir_after(...)
+	tup.unchdir()
+	return ...
+end
+
 local realioopen = io.open
 function io.open(filename, mode)
 	tup.chdir(filename, mode)
-	local f = realioopen(filename, mode)
-	tup.unchdir()
-	return f
+	return unchdir_after(realioopen(filename, mode))
 end
 
 tup.file = function(filename)
