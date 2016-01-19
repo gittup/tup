@@ -38,6 +38,12 @@ function io.open(filename, mode)
 	return unchdir_after(realioopen(filename, mode))
 end
 
+local realiolines = io.lines
+function io.lines(filename, ...)
+	tup.chdir(filename)
+	return unchdir_after(realiolines(filename, ...))
+end
+
 tup.file = function(filename)
 	-- Returns filename sans preceeding dir/'s
 	return (string.gsub(filename, '[^/\\]*[/\\]', ''))
