@@ -686,7 +686,7 @@ $ tup
 
 .fi
 
-This time all Tupfiles will be parsed with @(MYPROJ_DEBUG) set to "y", and all build products will be placed in the build-debug directory. Note that setting @(MYPROJ_DEBUG) only has any affect if the variable is actually used in a Tupfile (perhaps by adding debug flags to the compiler command-line).
+This time all Tupfiles will be parsed with @(MYPROJ_DEBUG) set to "y", and all build products will be placed in the build-debug directory. Note that setting @(MYPROJ_DEBUG) only has any effect if the variable is actually used in a Tupfile (perhaps by adding debug flags to the compiler command-line).
 
 Running "tup" will update all variants. For example, updating after modifying a C file that is used in all configurations will cause it to be re-compiled for each variant. As with any command that is executed, this is done in parallel subject to the constraints of the DAG and the number of jobs specified. To build a single variant (or subset of variants), specify the build directory as the target to "tup", just like with any partial update. For example:
 
