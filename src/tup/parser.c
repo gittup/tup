@@ -2854,7 +2854,8 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 
 static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, struct name_list *nl,
 			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
-			   int *command_modified, struct tupid_entries *output_root)
+			   int *command_modified, struct tupid_entries *output_root,
+			   const char *ext, int extlen)
 {
 	struct path_list *pl;
 	struct path_list_head tmplist;
@@ -2868,7 +2869,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		struct path_list *newpl;
 		char *toutput;
 
-		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, NULL, 0, NULL);
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
 		if(!toutput)
 			return -1;
 		newpl = new_pl(tf, toutput, -1, NULL);
@@ -2891,7 +2892,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		struct path_list *newpl;
 		char *toutput;
 
-		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, NULL, 0, NULL);
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
 		if(!toutput)
 			return -1;
 		newpl = new_pl(tf, toutput, -1, NULL);
@@ -3047,7 +3048,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root) < 0)
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, ext, extlen) < 0)
 		return -1;
 	if(r->bin) {
 		TAILQ_FOREACH(onle, &onl.entries, list) {
@@ -3055,9 +3056,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 	}
-	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root) < 0)
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen) < 0)
 		return -1;
-	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root) < 0)
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen) < 0)
 		return -1;
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
