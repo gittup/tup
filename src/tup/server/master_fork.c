@@ -152,7 +152,10 @@ int server_pre_init(void)
 	}
 	if(master_fork_pid == 0) {
 #ifdef __linux__
-		if(!tup_privileged()) {
+		if(getenv("TUP_NO_NAMESPACING")) {
+			use_namespacing = 0;
+		}
+		if(!tup_privileged() && use_namespacing) {
 			uid_t origuid = getuid();
 			uid_t origgid = getgid();
 			pid_t pid = getpid();
