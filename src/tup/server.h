@@ -67,7 +67,7 @@ int server_post_exit(void);
 int server_init(enum server_mode mode);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing);
+		struct tup_entry *dtent, int need_namespacing, int run_in_bash);
 int server_postexec(struct server *s);
 int server_is_dead(void);
 int server_config_start(struct server *s);

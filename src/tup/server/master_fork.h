@@ -36,6 +36,7 @@ struct execmsg {
 	int num_env_entries;
 	int single_output;
 	int need_namespacing;
+	int run_in_bash;
 };
 
 #define JOB_MAX 64
