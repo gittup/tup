@@ -2547,9 +2547,8 @@ static int update(struct node *n)
 	struct tupid_entries group_sticky_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
-	int need_namespacing = 0;
 	int compare_outputs = 0;
-	int run_in_bash = 0;
+	struct exec_flags flags = {0};
 	int use_server = 0;
 	struct tupid_entries used_groups_root = {NULL};
 
@@ -2559,13 +2558,13 @@ static int update(struct node *n)
 		while(*name && *name != ' ' && *name != '^') {
 			switch(*name) {
 				case 'c':
-					need_namespacing = 1;
+					flags.need_namespacing = 1;
 					break;
 				case 'o':
 					compare_outputs = 1;
 					break;
 				case 'b':
-					run_in_bash = 1;
+					flags.run_in_bash = 1;
 					break;
 				default:
 					pthread_mutex_lock(&display_mutex);
@@ -2626,7 +2625,7 @@ static int update(struct node *n)
 		rc = do_ln(&s, n->tent->parent, dfd, cmd + 8);
 		pthread_mutex_unlock(&db_mutex);
 	} else {
-		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);
+		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, flags);
 		use_server = 1;
 	}
 	if(rc < 0) {
