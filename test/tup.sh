@@ -637,6 +637,17 @@ HERE
 	rm tmpversioncheck.py
 }
 
+check_bash()
+{
+    if [ ! -e /usr/bin/env ]; then
+		echo "[33m/usr/bin/env not found - skipping test.[0m"
+		eotup
+    elif ! which bash > /dev/null 2>&1; then
+		echo "[33mNo bash found - skipping test.[0m"
+		eotup
+    fi
+}
+
 single_threaded()
 {
 	(echo "[updater]"; echo "num_jobs=1") >> .tup/options

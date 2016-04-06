@@ -210,7 +210,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	if(!inited)
 		return 0;
@@ -664,7 +664,13 @@ static int master_fork_loop(void)
 
 			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.need_namespacing) < 0)
 				exit(1);
-			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
+
+			if(em.run_in_bash) {
+				execle("/usr/bin/env", "/usr/bin/env", "bash", "-e", "-o", "pipefail", "-c", cmd, NULL, envp);
+			} else {
+				execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
+			}
+
 			perror("execl");
 			exit(1);
 		}

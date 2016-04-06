@@ -418,6 +418,9 @@ In a command string that uses the ^\ TEXT^ sequence, flag characters can be plac
 In the foo.c case, the command requires namespaces (or suid) and will display "CC foo.c". In the bar.c case, the command requires namespaces (or suid) and the "gcc --coverage bar.c -o bar" string is displayed. These are the supported flag characters:
 .RS
 .TP
+.B b
+The 'b' flag causes the command to be run via "/usr/bin/env bash -e -o pipefail -c <command>" instead of the default "/bin/sh -e -c <command>". In addition to allowing bash extensions in the :-rule, "-o pipefail" dictates that "the return value of a pipeline is the value of the last (rightmost) command to exit with a non-zero status, or zero if all commands in the pipeline exit successfully."
+.TP
 .B c
 The 'c' flag causes the command to fail if tup does not support user namespaces (on Linux) or is not suid root. In these cases, tup runs in a degraded mode where the fake working directories are visible in the sub-processes, and some dependencies may be missed. If these degraded behaviors will break your a particular command in your build, add the 'c' flag so that users know they need to add the suid bit or upgrade their kernel. This flag is ignored on Windows.
 .TP
