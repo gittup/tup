@@ -233,7 +233,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 #define SHSTR  "sh -c '"
 #define CMDSTR "CMD.EXE /Q /C "
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing)
+		struct tup_entry *dtent, struct exec_flags flags)
 {
 	int rc = -1;
 	DWORD return_code = 1;
@@ -259,7 +259,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int need_cmd = 0;
 
 	if(dtent) {}
-	if(need_namespacing) {}
+	(void)(flags); // unused on windows
 
 	if(initialize_depfile(s, depfile, &h) < 0) {
 		fprintf(stderr, "Error starting update server.\n");

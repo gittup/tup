@@ -20,7 +20,6 @@
 
 #define _GNU_SOURCE
 #include "master_fork.h"
-#include "tup/server.h"
 #include "tup/db_types.h"
 #include "tup/tupid_tree.h"
 #include "tup/container.h"
@@ -210,7 +209,7 @@ int server_pre_init(void)
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, {0, 0}};
 
 	if(!inited)
 		return 0;
@@ -614,7 +613,7 @@ static int master_fork_loop(void)
 		snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job);
 		snprintf(waiter->proc, sizeof(waiter->proc), "%s/proc", job);
 #ifdef __APPLE__
-		if(full_deps || (em.need_namespacing && privileged)) {
+		if(full_deps || (em.flags.need_namespacing && privileged)) {
 			waiter->umount_dev = 1;
 		}
 #endif
@@ -662,9 +661,15 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.need_namespacing) < 0)
+			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.flags.need_namespacing) < 0)
 				exit(1);
-			execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
+
+			if(em.flags.run_in_bash) {
+				execle("/usr/bin/env", "/usr/bin/env", "bash", "-e", "-o", "pipefail", "-c", cmd, NULL, envp);
+			} else {
+				execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
+			}
+
 			perror("execl");
 			exit(1);
 		}

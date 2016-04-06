@@ -56,6 +56,11 @@ struct parser_server {
 	pthread_mutex_t lock;
 };
 
+struct exec_flags {
+	int need_namespacing : 1;
+	int run_in_bash : 1;
+};
+
 enum server_mode {
 	SERVER_CONFIG_MODE,
 	SERVER_PARSER_MODE,
@@ -67,7 +72,7 @@ int server_post_exit(void);
 int server_init(enum server_mode mode);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing);
+		struct tup_entry *dtent, struct exec_flags flags);
 int server_postexec(struct server *s);
 int server_is_dead(void);
 int server_config_start(struct server *s);
