@@ -19,7 +19,6 @@
 # Test that $BASH is set in bash
 . ./tup.sh
 check_bash
-check_no_windows
 
 cat > Tupfile << HERE
 : |> ^b^ echo \$BASH > %o |> bash.txt

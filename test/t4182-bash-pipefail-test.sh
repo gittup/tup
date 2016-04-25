@@ -19,7 +19,6 @@
 # Test that a tuprule with a pipefail fails in bash
 . ./tup.sh
 check_bash
-check_no_windows
 
 # Test that normal pipefail passes successfully
 cat > Tupfile << HERE
