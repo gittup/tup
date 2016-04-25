@@ -2331,7 +2331,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 {
 	struct build_name_list_args args;
 
-	args.excluding = pl->mem && pl->mem[0] == '^';
+	args.excluding = pl->mem[0] == '^';
 	if(args.excluding) {
 		required = 0;
 	}
