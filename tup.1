@@ -474,6 +474,23 @@ The string that a glob operator matched. For example with the files a_text.txt a
 
 .fi
 will output the filenames a_binary.bin and b_binary.bin. Only the first glob expanded will be substituted in for %g. %g is only valid when there is a single input file or foreach is used.
+.TP
+.B %<group>
+All of the files in "group". For example:
+.nf
+
+#./submodules/sm1/Tupfile
+: foo.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+#./submodules/sm2/Tupfile
+: bar.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+#./project/Tupfile
+: ../submodules/<submodgroup> |> echo '%f' > %o |> submodules_f.txt
+: ../submodules/<submodgroup> |> echo '%<submodgroup>' > %o |> submodules_group.txt
+
+.fi
+will produce "../submodules/<submodgroup>" in submodules_f.txt, but "../submodules/sm1/foo.o ../submodules/sm2/bar.o" in submodules_group.txt. If the input contains multiple groups with the same name but different directories, %<group> will be expanded to all of the files in each listed group.
 .RE
 .RE
 .TP
