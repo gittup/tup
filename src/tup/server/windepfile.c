@@ -531,9 +531,6 @@ static int process_depfile(struct server *s, HANDLE h)
 			break;
 		}
 
-		if(!event.len)
-			continue;
-
 		if(event.len >= PATH_MAX - 1) {
 			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len);
 			return -1;
@@ -557,6 +554,11 @@ static int process_depfile(struct server *s, HANDLE h)
 		if(event1[event.len] != '\0' || event2[event.len2] != '\0') {
 			fprintf(stderr, "tup error: Missing null terminator in access_event\n");
 			return -1;
+		}
+
+		if(!event.len) {
+			/* We have to check this after reading the nul bytes for the empty events. */
+			continue;
 		}
 
 		if(event.at == ACCESS_WRITE) {
