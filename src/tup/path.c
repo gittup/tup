@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+
 static int watch_path_internal(tupid_t dt, const char *file,
 			       int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
