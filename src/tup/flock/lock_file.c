@@ -53,9 +53,8 @@ void tup_lock_close(tup_lock_t lock)
 
 int tup_flock(tup_lock_t fd)
 {
-	OVERLAPPED wtf;
+	OVERLAPPED wtf = {0};
 
-	memset(&wtf, 0, sizeof(wtf));
 	if(LockFileEx(fd, LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &wtf) == 0) {
 		errno = EIO;
 		return -1;
@@ -66,9 +65,8 @@ int tup_flock(tup_lock_t fd)
 /* Returns: -1 error, 0 got lock, 1 would block */
 int tup_try_flock(tup_lock_t fd)
 {
-	OVERLAPPED wtf;
+	OVERLAPPED wtf = {0};
 
-	memset(&wtf, 0, sizeof(wtf));
 	if(LockFileEx(fd, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &wtf) == 0) {
 		DWORD last_error;
 
