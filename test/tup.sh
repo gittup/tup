@@ -668,6 +668,14 @@ clear_full_deps()
 	(echo "[updater]"; echo "full_deps=0") >> .tup/options
 }
 
+tup_ln_cmd() {
+	printf "^ ln $2 -> $1^ !tup_ln $1 $2"
+}
+
+tup_preserve_cmd() {
+	printf "^ preserve $2^ !tup_preserve $1 $2"
+}
+
 eotup()
 {
 	if [ "$monitor_running" = "1" ]; then

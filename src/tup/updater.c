@@ -2493,37 +2493,41 @@ static int expand_command(char **res,
 	return 0;
 }
 
-static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char *cmd)
+static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *dtent, char *input, char *output)
 {
-	char file1[PATH_MAX];
-	char fileout[PATH_MAX];
 	const char *endp;
-	struct mapping *map;
-
+	size_t input_len;
 	while(isspace(*cmd))
 		cmd++;
 	endp = cmd;
 	while(!isspace(*endp))
 		endp++;
-	strncpy(file1, cmd, endp-cmd);
-	file1[endp-cmd] = 0;
+	input_len = endp - cmd;
+	if(input_len >= PATH_MAX - 1)
+		return NULL;
+	strncpy(input, cmd, input_len);
+	input[input_len] = 0;
 	while(isspace(*endp))
 		endp++;
-	if(server_symlink(s, file1, dfd, endp) < 0)
-		return -1;
-	fileout[0] = '.';
-	snprint_tup_entry(fileout+1, PATH_MAX-1, dtent);
-	strcat(fileout, "/");
-	strcat(fileout, endp);
-	if(handle_file(ACCESS_WRITE, fileout, NULL, &s->finfo) < 0)
+	output[0] = '.';
+	snprint_tup_entry(output+1, PATH_MAX-1, dtent);
+	strcat(output, "/");
+	strcat(output, endp);
+	return endp;
+}
+
+static int specify_pseudo_exec_output(struct server *s, const char *output)
+{
+	struct mapping *map;
+	if(handle_file(ACCESS_WRITE, output, NULL, &s->finfo) < 0)
 		return -1;
 	map = malloc(sizeof *map);
 	if(!map) {
 		perror("malloc");
 		return -1;
 	}
-	map->realname = strdup(fileout);
-	map->tmpname = strdup(fileout);
+	map->realname = strdup(output);
+	map->tmpname = strdup(output);
 	map->tent = NULL;
 	finfo_lock(&s->finfo);
 	LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
@@ -2532,6 +2536,18 @@ static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char 
 	s->exited = 1;
 	s->exit_status = 0;
 	return 0;
+}
+
+static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char *cmd)
+{
+	char input_path[PATH_MAX];
+	char full_output_path[PATH_MAX];
+	const char* output_name = input_and_output_from_cmd(cmd, dtent, input_path, full_output_path);
+	if(!output_name)
+		return -1;
+	if(server_symlink(s, input_path, dfd, output_name) < 0)
+		return -1;
+	return specify_pseudo_exec_output(s, full_output_path);
 }
 
 static int update(struct node *n)
@@ -2624,6 +2640,10 @@ static int update(struct node *n)
 	if(strncmp(cmd, "!tup_ln ", 8) == 0) {
 		pthread_mutex_lock(&db_mutex);
 		rc = do_ln(&s, n->tent->parent, dfd, cmd + 8);
+		pthread_mutex_unlock(&db_mutex);
+	} else if (strncmp(cmd, "!tup_preserve ", 14) == 0) {
+		pthread_mutex_lock(&db_mutex);
+		rc = do_ln(&s, n->tent->parent, dfd, cmd + 14);
 		pthread_mutex_unlock(&db_mutex);
 	} else {
 		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);

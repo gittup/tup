@@ -726,6 +726,18 @@ $ rm -rf build-debug
 
 If you build with variants, it is recommended that you always have a default variant that contains an empty tup.config file. This helps check that your software is always able to be built by simply checking it out and doing 'tup init; tup' without relying on a specific configuration.
 
+.fi
+
+When using in-tree builds, the resulting build outputs may rely on run-time files, placed in the source tree and not being processed by tup. Tup allows such files to be copied verbatim in the variant build directory by providing a built-in macro "!tup_preserve":
+
+.nf
+
+:foreach *.png |> !tup_preserve |>
+
+.fi
+
+Either a symbolic link or a copy of the source file will be created, depending on the OS and file system being used.
+
 .SH "EXAMPLE"
 Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf
