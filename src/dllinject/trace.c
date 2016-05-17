@@ -39,7 +39,6 @@ void debug_hook(const char* format, ...)
 {
 	DWORD save_error = GetLastError();
 
-	char buf[256];
 	va_list ap;
 	if(debugf == NULL && !opening) {
 		opening = 1;
@@ -54,9 +53,7 @@ void debug_hook(const char* format, ...)
 		goto exit;
 	}
 	va_start(ap, format);
-	vsnprintf(buf, 255, format, ap);
-	buf[255] = '\0';
-	fprintf(debugf, buf);
+	vfprintf(debugf, format, ap);
 	fflush(debugf);
 
 exit:
