@@ -1527,7 +1527,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 		*(dest++) = '\0';
 	}
 
-	DEBUG_HOOK("%s: '%s' '%s'\n", access_type_name[at], file, file2);
+	DEBUG_HOOK("WRITE EVENT %s: '%s' '%s'\n", access_type_name[at], ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
 	ret = writef((char*) e, dest - (char*) e);
 	DEBUG_HOOK("writef %d\n", ret);
 	if(ret) {}
@@ -1580,7 +1580,7 @@ static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access
 	dest += e->len2;
 	*(dest++) = '\0';
 
-	DEBUG_HOOK("%s [wide, %i, %i]: '%S', '%S'\n", access_type_name[at], e->len, e->len2, file, file2);
+	DEBUG_HOOK("WRITE EVENT %s [wide, %i, %i]: '%s' '%s'\n", access_type_name[at], e->len, e->len2, ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
 	ret = writef((char*) e, dest - (char*) e);
 	DEBUG_HOOK("writef [wide] %d\n", ret);
 	if(ret) {}

@@ -526,7 +526,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			return -1;
 		}
 		if(!pel) {
-			fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer.[0m\n");
+			fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointerfor file: %s[0m\n", w->filename);
 			return -1;
 		}
 
