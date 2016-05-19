@@ -28,8 +28,8 @@ LDFLAGS += -lm
 : src/tup/tup/main.o libtup.a src/lua/liblua.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
 
 ifneq (@(TUP_MINGW),)
-: src/dllinject/*.omingw |> ^ MINGWLINK %o^ @(TUP_MINGW)-gcc -shared -static-libgcc %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject.dll
-: src/dllinject/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc -shared -static-libgcc %f -lws2_32 -lpsapi -lshlwapi -o %o |> tup-dllinject32.dll
+: src/dllinject/*.omingw |> ^ MINGWLINK %o^ @(TUP_MINGW)-gcc -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject.dll
+: src/dllinject/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject32.dll
 
 mingwsrcs = src/tup/*.omingw
 mingwsrcs += src/tup/monitor/*.omingw

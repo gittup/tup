@@ -40,7 +40,6 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <ctype.h>
-#include <shlwapi.h>
 
 #define __DBG_W64		0
 #define __DBG_W32		0
@@ -1336,39 +1335,6 @@ static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2)
 	return(NULL);
 }
 
-static int ignore_file(const char* file)
-{
-	if (!file)
-		return 0;
-	if (stricmp(file, "nul") == 0)
-		return 1;
-	if (stricmp(file, "nul:") == 0)
-		return 1;
-	if (stricmp(file, "prn") == 0)
-		return 1;
-	if (stricmp(file, "aux") == 0)
-		return 1;
-	if (stricmp(file, "con") == 0)
-		return 1;
-	if (strncmp(file, "com", 3) == 0 && isdigit(file[3]) && file[4] == '\0')
-		return 1;
-	if (strncmp(file, "lpt", 3) == 0 && isdigit(file[3]) && file[4] == '\0')
-		return 1;
-	if (strcasestr(file, "\\PIPE\\") != NULL)
-		return 1;
-	if (strnicmp(file, "PIPE\\", 5) == 0)
-		return 1;
-	if (strcasestr(file, "\\Device\\") != NULL)
-		return 1;
-	if (strstr(file, "$") != NULL)
-		return 1;
-	if (strncmp(file, "\\\\", 2) == 0)
-		return 1;
-	if (strcasestr(file, "SQM\\sqmcpp.log") != NULL)
-		return 1;
-	return 0;
-}
-
 static int ignore_file_w(const wchar_t* file)
 {
 	if (!file)
@@ -1400,68 +1366,94 @@ static int ignore_file_w(const wchar_t* file)
 	return 0;
 }
 
-static int canon_path(const char *file, char *dest)
+static int canon_path(const wchar_t *file, int filelen, char *dest)
 {
-	char tmpfile[PATH_MAX];
-	int x;
+	wchar_t widepath[WIDE_PATH_MAX];
+	wchar_t widefullpath[WIDE_PATH_MAX];
+	wchar_t other_prefix[] = L"\\??\\"; /* Can't find where this is documented, but NtCreateFile / NtOpenFile use it. */
+	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
+	int prefix_len = 4;
+	int len;
+	int count;
 	if(!file) {
 		DEBUG_HOOK("canon_path: No file - return 0\n");
-		return 0;
+		goto out_empty;
 	}
 	if(!file[0]) {
 		DEBUG_HOOK("canon_path: nul file - return 0\n");
-		return 0;
+		goto out_empty;
 	}
-	x = 0;
-	while(file[x]) {
-		if(file[x] == '/')
-			tmpfile[x] = '\\';
-		else
-			tmpfile[x] = file[x];
-		x++;
+	if(filelen > WIDE_PATH_MAX - prefix_len - 1) {
+		DEBUG_HOOK("Error: file too long: %.*ls\n", filelen, file);
+		goto out_empty;
 	}
-	tmpfile[x] = 0;
 
-	if(is_full_path(tmpfile)) {
-		/* Full path */
-		PathCanonicalizeA(dest, tmpfile);
+	wcscpy(widepath, backslash_prefix);
+
+	if(wcsncmp(file, other_prefix, prefix_len) == 0 ||
+	   wcsncmp(file, backslash_prefix, prefix_len) == 0) {
+		wcsncpy(&widepath[prefix_len], file + prefix_len, filelen - prefix_len);
+		widepath[filelen] = 0;
+		DEBUG_HOOK("canon_path1: Already prefixed: '%.*ls' -> '%ls'\n", filelen, file, widepath);
+	} else if(is_full_path(file)) {
+		wcsncpy(&widepath[prefix_len], file, filelen);
+		widepath[filelen + prefix_len] = 0;
+		DEBUG_HOOK("canon_path2: Adding backslash prefix: '%.*ls' -> '%ls'\n", filelen, file, widepath);
 	} else {
-		/* Relative path */
-		char tmp[PATH_MAX];
-		int cwdlen;
-		int filelen = strlen(tmpfile);
+		wchar_t *tmp;
+		int dirlen;
+		tmp = widepath + prefix_len;
+		dirlen = GetCurrentDirectoryW(WIDE_PATH_MAX - prefix_len, tmp);
+		if(dirlen == 0) {
+			/* TODO: Error handle? */
+			goto out_empty;
+		}
+		tmp += dirlen;
 
+		if(prefix_len + dirlen + filelen + 2 > WIDE_PATH_MAX) {
+			DEBUG_HOOK("Error: file plus direcotry too long: '%ls' + '%.*ls'\n", widepath, filelen, file);
+			goto out_empty;
+		}
+
+		tmp[0] = '\\';
+		tmp++;
+
+		wcsncpy(tmp, file, filelen);
+		tmp += filelen;
 		tmp[0] = 0;
-		if(GetCurrentDirectoryA(sizeof(tmp), tmp) == 0) {
-			/* TODO: Error handle? */
-			return 0;
-		}
-		cwdlen = strlen(tmp);
-		if(cwdlen + filelen + 2 >= (signed)sizeof(tmp)) {
-			/* TODO: Error handle? */
-			return 0;
-		}
-		tmp[cwdlen] = '\\';
-		memcpy(tmp + cwdlen + 1, tmpfile, filelen + 1);
-		PathCanonicalizeA(dest, tmp);
+
+		DEBUG_HOOK("canon_path3: Prepend CWD: '%.*ls' -> '%ls'\n", filelen, file, widepath);
 	}
-	return strlen(dest);
+
+	len = GetFullPathName(widepath, WIDE_PATH_MAX, widefullpath, NULL);
+	if(!len) {
+		goto out_empty;
+	}
+	DEBUG_HOOK("GetFullPathName[%ls] -> %i, '%ls'\n", widepath, len, widefullpath);
+
+	count = WideCharToMultiByte(CP_UTF8, 0, widefullpath+prefix_len, len+1-prefix_len, dest, WIDE_PATH_MAX, NULL, NULL);
+	if(!count) {
+		goto out_empty;
+	}
+	DEBUG_HOOK("WideCharToMultiByte[%ls] -> %i, '%s'\n", widefullpath, count, dest);
+
+	/* Discount the nul-terminator */
+	return count - 1;
+
+out_empty:
+	dest[0] = 0;
+	return 0;
 }
 
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line)
 {
 	DWORD save_error = GetLastError();
 
-	char buf[ACCESS_EVENT_MAX_SIZE];
-	struct access_event* e = (struct access_event*) buf;
-	char* dest = (char*) (e + 1);
-	int ret;
-	if(line) {}
-
-	if (ignore_file(file) || ignore_file(file2) || deph == INVALID_HANDLE_VALUE)
-		goto exit;
-
 	if(strncmp(file, "@tup@", 5) == 0) {
+		int ret;
+		char buf[ACCESS_EVENT_MAX_SIZE];
+		struct access_event* e = (struct access_event*) buf;
+		char* dest = (char*) (e + 1);
 		const char *var = file+6;
 		e->at = ACCESS_VAR;
 		e->len = strlen(var);
@@ -1470,26 +1462,26 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 		dest += e->len;
 		*(dest++) = '\0';
 		*(dest++) = '\0';
+		DEBUG_HOOK("WRITE EVENT %s: '%s' '%s'\n", access_type_name[at], ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
+		ret = writef((char*) e, dest - (char*) e);
+		DEBUG_HOOK("writef %d\n", ret);
+		if(ret) {}
 	} else {
-		e->at = at;
+		wchar_t wfile[WIDE_PATH_MAX];
+		wchar_t wfile2[WIDE_PATH_MAX];
 
-		e->len = canon_path(file, dest);
-		DEBUG_HOOK("Canonicalize1 [%i]: '%s' -> '%s', len=%i\n", line, file, dest, e->len);
-		dest += e->len;
-		*(dest++) = '\0';
+		MultiByteToWideChar(CP_ACP, 0, file, -1, wfile, WIDE_PATH_MAX);
+		DEBUG_HOOK("Convert to widechar: '%s' -> '%ls'\n", file, wfile);
+		if(file2) {
+			MultiByteToWideChar(CP_ACP, 0, file2, -1, wfile2, WIDE_PATH_MAX);
+			DEBUG_HOOK("Convert to widechar: '%s' -> '%ls'\n", file2, wfile2);
+		} else {
+			wfile2[0] = 0;
+		}
 
-		e->len2 = canon_path(file2, dest);
-		DEBUG_HOOK("Canonicalize2: '%s' -> '%s' len2=%i\n", file2, file2 ? dest : NULL, e->len2);
-		dest += e->len2;
-		*(dest++) = '\0';
+		mhandle_file_w(wfile, -1, wfile2, at, line);
 	}
 
-	DEBUG_HOOK("WRITE EVENT %s: '%s' '%s'\n", access_type_name[at], ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
-	ret = writef((char*) e, dest - (char*) e);
-	DEBUG_HOOK("writef %d\n", ret);
-	if(ret) {}
-
-exit:
 	SetLastError( save_error );
 }
 
@@ -1498,16 +1490,10 @@ static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file
 	DWORD save_error = GetLastError();
 
 	char buf[ACCESS_EVENT_MAX_SIZE];
-	char afile[PATH_MAX];
-	char afile2[PATH_MAX];
 	size_t file2len;
 	struct access_event* e = (struct access_event*) buf;
 	char* dest = (char*) (e + 1);
 	int ret;
-	int count;
-	wchar_t other_prefix[] = L"\\??\\"; /* Can't find where this is documented, but NtCreateFile / NtOpenFile use it. */
-	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
-	const int backslash_prefix_len = 4;
 	if(line) {}
 
 	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
@@ -1515,40 +1501,21 @@ static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file
 
 	if(filelen < 0)
 		filelen = wcslen(file);
-	if(file) {
-		if(wcsncmp(file, backslash_prefix, backslash_prefix_len) == 0)
-			file += backslash_prefix_len;
-		if(wcsncmp(file, other_prefix, backslash_prefix_len) == 0)
-			file += backslash_prefix_len;
-	}
-	if(file2) {
-		if(wcsncmp(file2, backslash_prefix, backslash_prefix_len) == 0)
-			file2 += backslash_prefix_len;
-		if(wcsncmp(file2, other_prefix, backslash_prefix_len) == 0)
-			file2 += backslash_prefix_len;
-	}
-
 	file2len = file2 ? wcslen(file2) : 0;
 
 	e->at = at;
 
-	count = WideCharToMultiByte(CP_UTF8, 0, file, filelen, afile, PATH_MAX, NULL, NULL);
-	afile[count] = 0;
-	count = WideCharToMultiByte(CP_UTF8, 0, file2, file2len, afile2, PATH_MAX, NULL, NULL);
-	afile2[count] = 0;
-
-	e->len = canon_path(afile, dest);
+	e->len = canon_path(file, filelen, dest);
 	DEBUG_HOOK("Canonicalize1[%i]: '%.*ls' -> '%s', len=%i\n", line, filelen, file, dest, e->len);
-	dest += e->len;
-	*(dest++) = '\0';
+	dest += e->len + 1;
 
-	e->len2 = canon_path(afile2, dest);
-	DEBUG_HOOK("Canonicalize2: '%ls' -> '%s' len2=%i\n", file2, file2 ? dest : NULL, e->len2);
-	dest += e->len2;
-	*(dest++) = '\0';
+	e->len2 = canon_path(file2, file2len, dest);
+	DEBUG_HOOK("Canonicalize2: '%ls' -> '%s' len2=%i\n", file2, dest, e->len2);
+	dest += e->len2 + 1;
 
-	DEBUG_HOOK("WRITE EVENT %s [wide, %i, %i]: '%s' '%s'\n", access_type_name[at], e->len, e->len2, ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
-	ret = writef((char*) e, dest - (char*) e);
+	DEBUG_HOOK("WRITE EVENT %s [%i, %i]: '%s' '%s'\n", access_type_name[at], e->len, e->len2, ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
+
+	ret = writef(buf, dest - buf);
 	DEBUG_HOOK("writef [wide] %d\n", ret);
 	if(ret) {}
 

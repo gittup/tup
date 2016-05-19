@@ -270,6 +270,43 @@ static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
 	return 0;
 }
 
+#ifdef _WIN32
+#define WINDOWS_TICK 10000000
+#define SEC_TO_UNIX_EPOCH 11644473600LL
+
+static unsigned filetime_to_epoch(FILETIME *ft)
+{
+        long long ticks = (((long long)ft->dwHighDateTime) << 32) + (long long)ft->dwLowDateTime;
+        return (unsigned)(ticks / WINDOWS_TICK - SEC_TO_UNIX_EPOCH);
+}
+
+static int file_set_mtime(struct tup_entry *tent, const char *file)
+{
+	WIN32_FILE_ATTRIBUTE_DATA data;
+	wchar_t widefile[WIDE_PATH_MAX];
+	int prefix_len = 4;
+	wchar_t *dest;
+
+	dest = widefile;
+	if(is_full_path(file)) {
+		/* Everything from the DLL injection is a full path, but we
+		 * need to prefix with \\?\ make GetFileAttributesEx work with
+		 * >260 character paths.
+		 */
+		wcscpy(widefile, L"\\\\?\\");
+		dest += prefix_len;
+	}
+	MultiByteToWideChar(CP_UTF8, 0, file, -1, dest, WIDE_PATH_MAX - prefix_len);
+	widefile[WIDE_PATH_MAX-1] = 0;
+	if(!GetFileAttributesExW(widefile, GetFileExInfoStandard, &data)) {
+		fprintf(stderr, "tup error: GetFileAttributesExW(\"%ls\") failed: 0x%08lx\n", widefile, GetLastError());
+		return -1;
+	}
+	if(tup_db_set_mtime(tent, filetime_to_epoch(&data.ftLastWriteTime)) < 0)
+		return -1;
+	return 0;
+}
+#else
 static int file_set_mtime(struct tup_entry *tent, const char *file)
 {
 	struct stat buf;
@@ -286,6 +323,7 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 		return -1;
 	return 0;
 }
+#endif
 
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent)
 {

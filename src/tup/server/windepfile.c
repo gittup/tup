@@ -502,8 +502,8 @@ static int initialize_depfile(struct server *s, char *depfile, HANDLE *h)
 
 static int process_depfile(struct server *s, HANDLE h)
 {
-	char event1[PATH_MAX];
-	char event2[PATH_MAX];
+	char event1[WIDE_PATH_MAX];
+	char event2[WIDE_PATH_MAX];
 	int fd;
 	FILE *f;
 
@@ -531,11 +531,11 @@ static int process_depfile(struct server *s, HANDLE h)
 			break;
 		}
 
-		if(event.len >= PATH_MAX - 1) {
+		if(event.len >= WIDE_PATH_MAX - 1) {
 			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len);
 			return -1;
 		}
-		if(event.len2 >= PATH_MAX - 1) {
+		if(event.len2 >= WIDE_PATH_MAX - 1) {
 			fprintf(stderr, "tup error: Size of %i bytes is longer than the max filesize\n", event.len2);
 			return -1;
 		}

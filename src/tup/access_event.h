@@ -56,7 +56,9 @@ struct access_event {
 	int len2;
 };
 
-#define ACCESS_EVENT_MAX_SIZE (PATH_MAX * 2 + sizeof(struct access_event))
+/* Windows' wider path max */
+#define WIDE_PATH_MAX 32767
+#define ACCESS_EVENT_MAX_SIZE (WIDE_PATH_MAX * 2 + sizeof(struct access_event))
 void tup_send_event(const char *file, int len, const char *file2, int len2, int at);
 
 #endif
