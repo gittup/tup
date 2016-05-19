@@ -371,8 +371,9 @@ static rename_t				rename_orig;
 #define FILE_OPEN_FOR_BACKUP_INTENT 0x00004000
 
 #define handle_file(a, b, c) mhandle_file(a, b, c, __LINE__)
+#define handle_file_w(a, b, c, d) mhandle_file_w(a, b, c, d, __LINE__)
 static void mhandle_file(const char* file, const char* file2, enum access_type at, int line);
-static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at);
+static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file2, enum access_type at, int line);
 
 static const char *strcasestr(const char *arg1, const char *arg2);
 static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2);
@@ -416,20 +417,6 @@ static HFILE WINAPI OpenFile_hook(
 		uStyle);
 }
 
-static char *unicode_to_ansi(PUNICODE_STRING uni)
-{
-	int len;
-	char *name = NULL;
-
-	len = WideCharToMultiByte(CP_UTF8, 0, uni->Buffer, uni->Length / sizeof(wchar_t), 0, 0, NULL, NULL);
-	if(len > 0) {
-		name = malloc(len + 1);
-		WideCharToMultiByte(CP_UTF8, 0, uni->Buffer, uni->Length / sizeof(wchar_t), name, len, NULL, NULL);
-		name[len] = 0;
-	}
-	return name;
-}
-
 NTSTATUS WINAPI NtCreateFile_hook(
     __out     PHANDLE FileHandle,
     __in      ACCESS_MASK DesiredAccess,
@@ -454,32 +441,14 @@ NTSTATUS WINAPI NtCreateFile_hook(
 					CreateOptions,
 					EaBuffer,
 					EaLength);
-	char *ansi;
+	PUNICODE_STRING uni = ObjectAttributes->ObjectName;
 
-	ansi = unicode_to_ansi(ObjectAttributes->ObjectName);
+	DEBUG_HOOK("NtCreateFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, CreateOptions);
 
-	if(ansi)  {
-		const char *name = ansi;
-
-		DEBUG_HOOK("NtCreateFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, CreateOptions);
-		if(strncmp(name, "\\??\\", 4) == 0) {
-			name += 4;
-			/* Windows started trying to read a file called
-			 * "\??\Ip", which broke some of the tests. This just
-			 * skips anything that doesn't begin with something
-			 * like "C:"
-			 */
-			if(name[0] != 0 && name[1] != ':')
-				goto out_free;
-		}
-
-		if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-			handle_file(name, NULL, ACCESS_WRITE);
-		} else {
-			handle_file(name, NULL, ACCESS_READ);
-		}
-out_free:
-		free(ansi);
+	if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
+		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_WRITE);
+	} else {
+		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_READ);
 	}
 
 	return rc;
@@ -499,52 +468,32 @@ NTSTATUS WINAPI NtOpenFile_hook(
 				      IoStatusBlock,
 				      ShareAccess,
 				      OpenOptions);
-	char *ansi;
+	PUNICODE_STRING uni = ObjectAttributes->ObjectName;
 
-	ansi = unicode_to_ansi(ObjectAttributes->ObjectName);
+	DEBUG_HOOK("NtOpenFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, OpenOptions);
 
-	if(ansi) {
-		const char *name = ansi;
-
-		DEBUG_HOOK("NtOpenFile[%i] '%s': %x, %x, %x\n", rc, ansi, ShareAccess, DesiredAccess, OpenOptions);
-		if(strncmp(name, "\\??\\", 4) == 0) {
-			name += 4;
-			/* Windows started trying to read a file called "\??\Ip",
-			 * which broke some of the tests. This just skips
-			 * anything that doesn't begin with something like "C:"
-			 */
-			if(name[0] != 0 && name[1] != ':')
-				goto out_free;
-		}
-
-		/* The ShareAccess == FILE_SHARE_DELETE check might be
-		 * specific to how cygwin handles unlink(). It is very
-		 * confusing to follow, but it doesn't ever seem to go through
-		 * the DeleteFile() route. This is the only place I've found
-		 * that seems to be able to hook those events.
-		 *
-		 * The DesiredAccess & DELETE check is how cygwin does a
-		 * rename() to remove the old file.
+	/* The ShareAccess == FILE_SHARE_DELETE check might be specific to how
+	 * cygwin handles unlink(). It is very confusing to follow, but it
+	 * doesn't ever seem to go through the DeleteFile() route. This is the
+	 * only place I've found that seems to be able to hook those events.
+	 *
+	 * The DesiredAccess & DELETE check is how cygwin does a rename() to
+	 * remove the old file.
+	 */
+	if(ShareAccess == FILE_SHARE_DELETE || DesiredAccess & DELETE) {
+		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_UNLINK);
+	} else if(OpenOptions & FILE_OPEN_FOR_BACKUP_INTENT) {
+		/* The MSVC linker seems to successfully open "prog.ilk" for
+		 * reading (when linking "prog.exe"), even though no such file
+		 * exists. This confuses tup.  It seems that this flag is used
+		 * for temporary files, so that should be safe to ignore.
 		 */
-		if(ShareAccess == FILE_SHARE_DELETE ||
-		   DesiredAccess & DELETE) {
-			handle_file(name, NULL, ACCESS_UNLINK);
-		} else if(OpenOptions & FILE_OPEN_FOR_BACKUP_INTENT) {
-			/* The MSVC linker seems to successfully open
-			 * "prog.ilk" for reading (when linking "prog.exe"),
-			 * even though no such file exists. This confuses tup.
-			 * It seems that this flag is used for temporary files,
-			 * so that should be safe to ignore.
-			 */
+	} else {
+		if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
+			handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_WRITE);
 		} else {
-			if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
-				handle_file(name, NULL, ACCESS_WRITE);
-			} else {
-				handle_file(name, NULL, ACCESS_READ);
-			}
+			handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_READ);
 		}
-out_free:
-		free(ansi);
 	}
 
 	return rc;
@@ -609,7 +558,7 @@ BOOL WINAPI DeleteFileA_hook(
 BOOL WINAPI DeleteFileW_hook(
     __in LPCWSTR lpFileName)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_UNLINK);
+	handle_file_w(lpFileName, -1, NULL, ACCESS_UNLINK);
 	return DeleteFileW_orig(lpFileName);
 }
 
@@ -625,7 +574,7 @@ BOOL WINAPI DeleteFileTransactedW_hook(
     __in     LPCWSTR lpFileName,
     __in     HANDLE hTransaction)
 {
-	handle_file_w(lpFileName, NULL, ACCESS_UNLINK);
+	handle_file_w(lpFileName, -1, NULL, ACCESS_UNLINK);
 	return DeleteFileTransactedW_orig(lpFileName, hTransaction);
 }
 
@@ -641,7 +590,7 @@ BOOL WINAPI MoveFileW_hook(
     __in LPCWSTR lpExistingFileName,
     __in LPCWSTR lpNewFileName)
 {
-	handle_file_w(lpExistingFileName, lpNewFileName, ACCESS_RENAME);
+	handle_file_w(lpExistingFileName, -1, lpNewFileName, ACCESS_RENAME);
 	return MoveFileW_orig(lpExistingFileName, lpNewFileName);
 }
 
@@ -659,7 +608,7 @@ BOOL WINAPI MoveFileExW_hook(
     __in_opt LPCWSTR lpNewFileName,
     __in     DWORD    dwFlags)
 {
-	handle_file_w(lpExistingFileName, lpNewFileName, ACCESS_RENAME);
+	handle_file_w(lpExistingFileName, -1, lpNewFileName, ACCESS_RENAME);
 	return MoveFileExW_orig(lpExistingFileName, lpNewFileName, dwFlags);
 }
 
@@ -686,7 +635,7 @@ BOOL WINAPI MoveFileWithProgressW_hook(
     __in_opt LPVOID lpData,
     __in     DWORD dwFlags)
 {
-	handle_file_w(lpExistingFileName, lpNewFileName, ACCESS_RENAME);
+	handle_file_w(lpExistingFileName, -1, lpNewFileName, ACCESS_RENAME);
 	return MoveFileWithProgressW_orig(
 		lpExistingFileName,
 		lpNewFileName,
@@ -721,7 +670,7 @@ BOOL WINAPI MoveFileTransactedW_hook(
     __in     DWORD dwFlags,
     __in     HANDLE hTransaction)
 {
-	handle_file_w(lpExistingFileName, lpNewFileName, ACCESS_RENAME);
+	handle_file_w(lpExistingFileName, -1, lpNewFileName, ACCESS_RENAME);
 	return MoveFileTransactedW_orig(
 		lpExistingFileName,
 		lpNewFileName,
@@ -757,7 +706,7 @@ BOOL WINAPI ReplaceFileW_hook(
     __reserved LPVOID  lpExclude,
     __reserved LPVOID  lpReserved)
 {
-	handle_file_w(lpReplacementFileName, lpReplacedFileName, ACCESS_RENAME);
+	handle_file_w(lpReplacementFileName, -1, lpReplacedFileName, ACCESS_RENAME);
 	return ReplaceFileW_orig(
 		lpReplacedFileName,
 		lpReplacementFileName,
@@ -785,8 +734,8 @@ BOOL WINAPI CopyFileW_hook(
     __in LPCWSTR lpNewFileName,
     __in BOOL bFailIfExists)
 {
-	handle_file_w(lpExistingFileName, NULL, ACCESS_READ);
-	handle_file_w(lpNewFileName, NULL, ACCESS_WRITE);
+	handle_file_w(lpExistingFileName, -1, NULL, ACCESS_READ);
+	handle_file_w(lpNewFileName, -1, NULL, ACCESS_WRITE);
 	return CopyFileW_orig(
 		lpExistingFileName,
 		lpNewFileName,
@@ -820,8 +769,8 @@ BOOL WINAPI CopyFileExW_hook(
     __in_opt LPBOOL pbCancel,
     __in     DWORD dwCopyFlags)
 {
-	handle_file_w(lpExistingFileName, NULL, ACCESS_READ);
-	handle_file_w(lpNewFileName, NULL, ACCESS_WRITE);
+	handle_file_w(lpExistingFileName, -1, NULL, ACCESS_READ);
+	handle_file_w(lpNewFileName, -1, NULL, ACCESS_WRITE);
 	return CopyFileExW_orig(
 		lpExistingFileName,
 		lpNewFileName,
@@ -861,8 +810,8 @@ BOOL WINAPI CopyFileTransactedW_hook(
     __in     DWORD dwCopyFlags,
     __in     HANDLE hTransaction)
 {
-	handle_file_w(lpExistingFileName, NULL, ACCESS_READ);
-	handle_file_w(lpNewFileName, NULL, ACCESS_WRITE);
+	handle_file_w(lpExistingFileName, -1, NULL, ACCESS_READ);
+	handle_file_w(lpNewFileName, -1, NULL, ACCESS_WRITE);
 	return CopyFileTransactedW_orig(
 		lpExistingFileName,
 		lpNewFileName,
@@ -894,7 +843,7 @@ DWORD WINAPI GetFileAttributesW_hook(
 {
 	DWORD attributes = GetFileAttributesW_orig(lpFileName);
 	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
-		handle_file_w(lpFileName, NULL, ACCESS_READ);
+		handle_file_w(lpFileName, -1, NULL, ACCESS_READ);
 	return attributes;
 }
 
@@ -922,7 +871,7 @@ BOOL WINAPI GetFileAttributesExW_hook(
 		fInfoLevelId,
 		lpFileInformation);
 	if(attributes == ATTRIB_FAIL || ! (attributes & FILE_ATTRIBUTE_DIRECTORY))
-		handle_file_w(lpFileName, NULL, ACCESS_READ);
+		handle_file_w(lpFileName, -1, NULL, ACCESS_READ);
 	return attributes;
 }
 
@@ -940,7 +889,7 @@ __out HANDLE WINAPI FindFirstFileW_hook(
     __out LPWIN32_FIND_DATAW lpFindFileData)
 {
 	DEBUG_HOOK("FindFirstFileW '%S'\n", lpFileName);
-	handle_file_w(lpFileName, NULL, ACCESS_READ);
+	handle_file_w(lpFileName, -1, NULL, ACCESS_READ);
 	return FindFirstFileW_orig(lpFileName, lpFindFileData);
 }
 
@@ -1440,6 +1389,8 @@ static int ignore_file_w(const wchar_t* file)
 		return 1;
 	if (wcscasestr(file, L"\\PIPE\\") != NULL)
 		return 1;
+	if (wcscasestr(file, L"\\Device\\") != NULL)
+		return 1;
 	if (wcsstr(file, L"$") != NULL)
 		return 1;
 	if (wcsncmp(file, L"\\\\", 2) == 0)
@@ -1453,8 +1404,14 @@ static int canon_path(const char *file, char *dest)
 {
 	char tmpfile[PATH_MAX];
 	int x;
-	if(!file)
+	if(!file) {
+		DEBUG_HOOK("canon_path: No file - return 0\n");
 		return 0;
+	}
+	if(!file[0]) {
+		DEBUG_HOOK("canon_path: nul file - return 0\n");
+		return 0;
+	}
 	x = 0;
 	while(file[x]) {
 		if(file[x] == '/')
@@ -1536,47 +1493,57 @@ exit:
 	SetLastError( save_error );
 }
 
-static void handle_file_w(const wchar_t* file, const wchar_t* file2, enum access_type at)
+static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file2, enum access_type at, int line)
 {
 	DWORD save_error = GetLastError();
 
 	char buf[ACCESS_EVENT_MAX_SIZE];
 	char afile[PATH_MAX];
 	char afile2[PATH_MAX];
-	size_t fsz;
-	size_t f2sz;
+	size_t file2len;
 	struct access_event* e = (struct access_event*) buf;
 	char* dest = (char*) (e + 1);
 	int ret;
 	int count;
+	wchar_t other_prefix[] = L"\\??\\"; /* Can't find where this is documented, but NtCreateFile / NtOpenFile use it. */
 	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
 	const int backslash_prefix_len = 4;
+	if(line) {}
 
 	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
 		goto exit;
 
-	if(file)
+	if(filelen < 0)
+		filelen = wcslen(file);
+	if(file) {
 		if(wcsncmp(file, backslash_prefix, backslash_prefix_len) == 0)
 			file += backslash_prefix_len;
-	if(file2)
+		if(wcsncmp(file, other_prefix, backslash_prefix_len) == 0)
+			file += backslash_prefix_len;
+	}
+	if(file2) {
 		if(wcsncmp(file2, backslash_prefix, backslash_prefix_len) == 0)
 			file2 += backslash_prefix_len;
+		if(wcsncmp(file2, other_prefix, backslash_prefix_len) == 0)
+			file2 += backslash_prefix_len;
+	}
 
-	fsz = file ? wcslen(file) : 0;
-	f2sz = file2 ? wcslen(file2) : 0;
+	file2len = file2 ? wcslen(file2) : 0;
 
 	e->at = at;
 
-	count = WideCharToMultiByte(CP_UTF8, 0, file, fsz, afile, PATH_MAX, NULL, NULL);
+	count = WideCharToMultiByte(CP_UTF8, 0, file, filelen, afile, PATH_MAX, NULL, NULL);
 	afile[count] = 0;
-	count = WideCharToMultiByte(CP_UTF8, 0, file2, f2sz, afile2, PATH_MAX, NULL, NULL);
+	count = WideCharToMultiByte(CP_UTF8, 0, file2, file2len, afile2, PATH_MAX, NULL, NULL);
 	afile2[count] = 0;
 
 	e->len = canon_path(afile, dest);
+	DEBUG_HOOK("Canonicalize1[%i]: '%.*ls' -> '%s', len=%i\n", line, filelen, file, dest, e->len);
 	dest += e->len;
 	*(dest++) = '\0';
 
 	e->len2 = canon_path(afile2, dest);
+	DEBUG_HOOK("Canonicalize2: '%ls' -> '%s' len2=%i\n", file2, file2 ? dest : NULL, e->len2);
 	dest += e->len2;
 	*(dest++) = '\0';
 
