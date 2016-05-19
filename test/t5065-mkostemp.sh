@@ -24,7 +24,10 @@ if [ ! "$tupos" = "Linux" ]; then
 	eotup
 fi
 cat > ok.c << HERE
+#define _GNU_SOURCE
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <fcntl.h>
 
 int main(void)
