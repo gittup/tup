@@ -22,6 +22,7 @@
 check_no_windows statfs
 
 cat > ok.c << HERE
+#include <stdio.h>
 #ifdef __linux__
 #include <sys/vfs.h>
 #elif __APPLE__

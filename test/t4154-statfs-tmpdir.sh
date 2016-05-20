@@ -22,6 +22,7 @@
 check_no_windows statfs
 
 cat > ok.c << HERE
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>

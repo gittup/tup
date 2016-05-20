@@ -24,6 +24,7 @@ cat > ok.c << HERE
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <unistd.h>
 
 int main(void)
 {

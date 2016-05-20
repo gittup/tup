@@ -24,6 +24,7 @@ check_no_windows shell
 
 cat > foo.c << HERE
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 int main(void)

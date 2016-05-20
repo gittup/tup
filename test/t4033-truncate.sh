@@ -22,6 +22,7 @@
 check_no_windows truncate
 
 cat > foo.c << HERE
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
 

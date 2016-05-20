@@ -24,9 +24,11 @@ check_no_windows mmap
 
 cat > ok.c << HERE
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 int main(void)
 {
