@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lstate.h"
 
 
 static int luaB_print (lua_State *L) {
@@ -34,11 +35,11 @@ static int luaB_print (lua_State *L) {
     s = lua_tolstring(L, -1, &l);  /* get result */
     if (s == NULL)
       return luaL_error(L, "'tostring' must return a string to 'print'");
-    if (i>1) lua_writestring("\t", 1);
-    lua_writestring(s, l);
+    if (i>1) lua_writestringout("\t", 1, L);
+    lua_writestringout(s, l, L);
     lua_pop(L, 1);  /* pop result */
   }
-  lua_writeline();
+  lua_writelineout(L);
   return 0;
 }
 

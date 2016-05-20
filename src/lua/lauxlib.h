@@ -83,6 +83,8 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
 
 LUALIB_API lua_State *(luaL_newstate) (void);
 
+LUALIB_API void (luaL_setoutput) (lua_State *L, FILE *output);
+
 LUALIB_API lua_Integer (luaL_len) (lua_State *L, int idx);
 
 LUALIB_API const char *(luaL_gsub) (lua_State *L, const char *s, const char *p,
@@ -225,6 +227,9 @@ LUALIB_API void (luaL_openlib) (lua_State *L, const char *libname,
 #define lua_writestringerror(s,p) \
         (fprintf(stderr, (s), (p)), fflush(stderr))
 #endif
+
+#define lua_writestringout(s,l,ls)  fwrite((s), sizeof(char), (l), ls->output)
+#define lua_writelineout(ls)  (lua_writestringout("\n", 1, ls), fflush(ls->output))
 
 /* }================================================================== */
 
