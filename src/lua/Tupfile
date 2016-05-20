@@ -32,6 +32,7 @@ srcs += lstrlib.c
 srcs += ltablib.c
 srcs += loadlib.c
 srcs += linit.c
+srcs += lutf8lib.c
 
 CFLAGS += -DLUA_COMPAT_ALL
 CFLAGS += -DLUA_USE_MKSTEMP
