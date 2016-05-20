@@ -32,12 +32,12 @@ srcs += lstrlib.c
 srcs += ltablib.c
 srcs += loadlib.c
 srcs += linit.c
+srcs += lutf8lib.c
 
-CFLAGS += -DLUA_COMPAT_ALL
-CFLAGS += -DLUA_USE_MKSTEMP
+CFLAGS += -DLUA_COMPAT_BITLIB
 CFLAGS += -w
 
-: foreach $(srcs) |> !cc |> {objs}
+: foreach $(srcs) |> !cc -DLUA_USE_POSIX |> {objs}
 : foreach $(srcs) |> !mingwcc |> {mingwobjs}
 
 : {objs} |> !ar |> liblua.a
