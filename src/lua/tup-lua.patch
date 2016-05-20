@@ -95,7 +95,7 @@ index 9ca8a29..1b58512 100644
  
  /* number of reserved words */
 diff --git a/src/lua/lparser.c b/src/lua/lparser.c
-index d8f5b4f..b429f71 100644
+index d8f5b4f..fffbbea 100644
 --- a/src/lua/lparser.c
 +++ b/src/lua/lparser.c
 @@ -1004,6 +1004,7 @@ static BinOpr getbinopr (int op) {
@@ -106,70 +106,78 @@ index d8f5b4f..b429f71 100644
      case TK_EQ: return OPR_EQ;
      case '<': return OPR_LT;
      case TK_LE: return OPR_LE;
-@@ -1132,6 +1133,62 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
+@@ -1132,6 +1133,70 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
    }
  }
  
 +static void append_assignment (LexState *ls, struct LHS_assign *lh) {
-+  int line;
 +  FuncState * fs=ls->fs;
-+  expdesc tup_append;
-+  expdesc mfunc;
++  TString *appendfunc_name;
++  expdesc appendfunc;
 +  expdesc var;
 +  expdesc value;
-+  expdesc env;
-+  TString *ts;
-+  int reg;
++  int base;
 +
 +  luaX_next(ls);
 +
 +  checknext(ls, '=');
 +
-+  /* Most of the actual work is done by tup_append_assignment in the
-+   * builtin.lua file.
-+   */
-+  ts = luaS_new(ls->L, "tup_append_assignment");
-+  codestring(ls, &tup_append, ts);
-+  singlevaraux(fs, ls->envn, &env, 1);  /* get environment variable */
-+  lua_assert(env.k == VLOCAL || env.k == VUPVAL);
++  /* Push tup_append_assignment onto the stack */
++  /* Note: copied from function call suffixedexp -> primaryexp -> singlevar */
++  appendfunc_name = luaS_new(ls->L, "tup_append_assignment");
++  if (singlevaraux(fs, appendfunc_name, &appendfunc, 1) == VVOID) {
++    /* If tup_append_assignment isn't global, then check _ENV/locals
++     * Note: reuse appendfunc to reference _ENV temporarily
++     */
++    expdesc key;
++    /* Locate _ENV and make it an upvalue if necessary */
++    singlevaraux(fs, ls->envn, &appendfunc, 1);
++    lua_assert(appendfunc.k == VLOCAL || appendfunc.k == VUPVAL);
++    codestring(ls, &key, appendfunc_name);  /* Make func_name a constant */
++    luaK_indexed(fs, &appendfunc, &key);  /* env[varname] */
++  }
++  luaK_exp2nextreg(fs, &appendfunc);
 +
-+  /* Grab a free register for the tup_append_assignment function call */
-+  reg = fs->freereg;
-+  luaK_reserveregs(fs, 1);
-+
-+  /* Find the tup_append_assignment function call using the constant in
-+   * tup_append.
-+   */
-+  init_exp(&mfunc, VNONRELOC, reg);
-+  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, env.u.info,
-+	       luaK_exp2RK(fs, &tup_append));
-+
-+  /* First value on register stack after the function call is our variable that
-+   * we are appending to.
-+   */
-+  if((lh->v.k == VINDEXED) && (lh->v.u.ind.vt == VLOCAL))
-+    luaK_reserveregs(fs, 1);
-+  var = lh->v;
++  /* Push assignment lhs as first function argument */
++  var = lh->v; /* exp2nextreg disables the expr somehow, so copy it first */
++  if (var.k == VINDEXED) {
++    /* exp2nextreg if INDEXED will try to pop/reuse the source table and
++     * index stack positions.
++     * Increase freeregs to prevent that.
++     * The conditions need to match those in and around freereg in
++     * luaK_dischargevars exactly.
++     */
++    if (!ISK(var.u.ind.idx) && var.u.ind.idx >= fs->nactvar) {
++      fs->freereg += 1;
++    }
++    if (var.u.ind.vt == VLOCAL) {
++      if (!ISK(var.u.ind.t) && var.u.ind.t >= fs->nactvar) {
++	fs->freereg += 1;
++      }
++    }
++  }
 +  luaK_exp2nextreg(fs, &var);
 +
-+  /* Second value on the register stack is the value being appended. */
++  /* Push original rhs as second function argument */
 +  expr(ls, &value);
 +  luaK_exp2nextreg(fs, &value);
 +
-+  /* Do the function call, with 2 parameters and 1 return value (aka: 3 and 2
-+   * because of the 1-offset).
-+   */
-+  luaK_codeABC(fs, OP_CALL, mfunc.u.info, 3, 2);
++  /* Call the function */
++  /* Note: copied from funcargs */
++  lua_assert(appendfunc.k == VNONRELOC);
++  base = appendfunc.u.info;  /* base register for call */
++  init_exp(&appendfunc, VCALL,
++	   luaK_codeABC(fs, OP_CALL, base, fs->freereg - (base + 1) + 1, 2));
++  fs->freereg = base + 1;  /* call removes function and arguments and leaves
++			      (unless changed) one result */
 +
-+  /* Store the result in our original variable. */
-+  luaK_storevar(fs, &lh->v, &mfunc);
-+
-+  fs->freereg = reg;
++  /* Store the call result */
++  luaK_storevar(fs, &lh->v, &appendfunc);
 +}
  
  static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
    expdesc e;
-@@ -1148,6 +1205,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
+@@ -1148,6 +1213,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
    }
    else {  /* assignment -> `=' explist */
      int nexps;
@@ -183,7 +191,7 @@ index d8f5b4f..b429f71 100644
      checknext(ls, '=');
      nexps = explist(ls, &e);
      if (nexps != nvars) {
-@@ -1482,7 +1546,7 @@ static void exprstat (LexState *ls) {
+@@ -1482,7 +1554,7 @@ static void exprstat (LexState *ls) {
    FuncState *fs = ls->fs;
    struct LHS_assign v;
    suffixedexp(ls, &v.v);
@@ -266,267 +274,3 @@ index df802c9..7d597bb 100644
  #endif
  
  /*
-diff --git a/src/lua/tup-lua.patch b/src/lua/tup-lua.patch
-index f5bcb55..2d87b14 100644
---- a/src/lua/tup-lua.patch
-+++ b/src/lua/tup-lua.patch
-@@ -1,259 +0,0 @@
--diff --git a/src/lua/lauxlib.c b/src/lua/lauxlib.c
--index 0aa80fd..bf1c162 100644
----- a/src/lua/lauxlib.c
--+++ b/src/lua/lauxlib.c
--@@ -939,6 +939,11 @@ LUALIB_API lua_State *luaL_newstate (void) {
-- }
-- 
-- 
--+LUALIB_API void luaL_setoutput (lua_State *L, FILE *output) {
--+	lua_setoutput(L, output);
--+}
--+
--+
-- LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver) {
--   const lua_Number *v = lua_version(L);
--   if (v != lua_version(NULL))
--diff --git a/src/lua/lauxlib.h b/src/lua/lauxlib.h
--index ac4d15f..f030e1a 100644
----- a/src/lua/lauxlib.h
--+++ b/src/lua/lauxlib.h
--@@ -83,6 +83,8 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
-- 
-- LUALIB_API lua_State *(luaL_newstate) (void);
-- 
--+LUALIB_API void (luaL_setoutput) (lua_State *L, FILE *output);
--+
-- LUALIB_API int (luaL_len) (lua_State *L, int idx);
-- 
-- LUALIB_API const char *(luaL_gsub) (lua_State *L, const char *s, const char *p,
--diff --git a/src/lua/lbaselib.c b/src/lua/lbaselib.c
--index 1dfae30..24ecf91 100644
----- a/src/lua/lbaselib.c
--+++ b/src/lua/lbaselib.c
--@@ -18,6 +18,7 @@
-- 
-- #include "lauxlib.h"
-- #include "lualib.h"
--+#include "lstate.h"
-- 
-- 
-- static int luaB_print (lua_State *L) {
--@@ -34,11 +35,11 @@ static int luaB_print (lua_State *L) {
--     if (s == NULL)
--       return luaL_error(L,
--          LUA_QL("tostring") " must return a string to " LUA_QL("print"));
---    if (i>1) luai_writestring("\t", 1);
---    luai_writestring(s, l);
--+    if (i>1) luai_writestringout("\t", 1, L);
--+    luai_writestringout(s, l, L);
--     lua_pop(L, 1);  /* pop result */
--   }
---  luai_writeline();
--+  luai_writelineout(L);
--   return 0;
-- }
-- 
--diff --git a/src/lua/llex.c b/src/lua/llex.c
--index 74deebb..c98e7b5 100644
----- a/src/lua/llex.c
--+++ b/src/lua/llex.c
--@@ -39,7 +39,8 @@ static const char *const luaX_tokens [] = {
--     "in", "local", "nil", "not", "or", "repeat",
--     "return", "then", "true", "until", "while",
--     "..", "...", "==", ">=", "<=", "~=", "::", "<eof>",
---    "<number>", "<name>", "<string>"
--+    "<number>", "<name>", "<string>",
--+    "!=",
-- };
-- 
-- 
--@@ -444,6 +445,11 @@ static int llex (LexState *ls, SemInfo *seminfo) {
--         if (ls->current != '=') return '~';
--         else { next(ls); return TK_NE; }
--       }
--+      case '!': {
--+        next(ls);
--+        if (ls->current != '=') return '!';
--+        else { next(ls); return TK_NE2; }
--+      }
--       case ':': {
--         next(ls);
--         if (ls->current != ':') return ':';
--diff --git a/src/lua/llex.h b/src/lua/llex.h
--index 9ca8a29..1b58512 100644
----- a/src/lua/llex.h
--+++ b/src/lua/llex.h
--@@ -27,7 +27,8 @@ enum RESERVED {
--   TK_RETURN, TK_THEN, TK_TRUE, TK_UNTIL, TK_WHILE,
--   /* other terminal symbols */
--   TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE, TK_DBCOLON, TK_EOS,
---  TK_NUMBER, TK_NAME, TK_STRING
--+  TK_NUMBER, TK_NAME, TK_STRING,
--+  TK_NE2,
-- };
-- 
-- /* number of reserved words */
--diff --git a/src/lua/lparser.c b/src/lua/lparser.c
--index 4d68936..5227e9b 100644
----- a/src/lua/lparser.c
--+++ b/src/lua/lparser.c
--@@ -1009,6 +1009,7 @@ static BinOpr getbinopr (int op) {
--     case '^': return OPR_POW;
--     case TK_CONCAT: return OPR_CONCAT;
--     case TK_NE: return OPR_NE;
--+    case TK_NE2: return OPR_NE;
--     case TK_EQ: return OPR_EQ;
--     case '<': return OPR_LT;
--     case TK_LE: return OPR_LE;
--@@ -1137,6 +1138,62 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
--   }
-- }
-- 
--+static void append_assignment (LexState *ls, struct LHS_assign *lh) {
--+  int line;
--+  FuncState * fs=ls->fs;
--+  expdesc tup_append;
--+  expdesc mfunc;
--+  expdesc var;
--+  expdesc value;
--+  expdesc env;
--+  TString *ts;
--+  int reg;
--+
--+  luaX_next(ls);
--+
--+  checknext(ls, '=');
--+
--+  /* Most of the actual work is done by tup_append_assignment in the
--+   * builtin.lua file.
--+   */
--+  ts = luaS_new(ls->L, "tup_append_assignment");
--+  codestring(ls, &tup_append, ts);
--+  singlevaraux(fs, ls->envn, &env, 1);  /* get environment variable */
--+  lua_assert(env.k == VLOCAL || env.k == VUPVAL);
--+
--+  /* Grab a free register for the tup_append_assignment function call */
--+  reg = fs->freereg;
--+  luaK_reserveregs(fs, 1);
--+
--+  /* Find the tup_append_assignment function call using the constant in
--+   * tup_append.
--+   */
--+  init_exp(&mfunc, VNONRELOC, reg);
--+  luaK_codeABC(fs, OP_GETTABUP, mfunc.u.info, env.u.info,
--+	       luaK_exp2RK(fs, &tup_append));
--+
--+  /* First value on register stack after the function call is our variable that
--+   * we are appending to.
--+   */
--+  if((lh->v.k == VINDEXED) && (lh->v.u.ind.vt == VLOCAL))
--+    luaK_reserveregs(fs, 1);
--+  var = lh->v;
--+  luaK_exp2nextreg(fs, &var);
--+
--+  /* Second value on the register stack is the value being appended. */
--+  expr(ls, &value);
--+  luaK_exp2nextreg(fs, &value);
--+
--+  /* Do the function call, with 2 parameters and 1 return value (aka: 3 and 2
--+   * because of the 1-offset).
--+   */
--+  luaK_codeABC(fs, OP_CALL, mfunc.u.info, 3, 2);
--+
--+  /* Store the result in our original variable. */
--+  luaK_storevar(fs, &lh->v, &mfunc);
--+
--+  fs->freereg = reg;
--+}
-- 
-- static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
--   expdesc e;
--@@ -1153,6 +1210,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
--   }
--   else {  /* assignment -> `=' explist */
--     int nexps;
--+
--+    if(nvars==1) {
--+      if(ls->t.token == '+') {
--+        append_assignment(ls, lh);
--+        return;
--+      }
--+    }
--     checknext(ls, '=');
--     nexps = explist(ls, &e);
--     if (nexps != nvars) {
--diff --git a/src/lua/lstate.c b/src/lua/lstate.c
--index 6e2801c..3d76c3c 100644
----- a/src/lua/lstate.c
--+++ b/src/lua/lstate.c
--@@ -272,10 +272,16 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
--   }
--   else
--     luai_userstateopen(L);
--+  L->output = stdout;
--   return L;
-- }
-- 
-- 
--+LUA_API void lua_setoutput (lua_State *L, FILE *output) {
--+	L->output = output;
--+}
--+
--+
-- LUA_API void lua_close (lua_State *L) {
--   L = G(L)->mainthread;  /* only the main thread can be closed */
--   lua_lock(L);
--diff --git a/src/lua/lstate.h b/src/lua/lstate.h
--index 4743d74..2e50dc8 100644
----- a/src/lua/lstate.h
--+++ b/src/lua/lstate.h
--@@ -12,6 +12,7 @@
-- #include "lobject.h"
-- #include "ltm.h"
-- #include "lzio.h"
--+#include <stdio.h>
-- 
-- 
-- /*
--@@ -169,6 +170,7 @@ struct lua_State {
--   struct lua_longjmp *errorJmp;  /* current error recover point */
--   ptrdiff_t errfunc;  /* current error handling function (stack index) */
--   CallInfo base_ci;  /* CallInfo for first level (C calling Lua) */
--+  FILE *output;
-- };
-- 
-- 
--diff --git a/src/lua/lua.h b/src/lua/lua.h
--index 1fafa45..85430ab 100644
----- a/src/lua/lua.h
--+++ b/src/lua/lua.h
--@@ -9,6 +9,7 @@
-- #ifndef lua_h
-- #define lua_h
-- 
--+#include <stdio.h>
-- #include <stdarg.h>
-- #include <stddef.h>
-- 
--@@ -124,6 +125,7 @@ typedef LUA_UNSIGNED lua_Unsigned;
-- ** state manipulation
-- */
-- LUA_API lua_State *(lua_newstate) (lua_Alloc f, void *ud);
--+LUA_API void       (lua_setoutput) (lua_State *L, FILE *output);
-- LUA_API void       (lua_close) (lua_State *L);
-- LUA_API lua_State *(lua_newthread) (lua_State *L);
-- 
--diff --git a/src/lua/luaconf.h b/src/lua/luaconf.h
--index bab401e..400802b 100644
----- a/src/lua/luaconf.h
--+++ b/src/lua/luaconf.h
--@@ -213,6 +213,8 @@
-- #include <stdio.h>
-- #define luai_writestring(s,l)	fwrite((s), sizeof(char), (l), stdout)
-- #define luai_writeline()	(luai_writestring("\n", 1), fflush(stdout))
--+#define luai_writestringout(s,l,ls)	fwrite((s), sizeof(char), (l), ls->output)
--+#define luai_writelineout(ls)	(luai_writestringout("\n", 1, ls), fflush(ls->output))
-- #endif
-- 
-- /*
