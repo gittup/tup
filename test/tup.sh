@@ -669,11 +669,11 @@ clear_full_deps()
 }
 
 tup_ln_cmd() {
-  printf "^ ln $2 -> $1^ !tup_ln $1 $2"
+	printf "^ ln $2 -> $1^ !tup_ln $1 $2"
 }
 
 tup_preserve_cmd() {
-  printf "^ preserve $2^ !tup_preserve $1 $2"
+	printf "^ preserve $2^ !tup_preserve $1 $2"
 }
 
 eotup()

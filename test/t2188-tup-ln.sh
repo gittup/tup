@@ -21,9 +21,9 @@
 . ./tup.sh
 
 mkfiles() {
-  for f in $*; do
-    echo "$f" > $f
-  done
+	for f in $*; do
+		echo "$f" > $f
+	done
 }
 
 cat > Tupfile << HERE
@@ -47,19 +47,19 @@ tup_dep_exist sub "$(tup_ln_cmd blah.txt blah.lnk)" sub blah.lnk
 case $tupos in
 	CYGWIN*)
 		# Windows does a copy, so it should have input dependencies
-    tup_dep_exist . foo.txt . "$(tup_ln_cmd foo.txt foo.lnk)"
-    tup_dep_exist . bar.txt . "$(tup_ln_cmd bar.txt bar.lnk)"
+		tup_dep_exist . foo.txt . "$(tup_ln_cmd foo.txt foo.lnk)"
+		tup_dep_exist . bar.txt . "$(tup_ln_cmd bar.txt bar.lnk)"
 
-    tup_dep_exist sub baz.txt sub "$(tup_ln_cmd baz.txt baz.lnk)"
-    tup_dep_exist sub blah.txt sub "$(tup_ln_cmd blah.txt blah.lnk)"
+		tup_dep_exist sub baz.txt sub "$(tup_ln_cmd baz.txt baz.lnk)"
+		tup_dep_exist sub blah.txt sub "$(tup_ln_cmd blah.txt blah.lnk)"
 		;;
 	*)
 		# Other platforms use symlink, so no input dependencies
-    tup_dep_no_exist . foo.txt . "$(tup_ln_cmd foo.txt foo.lnk)"
-    tup_dep_no_exist . bar.txt . "$(tup_ln_cmd bar.txt bar.lnk)"
+		tup_dep_no_exist . foo.txt . "$(tup_ln_cmd foo.txt foo.lnk)"
+		tup_dep_no_exist . bar.txt . "$(tup_ln_cmd bar.txt bar.lnk)"
 
-    tup_dep_no_exist sub baz.txt sub "$(tup_ln_cmd baz.txt baz.lnk)"
-    tup_dep_no_exist sub blah.txt sub "$(tup_ln_cmd blah.txt blah.lnk)"
+		tup_dep_no_exist sub baz.txt sub "$(tup_ln_cmd baz.txt baz.lnk)"
+		tup_dep_no_exist sub blah.txt sub "$(tup_ln_cmd blah.txt blah.lnk)"
 		;;
 esac
 
