@@ -26,7 +26,7 @@ HERE
 tup touch foo.txt bar.txt
 update
 
-tup_dep_exist . '!tup_ln foo.txt foo.lnk' . foo.lnk
-tup_dep_exist . '!tup_ln bar.txt bar.lnk' . bar.lnk
+tup_dep_exist . "$(tup_ln_cmd foo.txt foo.lnk)" . foo.lnk
+tup_dep_exist . "$(tup_ln_cmd bar.txt bar.lnk)" . bar.lnk
 
 eotup
