@@ -778,6 +778,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_IOLIBNAME, luaopen_io, 1); lua_pop(ls, 1);
+		luaL_requiref(ls, LUA_UTF8LIBNAME, luaopen_utf8, 1); lua_pop(ls, 1);
 		lua_pushnil(ls); lua_setglobal(ls, "dofile");
 		lua_pushnil(ls); lua_setglobal(ls, "loadfile");
 		lua_pushnil(ls); lua_setglobal(ls, "load");
