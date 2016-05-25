@@ -34,7 +34,6 @@ srcs += loadlib.c
 srcs += linit.c
 srcs += lutf8lib.c
 
-CFLAGS += -DLUA_COMPAT_BITLIB
 CFLAGS += -w
 
 : foreach $(srcs) |> !cc -DLUA_USE_POSIX |> {objs}

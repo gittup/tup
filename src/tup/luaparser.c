@@ -775,7 +775,6 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		luaL_requiref(ls, "_G", luaopen_base, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_TABLIBNAME, luaopen_table, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_STRLIBNAME, luaopen_string, 1); lua_pop(ls, 1);
-		luaL_requiref(ls, LUA_BITLIBNAME, luaopen_bit32, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_MATHLIBNAME, luaopen_math, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_DBLIBNAME, luaopen_debug, 1); lua_pop(ls, 1);
 		luaL_requiref(ls, LUA_IOLIBNAME, luaopen_io, 1); lua_pop(ls, 1);
