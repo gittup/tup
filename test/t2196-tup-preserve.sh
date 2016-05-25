@@ -16,17 +16,29 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try the !tup_ln macro in lua
+# !tup_preserve has no effect without variants
 
 . ./tup.sh
 
-cat > Tupfile.lua << HERE
-tup.foreach_rule('*.txt', '!tup_ln', '%B.lnk')
+cat > Tupfile << HERE
+: file.txt |> !tup_preserve |>
 HERE
-tup touch foo.txt bar.txt
+
+echo 'some content' > file.txt
+
+# test that usage without variants don't result in errors
 update
 
-tup_dep_exist . "$(tup_ln_cmd foo.txt foo.lnk)" . foo.lnk
-tup_dep_exist . "$(tup_ln_cmd bar.txt bar.lnk)" . bar.lnk
+mkdir build-1
+touch build-1/tup.config
+mkdir build-2
+touch build-2/tup.config
+
+update
+
+# test that the file contents have been preserved
+cmp file.txt build-1/file.txt
+cmp file.txt build-2/file.txt
 
 eotup
+

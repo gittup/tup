@@ -449,14 +449,31 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 	return -1;
 }
 
+#define TUP_PRESERVE_CMD "^ preserve %o^ !tup_preserve %f %o"
+#define TUP_LN_CMD       "^ ln %o -> %f^ !tup_ln %f %o"
+
 static int parse_internal_definitions(struct tupfile *tf)
 {
-	char tup_ln[] = "!tup_ln = |> !tup_ln %f %o |>";
+	char tup_ln[] = "!tup_ln = |> " TUP_LN_CMD " |>";
 	if(parse_bang_definition(tf, tup_ln, 0) < 0) {
 		fprintf(tf->f, "tup error: Unable to parse built-in !tup_ln rule.\n");
 		return -1;
 	}
+	if(tf->variant->root_variant) {
+		char tup_preserve[] = "!tup_preserve = |> |>";
+		if(parse_bang_definition(tf, tup_preserve, 0) < 0)
+			return -1;
+	} else {
+		char tup_preserve[] = "!tup_preserve = |> " TUP_PRESERVE_CMD " |> %b";
+		if(parse_bang_definition(tf, tup_preserve, 0) < 0)
+			return -1;
+	}
 	return 0;
+}
+
+static int is_internal_command(const char *cmd) {
+	return !strcmp(cmd, TUP_PRESERVE_CMD) ||
+	       !strcmp(cmd, TUP_LN_CMD);
 }
 
 static char *get_newline(char *p)
@@ -2855,7 +2872,7 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, struct name_list *nl,
 			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
 			   int *command_modified, struct tupid_entries *output_root,
-			   const char *ext, int extlen)
+			   const char *ext, int extlen, int is_variant_copy)
 {
 	struct path_list *pl;
 	struct path_list_head tmplist;
@@ -2969,7 +2986,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
 
-		if(tf->srctent) {
+		if(tf->srctent && !is_variant_copy) {
 			struct tup_entry *tent;
 			if(tup_db_select_tent(tf->srctent->tnode.tupid, onle->path, &tent) < 0)
 				return -1;
@@ -3031,11 +3048,16 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
 	int command_modified = 0;
+	int is_variant_copy = 0;
+
+	if(strcmp(r->command, TUP_PRESERVE_CMD) == 0)
+		is_variant_copy = 1;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
 	 */
 	if(r->command_len == 0) {
+
 		if(r->bin) {
 			TAILQ_FOREACH(nle, &nl->entries, list) {
 				if(bin_add_entry(r->bin, nle->path, nle->len, nle->tent) < 0)
@@ -3048,7 +3070,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, ext, extlen) < 0)
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
 	if(r->bin) {
 		TAILQ_FOREACH(onle, &onl.entries, list) {
@@ -3056,10 +3078,17 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 	}
-	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen) < 0)
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
-	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen) < 0)
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
+
+	if(is_variant_copy) {
+		if(onl.num_entries != 1 || nl->num_entries != 1) {
+			fprintf(tf->f, "tup error: !tup_preserve requires a single input file.\n");
+			return -1;
+		}
+	}
 
 	tcmd = tup_printf(tf, r->command, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
 	if(!tcmd)
@@ -3357,7 +3386,18 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				if(!first) {
 					estring_append(&e, " ", 1);
 				}
-				estring_append(&e, nle->path, nle->len);
+				if(!tf->variant->root_variant && is_internal_command(cmd)) {
+					struct estring rel_path;
+					struct name_list_entry *onle = TAILQ_FIRST(&onl->entries);
+					if(estring_init(&rel_path) < 0)
+						return NULL;
+					if(get_relative_dir(NULL, &rel_path, onle->tent->tnode.tupid, nle->tent->tnode.tupid) < 0)
+						return NULL;
+					estring_append(&e, rel_path.s, rel_path.len);
+					free(rel_path.s);
+				} else {
+					estring_append(&e, nle->path, nle->len);
+				}
 				first = 0;
 			}
 		} else if(*next == 'b') {
