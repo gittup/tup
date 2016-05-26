@@ -1,0 +1,27 @@
+sudo: required
+dist: trusty
+
+git:
+  depth: 1000  # if last tag is older than 50 commits
+
+language: c
+
+compiler:
+  - clang
+  - gcc
+
+addons:
+  apt:
+    packages:
+      - libfuse-dev
+      - pkg-config
+      - fuse
+
+before_install:
+  - sudo modprobe fuse
+  - sudo chmod 666 /dev/fuse
+  - sudo chown root:$USER /etc/fuse.conf
+
+script:
+  - ./bootstrap.sh
+  - cd test && ./test.sh
