@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include "tup/compat.h"
 #include "dir_mutex.h"
 
 #ifdef _WIN32
@@ -31,11 +32,17 @@
 int mkdirat(int dirfd, const char *pathname, mode_t mode)
 {
 	int rc;
-
+#ifdef _WINDOWS
+	char cwd[PATH_MAX];
+	getcwd(cwd, PATH_MAX);
+#endif
 	if(mode) {/* for win32 */}
 
 	dir_mutex_lock(dirfd);
 	rc = mkdir(pathname, mode);
+#ifdef _WINDOWS
+	chdir(cwd);
+#endif
 	dir_mutex_unlock();
 	return rc;
 }

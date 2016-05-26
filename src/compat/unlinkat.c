@@ -21,17 +21,24 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "tup/compat.h"
 #include "dir_mutex.h"
 
 int unlinkat(int dirfd, const char *pathname, int flags)
 {
 	int rc;
-
+#ifdef _WINDOWS
+	char cwd[PATH_MAX];
+	getcwd(cwd, PATH_MAX);
+#endif
 	dir_mutex_lock(dirfd);
 	if(flags == AT_REMOVEDIR)
 		rc = rmdir(pathname);
 	else
 		rc = unlink(pathname);
+#ifdef _WINDOWS
+	chdir(cwd);
+#endif
 	dir_mutex_unlock();
 	return rc;
 }
