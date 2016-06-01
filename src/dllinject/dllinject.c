@@ -1704,11 +1704,11 @@ static void printHex(const void *lpvbits, const unsigned int n)
 }
 #endif
 
-inline long long unsigned int low32(long long unsigned int tall)
+static inline long long unsigned int low32(long long unsigned int tall)
 {
         return tall & 0x00000000ffffffff;
 }
-inline long long unsigned int high32(long long unsigned int tall)
+static inline long long unsigned int high32(long long unsigned int tall)
 {
         return tall >> 32;
 }
