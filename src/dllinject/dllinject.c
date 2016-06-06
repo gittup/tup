@@ -323,6 +323,7 @@ ULONG_PTR AttributeList
 );
 
 
+typedef int (*access_t)(const char *pathname, int mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
 
 static OpenFile_t			OpenFile_orig;
@@ -363,6 +364,7 @@ static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
 static NtCreateUserProcess_t		NtCreateUserProcess_orig;
+static access_t				_access_orig;
 static rename_t				rename_orig;
 
 #define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES)
@@ -1189,6 +1191,13 @@ BOOL WINAPI CreateProcessWithTokenW_hook(
 	return ResumeThread(lpProcessInformation->hThread) != 0xFFFFFFFF;
 }
 
+int _access_hook(const char *pathname, int mode)
+{
+	DEBUG_HOOK("access(%s, %i)\n", pathname, mode);
+	handle_file(pathname, NULL, ACCESS_READ);
+	return _access_orig(pathname, mode);
+}
+
 int rename_hook(const char *oldpath, const char *newpath)
 {
 	handle_file(oldpath, newpath, ACCESS_RENAME);
@@ -1275,6 +1284,7 @@ static struct patch_entry patch_table[] = {
 	HOOK(NtCreateUserProcess),
 #undef MODULE_NAME
 #define MODULE_NAME "msvcrt.dll"
+	HOOK(_access),
 	HOOK(rename),
 };
 #undef HOOK
