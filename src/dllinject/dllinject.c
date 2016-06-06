@@ -29,7 +29,6 @@
 
 #include <windows.h>
 #include <ntdef.h>
-#include <wow64.h>
 #ifndef STATUS_SUCCESS
 #include <ntstatus.h>
 #endif
@@ -40,6 +39,7 @@
 #include <malloc.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <fileapi.h>
 
 #define __DBG_W64		0
 #define __DBG_W32		0
@@ -322,6 +322,18 @@ ULONG_PTR CreateInfo,
 ULONG_PTR AttributeList
 );
 
+typedef NTSTATUS (WINAPI *NtQueryDirectoryFile_t)(
+  HANDLE FileHandle,
+  HANDLE Event,
+  PIO_APC_ROUTINE ApcRoutine,
+  PVOID ApcContext,
+  PIO_STATUS_BLOCK IoStatusBlock,
+  PVOID FileInformation,
+  ULONG Length,
+  FILE_INFORMATION_CLASS FileInformationClass,
+  BOOLEAN ReturnSingleEntry,
+  PUNICODE_STRING FileName,
+  BOOLEAN RestartScan);
 
 typedef int (*access_t)(const char *pathname, int mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
@@ -364,6 +376,7 @@ static CreateProcessWithTokenW_t	CreateProcessWithTokenW_orig;
 static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
 static NtCreateUserProcess_t		NtCreateUserProcess_orig;
+static NtQueryDirectoryFile_t		NtQueryDirectoryFile_orig;
 static access_t				_access_orig;
 static rename_t				rename_orig;
 
@@ -546,6 +559,68 @@ ULONG_PTR AttributeList)
 		tup_inject_dll(&processInformation, s_depfilename, s_vardict_file);
         }
 
+	return rc;
+}
+
+NTSTATUS WINAPI NtQueryDirectoryFile_hook(
+  HANDLE FileHandle,
+  HANDLE Event,
+  PIO_APC_ROUTINE ApcRoutine,
+  PVOID ApcContext,
+  PIO_STATUS_BLOCK IoStatusBlock,
+  PVOID FileInformation,
+  ULONG Length,
+  FILE_INFORMATION_CLASS FileInformationClass,
+  BOOLEAN ReturnSingleEntry,
+  PUNICODE_STRING FileName,
+  BOOLEAN RestartScan)
+{
+	wchar_t widepath[WIDE_PATH_MAX];
+	NTSTATUS rc;
+	DWORD len;
+	if(FileName) {
+		DEBUG_HOOK("NtQueryDirectoryFile: %.*ls\n", FileName->Length/2, FileName->Buffer);
+	} else {
+		DEBUG_HOOK("NtQueryDirectoryFile: (No Filename)\n");
+	}
+
+	rc = NtQueryDirectoryFile_orig(FileHandle,
+				       Event,
+				       ApcRoutine,
+				       ApcContext,
+				       IoStatusBlock,
+				       FileInformation,
+				       Length,
+				       FileInformationClass,
+				       ReturnSingleEntry,
+				       FileName,
+				       RestartScan);
+	if(!FileName) {
+		/* There's no FileName if we're doing the equivalent of
+		 * readdir(), and in that case we already had to CreateFile()
+		 * on the directory name in order to get here, so just return.
+		 */
+		return rc;
+	}
+	DWORD save_error = GetLastError();
+
+	len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
+	if(len == 0) {
+		/* Failed to get path for some reason */
+		DEBUG_HOOK("NtQueryDirectoryFile Error - failed to GetFinalPathNameByHandle\n");
+		goto out_exit;
+	}
+	if(len + 1 + FileName->Length/2 + 1 > WIDE_PATH_MAX) {
+		/* Path too large. */
+		DEBUG_HOOK("NtQueryDirectorFile Error - path too long (%i, %i)\n", len, FileName->Length);
+		goto out_exit;
+	}
+	swprintf(widepath+len, WIDE_PATH_MAX-len, L"\\%.*ls", FileName->Length/2, FileName->Buffer);
+	DEBUG_HOOK(" - got full NtQueryDirectoryFile path: '%ls'\n", widepath);
+	handle_file_w(widepath, -1, NULL, ACCESS_READ);
+
+out_exit:
+	SetLastError(save_error);
 	return rc;
 }
 
@@ -1282,6 +1357,7 @@ static struct patch_entry patch_table[] = {
 	HOOK(NtCreateFile),
 	HOOK(NtOpenFile),
 	HOOK(NtCreateUserProcess),
+	HOOK(NtQueryDirectoryFile),
 #undef MODULE_NAME
 #define MODULE_NAME "msvcrt.dll"
 	HOOK(_access),
@@ -1369,7 +1445,7 @@ static int ignore_file_w(const wchar_t* file)
 		return 1;
 	if (wcsstr(file, L"$") != NULL)
 		return 1;
-	if (wcsncmp(file, L"\\\\", 2) == 0)
+	if (wcsicmp(file, L"\\\\WMIDataDevice") == 0)
 		return 1;
 	if (wcscasestr(file, L"SQM\\sqmcpp.log") != NULL)
 		return 1;
@@ -1506,8 +1582,10 @@ static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file
 	int ret;
 	if(line) {}
 
-	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE)
+	if (ignore_file_w(file) || ignore_file_w(file2) || deph == INVALID_HANDLE_VALUE) {
+		DEBUG_HOOK("IGNORE: %ls, %ls, %08x\n", file, file2, deph);
 		goto exit;
+	}
 
 	if(filelen < 0)
 		filelen = wcslen(file);

@@ -36,6 +36,9 @@ endif
 
 export PKG_CONFIG_PATH
 
+# Minimum version is windows Vista (for GetFinalPathNameByHandle, at least)
+MINGWCFLAGS += -D_WIN32_WINNT=0x600
+
 # Compatibility function prototypes and include path for wrapper functions
 MINGWCFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
 MINGWCFLAGS += -I$(TUP_CWD)/src/compat/win32
