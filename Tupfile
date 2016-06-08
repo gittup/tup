@@ -46,6 +46,10 @@ MINGWLDFLAGS += -Wl,--wrap=tmpfile
 MINGWLDFLAGS += -Wl,--wrap=dup
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
 MINGWLDFLAGS += -Wl,--wrap=__mingw_vfprintf
+
+# This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
+MINGWLDFLAGS += -lole32
+
 : $(mingwsrcs) tup-dllinject.dll src/lua/liblua-mingw.a |> ^ MINGWLINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc -static-libgcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
 : src/compat/win32/detect/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc %f -o %o -m32 |> tup32detect.exe
 endif
