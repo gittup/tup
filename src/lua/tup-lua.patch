@@ -1,8 +1,8 @@
 diff --git a/src/lua/lauxlib.c b/src/lua/lauxlib.c
-index 5d362c3..d04b01c 100644
+index bacf43b..4f7ea29 100644
 --- a/src/lua/lauxlib.c
 +++ b/src/lua/lauxlib.c
-@@ -1007,6 +1007,11 @@ LUALIB_API lua_State *luaL_newstate (void) {
+@@ -1022,6 +1022,11 @@ LUALIB_API lua_State *luaL_newstate (void) {
  }
  
  
@@ -38,7 +38,7 @@ index ddb7c22..cb02636 100644
  
  
 diff --git a/src/lua/lbaselib.c b/src/lua/lbaselib.c
-index 861823d..498c3e1 100644
+index d481c4e..c847800 100644
 --- a/src/lua/lbaselib.c
 +++ b/src/lua/lbaselib.c
 @@ -19,6 +19,7 @@
@@ -65,7 +65,7 @@ index 861823d..498c3e1 100644
  }
  
 diff --git a/src/lua/llex.c b/src/lua/llex.c
-index 16ea3eb..3777ec9 100644
+index 7032827..92de8e3 100644
 --- a/src/lua/llex.c
 +++ b/src/lua/llex.c
 @@ -44,7 +44,8 @@ static const char *const luaX_tokens [] = {
@@ -78,7 +78,7 @@ index 16ea3eb..3777ec9 100644
  };
  
  
-@@ -525,6 +526,11 @@ static int llex (LexState *ls, SemInfo *seminfo) {
+@@ -494,6 +495,11 @@ static int llex (LexState *ls, SemInfo *seminfo) {
          if (check_next1(ls, '=')) return TK_NE;
          else return '~';
        }
@@ -91,7 +91,7 @@ index 16ea3eb..3777ec9 100644
          next(ls);
          if (check_next1(ls, ':')) return TK_DBCOLON;
 diff --git a/src/lua/llex.h b/src/lua/llex.h
-index afb40b5..87d5cc3 100644
+index 2363d87..443f2d9 100644
 --- a/src/lua/llex.h
 +++ b/src/lua/llex.h
 @@ -33,7 +33,8 @@ enum RESERVED {
@@ -105,10 +105,10 @@ index afb40b5..87d5cc3 100644
  
  /* number of reserved words */
 diff --git a/src/lua/lparser.c b/src/lua/lparser.c
-index 282a6b1..2a25b13 100644
+index 22530a5..090cd8c 100644
 --- a/src/lua/lparser.c
 +++ b/src/lua/lparser.c
-@@ -1005,6 +1005,7 @@ static BinOpr getbinopr (int op) {
+@@ -1009,6 +1009,7 @@ static BinOpr getbinopr (int op) {
      case TK_SHR: return OPR_SHR;
      case TK_CONCAT: return OPR_CONCAT;
      case TK_NE: return OPR_NE;
@@ -116,7 +116,7 @@ index 282a6b1..2a25b13 100644
      case TK_EQ: return OPR_EQ;
      case '<': return OPR_LT;
      case TK_LE: return OPR_LE;
-@@ -1138,6 +1139,70 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
+@@ -1142,6 +1143,71 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
    }
  }
  
@@ -135,7 +135,8 @@ index 282a6b1..2a25b13 100644
 +  /* Push tup_append_assignment onto the stack */
 +  /* Note: copied from function call suffixedexp -> primaryexp -> singlevar */
 +  appendfunc_name = luaS_new(ls->L, "tup_append_assignment");
-+  if (singlevaraux(fs, appendfunc_name, &appendfunc, 1) == VVOID) {
++  singlevaraux(fs, appendfunc_name, &appendfunc, 1);
++  if (appendfunc.k == VVOID) {
 +    /* If tup_append_assignment isn't global, then check _ENV/locals
 +     * Note: reuse appendfunc to reference _ENV temporarily
 +     */
@@ -187,7 +188,7 @@ index 282a6b1..2a25b13 100644
  
  static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
    expdesc e;
-@@ -1154,6 +1219,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
+@@ -1158,6 +1224,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
    }
    else {  /* assignment -> '=' explist */
      int nexps;
@@ -201,7 +202,7 @@ index 282a6b1..2a25b13 100644
      checknext(ls, '=');
      nexps = explist(ls, &e);
      if (nexps != nvars) {
-@@ -1488,7 +1560,7 @@ static void exprstat (LexState *ls) {
+@@ -1492,7 +1565,7 @@ static void exprstat (LexState *ls) {
    FuncState *fs = ls->fs;
    struct LHS_assign v;
    suffixedexp(ls, &v.v);
@@ -232,7 +233,7 @@ index 9194ac3..a439055 100644
    L = G(L)->mainthread;  /* only the main thread can be closed */
    lua_lock(L);
 diff --git a/src/lua/lstate.h b/src/lua/lstate.h
-index 65c914d..cb1af04 100644
+index b3033be..9821cac 100644
 --- a/src/lua/lstate.h
 +++ b/src/lua/lstate.h
 @@ -12,6 +12,7 @@
@@ -243,16 +244,16 @@ index 65c914d..cb1af04 100644
  
  
  /*
-@@ -171,6 +172,7 @@ struct lua_State {
+@@ -180,6 +181,7 @@ struct lua_State {
    unsigned short nCcalls;  /* number of nested C calls */
-   lu_byte hookmask;
+   l_signalT hookmask;
    lu_byte allowhook;
 +  FILE *output;
  };
  
  
 diff --git a/src/lua/lua.h b/src/lua/lua.h
-index 06381d7..cae0cca 100644
+index f78899f..dcedd17 100644
 --- a/src/lua/lua.h
 +++ b/src/lua/lua.h
 @@ -9,6 +9,7 @@
