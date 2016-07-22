@@ -207,7 +207,6 @@ int get_path_elements(const char *path, struct pel_group *pg)
 				pel = TAILQ_FIRST(&pg->path_list);
 				del_pel(pel, pg);
 			}
-			pg->pg_flags &= ~PG_ROOT;
 		}
 	}
 
@@ -298,7 +297,7 @@ void print_pel_group(struct pel_group *pg)
 	struct path_element *pel;
 	int slash = 0;
 	printf("Pel[%i, %08x]: ", pg->num_elements, pg->pg_flags);
-	if(pg->pg_flags & PG_ROOT) {
+	if((pg->pg_flags & PG_ROOT) && (pg->pg_flags & PG_OUTSIDE_TUP)) {
 		slash = 1;
 	}
 	TAILQ_FOREACH(pel, &pg->path_list, list) {
