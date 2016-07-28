@@ -84,7 +84,7 @@ struct build_name_list_args {
 };
 
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
-			char *path, int *parser_lua);
+			char *path, int *parser_lua, int *fd);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
 static int parse_internal_definitions(struct tupfile *tf);
 static int var_ifdef(struct tupfile *tf, const char *var);
@@ -152,7 +152,7 @@ void parser_debug_run(void)
 int parse(struct node *n, struct graph *g, struct timespan *retts, int refactoring, int use_server)
 {
 	struct tupfile tf;
-	int fd;
+	int fd = -1;
 	int rc = -1;
 	int parser_lua = 0;
 	struct buf b = {NULL, 0};
@@ -258,7 +258,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	}
 
 	if(n->tent->type == TUP_NODE_GHOST) {
-		fd = -1;
 		tf.cur_dfd = -1;
 	} else {
 		tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
@@ -267,20 +266,16 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			goto out_close_vdb;
 		}
 
-		fd = open_tupfile(&tf, n->tent, path, &parser_lua);
+		if(open_tupfile(&tf, n->tent, path, &parser_lua, &fd) < 0)
+			goto out_close_dfd;
 		if(fd < 0) {
-			if(errno == ENOENT) {
-				/* No Tupfile means we have nothing to do */
-				if(n->tent->tnode.tupid == DOT_DT) {
-					/* Check to see if the top-level rules file would .gitignore. We disable
-					 * tf.tupid so no rules get created.
-					 */
-					if(check_toplevel_gitignore(&tf) < 0)
-						goto out_close_dfd;
-				}
-			} else {
-				parser_error(&tf, path);
-				goto out_close_dfd;
+			/* No Tupfile means we have nothing to do */
+			if(n->tent->tnode.tupid == DOT_DT) {
+				/* Check to see if the top-level rules file would .gitignore. We disable
+				 * tf.tupid so no rules get created.
+				 */
+				if(check_toplevel_gitignore(&tf) < 0)
+					goto out_close_dfd;
 			}
 		}
 	}
@@ -401,52 +396,90 @@ out_server_stop:
 	return rc;
 }
 
-static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
-			char *path, int *parser_lua)
+static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char *fullpath, const char *path, int *fd)
 {
-	int fd;
+	struct tup_entry *tupfile_tent;
+	if(tup_db_select_tent(dtent->tnode.tupid, path, &tupfile_tent) < 0)
+		return -1;
+	if(!tupfile_tent) {
+		if(tup_db_node_insert_tent(dtent->tnode.tupid, path, strlen(path), TUP_NODE_GHOST, -1, -1, &tupfile_tent) < 0) {
+			fprintf(tf->f, "tup error: Node '%s' doesn't exist and we couldn't create a ghost in directory: ", path);
+			print_tup_entry(tf->f, dtent);
+			fprintf(tf->f, "\n");
+			return -1;
+		}
+	}
+	if(tupfile_tent->type == TUP_NODE_GHOST) {
+		if(tupid_tree_add_dup(&tf->input_root, tupfile_tent->tnode.tupid) < 0)
+			return -1;
+		return 0;
+	}
+	*fd = openat(tf->cur_dfd, fullpath, O_RDONLY);
+	if(*fd < 0 && errno != ENOENT) {
+		parser_error(tf, fullpath);
+		return -1;
+	}
+	return 0;
+}
+
+static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
+			char *path, int *parser_lua, int *fd)
+{
+	struct tup_entry *dtent;
 	int n = 0;
 
+	if(tf->variant->root_variant) {
+		dtent = tent;
+	} else {
+		if(tent->srcid < 0) {
+			/* This happens if there is a manually created
+			 * directory inside a variant (t8075).
+			 */
+			return 0;
+		}
+		if(tup_entry_add(tent->srcid, &dtent) < 0)
+			return -1;
+	}
+
 	strcpy(path, TUPFILE);
-	fd = openat(tf->cur_dfd, path, O_RDONLY);
-	if(fd < 0 && errno != ENOENT)
+	if(open_if_entry(tf, dtent, path, TUPFILE, fd) < 0)
 		return -1;
-	if(fd >= 0)
-		return fd;
+	if(*fd >= 0) {
+		return 0;
+	}
 
 	strcpy(path, TUPFILE_LUA);
-	fd = openat(tf->cur_dfd, path, O_RDONLY);
-	if(fd < 0 && errno != ENOENT)
+	if(open_if_entry(tf, dtent, path, TUPFILE_LUA, fd) < 0)
 		return -1;
-	if(fd >= 0) {
+	if(*fd >= 0) {
 		*parser_lua = 1;
-		return fd;
+		return 0;
 	}
 	do {
 		int x;
 		strcpy(path + n*3, TUPDEFAULT);
-		fd = openat(tf->cur_dfd, path, O_RDONLY);
-		if(fd < 0 && errno != ENOENT)
+		if(open_if_entry(tf, dtent, path, TUPDEFAULT, fd) < 0)
 			return -1;
-		if(fd >= 0)
-			return fd;
+		if(*fd >= 0) {
+			return 0;
+		}
+
 		strcpy(path + n*3, TUPDEFAULT_LUA);
-		fd = openat(tf->cur_dfd, path, O_RDONLY);
-		if(fd < 0 && errno != ENOENT)
+		if(open_if_entry(tf, dtent, path, TUPDEFAULT_LUA, fd) < 0)
 			return -1;
-		if(fd >= 0) {
+		if(*fd >= 0) {
 			*parser_lua = 1;
-			return fd;
+			return 0;
 		}
 
 		n++;
 		for(x=0; x<n; x++) {
 			strcpy(path + x*3, "../");
 		}
-		tent = tent->parent;
-	} while(tent);
-	errno = ENOENT;
-	return -1;
+		dtent = dtent->parent;
+	} while(dtent);
+
+	return 0;
 }
 
 #define TUP_PRESERVE_CMD "^ preserve %o^ !tup_preserve %f %o"
