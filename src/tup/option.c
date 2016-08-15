@@ -522,8 +522,15 @@ static const char *get_console_width(void)
 static const char *stdout_isatty(void)
 {
 	static char buf[10];
+	int tty;
 
-	snprintf(buf, sizeof(buf), "%d", isatty(STDOUT_FILENO));
+	tty = isatty(STDOUT_FILENO);
+#ifndef _WIN32
+	if(!tty) {
+		setlinebuf(stdout);
+	}
+#endif
+	snprintf(buf, sizeof(buf), "%d", tty);
 	buf[sizeof(buf) - 1]= 0;
 	return buf;
 }
