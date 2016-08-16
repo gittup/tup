@@ -40,7 +40,7 @@ int main(void)
 HERE
 cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> tup_t5067_segfault2
-: tup_t5067_segfault2 |> ./%f |>
+: tup_t5067_segfault2 |> ./%f |> tmp.txt
 HERE
 tup touch ok.c Tupfile
 update_fail_msg "Segmentation fault"

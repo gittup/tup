@@ -409,7 +409,7 @@ static int finfo_wait_open_count(struct server *s)
 	while(s->finfo.open_count > 0) {
 		struct timespec ts;
 		int rc;
-		ts.tv_sec = time(NULL) + 2;
+		ts.tv_sec = time(NULL) + 10;
 		ts.tv_nsec = 0;
 		rc = pthread_cond_timedwait(&s->finfo.cond, &s->finfo.lock, &ts);
 		if(rc != 0) {
