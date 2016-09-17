@@ -934,7 +934,7 @@ static int tup_fs_rmdir(const char *path)
 		}
 		put_finfo(finfo);
 	}
-	fprintf(stderr, "tup error: Unable to rmdir a directory not created during this job: %s\n", path);
+	fprintf(stderr, "tup error: Unable to rmdir a directory not created during this job: %s\n", peel(path));
 	return -EPERM;
 }
 
@@ -1044,7 +1044,7 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 		}
 		put_finfo(finfo);
 	}
-	fprintf(stderr, "tup error: Unable to chmod() files not created by this job: %s\n", path);
+	fprintf(stderr, "tup error: Unable to chmod() files not created by this job: %s\n", peel(path));
 	return -EPERM;
 }
 
@@ -1077,7 +1077,7 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 		}
 		put_finfo(finfo);
 	}
-	fprintf(stderr, "tup error: Unable to chown() files not created by this job: %s\n", path);
+	fprintf(stderr, "tup error: Unable to chown() files not created by this job: %s\n", peel(path));
 	return -EPERM;
 }
 
@@ -1117,7 +1117,7 @@ static int tup_fs_truncate(const char *path, off_t size)
 			return -errno;
 		return 0;
 	}
-	fprintf(stderr, "tup error: Unable to truncate() files not created by this job: %s\n", path);
+	fprintf(stderr, "tup error: Unable to truncate() files not created by this job: %s\n", peel(path));
 	return -EPERM;
 }
 
@@ -1152,7 +1152,7 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 			return -errno;
 		return 0;
 	}
-	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", path);
+	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", peel(path));
 	return -EPERM;
 }
 
