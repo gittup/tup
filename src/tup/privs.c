@@ -47,6 +47,9 @@ int tup_restore_privs(void)
 	return 0;
 }
 #else
+#ifdef __linux__
+#include <grp.h>
+#endif
 static int privileges_dropped = 0;
 
 int tup_privileged(void)
@@ -59,6 +62,14 @@ int tup_privileged(void)
 int tup_drop_privs(void)
 {
 	if(geteuid() == 0) {
+#ifdef __linux__
+		/* On Linux this ensures that we don't have any lingering
+		 * groups with root privileges after the setgid(). On OSX we
+		 * still need some groups in order to actually do the FUSE
+		 * mounts.
+		 */
+		setgroups(0, NULL);
+#endif
 		if(setgid(getgid()) != 0) {
 			perror("setgid");
 			return -1;
