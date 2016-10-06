@@ -1868,7 +1868,7 @@ static int generate_work(struct graph *g, struct node *n)
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
-		const char *name;
+		const char *cmd;
 		if(generate_cwd != n->tent->parent) {
 			fprintf(generate_f, "cd '");
 			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, n->tent->dt) < 0) {
@@ -1878,28 +1878,18 @@ static int generate_work(struct graph *g, struct node *n)
 				generate_cwd = n->tent->parent;
 			}
 		}
-		name = n->tent->name.s;
-		if(name[0] == '^') {
-			name = strchr(name+1, '^');
-			if(!name) {
-				fprintf(stderr, "tup error: Expected string '%s' to have two ^ characters.\n", n->tent->name.s);
-				rc = -1;
-			} else {
-				name++;
-				while(isspace(*name)) name++;
-			}
-		}
+		cmd = n->tent->cmd;
 		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
 		if (rc == 0) {
-			if(expand_command(&expanded_name, n->tent, name, &group_sticky_root, &used_groups_root) < 0) {
+			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0) {
 				fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
 				rc = -1;
 			}
 			if(expanded_name)
-				name = expanded_name;
+				cmd = expanded_name;
 		}
-		if(name)
-			fprintf(generate_f, "%s\n", name);
+		if(cmd)
+			fprintf(generate_f, "%s\n", cmd);
 	} else {
 		rc = 0;
 	}
@@ -2553,7 +2543,6 @@ static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char 
 static int update(struct node *n)
 {
 	int dfd = -1;
-	const char *name = n->tent->name.s;
 	char *expanded_name = NULL;
 	const char *cmd;
 	struct server s;
@@ -2570,10 +2559,10 @@ static int update(struct node *n)
 	struct tupid_entries used_groups_root = {NULL};
 
 	timespan_start(&ts);
-	if(name[0] == '^') {
-		name++;
-		while(*name && *name != ' ' && *name != '^') {
-			switch(*name) {
+	if(n->tent->flags) {
+		int x;
+		for(x=0; x<n->tent->flagslen; x++) {
+			switch(n->tent->flags[x]) {
 				case 'c':
 					need_namespacing = 1;
 					break;
@@ -2586,24 +2575,13 @@ static int update(struct node *n)
 				default:
 					pthread_mutex_lock(&display_mutex);
 					show_result(n->tent, 1, NULL, NULL, 1);
-					fprintf(stderr, "tup error: Unknown ^ flag: '%c'\n", *name);
+					fprintf(stderr, "tup error: Unknown ^-flag: '%c'\n", n->tent->flags[x]);
 					pthread_mutex_unlock(&display_mutex);
 					return -1;
 			}
-			name++;
 		}
-		while(*name && *name != '^') name++;
-		if(!*name) {
-			pthread_mutex_lock(&display_mutex);
-			show_result(n->tent, 1, NULL, NULL, 1);
-			fprintf(stderr, "tup error: Missing ending '^' flag in command %lli: %s\n", n->tnode.tupid, n->tent->name.s);
-			pthread_mutex_unlock(&display_mutex);
-			return -1;
-		}
-		name++;
-		while(isspace(*name)) name++;
 	}
-	cmd = name;
+	cmd = n->tent->cmd;
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {
@@ -2628,7 +2606,7 @@ static int update(struct node *n)
 	if(rc == 0)
 		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
 	if(rc == 0) {
-		if(expand_command(&expanded_name, n->tent, name, &group_sticky_root, &used_groups_root) < 0)
+		if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0)
 			rc = -1;
 		if(expanded_name)
 			cmd = expanded_name;

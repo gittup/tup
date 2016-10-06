@@ -49,6 +49,7 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
+static int split_command_string(struct tup_entry *tent);
 
 int tup_entry_init(void)
 {
@@ -82,7 +83,8 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
 		return -1;
-
+	if(split_command_string(tent) < 0)
+		return -1;
 	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
 		return -1;
 
@@ -239,23 +241,9 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	}
 	name = tent->name.s;
 	name_sz = tent->name.len;
-	if(!do_verbose && name[0] == '^') {
-		name++;
-		while(*name && *name != ' ' && *name != '^') name++;
-		if(*name == '^') {
-			/* If we just have ^-flags but no TEXT, then print the rest of the
-			 * string verbatim.
-			 */
-			name++;
-			while(isspace(*name)) name++;
-			name_sz = strlen(name);
-		} else {
-			/* If we have ^ TEXT^, then just capture the TEXT part */
-			name++;
-			name_sz = 0;
-			while(name[name_sz] && name[name_sz] != '^')
-				name_sz++;
-		}
+	if(!do_verbose && tent->display) {
+		name = tent->display;
+		name_sz = tent->displaylen;
 	}
 
 	color_set(f);
@@ -505,6 +493,11 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	RB_INIT(&tent->group_stickies);
 	tent->retrieved_stickies = 0;
 	tent->incoming = NULL;
+	tent->flags = NULL;
+	tent->flagslen = 0;
+	tent->display = NULL;
+	tent->displaylen = 0;
+	tent->cmd = NULL;
 	if(name) {
 		tent->name.s = malloc(len+1);
 		if(!tent->name.s) {
@@ -515,6 +508,10 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 		strncpy(tent->name.s, name, len);
 		tent->name.s[len] = 0;
 		tent->name.len = len;
+		if(tent->type == TUP_NODE_CMD) {
+			if(split_command_string(tent) < 0)
+				return NULL;
+		}
 	} else {
 		tent->name.s = NULL;
 		tent->name.len = 0;
@@ -685,6 +682,60 @@ int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
 	return 0;
 }
 
+int split_command_string(struct tup_entry *tent)
+{
+	tent->flags = NULL;
+	tent->flagslen = 0;
+	tent->display = NULL;
+	tent->displaylen = 0;
+	tent->cmd = NULL;
+	if(tent->type != TUP_NODE_CMD || !tent->name.s)
+		return 0;
+	const char *s = tent->name.s;
+	if(s[0] == '^') {
+		s++;
+		if(*s != ' ') {
+			tent->flags = s;
+			do {
+				if(!*s) {
+					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", tent->name.s);
+					return -1;
+				}
+				if(*s == ' ')
+					break;
+				if(s[0] == '^')
+					break;
+				s++;
+			} while(1);
+			tent->flagslen = s - tent->flags;
+		}
+		if(*s == '^') {
+			/* Only flags - the display is the same as the cmd */
+			s++;
+			while(isspace(*s)) s++;
+			tent->display = s;
+			tent->displaylen = strlen(s);
+		} else {
+			while(isspace(*s)) s++;
+			tent->display = s;
+			do {
+				if(!*s) {
+					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", tent->name.s);
+					return -1;
+				}
+				if(s[0] == '^')
+					break;
+				s++;
+			} while(1);
+			tent->displaylen = s - tent->display;
+			s++;
+		}
+	}
+	while(isspace(*s)) s++;
+	tent->cmd = s;
+	return 0;
+}
+
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {
@@ -699,6 +750,8 @@ static int change_name(struct tup_entry *tent, const char *new_name)
 		return -1;
 	}
 	strcpy(tent->name.s, new_name);
+	if(split_command_string(tent) < 0)
+		return -1;
 	if(resolve_parent(tent) < 0)
 		return -1;
 	return 0;

@@ -46,6 +46,14 @@ struct tup_entry {
 	struct tupid_entries group_stickies;
 	int retrieved_stickies;
 	struct tup_entry *incoming;
+
+	/* For command strings */
+	const char *flags;
+	int flagslen;
+	const char *display;
+	int displaylen;
+	const char *cmd;
+
 	LIST_ENTRY(tup_entry) ghost_list;
 
 	/* Only valid inside of get/release list. The next pointer is used to

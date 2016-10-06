@@ -677,15 +677,16 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 	fclose(f);
 }
 
-static void print_name(FILE *f, const char *s, char c)
+static void print_name(FILE *f, const char *s, int len)
 {
-	for(; *s && *s != c; s++) {
-		if(*s == '"') {
+	int x;
+	for(x=0; x<len; x++) {
+		if(s[x] == '"') {
 			fprintf(f, "\\\"");
-		} else if(*s == '\\') {
+		} else if(s[x] == '\\') {
 			fprintf(f, "\\\\");
 		} else {
-			fprintf(f, "%c", *s);
+			fprintf(f, "%c", s[x]);
 		}
 	}
 }
@@ -704,7 +705,6 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	int fontcolor;
 	const char *shape;
 	const char *style;
-	char *s;
 	struct edge *e;
 	int flags;
 	struct tupid_tree *tt;
@@ -771,17 +771,12 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 		}
 	}
 	fprintf(f, "\tnode_%lli [label=\"", n->tnode.tupid);
-	s = n->tent->name.s;
-	if(s[0] == '^') {
-		s++;
-		while(*s && *s != ' ') {
-			/* Skip flags (Currently there are none) */
-			s++;
-		}
-		print_name(f, s, '^');
-	} else {
-		print_name(f, s, 0);
-	}
+	if(n->tent->display)
+		print_name(f, n->tent->display, n->tent->displaylen);
+	else if(n->tent->cmd)
+		print_name(f, n->tent->cmd, strlen(n->tent->cmd));
+	else
+		print_name(f, n->tent->name.s, n->tent->name.len);
 	tt = tupid_tree_search(node_root, n->tent->tnode.tupid);
 	if(tt) {
 		struct node_details *nd;
