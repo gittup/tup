@@ -35,7 +35,7 @@ struct pel_group;
 
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
-tupid_t create_command_file(tupid_t dt, const char *cmd);
+tupid_t create_command_file(tupid_t dt, const char *cmd, const char *display, int displaylen, const char *flags, int flagslen);
 tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified);
 tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force, int ignore_generated, int *modified);

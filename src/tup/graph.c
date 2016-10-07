@@ -773,8 +773,6 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 	fprintf(f, "\tnode_%lli [label=\"", n->tnode.tupid);
 	if(n->tent->display)
 		print_name(f, n->tent->display, n->tent->displaylen);
-	else if(n->tent->cmd)
-		print_name(f, n->tent->cmd, strlen(n->tent->cmd));
 	else
 		print_name(f, n->tent->name.s, n->tent->name.len);
 	tt = tupid_tree_search(node_root, n->tent->tnode.tupid);

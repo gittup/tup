@@ -482,12 +482,12 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 	return 0;
 }
 
-#define TUP_PRESERVE_CMD "^ preserve %o^ !tup_preserve %f %o"
-#define TUP_LN_CMD       "^ ln %o -> %f^ !tup_ln %f %o"
+#define TUP_PRESERVE_CMD "!tup_preserve %f %o"
+#define TUP_LN_CMD       "!tup_ln %f %o"
 
 static int parse_internal_definitions(struct tupfile *tf)
 {
-	char tup_ln[] = "!tup_ln = |> " TUP_LN_CMD " |>";
+	char tup_ln[] = "!tup_ln = |> ^ symlink %o -> %f^ " TUP_LN_CMD " |>";
 	if(parse_bang_definition(tf, tup_ln, 0) < 0) {
 		fprintf(tf->f, "tup error: Unable to parse built-in !tup_ln rule.\n");
 		return -1;
@@ -497,7 +497,7 @@ static int parse_internal_definitions(struct tupfile *tf)
 		if(parse_bang_definition(tf, tup_preserve, 0) < 0)
 			return -1;
 	} else {
-		char tup_preserve[] = "!tup_preserve = |> " TUP_PRESERVE_CMD " |> %b";
+		char tup_preserve[] = "!tup_preserve = |> ^ preserve %o^ " TUP_PRESERVE_CMD " |> %b";
 		if(parse_bang_definition(tf, tup_preserve, 0) < 0)
 			return -1;
 	}
@@ -3097,6 +3097,66 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	return 0;
 }
 
+struct command_split {
+	const char *flags;
+	int flagslen;
+	const char *display;
+	int displaylen;
+	const char *cmd;
+};
+
+static int split_command_string(const char *cmd, struct command_split *cs)
+{
+	cs->flags = NULL;
+	cs->flagslen = 0;
+	cs->display = NULL;
+	cs->displaylen = 0;
+	cs->cmd = NULL;
+	const char *s = cmd;
+	if(s[0] == '^') {
+		s++;
+		if(*s != ' ') {
+			cs->flags = s;
+			do {
+				if(!*s) {
+					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
+					return -1;
+				}
+				if(*s == ' ')
+					break;
+				if(s[0] == '^')
+					break;
+				s++;
+			} while(1);
+			cs->flagslen = s - cs->flags;
+		}
+		if(*s == '^') {
+			/* Only flags - no display */
+			s++;
+			while(isspace(*s)) s++;
+			cs->display = NULL;
+			cs->displaylen = 0;
+		} else {
+			while(isspace(*s)) s++;
+			cs->display = s;
+			do {
+				if(!*s) {
+					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
+					return -1;
+				}
+				if(s[0] == '^')
+					break;
+				s++;
+			} while(1);
+			cs->displaylen = s - cs->display;
+			s++;
+		}
+	}
+	while(isspace(*s)) s++;
+	cs->cmd = s;
+	return 0;
+}
+
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl)
 {
@@ -3105,6 +3165,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct name_list_entry *nle, *onle;
 	char *tcmd;
 	char *cmd;
+	char *real_display;
+	int real_displaylen;
 	struct tupid_tree *tt;
 	struct tupid_tree *cmd_tt;
 	tupid_t cmdid = -1;
@@ -3115,9 +3177,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tup_entry *old_group = NULL;
 	int command_modified = 0;
 	int is_variant_copy = 0;
-
-	if(strcmp(r->command, TUP_PRESERVE_CMD) == 0)
-		is_variant_copy = 1;
+	int compare_display_flags = 0;
+	struct command_split cs;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
 	 * bin.
@@ -3131,6 +3192,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		return 0;
 	}
+
+	if(split_command_string(r->command, &cs) < 0)
+		return -1;
+
+	if(strcmp(cs.cmd, TUP_PRESERVE_CMD) == 0)
+		is_variant_copy = 1;
 
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
@@ -3155,13 +3222,23 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 	}
 
-	tcmd = tup_printf(tf, r->command, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
+	tcmd = tup_printf(tf, cs.cmd, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, ALLOW_NODES);
 	if(!cmd)
 		return -1;
 	free(tcmd);
+
+	if(cs.display) {
+		real_display = tup_printf(tf, cs.display, cs.displaylen, nl, &onl, &r->order_only_inputs, ext, extlen, NULL);
+		if(!real_display)
+			return -1;
+		real_displaylen = strlen(real_display);
+	} else {
+		real_display = NULL;
+		real_displaylen = 0;
+	}
 
 	/* If we already have our command string in the db, then use that.
 	 * Otherwise, we try to find an existing command of a different
@@ -3178,6 +3255,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			fprintf(tf->f, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
 			return -1;
 		}
+		compare_display_flags = 1;
 	} else {
 		if(find_existing_command(&onl, &cmdid) < 0)
 			return -1;
@@ -3186,7 +3264,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
 				return -1;
 			}
-			cmdid = create_command_file(tf->tupid, cmd);
+			cmdid = create_command_file(tf->tupid, cmd, real_display, real_displaylen, cs.flags, cs.flagslen);
 		} else {
 			if(tf->refactoring) {
 				struct tup_entry *old;
@@ -3204,9 +3282,32 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			 * command again.
 			 */
 			command_modified = 1;
+
+			compare_display_flags = 1;
+		}
+	}
+	if(compare_display_flags) {
+		struct tup_entry *tent;
+		if(tup_entry_add(cmdid, &tent) < 0)
+			return -1;
+		if(tent->displaylen != real_displaylen || strncmp(tent->display, real_display, real_displaylen) != 0) {
+			if(tup_db_set_display(tent, real_display, real_displaylen) < 0)
+				return -1;
+		}
+		if(tent->flagslen != cs.flagslen || strncmp(tent->flags, cs.flags, cs.flagslen) != 0) {
+			if(tf->refactoring) {
+				fprintf(tf->f, "tup refactoring error: Attempting to modify a command's flags:\n");
+				fprintf(tf->f, "Old: '%.*s'\n", tent->flagslen, tent->flags);
+				fprintf(tf->f, "New: '%.*s'\n", cs.flagslen, cs.flags);
+				return -1;
+			}
+			if(tup_db_set_flags(tent, cs.flags, cs.flagslen) < 0)
+				return -1;
+			command_modified = 1;
 		}
 	}
 
+	free(real_display);
 	free(cmd);
 	if(cmdid < 0)
 		return -1;

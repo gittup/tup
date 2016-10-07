@@ -61,10 +61,11 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 	return 0;
 }
 
-tupid_t create_command_file(tupid_t dt, const char *cmd)
+tupid_t create_command_file(tupid_t dt, const char *cmd, const char *display, int displaylen, const char *flags, int flagslen)
 {
 	struct tup_entry *tent;
-	tent = tup_db_create_node(dt, cmd, TUP_NODE_CMD);
+	tent = tup_db_create_node_part_display(dt, cmd, -1, display, displaylen, flags, flagslen,
+					       TUP_NODE_CMD, -1, NULL);
 	if(tent)
 		return tent->tnode.tupid;
 	return -1;

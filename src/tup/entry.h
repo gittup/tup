@@ -48,11 +48,10 @@ struct tup_entry {
 	struct tup_entry *incoming;
 
 	/* For command strings */
-	const char *flags;
+	char *flags;
 	int flagslen;
-	const char *display;
+	char *display;
 	int displaylen;
-	const char *cmd;
 
 	LIST_ENTRY(tup_entry) ghost_list;
 
@@ -72,12 +71,15 @@ int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len
 int tup_entry_find_name_in_dir_dt(tupid_t dt, const char *name, int len,
 				  struct tup_entry **dest);
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
+			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest);
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name);
+		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags);
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
+int tup_entry_change_display(struct tup_entry *tent, const char *display, int displaylen);
+int tup_entry_change_flags(struct tup_entry *tent, const char *flags, int flagslen);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
 int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent);

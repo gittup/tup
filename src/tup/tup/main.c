@@ -465,7 +465,7 @@ static int mlink(int argc, char **argv)
 		return -1;
 	if(tup_entry_add(DOT_DT, NULL) < 0)
 		return -1;
-	cmdid = create_command_file(DOT_DT, argv[1]);
+	cmdid = create_command_file(DOT_DT, argv[1], NULL, 0, NULL, 0);
 	if(cmdid < 0) {
 		return -1;
 	}

@@ -43,13 +43,14 @@ static int do_verbose = 0;
 static pthread_mutex_t entry_openat_mutex;
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
-				   const char *name, int len, enum TUP_NODE_TYPE type,
+				   const char *name, int len,
+				   const char *display, int displaylen, const char *flags, int flagslen,
+				   enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid);
 static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
-static int split_command_string(struct tup_entry *tent);
 
 int tup_entry_init(void)
 {
@@ -77,13 +78,11 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = new_entry(tupid, -1, NULL, 0, -1, -1, -1);
+	tent = new_entry(tupid, -1, NULL, 0, NULL, 0, NULL, 0, -1, -1, -1);
 	if(!tent)
 		return -1;
 
 	if(tup_db_fill_tup_entry(tupid, tent) < 0)
-		return -1;
-	if(split_command_string(tent) < 0)
 		return -1;
 	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
 		return -1;
@@ -182,6 +181,8 @@ static int rm_entry(tupid_t tupid, int safe)
 	free_tupid_tree(&tent->stickies);
 	free_tupid_tree(&tent->group_stickies);
 	free(tent->name.s);
+	free(tent->display);
+	free(tent->flags);
 	free(tent);
 	return 0;
 }
@@ -282,12 +283,13 @@ static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
 }
 
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
+			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, len, type, mtime, srcid);
+	tent = new_entry(tupid, dt, name, len, display, displaylen, flags, flagslen, type, mtime, srcid);
 	if(!tent)
 		return -1;
 	if(resolve_parent(tent) < 0)
@@ -298,11 +300,11 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name)
+		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, strlen(name), type, mtime, srcid);
+	tent = new_entry(tupid, dt, name, strlen(name), display, -1, flags, -1, type, mtime, srcid);
 	if(!tent)
 		return -1;
 	return 0;
@@ -465,8 +467,28 @@ int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent)
 	return 0;
 }
 
+static int set_string(char **dest, int *destlen, const char *src, int srclen)
+{
+	if(src) {
+		*dest = malloc(srclen+1);
+		if(!*dest) {
+			perror("malloc");
+			return -1;
+		}
+		strncpy(*dest, src, srclen);
+		(*dest)[srclen] = 0;
+		*destlen = srclen;
+	} else {
+		*dest = NULL;
+		*destlen = 0;
+	}
+	return 0;
+}
+
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
-				   const char *name, int len, enum TUP_NODE_TYPE type,
+				   const char *name, int len,
+				   const char *display, int displaylen, const char *flags, int flagslen,
+				   enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
@@ -479,6 +501,18 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 
 	if(len == -1)
 		len = strlen(name);
+	if(displaylen == -1) {
+		if(display)
+			displaylen = strlen(display);
+		else
+			displaylen = 0;
+	}
+	if(flagslen == -1) {
+		if(flags)
+			flagslen = strlen(flags);
+		else
+			flagslen = 0;
+	}
 
 	tent->tnode.tupid = tupid;
 	tent->list.le_prev = NULL;
@@ -493,29 +527,12 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	RB_INIT(&tent->group_stickies);
 	tent->retrieved_stickies = 0;
 	tent->incoming = NULL;
-	tent->flags = NULL;
-	tent->flagslen = 0;
-	tent->display = NULL;
-	tent->displaylen = 0;
-	tent->cmd = NULL;
-	if(name) {
-		tent->name.s = malloc(len+1);
-		if(!tent->name.s) {
-			perror("malloc");
-			free(tent);
-			return NULL;
-		}
-		strncpy(tent->name.s, name, len);
-		tent->name.s[len] = 0;
-		tent->name.len = len;
-		if(tent->type == TUP_NODE_CMD) {
-			if(split_command_string(tent) < 0)
-				return NULL;
-		}
-	} else {
-		tent->name.s = NULL;
-		tent->name.len = 0;
-	}
+	if(set_string(&tent->name.s, &tent->name.len, name, len) < 0)
+		return NULL;
+	if(set_string(&tent->display, &tent->displaylen, display, displaylen) < 0)
+		return NULL;
+	if(set_string(&tent->flags, &tent->flagslen, flags, flagslen) < 0)
+		return NULL;
 	RB_INIT(&tent->entries);
 
 	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
@@ -554,6 +571,22 @@ int tup_entry_change_name_dt(tupid_t tupid, const char *new_name,
 	tent->dt = new_dt;
 
 	return change_name(tent, new_name);
+}
+
+int tup_entry_change_display(struct tup_entry *tent, const char *display, int displaylen)
+{
+	free(tent->display);
+	if(set_string(&tent->display, &tent->displaylen, display, displaylen) < 0)
+		return -1;
+	return 0;
+}
+
+int tup_entry_change_flags(struct tup_entry *tent, const char *flags, int flagslen)
+{
+	free(tent->flags);
+	if(set_string(&tent->flags, &tent->flagslen, flags, flagslen) < 0)
+		return -1;
+	return 0;
 }
 
 int tup_entry_clear(void)
@@ -682,60 +715,6 @@ int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
 	return 0;
 }
 
-int split_command_string(struct tup_entry *tent)
-{
-	tent->flags = NULL;
-	tent->flagslen = 0;
-	tent->display = NULL;
-	tent->displaylen = 0;
-	tent->cmd = NULL;
-	if(tent->type != TUP_NODE_CMD || !tent->name.s)
-		return 0;
-	const char *s = tent->name.s;
-	if(s[0] == '^') {
-		s++;
-		if(*s != ' ') {
-			tent->flags = s;
-			do {
-				if(!*s) {
-					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", tent->name.s);
-					return -1;
-				}
-				if(*s == ' ')
-					break;
-				if(s[0] == '^')
-					break;
-				s++;
-			} while(1);
-			tent->flagslen = s - tent->flags;
-		}
-		if(*s == '^') {
-			/* Only flags - the display is the same as the cmd */
-			s++;
-			while(isspace(*s)) s++;
-			tent->display = s;
-			tent->displaylen = strlen(s);
-		} else {
-			while(isspace(*s)) s++;
-			tent->display = s;
-			do {
-				if(!*s) {
-					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", tent->name.s);
-					return -1;
-				}
-				if(s[0] == '^')
-					break;
-				s++;
-			} while(1);
-			tent->displaylen = s - tent->display;
-			s++;
-		}
-	}
-	while(isspace(*s)) s++;
-	tent->cmd = s;
-	return 0;
-}
-
 static int change_name(struct tup_entry *tent, const char *new_name)
 {
 	if(tent->parent) {
@@ -750,8 +729,6 @@ static int change_name(struct tup_entry *tent, const char *new_name)
 		return -1;
 	}
 	strcpy(tent->name.s, new_name);
-	if(split_command_string(tent) < 0)
-		return -1;
 	if(resolve_parent(tent) < 0)
 		return -1;
 	return 0;

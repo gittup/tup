@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2016  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2016  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,35 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Verify the --verbose flag.
+# Try the !tup_ln macro with a filename that has a caret.
 
 . ./tup.sh
 
-tmp=".tmp.txt"
 cat > Tupfile << HERE
-: ok.c |> ^ short^ gcc -c %f -o %o |> %B.o
+: input1^.txt |> !tup_ln |> link1.txt
+: input2^.^txt |> !tup_ln |> link2.txt
 HERE
-tup touch ok.c Tupfile
-update > $tmp
+touch input1^.txt input2^.^txt
+update
 
-if ! grep short $tmp > /dev/null; then
-	echo "Error: Expected 'short' to be in the output text." 1>&2
-	exit 1
-fi
-if grep 'gcc -c ok.c -o ok.o' $tmp > /dev/null; then
-	echo "Error: Expected the gcc string to be absent from the output text." 1>&2
-	exit 1
-fi
-
-tup touch ok.c
-update --verbose > $tmp
-if grep short $tmp > /dev/null; then
-	echo "Error: Expected 'short' not to be in the output text." 1>&2
-	exit 1
-fi
-if ! grep 'gcc -c ok.c -o ok.o' $tmp > /dev/null; then
-	echo "Error: Expected the gcc string to be in the output text." 1>&2
-	exit 1
-fi
+tup_dep_exist . "!tup_ln input1^.txt link1.txt" . link1.txt
+tup_dep_exist . "!tup_ln input2^.^txt link2.txt" . link2.txt
 
 eotup

@@ -1878,7 +1878,7 @@ static int generate_work(struct graph *g, struct node *n)
 				generate_cwd = n->tent->parent;
 			}
 		}
-		cmd = n->tent->cmd;
+		cmd = n->tent->name.s;
 		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
 		if (rc == 0) {
 			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0) {
@@ -2581,7 +2581,7 @@ static int update(struct node *n)
 			}
 		}
 	}
-	cmd = n->tent->cmd;
+	cmd = n->tent->name.s;
 
 	dfd = tup_entry_open(n->tent->parent);
 	if(dfd < 0) {

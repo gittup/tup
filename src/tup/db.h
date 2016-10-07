@@ -56,10 +56,14 @@ struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TU
 					   tupid_t srcid, int *node_changed);
 struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
 					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed);
-struct tup_entry *tup_db_node_insert(tupid_t dt, const char *name,
-				     int len, enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid);
-int tup_db_node_insert_tent(tupid_t dt, const char *name, int len, enum TUP_NODE_TYPE type,
-			    time_t mtime, tupid_t srcid, struct tup_entry **entry);
+struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, int namelen,
+						  const char *display, int displaylen, const char *flags, int flagslen,
+						  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed);
+int tup_db_node_insert_tent(tupid_t dt, const char *name, int namelen,
+			    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
+int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
+				    const char *display, int displaylen, const char *flags, int flagslen,
+				    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
@@ -80,6 +84,8 @@ int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_chdir(tupid_t dt);
 int tup_db_change_node(tupid_t tupid, const char *name, tupid_t new_dt);
 int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt);
+int tup_db_set_display(struct tup_entry *tent, const char *display, int displaylen);
+int tup_db_set_flags(struct tup_entry *tent, const char *flags, int flagslen);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
