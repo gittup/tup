@@ -2115,32 +2115,65 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl)
 {
-	int spc_index;
-	int last_entry = 0;
+        size_t const to_parse_size = strlen(p);
+        char *out_str = calloc(to_parse_size, sizeof(*out_str));
+        char *out_cursor = out_str;
+	struct path_list *pl;
 	int orderid = 1;
 
-	do {
-		struct path_list *pl;
+#define end_and_push() { \
+	if (strcmp(out_str, "") != 0) { \
+		pl = new_pl(tf, out_str, out_cursor - out_str, bl); \
+		if(!pl) \
+			return -1; \
+		pl->orderid = orderid; \
+		orderid++; \
+		TAILQ_INSERT_TAIL(plist, pl, list); \
+	} \
+}
 
-		spc_index = strcspn(p, " \t");
-		if(p[spc_index] == 0)
-			last_entry = 1;
-		if(spc_index == 0)
-			goto skip_empty_space;
+#define reset_out() { \
+        out_str = calloc(to_parse_size - i, sizeof(*out_str)); \
+        out_cursor = out_str; \
+}
 
-		pl = new_pl(tf, p, spc_index, bl);
-		if(!pl)
-			return -1;
-		pl->orderid = orderid;
-		orderid++;
+        int quotted = 0;
+        int espace = 0;
 
-		TAILQ_INSERT_TAIL(plist, pl, list);
+	size_t i;
+        for (i = 0; i < to_parse_size; ++i) {
+                char c = p[i];
 
-skip_empty_space:
-		p += spc_index + 1;
-	} while(!last_entry);
+                if (espace) {
+                        out_cursor[0] = c;
+                        ++out_cursor;
+                        espace = 0;
+                        continue;
+                } else if (c == '\\') {
+                        espace = 1;
+                        continue;
+                }
 
-	return 0;
+                if (c == '"') {
+                        quotted = !quotted;
+                        continue;
+                } else if (isspace(c) && !quotted) {
+                        end_and_push();
+                        reset_out();
+                } else {
+                        out_cursor[0] = c;
+                        ++out_cursor;
+                }
+        }
+        end_and_push();
+
+        if (quotted)
+                return -1;
+
+        return 0;
+
+#undef reset_out
+#undef end_and_push
 }
 
 static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
