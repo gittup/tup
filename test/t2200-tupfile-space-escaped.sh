@@ -19,6 +19,7 @@
 # Check a rule with escaped quote in a Tupfile
 
 . ./tup.sh
+check_no_windows unlinkat_quote
 cat > Tupfile << HERE
 : |> touch 'a"' ' b' |> a\" \ b
 HERE

@@ -2113,67 +2113,67 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 	return pl;
 }
 
+static int next_path(struct tupfile *tf, const char *p, char *dest)
+{
+	int espace = 0;
+	int quoted = 0;
+	const char *s = p;
+
+	for(; *s; s++) {
+		if(espace) {
+			*dest = *s;
+			dest++;
+			espace = 0;
+			continue;
+		} else if(*s == '\\') {
+			espace = 1;
+			continue;
+		} else if(*s == '"') {
+			quoted = !quoted;
+			continue;
+		} else if(isspace(*s) && !quoted) {
+			*dest = 0;
+			return s - p;
+		} else {
+			*dest = *s;
+			dest++;
+		}
+	}
+	if(quoted) {
+		fprintf(tf->f, "tup error: Missing endquote on string: %s\n", p);
+		return -1;
+	}
+	*dest = 0;
+	return s - p;
+}
+
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl)
 {
-        size_t const to_parse_size = strlen(p);
-        char *out_str = calloc(to_parse_size, sizeof(*out_str));
-        char *out_cursor = out_str;
 	struct path_list *pl;
 	int orderid = 1;
+	const char *s = p;
 
-#define end_and_push() { \
-	if (strcmp(out_str, "") != 0) { \
-		pl = new_pl(tf, out_str, out_cursor - out_str, bl); \
-		if(!pl) \
-			return -1; \
-		pl->orderid = orderid; \
-		orderid++; \
-		TAILQ_INSERT_TAIL(plist, pl, list); \
-	} \
-}
+	while(*s) {
+		char dest[PATH_MAX];
+		int x;
+		x = next_path(tf, s, dest);
+		if(x < 0)
+			return -1;
 
-#define reset_out() { \
-        out_str = calloc(to_parse_size - i, sizeof(*out_str)); \
-        out_cursor = out_str; \
-}
+		pl = new_pl(tf, dest, -1, bl);
+		if(!pl)
+			return -1;
+		pl->orderid = orderid;
+		orderid++;
+		TAILQ_INSERT_TAIL(plist, pl, list);
 
-        int quotted = 0;
-        int espace = 0;
+		s += x;
+		while(isspace(*s)) {
+			s++;
+		}
+	}
 
-	size_t i;
-        for (i = 0; i < to_parse_size; ++i) {
-                char c = p[i];
-
-                if (espace) {
-                        out_cursor[0] = c;
-                        ++out_cursor;
-                        espace = 0;
-                        continue;
-                } else if (c == '\\') {
-                        espace = 1;
-                        continue;
-                }
-
-                if (c == '"') {
-                        quotted = !quotted;
-                        continue;
-                } else if (isspace(c) && !quotted) {
-                        end_and_push();
-                        reset_out();
-                } else {
-                        out_cursor[0] = c;
-                        ++out_cursor;
-                }
-        }
-        end_and_push();
-
-        if (quotted)
-                return -1;
-
-        return 0;
-
-#undef reset_out
-#undef end_and_push
+	return 0;
 }
 
 static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
