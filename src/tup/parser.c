@@ -1311,7 +1311,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 		if(strncmp(input, "foreach", 7) == 0) {
 			r.foreach = 1;
 			input += 7;
-			while(*input == ' ') input++;
+			while(isspace(*input)) input++;
 		}
 	}
 
@@ -1475,7 +1475,7 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		if(strncmp(input, "foreach", 7) == 0) {
 			foreach = 1;
 			input += 7;
-			while(*input == ' ') input++;
+			while(isspace(*input)) input++;
 		}
 	}
 
