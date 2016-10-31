@@ -54,6 +54,8 @@ const char *tup_arch = "alpha";
 const char *tup_arch = "sparc";
 #elif __arm__
 const char *tup_arch = "arm";
+#elif __aarch64__
+const char *tup_arch = "arm64";
 #else
 #error Unsupported cpu architecture. Please add support in tup/platform.c
 #endif
