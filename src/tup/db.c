@@ -2471,6 +2471,47 @@ int tup_db_print(FILE *stream, tupid_t tupid)
 	return rc;
 }
 
+static int write_gitignore_line(FILE * f, const unsigned char *to_ignore)
+{
+	const size_t str_size = NAME_MAX + 1;
+	char *const str = calloc(str_size, sizeof(*str));
+
+	if (str == NULL) {
+		perror("calloc");
+		goto abort;
+	}
+
+	size_t i = 0;
+	for (; *to_ignore != '\0'; ++i, ++to_ignore) {
+		const char c = *to_ignore;
+
+		switch (c) {
+		case '[':
+		case ']':
+			if (i >= str_size)
+				goto abort;
+			str[i] = '\\';
+			++i;
+		}
+
+		if (i >= str_size)
+			goto abort;
+		str[i] = c;
+	}
+
+	if (fprintf(f, "/%s\n", str) < 0) {
+		perror("fprintf");
+		goto abort;
+	}
+
+	free(str);
+	return 0;
+
+ abort:
+	free(str);
+	return -1;
+}
+
 int tup_db_write_gitignore(FILE *f, tupid_t dt)
 {
 	int rc;
@@ -2515,8 +2556,7 @@ int tup_db_write_gitignore(FILE *f, tupid_t dt)
 			rc = -1;
 			goto out_reset;
 		}
-		if(fprintf(f, "/%s\n", sqlite3_column_text(*stmt, 0)) < 0) {
-			perror("fprintf");
+		if(write_gitignore_line(f, sqlite3_column_text(*stmt, 0)) < 0) {
 			fprintf(stderr, "tup error: Unable to write data to .gitignore file.\n");
 			rc = -1;
 			goto out_reset;
