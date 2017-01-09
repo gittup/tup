@@ -2222,9 +2222,7 @@ static int process_output(struct server *s, struct node *n,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
-				fprintf(f, " *** Command ID=%lli ran successfully, but tup failed to save the dependencies.\n", tent->tnode.tupid);
-			} else {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) == 0) {
 				timespan_end(ts);
 				show_ts = ts;
 				ms = timespan_milliseconds(ts);
@@ -2234,9 +2232,8 @@ static int process_output(struct server *s, struct node *n,
 			}
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
-				fprintf(f, " *** Additionally, command %lli failed to process input dependencies. These should probably be fixed before addressing the command failure.\n", tent->tnode.tupid);
-			}
+			/* Call write_files just to check for dependency issues */
+			write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
 		}
 	} else if(s->signalled) {
 		int sig = s->exit_sig;
@@ -2245,9 +2242,8 @@ static int process_output(struct server *s, struct node *n,
 		if(sig >= 0 && sig < ARRAY_SIZE(signal_err) && signal_err[sig])
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
-		if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) < 0) {
-			fprintf(f, " *** Additionally, command %lli failed to process input dependencies.", tent->tnode.tupid);
-		}
+		/* Call write_files just to check for dependency issues */
+		write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
 	} else {
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}

@@ -173,6 +173,27 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 
 	if(rc1 == 0 && rc2 == 0)
 		return 0;
+	if(rc2 < 0) {
+		if(check_only) {
+			fprintf(f, " *** Additionally, the command failed to process input dependencies. These should probably be fixed before addressing the command failure.\n");
+		} else {
+			if(rc1 < 0) {
+				fprintf(f, " *** Command ran successfully, but failed due to errors processing both the input and output dependencies.\n");
+			} else {
+				fprintf(f, " *** Command ran successfully, but failed due to errors processing input dependencies.\n");
+			}
+		}
+	} else {
+		if(rc1 < 0) {
+			/* Only print file write error if the rest succeeded.
+			 * We generally expect not to write the output files if
+			 * the command fails.
+			 */
+			if(!check_only) {
+				fprintf(f, " *** Command failed due to errors processing the output dependencies.\n");
+			}
+		}
+	}
 	return -1;
 }
 
