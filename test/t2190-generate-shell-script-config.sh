@@ -19,7 +19,7 @@
 # Try to generate a shell script using a specific variant config
 
 . ./tup.sh
-check_no_windows shell
+
 tmkdir sub1
 tmkdir sub2
 cat > Tupfile << HERE
@@ -35,20 +35,20 @@ HERE
 tmkdir configs
 echo 'CONFIG_FOO=1' > configs/foo.config
 
-tup generate build.sh
-gitignore_good 'echo bar' build.sh
-gitignore_bad 'echo foo' build.sh
-gitignore_bad 'echo baz' build.sh
+tup generate $generate_script_name
+gitignore_good 'echo bar' $generate_script_name
+gitignore_bad 'echo foo' $generate_script_name
+gitignore_bad 'echo baz' $generate_script_name
 
-tup generate build.sh --config configs/foo.config
-gitignore_bad 'echo bar' build.sh
-gitignore_good 'echo foo' build.sh
-gitignore_bad 'echo baz' build.sh
+tup generate $generate_script_name --config configs/foo.config
+gitignore_bad 'echo bar' $generate_script_name
+gitignore_good 'echo foo' $generate_script_name
+gitignore_bad 'echo baz' $generate_script_name
 
 echo 'CONFIG_BAZ=1' > tup.config
-tup generate build.sh
-gitignore_good 'echo bar' build.sh
-gitignore_bad 'echo foo' build.sh
-gitignore_good 'echo baz' build.sh
+tup generate $generate_script_name
+gitignore_good 'echo bar' $generate_script_name
+gitignore_bad 'echo foo' $generate_script_name
+gitignore_good 'echo baz' $generate_script_name
 
 eotup

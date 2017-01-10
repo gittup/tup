@@ -21,7 +21,7 @@
 # dependency errors.
 
 . ./tup.sh
-check_no_windows shell
+
 tmkdir sub1
 tmkdir sub2
 cat > Tuprules.tup << HERE
@@ -37,12 +37,21 @@ cp Tupfile sub1
 cp Tupfile sub2
 echo ': *.o ../*.o ../sub2/*.o |> ar cr %o %f |> libfoo.a' >> sub1/Tupfile
 
-tup generate --verbose build.sh
-./build.sh
+case $tupos in
+CYGWIN*)
+	expected="@echo ON"
+	;;
+*)
+	expected="^#! /bin/sh -ex$"
+	;;
+esac
+
+tup generate --verbose $generate_script_name
+./$generate_script_name
 sym_check sub1/libfoo.a foo bar bar2 baz baz2
 
-if ! grep '^#! /bin/sh -ex$' build.sh > /dev/null; then
-	echo "Error: Expected /bin/sh -ex in generated script" 1>&2
+if ! grep "$expected" $generate_script_name > /dev/null; then
+	echo "Error: Expected $expected in generated script" 1>&2
 	exit 1
 fi
 

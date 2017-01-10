@@ -41,6 +41,14 @@ FILE *__wrap_tmpfile(void)
 
 	dir_mutex_lock(tup_top_fd());
 
+	if(mkdir(".tup/tmp") < 0) {
+		if(errno != EEXIST) {
+			perror(".tup/tmp");
+			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
+			goto err_out;
+		}
+	}
+
 	snprintf(filename, sizeof(filename), ".tup/tmp/tmpfile-%i", num);
 	filename[sizeof(filename)-1] = 0;
 	num++;

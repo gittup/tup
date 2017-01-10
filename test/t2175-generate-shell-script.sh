@@ -19,7 +19,7 @@
 # Try to generate a shell script that builds the project.
 
 . ./tup.sh
-check_no_windows shell
+
 tmkdir sub1
 tmkdir sub2
 cat > Tuprules.tup << HERE
@@ -35,12 +35,21 @@ cp Tupfile sub1
 cp Tupfile sub2
 echo ': *.o sub1/*.o sub2/*.o |> ar cr %o %f |> libfoo.a' >> Tupfile
 
-tup generate build.sh
-./build.sh
+case $tupos in
+CYGWIN*)
+	expected="@echo OFF"
+	;;
+*)
+	expected="^#! /bin/sh -e$"
+	;;
+esac
+
+tup generate $generate_script_name
+./$generate_script_name
 sym_check libfoo.a foo bar bar2 baz baz2
 
-if ! grep '^#! /bin/sh -e$' build.sh > /dev/null; then
-	echo "Error: Expected /bin/sh -e in generated script" 1>&2
+if ! grep "$expected" $generate_script_name > /dev/null; then
+	echo "Error: Expected $expected in generated script" 1>&2
 	exit 1
 fi
 

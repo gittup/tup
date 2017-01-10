@@ -34,11 +34,13 @@ mkdir $tuptestdir
 cd $tuptestdir
 tup init --no-sync --force
 
+generate_script_name="build.sh"
 case $tupos in
 CYGWIN*)
-       # Avoid problems with CR/LF vs LF
-       alias diff='diff -b'
-       in_windows=1
+	# Avoid problems with CR/LF vs LF
+	alias diff='diff -b'
+	in_windows=1
+	generate_script_name="build.bat"
 ;;
 esac
 

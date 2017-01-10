@@ -231,6 +231,11 @@ int generate(int argc, char **argv)
 	int verbose_script = 0;
 	int x;
 	int rc;
+#ifdef _WIN32
+	const char *example_script = "script_name.bat";
+#else
+	const char *example_script = "script_name.sh";
+#endif
 
 	for(x=1; x<argc; x++) {
 		if(strcmp(argv[x], "--config") == 0) {
@@ -246,13 +251,13 @@ int generate(int argc, char **argv)
 			continue;
 		}
 		if(script_name) {
-			fprintf(stderr, "Usage: tup generate [--config config_file] script_name.sh\n");
+			fprintf(stderr, "Usage: tup generate [--config config_file] %s\n", example_script);
 			return -1;
 		}
 		script_name = argv[x];
 	}
 	if(!script_name) {
-		fprintf(stderr, "Usage: tup generate [--config config_file] script_name.sh\n");
+		fprintf(stderr, "Usage: tup generate [--config config_file] %s\n", example_script);
 		return -1;
 	}
 	if(tup_entry_init() < 0)
@@ -321,7 +326,11 @@ int generate(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to open script for writing.\n");
 		return -1;
 	}
+#ifdef _WIN32
+	fprintf(generate_f, "@echo %s\n", verbose_script ? "ON" : "OFF");
+#else
 	fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
+#endif
 	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
@@ -1870,11 +1879,11 @@ static int generate_work(struct graph *g, struct node *n)
 	if(n->tent->type == TUP_NODE_CMD) {
 		const char *cmd;
 		if(generate_cwd != n->tent->parent) {
-			fprintf(generate_f, "cd '");
+			fprintf(generate_f, "cd \"");
 			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, n->tent->dt) < 0) {
 				rc = -1;
 			} else {
-				fprintf(generate_f, "'\n");
+				fprintf(generate_f, "\"\n");
 				generate_cwd = n->tent->parent;
 			}
 		}

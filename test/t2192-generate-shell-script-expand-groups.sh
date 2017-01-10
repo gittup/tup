@@ -19,7 +19,6 @@
 # Try to generate a shell script using a specific variant config
 
 . ./tup.sh
-check_no_windows shell
 cat > Tupfile << HERE
 : |> echo "asdf" > a |> a <foo>
 : |> echo "fdsa" > b |> b <foo>
@@ -27,8 +26,8 @@ cat > Tupfile << HERE
 : <foo> |> cat %<foo> > c |> c
 HERE
 
-tup generate generated.sh
-./generated.sh
+tup generate $generate_script_name
+./$generate_script_name
 check_exist . c
 
 eotup
