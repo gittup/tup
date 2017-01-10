@@ -46,7 +46,7 @@ CYGWIN*)
 	;;
 esac
 
-tup generate --verbose $generate_script_name
+generate --verbose $generate_script_name
 ./$generate_script_name
 sym_check sub1/libfoo.a foo bar bar2 baz baz2
 

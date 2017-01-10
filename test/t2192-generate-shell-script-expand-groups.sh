@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : <foo> |> cat %<foo> > c |> c
 HERE
 
-tup generate $generate_script_name
+generate $generate_script_name
 ./$generate_script_name
 check_exist . c
 

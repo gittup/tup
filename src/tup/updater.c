@@ -327,6 +327,9 @@ int generate(int argc, char **argv)
 	 */
 	n = TAILQ_FIRST(&g.node_list);
 	TAILQ_REMOVE(&g.node_list, n, list);
+	while(!LIST_EMPTY(&n->edges)) {
+		remove_edge(LIST_FIRST(&n->edges));
+	}
 	remove_node(&g, n);
 
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
@@ -334,6 +337,9 @@ int generate(int argc, char **argv)
 			if(parse(n, &g, NULL, 0, 0) < 0)
 				return -1;
 		TAILQ_REMOVE(&g.plist, n, list);
+		while(!LIST_EMPTY(&n->incoming)) {
+			remove_edge(LIST_FIRST(&n->incoming));
+		}
 		remove_node(&g, n);
 	}
 	if(destroy_graph(&g) < 0)
@@ -372,6 +378,7 @@ int generate(int argc, char **argv)
 				return -1;
 		}
 	}
+	free_tupid_tree(&generated_dir_root);
 
 	if(tup_entry_add(DOT_DT, &generate_cwd) < 0)
 		return -1;
@@ -385,6 +392,9 @@ int generate(int argc, char **argv)
 	tup_db_commit();
 	if(tup_db_close() < 0)
 		return -1;
+	if(close(tup_top_fd()) < 0) {
+		perror("close(tup_top_fd())");
+	}
 	return 0;
 }
 
@@ -1932,8 +1942,13 @@ static int generate_work(struct graph *g, struct node *n)
 			if(expanded_name)
 				cmd = expanded_name;
 		}
+		free_tupid_tree(&sticky_root);
+		free_tupid_tree(&normal_root);
+		free_tupid_tree(&group_sticky_root);
+		free_tupid_tree(&used_groups_root);
 		if(cmd)
 			fprintf(generate_f, "%s\n", cmd);
+		free(expanded_name);
 	} else {
 		rc = 0;
 	}

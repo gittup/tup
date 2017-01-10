@@ -35,18 +35,18 @@ HERE
 tmkdir configs
 echo 'CONFIG_FOO=1' > configs/foo.config
 
-tup generate $generate_script_name
+generate $generate_script_name
 gitignore_good 'echo bar' $generate_script_name
 gitignore_bad 'echo foo' $generate_script_name
 gitignore_bad 'echo baz' $generate_script_name
 
-tup generate $generate_script_name --config configs/foo.config
+generate $generate_script_name --config configs/foo.config
 gitignore_bad 'echo bar' $generate_script_name
 gitignore_good 'echo foo' $generate_script_name
 gitignore_bad 'echo baz' $generate_script_name
 
 echo 'CONFIG_BAZ=1' > tup.config
-tup generate $generate_script_name
+generate $generate_script_name
 gitignore_good 'echo bar' $generate_script_name
 gitignore_bad 'echo foo' $generate_script_name
 gitignore_good 'echo baz' $generate_script_name

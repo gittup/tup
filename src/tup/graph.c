@@ -213,6 +213,8 @@ int destroy_graph(struct graph *g)
 	while(!TAILQ_EMPTY(&g->node_list)) {
 		remove_node_internal(g, TAILQ_FIRST(&g->node_list));
 	}
+	free_tupid_tree(&g->normal_dir_root);
+	free_tupid_tree(&g->parse_gitignore_root);
 	return 0;
 }
 

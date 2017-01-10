@@ -28,7 +28,7 @@ cat > sub1/Tupfile << HERE
 HERE
 tup touch sub1/Tupfile
 
-tup generate $generate_script_name
+generate $generate_script_name
 ./$generate_script_name
 
 # Make sure running it again doesn't fail mkdirs
