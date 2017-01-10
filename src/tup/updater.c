@@ -217,6 +217,25 @@ out:
 	return rc; /* Profit! */
 }
 
+static int generate_script_mkdir(FILE *f, struct tupid_entries *root, struct tup_entry *dtent)
+{
+	if(dtent->type != TUP_NODE_GENERATED_DIR)
+		return 0;
+	if(tupid_tree_search(root, dtent->tnode.tupid) != NULL)
+		return 0;
+	tupid_tree_add(root, dtent->tnode.tupid);
+	if(generate_script_mkdir(f, root, dtent->parent) < 0)
+		return -1;
+#ifdef _WIN32
+	fprintf(f, "mkdir \"");
+#else
+	fprintf(f, "mkdir -p \"");
+#endif
+	print_tup_entry(f, dtent);
+	fprintf(f, "\"\n");
+	return 0;
+}
+
 static struct tup_entry *generate_cwd;
 static FILE *generate_f;
 int generate(int argc, char **argv)
@@ -226,6 +245,7 @@ int generate(int argc, char **argv)
 	struct node *tmp;
 	struct tup_entry *vartent;
 	struct tup_entry *varfiletent;
+	struct tupid_entries generated_dir_root;
 	char *script_name = NULL;
 	char *config_file = NULL;
 	int verbose_script = 0;
@@ -320,6 +340,10 @@ int generate(int argc, char **argv)
 		return -1;
 
 	printf("Generate: %s\n", script_name);
+	if(chdir(get_tup_top()) < 0) {
+		perror("chdir(get_tup_top())\n");
+		return -1;
+	}
 	generate_f = fopen(script_name, "w");
 	if(!generate_f) {
 		perror(script_name);
@@ -337,6 +361,17 @@ int generate(int argc, char **argv)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+
+	/* Loop through all the nodes and pull out any generated directories.
+	 * The script will 'mkdir' all of these at the top of the script.
+	 */
+	RB_INIT(&generated_dir_root);
+	TAILQ_FOREACH(n, &g.node_list, list) {
+		if(n->tent->type == TUP_NODE_GENERATED) {
+			if(generate_script_mkdir(generate_f, &generated_dir_root, n->tent->parent) < 0)
+				return -1;
+		}
+	}
 
 	if(tup_entry_add(DOT_DT, &generate_cwd) < 0)
 		return -1;
