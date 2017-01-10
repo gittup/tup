@@ -38,7 +38,7 @@ int varsed(int argc, char **argv)
 	int binmode = 0;
 	int input_found = 0;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-h") == 0 ||
 		   strcmp(argv[x], "--help") == 0) {
 			fprintf(stderr, "Usage: %s [infile] [outfile]\n", argv[0]);

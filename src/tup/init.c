@@ -166,7 +166,7 @@ int init_command(int argc, char **argv)
 	int fd;
 	const char *dirname = NULL;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "--no-sync") == 0) {
 			db_sync = 0;
 		} else if(strcmp(argv[x], "--force") == 0) {

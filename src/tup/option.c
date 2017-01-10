@@ -180,9 +180,8 @@ int tup_option_process_ini(void)
 
 	if(!found_tup_dir) {
 		int rc;
-		int argc = 1;
-		char argv0[] = "init";
-		char *argv[] = {argv0, NULL};
+		int argc = 0;
+		char *argv[] = {NULL};
 		char root_path[PATH_MAX];
 
 		if(fchdir(best_root) < 0) {

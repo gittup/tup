@@ -61,7 +61,7 @@ static int graph(int argc, char **argv);
 static int mlink(int argc, char **argv);
 static int variant(int argc, char **argv);
 static int node_exists(int argc, char **argv);
-static int link_exists(int argc, char **argv);
+static int link_exists(const char *cmd, int argc, char **argv);
 static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
 static int rm(int argc, char **argv);
@@ -83,8 +83,15 @@ int main(int argc, char **argv)
 	int cmd_arg = 0;
 	const char *cmd = NULL;
 	int clear_autoupdate = 0;
+	int orig_argc;
+	char **orig_argv;
 
-	for(x=1; x<argc; x++) {
+	/* Skip 'tup' executable argument */
+	argc--;
+	argv++;
+	orig_argc = argc;
+	orig_argv = argv;
+	for(x=0; x<argc; x++) {
 		if(!cmd && argv[x][0] != '-') {
 			cmd = argv[x];
 			cmd_arg = x;
@@ -98,18 +105,18 @@ int main(int argc, char **argv)
 
 	if(NULL == cmd) {
 		cmd = "upd";
+	} else {
+		argc = argc - (cmd_arg + 1);
+		argv = &argv[cmd_arg + 1];
 	}
 
-	if(argc > 1) {
-		if(strcmp(argv[1], "--version") == 0 ||
-		   strcmp(argv[1], "-v") == 0) {
+	if(argc > 0) {
+		if(strcmp(argv[0], "--version") == 0 ||
+		   strcmp(argv[0], "-v") == 0) {
 			version();
 			return 0;
 		}
 	}
-
-	argc = argc - cmd_arg;
-	argv = &argv[cmd_arg];
 
 	/* Commands that can run as a sub-process to tup (eg: in a :-rule) */
 	if(strcmp(cmd, "varsed") == 0) {
@@ -184,7 +191,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if(tup_init(argc, argv) < 0)
+	/* Pass all arguments so we capture any flags before the command */
+	if(tup_init(orig_argc, orig_argv) < 0)
 		return 1;
 
 	if(strcmp(cmd, "monitor") == 0) {
@@ -234,7 +242,7 @@ int main(int argc, char **argv)
 		rc = node_exists(argc, argv);
 	} else if(strcmp(cmd, "normal_exists") == 0 ||
 		  strcmp(cmd, "sticky_exists") == 0) {
-		rc = link_exists(argc, argv);
+		rc = link_exists(cmd, argc, argv);
 		/* Since an error code of <0 gets converted to 1, we have to
 		 * make 1 (meaning the link exists) something else.
 		 */
@@ -267,9 +275,10 @@ int main(int argc, char **argv)
 	} else if(strcmp(cmd, "monitor_supported") == 0) {
 		rc = monitor_supported();
 	} else {
-		argc++;
-		argv--;
-		rc = updater(argc, argv, 0);
+		/* Use the original arguments, since the arg we pulled out for
+		 * the cmd is actually a file to update, not a command.
+		 */
+		rc = updater(orig_argc, orig_argv, 0);
 	}
 
 	if(clear_autoupdate) {
@@ -298,7 +307,7 @@ static int entry(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		char *endptr;
 		tupid_t tupid;
 
@@ -329,7 +338,7 @@ static int type(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		char *endptr;
 		tupid_t tupid;
 
@@ -359,7 +368,7 @@ static int tupid(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(gimme_tent(argv[x], &tent) < 0) {
 			fprintf(stderr, "No tent :(\n");
 			return -1;
@@ -382,7 +391,7 @@ static int inputs(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		struct tent_entries inputs = TENT_ENTRIES_INITIALIZER;
 		struct tent_tree *tt;
 		tupid_t cmdid;
@@ -478,7 +487,7 @@ static int graph(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		struct tup_entry *tent;
 
 		if(strcmp(argv[x], "--dirs") == 0) {
@@ -727,14 +736,14 @@ static int variant(int argc, char **argv)
 {
 	int x;
 
-	if(argc < 2) {
+	if(argc < 1) {
 		fprintf(stderr, "Usage: variant foo.config [bar.config] [...]\n");
 		fprintf(stderr, "This will create a build-foo directory with a tup.config symlink to foo.config\n");
 		return -1;
 	}
 	if(tup_db_begin() < 0)
 		return -1;
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(create_variant(argv[x]) < 0)
 			return -1;
 	}
@@ -752,15 +761,13 @@ static int node_exists(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(argc < 3) {
+	if(argc < 2) {
 		fprintf(stderr, "Usage: node_exists dir [n1] [n2...]\n");
 		return -1;
 	}
-	dt = find_dir_tupid(argv[1]);
+	dt = find_dir_tupid(argv[0]);
 	if(dt < 0)
 		return -1;
-	argv++;
-	argc--;
 	for(x=1; x<argc; x++) {
 		char *p = argv[x];
 		if(tup_entry_add(dt, &dtent) < 0)
@@ -795,7 +802,7 @@ static int node_exists(int argc, char **argv)
 	return 0;
 }
 
-static int link_exists(int argc, char **argv)
+static int link_exists(const char *cmd, int argc, char **argv)
 {
 	struct tup_entry *tenta;
 	struct tup_entry *tentb;
@@ -807,45 +814,45 @@ static int link_exists(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(argc != 5) {
+	if(argc != 4) {
 		fprintf(stderr, "tup error: %s requires two dir/name pairs.\n", argv[0]);
 		return -1;
 	}
-	if(strcmp(argv[0], "normal_exists") == 0) {
+	if(strcmp(cmd, "normal_exists") == 0) {
 		style = TUP_LINK_NORMAL;
-	} else if(strcmp(argv[0], "sticky_exists") == 0) {
+	} else if(strcmp(cmd, "sticky_exists") == 0) {
 		style = TUP_LINK_STICKY;
 	} else {
-		fprintf(stderr, "[31mError: link_exists called with unknown style: %s\n", argv[0]);
+		fprintf(stderr, "[31mError: link_exists called with unknown style: %s\n", cmd);
 		return -1;
 	}
-	dta = find_dir_tupid(argv[1]);
+	dta = find_dir_tupid(argv[0]);
 	if(dta < 0) {
-		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[1]);
+		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[0]);
 		return -1;
 	}
 
 	if(tup_entry_add(dta, &dtenta) < 0)
 		return -1;
-	if(tup_db_select_tent(dtenta, argv[2], &tenta) < 0)
+	if(tup_db_select_tent(dtenta, argv[1], &tenta) < 0)
 		return -1;
 	if(!tenta) {
-		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[2]);
+		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[1]);
 		return -1;
 	}
 
-	dtb = find_dir_tupid(argv[3]);
+	dtb = find_dir_tupid(argv[2]);
 	if(dtb < 0) {
-		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[3]);
+		fprintf(stderr, "[31mError: dir '%s' doesn't exist.[0m\n", argv[2]);
 		return -1;
 	}
 
 	if(tup_entry_add(dtb, &dtentb) < 0)
 		return -1;
-	if(tup_db_select_tent(dtentb, argv[4], &tentb) < 0)
+	if(tup_db_select_tent(dtentb, argv[3], &tentb) < 0)
 		return -1;
 	if(!tentb) {
-		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
+		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[3]);
 		return -1;
 	}
 	if(tup_db_link_exists(tenta->tnode.tupid, tentb->tnode.tupid, style, &exists) < 0)
@@ -871,7 +878,7 @@ static int touch(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		struct stat buf;
 		struct path_element *pel = NULL;
 		struct tup_entry *dtent;
@@ -918,7 +925,7 @@ static int node(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		tupid_t dt;
 		struct path_element *pel = NULL;
 
@@ -949,7 +956,7 @@ static int rm(int argc, char **argv)
 	if(sub_dir_dt < 0)
 		return -1;
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		struct path_element *pel = NULL;
 		tupid_t dt;
 
@@ -1012,7 +1019,7 @@ static int varshow(int argc, char **argv)
 		} else {
 			int x;
 			struct tup_entry *tent;
-			for(x=1; x<argc; x++) {
+			for(x=0; x<argc; x++) {
 				tent = tup_db_get_var(variant, argv[x], strlen(argv[x]), NULL);
 				if(!tent) {
 					fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
@@ -1069,7 +1076,7 @@ static int fake_mtime(int argc, char **argv)
 	tupid_t sub_dir_dt;
 	struct path_element *pel = NULL;
 
-	if(argc != 3) {
+	if(argc != 2) {
 		fprintf(stderr, "tup error: fake_mtime requires a file and an mtime.\n");
 		return -1;
 	}
@@ -1078,9 +1085,9 @@ static int fake_mtime(int argc, char **argv)
 	sub_dir_dt = get_sub_dir_dt();
 	if(sub_dir_dt < 0)
 		return -1;
-	dt = find_dir_tupid_dt(sub_dir_dt, argv[1], &pel, 0, 1);
+	dt = find_dir_tupid_dt(sub_dir_dt, argv[0], &pel, 0, 1);
 	if(dt < 0) {
-		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[1]);
+		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[0]);
 		return -1;
 	}
 	if(tup_entry_add(dt, &dtent) < 0)
@@ -1091,7 +1098,7 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
-	mtime = strtol(argv[2], NULL, 0);
+	mtime = strtol(argv[1], NULL, 0);
 	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
 	free_pel(pel);

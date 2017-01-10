@@ -153,7 +153,7 @@ int monitor(int argc, char **argv)
 	 * meant for the monitor. Ultimately the options may end up at
 	 * prune_graph(), which ignores args that begin with '-'.
 	 */
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			argv[x][1] = 0;
 			debug_enable("monitor");
@@ -872,7 +872,7 @@ static int autoupdate(const char *cmd)
 		char **args;
 		int x;
 
-		args = malloc((sizeof *args) * (update_argc + 3));
+		args = malloc((sizeof *args) * (update_argc + 4));
 		if(!args) {
 			perror("malloc");
 			exit(1);
@@ -892,14 +892,14 @@ static int autoupdate(const char *cmd)
 			perror("strdup");
 			exit(1);
 		}
-		for(x=1; x<update_argc; x++) {
-			args[x+2] = strdup(update_argv[x]);
-			if(!args[x+2]) {
+		for(x=0; x<update_argc; x++) {
+			args[x+3] = strdup(update_argv[x]);
+			if(!args[x+3]) {
 				perror("strdup");
 				exit(1);
 			}
 		}
-		args[update_argc+2] = NULL;
+		args[update_argc+3] = NULL;
 		execvp("tup", args);
 		perror("execvp");
 		exit(1);

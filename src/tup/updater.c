@@ -151,9 +151,6 @@ int updater(int argc, char **argv, int phase)
 	if(check_full_deps_rebuild() < 0)
 		return -1;
 
-	argc--;
-	argv++;
-
 	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "-d") == 0) {
 			debug_enable("tup.updater");
@@ -263,7 +260,7 @@ int generate(int argc, char **argv)
 	const char *example_script = "script_name.sh";
 #endif
 
-	for(x=1; x<argc; x++) {
+	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "--config") == 0) {
 			if(x+1 >= argc) {
 				fprintf(stderr, "--config requires a filename");
@@ -433,9 +430,6 @@ int todo(int argc, char **argv)
 	int x;
 	int rc;
 	int do_scan = 1;
-
-	argc--;
-	argv++;
 
 	for(x=0; x<argc; x++) {
 		if(strcmp(argv[x], "--no-scan") == 0) {
