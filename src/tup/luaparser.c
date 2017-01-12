@@ -337,7 +337,7 @@ static int tuplua_function_getdirectory(lua_State *ls)
 		char *last_slash;
 		const char *dirstring;
 
-		last_slash = strrchr(get_tup_top(), PATH_SEP);
+		last_slash = strrchr(get_tup_top(), path_sep());
 		if(last_slash) {
 			/* Point to the directory after the last slash */
 			dirstring = last_slash + 1;
@@ -415,7 +415,7 @@ static int tuplua_glob_callback(void *arg, struct tup_entry *tent)
 		fullpath_length = data->directory_size + 1 + tent->name.len;
 		fullpath = malloc(fullpath_length);
 		strncpy(fullpath, data->directory, data->directory_size);
-		fullpath[data->directory_size] = PATH_SEP;
+		fullpath[data->directory_size] = path_sep();
 		strncpy(fullpath + data->directory_size + 1, tent->name.s, tent->name.len);
 	} else {
 		fullpath_length = tent->name.len;

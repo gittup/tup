@@ -222,7 +222,7 @@ static int print_tup_entry_internal(FILE *f, struct tup_entry *tent)
 	if(!tent || !tent->parent)
 		return 0;
 	if(print_tup_entry_internal(f, tent->parent))
-		fprintf(f, "%s", PATH_SEP_STR);
+		fprintf(f, "%c", path_sep());
 	/* Don't print anything for the slash root entry */
 	if(tent->name.s[0] != '/')
 		fprintf(f, "%s", tent->name.s);
@@ -237,8 +237,11 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 	if(!tent)
 		return;
 	if(print_tup_entry_internal(f, tent->parent)) {
-		const char *sep = tent->type == TUP_NODE_CMD ? ": " : PATH_SEP_STR;
-		fprintf(f, "%s", sep);
+		if(tent->type == TUP_NODE_CMD) {
+			fprintf(f, ": ");
+		} else {
+			fprintf(f, "%c", path_sep());
+		}
 	}
 	name = tent->name.s;
 	name_sz = tent->name.len;

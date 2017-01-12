@@ -1,4 +1,4 @@
-.TH "tup" "1" "2015/11/20" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2017/01/12" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -193,8 +193,8 @@ Do not scan the project for changed files. This is for internal tup testing only
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
 .RE
 .TP
-.B generate [--config config-file] script.sh
-The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). For example:
+.B generate [--config config-file] script.sh (or script.bat on Windows)
+The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). On Windows, if the script filename has a ".bat" extension, then the output will be a batch script instead of a shell script. For example:
 .nf
 
 git clone ... myproj

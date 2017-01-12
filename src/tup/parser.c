@@ -769,6 +769,7 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 	char *path;
 	char *p;
 	int x;
+	const char dotdotstr[] = {'.', '.', path_sep(), 0};
 
 	num_dotdots = 0;
 	tent = tf->curtent;
@@ -784,7 +785,7 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 
 	p = path;
 	for(x=0; x<num_dotdots; x++, p += 3) {
-		strcpy(p, ".." PATH_SEP_STR);
+		strcpy(p, dotdotstr);
 	}
 	strcpy(path + num_dotdots*3, tuprules);
 
@@ -2818,7 +2819,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 		}
 
 		memcpy(path, dir, dirlen-1);
-		path[dirlen-1] = PATH_SEP;
+		path[dirlen-1] = path_sep();
 		strcpy(path + dirlen, name);
 	} else {
 		path = strdup(name);
@@ -3024,7 +3025,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 				return -1;
 			}
 			strcpy(onle->path, pl->path);
-			onle->path[plpathlen] = PATH_SEP;
+			onle->path[plpathlen] = path_sep();
 			onle->path[plpathlen + 1] = 0;
 			strncpy(onle->path + plpathlen + 1, pl->pel->path, pl->pel->len);
 			onle->path[plpathlen + 1 + pl->pel->len] = 0;
@@ -3409,7 +3410,7 @@ static void set_nle_base(struct name_list_entry *nle)
 	nle->baselen = 0;
 	while(nle->base > nle->path) {
 		nle->base--;
-		if(nle->base[0] == PATH_SEP) {
+		if(nle->base[0] == path_sep()) {
 			nle->base++;
 			goto out;
 		}
@@ -3682,7 +3683,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				const char *dirstring;
 				int len;
 
-				last_slash = strrchr(get_tup_top(), PATH_SEP);
+				last_slash = strrchr(get_tup_top(), path_sep());
 				if(last_slash) {
 					dirstring = last_slash + 1;
 				} else {

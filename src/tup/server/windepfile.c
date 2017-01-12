@@ -273,11 +273,11 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		return -1;
 	}
 	strcpy(vardict_file, get_tup_top());
-	vardict_file[get_tup_top_len()] = PATH_SEP;
+	vardict_file[get_tup_top_len()] = path_sep();
 	for(x=0; x<strlen(variant->vardict_file); x++) {
 		char c = variant->vardict_file[x];
 		if(c == '/')
-			c = PATH_SEP;
+			c = path_sep();
 		vardict_file[get_tup_top_len() + 1 + x] = c;
 	}
 	vardict_file[get_tup_top_len() + 1 + strlen(variant->vardict_file)] = 0;

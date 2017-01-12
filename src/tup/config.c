@@ -39,6 +39,11 @@ static int tup_top_len;
 static int tup_sub_len;
 static tupid_t tup_sub_dir_dt = -1;
 static int top_fd = -1;
+#ifdef _WIN32
+static char internal_path_sep = '\\';
+#else
+static char internal_path_sep = '/';
+#endif
 
 int find_tup_dir(void)
 {
@@ -176,4 +181,14 @@ int display_output(int fd, int iserr, const char *name, int display_name, FILE *
 		}
 	}
 	return 0;
+}
+
+char path_sep(void)
+{
+	return internal_path_sep;
+}
+
+void set_path_sep(char sep)
+{
+	internal_path_sep = sep;
 }

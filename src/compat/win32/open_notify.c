@@ -22,6 +22,7 @@
 #include "bsd/queue.h"
 #include "tup/file.h"
 #include "tup/db.h"
+#include "tup/config.h"
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -84,7 +85,7 @@ int open_notify(enum access_type at, const char *pathname)
 			fprintf(stderr, "tup internal error: max pathname exceeded.\n");
 			return -1;
 		}
-		fullpath[cwdlen] = PATH_SEP;
+		fullpath[cwdlen] = path_sep();
 		memcpy(fullpath + cwdlen + 1, pathname, pathlen);
 		fullpath[cwdlen + pathlen + 1] = 0;
 

@@ -249,10 +249,12 @@ int generate(int argc, char **argv)
 	char *script_name = NULL;
 	char *config_file = NULL;
 	int verbose_script = 0;
+	int is_batch_script = 0;
 	int x;
 	int rc;
+	const char *file_open_flags = "w";
 #ifdef _WIN32
-	const char *example_script = "script_name.bat";
+	const char *example_script = "script_name.bat | script_name.sh";
 #else
 	const char *example_script = "script_name.sh";
 #endif
@@ -280,6 +282,25 @@ int generate(int argc, char **argv)
 		fprintf(stderr, "Usage: tup generate [--config config_file] %s\n", example_script);
 		return -1;
 	}
+#ifdef _WIN32
+	int len;
+	len = strlen(script_name);
+	if(len >= 4) {
+		if(strcmp(script_name + len - 4, ".bat") == 0) {
+			is_batch_script = 1;
+		} else {
+			/* We have to use '/' as the separator for shell
+			 * scripts, since we normally invoke things with
+			 * CreateProcess, which understands the backslash as a
+			 * path seperator. However, sh does not.
+			 */
+			set_path_sep('/');
+
+			/* We can't use DOS line-endings in shell scripts. */
+			file_open_flags = "wb";
+		}
+	}
+#endif
 	if(tup_entry_init() < 0)
 		return -1;
 	if(tup_db_create(0, 1) < 0)
@@ -350,17 +371,17 @@ int generate(int argc, char **argv)
 		perror("chdir(get_tup_top())\n");
 		return -1;
 	}
-	generate_f = fopen(script_name, "w");
+	generate_f = fopen(script_name, file_open_flags);
 	if(!generate_f) {
 		perror(script_name);
 		fprintf(stderr, "tup error: Unable to open script for writing.\n");
 		return -1;
 	}
-#ifdef _WIN32
-	fprintf(generate_f, "@echo %s\n", verbose_script ? "ON" : "OFF");
-#else
-	fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
-#endif
+	if(is_batch_script) {
+		fprintf(generate_f, "@echo %s\n", verbose_script ? "ON" : "OFF");
+	} else {
+		fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
+	}
 	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)

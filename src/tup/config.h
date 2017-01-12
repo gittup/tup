@@ -33,5 +33,7 @@ const char *get_sub_dir(void);
 int get_sub_dir_len(void);
 int tup_top_fd(void);
 int display_output(int fd, int iserr, const char *name, int display_name, FILE *f);
+char path_sep(void);
+void set_path_sep(char sed);
 
 #endif

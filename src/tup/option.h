@@ -21,8 +21,6 @@
 #ifndef tup_option_h
 #define tup_option_h
 
-#include "compat.h"
-
 int tup_option_process_ini(void);
 int tup_option_init(int argc, char **argv);
 void tup_option_exit(void);
@@ -32,6 +30,6 @@ const char *tup_option_get_string(const char *opt);
 const char *tup_option_get_location(const char *opt);
 int tup_option_show(void);
 
-#define TUP_OPTIONS_FILE ".tup" PATH_SEP_STR "options"
+#define TUP_OPTIONS_FILE ".tup/options"
 
 #endif

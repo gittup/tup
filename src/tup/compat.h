@@ -35,8 +35,6 @@ void compat_lock_disable(void);
 #define is_path_sep(str) ((str)[0] == '/' || (str)[0] == '\\')
 #define is_full_path(str) (is_path_sep(str) || ((str)[0] != '\0' && (str)[1] == ':'))
 #define is_root_path(str) ((str)[0] != '\0' && (str)[1] == ':' && (str)[2] == '\\' && (str)[3] == '\0')
-#define PATH_SEP '\\'
-#define PATH_SEP_STR "\\"
 #define SQL_NAME_COLLATION " collate nocase"
 #define name_cmp stricmp
 #define name_cmp_n strnicmp
@@ -46,8 +44,6 @@ void compat_lock_disable(void);
 #define is_path_sep(ch) ((ch)[0] == '/')
 #define is_full_path is_path_sep
 #define is_root_path(str) (strcmp(str, "/") == 0)
-#define PATH_SEP '/'
-#define PATH_SEP_STR "/"
 #define SQL_NAME_COLLATION ""
 #define name_cmp strcmp
 #define name_cmp_n strncmp

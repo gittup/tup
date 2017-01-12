@@ -657,7 +657,7 @@ static int node_exists(int argc, char **argv)
 			while((p = strchr(p, '/')) != NULL) {
 				/* Don't translate "./foo" to ".\foo" */
 				if(p == argv[x] || p[-1] != '.') {
-					*p = PATH_SEP;
+					*p = path_sep();
 				}
 				p++;
 			}
