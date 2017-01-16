@@ -1497,7 +1497,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 		tmp += dirlen;
 
 		if(prefix_len + dirlen + filelen + 2 > WIDE_PATH_MAX) {
-			DEBUG_HOOK("Error: file plus direcotry too long: '%ls' + '%.*ls'\n", widepath, filelen, file);
+			DEBUG_HOOK("Error: file plus directory too long: '%ls' + '%.*ls'\n", widepath, filelen, file);
 			goto out_empty;
 		}
 
