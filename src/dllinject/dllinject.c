@@ -1454,13 +1454,16 @@ static int ignore_file_w(const wchar_t* file)
 
 static int canon_path(const wchar_t *file, int filelen, char *dest)
 {
-	wchar_t widepath[WIDE_PATH_MAX];
-	wchar_t widefullpath[WIDE_PATH_MAX];
+	wchar_t *widepath;
+	wchar_t *widefullpath;
 	wchar_t other_prefix[] = L"\\??\\"; /* Can't find where this is documented, but NtCreateFile / NtOpenFile use it. */
 	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
 	int prefix_len = 4;
+	int widepath_len; /* excluding the terminating null character, as usual */
+	int bufsize;
 	int len;
 	int count;
+	int branch;
 	if(!file) {
 		DEBUG_HOOK("canon_path: No file - return 0\n");
 		goto out_empty;
@@ -1474,22 +1477,44 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 		goto out_empty;
 	}
 
-	wcscpy(widepath, backslash_prefix);
-
+	/* Two wchar_t buffers with a size of WIDE_PATH_MAX take up 128 KiB in
+	 * total, which might exceed the stack reserve size defined by the target
+	 * executable. Therefore, determine how much we actually need before
+	 * alloca()ing that exact amount of memory. */
 	if(wcsncmp(file, other_prefix, prefix_len) == 0 ||
 	   wcsncmp(file, backslash_prefix, prefix_len) == 0) {
+		branch = 1;
+		widepath_len = filelen;
+	} else if(is_full_path(file)) {
+		branch = 2;
+		widepath_len = prefix_len + filelen;
+	} else {
+		branch = 3;
+		widepath_len = prefix_len + GetCurrentDirectoryW(0, NULL) + 1 + filelen;
+	}
+
+	bufsize = (widepath_len + 1) * sizeof(wchar_t);
+	widepath = __builtin_alloca(bufsize);
+	if(!widepath) {
+		DEBUG_HOOK("Error: failed to allocate a %i-byte wide path buffer for '%.*ls'\n", bufsize, filelen, file);
+		goto out_empty;
+	}
+
+	wcscpy(widepath, backslash_prefix);
+
+	if(branch == 1) {
 		wcsncpy(&widepath[prefix_len], file + prefix_len, filelen - prefix_len);
 		widepath[filelen] = 0;
 		DEBUG_HOOK("canon_path1: Already prefixed: '%.*ls' -> '%ls'\n", filelen, file, widepath);
-	} else if(is_full_path(file)) {
+	} else if(branch == 2) {
 		wcsncpy(&widepath[prefix_len], file, filelen);
 		widepath[filelen + prefix_len] = 0;
 		DEBUG_HOOK("canon_path2: Adding backslash prefix: '%.*ls' -> '%ls'\n", filelen, file, widepath);
-	} else {
+	} else if(branch == 3) {
 		wchar_t *tmp;
 		int dirlen;
 		tmp = widepath + prefix_len;
-		dirlen = GetCurrentDirectoryW(WIDE_PATH_MAX - prefix_len, tmp);
+		dirlen = GetCurrentDirectoryW((widepath_len + 1) - prefix_len, tmp);
 		if(dirlen == 0) {
 			/* TODO: Error handle? */
 			goto out_empty;
@@ -1511,7 +1536,19 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 		DEBUG_HOOK("canon_path3: Prepend CWD: '%.*ls' -> '%ls'\n", filelen, file, widepath);
 	}
 
-	len = GetFullPathName(widepath, WIDE_PATH_MAX, widefullpath, NULL);
+	len = GetFullPathName(widepath, 0, NULL, NULL);
+	if(!len) {
+		goto out_empty;
+	}
+
+	bufsize = (len + 1) * sizeof(wchar_t);
+	widefullpath = __builtin_alloca(bufsize);
+	if(!widefullpath) {
+		DEBUG_HOOK("Error: failed to allocate a %i-byte full wide path buffer for '%s'\n", bufsize, widepath);
+		goto out_empty;
+	}
+
+	len = GetFullPathName(widepath, len + 1, widefullpath, NULL);
 	if(!len) {
 		goto out_empty;
 	}
