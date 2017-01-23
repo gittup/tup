@@ -1459,7 +1459,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 	wchar_t other_prefix[] = L"\\??\\"; /* Can't find where this is documented, but NtCreateFile / NtOpenFile use it. */
 	wchar_t backslash_prefix[] = L"\\\\?\\"; /* \\?\ can be used as a prefix in wide-char paths */
 	int prefix_len = 4;
-	int widepath_len; /* exclusding the terminating null character, as usual */
+	int widepath_len; /* excluding the terminating null character, as usual */
 	int bufsize;
 	int len;
 	int count;
@@ -1495,7 +1495,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 
 	bufsize = (widepath_len + 1) * sizeof(wchar_t);
 	widepath = __builtin_alloca(bufsize);
-	if(widepath) {
+	if(!widepath) {
 		DEBUG_HOOK("Error: failed to allocate a %i-byte wide path buffer for '%.*ls'\n", bufsize, filelen, file);
 		goto out_empty;
 	}
