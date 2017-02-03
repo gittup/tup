@@ -43,6 +43,9 @@ static int watch_path_internal(tupid_t dt, const char *file,
 	struct flist f = FLIST_INITIALIZER;
 	struct stat buf;
 
+	if(file[0] == '.' && file[1])
+		return 0;
+
 	if(lstat(file, &buf) != 0) {
 		if(errno == ENOENT) {
 			/* The file may have been created and then removed before
