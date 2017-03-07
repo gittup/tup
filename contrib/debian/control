@@ -5,6 +5,7 @@ Maintainer: Anatol Pomozov <anatol.pomozov@gmail.com>
 Build-Depends: debhelper (>= 7),
  libfuse-dev (>= 2.8.1),
  pkg-config (>= 0.22),
+ vim-common (>= 7.3),
 Standards-Version: 3.8.4
 Homepage: http://gittup.org/tup/
 
