@@ -2944,6 +2944,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	struct path_list *pl;
 	struct path_list_head tmplist;
 	struct path_list_head tmplist2;
+	int rc = 0;
 
 	TAILQ_INIT(&tmplist);
 	TAILQ_INIT(&tmplist2);
@@ -3046,7 +3047,8 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			fprintf(tf->f, "tup error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
 			free(onle->path);
 			free(onle);
-			return -1;
+			rc = -1;
+			continue;
 		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
@@ -3076,8 +3078,10 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			return -1;
 
 		set_nle_base(onle);
-		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0)
-			return -1;
+		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0) {
+			rc = -1;
+			continue;
+		}
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
@@ -3089,13 +3093,14 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		}
 		if(tupid_tree_add(output_root, onle->tent->tnode.tupid) < 0) {
 			fprintf(tf->f, "tup error: The output file '%s' is listed multiple times in a command.\n", onle->path);
-			return -1;
+			rc = -1;
+			continue;
 		}
 
 		add_name_list_entry(onl, onle);
 	}
 	free_path_list(&tmplist2);
-	return 0;
+	return rc;
 }
 
 struct command_split {
