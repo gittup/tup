@@ -2352,7 +2352,11 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 				}
 			}
 			n = find_node(tf->g, pl->dt);
-			if(n != NULL && !n->already_used) {
+			/* We have to double check n->tent->type here in case a
+			 * directory was deleted and then re-created as
+			 * something else (t6073).
+			 */
+			if(n != NULL && !n->already_used && n->tent->type == TUP_NODE_DIR) {
 				int rc;
 				struct timespan ts;
 				n->already_used = 1;
