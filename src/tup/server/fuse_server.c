@@ -41,6 +41,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/mount.h>
+#ifdef __linux__
+#include <sys/sysmacros.h>
+#endif
 #include <sys/wait.h>
 
 #define TUP_MNT ".tup/mnt"
