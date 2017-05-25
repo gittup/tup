@@ -26,6 +26,15 @@ static const char *default_env[] = {
 /* NOTE: Please increment PARSER_VERSION if these are modified */
 	"PATH",
 	"HOME",
+	"LANG",
+	"LC_COLLATE",
+	"LC_CTYPE",
+	"LC_MESSAGES",
+	"LC_MONETARY",
+	"LC_NUMERIC",
+	"LC_TIME",
+	"LC_PAPER",
+	"LC_ALL",
 #ifdef _WIN32
 	/* Basic Windows variables */
 	"SYSTEMROOT",
