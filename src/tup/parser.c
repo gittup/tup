@@ -3409,7 +3409,7 @@ void init_name_list(struct name_list *nl)
 	nl->totlen = 0;
 	nl->basetotlen = 0;
 	nl->extlessbasetotlen = 0;
-	memset(nl->globtotlen, 0, MAX_GLOBS);
+	memset(nl->globtotlen, 0, MAX_GLOBS * sizeof(int));
 	nl->globcnt = 0;
 }
 
