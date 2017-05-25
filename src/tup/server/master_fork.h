@@ -21,6 +21,7 @@
 #ifndef tup_master_fork_h
 #define tup_master_fork_h
 
+#include "tup/server.h"
 #include "tup/compat.h"
 #include "tup/tupid.h"
 
@@ -35,8 +36,7 @@ struct execmsg {
 	int vardictlen;
 	int num_env_entries;
 	int single_output;
-	int need_namespacing;
-	int run_in_bash;
+	struct exec_flags flags;
 };
 
 #define JOB_MAX 64
