@@ -15,4 +15,3 @@ CFLAGS += -DSQLITE_OMIT_LOAD_EXTENSION
 ifneq (@(TUP_USE_SYSTEM_SQLITE),y)
 : foreach *.c |> !cc |>
 endif
-: foreach *.c |> !mingwcc |>

@@ -20,7 +20,7 @@
 
 #include "dirpath.h"
 
-int __wrap_dup(int oldfd);
+int __wrap_dup(int oldfd) ATTRIBUTE_USED;
 int __real_dup(int oldfd);
 
 int __wrap_dup(int oldfd)

@@ -1027,5 +1027,5 @@ static int ghost_check(void)
 
 static void version(void)
 {
-	printf("tup %s\n", tup_version());
+	printf("tup %s\n", tup_version);
 }

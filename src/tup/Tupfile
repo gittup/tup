@@ -1,3 +1,10 @@
 include_rules
 : foreach *.c | ../luabuiltin/luabuiltin.h |> !cc |>
-: foreach *.c | ../luabuiltin/luabuiltin.h |> !mingwcc |>
+ifneq (@(TUP_PLATFORM),win32)
+: |> version=`git describe` ; echo "const char * const tup_version = \"$version\";" >version.c |> version.c
+else
+# The rule above assumes that commands are run through the shell, which is not the case in Windows
+# And, if running the rule above through bash, Tup complains that some file called 'nul' is written to
+: |> echo const char * const tup_version = "Windows"; >version.c |> version.c
+endif
+: version.c |> !cc |>

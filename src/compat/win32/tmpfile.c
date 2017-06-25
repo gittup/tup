@@ -28,7 +28,7 @@
 #include "tup/config.h"
 #include "compat/dir_mutex.h"
 
-FILE *__wrap_tmpfile(void);
+FILE *__wrap_tmpfile(void) ATTRIBUTE_USED;
 
 FILE *__wrap_tmpfile(void)
 {
