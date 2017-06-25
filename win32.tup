@@ -43,6 +43,6 @@ CFLAGS += -D_UNICODE
 
 CFLAGS32 += $(CFLAGS)
 
-!cc32 = |> ^ CC32 %f^ $(CC32) -c %f -o %o $(CFLAGS32) $(CFLAGS32_%f) |> %B.o32
+!cc32 = |> ^ CC32 %f^ $(CC32) -c -o %o $(CFLAGS32) $(CFLAGS32_%f) %f |> %B.o32
 
 PROGRAM_SUFFIX=.exe
