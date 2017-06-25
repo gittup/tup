@@ -23,6 +23,8 @@ CFLAGS = @(CFLAGS)
 CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -I$(TUP_CWD)/src
 
+LDFLAGS = @(LDFLAGS)
+
 export PKG_CONFIG_PATH
 
 !cc = |> ^ CC %f^ $(CC) -c -o %o $(CFLAGS) $(CFLAGS_%f) %f |> %B.o
