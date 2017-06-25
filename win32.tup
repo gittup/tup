@@ -42,5 +42,7 @@ CFLAGS += -D_UNICODE
 
 !cc32 = |> ^ CC32 %f^ $(CC32) -c %f -o %o $(CFLAGS) $(CFLAGS32) $(CFLAGS32_%f) |> %B.o32
 !ld32 = |> ^ LINK32 %o^ $(CC32) %f -o %o $(LDFLAGS) $(LDFLAGS32) $(LDFLAGS32_%o) |>
+!dll = |> ^ DLL %o^ $(CC) -shared %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
+!dll32 = |> ^ DLL32 %o^ $(CC32) -shared %f -o %o $(LDFLAGS) $(LDFLAGS32) $(LDFLAGS32_%o) |>
 
 PROGRAM_SUFFIX=.exe

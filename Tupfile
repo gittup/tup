@@ -30,8 +30,8 @@ LDFLAGS += `pkg-config fuse --libs`
 LDFLAGS += -lm
 LDFLAGS += -lpthread
 else
-: src/dllinject/*.o |> ^ LINK %o^ $(CC) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject.dll
-: src/dllinject/*.o32 |> ^ LINK %o^ $(CC32) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject32.dll
+: src/dllinject/*.o |> !dll -lpsapi |> tup-dllinject.dll
+: src/dllinject/*.o32 |> !dll32 -lpsapi |> tup-dllinject32.dll
 : src/compat/win32/detect/*.o32 |> !ld32 |> tup32detect$(PROGRAM_SUFFIX)
 
 srcs += src/compat/win32/*.o
