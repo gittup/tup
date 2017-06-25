@@ -44,4 +44,4 @@ LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 # This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
 LDFLAGS += -lole32
 endif
-: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) |> tup$(PROGRAM_SUFFIX)
+: $(srcs) src/lua/liblua.a |> !ld |> tup$(PROGRAM_SUFFIX)
