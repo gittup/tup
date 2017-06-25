@@ -6,40 +6,38 @@ client_objs += src/tup/send_event.o
 client_objs += src/tup/flock/fcntl.o
 : $(client_objs) |> !ar |> libtup_client.a
 : src/tup/vardict.h |> !cp |> tup_client.h
+endif
 
 srcs = src/tup/*.o
+srcs += src/tup/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
+srcs += src/inih/*.o
+srcs += src/compat/*.o
 ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
 LDFLAGS += -lsqlite3
 else
 srcs += src/sqlite3/*.o
 endif
-srcs += src/inih/*.o
-srcs += src/compat/*.o
-: $(srcs) |> !ar |> libtup.a
-
+ifneq ($(TARGET),win32)
 ifeq (@(TUP_SUDO_SUID),y)
 suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
 LDFLAGS += `pkg-config fuse --libs`
 LDFLAGS += -lm
-: src/tup/tup/main.o libtup.a src/lua/liblua.a |> ^ LINK tup^ $(CC) %f -o %o -lpthread $(LDFLAGS) $(suid) |> tup$(PROGRAM_SUFFIX)
+LDFLAGS += -lpthread
 else
 : src/dllinject/*.o |> ^ LINK %o^ $(CC) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject.dll
 : src/dllinject/*.o32 |> ^ LINK %o^ $(CC32) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject32.dll
+: src/compat/win32/detect/*.o32 |> ^ LINK32 %o^ $(CC32) %f -o %o $(LDFLAGS32) $(LDFLAGS32_%o) |> tup32detect$(PROGRAM_SUFFIX)
 
-srcs = src/tup/*.o
-srcs += src/tup/monitor/*.o
-srcs += src/tup/tup/*.o
-srcs += src/tup/flock/*.o
-srcs += src/tup/server/*.o
-srcs += src/inih/*.o
-srcs += src/sqlite3/*.o
-srcs += src/compat/*.o
 srcs += src/compat/win32/*.o
+srcs += tup-dllinject.dll
+
+LDFLAGS += -static-libgcc
+
 LDFLAGS += -Wl,--wrap=open
 LDFLAGS += -Wl,--wrap=close
 LDFLAGS += -Wl,--wrap=tmpfile
@@ -49,7 +47,5 @@ LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 
 # This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
 LDFLAGS += -lole32
-
-: $(srcs) tup-dllinject.dll src/lua/liblua.a |> ^ LINK tup.exe^ $(CC) -static-libgcc %f $(LDFLAGS) -o %o |> tup$(PROGRAM_SUFFIX)
-: src/compat/win32/detect/*.o32 |> ^ LINK32 %o^ $(CC32) %f -o %o $(LDFLAGS32) $(LDFLAGS32_%o) |> tup32detect$(PROGRAM_SUFFIX)
 endif
+: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(suid) |> tup$(PROGRAM_SUFFIX)
