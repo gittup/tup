@@ -6,7 +6,11 @@ else
 TARGET = @(TUP_PLATFORM)
 endif
 
+ifdef CC
+CC = @(CC)
+else
 CC = gcc
+endif
 
 ifeq (@(TUP_DEBUG),y)
 CFLAGS += -g
