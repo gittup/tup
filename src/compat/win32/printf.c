@@ -22,8 +22,8 @@
 #include <stdarg.h>
 #include <windows.h>
 
-int __wrap___mingw_vprintf(const char *format, va_list ap);
-int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
+int __wrap___mingw_vprintf(const char *format, va_list ap) ATTRIBUTE_USED;
+int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap) ATTRIBUTE_USED;
 int __real___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
 
 static char * handle_color(HANDLE output, char *p)

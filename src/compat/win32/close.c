@@ -20,7 +20,7 @@
 
 #include "dirpath.h"
 
-int __wrap_close(int fd);
+int __wrap_close(int fd) ATTRIBUTE_USED;
 int __real_close(int fd);
 
 int __wrap_close(int fd)

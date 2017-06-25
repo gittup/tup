@@ -24,7 +24,7 @@
 #include "dirpath.h"
 #include "open_notify.h"
 
-int __wrap_open(const char *pathname, int flags, ...);
+int __wrap_open(const char *pathname, int flags, ...) ATTRIBUTE_USED;
 
 int __wrap_open(const char *pathname, int flags, ...)
 {
