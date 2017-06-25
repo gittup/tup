@@ -1,5 +1,11 @@
 .gitignore
 
+ifdef TARGET
+TARGET = @(TARGET)
+else
+TARGET = @(TUP_PLATFORM)
+endif
+
 CC = gcc
 
 ifeq (@(TUP_DEBUG),y)
@@ -36,44 +42,12 @@ endif
 
 export PKG_CONFIG_PATH
 
-# Minimum version is windows Vista (for GetFinalPathNameByHandle, at least)
-MINGWCFLAGS += -D_WIN32_WINNT=0x600
-
-# Compatibility function prototypes and include path for wrapper functions
-MINGWCFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
-MINGWCFLAGS += -I$(TUP_CWD)/src/compat/win32
-
-# _GNU_SOURCE lets us use the %lli flag correctly
-MINGWCFLAGS += -D_GNU_SOURCE
-
-# No symlinks on windows
-MINGWCFLAGS += -D'S_ISLNK(a)=0'
-
-# No sig_atomic_t on windows
-MINGWCFLAGS += -Dsig_atomic_t=int
-
-# Use the same value as linux here. The logic is in src/compat/unlinkat.c
-MINGWCFLAGS += -DAT_REMOVEDIR=0x200
-
-# Use wchar functions for Windows (we use UTF8 internally)
-MINGWCFLAGS += -DUNICODE
-MINGWCFLAGS += -D_UNICODE
-
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
 !ar = |> ^ AR %o^ ar crs %o %f |>
 !dot = |> ^ DOT %f^ dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
 !cp = |> ^ CP %f -> %o^ cp %f %o |>
-ifeq (@(TUP_MINGW),)
-!mingwcc = |> |>
-!mingwcc32 = |> |>
-!mingwar = |> |>
-else
-!mingwcc = |> ^ MINGWCC %f^ @(TUP_MINGW)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw
-!mingwcc32 = |> ^ MINGW32CC %f^ @(TUP_MINGW32)-gcc -c %f -o %o $(CFLAGS) $(CFLAGS_%f) $(MINGWCFLAGS) |> %B.omingw32
-!mingwar = |> ^ MINGWAR %o^ @(TUP_MINGW)-ar crs %o %f |>
-endif
 
 TUP_MONITOR = null
 TUP_SUID_GROUP = root
-include @(TUP_PLATFORM).tup
+include $(TARGET).tup
