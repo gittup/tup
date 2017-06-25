@@ -1,4 +1,9 @@
 include_rules
 ifeq ($(TARGET),win32)
+ifeq (@(TUP_PLATFORM),win32)
+CFLAGS += -DATTRIBUTE_USED=__attribute__((used))
+else
+CFLAGS += '-DATTRIBUTE_USED=__attribute__((used))'
+endif
 : foreach *.c |> !cc |>
 endif
