@@ -37,8 +37,6 @@ else
 srcs += src/compat/win32/*.o
 srcs += tup-dllinject.dll
 
-LDFLAGS += -static-libgcc
-
 LDFLAGS += -Wl,--wrap=open
 LDFLAGS += -Wl,--wrap=close
 LDFLAGS += -Wl,--wrap=tmpfile
