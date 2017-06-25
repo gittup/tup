@@ -1,7 +1,6 @@
 ifdef CC32
 CC32 = @(CC32)
 else
-#error CONFIG_CC32 not specified
 CC32 = $(CC)
 CFLAGS32 += -m32
 LDFLAGS32 += -m32
