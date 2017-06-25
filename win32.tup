@@ -42,7 +42,11 @@ endif
 
 LDFLAGS += -static-libgcc
 
-LDFLAGS32 += $(LDFLAGS)
+ifdef LDFLAGS32
+LDFLAGS32 = @(LDFLAGS32)
+else
+LDFLAGS32 = $(LDFLAGS)
+endif
 
 !cc32 = |> ^ CC32 %f^ $(CC32) -c -o %o $(CFLAGS32) $(CFLAGS32_%f) %f |> %B.o32
 !ld32 = |> ^ LINK32 %o^ $(CC32) -o %o %f $(LDFLAGS32) $(LDFLAGS32_%o) |>
