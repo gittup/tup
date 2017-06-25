@@ -32,7 +32,7 @@ LDFLAGS += -lpthread
 else
 : src/dllinject/*.o |> ^ LINK %o^ $(CC) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject.dll
 : src/dllinject/*.o32 |> ^ LINK %o^ $(CC32) -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject32.dll
-: src/compat/win32/detect/*.o32 |> ^ LINK32 %o^ $(CC32) %f -o %o $(LDFLAGS32) $(LDFLAGS32_%o) |> tup32detect$(PROGRAM_SUFFIX)
+: src/compat/win32/detect/*.o32 |> !ld32 |> tup32detect$(PROGRAM_SUFFIX)
 
 srcs += src/compat/win32/*.o
 srcs += tup-dllinject.dll
