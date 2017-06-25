@@ -1,5 +1,7 @@
 include_rules
+ifeq ($(TARGET),win32)
 CFLAGS += -Wno-missing-prototypes
 CFLAGS += -DNDEBUG
-: foreach *.c |> !mingwcc |>
-: foreach *.c |> !mingwcc32 |>
+: foreach *.c |> !cc |>
+: foreach *.c |> !cc32 |>
+endif

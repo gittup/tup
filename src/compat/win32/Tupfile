@@ -1,2 +1,4 @@
 include_rules
-: foreach *.c |> !mingwcc |>
+ifeq ($(TARGET),win32)
+: foreach *.c |> !cc |>
+endif

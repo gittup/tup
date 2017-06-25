@@ -46,10 +46,20 @@
 
 #ifndef __in
 #define __in
+#endif
+#ifndef __out
 #define __out
+#endif
+#ifndef __inout
 #define __inout
+#endif
+#ifndef __in_opt
 #define __in_opt
+#endif
+#ifndef __inout_opt
 #define __inout_opt
+#endif
+#ifndef __reserved
 #define __reserved
 #endif
 

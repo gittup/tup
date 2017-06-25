@@ -7,4 +7,3 @@ CFLAGS += -Wno-cast-qual
 CFLAGS += -DINI_ALLOW_MULTILINE=0
 
 : foreach *.c |> !cc |>
-: foreach *.c |> !mingwcc |>

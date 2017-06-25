@@ -1,3 +1,2 @@
 include_rules
 : foreach *.c | ../luabuiltin/luabuiltin.h |> !cc |>
-: foreach *.c | ../luabuiltin/luabuiltin.h |> !mingwcc |>

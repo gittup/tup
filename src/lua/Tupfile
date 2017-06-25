@@ -36,13 +36,17 @@ srcs += lutf8lib.c
 
 CFLAGS += -w
 
-: foreach $(srcs) |> !cc -DLUA_USE_POSIX |> {objs}
-: foreach $(srcs) |> !mingwcc |> {mingwobjs}
+ifneq ($(TARGET),win32)
+CFLAGS += -DLUA_USE_POSIX
+else
+CFLAGS_lua.c += -Usig_atomic_t
+endif
+
+: foreach $(srcs) |> !cc |> {objs}
 
 : {objs} |> !ar |> liblua.a
-: {mingwobjs} |> !mingwar |> liblua-mingw.a
 
 : foreach lua.c |> !cc |>
 
 LDFLAGS += -lm
-: lua.o liblua.a |> !ld |> lua
+: lua.o liblua.a |> !ld |> lua$(PROGRAM_SUFFIX)
