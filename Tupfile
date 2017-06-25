@@ -21,10 +21,6 @@ else
 srcs += src/sqlite3/*.o
 endif
 ifneq ($(TARGET),win32)
-ifeq (@(TUP_SUDO_SUID),y)
-suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
-endif
-
 LDFLAGS += `pkg-config fuse --libs`
 LDFLAGS += -lm
 LDFLAGS += -lpthread
@@ -48,4 +44,4 @@ LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 # This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
 LDFLAGS += -lole32
 endif
-: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(suid) |> tup$(PROGRAM_SUFFIX)
+: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) |> tup$(PROGRAM_SUFFIX)
