@@ -65,6 +65,7 @@
 #include "tup/timespan.h"
 #include "tup/variant.h"
 #include "tup/init.h"
+#include "tup/pel_group.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -963,12 +964,7 @@ static void *wait_thread(void *arg)
 static int skip_event(struct inotify_event *e)
 {
 	/* Skip hidden files */
-	if(e->len && e->name[0] == '.') {
-		if(strcmp(e->name, ".gitignore") == 0)
-			return 0;
-		return 1;
-	}
-	return 0;
+	return pel_ignored(e->name, e->len);
 }
 
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2)
