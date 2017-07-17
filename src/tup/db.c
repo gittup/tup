@@ -436,64 +436,96 @@ int tup_db_get_tup_config_tent(struct tup_entry **tent)
 	return 0;
 }
 
+#define UPGRADE(x) upgrade_version(sql_##x, ARRAY_SIZE(sql_##x), x)
+static int upgrade_version(const char **upg_stmts, int n, int version)
+{
+	int x;
+	char *errmsg;
+	for(x=0; x<n; x++) {
+		if(sqlite3_exec(tup_db, upg_stmts[x], NULL, NULL, &errmsg) != 0) {
+			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+				errmsg, upg_stmts[x]);
+			return -1;
+		}
+	}
+	if(tup_db_config_set_int("db_version", version + 1) < 0)
+		return -1;
+	return 0;
+}
+
 static int version_check(void)
 {
 	int version;
 	char *errmsg;
-	char sql_1a[] = "alter table link add column style integer default 0";
-	char sql_1b[] = "insert or replace into create_list select id from node where type=2 and not id=2";
-	char sql_1c[] = "update node set type=4 where id in (select to_id from link) and type=0";
+	const char *sql_1[] = {
+		"alter table link add column style integer default 0",
+		"insert or replace into create_list select id from node where type=2 and not id=2",
+		"update node set type=4 where id in (select to_id from link) and type=0",
+	};
 
-	char sql_2a[] = "update link set style=2 where style=1";
-	char sql_2b[] = "update link set style=1 where style=0";
-	char sql_2c[] = "insert into link select from_id, to_id, sum(style) from link group by from_id, to_id";
-	char sql_2d[] = "delete from link where rowid not in (select rowid from link group by from_id, to_id having max(style))";
+	const char *sql_2[] = {
+		"update link set style=2 where style=1",
+		"update link set style=1 where style=0",
+		"insert into link select from_id, to_id, sum(style) from link group by from_id, to_id",
+		"delete from link where rowid not in (select rowid from link group by from_id, to_id having max(style))",
+	};
 
-	char sql_3a[] = "alter table node add column sym integer default -1";
+	const char *sql_3[] = {"alter table node add column sym integer default -1"};
 
-	char sql_4a[] = "drop index link_index";
-	char sql_4b[] = "create index link_index on link(from_id, to_id)";
+	const char *sql_4[] = {
+		"drop index link_index",
+		"create index link_index on link(from_id, to_id)",
+	};
 
-	char sql_5a[] = "create index node_sym_index on node(sym)";
+	const char *sql_5[] = {"create index node_sym_index on node(sym)"};
 
-	char sql_6a[] = "create table ghost_list (id integer primary key not null)";
+	const char *sql_6[] = {"create table ghost_list (id integer primary key not null)"};
 
-	char sql_7a[] = "drop table ghost_list";
+	const char *sql_7[] = {"drop table ghost_list"};
 
-	char sql_8a[] = "alter table node add column mtime integer default -1";
+	const char *sql_8[] = {"alter table node add column mtime integer default -1"};
 
-	char sql_9a[] = "create table link_new (from_id integer, to_id integer, style integer, unique(from_id, to_id))";
-	char sql_9b[] = "insert or ignore into link_new select from_id, to_id, style from link";
-	char sql_9c[] = "drop index link_index";
-	char sql_9d[] = "drop index link_index2";
-	char sql_9e[] = "drop table link";
-	char sql_9f[] = "alter table link_new rename to link";
-	char sql_9g[] = "create index link_index2 on link(to_id)";
+	const char *sql_9[] = {
+		"create table link_new (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
+		"insert or ignore into link_new select from_id, to_id, style from link",
+		"drop index link_index",
+		"drop index link_index2",
+		"drop table link",
+		"alter table link_new rename to link",
+		"create index link_index2 on link(to_id)",
+	};
 
-	char sql_10[] = "drop table delete_list";
+	const char *sql_10[] = {"drop table delete_list"};
 
-	char sql_11a[] = "drop index node_dir_index";
-	char sql_11b[] = "create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))";
-	char sql_11c[] = "insert or ignore into node_new select id, dir, type, sym, mtime, name from node";
-	char sql_11d[] = "drop index node_sym_index";
-	char sql_11e[] = "drop table node";
-	char sql_11f[] = "alter table node_new rename to node";
-	char sql_11g[] = "create index node_sym_index on node(sym)";
+	const char *sql_11[] = {
+		"drop index node_dir_index",
+		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
+		"insert or ignore into node_new select id, dir, type, sym, mtime, name from node",
+		"drop index node_sym_index",
+		"drop table node",
+		"alter table node_new rename to node",
+		"create index node_sym_index on node(sym)",
+	};
 
-	char sql_12a[] = "create table node_new (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))";
-	char sql_12b[] = "insert or ignore into node_new select id, dir, type, mtime, name from node";
-	char sql_12c[] = "drop index node_sym_index";
-	char sql_12d[] = "drop table node";
-	char sql_12e[] = "alter table node_new rename to node";
+	const char *sql_12[] = {
+		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
+		"insert or ignore into node_new select id, dir, type, mtime, name from node",
+		"drop index node_sym_index",
+		"drop table node",
+		"alter table node_new rename to node",
+	};
 
-	char sql_13a[] = "create table config_list (id integer primary key not null)";
-	char sql_13b[] = "create table variant_list (id integer primary key not null)";
-	char sql_13c[] = "alter table node add column srcid integer default -1";
-	const char *sql_13d[] = {
+	const char *sql_13[] = {
+		"create table config_list (id integer primary key not null)",
+		"create table variant_list (id integer primary key not null)",
+		"alter table node add column srcid integer default -1",
+	};
+	const char *sql_13x[] = {
 		"update node set dir=%lli where dir=2",
 		"update create_list set id=%lli where id=2",
 		"update modify_list set id=%lli where id=2",
 	};
+
 	const char *sql_14[] = {
 		"create table normal_link (from_id integer, to_id integer, unique(from_id, to_id))",
 		"create table sticky_link (from_id integer, to_id integer, unique(from_id, to_id))",
@@ -509,11 +541,16 @@ static int version_check(void)
 		"delete from node where type=6",
 		"drop table link",
 	};
-	char sql_15a[] = "create index srcid_index on node(srcid)";
-	char sql_15b[] = "update node set srcid=dir where type=4";
 
-	char sql_16a[] = "alter table node add column display varchar(4096)";
-	char sql_16b[] = "alter table node add column flags varchar(256)";
+	const char *sql_15[] = {
+		"create index srcid_index on node(srcid)",
+		"update node set srcid=dir where type=4",
+	};
+
+	const char *sql_16[] = {
+		"alter table node add column display varchar(4096)",
+		"alter table node add column flags varchar(256)",
+	};
 
 	char *tmpsql;
 	struct tup_entry *vartent;
@@ -553,161 +590,51 @@ static int version_check(void)
 	}
 	switch(version) {
 		case 1:
-			if(sqlite3_exec(tup_db, sql_1a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_1a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_1b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_1b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_1c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_1c);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 2) < 0)
+			if(UPGRADE(1) < 0)
 				return -1;
 			printf("WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
 
 			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
 		case 2:
-			if(sqlite3_exec(tup_db, sql_2a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_2a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_2b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_2b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_2c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_2c);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_2d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_2d);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 3) < 0)
+			if(UPGRADE(2) < 0)
 				return -1;
 			printf("WARNING: Tup database updated to version 3.\nThe style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.\n");
 		case 3:
-			if(sqlite3_exec(tup_db, sql_3a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_3a);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 4) < 0)
+			if(UPGRADE(3) < 0)
 				return -1;
 			printf("WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
 		case 4:
-			if(sqlite3_exec(tup_db, sql_4a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_4a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_4b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_4b);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 5) < 0)
+			if(UPGRADE(4) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
 
 		case 5:
-			if(sqlite3_exec(tup_db, sql_5a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_5a);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 6) < 0)
+			if(UPGRADE(5) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 6.\nAnother minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.\n");
 
 		case 6:
-			if(sqlite3_exec(tup_db, sql_6a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_6a);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 7) < 0)
+			if(UPGRADE(6) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 7.\nThis includes a ghost_list for storing ghost ids so they can later be raptured.\n");
 
 		case 7:
-			if(sqlite3_exec(tup_db, sql_7a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_7a);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 8) < 0)
+			if(UPGRADE(7) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
 
 		case 8:
-			if(sqlite3_exec(tup_db, sql_8a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_8a);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 9) < 0)
+			if(UPGRADE(8) < 0)
 				return -1;
 			printf("WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
 
 		case 9:
-			if(sqlite3_exec(tup_db, sql_9a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9c);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9d);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9e, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9e);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9f, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9f);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_9g, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_9g);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 10) < 0)
+			if(UPGRADE(9) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
 
 		case 10:
-			if(sqlite3_exec(tup_db, sql_10, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_10);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 11) < 0)
+			if(UPGRADE(10) < 0)
 				return -1;
 			printf("NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
 
@@ -720,98 +647,25 @@ static int version_check(void)
 				return -1;
 			if(tup_entry_clear() < 0)
 				return -1;
-			if(sqlite3_exec(tup_db, sql_11a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11c);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11d);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11e, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11e);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11f, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11f);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_11g, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_11g);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 12) < 0)
+			if(UPGRADE(11) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
 
 		case 12:
-			if(sqlite3_exec(tup_db, sql_12a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_12a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_12b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_12b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_12c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_12c);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_12d, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_12d);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_12e, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_12e);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 13) < 0)
+			if(UPGRADE(12) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 13.\nThe sym field was removed, since symlinks are automatically handled by the filesystem layer.\n");
 
 		case 13:
-			if(sqlite3_exec(tup_db, sql_13a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_13a);
+			if(UPGRADE(13) < 0)
 				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_13b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_13b);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_13c, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_13c);
-				return -1;
-			}
 			if(tup_db_get_tup_config_tent(&vartent) < 0)
 				return -1;
 			/* Move all @-variable nodes over to have ./tup.config
 			 * as the parent
 			 */
-			for(x=0; x<ARRAY_SIZE(sql_13d); x++) {
-				tmpsql = sqlite3_mprintf(sql_13d[x], vartent->tnode.tupid);
+			for(x=0; x<ARRAY_SIZE(sql_13x); x++) {
+				tmpsql = sqlite3_mprintf(sql_13x[x], vartent->tnode.tupid);
 				if(!tmpsql) {
 					fprintf(stderr, "tup error: Unable to allocate memory for database upgrade SQL query.\n");
 					return -1;
@@ -826,51 +680,22 @@ static int version_check(void)
 			if(delete_name_file(2) < 0)
 				return -1;
 
-			if(tup_db_config_set_int("db_version", 14) < 0)
-				return -1;
 			printf("NOTE: Tup database updated to version 14.\nA new config_list table was added to handle tup.config changes for variants.\n");
 		case 14:
-			for(x=0; x<ARRAY_SIZE(sql_14); x++) {
-				if(sqlite3_exec(tup_db, sql_14[x], NULL, NULL, &errmsg) != 0) {
-					fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-						errmsg, sql_14[x]);
-					return -1;
-				}
-			}
+			if(UPGRADE(14) < 0)
+				return -1;
 			if(tup_db_reparse_all() < 0)
 				return -1;
 
-			if(tup_db_config_set_int("db_version", 15) < 0)
-				return -1;
 			printf("NOTE: Tup database updated to version 15.\nThe link table was split to better handle groups and simplify logic. All Tupfiles will be re-parsed to add groups using the new tables.\n");
 
 		case 15:
-			if(sqlite3_exec(tup_db, sql_15a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_15a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_15b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_15b);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 16) < 0)
+			if(UPGRADE(15) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 16.\nAdded an index for node.srcid\n");
 
 		case 16:
-			if(sqlite3_exec(tup_db, sql_16a, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_16a);
-				return -1;
-			}
-			if(sqlite3_exec(tup_db, sql_16b, NULL, NULL, &errmsg) != 0) {
-				fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-					errmsg, sql_16b);
-				return -1;
-			}
-			if(tup_db_config_set_int("db_version", 17) < 0)
+			if(UPGRADE(16) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 17.\nAdded display and flags columns. All Tupfiles will be reparsed.\n");
 			if(tup_db_reparse_all() < 0)
