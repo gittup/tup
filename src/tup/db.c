@@ -456,9 +456,18 @@ static int upgrade_version(const char **upg_stmts, int n, int version)
 static int version_check(void)
 {
 	int version;
-	char *errmsg;
 	const char *sql_1[] = {
 		"alter table link add column style integer default 0",
+		"create table create_list (id integer primary key not null)",
+		"create table modify_list (id integer primary key not null)",
+		"create table delete_list (id integer primary key not null)",
+		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, name varchar(4096))",
+		"insert or ignore into node_new select id, dir, type, name from node",
+		"drop index node_dir_index",
+		"drop index node_flags_index",
+		"drop table node",
+		"alter table node_new rename to node",
+		"create index node_dir_index on node(dir, name)",
 		"insert or replace into create_list select id from node where type=2 and not id=2",
 		"update node set type=4 where id in (select to_id from link) and type=0",
 	};
@@ -498,6 +507,11 @@ static int version_check(void)
 	const char *sql_10[] = {"drop table delete_list"};
 
 	const char *sql_11[] = {
+		/* First clear out any ghosts that shouldn't be there.  We
+		 * don't want them to take precedence over real nodes that may
+		 * have been moved over them.
+		 */
+		"delete from node where id in (select id from node as node1 where type=5 and exists(select id from node as node2 where node1.name=node2.name and node1.dir=node2.dir and node2.type!=5))",
 		"drop index node_dir_index",
 		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
 		"insert or ignore into node_new select id, dir, type, sym, mtime, name from node",
@@ -516,14 +530,14 @@ static int version_check(void)
 	};
 
 	const char *sql_13[] = {
+		"insert or ignore into node(dir, name, type, mtime) values(1, 'tup.config', 5, -1)",
 		"create table config_list (id integer primary key not null)",
 		"create table variant_list (id integer primary key not null)",
 		"alter table node add column srcid integer default -1",
-	};
-	const char *sql_13x[] = {
-		"update node set dir=%lli where dir=2",
-		"update create_list set id=%lli where id=2",
-		"update modify_list set id=%lli where id=2",
+		"update node set dir=(select id from node where name='tup.config' and dir=1) where dir=2",
+		"update create_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
+		"update modify_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
+		"delete from node where id=2",
 	};
 
 	const char *sql_14[] = {
@@ -538,8 +552,8 @@ static int version_check(void)
 		"delete from sticky_link where from_id in (select id from node where type=6)",
 		"delete from sticky_link where to_id in (select id from node where type=6)",
 		"delete from node where type=6",
-		"delete from node where type=6",
 		"drop table link",
+		"insert or replace into create_list select id from node where type=2",
 	};
 
 	const char *sql_15[] = {
@@ -550,11 +564,8 @@ static int version_check(void)
 	const char *sql_16[] = {
 		"alter table node add column display varchar(4096)",
 		"alter table node add column flags varchar(256)",
+		"insert or replace into create_list select id from node where type=2",
 	};
-
-	char *tmpsql;
-	struct tup_entry *vartent;
-	int x;
 
 	if(tup_db_config_get_int("db_version", -1, &version) < 0)
 		return -1;
@@ -639,14 +650,6 @@ static int version_check(void)
 			printf("NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
 
 		case 11:
-			/* First clear out any ghosts that shouldn't be there.
-			 * We don't want them to take precedence over real
-			 * nodes that may have been moved over them.
-			 */
-			if(tup_db_debug_add_all_ghosts() < 0)
-				return -1;
-			if(tup_entry_clear() < 0)
-				return -1;
 			if(UPGRADE(11) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
@@ -659,32 +662,10 @@ static int version_check(void)
 		case 13:
 			if(UPGRADE(13) < 0)
 				return -1;
-			if(tup_db_get_tup_config_tent(&vartent) < 0)
-				return -1;
-			/* Move all @-variable nodes over to have ./tup.config
-			 * as the parent
-			 */
-			for(x=0; x<ARRAY_SIZE(sql_13x); x++) {
-				tmpsql = sqlite3_mprintf(sql_13x[x], vartent->tnode.tupid);
-				if(!tmpsql) {
-					fprintf(stderr, "tup error: Unable to allocate memory for database upgrade SQL query.\n");
-					return -1;
-				}
-				if(sqlite3_exec(tup_db, tmpsql, NULL, NULL, &errmsg) != 0) {
-					fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-						errmsg, tmpsql);
-					return -1;
-				}
-				sqlite3_free(tmpsql);
-			}
-			if(delete_name_file(2) < 0)
-				return -1;
 
 			printf("NOTE: Tup database updated to version 14.\nA new config_list table was added to handle tup.config changes for variants.\n");
 		case 14:
 			if(UPGRADE(14) < 0)
-				return -1;
-			if(tup_db_reparse_all() < 0)
 				return -1;
 
 			printf("NOTE: Tup database updated to version 15.\nThe link table was split to better handle groups and simplify logic. All Tupfiles will be re-parsed to add groups using the new tables.\n");
@@ -698,8 +679,6 @@ static int version_check(void)
 			if(UPGRADE(16) < 0)
 				return -1;
 			printf("NOTE: Tup database updated to version 17.\nAdded display and flags columns. All Tupfiles will be reparsed.\n");
-			if(tup_db_reparse_all() < 0)
-				return -1;
 
 			/***************************************/
 			/* Last case must fall through to here */
