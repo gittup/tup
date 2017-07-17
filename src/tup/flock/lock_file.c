@@ -34,7 +34,7 @@ int tup_lock_open(const char *lockname, tup_lock_t *lock)
 		       GENERIC_READ | GENERIC_WRITE,
 		       FILE_SHARE_READ | FILE_SHARE_WRITE,
 		       NULL,
-		       OPEN_EXISTING,
+		       OPEN_ALWAYS,
 		       0,
 		       NULL);
 	if(h == INVALID_HANDLE_VALUE) {

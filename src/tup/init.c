@@ -225,18 +225,6 @@ int init_command(int argc, char **argv)
 		return -1;
 	}
 
-	if(creat(TUP_OBJECT_LOCK, 0666) < 0) {
-		perror(TUP_OBJECT_LOCK);
-		return -1;
-	}
-	if(creat(TUP_SHARED_LOCK, 0666) < 0) {
-		perror(TUP_SHARED_LOCK);
-		return -1;
-	}
-	if(creat(TUP_TRI_LOCK, 0666) < 0) {
-		perror(TUP_TRI_LOCK);
-		return -1;
-	}
 	if(!db_sync) {
 		FILE *f = fopen(TUP_OPTIONS_FILE, "w");
 		if(!f) {

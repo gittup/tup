@@ -19,11 +19,9 @@
 . ./tup.sh
 
 tup init --force foo/bar/baz
-for i in db object shared tri; do
-	if [ ! -f "foo/bar/baz/.tup/$i" ]; then
-		echo "foo/bar/baz/.tup/$i not created!" 1>&2
-		exit 1
-	fi
-done
+if [ ! -f "foo/bar/baz/.tup/db" ]; then
+	echo "foo/bar/baz/.tup/db not created!" 1>&2
+	exit 1
+fi
 
 eotup

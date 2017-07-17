@@ -18,11 +18,9 @@
 
 . ./tup.sh
 
-for i in db object shared tri; do
-	if [ ! -f ".tup/$i" ]; then
-		echo ".tup/$i not created!" 1>&2
-		exit 1
-	fi
-done
+if [ ! -f ".tup/db" ]; then
+	echo ".tup/db not created!" 1>&2
+	exit 1
+fi
 
 eotup

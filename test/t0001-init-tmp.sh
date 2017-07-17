@@ -33,13 +33,11 @@ cleanup
 mkdir $tmpdir
 cd $tmpdir
 tup init
-for i in db object shared tri; do
-	if [ ! -f ".tup/$i" ]; then
-		echo ".tup/$i not created!" 1>&2
-		cleanup
-		exit 1
-	fi
-done
+if [ ! -f ".tup/db" ]; then
+	echo ".tup/db not created!" 1>&2
+	cleanup
+	exit 1
+fi
 cleanup
 
 cd $tupcurdir
