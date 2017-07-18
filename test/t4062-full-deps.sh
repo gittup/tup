@@ -41,7 +41,11 @@ path="/usr/bin/"
 filename="gcc"
 case $tupos in
 	CYGWIN*)
-		path="c:\\MinGW\\bin\\"
+		if which gcc | grep MinGW  > /dev/null; then
+			path="c:\\MinGW\\bin\\"
+		else
+			path="c:\\cygwin64\\bin\\"
+		fi
 		filename="gcc.exe"
 		;;
 esac
