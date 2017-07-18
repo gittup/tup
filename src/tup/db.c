@@ -2178,6 +2178,11 @@ int tup_db_set_mtime(struct tup_entry *tent, time_t mtime)
 	sqlite3_stmt **stmt = &stmts[DB_SET_MTIME];
 	static char s[] = "update node set mtime=? where id=?";
 
+	if(!tent) {
+		fprintf(stderr, "tup internal error: tent is NULL in tup_db_set_mtime()\n");
+		return -1;
+	}
+
 	transaction_check("%s [37m[%li, %lli][0m", s, mtime, tent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {

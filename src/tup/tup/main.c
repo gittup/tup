@@ -934,7 +934,9 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
-	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {
+	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+		return -1;
+	if(tent == NULL) {
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
