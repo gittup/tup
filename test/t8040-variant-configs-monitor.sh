@@ -61,7 +61,7 @@ check_not_exist build-debug/foo
 
 # Fixing up the symlinks should get us back to our old config
 ln -sf ../new-configs/debug.config build-debug/tup.config
-ln -sf ../configs/default.config build-default/tup.config
+ln -sf ../new-configs/default.config build-default/tup.config
 update
 
 check_exist build-default/bar
