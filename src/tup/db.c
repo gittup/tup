@@ -436,135 +436,196 @@ int tup_db_get_tup_config_tent(struct tup_entry **tent)
 	return 0;
 }
 
-#define UPGRADE(x) upgrade_version(sql_##x, ARRAY_SIZE(sql_##x), x)
-static int upgrade_version(const char **upg_stmts, int n, int version)
-{
-	int x;
-	char *errmsg;
-	for(x=0; x<n; x++) {
-		if(sqlite3_exec(tup_db, upg_stmts[x], NULL, NULL, &errmsg) != 0) {
-			fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
-				errmsg, upg_stmts[x]);
-			return -1;
-		}
-	}
-	if(tup_db_config_set_int("db_version", version + 1) < 0)
-		return -1;
-	return 0;
-}
+#define MAX_UPGRADE 13
+struct sql_upgrade {
+	const char *message;
+	const char *statements[MAX_UPGRADE];
+};
 
 static int version_check(void)
 {
 	int version;
-	const char *sql_1[] = {
-		"alter table link add column style integer default 0",
-		"create table create_list (id integer primary key not null)",
-		"create table modify_list (id integer primary key not null)",
-		"create table delete_list (id integer primary key not null)",
-		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, name varchar(4096))",
-		"insert or ignore into node_new select id, dir, type, name from node",
-		"drop index node_dir_index",
-		"drop index node_flags_index",
-		"drop table node",
-		"alter table node_new rename to node",
-		"create index node_dir_index on node(dir, name)",
-		"insert or replace into create_list select id from node where type=2 and not id=2",
-		"update node set type=4 where id in (select to_id from link) and type=0",
-	};
-
-	const char *sql_2[] = {
-		"update link set style=2 where style=1",
-		"update link set style=1 where style=0",
-		"insert into link select from_id, to_id, sum(style) from link group by from_id, to_id",
-		"delete from link where rowid not in (select rowid from link group by from_id, to_id having max(style))",
-	};
-
-	const char *sql_3[] = {"alter table node add column sym integer default -1"};
-
-	const char *sql_4[] = {
-		"drop index link_index",
-		"create index link_index on link(from_id, to_id)",
-	};
-
-	const char *sql_5[] = {"create index node_sym_index on node(sym)"};
-
-	const char *sql_6[] = {"create table ghost_list (id integer primary key not null)"};
-
-	const char *sql_7[] = {"drop table ghost_list"};
-
-	const char *sql_8[] = {"alter table node add column mtime integer default -1"};
-
-	const char *sql_9[] = {
-		"create table link_new (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
-		"insert or ignore into link_new select from_id, to_id, style from link",
-		"drop index link_index",
-		"drop index link_index2",
-		"drop table link",
-		"alter table link_new rename to link",
-		"create index link_index2 on link(to_id)",
-	};
-
-	const char *sql_10[] = {"drop table delete_list"};
-
-	const char *sql_11[] = {
-		/* First clear out any ghosts that shouldn't be there.  We
-		 * don't want them to take precedence over real nodes that may
-		 * have been moved over them.
-		 */
-		"delete from node where id in (select id from node as node1 where type=5 and exists(select id from node as node2 where node1.name=node2.name and node1.dir=node2.dir and node2.type!=5))",
-		"drop index node_dir_index",
-		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
-		"insert or ignore into node_new select id, dir, type, sym, mtime, name from node",
-		"drop index node_sym_index",
-		"drop table node",
-		"alter table node_new rename to node",
-		"create index node_sym_index on node(sym)",
-	};
-
-	const char *sql_12[] = {
-		"create table node_new (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
-		"insert or ignore into node_new select id, dir, type, mtime, name from node",
-		"drop index node_sym_index",
-		"drop table node",
-		"alter table node_new rename to node",
-	};
-
-	const char *sql_13[] = {
-		"insert or ignore into node(dir, name, type, mtime) values(1, 'tup.config', 5, -1)",
-		"create table config_list (id integer primary key not null)",
-		"create table variant_list (id integer primary key not null)",
-		"alter table node add column srcid integer default -1",
-		"update node set dir=(select id from node where name='tup.config' and dir=1) where dir=2",
-		"update create_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
-		"update modify_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
-		"delete from node where id=2",
-	};
-
-	const char *sql_14[] = {
-		"create table normal_link (from_id integer, to_id integer, unique(from_id, to_id))",
-		"create table sticky_link (from_id integer, to_id integer, unique(from_id, to_id))",
-		"create table group_link (from_id integer, to_id integer, cmdid integer, unique(from_id, to_id, cmdid))",
-		"create index normal_index2 on normal_link(to_id)",
-		"create index sticky_index2 on sticky_link(to_id)",
-		"create index group_index2 on group_link(cmdid)",
-		"insert into normal_link select from_id, to_id from link where style=1 or style=3",
-		"insert into sticky_link select from_id, to_id from link where style=2 or style=3",
-		"delete from sticky_link where from_id in (select id from node where type=6)",
-		"delete from sticky_link where to_id in (select id from node where type=6)",
-		"delete from node where type=6",
-		"drop table link",
-		"insert or replace into create_list select id from node where type=2",
-	};
-
-	const char *sql_15[] = {
-		"create index srcid_index on node(srcid)",
-		"update node set srcid=dir where type=4",
-	};
-
-	const char *sql_16[] = {
-		"alter table node add column display varchar(4096)",
-		"alter table node add column flags varchar(256)",
-		"insert or replace into create_list select id from node where type=2",
+	int x, y;
+	char *errmsg;
+	struct sql_upgrade upgrades[] = {
+		{
+			/* Version 1 is built-in. */
+			"Unused",
+			{
+			}
+		},
+		{
+			/* Upgrade to version 2 */
+			"The link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.",
+			{
+				"alter table link add column style integer default 0",
+				"create table create_list (id integer primary key not null)",
+				"create table modify_list (id integer primary key not null)",
+				"create table delete_list (id integer primary key not null)",
+				"create table node_new (id integer primary key not null, dir integer not null, type integer not null, name varchar(4096))",
+				"insert or ignore into node_new select id, dir, type, name from node",
+				"drop index node_dir_index",
+				"drop index node_flags_index",
+				"drop table node",
+				"alter table node_new rename to node",
+				"create index node_dir_index on node(dir, name)",
+				"insert or replace into create_list select id from node where type=2 and not id=2",
+				"update node set type=4 where id in (select to_id from link) and type=0",
+			}
+		},
+		{
+			/* Upgrade to version 3 */
+			"The style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.",
+			{
+				"update link set style=2 where style=1",
+				"update link set style=1 where style=0",
+				"insert into link select from_id, to_id, sum(style) from link group by from_id, to_id",
+				"delete from link where rowid not in (select rowid from link group by from_id, to_id having max(style))",
+			}
+		},
+		{
+			/* Upgrade to version 4 */
+			"A 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.",
+			{
+				"alter table node add column sym integer default -1",
+			}
+		},
+		{
+			/* Upgrade to version 5 */
+			"This is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.",
+			{
+				"drop index link_index",
+				"create index link_index on link(from_id, to_id)",
+			}
+		},
+		{
+			/* Upgrade to version 6 */
+			"Another minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.",
+			{
+				"create index node_sym_index on node(sym)",
+			}
+		},
+		{
+			/* Upgrade to version 7 */
+			"This includes a ghost_list for storing ghost ids so they can later be raptured.",
+			{
+				"create table ghost_list (id integer primary key not null)",
+			}
+		},
+		{
+			/* Upgrade to version 8 */
+			"This is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.",
+			{
+				"drop table ghost_list",
+			}
+		},
+		{
+			/* Upgrade to version 9 */
+			"This version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.",
+			{
+				"alter table node add column mtime integer default -1",
+			}
+		},
+		{
+			/* Upgrade to version 10 */
+			"A new unique constraint was placed on the link table.",
+			{
+				"create table link_new (from_id integer, to_id integer, style integer, unique(from_id, to_id))",
+				"insert or ignore into link_new select from_id, to_id, style from link",
+				"drop index link_index",
+				"drop index link_index2",
+				"drop table link",
+				"alter table link_new rename to link",
+				"create index link_index2 on link(to_id)",
+			}
+		},
+		{
+			/* Upgrade to version 11 */
+			"The delete_list is no longer necessary, and is now gone.",
+			{
+				"drop table delete_list",
+			}
+		},
+		{
+			/* Upgrade to version 12 */
+			"Extraneous ghosts were removed, and a new unique constraint was placed on the node table.",
+			{
+				/* First clear out any ghosts that shouldn't be
+				 * there.  We don't want them to take
+				 * precedence over real nodes that may have
+				 * been moved over them.
+				 */
+				"delete from node where id in (select id from node as node1 where type=5 and exists(select id from node as node2 where node1.name=node2.name and node1.dir=node2.dir and node2.type!=5))",
+				"drop index node_dir_index",
+				"create table node_new (id integer primary key not null, dir integer not null, type integer not null, sym integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
+				"insert or ignore into node_new select id, dir, type, sym, mtime, name from node",
+				"drop index node_sym_index",
+				"drop table node",
+				"alter table node_new rename to node",
+				"create index node_sym_index on node(sym)",
+			}
+		},
+		{
+			/* Upgrade to version 13 */
+			"The sym field was removed, since symlinks are automatically handled by the filesystem layer.",
+			{
+				"create table node_new (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, name varchar(4096), unique(dir, name))",
+				"insert or ignore into node_new select id, dir, type, mtime, name from node",
+				"drop index node_sym_index",
+				"drop table node",
+				"alter table node_new rename to node",
+			}
+		},
+		{
+			/* Upgrade to version 14 */
+			"A new config_list table was added to handle tup.config changes for variants.",
+			{
+				"insert or ignore into node(dir, name, type, mtime) values(1, 'tup.config', 5, -1)",
+				"create table config_list (id integer primary key not null)",
+				"create table variant_list (id integer primary key not null)",
+				"alter table node add column srcid integer default -1",
+				"update node set dir=(select id from node where name='tup.config' and dir=1) where dir=2",
+				"update create_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
+				"update modify_list set id=(select id from node where name='tup.config' and dir=1) where id=2",
+				"delete from node where id=2",
+			}
+		},
+		{
+			/* Upgrade to version 15 */
+			"The link table was split to better handle groups and simplify logic. All Tupfiles will be re-parsed to add groups using the new tables.",
+			{
+				"create table normal_link (from_id integer, to_id integer, unique(from_id, to_id))",
+				"create table sticky_link (from_id integer, to_id integer, unique(from_id, to_id))",
+				"create table group_link (from_id integer, to_id integer, cmdid integer, unique(from_id, to_id, cmdid))",
+				"create index normal_index2 on normal_link(to_id)",
+				"create index sticky_index2 on sticky_link(to_id)",
+				"create index group_index2 on group_link(cmdid)",
+				"insert into normal_link select from_id, to_id from link where style=1 or style=3",
+				"insert into sticky_link select from_id, to_id from link where style=2 or style=3",
+				"delete from sticky_link where from_id in (select id from node where type=6)",
+				"delete from sticky_link where to_id in (select id from node where type=6)",
+				"delete from node where type=6",
+				"drop table link",
+				"insert or replace into create_list select id from node where type=2",
+			}
+		},
+		{
+			/* Upgrade to version 16 */
+			"Added an index for node.srcid",
+			{
+				"create index srcid_index on node(srcid)",
+				"update node set srcid=dir where type=4",
+			}
+		},
+		{
+			/* Upgrade to version 17 */
+			"Added display and flags columns. All Tupfiles will be reparsed.",
+			{
+				"alter table node add column display varchar(4096)",
+				"alter table node add column flags varchar(256)",
+				"insert or replace into create_list select id from node where type=2",
+			}
+		},
 	};
 
 	if(tup_db_config_get_int("db_version", -1, &version) < 0)
@@ -579,6 +640,10 @@ static int version_check(void)
 		return -1;
 	}
 	if(version != DB_VERSION) {
+		if(DB_VERSION > ARRAY_SIZE(upgrades)) {
+			fprintf(stderr, "tup internal error: Trying to upgrade to db version %i, but there are only upgrades available up to %i\n", DB_VERSION, ARRAY_SIZE(upgrades));
+			return -1;
+		}
 		printf("Updating tup database from version %i to %i. This may take a while...\n", version, DB_VERSION);
 		if(monitor_supported() == 0) {
 			/* Monitor is supported (funky return value is because
@@ -598,100 +663,26 @@ static int version_check(void)
 			fprintf(stderr, "tup error: Unable to backup the current database during the db version upgrade.\n");
 			return -1;
 		}
-	}
-	switch(version) {
-		case 1:
-			if(UPGRADE(1) < 0)
-				return -1;
-			printf("WARNING: Tup database updated to version 2.\nThe link table has a new column (style) to annotate the origin of the link. This is used to differentiate between links specified in Tupfiles vs. links determined automatically via wrapped command execution, so the links can be removed at appropriate times. Also, a new node type (TUP_NODE_GENERATED==4) has been added. All files created from commands have been updated to this new type. This is used so you can't try to create a command to write to a base source file. All Tupfiles will be re-parsed on the next update in order to generate the new links. If you have any problems, it might be easiest to re-checkout your code and start anew. Admittedly I haven't tested the conversion completely.\n");
 
-			fprintf(stderr, "NOTE: If you are using the file monitor, you probably want to restart it.\n");
-		case 2:
-			if(UPGRADE(2) < 0)
+		for(x=version; x<ARRAY_SIZE(upgrades); x++) {
+			for(y=0; y<MAX_UPGRADE; y++) {
+				if(upgrades[x].statements[y] == NULL)
+					break;
+				if(sqlite3_exec(tup_db, upgrades[x].statements[y], NULL, NULL, &errmsg) != 0) {
+					fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
+						errmsg, upgrades[x].statements[y]);
+					return -1;
+				}
+			}
+			if(tup_db_config_set_int("db_version", x + 1) < 0)
 				return -1;
-			printf("WARNING: Tup database updated to version 3.\nThe style column in the link table now uses flags instead of multiple records. For example, a link from ID 5 to 7 used to contain 5|7|0 for a normal link and 5|7|1 for a sticky link. Now it is 5|7|1 for a normal link, 5|7|2 for a sticky link, and 5|7|3 for both links.\n");
-		case 3:
-			if(UPGRADE(3) < 0)
-				return -1;
-			printf("WARNING: Tup database updated to version 4.\nA 'sym' column has been added to the node table so symlinks can reference their destination nodes. This is necessary in order to properly handle dependencies on symlinks in an efficient manner.\nWARNING: If you have any symlinks in your system, you probably want to delete and re-create them with the monitor running.\n");
-		case 4:
-			if(UPGRADE(4) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 5.\nThis is a pretty minor update - the link_index is adjusted to use (from_id, to_id) instead of just (from_id). This greatly improves the performance of link insertion, since a query has to be done for uniqueness and style constraints.\n");
-
-		case 5:
-			if(UPGRADE(5) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 6.\nAnother minor update - just adding an index on node.sym so it can be quickly determined if a deleted node needs to be made into a ghost.\n");
-
-		case 6:
-			if(UPGRADE(6) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 7.\nThis includes a ghost_list for storing ghost ids so they can later be raptured.\n");
-
-		case 7:
-			if(UPGRADE(7) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 8.\nThis is really the same as version 6. Turns out putting the ghost_list on disk was kinda stupid. Now it's all handled in a temporary table in memory during a transaction.\n");
-
-		case 8:
-			if(UPGRADE(8) < 0)
-				return -1;
-			printf("WARNING: Tup database updated to version 9.\nThis version includes a per-file timestamp in order to determine if a file has changed in between monitor invocations, or during a scan. You will want to restart the monitor in order to set the mtime field for all the files. Note that since no mtimes currently exist in the database, this will cause all commands to be executed for the next update.\n");
-
-		case 9:
-			if(UPGRADE(9) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 10.\nA new unique constraint was placed on the link table.\n");
-
-		case 10:
-			if(UPGRADE(10) < 0)
-				return -1;
-			printf("NOTE: This database goes to 11.\nThe delete_list is no longer necessary, and is now gone.\n");
-
-		case 11:
-			if(UPGRADE(11) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 12.\nExtraneous ghosts were removed, and a new unique constraint was placed on the node table.\n");
-
-		case 12:
-			if(UPGRADE(12) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 13.\nThe sym field was removed, since symlinks are automatically handled by the filesystem layer.\n");
-
-		case 13:
-			if(UPGRADE(13) < 0)
-				return -1;
-
-			printf("NOTE: Tup database updated to version 14.\nA new config_list table was added to handle tup.config changes for variants.\n");
-		case 14:
-			if(UPGRADE(14) < 0)
-				return -1;
-
-			printf("NOTE: Tup database updated to version 15.\nThe link table was split to better handle groups and simplify logic. All Tupfiles will be re-parsed to add groups using the new tables.\n");
-
-		case 15:
-			if(UPGRADE(15) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 16.\nAdded an index for node.srcid\n");
-
-		case 16:
-			if(UPGRADE(16) < 0)
-				return -1;
-			printf("NOTE: Tup database updated to version 17.\nAdded display and flags columns. All Tupfiles will be reparsed.\n");
-
-			/***************************************/
-			/* Last case must fall through to here */
-			if(tup_db_commit() < 0)
-				return -1;
-			if(tup_db_begin() < 0)
-				return -1;
-			printf("Database update successful. You can remove the backup database file in the .tup/ directory if everything appears to be working.\n");
-		case DB_VERSION:
-			break;
-		default:
-			fprintf(stderr, "tup error: Unable to convert database version %i to version %i\n", version, DB_VERSION);
+			printf("WARNING: Tup database upgraded to version %i.\n%s\n\n", x+1, upgrades[x].message);
+		}
+		if(tup_db_commit() < 0)
 			return -1;
+		if(tup_db_begin() < 0)
+			return -1;
+		printf("Database update successful. You can remove the backup database file in the .tup/ directory if everything appears to be working.\n");
 	}
 
 	if(tup_db_config_get_int("parser_version", 0, &version) < 0)
