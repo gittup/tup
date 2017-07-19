@@ -1158,8 +1158,22 @@ static int handle_event(struct monitor_event *m, int *modified)
 		 */
 		if(tup_db_select_tent(dc->dt_node.tupid, m->e.name, &tent) < 0)
 			return -1;
-		if(tent && tent->type != TUP_NODE_GENERATED)
+		if(tent && tent->type != TUP_NODE_GENERATED) {
+			if(m->e.mask & IN_MOVED_TO) {
+				/* This seems to be specific to certain
+				 * versions of inotify (it was found on Arch).
+				 * What happens is when overwriting a file, we
+				 * get a create event on a temporary file, and
+				 * then an unmatched IN_MOVED_TO event on the
+				 * destination file (eg: tup.config). We would
+				 * like to force an update in this case, but
+				 * not for all IN_CREATE events.
+				 */
+				if(tup_file_mod(dc->dt_node.tupid, m->e.name, NULL) < 0)
+					return -1;
+			}
 			*modified = 1;
+		}
 		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
