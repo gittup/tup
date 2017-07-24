@@ -46,6 +46,7 @@ int thread_tree_insert(struct thread_root *troot, struct thread_tree *data)
 	pthread_mutex_lock(&troot->lock);
 	if(RB_INSERT(thread_entries, &troot->root, data) != NULL)
 		rc = -1;
+	pthread_cond_signal(&troot->cond);
 	pthread_mutex_unlock(&troot->lock);
 	return rc;
 }

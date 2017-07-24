@@ -23,6 +23,7 @@
 #include "tup/server.h"
 #include "tup/db_types.h"
 #include "tup/tupid_tree.h"
+#include "tup/thread_tree.h"
 #include "tup/container.h"
 #include "tup/privs.h"
 #include "tup/config.h"
@@ -44,7 +45,8 @@ struct rcmsg {
 	int status;
 };
 
-struct child_waiter {
+struct child_wait_info {
+	struct thread_tree tnode;
 	pid_t pid;
 	int sid;
 	int umount_dev;
@@ -58,6 +60,8 @@ struct status_tree {
 	int set;
 	pthread_cond_t cond;
 };
+
+static struct thread_root child_waiter_root = THREAD_ROOT_INITIALIZER;
 
 static pthread_mutex_t statuslock = PTHREAD_MUTEX_INITIALIZER;
 static struct tupid_entries status_root = {NULL};
@@ -74,6 +78,7 @@ static int inited = 0;
 static int use_namespacing = 1;
 static int privileged = 0;
 static int full_deps;
+static int child_waiter_exiting = 0;
 
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
@@ -485,7 +490,7 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 static int master_fork_loop(void)
 {
 	struct execmsg em;
-	pthread_attr_t attr;
+	pthread_t waiter_tid;
 	int null_fd;
 	char job[PATH_MAX];
 	char dir[PATH_MAX];
@@ -553,21 +558,17 @@ static int master_fork_loop(void)
 	}
 	if(close(null_fd) < 0) {
 		perror("close(null_fd)");
-		exit(1);
+		return -1;
 	}
 
-	if(pthread_attr_init(&attr) != 0) {
-		perror("pthread_attr_init");
-		exit(1);
+	if(pthread_create(&waiter_tid, NULL, child_waiter, NULL) != 0) {
+		perror("pthread_create()");
+		return -1;
 	}
-	if(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) != 0) {
-		perror("pthread_attr_setdetachstate\n");
-		exit(1);
-	}
+
 	while(1) {
-		struct child_waiter *waiter;
+		struct child_wait_info *waiter;
 		pid_t pid;
-		pthread_t pt;
 
 		if(read_all(msd[0], &em, sizeof(em)) < 0)
 			return -1;
@@ -676,7 +677,11 @@ static int master_fork_loop(void)
 		}
 		waiter->pid = pid;
 		waiter->sid = em.sid;
-		pthread_create(&pt, &attr, child_waiter, waiter);
+		waiter->tnode.id = pid;
+		if(thread_tree_insert(&child_waiter_root, &waiter->tnode) < 0) {
+			fprintf(stderr, "tup internal error: unable to insert pid %i into the thread tree.\n", pid);
+			exit(1);
+		}
 	}
 
 	{
@@ -695,6 +700,12 @@ static int master_fork_loop(void)
 		}
 	}
 
+	pthread_mutex_lock(&child_waiter_root.lock);
+	child_waiter_exiting = 1;
+	pthread_cond_signal(&child_waiter_root.cond);
+	pthread_mutex_unlock(&child_waiter_root.lock);
+	pthread_join(waiter_tid, NULL);
+
 	if(in_valgrind) {
 		if(close(STDIN_FILENO) < 0)
 			perror("close(STDIN_FILENO)");
@@ -710,32 +721,57 @@ static int master_fork_loop(void)
 
 static void *child_waiter(void *arg)
 {
-	struct child_waiter *waiter = arg;
-	struct rcmsg rcm;
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	if(arg) {/* unused */}
+	while(1) {
+		struct child_wait_info *waiter;
+		struct thread_tree *tt;
+		struct rcmsg rcm;
+		pid_t pid;
 
-	memset(&rcm, 0, sizeof(rcm));
-	rcm.sid = waiter->sid;
-	if(waitpid(waiter->pid, &rcm.status, 0) < 0) {
-		perror("waitpid");
-	}
-#ifdef __APPLE__
-	if(waiter->umount_dev) {
-		int rc;
-		rc = unmount(waiter->dev, MNT_FORCE);
-		if(rc < 0) {
-			perror("umount");
-			fprintf(stderr, "tup error: Unable to umount the /dev file-system in the chroot environment. Subprocess pid=%i may not exit properly.\n", waiter->pid);
+		memset(&rcm, 0, sizeof(rcm));
+
+		pthread_mutex_lock(&child_waiter_root.lock);
+		while(RB_EMPTY(&child_waiter_root.root) && !child_waiter_exiting) {
+			pthread_cond_wait(&child_waiter_root.cond, &child_waiter_root.lock);
 		}
-	}
+		pthread_mutex_unlock(&child_waiter_root.lock);
+		if(child_waiter_exiting) {
+			return NULL;
+		}
+
+		pid = wait(&rcm.status);
+		if(pid < 0) {
+			perror("wait");
+			break;
+		}
+
+		tt = thread_tree_search(&child_waiter_root, pid);
+		if(!tt) {
+			fprintf(stderr, "tup internal error: Unable to find pid %i in child_waiter\n", pid);
+			return NULL;
+		}
+		thread_tree_rm(&child_waiter_root, tt);
+
+		waiter = container_of(tt, struct child_wait_info, tnode);
+		rcm.sid = waiter->sid;
+
+#ifdef __APPLE__
+		if(waiter->umount_dev) {
+			int rc;
+			rc = unmount(waiter->dev, MNT_FORCE);
+			if(rc < 0) {
+				perror("umount");
+				fprintf(stderr, "tup error: Unable to umount the /dev file-system in the chroot environment. Subprocess pid=%i may not exit properly.\n", waiter->pid);
+			}
+		}
 #endif
-	pthread_mutex_lock(&lock);
-	if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
-		perror("write");
-		fprintf(stderr, "tup error: Unable to write return status value to the socket. Subprocess pid=%i may not exit properly.\n", waiter->pid);
+		if(write(msd[0], &rcm, sizeof(rcm)) != sizeof(rcm)) {
+			perror("write");
+			fprintf(stderr, "tup error: Unable to write return status value to the socket. Subprocess pid=%i may not exit properly.\n", waiter->pid);
+		}
+
+		free(waiter);
 	}
-	pthread_mutex_unlock(&lock);
-	free(waiter);
 	return NULL;
 }
 
