@@ -1431,10 +1431,12 @@ static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2)
 	return(NULL);
 }
 
-static int ignore_file_w(const wchar_t* file)
+static int ignore_file_w(const wchar_t *file)
 {
 	if (!file)
 		return 0;
+	if (wcsicmp(file, L"\\??\\nul") == 0)
+		return 1;
 	if (wcsicmp(file, L"nul") == 0)
 		return 1;
 	if (wcsicmp(file, L"nul:") == 0)
@@ -1479,7 +1481,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 		goto out_empty;
 	}
 	if(!file[0]) {
-		DEBUG_HOOK("canon_path: nul file - return 0\n");
+		DEBUG_HOOK("canon_path: empty string - return 0\n");
 		goto out_empty;
 	}
 	if(filelen > WIDE_PATH_MAX - prefix_len - 1) {
