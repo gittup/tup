@@ -1825,6 +1825,7 @@ static int create_work(struct graph *g, struct node *n)
 		  n->tent->type == TUP_NODE_FILE ||
 		  n->tent->type == TUP_NODE_GENERATED ||
 		  n->tent->type == TUP_NODE_GROUP ||
+		  n->tent->type == TUP_NODE_GENERATED_DIR ||
 		  n->tent->type == TUP_NODE_CMD) {
 		rc = 0;
 	} else {
