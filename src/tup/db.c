@@ -636,7 +636,7 @@ static int version_check(void)
 	}
 
 	if(version > DB_VERSION) {
-		fprintf(stderr, "tup error: database is version %i, but this version of tup (%s) can only handle up to %i.\n", version, tup_version(), DB_VERSION);
+		fprintf(stderr, "tup error: database is version %i, but this version of tup (%s) can only handle up to %i.\n", version, tup_version, DB_VERSION);
 		return -1;
 	}
 	if(version != DB_VERSION) {

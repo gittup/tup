@@ -1,6 +1,6 @@
 include_rules
 ifneq (@(TUP_PLATFORM),win32)
-: |> version=`git describe` ; (echo '#include "tup/version.h"'; echo "const char *tup_version(void) {return \"$version\";}") > %o |> version.c
+: |> version=`git describe` ; (echo '#include "tup/version.h"'; echo "const char *tup_version = \"$version\";") > %o |> version.c
 else
 : |> produce_version.bat >%o |> version.c
 endif
