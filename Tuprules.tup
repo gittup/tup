@@ -35,6 +35,10 @@ CFLAGS += -fno-common
 CFLAGS += -O2
 endif
 
+ifdef LDFLAGS
+LDFLAGS += @(LDFLAGS)
+endif
+
 ifdef AR
 AR = @(AR)
 else
