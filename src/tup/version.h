@@ -21,7 +21,7 @@
 #ifndef tup_version_h
 #define tup_version_h
 
-/* This function is defined by an automatically generated file */
-const char *tup_version(void);
+/* This constant is defined by an automatically generated file */
+extern const char *tup_version;
 
 #endif
