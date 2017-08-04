@@ -22,6 +22,6 @@
 #define tup_version_h
 
 /* This constant is defined by an automatically generated file */
-extern const char *tup_version;
+extern const char tup_version[];
 
 #endif
