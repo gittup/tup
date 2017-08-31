@@ -813,9 +813,10 @@ static tupid_t get_hash(tupid_t hash, tupid_t id, int style)
 	return hash * 31 + (id * style);
 }
 
-static tupid_t command_name_hash(tupid_t hash, const char *name,
+static tupid_t command_name_hash(tupid_t hash, struct tup_entry *tent,
 				 struct string_entries *root, int mult)
 {
+	const char *name;
 	const char *space;
 	int len;
 	int x;
@@ -824,13 +825,9 @@ static tupid_t command_name_hash(tupid_t hash, const char *name,
 	 * space, so eg: all "gcc" commands can
 	 * potentially be joined.
 	 */
-	if(name[0] == '^') {
-		name++;
-		while(!isspace(*name))
-			name++;
-		while(isspace(*name))
-			name++;
-	}
+	name = tent->display;
+	if(!name)
+		name = tent->name.s;
 	space = strchr(name, ' ');
 	if(space) {
 		len = space - name;
@@ -880,7 +877,7 @@ static tupid_t command_outgoing_hash(tupid_t hash, struct node *n)
 	LIST_FOREACH(e, &n->edges, list) {
 		LIST_FOREACH(e2, &e->dest->edges, list) {
 			if(e2->dest->tent->type == TUP_NODE_CMD) {
-				hash = command_name_hash(hash, e2->dest->tent->name.s, &root, 1);
+				hash = command_name_hash(hash, e2->dest->tent, &root, 1);
 			}
 		}
 	}
@@ -905,7 +902,7 @@ static tupid_t command_incoming_hash(tupid_t hash, struct node *n)
 	LIST_FOREACH(e, &n->incoming, destlist) {
 		LIST_FOREACH(e2, &e->src->incoming, destlist) {
 			if(e2->src->tent->type == TUP_NODE_CMD) {
-				hash = command_name_hash(hash, e2->src->tent->name.s, &root, -1);
+				hash = command_name_hash(hash, e2->src->tent, &root, -1);
 			}
 		}
 	}
@@ -927,7 +924,7 @@ static tupid_t command_hash_func(struct node *n)
 	tupid_t hash = 1;
 
 	/* Command hash is our name... */
-	hash = command_name_hash(hash, n->tent->name.s, NULL, 1);
+	hash = command_name_hash(hash, n->tent, NULL, 1);
 
 	/* Plus the hashes of all unique commands that follow... */
 	hash = command_outgoing_hash(hash, n);
