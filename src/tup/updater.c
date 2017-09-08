@@ -2576,10 +2576,14 @@ static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *
 	input[input_len] = 0;
 	while(isspace(*endp))
 		endp++;
-	output[0] = '.';
-	snprint_tup_entry(output+1, PATH_MAX-1, dtent);
-	strcat(output, "/");
-	strcat(output, endp);
+	if(is_full_path(endp)) {
+		strcpy(output, endp);
+	} else {
+		output[0] = '.';
+		snprint_tup_entry(output+1, PATH_MAX-1, dtent);
+		strcat(output, "/");
+		strcat(output, endp);
+	}
 	return endp;
 }
 
