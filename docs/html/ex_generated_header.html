@@ -40,7 +40,7 @@ int square(int x)
 
 <p>Now we can run our code and get the original output:</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.005s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -70,7 +70,7 @@ echo '#define SIDES_OF_A_TRIANGLE 3'
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.009s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -99,7 +99,7 @@ int main(void)
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -131,7 +131,7 @@ possible this could randomly break in the future.
 <p>Now we can finish the update and take a look at the dependency graph:</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.008s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -151,7 +151,7 @@ possible this could randomly break in the future.
 
 <pre>
 <span class="prompt">$</span> touch gen_triangle.sh
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -162,7 +162,7 @@ possible this could randomly break in the future.
 [    3/3    ] gcc hello.o square.o -o hello
 [ tup ] Updated.
 <span class="prompt">$</span> touch square.h
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.

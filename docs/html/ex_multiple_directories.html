@@ -60,7 +60,7 @@ square.c  square.h
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -123,7 +123,7 @@ tup error: Error parsing Tupfile line 3
  *** tup: 1 job failed.
 </pre>
 
-<p>If we didn't intend for the Tupfile refactoring to change anything, we could keep modifying the Tupfile and running <span class="cmd">tup refactor</span> until all of the refactoring errors are fixed. Of course, if we *do* actually want to change command-lines (such as by switching to -O2 in this case), then just run <span class="cmd">tup upd</span> as normal.</p>
+<p>If we didn't intend for the Tupfile refactoring to change anything, we could keep modifying the Tupfile and running <span class="cmd">tup refactor</span> until all of the refactoring errors are fixed. Of course, if we *do* actually want to change command-lines (such as by switching to -O2 in this case), then just run <span class="cmd">tup</span> as normal.</p>
 
 <hr>
 <h3>Build the program</h3>
@@ -137,7 +137,7 @@ CFLAGS += -O2
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -162,7 +162,7 @@ CFLAGS += -O2
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -189,7 +189,7 @@ CFLAGS += -Inewmath
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -251,7 +251,7 @@ CFLAGS += -O2</span>
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.009s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...

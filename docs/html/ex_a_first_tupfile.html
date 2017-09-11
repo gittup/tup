@@ -31,9 +31,9 @@ int main(void)
 
 <p>This line we typed is known as a ":-rule", since the line begins with a <span class="keyword">:</span>. You can see the gcc command in between the <span class="keyword">|&gt;</span> symbols. The file listed on the left side is the input, and the file listed on the right side is the output. Ignore the redundancy for now -- we'll fix that later.</p>
 
-<p>Now that you have a Tupfile to tell tup what to do, you can run <span class="cmd">tup upd</span> to start the build process. If all goes well, you should see something like the following, only with more colors and cool progress bars:</p>
+<p>Now that you have a Tupfile to tell tup what to do, you can run <span class="cmd">tup</span> to start the build process. If all goes well, you should see something like the following, only with more colors and cool progress bars:</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -48,9 +48,9 @@ Tupfile  hello  hello.c
 Hello, world!
 </pre>
 
-<p>You can try to run <span class="cmd">tup upd</span> again to verify that the file isn't compiled unnecessarily (since it hasn't been changed). Then you can edit the file and see that it *is* rebuilt:</p>
+<p>You can try to run <span class="cmd">tup</span> again to verify that the file isn't compiled unnecessarily (since it hasn't been changed). Then you can edit the file and see that it *is* rebuilt:</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.000s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -71,7 +71,7 @@ int main(void)
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -90,7 +90,7 @@ Hi, everybody!
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -138,7 +138,7 @@ int main(void)
 
 <p>Now we can try to build the new program:</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -154,7 +154,7 @@ collect2: ld returned 1 exit status
 </pre>
 
 <p>Oops, that obviously didn't work, since we forgot to actually compile and link the new C file. Let's do that now.</p>
-<p>Consider how you might build this program with the shell, keeping scalability in mind. As a first step, you would probably compile each C file individually with <span class="cmd">gcc -Wall -c hello.c -o hello.o</span> and <span class="cmd">gcc -Wall -c square.c -o square.o</span>. Similar to before, we will type these compilation commands exactly as is in the Tupfile, and add the input/output annotations. Note that we change the first :-rule to use -c and output to <span class="filename">hello.o</span> instead of <span class="filename">hello</span>. After you've made the changes, run <span class="cmd">tup upd</span>.</p>
+<p>Consider how you might build this program with the shell, keeping scalability in mind. As a first step, you would probably compile each C file individually with <span class="cmd">gcc -Wall -c hello.c -o hello.o</span> and <span class="cmd">gcc -Wall -c square.c -o square.o</span>. Similar to before, we will type these compilation commands exactly as is in the Tupfile, and add the input/output annotations. Note that we change the first :-rule to use -c and output to <span class="filename">hello.o</span> instead of <span class="filename">hello</span>. After you've made the changes, run <span class="cmd">tup</span>.</p>
 
 <span class="modfileheader">Tupfile</span>
 <pre class="code">: hello.c |&gt; gcc -Wall <span class="added">-c </span>hello.c -o hello<span class="added">.o</span> |&gt; hello<span class="added">.o</span>
@@ -162,7 +162,7 @@ collect2: ld returned 1 exit status
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -190,7 +190,7 @@ bash: ./hello: No such file or directory
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -212,7 +212,7 @@ Five squared is: 25
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -337,6 +337,6 @@ Five squared is: 25
 </pre>
 
 <p><div class="img"><div class="desc">Program Dependencies</div><img src="hello.png"></div></p>
-<p>If you were to make a <a href="http://en.wikipedia.org/wiki/Topological_ordering">topological sort (Wikipedia)</a> of the graph, keeping only the rectangle shaped nodes, you would have your shell script again. When <span class="cmd">tup upd</span> gets to the final stage of its processing and actually goes to execute commands, it will start with the files you changed (like <span class="filename">hello.c</span>) and follow the arrows upward until there are no more arrows to follow. Try starting at each of the three base files and see which commands will be executed. It also works for any combination of inputs. In this way, you can think of the tup database as a collection of <span class="keyword">2^n</span> shell scripts, where <span class="keyword">n</span> is the number of input files (since each file can be either "modified" or "unmodified", you get an exponential number of possible fileset changes). Depending on which files you modified, tup will pick out the smallest shell script that updates everything quickly and correctly. Of course, the shell script is generated on the fly using the graph - storing an exponential number of shell scripts would be crazy.</p>
+<p>If you were to make a <a href="http://en.wikipedia.org/wiki/Topological_ordering">topological sort (Wikipedia)</a> of the graph, keeping only the rectangle shaped nodes, you would have your shell script again. When <span class="cmd">tup</span> gets to the final stage of its processing and actually goes to execute commands, it will start with the files you changed (like <span class="filename">hello.c</span>) and follow the arrows upward until there are no more arrows to follow. Try starting at each of the three base files and see which commands will be executed. It also works for any combination of inputs. In this way, you can think of the tup database as a collection of <span class="keyword">2^n</span> shell scripts, where <span class="keyword">n</span> is the number of input files (since each file can be either "modified" or "unmodified", you get an exponential number of possible fileset changes). Depending on which files you modified, tup will pick out the smallest shell script that updates everything quickly and correctly. Of course, the shell script is generated on the fly using the graph - storing an exponential number of shell scripts would be crazy.</p>
 
 <p>This is merely scratching the surface of how tup works - there is much more than just picking out the correct rectangles! After all, those dots and lines have to get in the graph in the first place...</p>

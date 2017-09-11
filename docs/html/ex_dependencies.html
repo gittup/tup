@@ -18,7 +18,7 @@ echo "Output from test.sh"
 
 <pre>
 <span class="prompt">$</span> chmod +x test.sh
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.006s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -34,7 +34,7 @@ Output from test.sh
 <p>So our simple script ran and created the <span class="filename">output.txt</span> file. When will tup decide to run the script again to create a new output? The answer is simple: whenever the <span class="filename">test.sh</span> script changes! Watch as <span class="cmd">tup upd</span> does not re-run the script until the script is touched:</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.000s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -42,7 +42,7 @@ Output from test.sh
 [ tup ] No commands to execute.
 [ tup ] Updated.
 <span class="prompt">$</span> touch test.sh
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.005s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -64,7 +64,7 @@ echo "Output from test.sh"
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -85,7 +85,7 @@ Output from test.sh
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] No Tupfiles to parse.
@@ -123,7 +123,7 @@ echo "Output from test.sh"
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -150,7 +150,7 @@ possible this could randomly break in the future.
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...
@@ -174,7 +174,7 @@ Output from test.sh
 </pre>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] Scanning filesystem...0.007s
 [ tup ] No tup.config changes.
 [ tup ] Parsing Tupfiles...

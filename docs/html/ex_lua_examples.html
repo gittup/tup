@@ -33,7 +33,7 @@ int main(void)
 <p>Compile the project by running:</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] [0.134s] Scanning filesystem...
 [ tup ] [0.252s] Reading in new environment variables...
 [ tup ] [0.369s] Parsing Tupfiles...
@@ -86,7 +86,7 @@ compile('goodbye.c', 'goodbye')
 <p>Build and test the programs:</p>
 
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] [0.000s] Scanning filesystem...
 [ tup ] [0.252s] Reading in new environment variables...
 [ tup ] [0.253s] Parsing Tupfiles...
@@ -151,9 +151,9 @@ compile('goodbye.c', 'goodbye')
 
 <p><span class="filename">Tupfile.lua</span> automatically includes <span class="filename">Tuprules.lua</span> in its current directory and parent directories, so we can access compile in <span class="filename">hello/Tupfile.lua</span> and <span class="filename">goodbye/Tupfile.lua</span>.</p>
 
-<p>Build and test the programs.  You can run <span class="cmd">tup upd</span> from any location under where you ran <span class="cmd">tup init</span>, but for the following listing we run everything in the top directory.</p>
+<p>Build and test the programs.  You can run <span class="cmd">tup</span> from any location under the root of your project (where the <span class="filename">Tupfile.ini</span/ lives, or where you ran <span class="cmd">tup init</span>), but for the following listing we run everything in the top directory.</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] [0.000s] Scanning filesystem...
 [ tup ] [0.286s] Reading in new environment variables...
 [ tup ] [0.287s] Parsing Tupfiles...
@@ -251,7 +251,7 @@ CONFIG_MODULE2=y
 
 <p>As usual, build and test with the following:</p>
 <pre>
-<span class="prompt">$</span> tup upd
+<span class="prompt">$</span> tup
 [ tup ] [0.298s] Scanning filesystem...
 [ tup ] [0.917s] Reading in new configuration/environment variables...
  1) new variant: tup.config
