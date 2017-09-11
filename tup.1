@@ -16,7 +16,7 @@ Tup is a file-based build system. You should use tup if you are developing softw
 .P
 Tup has no domain specific knowledge. You must tell tup how to build your program, such as by saying that all .c files are converted to .o files by using gcc. This is done by writing one or more Tupfiles.
 .SH "PRIMARY COMMAND: tup"
-You can do all of your development with just 'tup', along with writing Tupfiles. See also the \fBINI FILES\fR and \fBTUPFILES\fR sections below.
+You can do all of your development with just 'tup', along with writing Tupfiles. See also the \fBINI FILE\fR, \fBOPTIONS FILES\fR and \fBTUPFILES\fR sections below.
 .TP
 .B tup [<output_1> ... <output_n>]
 Updates the set of outputs based on the dependency graph and the current state of the filesystem. If no outputs are specified then the whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update the requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
@@ -166,7 +166,7 @@ Displays the current tup database configuration. These are internal values used 
 .B options
 Displays all of the current tup options, as well as where they originated.
 
-For details on all of the available options and how to set them, see the section \fBINI FILES\fR below.
+For details on all of the available options and how to set them, see the \fBOPTIONS FILES\fR section below.
 .TP
 .B graph [--dirs] [--ghosts] [--env] [--combine] [--stickies] [<output_1> ... <output_n>]
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. This is generally used for debugging tup -- you may or may not find it helpful for trying to look at the structure of your program.
@@ -228,10 +228,13 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .TP
 .B upd
 Legacy secondary command. Calling 'tup upd' is equivalent to simply calling 'tup'.
-.SH INI FILES
-Tup allows for a variety of configuration files. These files affect the behavior of tup as a program, but not tup as a build system. That is to say, changing any of these options should not affect the end result of a successful build, but may affect how tup gets there (e.g. how many compile jobs to run in parallel).
+.SH INI FILE
+The tup command can be run from anywhere in the source tree.  It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory, which is located at the root directory of the project.  The .tup directory can be created manually with the "tup init" command, but it is much more common to use a Tupfile.ini, which can be added to the project's version control repository.  Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run.
 
-In addition to setting options, Tupfile.ini files have a special property. Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run. This file may be empty. At a minimum, the root directory of a project should contain a file named 'Tupfile.ini' so that users do not need to explicitly run 'tup init' when first setting up a new project.
+The contents of the Tupfile.ini file are ignored.
+
+.SH OPTIONS FILES
+Tup allows for a variety of configuration files. These files affect the behavior of tup as a program, but not tup as a build system. That is to say, changing any of these options should not affect the end result of a successful build, but may affect how tup gets there (e.g. how many compile jobs to run in parallel).
 
 The options are read in the following precedence order:
 
