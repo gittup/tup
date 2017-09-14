@@ -574,7 +574,16 @@ cc -o main_app main.o lib/libstuff.a
 .fi
 .TP
 .B ifeq (lval,rval)
-Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored. Note that no whitespace is pruned for the values - all text between the '(' and ',' comprise 'lval', and all text between the ',' and ')' comprise 'rval'. This means that ifeq (foo, foo) is false, while ifeq(foo,foo) is true. This is for compatibility with Makefile if statements.
+Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored. Note that no whitespace is pruned for the values - all text between the '(' and ',' comprise 'lval', and all text between the ',' and ')' comprise 'rval'. This means that ifeq (foo, foo) is false, while ifeq (foo,foo) is true. This is for compatibility with Makefile if statements.
+.nf
+
+ifeq (@(FOO),y)
+CFLAGS += -DFOO
+else
+CFLAGS += -g
+endif
+
+.fi
 .TP
 .B ifneq (lval,rval)
 Same as 'ifeq', but with the logic inverted.
