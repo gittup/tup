@@ -640,7 +640,16 @@ export FOO
 .fi
 
 Tup will save the current value of FOO and pass it to the environment when executing command2. If FOO has a different value during the next update, then command2 will execute again with the new value in the environment. In this example, command1 will not have FOO in its environment and will not re-execute when its value changes.
+.P
+Note that the FOO above is passed to the environment; it is not provided as an internal variable within tup.  Thus, given the following:
+.nf
 
+export FOO
+: |> echo myFOO=$(FOO) envFOO=${FOO} > %o |> foo.txt
+
+.fi
+when run as "$ FOO=silly tup" would result in the contents of the foo.txt file being "myFOO= envFOO=silly".  If the "export FOO" was removed from the Tupfile, the contents of the file would be "myFOO= envFOO=" because tup does not propogate environment variables unless they are explicitly exported.  This helps preserve repeatable and deterministic builds.
+.P
 If you wish to export a variable to a specific value rather than get the value from the environment, you can do that in your shell instead of through tup. For example, in Linux you can do:
 
 .nf
