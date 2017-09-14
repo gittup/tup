@@ -536,8 +536,42 @@ No other special $-variables exist yet, but to be on the safe side you should as
 .PD 0
 .TP
 .B &var += file
-.PD 1
-Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines.
+p.PD 1
+Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines, and they are later be referenced by using "&(var)".
+.nf
+
+# Tuprules.tup
+&libdir = src/lib
+!cc = |> cc -I&(libdir) -c %f -o %o |> %B.o
+
+# src/lib/Tupfile
+: foreach *.c |> !cc |>
+: *.o |> ar crs %o %f |> libstuff.a
+
+# src/lib/test/Tupfile
+: test_stuff.c |> !cc |>
+: test_stuff.o &(libdir)/libstuff.a |> cc -o %o %f |> test_stuff
+
+# src/Tupfile
+: main.c |> !cc |> main.o
+: main.o &(libdir)/libstuff.a |> cc -o %o %f |> main_app
+
+.fi
+will generate the following build.sh commands (via "tup generate build.sh"):
+.nf
+
+cd src/lib
+cc -I. -c lib1.c -o lib1.o
+cc -I. -c lib2.c -o lib2.o
+ar crs libstuff.a lib1.o lib2.o
+cd test
+cc -I.. -c test_stuff.c -o test_stuff.o
+cc -o test_stuff test_stuff.o ../libstuff.a
+cd ../..
+cc -Ilib -c main.c -o main.o
+cc -o main_app main.o lib/libstuff.a
+
+.fi
 .TP
 .B ifeq (lval,rval)
 Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored. Note that no whitespace is pruned for the values - all text between the '(' and ',' comprise 'lval', and all text between the ',' and ')' comprise 'rval'. This means that ifeq (foo, foo) is false, while ifeq(foo,foo) is true. This is for compatibility with Makefile if statements.
