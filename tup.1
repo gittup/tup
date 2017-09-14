@@ -502,7 +502,18 @@ will produce "../submodules/<submodgroup>" in submodules_f.txt, but "../submodul
 .TP
 .B var := value
 .PD 1
-Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file. Note that you may see a syntax using back-ticks when setting variables, such as:
+Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment.  Any reference to a variable that has not had its value set returns an empty string.
+.nf
+
+CFLAGS = -Dfoo
+: bar.c |> cc $(CFLAGS) $(other) -o %o -c %f |> %B.o
+
+.fi
+will generate the command "cc -Dfoo -o bar.o -c bar.c" when run.
+.P
+Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file.
+.P
+Note that you may see a syntax using back-ticks when setting variables, such as:
 .nf
 
 CFLAGS += `pkg-config fuse --cflags`
