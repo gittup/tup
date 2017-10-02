@@ -1,4 +1,4 @@
-.TH "tup" "1" "2017/01/12" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2017/10/02" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -229,7 +229,7 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .B upd
 Legacy secondary command. Calling 'tup upd' is equivalent to simply calling 'tup'.
 .SH INI FILE
-The tup command can be run from anywhere in the source tree.  It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory, which is located at the root directory of the project.  The .tup directory can be created manually with the "tup init" command, but it is much more common to use a Tupfile.ini, which can be added to the project's version control repository.  Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run.
+The tup command can be run from anywhere in the source tree. It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory located at the root of the project. The .tup directory can be created manually with the "tup init" command, but it is much more common to use a Tupfile.ini, which can be added to the project's version control repository. Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run.
 
 The contents of the Tupfile.ini file are ignored.
 
@@ -262,7 +262,7 @@ All files use the same .ini-style syntax. A section header is enclosed in square
 [updater]
 .fi
 
-The section header is followed by one or more variable definitions, of the form 'variable = value'. Comments start with a semi-colon and continue to the end of the line.  The variable definitions can all be set to integers. For boolean flags, "true"/"yes" and "false"/"no" are synonyms for 1 and 0, respectively. For example, if you have a .tup/options file that contains:
+The section header is followed by one or more variable definitions, of the form 'variable = value'. Comments start with a semi-colon and continue to the end of the line. The variable definitions can all be set to integers. For boolean flags, "true"/"yes" and "false"/"no" are synonyms for 1 and 0, respectively. For example, if you have a .tup/options file that contains:
 
 .nf
 [updater]
@@ -287,7 +287,7 @@ Set to '1' to keep building as much as possible even if errors are encountered. 
 Set to '1' to track dependencies on files outside of the tup hierarchy. The default is '0', which only tracks dependencies within the tup hierarchy. For example, if you want all C files to be re-compiled when gcc is updated on your system, you should set this to '1'. In Linux and OSX, using full dependencies requires that the tup binary is suid as root so that it can run sub-processes in a chroot environment. Alternatively on Linux, if your kernel supports user namespaces, then you don't need to make the binary suid. Note that if this value is set to '1' from '0', tup will rebuild the entire project. Disabling this option when it was previously enabled does not require a full rebuild, but does take some time since the nodes representing external files are cleared out. NOTE: This does not currently work with ccache or other programs that may write to external files due to issues with locking. This may be fixed in the future.
 .TP
 .B updater.warnings (defaults to '1')
-Set to '0' to disable warnings about writing to hidden files. Tup doesn't track files that are hidden. If a sub-process writes to a hidden file, then by default tup will display a warning that this file was created. By disabling this option, those warnings are not displayed.  Hidden filenames (or directories) include: ., .., .tup, .git, .hg, .bzr, .svn.
+Set to '0' to disable warnings about writing to hidden files. Tup doesn't track files that are hidden. If a sub-process writes to a hidden file, then by default tup will display a warning that this file was created. By disabling this option, those warnings are not displayed. Hidden filenames (or directories) include: ., .., .tup, .git, .hg, .bzr, .svn.
 .TP
 .B display.color (default 'auto')
 Set to 'never' to disable ANSI escape codes for colored output, or 'always' to always use ANSI escape codes for colored output. The default is 'auto', which displays uses colored output if stdout is connected to a tty, and uses no colors otherwise (ie: if stdout is redirected to a file).
@@ -502,14 +502,14 @@ will produce "../submodules/<submodgroup>" in submodules_f.txt, but "../submodul
 .TP
 .B var := value
 .PD 1
-Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment.  Any reference to a variable that has not had its value set returns an empty string.
+Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any reference to a variable that has not had its value set returns an empty string.
 .nf
 
 CFLAGS = -Dfoo
 : bar.c |> cc $(CFLAGS) $(other) -o %o -c %f |> %B.o
 
 .fi
-will generate the command "cc -Dfoo -o bar.o -c bar.c" when run.
+will generate the command "cc -Dfoo  -o bar.o -c bar.c" when run.
 .P
 Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file.
 .P
@@ -683,16 +683,16 @@ export FOO
 .fi
 
 Tup will save the current value of FOO and pass it to the environment when executing command2. If FOO has a different value during the next update, then command2 will execute again with the new value in the environment. In this example, command1 will not have FOO in its environment and will not re-execute when its value changes.
-.P
-Note that the FOO above is passed to the environment; it is not provided as an internal variable within tup.  Thus, given the following:
+
+Note that the FOO above is passed to the environment; it is not provided as an internal variable within tup. Thus, given the following:
 .nf
 
 export FOO
 : |> echo myFOO=$(FOO) envFOO=${FOO} > %o |> foo.txt
 
 .fi
-when run as "$ FOO=silly tup" would result in the contents of the foo.txt file being "myFOO= envFOO=silly".  If the "export FOO" was removed from the Tupfile, the contents of the file would be "myFOO= envFOO=" because tup does not propogate environment variables unless they are explicitly exported.  This helps preserve repeatable and deterministic builds.
-.P
+when run as "$ FOO=silly tup" would result in the contents of the foo.txt file being "myFOO= envFOO=silly". If the "export FOO" was removed from the Tupfile, the contents of the file would be "myFOO= envFOO=" because tup does not propogate environment variables unless they are explicitly exported. This helps preserve repeatable and deterministic builds.
+
 If you wish to export a variable to a specific value rather than get the value from the environment, you can do that in your shell instead of through tup. For example, in Linux you can do:
 
 .nf
