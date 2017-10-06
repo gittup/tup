@@ -28,14 +28,14 @@ check_tup_suid
 set_full_deps
 
 cat > Tupfile << HERE
-: |> readlink /proc/self/exe > %o |> file.txt
+: |> readlink -e /proc/self/exe > %o |> file.txt
 HERE
 tup touch Tupfile
 update
 
 rlink=`which readlink`
 if test -h $rlink; then
-	text=`readlink $rlink`
+	text=`readlink -e $rlink`
 else
 	text=$rlink
 fi
