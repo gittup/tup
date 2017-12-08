@@ -195,8 +195,10 @@ int server_pre_init(void)
 		perror("close(msd[0])");
 		return -1;
 	}
+read_rc_again:
 	rc = read(msd[1], &c, 1);
 	if(rc < 0) {
+		if(errno == EINTR) goto read_rc_again;
 		perror("read");
 		return -1;
 	}
@@ -310,6 +312,7 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 	while(bytes_read < size) {
 		rc = read(sd, p + bytes_read, size - bytes_read);
 		if(rc < 0) {
+			if(errno == EINTR) continue;
 			perror("read");
 			fprintf(stderr, "tup error: Unable to read from the master fork socket (read_all called from line %i).\n", line);
 			return -1;
