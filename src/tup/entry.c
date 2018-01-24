@@ -336,21 +336,21 @@ static int entry_openat_internal(int root_dfd, struct tup_entry *tent)
 	if(!tent)
 		return -1;
 	if(tent->parent == NULL) {
-		return dup(root_dfd);
+		return fcntl(root_dfd, F_DUPFD_CLOEXEC, 0);
 	}
 
 	dfd = entry_openat_internal(root_dfd, tent->parent);
 	if(dfd < 0)
 		return dfd;
 
-	newdfd = openat(dfd, tent->name.s, O_RDONLY);
+	newdfd = openat(dfd, tent->name.s, O_RDONLY | O_CLOEXEC);
 	if(newdfd < 0 && errno == ENOENT && tent->type == TUP_NODE_GENERATED_DIR) {
 		if(mkdirat(dfd, tent->name.s, 0777) < 0) {
 			perror(tent->name.s);
 			close(dfd);
 			return -1;
 		}
-		newdfd = openat(dfd, tent->name.s, O_RDONLY);
+		newdfd = openat(dfd, tent->name.s, O_RDONLY | O_CLOEXEC);
 	}
 	if(close(dfd) < 0) {
 		perror("close(dfd)");
@@ -444,7 +444,7 @@ static int create_dir(int dfd, struct tup_entry *tent)
 			return -1;
 		}
 	}
-	newfd = openat(curfd, tent->name.s, O_RDONLY);
+	newfd = openat(curfd, tent->name.s, O_RDONLY | O_CLOEXEC);
 	if(newfd < 0) {
 		perror(tent->name.s);
 		fprintf(stderr, "tup error: Unable to open newly-created sub-directory in the build tree.\n");

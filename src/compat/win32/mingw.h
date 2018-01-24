@@ -25,6 +25,9 @@
 #include <sys/stat.h> /* struct stat redirection */
 #define AT_SYMLINK_NOFOLLOW 0x100
 
+#define O_CLOEXEC 0
+#define F_DUPFD_CLOEXEC 1030
+
 struct stat;
 
 #define lstat(a, b) win_lstat(a, b)
@@ -39,3 +42,4 @@ int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 int symlink(const char *oldpath, const char *newpath);
+int fcntl(int fd, int cmd, int);
