@@ -22,24 +22,17 @@
 #include <windows.h>
 #include <fcntl.h>
 #include "dirpath.h"
-#include "open_notify.h"
 
 int __wrap_open(const char *pathname, int flags, ...) ATTRIBUTE_USED;
 
 int __wrap_open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
-	enum access_type at = ACCESS_READ;
 	HANDLE h;
 	SECURITY_ATTRIBUTES sec;
 	DWORD desiredAccess;
 	DWORD creationDisposition;
 	wchar_t wpathname[PATH_MAX];
-
-	if(flags & O_WRONLY || flags & O_RDWR)
-		at = ACCESS_WRITE;
-	if(open_notify(at, pathname) < 0)
-		return -1;
 
 	if(flags & O_CREAT) {
 		va_list ap;

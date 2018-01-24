@@ -34,13 +34,13 @@ end
 
 local realioopen = io.open
 function io.open(filename, mode)
-	tup.chdir(filename, mode)
+	tup.handle_fileread(filename, mode)
 	return unchdir_after(realioopen(filename, mode))
 end
 
 local realiolines = io.lines
 function io.lines(filename, ...)
-	tup.chdir(filename)
+	tup.handle_fileread(filename)
 	return unchdir_after(realiolines(filename, ...))
 end
 

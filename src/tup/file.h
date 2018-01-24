@@ -72,6 +72,8 @@ struct file_info {
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
+int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
+		      const char *filename, struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info);
 int handle_open_file(enum access_type at, const char *filename,

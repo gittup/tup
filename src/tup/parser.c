@@ -399,6 +399,8 @@ out_server_stop:
 static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char *fullpath, const char *path, int *fd)
 {
 	struct tup_entry *tupfile_tent;
+	if(handle_file_dtent(ACCESS_READ, dtent, path, &tf->ps->s.finfo) < 0)
+		return -1;
 	if(tup_db_select_tent(dtent->tnode.tupid, path, &tupfile_tent) < 0)
 		return -1;
 	if(!tupfile_tent) {
@@ -791,6 +793,10 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
+		if(handle_file_dtent(ACCESS_READ, tf->curtent, p, &tf->ps->s.finfo) < 0) {
+			free(path);
+			return -1;
+		}
 		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
 			if(parser_include_file(tf, p) < 0)
 				goto out_free;
@@ -1096,6 +1102,8 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 		return -1;
 	if(!tent)
 		return 0;
+	if(handle_file_dtent(ACCESS_READ, tf->curtent, tent->name.s, &tf->ps->s.finfo) < 0)
+		return -1;
 	fd = tup_entry_openat(tf->root_fd, tent);
 	if(fd < 0) {
 		if(errno == ENOENT)
@@ -1222,6 +1230,10 @@ int parser_include_file(struct tupfile *tf, const char *file)
 
 	tf->cur_dfd = tup_entry_openat(tf->root_fd, tent->parent);
 	if(tf->cur_dfd < 0) {
+		parser_error(tf, file);
+		goto out_free_pel;
+	}
+	if(handle_file_dtent(ACCESS_READ, tent->parent, tent->name.s, &tf->ps->s.finfo) < 0) {
 		parser_error(tf, file);
 		goto out_free_pel;
 	}

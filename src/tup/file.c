@@ -84,6 +84,33 @@ void finfo_unlock(struct file_info *info)
 	pthread_mutex_unlock(&info->lock);
 }
 
+int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
+		      const char *filename, struct file_info *info)
+{
+	if(is_full_path(filename)) {
+		return handle_file(at, filename, "", info);
+	} else {
+		if(dtent->tnode.tupid == DOT_DT) {
+			return handle_file(at, filename, "", info);
+		} else {
+			char fullname[PATH_MAX];
+			int rc;
+
+			fullname[0] = '.';
+			rc = snprint_tup_entry(fullname+1, sizeof(fullname)-1, dtent);
+			if(rc >= PATH_MAX) {
+				fprintf(stderr, "tup error: string size too small in handle_file_dtent\n");
+				return -1;
+			}
+			if(snprintf(fullname+rc+1, sizeof(fullname)-rc-1, "/%s", filename) >= PATH_MAX) {
+				fprintf(stderr, "tup error: string size too small in handle_file_dtent\n");
+				return -1;
+			}
+			return handle_file(at, fullname, "", info);
+		}
+	}
+}
+
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info)
 {
