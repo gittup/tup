@@ -32,20 +32,41 @@ chmod +x ok.sh
 tup touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
-tup_dep_exist . secret . './ok.sh > output.txt'
 
-# Create 'secret' as a file - this will cause the command to run
+if tup node_exists secret ghost; then
+	filedep=1
+else
+	filedep=0
+fi
+
+if [ $filedep = 1 ]; then
+	tup_dep_exist secret ghost . './ok.sh > output.txt'
+else
+	tup_dep_exist . secret . './ok.sh > output.txt'
+fi
+
+# Create 'secret' as a file - this may cause the command to run
 echo 'foo' > secret
 tup touch secret
 update --no-scan
 tup_object_exist . secret
-tup_dep_exist . secret . './ok.sh > output.txt'
+if [ $filedep = 1 ]; then
+	tup_dep_exist secret ghost . './ok.sh > output.txt'
+else
+	tup_dep_exist . secret . './ok.sh > output.txt'
+fi
+echo nofile | diff output.txt -
 
 # Delete the file
 rm -f secret
 tup rm secret
 update --no-scan
-tup_dep_exist . secret . './ok.sh > output.txt'
+if [ $filedep = 1 ]; then
+	tup_dep_exist secret ghost . './ok.sh > output.txt'
+else
+	tup_dep_exist . secret . './ok.sh > output.txt'
+fi
+echo nofile | diff output.txt -
 
 # Once the dir exists we should get a dependency on 'ghost'
 tmkdir secret
