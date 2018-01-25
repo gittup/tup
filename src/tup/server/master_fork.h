@@ -24,8 +24,6 @@
 #include "tup/compat.h"
 #include "tup/tupid.h"
 
-struct tup_env;
-
 struct execmsg {
 	tupid_t sid;
 	int joblen;
