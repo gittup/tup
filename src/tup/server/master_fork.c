@@ -372,7 +372,7 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	}
 	if(dup2(efd, STDERR_FILENO) < 0) {
 		perror("dup2");
-		fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+		fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
 		return -1;
 	}
 	if(close(ofd) < 0) {
