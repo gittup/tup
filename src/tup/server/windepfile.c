@@ -411,6 +411,15 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
+int server_unlink(void)
+{
+	/* Errant files need to be removed if they are created but not
+	 * specified by the Tupfile since the subprocesses are not sandboxed
+	 * on Windows.
+	 */
+	return 1;
+}
+
 int server_is_dead(void)
 {
 	return (event_got != -1);

@@ -562,6 +562,14 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
+int server_unlink(void)
+{
+	/* No need to unlink errant files with the FUSE server since they are
+	 * created in a temporary sandbox.
+	 */
+	return 0;
+}
+
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tupid_entries *env_root, char **rules)
 {
@@ -580,7 +588,7 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.signalled = 0;
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
-	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir);
+	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir, 0);
 	if(exec_internal(&s, cmdline, &te, tent, 0, 0, 0) < 0)
 		return -1;
 	environ_free(&te);

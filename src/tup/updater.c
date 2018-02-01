@@ -679,7 +679,7 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
-	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir);
+	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink());
 }
 
 static int check_empty_variant(struct tup_entry *tent)

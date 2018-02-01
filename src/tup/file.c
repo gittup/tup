@@ -50,7 +50,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
 
-int init_file_info(struct file_info *info, const char *variant_dir)
+int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
 	LIST_INIT(&info->read_list);
 	LIST_INIT(&info->write_list);
@@ -70,6 +70,7 @@ int init_file_info(struct file_info *info, const char *variant_dir)
 		info->variant_dir = NULL;
 	info->server_fail = 0;
 	info->open_count = 0;
+	info->do_unlink = do_unlink;
 	return 0;
 }
 
@@ -597,11 +598,10 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
-#ifdef _WIN32
-			/* t5038 - Need to clean up files until Windows supports tmpfiles properly. */
-			fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
-			unlink(w->filename);
-#endif
+			if(info->do_unlink) {
+				fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
+				unlink(w->filename);
+			}
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
@@ -624,7 +624,7 @@ out_skip:
 		del_file_entry(w);
 	}
 
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork, info->do_unlink) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {

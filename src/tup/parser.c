@@ -197,7 +197,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			return -1;
 	}
 
-	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
+	init_file_info(&ps.s.finfo, tf.variant->variant_dir, 0);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
 

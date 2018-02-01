@@ -5684,6 +5684,7 @@ struct actual_output_data {
 	tupid_t cmdid;
 	int output_error;
 	struct mapping_head *mapping_list;
+	int do_unlink;
 };
 
 static int extra_output(tupid_t tupid, void *data)
@@ -5700,17 +5701,16 @@ static int extra_output(tupid_t tupid, void *data)
 		fprintf(aod->f, "tup error: Unspecified output files - A command is writing to files that you didn't specify in the Tupfile. You should add them so tup knows what to expect.\n");
 	}
 
-#ifdef _WIN32
-	/* TODO: This can be removed once win32 supports tmp files */
-	tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-	fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
-		tent->name.s, tent->dt);
-	delete_file(tent);
-#else
-	fprintf(aod->f, " -- Unspecified output: ");
-	print_tup_entry(aod->f, tent);
-	fprintf(aod->f, "\n");
-#endif
+	if(aod->do_unlink) {
+		tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+		fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
+			tent->name.s, tent->dt);
+		delete_file(tent);
+	} else {
+		fprintf(aod->f, " -- Unspecified output: ");
+		print_tup_entry(aod->f, tent);
+		fprintf(aod->f, "\n");
+	}
 
 	/* The tent could already exist, for example if there is a ghost file
 	 * here. In such cases if we didn't actually specify this as an output,
@@ -5759,7 +5759,8 @@ static int missing_output(tupid_t tupid, void *data)
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
 				struct mapping_head *mapping_list,
-				int *write_bork)
+				int *write_bork,
+				int do_unlink)
 {
 	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
@@ -5767,6 +5768,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.cmdid = cmdid,
 		.output_error = 0,
 		.mapping_list = mapping_list,
+		.do_unlink = do_unlink,
 	};
 
 	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0)
