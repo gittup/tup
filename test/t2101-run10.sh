@@ -19,7 +19,7 @@
 # Execute a run-script without a newline at the end of a rule.
 
 . ./tup.sh
-check_no_windows shell
+check_no_windows run-script shell
 
 # Need bash for 'echo -n'
 cat > gen.sh << HERE
