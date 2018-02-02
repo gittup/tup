@@ -20,6 +20,7 @@
 # stopped and restarted.
 
 . ./tup.sh
+check_no_ldpreload varsed
 check_monitor_supported
 monitor
 

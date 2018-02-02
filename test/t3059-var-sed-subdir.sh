@@ -19,6 +19,7 @@
 # Same as t3001, but in a sub-directory.
 
 . ./tup.sh
+check_no_ldpreload varsed
 tmkdir sub
 cat > sub/Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt

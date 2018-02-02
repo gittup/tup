@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows mkfifo
+check_no_ldpreload mozilla-unneeded
 
 cat > Tupfile << HERE
 : |> mkfifo %o |> tmpfifo

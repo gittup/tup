@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows TODO - temporary directories
+check_no_ldpreload mozilla-unneeded
 
 cat > Tupfile << HERE
 : |> mkdir %o |> outdir

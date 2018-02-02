@@ -21,6 +21,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_ldpreload mozilla-unneeded
 if ! whoami | grep marf > /dev/null; then
 	echo "[33mSkip t4031 - you're not marf.[0m"
 	eotup

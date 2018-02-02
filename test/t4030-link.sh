@@ -22,6 +22,7 @@
 # For some reason the link call results in an NtCreateFile on the directory
 # instead of on 'outlink'.
 check_no_windows TODO - hard links
+check_no_ldpreload mozilla-unneeded
 
 cat > Tupfile << HERE
 : tmp |> link %f %o |> outlink

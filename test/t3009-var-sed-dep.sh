@@ -20,6 +20,7 @@
 # sticky link change, it looks like this broke.
 
 . ./tup.sh
+check_no_ldpreload varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
 : out.txt |> cat %f > %o |> new.txt

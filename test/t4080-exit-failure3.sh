@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows output_tmp
+check_no_ldpreload tmpfile
 
 cat > ok.sh << HERE
 echo info > log.txt

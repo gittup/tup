@@ -19,6 +19,7 @@
 # Make sure we can use a symlink from the monitor
 . ./tup.sh
 check_monitor_supported
+check_no_ldpreload symlink-dir
 monitor
 
 mkdir foo-x86

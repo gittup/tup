@@ -597,8 +597,34 @@ check_windows()
 	eotup
 }
 
+check_no_ldpreload()
+{
+	case `tup server` in
+	ldpreload)
+		echo "[33mSkipping test for LD_PRELOAD shim in Linux: $1[0m"
+		eotup
+	esac
+}
+
 check_no_windows()
 {
+	case `tup server` in
+	ldpreload)
+		# The LD_PRELOAD shim doesn't support run-scripts, variants, or the client library.
+		for var in "$@"; do
+			if [ "$var" = "run-script" ]; then
+				echo "[33mSkipping run-script test for LD_PRELOAD shim[0m"
+				eotup
+			elif [ "$var" = "variant" ]; then
+				echo "[33mSkipping variant test for LD_PRELOAD shim[0m"
+				eotup
+			elif [ "$var" = "client" ]; then
+				echo "[33mSkipping client test for LD_PRELOAD shim[0m"
+				eotup
+			fi
+		done
+	esac
+
 	case $tupos in
 	CYGWIN*)
 		echo "Not supported in Windows. Skipping test."

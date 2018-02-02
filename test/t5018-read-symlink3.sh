@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows symlink
+check_no_ldpreload symlink-dir
 mkdir arch-x86
 mkdir arch-ppc
 tup touch arch-x86 arch-ppc

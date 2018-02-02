@@ -21,6 +21,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_ldpreload tmpfile
 
 cat > ok.sh << HERE
 echo "\$1" > tmp.txt

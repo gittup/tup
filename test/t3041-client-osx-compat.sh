@@ -22,6 +22,7 @@
 
 . ./tup.sh
 check_no_windows OSX-specific
+check_no_ldpreload varsed
 
 cat > ok.c << HERE
 #include <stdio.h>

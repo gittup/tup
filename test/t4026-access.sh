@@ -20,6 +20,7 @@
 # to a stat()).
 
 . ./tup.sh
+check_no_ldpreload mozilla-unneeded
 
 cat > foo.c << HERE
 #include <unistd.h>

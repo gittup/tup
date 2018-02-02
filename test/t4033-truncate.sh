@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows truncate
+check_no_ldpreload mozilla-unneeded
 
 cat > foo.c << HERE
 #include <stdio.h>

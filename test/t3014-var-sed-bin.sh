@@ -19,6 +19,7 @@
 # Check that static binning with a varsed rule works.
 
 . ./tup.sh
+check_no_ldpreload varsed
 cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt {txt}
 : foreach {txt} |> cp %f %o |> %B.copied

@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows statfs
+check_no_ldpreload mozilla-unneeded
 
 cat > ok.c << HERE
 #include <stdio.h>

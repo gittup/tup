@@ -21,6 +21,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_ldpreload symlink-dir
 
 mkdir foo
 ln -s foo boo

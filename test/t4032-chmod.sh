@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_ldpreload mozilla-unneeded
 
 cat > Tupfile << HERE
 : |> touch %o; chmod 664 %o |> test1

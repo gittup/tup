@@ -19,6 +19,7 @@
 # See what happens if we change where a symlink points while the monitor is away
 . ./tup.sh
 check_monitor_supported
+check_no_ldpreload symlink-dir
 monitor
 
 mkdir foo-x86
