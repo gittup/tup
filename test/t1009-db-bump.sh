@@ -43,6 +43,10 @@ insert into node values(2, 1, 2, 2, '@');
 update config set rval=0 where lval='db_sync';
 update config set rval=1 where lval='db_version';
 HERE
+cat > .tup/options << HERE
+[db]
+sync=0
+HERE
 
 cp ../testTupfile.tup Tupfile
 echo "int main(void) {}" > foo.c
