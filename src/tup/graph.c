@@ -800,11 +800,11 @@ static void dump_node(FILE *f, struct graph *g, struct node *n,
 		struct node *tmp;
 		tmp = find_node(g, n->tent->dt);
 		if(tmp)
-			fprintf(f, "\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot]\n", n->tnode.tupid, n->tent->dt);
+			fprintf(f, "\tnode_%lli -> node_%lli [dir=back color=\"#888888\" arrowtail=odot];\n", n->tnode.tupid, n->tent->dt);
 	}
 
 	LIST_FOREACH(e, &n->edges, list) {
-		fprintf(f, "\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"]\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
+		fprintf(f, "\tnode_%lli -> node_%lli [dir=back,style=\"%s\",arrowtail=\"%s\"];\n", e->dest->tnode.tupid, n->tnode.tupid, (e->style == TUP_LINK_STICKY) ? "dotted" : "solid", (e->style & TUP_LINK_STICKY) ? "normal" : "empty");
 	}
 }
 
