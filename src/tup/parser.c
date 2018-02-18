@@ -1684,18 +1684,17 @@ static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r)
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			   struct name_list *nl, const char *ext, int extlen)
 {
-	struct string_tree *st;
-	char tmp[r->command_len + extlen + 1];
-
-	memcpy(tmp, r->command, r->command_len);
-	if(ext)
-		memcpy(tmp + r->command_len, ext, extlen + 1);
+	struct string_tree *st = NULL;
 
 	/* First try to find the extension-specific rule, and if not then use
 	 * the general one. Eg: if the input is foo.c, then the extension is ".c",
 	 * so try "!cc.c" first, then "!cc" second.
 	 */
-	st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
+	if(ext) {
+		char tmp[r->command_len + extlen + 2];
+		snprintf(tmp, sizeof(tmp), "%.*s.%.*s", r->command_len, r->command, extlen, ext);
+		st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
+	}
 	if(!st) {
 		st = string_tree_search(&tf->bang_root, r->command, r->command_len);
 		if(!st) {
@@ -1948,8 +1947,8 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 			add_name_list_entry(&tmp_nl, &tmp_nle);
 			if(tmp_nle.base &&
 			   tmp_nle.extlessbaselen != tmp_nle.baselen) {
-				ext = tmp_nle.base + tmp_nle.extlessbaselen;
-				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen;
+				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
+				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
 			}
 			if(is_bang) {
 				/* parse_bang_rule overwrites the command and
@@ -1961,10 +1960,7 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
 			}
-			/* The extension in do_rule() does not include the
-			 * leading '.'
-			 */
-			if(do_rule(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
+			if(do_rule(tf, r, &tmp_nl, ext, extlen, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
