@@ -23,6 +23,7 @@
 #include "fslurp.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -134,6 +135,7 @@ static int var_replace(int ifd, int ofd, int binmode)
 		}
 		
 	} while(p < e);
+	free(b.s);
 
 	return 0;
 }

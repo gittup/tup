@@ -242,6 +242,8 @@ static int db_open(void)
 	int x;
 	int db_sync;
 
+	if(tup_db)
+		return 0;
 	if(sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL) != 0) {
 		fprintf(stderr, "Unable to open database: %s\n",
 			sqlite3_errmsg(tup_db));
@@ -285,6 +287,7 @@ int tup_db_close(void)
 			sqlite3_errmsg(tup_db));
 		return -1;
 	}
+	tup_db = NULL;
 	return 0;
 }
 
