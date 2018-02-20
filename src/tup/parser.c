@@ -3296,11 +3296,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		struct tup_entry *tent;
 		if(tup_entry_add(cmdid, &tent) < 0)
 			return -1;
-		if(tent->displaylen != real_displaylen || strncmp(tent->display, real_display, real_displaylen) != 0) {
+		if(tent->displaylen != real_displaylen || (real_displaylen > 0 && strncmp(tent->display, real_display, real_displaylen) != 0)) {
 			if(tup_db_set_display(tent, real_display, real_displaylen) < 0)
 				return -1;
 		}
-		if(tent->flagslen != cs.flagslen || strncmp(tent->flags, cs.flags, cs.flagslen) != 0) {
+		if(tent->flagslen != cs.flagslen || (cs.flagslen > 0 && strncmp(tent->flags, cs.flags, cs.flagslen)) != 0) {
 			if(tf->refactoring) {
 				fprintf(tf->f, "tup refactoring error: Attempting to modify a command's flags:\n");
 				fprintf(tf->f, "Old: '%.*s'\n", tent->flagslen, tent->flags);

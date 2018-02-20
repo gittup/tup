@@ -1046,11 +1046,11 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 		 * it is handled in the parser. So we don't need to check &
 		 * update the 'display' and 'flags' fields.
 		 */
-		if(tent->displaylen != displaylen || strncmp(tent->display, display, displaylen) != 0) {
+		if(tent->displaylen != displaylen || (displaylen > 0 && strncmp(tent->display, display, displaylen) != 0)) {
 			fprintf(stderr, "tup internal error: 'display' field shouldn't be changing here: %.*s -> %.*s\n", tent->displaylen, tent->display, displaylen, display);
 			return NULL;
 		}
-		if(tent->flagslen != flagslen || strncmp(tent->flags, flags, flagslen) != 0) {
+		if(tent->flagslen != flagslen || (flagslen > 0 && strncmp(tent->flags, flags, flagslen) != 0)) {
 			fprintf(stderr, "tup internal error: 'flags' field shouldn't be changing here: %.*s -> %.*s\n", tent->flagslen, tent->flags, flagslen, flags);
 			return NULL;
 		}
