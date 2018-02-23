@@ -146,6 +146,11 @@ int server_pre_init(void)
 	char c = 0;
 	int rc;
 	full_deps = tup_option_get_int("updater.full_deps");
+	if(setpgid(0, 0) < 0) {
+		perror("setpgid");
+		fprintf(stderr, "tup error: Unable to set process group for tup's subprocesses.\n");
+		return -1;
+	}
 	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, msd) < 0) {
 		perror("socketpair");
 		return -1;
