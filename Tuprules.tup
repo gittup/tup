@@ -12,23 +12,13 @@ else
 CC = gcc
 endif
 
-ifeq (@(TUP_DEBUG),y)
-CFLAGS += -g
+CFLAGS += -D_FILE_OFFSET_BITS=64
+CFLAGS += -I$(TUP_CWD)/src
+ifdef CFLAGS
+CFLAGS += @(CFLAGS)
 else
-CFLAGS += -Os
-endif
-
-ifdef AR
-AR = @(AR)
-else
-AR = ar
-endif
-
 CFLAGS += -W
 CFLAGS += -Wall
-ifeq (@(TUP_WERROR),y)
-CFLAGS += -Werror
-endif
 CFLAGS += -Wbad-function-cast
 CFLAGS += -Wcast-align
 CFLAGS += -Wcast-qual
@@ -42,12 +32,17 @@ CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wwrite-strings
 CFLAGS += -Wswitch-enum
 CFLAGS += -fno-common
-CFLAGS += -D_FILE_OFFSET_BITS=64
-CFLAGS += -I$(TUP_CWD)/src
+CFLAGS += -O2
+endif
 
-ifeq (@(TUP_32_BIT),y)
-CFLAGS += -m32
-LDFLAGS += -m32
+ifdef LDFLAGS
+LDFLAGS += @(LDFLAGS)
+endif
+
+ifdef AR
+AR = @(AR)
+else
+AR = ar
 endif
 
 export PKG_CONFIG_PATH
