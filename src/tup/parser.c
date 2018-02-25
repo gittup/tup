@@ -3585,6 +3585,19 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				estring_append(&e, nle->base, nle->baselen);
 				first = 0;
 			}
+		} else if(*next == 'D') {
+			int first = 1;
+			if(nl->num_entries == 0) {
+				fprintf(tf->f, "tup error: %%D used in rule pattern and no input files were specified.\n");
+				return NULL;
+			}
+			TAILQ_FOREACH(nle, &nl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->path, nle->dirlen + (nle->path[nle->dirlen] == path_sep() ? 1 : 0));
+				first = 0;
+			}
 		} else if(*next == 'B') {
 			int first = 1;
 			if(nl->num_entries == 0) {
