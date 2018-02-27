@@ -18,6 +18,14 @@ else
 CFLAGS += -Os
 endif
 
+ifeq (@(TUP_SANITIZE),y)
+CFLAGS += -fsanitize=address
+LDFLAGS += -lasan
+
+CFLAGS += -fsanitize=undefined
+LDFLAGS += -lubsan
+endif
+
 ifdef AR
 AR = @(AR)
 else
