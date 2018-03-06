@@ -42,3 +42,5 @@ LDFLAGS += -static-libgcc
 !dll32 = |> ^ DLL32 %o^ $(CC32) -shared %f -o %o $(LDFLAGS) $(LDFLAGS32) $(LDFLAGS32_%o) |>
 
 PROGRAM_SUFFIX=.exe
+
+TUP_SERVER = windepfile

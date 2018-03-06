@@ -4,8 +4,10 @@ fuse_cflags = `pkg-config fuse --cflags`
 CFLAGS_fuse_server.c += $(fuse_cflags)
 CFLAGS_fuse_fs.c += $(fuse_cflags)
 
-ifneq ($(TARGET),win32)
+ifeq ($(TUP_SERVER),fuse)
 : foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
-else
+endif
+
+ifeq ($(TUP_SERVER),windepfile)
 : windepfile.c |> !cc |>
 endif

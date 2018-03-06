@@ -157,6 +157,9 @@ int main(int argc, char **argv)
 		}
 #endif
 		return tup_privileged();
+	} else if(strcmp(cmd, "server") == 0) {
+		printf("%s\n", TUP_SERVER);
+		return 0;
 	}
 
 	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */

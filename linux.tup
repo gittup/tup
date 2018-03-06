@@ -1,1 +1,2 @@
 TUP_MONITOR = inotify
+TUP_SERVER = fuse
