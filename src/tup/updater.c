@@ -1230,6 +1230,12 @@ static int process_create_nodes(void)
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
 		return -1;
+	/* Force total_mtime to -1 so we count directory nodes rather than use
+	 * their mtimes to determine progress. In some cases we may assign an
+	 * mtime to a directory, which can make things misleading.
+	 */
+	g.total_mtime = -1;
+
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
