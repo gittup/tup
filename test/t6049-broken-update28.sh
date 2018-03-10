@@ -21,8 +21,6 @@
 # user file.
 
 . ./tup.sh
-# Windows should be able to support this in the future.
-check_no_windows TODO
 
 echo "hey there" > foo.c
 cat > Tupfile << HERE

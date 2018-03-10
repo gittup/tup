@@ -5702,10 +5702,21 @@ static int extra_output(tupid_t tupid, void *data)
 	}
 
 	if(aod->do_unlink) {
-		tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
-		fprintf(aod->f, "[35m -- Delete: %s at dir %lli[0m\n",
-			tent->name.s, tent->dt);
-		delete_file(tent);
+		if(tent->type == TUP_NODE_GHOST) {
+			fprintf(aod->f, "[35m -- Delete: [0m");
+			print_tup_entry(aod->f, tent);
+			fprintf(aod->f, "\n");
+			delete_file(tent);
+		} else if(tent->type == TUP_NODE_GENERATED) {
+			fprintf(aod->f, " -- Rescheduling command for: ");
+			print_tup_entry(aod->f, tent);
+			fprintf(aod->f, "\n");
+			tup_db_modify_cmds_by_output(tent->tnode.tupid, NULL);
+		} else {
+			fprintf(aod->f, " -- [31mFILE OVERWRITTEN (you may need to revert this file manually): [0m");
+			print_tup_entry(aod->f, tent);
+			fprintf(aod->f, "\n");
+		}
 	} else {
 		fprintf(aod->f, " -- Unspecified output: ");
 		print_tup_entry(aod->f, tent);
