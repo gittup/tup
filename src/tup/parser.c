@@ -424,6 +424,21 @@ static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char
 	return 0;
 }
 
+static int parser_entry_open(struct tupfile *tf, struct tup_entry *tent)
+{
+	int fd;
+	if(handle_file_dtent(ACCESS_READ, tent->parent, tent->name.s, &tf->ps->s.finfo) < 0) {
+		parser_error(tf, tent->name.s);
+		return -1;
+	}
+	fd = tup_entry_openat(tf->root_fd, tent);
+	if(fd < 0) {
+		parser_error(tf, tent->name.s);
+		return -1;
+	}
+	return fd;
+}
+
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 			char *path, int *parser_lua, int *fd)
 {
@@ -1102,9 +1117,7 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 		return -1;
 	if(!tent)
 		return 0;
-	if(handle_file_dtent(ACCESS_READ, tf->curtent, tent->name.s, &tf->ps->s.finfo) < 0)
-		return -1;
-	fd = tup_entry_openat(tf->root_fd, tent);
+	fd = parser_entry_open(tf, tent);
 	if(fd < 0) {
 		if(errno == ENOENT)
 			return 0;
@@ -1233,13 +1246,8 @@ int parser_include_file(struct tupfile *tf, const char *file)
 		parser_error(tf, file);
 		goto out_free_pel;
 	}
-	if(handle_file_dtent(ACCESS_READ, tent->parent, tent->name.s, &tf->ps->s.finfo) < 0) {
-		parser_error(tf, file);
-		goto out_free_pel;
-	}
-	fd = tup_entry_openat(tf->root_fd, tent);
+	fd = parser_entry_open(tf, tent);
 	if(fd < 0) {
-		parser_error(tf, file);
 		goto out_close_dfd;
 	}
 	if(fslurp_null(fd, &incb) < 0)
