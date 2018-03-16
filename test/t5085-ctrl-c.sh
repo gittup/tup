@@ -21,13 +21,14 @@
 . ./tup.sh
 check_no_windows process
 
+mypid=$$
 cat > Tupfile << HERE
-: |> sh ctrlctup.sh 0.1 |>
-: |> sh ctrlctup.sh 0.2 |>
-: |> sh ctrlctup.sh 0.3 |>
-: |> sh ctrlctup.sh 2.0 |>
+: |> sh ctrlctup-$mypid.sh 0.1 |>
+: |> sh ctrlctup-$mypid.sh 0.2 |>
+: |> sh ctrlctup-$mypid.sh 0.3 |>
+: |> sh ctrlctup-$mypid.sh 2.0 |>
 HERE
-cat > ctrlctup.sh << HERE
+cat > ctrlctup-$mypid.sh << HERE
 sleep \$1
 HERE
 set +e
@@ -39,8 +40,8 @@ if wait $pid; then
 	echo "Error: waiting on tup process should have failed." 1>&2
 	exit 1
 fi
-if pgrep -f ctrlctup.sh; then
-	ps -Af | grep ctrlctup.sh
+if pgrep -f ctrlctup-$mypid.sh; then
+	ps -Af | grep ctrlctup-$mypid.sh
 	echo "Error: Subprocess is still running." 1>&2
 	exit 1
 fi
