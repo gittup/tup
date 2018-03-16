@@ -9,5 +9,5 @@ ifeq ($(TUP_SERVER),fuse)
 endif
 
 ifeq ($(TUP_SERVER),windepfile)
-: windepfile.c |> !cc |>
+: foreach windepfile.c privs.c |> !cc |>
 endif
