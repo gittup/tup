@@ -464,10 +464,13 @@ varsetall()
 
 monitor()
 {
+	if [ `tup server` = "fuse" ]; then
+		sim_hints="--sim-hints=fuse-compatible"
+	fi
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup monitor -f"
+		cmd="valgrind -q --error-exitcode=11 $sim_hints --track-fds=yes --track-origins=yes --leak-check=full tup monitor -f"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup monitor -f"
+		cmd="valgrind -q --error-exitcode=12 $sim_hints --tool=helgrind tup monitor -f"
 	else
 		cmd="tup monitor -f"
 	fi
