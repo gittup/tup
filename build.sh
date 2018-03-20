@@ -11,7 +11,7 @@ if [ "$server" = "fuse" ]; then
 	plat_ldflags="`pkg-config fuse --libs`"
 	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
 elif [ "$server" = "ldpreload" ]; then
-	plat_files="../src/tup/server/depfile.c"
+	plat_files="../src/tup/server/depfile.c ../src/tup/server/privs.c"
 else
 	echo "Error: invalid TUP_SERVER \"$server\"" 1>&2
 	exit 1
