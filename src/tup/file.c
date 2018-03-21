@@ -638,12 +638,33 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			}
 		} else {
 			struct mapping *map;
+			int mapping_set = 0;
 			tup_entry_list_add(tent, entryhead);
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
 					map->tent = tent;
+					mapping_set = 1;
 				}
+			}
+			if(!mapping_set) {
+				map = malloc(sizeof *map);
+				if(!map) {
+					perror("malloc");
+					return -1;
+				}
+				map->realname = strdup(w->filename);
+				if(!map->realname) {
+					perror("strdup");
+					return -1;
+				}
+				map->tmpname = strdup(w->filename);
+				if(!map->tmpname) {
+					perror("strdup");
+					return -1;
+				}
+				map->tent = tent;
+				LIST_INSERT_HEAD(&info->mapping_list, map, list);
 			}
 		}
 
