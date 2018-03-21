@@ -43,7 +43,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <pthread.h>
-#include <sys/syscall.h>
 
 int __xstat(int vers, const char *name, struct stat *buf);
 int stat64(const char *filename, struct stat64 *buf);
@@ -86,7 +85,6 @@ static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
-static long (*s_syscall)(long number, ...);
 
 #define WRAP(ptr, name) \
 	if(!ptr) { \
@@ -500,38 +498,6 @@ int __lxstat64(int vers, const char *path, struct stat64 *buf)
 		}
 	}
 	return rc;
-}
-
-long syscall(long number, ...)
-{
-	va_list ap;
-	long int args[6];
-	int x;
-
-	WRAP(s_syscall, "syscall");
-	va_start(ap, number);
-	for(x=0; x<6; x++) {
-		args[x] = va_arg(ap, long int);
-	}
-	va_end(ap);
-	if(number == __NR_renameat2) {
-		int rc;
-		if((int)args[0] != AT_FDCWD || (int)args[2] != AT_FDCWD) {
-			fprintf(stderr, "tup error: renameat2() syscall with fd != AT_FDCWD is not yet supported.\n");
-			errno = ENOSYS;
-			return -1;
-		}
-		rc = s_syscall(number, args[0], args[1], args[2], args[3], args[4], args[5]);
-		if(rc == 0) {
-			char *old = (char*)args[1];
-			char *new = (char*)args[3];
-			if(!ignore_file(old) && !ignore_file(new)) {
-				handle_file(old, new, ACCESS_RENAME);
-			}
-		}
-		return rc;
-	}
-	return s_syscall(number, args[0], args[1], args[2], args[3], args[4], args[5]);
 }
 
 static int write_all(int fd, const void *data, int size)
