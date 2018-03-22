@@ -266,6 +266,24 @@ int symlinkat(const char *target, int newdirfd, const char *linkpath)
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz)
 {
 	ssize_t rc;
+	/* Force ENOENT for /etc/malloc.conf, which is used by jemalloc.
+	 *
+	 * The jemalloc library wraps malloc(), calloc(), etc, and calls
+	 * readlink on /etc/malloc.conf in its static initializer. This calls
+	 * into our hook, which means we try to call dlsym() to get the real
+	 * readlink from libc.so. Unfortunately, dlsym() calls calloc() to
+	 * allocate space for thread-specific variables, which jemalloc picks
+	 * up and tries to re-initialize itself, and then deadlocks since the
+	 * original initialization isn't complete yet. I haven't found aonther
+	 * way to work around this since both our shared library shim and
+	 * jemalloc have their symbols mapped into the process before the
+	 * static initializer is called, and I don't think we can get the real
+	 * readlink symbol without allocating memory.
+	 */
+	if(strcmp(pathname, "/etc/malloc.conf") == 0) {
+		errno = ENOENT;
+		return -1;
+	}
 	WRAP(s_readlink, "readlink");
 	rc = s_readlink(pathname, buf, bufsiz);
 	handle_file(pathname, "", ACCESS_READ);
