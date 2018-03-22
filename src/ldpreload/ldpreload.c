@@ -96,6 +96,16 @@ static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
 		} \
 	}
 
+#define VWRAP(ptr, name, version) \
+	if(!ptr) { \
+		ptr = dlvsym(RTLD_NEXT, name, version); \
+		if(!ptr) { \
+			fprintf(stderr, "tup.ldpreload: Unable to wrap '%s' version '%s'\n", \
+				name, version); \
+			exit(1); \
+		} \
+	}
+
 static int errored = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int depfd = -1;
@@ -264,7 +274,7 @@ ssize_t readlink(const char *pathname, char *buf, size_t bufsiz)
 
 char *realpath(const char *path, char *resolved_path)
 {
-	WRAP(s_realpath, "realpath");
+	VWRAP(s_realpath, "realpath", "GLIBC_2.3");
 	handle_file(path, "", ACCESS_READ);
 	return s_realpath(path, resolved_path);
 }
