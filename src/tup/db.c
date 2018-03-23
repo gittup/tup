@@ -115,7 +115,6 @@ enum {
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
 	DB_GET_VAR_ID_ALLOC,
-	DB_VAR_FOREACH,
 	DB_FILES_TO_TREE,
 	_DB_GET_OUTPUT_TREE,
 	_DB_GET_LINKS1,
@@ -136,7 +135,7 @@ enum {
 	_DB_GROUP_RECLAIMABLE2,
 	_DB_GHOST_RECLAIMABLE1,
 	_DB_GHOST_RECLAIMABLE2,
-	_DB_GET_DB_VAR_TREE,
+	DB_GET_VARDB,
 	_DB_VAR_FLAG_DIRS,
 	_DB_DELETE_VAR_ENTRY,
 	DB_NUM_STATEMENTS
@@ -197,7 +196,6 @@ static int group_reclaimable1(tupid_t tupid);
 static int group_reclaimable2(tupid_t tupid);
 static int ghost_reclaimable1(tupid_t tupid);
 static int ghost_reclaimable2(tupid_t tupid);
-static int get_db_var_tree(tupid_t dt, struct vardb *vdb);
 static int get_file_var_tree(struct vardb *vdb, int fd);
 static int var_flag_dirs(tupid_t tupid);
 static int delete_var_entry(tupid_t tupid);
@@ -4760,66 +4758,6 @@ out_reset:
 	return rc;
 }
 
-int tup_db_var_foreach(tupid_t dt, int (*callback)(void *, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type), void *arg)
-{
-	int rc = -1;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_VAR_FOREACH];
-	static char s[] = "select node.id, name, value, type from var, node where node.dir=? and node.id=var.id order by name" SQL_NAME_COLLATION;
-
-	transaction_check("%s [37m[%lli][0m", s, dt);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	while(1) {
-		const char *var;
-		const char *value;
-		enum TUP_NODE_TYPE type;
-		tupid_t tupid;
-
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			rc = 0;
-			goto out_reset;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			rc = -1;
-			goto out_reset;
-		}
-
-		tupid = sqlite3_column_int64(*stmt, 0);
-		var = (const char *)sqlite3_column_text(*stmt, 1);
-		value = (const char *)sqlite3_column_text(*stmt, 2);
-		type = sqlite3_column_int(*stmt, 3);
-
-		if((rc = callback(arg, tupid, var, value, type)) < 0) {
-			goto out_reset;
-		}
-	}
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return rc;
-}
-
 static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 {
 	int fd;
@@ -4964,7 +4902,7 @@ int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 
 	vardb_init(&db_tree);
 	vardb_init(&file_tree);
-	if(get_db_var_tree(vardt, &db_tree) < 0)
+	if(tup_db_get_vardb(vardt, &db_tree) < 0)
 		return -1;
 	dfd = tup_entry_openat(root_fd, tent);
 	if(dfd < 0) {
@@ -5063,19 +5001,13 @@ static struct var_entry *envdb_set(const char *var, int varlen, const char *newe
 	return ve;
 }
 
-static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_value, enum TUP_NODE_TYPE type)
+static int env_cb(int environ_check, struct tup_entry *tent, const char *var, const char *stored_value)
 {
 	const char *env;
-	struct tup_entry *tent;
 	int envlen = 0;
 	int match = 0;
 	struct var_entry *ve;
 	int varlen;
-	int environ_check = *(int*)arg;
-	if(type) {}
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	varlen = strlen(var);
 
@@ -5137,7 +5069,21 @@ static int env_cb(void *arg, tupid_t tupid, const char *var, const char *stored_
 
 int tup_db_check_env(int environ_check)
 {
-	if(tup_db_var_foreach(env_dt(), env_cb, &environ_check) < 0)
+	struct vardb vdb;
+	struct string_tree *st;
+	struct var_entry *ve;
+
+	if(vardb_init(&vdb) < 0)
+		return -1;
+	if(tup_db_get_vardb(env_dt(), &vdb) < 0)
+		return -1;
+	RB_FOREACH(st, string_entries, &vdb.root) {
+		ve = container_of(st, struct var_entry, var);
+		if(env_cb(environ_check, ve->tent, ve->var.s, ve->value) < 0)
+			return -1;
+	}
+
+	if(vardb_close(&vdb) < 0)
 		return -1;
 	return 0;
 }
@@ -7402,11 +7348,11 @@ int tup_db_reparse_all(void)
 	return 0;
 }
 
-static int get_db_var_tree(tupid_t dt, struct vardb *vdb)
+int tup_db_get_vardb(tupid_t dt, struct vardb *vdb)
 {
 	int rc = -1;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_GET_DB_VAR_TREE];
+	sqlite3_stmt **stmt = &stmts[DB_GET_VARDB];
 	static char s[] = "select node.id, name, value, type from node, var where dir=? and node.id=var.id";
 
 	transaction_check("%s [37m[%i][0m", s, dt);
