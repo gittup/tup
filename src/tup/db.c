@@ -5367,6 +5367,7 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_TREE];
 	static char s[] = "select to_id from normal_link where from_id=?";
+	struct tupid_tree *tt;
 
 	transaction_check("%s [37m[%lli][0m", s, cmdid);
 	if(!*stmt) {
@@ -5387,7 +5388,6 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 
 	while(1) {
 		tupid_t tupid;
-		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -5401,28 +5401,10 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
-		if(tent->type == TUP_NODE_GROUP) {
-			if(group) {
-				if(*group == NULL) {
-					*group = tent;
-				} else {
-					fprintf(stderr, "tup error: Unable to specify multiple output groups: ");
-					print_tup_entry(stderr, *group);
-					fprintf(stderr, ", and ");
-					print_tup_entry(stderr, tent);
-					fprintf(stderr, "\n");
-					rc = -1;
-					break;
-				}
-			}
-		} else {
-			rc = tupid_tree_add(output_root, tupid);
-			if(rc < 0) {
-				fprintf(stderr, "tup error: tup_db_get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
-				break;
-			}
+		rc = tupid_tree_add(output_root, tupid);
+		if(rc < 0) {
+			fprintf(stderr, "tup error: tup_db_get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+			break;
 		}
 	}
 
@@ -5430,6 +5412,32 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
+	}
+
+	if(rc == 0) {
+		struct tupid_tree *tmp;
+		RB_FOREACH_SAFE(tt, tupid_entries, output_root, tmp) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(tent->type == TUP_NODE_GROUP) {
+				if(group) {
+					if(*group == NULL) {
+						*group = tent;
+					} else {
+						fprintf(stderr, "tup error: Unable to specify multiple output groups: ");
+						print_tup_entry(stderr, *group);
+						fprintf(stderr, ", and ");
+						print_tup_entry(stderr, tent);
+						fprintf(stderr, "\n");
+						rc = -1;
+						break;
+					}
+				}
+				tupid_tree_rm(output_root, tt);
+				free(tt);
+			}
+		}
 	}
 
 	return rc;
