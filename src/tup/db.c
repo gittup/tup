@@ -206,10 +206,16 @@ static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head);
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
 
 static char transaction_buf[1024];
+static int transaction_started = 0;
 static struct timespan transaction_ts;
 
 static void transaction_check(const char *format, ...)
 {
+	if(transaction_started) {
+		fprintf(stderr, "tup internal error: Still in a previous database transaction.\n");
+		exit(1);
+	}
+	transaction_started = 1;
 	if(sql_debug || !transaction) {
 		va_list ap;
 		va_start(ap, format);
@@ -228,6 +234,7 @@ static void transaction_check(const char *format, ...)
 
 static int msqlite3_reset(sqlite3_stmt *stmt)
 {
+	transaction_started = 0;
 	if(sql_debug) {
 		timespan_end(&transaction_ts);
 		fprintf(stderr, "[%fs] {%i} %s\n", timespan_seconds(&transaction_ts), sqlite3_changes(tup_db), transaction_buf);
@@ -841,6 +848,7 @@ int tup_db_check_flags(int flags)
 			sqlite3_free(errmsg);
 			return -1;
 		}
+		transaction_started = 0;
 	}
 	if(flags & TUP_FLAGS_CREATE) {
 		transaction_check("%s", s2);
@@ -851,6 +859,7 @@ int tup_db_check_flags(int flags)
 			sqlite3_free(errmsg);
 			return -1;
 		}
+		transaction_started = 0;
 	}
 	if(flags & TUP_FLAGS_MODIFY) {
 		transaction_check("%s", s3);
@@ -861,6 +870,7 @@ int tup_db_check_flags(int flags)
 			sqlite3_free(errmsg);
 			return -1;
 		}
+		transaction_started = 0;
 	}
 	if(tup_db_commit() < 0)
 		return -1;
