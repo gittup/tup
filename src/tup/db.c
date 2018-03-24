@@ -3433,10 +3433,6 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 	}
 	*incoming = sqlite3_column_int64(*stmt, 0);
 
-	if(tup_entry_add(*incoming, &incoming_tent) < 0)
-		return -1;
-	tent->incoming = incoming_tent;
-
 	/* Do a quick double-check to make sure there isn't a duplicate link. */
 	dbrc = sqlite3_step(*stmt);
 	if(dbrc != SQLITE_DONE) {
@@ -3455,6 +3451,12 @@ out_reset:
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
+	}
+
+	if(rc == 0 && *incoming != -1) {
+		if(tup_entry_add(*incoming, &incoming_tent) < 0)
+			return -1;
+		tent->incoming = incoming_tent;
 	}
 
 	return rc;
