@@ -1263,6 +1263,8 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR];
 	static char s[] = "select id from node where dir=?";
+	struct tupid_entries root = {NULL};
+	struct tupid_tree *tt;
 
 	transaction_check("%s [37m[%lli][0m", s, dt);
 	if(!*stmt) {
@@ -1280,8 +1282,6 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 	}
 
 	while(1) {
-		struct tup_entry *tent;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			rc = 0;
@@ -1294,12 +1294,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 			goto out_reset;
 		}
 
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
-			rc = -1;
-			goto out_reset;
-		}
-
-		if(callback(arg, tent) < 0) {
+		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -1311,6 +1306,18 @@ out_reset:
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+
+	if(rc == 0) {
+		RB_FOREACH(tt, tupid_entries, &root) {
+			struct tup_entry *tent;
+
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(callback(arg, tent) < 0)
+				return -1;
+		}
+	}
+	free_tupid_tree(&root);
 
 	return rc;
 }
