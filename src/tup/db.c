@@ -2417,7 +2417,7 @@ int tup_db_rebuild_all(void)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	if(sqlite3_reset(*stmt) != 0) {
+	if(msqlite3_reset(*stmt) != 0) {
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
