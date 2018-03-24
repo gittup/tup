@@ -3215,6 +3215,7 @@ static int get_output_group(tupid_t cmdid, struct tup_entry **tent)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_GROUP];
 	static char s[] = "select to_id from normal_link, node where from_id=? and to_id=node.id and node.type=?";
+	tupid_t tupid = -1;
 
 	*tent = NULL;
 
@@ -3248,10 +3249,7 @@ static int get_output_group(tupid_t cmdid, struct tup_entry **tent)
 		rc = -1;
 		goto out_reset;
 	}
-	if(tup_entry_add(sqlite3_column_int64(*stmt, 0), tent) < 0) {
-		rc = -1;
-		goto out_reset;
-	}
+	tupid = sqlite3_column_int64(*stmt, 0);
 
 	/* Do a quick double-check to make sure there isn't a duplicate link. */
 	dbrc = sqlite3_step(*stmt);
@@ -3273,6 +3271,10 @@ out_reset:
 		return -1;
 	}
 
+	if(rc == 0 && tupid != -1) {
+		if(tup_entry_add(tupid, tent) < 0)
+			return -1;
+	}
 	return rc;
 }
 
