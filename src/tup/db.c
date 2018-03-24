@@ -6930,6 +6930,8 @@ static int add_ghost_checks(tupid_t tupid)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_CHECKS];
 	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tupid_entries root = {NULL};
+	struct tupid_tree *tt;
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -6948,7 +6950,6 @@ static int add_ghost_checks(tupid_t tupid)
 
 	do {
 		tupid_t link_tupid;
-		struct tup_entry *tent;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -6962,12 +6963,10 @@ static int add_ghost_checks(tupid_t tupid)
 		}
 
 		link_tupid = sqlite3_column_int64(*stmt, 0);
-		if(tup_entry_add(link_tupid, &tent) < 0) {
+		if(tupid_tree_add(&root, link_tupid) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
-
-		tup_entry_add_ghost_list(tent, &ghost_list);
 	} while(1);
 
 out_reset:
@@ -6976,6 +6975,17 @@ out_reset:
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+
+	if(rc == 0) {
+		RB_FOREACH(tt, tupid_entries, &root) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0) {
+				return -1;
+			}
+			tup_entry_add_ghost_list(tent, &ghost_list);
+		}
+	}
+	free_tupid_tree(&root);
 
 	return rc;
 }
