@@ -4352,6 +4352,12 @@ int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_GROUP_LINK];
 	static char s[] = "select to_id, cmdid from group_link where from_id=?";
+	struct pair {
+		LIST_ENTRY(pair) list;
+		tupid_t to_id;
+		tupid_t cmdid;
+	};
+	LIST_HEAD(, pair) pair_list = {NULL};
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -4369,8 +4375,7 @@ int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *,
 	}
 
 	while(1) {
-		struct tup_entry *tent;
-		struct tup_entry *cmdtent;
+		struct pair *pair;
 
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
@@ -4384,19 +4389,15 @@ int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *,
 			goto out_reset;
 		}
 
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 0), &tent) < 0) {
+		pair = malloc(sizeof *pair);
+		if(!pair) {
+			perror("malloc");
 			rc = -1;
 			goto out_reset;
 		}
-		if(tup_entry_add(sqlite3_column_int64(*stmt, 1), &cmdtent) < 0) {
-			rc = -1;
-			goto out_reset;
-		}
-
-		if(callback(arg, tent, cmdtent) < 0) {
-			rc = -1;
-			goto out_reset;
-		}
+		pair->to_id = sqlite3_column_int64(*stmt, 0);
+		pair->cmdid = sqlite3_column_int64(*stmt, 1);
+		LIST_INSERT_HEAD(&pair_list, pair, list);
 	}
 
 out_reset:
@@ -4404,6 +4405,23 @@ out_reset:
 		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
+	}
+
+	if(rc == 0) {
+		while(!LIST_EMPTY(&pair_list)) {
+			struct pair *pair = LIST_FIRST(&pair_list);
+			struct tup_entry *tent;
+			struct tup_entry *cmdtent;
+
+			if(tup_entry_add(pair->to_id, &tent) < 0)
+				return -1;
+			if(tup_entry_add(pair->cmdid, &cmdtent) < 0)
+				return -1;
+			if(callback(arg, tent, cmdtent) < 0)
+				return -1;
+			LIST_REMOVE(pair, list);
+			free(pair);
+		}
 	}
 
 	return rc;
