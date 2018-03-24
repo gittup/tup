@@ -5504,6 +5504,7 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS2];
 	static char s[] = "select from_id from sticky_link where to_id=?";
+	struct tupid_tree *tt;
 
 	transaction_check("%s [37m[%lli][0m", s, cmdid);
 	if(!*stmt) {
@@ -5521,8 +5522,6 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 	}
 
 	while(1) {
-		tupid_t tupid;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			break;
@@ -5534,21 +5533,9 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 			break;
 		}
 
-		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add_dup(root, tupid);
-
-		if(rc < 0) {
-			fprintf(stderr, "tup error: get_normal_links() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
+		if(tupid_tree_add(root, sqlite3_column_int64(*stmt, 0)) < 0) {
+			rc = -1;
 			break;
-		}
-
-		if(group_root) {
-			struct tup_entry *tent;
-			if(tup_entry_add(tupid, &tent) < 0)
-				return -1;
-			if(tent->type == TUP_NODE_GROUP)
-				if(tupid_tree_add_dup(group_root, tupid) < 0)
-					return -1;
 		}
 	}
 
@@ -5558,6 +5545,16 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 		return -1;
 	}
 
+	if(rc == 0 && group_root) {
+		RB_FOREACH(tt, tupid_entries, root) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(tent->type == TUP_NODE_GROUP)
+				if(tupid_tree_add_dup(group_root, tt->tupid) < 0)
+					return -1;
+		}
+	}
 	return rc;
 }
 
