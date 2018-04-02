@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -19,6 +19,7 @@
 # Make sure we can use a symlink from the monitor
 . ./tup.sh
 check_monitor_supported
+check_no_ldpreload symlink-dir
 monitor
 
 mkdir foo-x86

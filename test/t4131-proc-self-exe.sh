@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2013-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -28,14 +28,14 @@ check_tup_suid
 set_full_deps
 
 cat > Tupfile << HERE
-: |> readlink /proc/self/exe > %o |> file.txt
+: |> readlink -e /proc/self/exe > %o |> file.txt
 HERE
 tup touch Tupfile
 update
 
 rlink=`which readlink`
 if test -h $rlink; then
-	text=`readlink $rlink`
+	text=`readlink -e $rlink`
 else
 	text=$rlink
 fi

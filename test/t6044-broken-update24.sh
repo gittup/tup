@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2010-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -21,10 +21,22 @@
 . ./tup.sh
 check_no_windows shell
 
+if grep 'Fedora' /etc/system-release > /dev/null; then
+	echo "[33mSkipping on Fedora because coreutils' mv uses a syscall directly instead of renameat2[0m"
+	eotup
+fi
+
 cat > Tupfile << HERE
 : |> touch .foo; mv .foo bar |> bar
 HERE
 tup touch Tupfile
 update
+
+update > tmp.txt
+if grep 'touch .foo' tmp.txt > /dev/null; then
+	cat tmp.txt
+	echo "Error: Expected second update not to run the command." 1>&2
+	exit 1
+fi
 
 eotup

@@ -1,10 +1,21 @@
 #! /bin/sh -e
 
 label=${TUP_LABEL:-bootstrap}
+server=${TUP_SERVER:-fuse}
 os=`uname -s`
-plat_cflags="`pkg-config fuse --cflags`"
-plat_ldflags="`pkg-config fuse --libs`"
+plat_cflags=""
+plat_ldflags=""
 plat_files=""
+if [ "$server" = "fuse" ]; then
+	plat_cflags="`pkg-config fuse --cflags`"
+	plat_ldflags="`pkg-config fuse --libs`"
+	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
+elif [ "$server" = "ldpreload" ]; then
+	plat_files="../src/tup/server/depfile.c ../src/tup/server/privs.c"
+else
+	echo "Error: invalid TUP_SERVER \"$server\"" 1>&2
+	exit 1
+fi
 LDFLAGS="$LDFLAGS -lm"
 : ${CC:=gcc}
 case "$os" in
@@ -66,7 +77,9 @@ cp ../src/luabuiltin/builtin.lua builtin.lua
 mkdir luabuiltin
 ./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
 
-for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/inih/ini.c $plat_files; do
+CFLAGS="$CFLAGS -DTUP_SERVER=\"$server\""
+
+for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/inih/ini.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	# Put -I. first so we find our new luabuiltin.h file, not one built
 	# by a previous 'tup upd'.
@@ -79,5 +92,18 @@ $CC $CFLAGS -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAF
 echo "  bootstrap LD tup $LDFLAGS"
 echo "const char *tup_version(void) {return \"$label\";}" | $CC -x c -c - -o tup_version.o
 $CC *.o -o tup -lpthread $plat_ldflags $LDFLAGS
+
+if [ "$server" = "ldpreload" ]; then
+	mkdir ldpreload
+	cd ldpreload
+	CFLAGS="$CFLAGS -fpic"
+	for i in ../../src/ldpreload/*.c ../../src/tup/flock/fcntl.c; do
+		echo "  bootstrap CC $CFLAGS $i"
+		$CC $CFLAGS -c $i -I../../src $plat_cflags -o `basename $i`.64.o
+	done
+	echo "  bootstrap LD tup-ldpreload.so"
+	$CC *.o -o ../tup-ldpreload.so -fpic -shared -ldl $plat_ldflags $LDFLAGS
+	cd ..
+fi
 
 cd ..

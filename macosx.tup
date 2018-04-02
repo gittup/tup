@@ -8,3 +8,5 @@ CFLAGS += -DAT_REMOVEDIR=0x200
 CFLAGS += -include compat/macosx.h
 
 TUP_SUID_GROUP = wheel
+
+TUP_SERVER = fuse

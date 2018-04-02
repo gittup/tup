@@ -1,0 +1,46 @@
+ifdef CC32
+CC32 = @(CC32)
+else
+CC32 = $(CC)
+CFLAGS32 += -m32
+LDFLAGS32 += -m32
+endif
+
+# Minimum version is windows Vista (for GetFinalPathNameByHandle, at least)
+CFLAGS += -D_WIN32_WINNT=0x600
+
+# Compatibility function prototypes and include path for wrapper functions
+CFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
+CFLAGS += -I$(TUP_CWD)/src/compat/win32
+
+# _GNU_SOURCE lets us use the %lli flag correctly
+CFLAGS += -D_GNU_SOURCE
+
+# No symlinks on windows
+# Different tokenization between platforms. *sigh* Tupfiles should be portable
+ifneq (@(TUP_PLATFORM),win32)
+CFLAGS += -D'S_ISLNK(a)=0'
+else
+CFLAGS += -DS_ISLNK(a)=0
+endif
+
+# No sig_atomic_t on windows
+CFLAGS += -Dsig_atomic_t=int
+
+# Use the same value as linux here. The logic is in src/compat/unlinkat.c
+CFLAGS += -DAT_REMOVEDIR=0x200
+
+# Use wchar functions for Windows (we use UTF8 internally)
+CFLAGS += -DUNICODE
+CFLAGS += -D_UNICODE
+
+LDFLAGS += -static-libgcc
+
+!cc32 = |> ^ CC32 %f^ $(CC32) -c %f -o %o $(CFLAGS) $(CFLAGS32) $(CFLAGS32_%f) |> %B.o32
+!ld32 = |> ^ LINK32 %o^ $(CC32) %f -o %o $(LDFLAGS) $(LDFLAGS32) $(LDFLAGS32_%o) |>
+!dll = |> ^ DLL %o^ $(CC) -shared %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
+!dll32 = |> ^ DLL32 %o^ $(CC32) -shared %f -o %o $(LDFLAGS) $(LDFLAGS32) $(LDFLAGS32_%o) |>
+
+PROGRAM_SUFFIX=.exe
+
+TUP_SERVER = windepfile

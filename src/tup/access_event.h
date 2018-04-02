@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,6 +22,9 @@
 #define tup_access_event_h
 
 #include "compat.h"
+
+/** The filename to write file accesses to. */
+#define TUP_DEPFILE "TUP_DEPFILE"
 
 /** The file descriptor for the variable dictionary. */
 #define TUP_VARDICT_NAME "tup_vardict"

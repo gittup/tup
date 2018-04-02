@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -69,6 +69,7 @@ int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
 		struct tup_entry *dtent, int need_namespacing, int run_in_bash);
 int server_postexec(struct server *s);
+int server_unlink(void);
 int server_is_dead(void);
 int server_config_start(struct server *s);
 int server_config_stop(struct server *s);

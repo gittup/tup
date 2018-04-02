@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -50,7 +50,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
 
-int init_file_info(struct file_info *info, const char *variant_dir)
+int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
 	LIST_INIT(&info->read_list);
 	LIST_INIT(&info->write_list);
@@ -70,6 +70,7 @@ int init_file_info(struct file_info *info, const char *variant_dir)
 		info->variant_dir = NULL;
 	info->server_fail = 0;
 	info->open_count = 0;
+	info->do_unlink = do_unlink;
 	return 0;
 }
 
@@ -81,6 +82,33 @@ void finfo_lock(struct file_info *info)
 void finfo_unlock(struct file_info *info)
 {
 	pthread_mutex_unlock(&info->lock);
+}
+
+int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
+		      const char *filename, struct file_info *info)
+{
+	if(is_full_path(filename)) {
+		return handle_file(at, filename, "", info);
+	} else {
+		if(dtent->tnode.tupid == DOT_DT) {
+			return handle_file(at, filename, "", info);
+		} else {
+			char fullname[PATH_MAX];
+			int rc;
+
+			fullname[0] = '.';
+			rc = snprint_tup_entry(fullname+1, sizeof(fullname)-1, dtent);
+			if(rc >= PATH_MAX) {
+				fprintf(stderr, "tup error: string size too small in handle_file_dtent\n");
+				return -1;
+			}
+			if(snprintf(fullname+rc+1, sizeof(fullname)-rc-1, "/%s", filename) >= PATH_MAX) {
+				fprintf(stderr, "tup error: string size too small in handle_file_dtent\n");
+				return -1;
+			}
+			return handle_file(at, fullname, "", info);
+		}
+	}
 }
 
 int handle_file(enum access_type at, const char *filename, const char *file2,
@@ -597,11 +625,10 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
-#ifdef _WIN32
-			/* t5038 - Need to clean up files until Windows supports tmpfiles properly. */
-			fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
-			unlink(w->filename);
-#endif
+			if(info->do_unlink) {
+				fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
+				unlink(w->filename);
+			}
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
@@ -611,12 +638,33 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			}
 		} else {
 			struct mapping *map;
+			int mapping_set = 0;
 			tup_entry_list_add(tent, entryhead);
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
 					map->tent = tent;
+					mapping_set = 1;
 				}
+			}
+			if(!mapping_set) {
+				map = malloc(sizeof *map);
+				if(!map) {
+					perror("malloc");
+					return -1;
+				}
+				map->realname = strdup(w->filename);
+				if(!map->realname) {
+					perror("strdup");
+					return -1;
+				}
+				map->tmpname = strdup(w->filename);
+				if(!map->tmpname) {
+					perror("strdup");
+					return -1;
+				}
+				map->tent = tent;
+				LIST_INSERT_HEAD(&info->mapping_list, map, list);
 			}
 		}
 
@@ -624,7 +672,7 @@ out_skip:
 		del_file_entry(w);
 	}
 
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork, info->do_unlink) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {

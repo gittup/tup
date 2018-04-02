@@ -3,7 +3,7 @@
 -- tup - A file-based build system
 --
 -- Copyright (C) 2013  Rendaw <rendaw@zarbosoft.com>
--- Copyright (C) 2013-2017  Mike Shal <marfey@gmail.com>
+-- Copyright (C) 2013-2018  Mike Shal <marfey@gmail.com>
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License version 2 as
@@ -34,13 +34,13 @@ end
 
 local realioopen = io.open
 function io.open(filename, mode)
-	tup.chdir(filename, mode)
+	tup.handle_fileread(filename, mode)
 	return unchdir_after(realioopen(filename, mode))
 end
 
 local realiolines = io.lines
 function io.lines(filename, ...)
-	tup.chdir(filename)
+	tup.handle_fileread(filename)
 	return unchdir_after(realiolines(filename, ...))
 end
 

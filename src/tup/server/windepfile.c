@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2010  James McKaskill
- * Copyright (C) 2010-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,7 +27,6 @@
 #include "tup/variant.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
-#include "compat/win32/open_notify.h"
 #include "compat/dir_mutex.h"
 #include <stdio.h>
 #include <fcntl.h>
@@ -411,6 +410,15 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
+int server_unlink(void)
+{
+	/* Errant files need to be removed if they are created but not
+	 * specified by the Tupfile since the subprocesses are not sandboxed
+	 * on Windows.
+	 */
+	return 1;
+}
+
 int server_is_dead(void)
 {
 	return (event_got != -1);
@@ -432,15 +440,12 @@ int server_config_stop(struct server *s)
 int server_parser_start(struct parser_server *ps)
 {
 	ps->root_fd = tup_top_fd();
-	if(open_notify_push(&ps->s.finfo) < 0)
-		return -1;
 	return 0;
 }
 
 int server_parser_stop(struct parser_server *ps)
 {
-	if(open_notify_pop(&ps->s.finfo) < 0)
-		return -1;
+	if(ps) {}
 	return 0;
 }
 

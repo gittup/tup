@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,7 +20,7 @@
 
 #include "dirpath.h"
 
-int __wrap_close(int fd);
+int __wrap_close(int fd) ATTRIBUTE_USED;
 int __real_close(int fd);
 
 int __wrap_close(int fd)

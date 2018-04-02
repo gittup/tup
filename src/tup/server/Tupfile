@@ -1,8 +1,16 @@
 include_rules
 
+ifeq ($(TUP_SERVER),fuse)
 fuse_cflags = `pkg-config fuse --cflags`
 CFLAGS_fuse_server.c += $(fuse_cflags)
 CFLAGS_fuse_fs.c += $(fuse_cflags)
-
 : foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
-: windepfile.c |> !mingwcc |>
+endif
+
+ifeq ($(TUP_SERVER),ldpreload)
+: foreach depfile.c privs.c |> !cc |>
+endif
+
+ifeq ($(TUP_SERVER),windepfile)
+: foreach windepfile.c privs.c |> !cc |>
+endif

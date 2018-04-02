@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -66,11 +66,14 @@ struct file_info {
 	const char *variant_dir;
 	int server_fail;
 	int open_count;
+	int do_unlink;
 };
 
-int init_file_info(struct file_info *info, const char *variant_dir);
+int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
+int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
+		      const char *filename, struct file_info *info);
 int handle_file(enum access_type at, const char *filename, const char *file2,
 		struct file_info *info);
 int handle_open_file(enum access_type at, const char *filename,

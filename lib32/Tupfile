@@ -1,0 +1,8 @@
+include_rules
+
+ifeq ($(TUP_SERVER),ldpreload)
+ifeq ($(X86_ARCH_SIBLINGS),y)
+  LDFLAGS_tup-ldpreload.so += -m32
+  : ../src/ldpreload/*.32.o |> !ld |> tup-ldpreload.so
+endif
+endif

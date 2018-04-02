@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2010-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -22,8 +22,8 @@
 #include <stdarg.h>
 #include <windows.h>
 
-int __wrap___mingw_vprintf(const char *format, va_list ap);
-int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
+int __wrap___mingw_vprintf(const char *format, va_list ap) ATTRIBUTE_USED;
+int __wrap___mingw_vfprintf(FILE *stream, const char *format, va_list ap) ATTRIBUTE_USED;
 int __real___mingw_vfprintf(FILE *stream, const char *format, va_list ap);
 
 static char * handle_color(HANDLE output, char *p)

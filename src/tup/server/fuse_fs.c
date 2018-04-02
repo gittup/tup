@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2012-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2012-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -38,13 +38,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/resource.h>
-
-#if defined(__FreeBSD__)
-/* FreeBSD doessn't support AT_SYMLINK_NOFOLLOW in faccessat() */
-static int access_flags = 0;
-#else
-static int access_flags = AT_SYMLINK_NOFOLLOW;
-#endif
 
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
@@ -484,7 +477,7 @@ static int tup_fs_access(const char *path, int mask)
 				 * permissions assigned in mkdir for a temp
 				 * directory.
 				 */
-				if(faccessat(tup_top_fd(), ".", mask, access_flags) < 0)
+				if(faccessat(tup_top_fd(), ".", mask, 0) < 0)
 					rc = -errno;
 				entry_found = 1;
 				break;
@@ -506,11 +499,11 @@ static int tup_fs_access(const char *path, int mask)
 	}
 
 	/* This is preceded by a getattr - no need to handle a read event */
-	res = faccessat(tup_top_fd(), peeled, mask, access_flags);
+	res = faccessat(tup_top_fd(), peeled, mask, 0);
 	if (res == -1 && variant_dir) {
 		const char *stripped = prefix_strip(peeled, variant_dir);
 		if(stripped) {
-			res = faccessat(tup_top_fd(), stripped, mask, access_flags);
+			res = faccessat(tup_top_fd(), stripped, mask, 0);
 		}
 	}
 	if (res == -1)

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -176,9 +176,9 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			 * it's in a top-level subdirectory for a variant.
 			 */
 			if(tent->dt == DOT_DT || tent->parent->dt == DOT_DT) {
-				/* If tup.config was modified, put the @-directory in
-				 * the create list so we can import any variables that
-				 * have changed.
+				/* If tup.config was modified, put the node in
+				 * the config list so we can import any
+				 * variables that have changed.
 				 */
 				if(tup_db_add_config_list(tent->tnode.tupid) < 0)
 					return -1;

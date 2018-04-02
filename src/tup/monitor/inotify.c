@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -65,6 +65,7 @@
 #include "tup/timespan.h"
 #include "tup/variant.h"
 #include "tup/init.h"
+#include "tup/pel_group.h"
 
 #define MONITOR_LOOP_RETRY -2
 
@@ -118,6 +119,11 @@ static char **update_argv;
 static int update_argc;
 static int autoupdate_flag = -1;
 static int autoparse_flag = -1;
+static pthread_mutex_t autoupdate_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t autoupdate_cond = PTHREAD_COND_INITIALIZER;
+#define AUTOUPDATE_EXIT -2
+#define AUTOUPDATE_NONE -1
+static pid_t autoupdate_pid = AUTOUPDATE_NONE;
 static volatile sig_atomic_t dircache_debug = 0;
 static volatile sig_atomic_t monitor_quit = 0;
 static struct moved_from_event_head moved_from_list = LIST_HEAD_INITIALIZER(&moved_from_list);
@@ -132,6 +138,7 @@ int monitor(int argc, char **argv)
 	int x;
 	int rc = 0;
 	int foreground;
+	pthread_t autoupdate_thread;
 
 	/* Close down the fork process, since we don't need it. */
 	if(server_post_exit() < 0)
@@ -263,6 +270,12 @@ int monitor(int argc, char **argv)
 	dircache_init(&droot);
 	tup_register_rmdir_callback(monitor_rmdir_cb);
 
+	if(pthread_create(&autoupdate_thread, NULL, wait_thread, NULL) != 0) {
+		perror("pthread_create");
+		rc = -1;
+		goto close_inot;
+	}
+
 	do {
 		rc = monitor_loop();
 		if(rc == MONITOR_LOOP_RETRY) {
@@ -323,6 +336,12 @@ int monitor(int argc, char **argv)
 		}
 	} while(rc == MONITOR_LOOP_RETRY);
 	monitor_set_pid(-1);
+
+	pthread_mutex_lock(&autoupdate_lock);
+	autoupdate_pid = AUTOUPDATE_EXIT;
+	pthread_cond_signal(&autoupdate_cond);
+	pthread_mutex_unlock(&autoupdate_lock);
+	pthread_join(autoupdate_thread, NULL);
 
 close_inot:
 	if(close(inot_fd) < 0) {
@@ -885,23 +904,10 @@ static int autoupdate(const char *cmd)
 		perror("execvp");
 		exit(1);
 	} else {
-		int *newpid;
-		pthread_t tid;
-
-		newpid = malloc(sizeof(int));
-		if(!newpid) {
-			perror("malloc");
-			return -1;
-		}
-		*newpid = pid;
-		if(pthread_create(&tid, NULL, wait_thread, (void*)newpid) < 0) {
-			perror("pthread_create");
-			return -1;
-		}
-		if(pthread_detach(tid) < 0) {
-			perror("pthread_detach");
-			return -1;
-		}
+		pthread_mutex_lock(&autoupdate_lock);
+		autoupdate_pid = pid;
+		pthread_cond_signal(&autoupdate_cond);
+		pthread_mutex_unlock(&autoupdate_lock);
 		if(tup_db_begin() < 0)
 			return -1;
 		if(tup_db_config_set_int(AUTOUPDATE_PID, pid) < 0)
@@ -917,24 +923,48 @@ static void *wait_thread(void *arg)
 	/* Apparently setting SIGCHLD to SIG_IGN isn't particularly portable,
 	 * so I use this stupid thread instead. Maybe there's a better way.
 	 */
-	int *pid = (int*)arg;
 
-	if(waitpid(*pid, NULL, 0) < 0) {
-		perror("waitpid");
+	sigset_t set;
+	if(arg) {/* unused */}
+
+	/* Ignore signals so we don't catch the monitor shutdown signal. It
+	 * shouldn't really matter, but helgrind complains if the wait thread
+	 * writes to monitor_quit while the main thread reads from it.
+	 */
+	sigemptyset(&set);
+	sigaddset(&set, SIGINT);
+	sigaddset(&set, SIGTERM);
+	sigaddset(&set, SIGHUP);
+	sigaddset(&set, SIGUSR1);
+	if(pthread_sigmask(SIG_BLOCK, &set, NULL) != 0) {
+		perror("pthread_sigmask()");
+		exit(1);
 	}
-	free(pid);
+
+	while(1) {
+		pid_t mypid;
+		pthread_mutex_lock(&autoupdate_lock);
+		while(autoupdate_pid == AUTOUPDATE_NONE) {
+			pthread_cond_wait(&autoupdate_cond, &autoupdate_lock);
+		}
+		mypid = autoupdate_pid;
+		autoupdate_pid = AUTOUPDATE_NONE;
+		pthread_mutex_unlock(&autoupdate_lock);
+
+		if(mypid == AUTOUPDATE_EXIT) {
+			break;
+		}
+		if(waitpid(mypid, NULL, 0) < 0) {
+			perror("waitpid");
+		}
+	}
 	return NULL;
 }
 
 static int skip_event(struct inotify_event *e)
 {
 	/* Skip hidden files */
-	if(e->len && e->name[0] == '.') {
-		if(strcmp(e->name, ".gitignore") == 0)
-			return 0;
-		return 1;
-	}
-	return 0;
+	return pel_ignored(e->name, e->len);
 }
 
 static int eventcmp(struct inotify_event *e1, struct inotify_event *e2)
@@ -1158,8 +1188,22 @@ static int handle_event(struct monitor_event *m, int *modified)
 		 */
 		if(tup_db_select_tent(dc->dt_node.tupid, m->e.name, &tent) < 0)
 			return -1;
-		if(tent && tent->type != TUP_NODE_GENERATED)
+		if(tent && tent->type != TUP_NODE_GENERATED) {
+			if(m->e.mask & IN_MOVED_TO) {
+				/* This seems to be specific to certain
+				 * versions of inotify (it was found on Arch).
+				 * What happens is when overwriting a file, we
+				 * get a create event on a temporary file, and
+				 * then an unmatched IN_MOVED_TO event on the
+				 * destination file (eg: tup.config). We would
+				 * like to force an update in this case, but
+				 * not for all IN_CREATE events.
+				 */
+				if(tup_file_mod(dc->dt_node.tupid, m->e.name, NULL) < 0)
+					return -1;
+			}
 			*modified = 1;
+		}
 		return rc;
 	}
 	if(!(m->e.mask & IN_ISDIR) &&

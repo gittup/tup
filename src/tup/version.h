@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,7 +21,7 @@
 #ifndef tup_version_h
 #define tup_version_h
 
-/* This function is defined by an automatically generated file */
-const char *tup_version(void);
+/* This constant is defined by an automatically generated file */
+extern const char tup_version[];
 
 #endif

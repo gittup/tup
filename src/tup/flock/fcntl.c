@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,7 +30,7 @@ int tup_lock_open(const char *lockname, tup_lock_t *lock)
 {
 	int fd;
 
-	fd = openat(tup_top_fd(), lockname, O_RDWR);
+	fd = openat(tup_top_fd(), lockname, O_RDWR | O_CREAT, 0666);
 	if(fd < 0) {
 		perror(lockname);
 		fprintf(stderr, "tup error: Unable to open lockfile.\n");

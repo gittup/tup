@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -679,7 +679,7 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
-	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir);
+	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink());
 }
 
 static int check_empty_variant(struct tup_entry *tent)
@@ -1230,6 +1230,12 @@ static int process_create_nodes(void)
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
 		return -1;
+	/* Force total_mtime to -1 so we count directory nodes rather than use
+	 * their mtimes to determine progress. In some cases we may assign an
+	 * mtime to a directory, which can make things misleading.
+	 */
+	g.total_mtime = -1;
+
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
@@ -1825,6 +1831,7 @@ static int create_work(struct graph *g, struct node *n)
 		  n->tent->type == TUP_NODE_FILE ||
 		  n->tent->type == TUP_NODE_GENERATED ||
 		  n->tent->type == TUP_NODE_GROUP ||
+		  n->tent->type == TUP_NODE_GENERATED_DIR ||
 		  n->tent->type == TUP_NODE_CMD) {
 		rc = 0;
 	} else {
@@ -2575,10 +2582,14 @@ static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *
 	input[input_len] = 0;
 	while(isspace(*endp))
 		endp++;
-	output[0] = '.';
-	snprint_tup_entry(output+1, PATH_MAX-1, dtent);
-	strcat(output, "/");
-	strcat(output, endp);
+	if(is_full_path(endp)) {
+		strcpy(output, endp);
+	} else {
+		output[0] = '.';
+		snprint_tup_entry(output+1, PATH_MAX-1, dtent);
+		strcat(output, "/");
+		strcat(output, endp);
+	}
 	return endp;
 }
 

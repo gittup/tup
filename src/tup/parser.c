@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -197,7 +197,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			return -1;
 	}
 
-	init_file_info(&ps.s.finfo, tf.variant->variant_dir);
+	init_file_info(&ps.s.finfo, tf.variant->variant_dir, 0);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
 
@@ -399,6 +399,8 @@ out_server_stop:
 static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char *fullpath, const char *path, int *fd)
 {
 	struct tup_entry *tupfile_tent;
+	if(handle_file_dtent(ACCESS_READ, dtent, path, &tf->ps->s.finfo) < 0)
+		return -1;
 	if(tup_db_select_tent(dtent->tnode.tupid, path, &tupfile_tent) < 0)
 		return -1;
 	if(!tupfile_tent) {
@@ -420,6 +422,21 @@ static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char
 		return -1;
 	}
 	return 0;
+}
+
+static int parser_entry_open(struct tupfile *tf, struct tup_entry *tent)
+{
+	int fd;
+	if(handle_file_dtent(ACCESS_READ, tent->parent, tent->name.s, &tf->ps->s.finfo) < 0) {
+		parser_error(tf, tent->name.s);
+		return -1;
+	}
+	fd = tup_entry_openat(tf->root_fd, tent);
+	if(fd < 0) {
+		parser_error(tf, tent->name.s);
+		return -1;
+	}
+	return fd;
 }
 
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
@@ -791,6 +808,10 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 
 	p = path;
 	for(x=0; x<=num_dotdots; x++, p += 3) {
+		if(handle_file_dtent(ACCESS_READ, tf->curtent, p, &tf->ps->s.finfo) < 0) {
+			free(path);
+			return -1;
+		}
 		if(fstatat(tf->cur_dfd, p, &buf, AT_SYMLINK_NOFOLLOW) == 0)
 			if(parser_include_file(tf, p) < 0)
 				goto out_free;
@@ -1096,7 +1117,7 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 		return -1;
 	if(!tent)
 		return 0;
-	fd = tup_entry_openat(tf->root_fd, tent);
+	fd = parser_entry_open(tf, tent);
 	if(fd < 0) {
 		if(errno == ENOENT)
 			return 0;
@@ -1225,9 +1246,8 @@ int parser_include_file(struct tupfile *tf, const char *file)
 		parser_error(tf, file);
 		goto out_free_pel;
 	}
-	fd = tup_entry_openat(tf->root_fd, tent);
+	fd = parser_entry_open(tf, tent);
 	if(fd < 0) {
-		parser_error(tf, file);
 		goto out_close_dfd;
 	}
 	if(fslurp_null(fd, &incb) < 0)
@@ -1684,18 +1704,17 @@ static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r)
 static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 			   struct name_list *nl, const char *ext, int extlen)
 {
-	struct string_tree *st;
-	char tmp[r->command_len + extlen + 1];
-
-	memcpy(tmp, r->command, r->command_len);
-	if(ext)
-		memcpy(tmp + r->command_len, ext, extlen + 1);
+	struct string_tree *st = NULL;
 
 	/* First try to find the extension-specific rule, and if not then use
 	 * the general one. Eg: if the input is foo.c, then the extension is ".c",
 	 * so try "!cc.c" first, then "!cc" second.
 	 */
-	st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
+	if(ext) {
+		char tmp[r->command_len + extlen + 2];
+		snprintf(tmp, sizeof(tmp), "%.*s.%.*s", r->command_len, r->command, extlen, ext);
+		st = string_tree_search(&tf->bang_root, tmp, sizeof(tmp) - 1);
+	}
 	if(!st) {
 		st = string_tree_search(&tf->bang_root, r->command, r->command_len);
 		if(!st) {
@@ -1948,8 +1967,8 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 			add_name_list_entry(&tmp_nl, &tmp_nle);
 			if(tmp_nle.base &&
 			   tmp_nle.extlessbaselen != tmp_nle.baselen) {
-				ext = tmp_nle.base + tmp_nle.extlessbaselen;
-				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen;
+				ext = tmp_nle.base + tmp_nle.extlessbaselen + 1;
+				extlen = tmp_nle.baselen - tmp_nle.extlessbaselen - 1;
 			}
 			if(is_bang) {
 				/* parse_bang_rule overwrites the command and
@@ -1961,10 +1980,7 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
 			}
-			/* The extension in do_rule() does not include the
-			 * leading '.'
-			 */
-			if(do_rule(tf, r, &tmp_nl, ext+1, extlen-1, output_nl) < 0)
+			if(do_rule(tf, r, &tmp_nl, ext, extlen, output_nl) < 0)
 				return -1;
 
 			if(is_bang) {
@@ -2352,7 +2368,11 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 				}
 			}
 			n = find_node(tf->g, pl->dt);
-			if(n != NULL && !n->already_used) {
+			/* We have to double check n->tent->type here in case a
+			 * directory was deleted and then re-created as
+			 * something else (t6073).
+			 */
+			if(n != NULL && !n->already_used && n->tent->type == TUP_NODE_DIR) {
 				int rc;
 				struct timespan ts;
 				n->already_used = 1;
@@ -2944,6 +2964,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	struct path_list *pl;
 	struct path_list_head tmplist;
 	struct path_list_head tmplist2;
+	int rc = 0;
 
 	TAILQ_INIT(&tmplist);
 	TAILQ_INIT(&tmplist2);
@@ -3046,7 +3067,8 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			fprintf(tf->f, "tup error: Attempted to generate a file called '%s', which is reserved by tup. Your build configuration must be comprised of files you write yourself.\n", onle->path);
 			free(onle->path);
 			free(onle);
-			return -1;
+			rc = -1;
+			continue;
 		}
 		onle->len = strlen(onle->path);
 		onle->extlesslen = onle->len - 1;
@@ -3076,8 +3098,10 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			return -1;
 
 		set_nle_base(onle);
-		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0)
-			return -1;
+		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0) {
+			rc = -1;
+			continue;
+		}
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
 		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
@@ -3089,13 +3113,14 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		}
 		if(tupid_tree_add(output_root, onle->tent->tnode.tupid) < 0) {
 			fprintf(tf->f, "tup error: The output file '%s' is listed multiple times in a command.\n", onle->path);
-			return -1;
+			rc = -1;
+			continue;
 		}
 
 		add_name_list_entry(onl, onle);
 	}
 	free_path_list(&tmplist2);
-	return 0;
+	return rc;
 }
 
 struct command_split {
@@ -3291,11 +3316,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		struct tup_entry *tent;
 		if(tup_entry_add(cmdid, &tent) < 0)
 			return -1;
-		if(tent->displaylen != real_displaylen || strncmp(tent->display, real_display, real_displaylen) != 0) {
+		if(tent->displaylen != real_displaylen || (real_displaylen > 0 && strncmp(tent->display, real_display, real_displaylen) != 0)) {
 			if(tup_db_set_display(tent, real_display, real_displaylen) < 0)
 				return -1;
 		}
-		if(tent->flagslen != cs.flagslen || strncmp(tent->flags, cs.flags, cs.flagslen) != 0) {
+		if(tent->flagslen != cs.flagslen || (cs.flagslen > 0 && strncmp(tent->flags, cs.flags, cs.flagslen)) != 0) {
 			if(tf->refactoring) {
 				fprintf(tf->f, "tup refactoring error: Attempting to modify a command's flags:\n");
 				fprintf(tf->f, "Old: '%.*s'\n", tent->flagslen, tent->flags);
@@ -3400,7 +3425,7 @@ void init_name_list(struct name_list *nl)
 	nl->totlen = 0;
 	nl->basetotlen = 0;
 	nl->extlessbasetotlen = 0;
-	memset(nl->globtotlen, 0, MAX_GLOBS);
+	memset(nl->globtotlen, 0, MAX_GLOBS * sizeof(int));
 	nl->globcnt = 0;
 }
 

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -52,6 +52,7 @@
 #define mkdir(a,b) mkdir(a)
 #endif
 
+static int entry(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
@@ -156,6 +157,9 @@ int main(int argc, char **argv)
 		}
 #endif
 		return tup_privileged();
+	} else if(strcmp(cmd, "server") == 0) {
+		printf("%s\n", TUP_SERVER);
+		return 0;
 	}
 
 	/* Process all of the Tupfile.ini files. Runs `tup init' if necessary */
@@ -197,12 +201,7 @@ int main(int argc, char **argv)
 	if(strcmp(cmd, "monitor") == 0) {
 		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "entry") == 0) {
-		struct tup_entry *tent;
-		if(gimme_tent(argv[1], &tent) < 0) {
-			fprintf(stderr, "No tent :(\n");
-			return 1;
-		}
-		print_tup_entry(stdout, tent);
+		rc = entry(argc, argv);
 	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
@@ -295,6 +294,37 @@ int main(int argc, char **argv)
 	if(rc < 0)
 		return 1;
 	return rc;
+}
+
+static int entry(int argc, char **argv)
+{
+	struct tup_entry *tent;
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		char *endptr;
+		tupid_t tupid;
+
+		tupid = strtol(argv[x], &endptr, 10);
+		if(!*endptr) {
+			if(tup_entry_add(tupid, &tent) < 0)
+				return -1;
+		} else {
+			if(gimme_tent(argv[x], &tent) < 0) {
+				fprintf(stderr, "No tent :(\n");
+				return -1;
+			}
+		}
+		if(tent) {
+			print_tup_entry(stdout, tent);
+			printf("\n");
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
 }
 
 static int show_dirs;
@@ -934,7 +964,9 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
-	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0) {
+	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+		return -1;
+	if(tent == NULL) {
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
@@ -1027,5 +1059,5 @@ static int ghost_check(void)
 
 static void version(void)
 {
-	printf("tup %s\n", tup_version());
+	printf("tup %s\n", tup_version);
 }

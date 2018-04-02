@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -22,6 +22,7 @@
 
 . ./tup.sh
 check_no_windows OSX-specific
+check_no_ldpreload varsed
 
 cat > ok.c << HERE
 #include <stdio.h>

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2012-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2012-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -26,7 +26,11 @@ path="/usr/bin/"
 filename="gcc"
 case $tupos in
 	CYGWIN*)
-		path="c:\\MinGW\\bin\\"
+		if which gcc | grep MinGW > /dev/null; then
+			path="c:\\MinGW\\bin\\"
+		else
+			path="c:\\cygwin64\\bin\\"
+		fi
 		filename="gcc.exe"
 		;;
 esac

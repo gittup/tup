@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2009-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2009-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -19,6 +19,7 @@
 # Same as t3001, but in a sub-directory.
 
 . ./tup.sh
+check_no_ldpreload varsed
 tmkdir sub
 cat > sub/Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt

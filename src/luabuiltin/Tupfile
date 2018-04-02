@@ -1,2 +1,8 @@
 include_rules
-: builtin.lua | ../lua/lua |> ../lua/lua xxd.lua %f %o |> luabuiltin.h
+ifeq ($(TARGET),@(TUP_PLATFORM))
+dep = ../lua/lua$(PROGRAM_SUFFIX)
+lua = $(dep)
+else
+lua = lua
+endif
+: builtin.lua | $(dep) |> $(lua) xxd.lua %f %o |> luabuiltin.h

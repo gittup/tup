@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2013-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -31,17 +31,17 @@ HERE
 cat > bar/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> ../foo/%B.o
 HERE
-echo "int x;" > foo/x.c
-echo "int y;" > foo/y.c
-echo "int z;" > bar/z.c
+echo "int marfx;" > foo/x.c
+echo "int marfy;" > foo/y.c
+echo "int marfz;" > bar/z.c
 tup touch foo/Tupfile bar/Tupfile
 update
 
-sym_check foo/libfoo.a x y ^z
+sym_check foo/libfoo.a marfx marfy ^marfz
 
 tup touch foo/Tupfile
 update
 
-sym_check foo/libfoo.a x y ^z
+sym_check foo/libfoo.a marfx marfy ^marfz
 
 eotup

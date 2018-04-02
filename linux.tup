@@ -1,1 +1,9 @@
 TUP_MONITOR = inotify
+TUP_SERVER = @(TUP_SERVER)
+ifeq (,$(TUP_SERVER))
+TUP_SERVER = fuse
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+  X86_ARCH_SIBLINGS=y
+endif

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,6 +46,7 @@ int thread_tree_insert(struct thread_root *troot, struct thread_tree *data)
 	pthread_mutex_lock(&troot->lock);
 	if(RB_INSERT(thread_entries, &troot->root, data) != NULL)
 		rc = -1;
+	pthread_cond_signal(&troot->cond);
 	pthread_mutex_unlock(&troot->lock);
 	return rc;
 }

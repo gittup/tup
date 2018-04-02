@@ -1,7 +1,7 @@
 #! /bin/sh
 # tup - A file-based build system
 #
-# Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -240,10 +240,13 @@ set_leak_check()
 
 __update()
 {
+	if [ `tup server` = "fuse" ]; then
+		sim_hints="--sim-hints=fuse-compatible"
+	fi
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=${leak_check-full} tup"
+		cmd="valgrind -q --error-exitcode=11 $sim_hints --track-fds=yes --track-origins=yes --leak-check=${leak_check-full} tup"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup"
+		cmd="valgrind -q --error-exitcode=12 $sim_hints --tool=helgrind tup"
 	else
 		cmd="tup"
 	fi
@@ -461,10 +464,13 @@ varsetall()
 
 monitor()
 {
+	if [ `tup server` = "fuse" ]; then
+		sim_hints="--sim-hints=fuse-compatible"
+	fi
 	if [ -n "$TUP_VALGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup monitor -f"
+		cmd="valgrind -q --error-exitcode=11 $sim_hints --track-fds=yes --track-origins=yes --leak-check=full tup monitor -f"
 	elif [ -n "$TUP_HELGRIND" ]; then
-		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup monitor -f"
+		cmd="valgrind -q --error-exitcode=12 $sim_hints --tool=helgrind tup monitor -f"
 	else
 		cmd="tup monitor -f"
 	fi
@@ -563,6 +569,9 @@ HERE
 	if [ "$tupos" = "SunOS" ]; then
 		plat_ldflags="$plat_ldflags -lsocket"
 	fi
+	if ldd ../../tup | grep 'libasan' > /dev/null; then
+		plat_ldflags="$plat_ldflags -lasan -lubsan"
+	fi
 	gcc client.c ../../libtup_client.a -o client $plat_ldflags -ldl
 	tup touch client
 }
@@ -591,8 +600,34 @@ check_windows()
 	eotup
 }
 
+check_no_ldpreload()
+{
+	case `tup server` in
+	ldpreload)
+		echo "[33mSkipping test for LD_PRELOAD shim in Linux: $1[0m"
+		eotup
+	esac
+}
+
 check_no_windows()
 {
+	case `tup server` in
+	ldpreload)
+		# The LD_PRELOAD shim doesn't support run-scripts, variants, or the client library.
+		for var in "$@"; do
+			if [ "$var" = "run-script" ]; then
+				echo "[33mSkipping run-script test for LD_PRELOAD shim[0m"
+				eotup
+			elif [ "$var" = "variant" ]; then
+				echo "[33mSkipping variant test for LD_PRELOAD shim[0m"
+				eotup
+			elif [ "$var" = "client" ]; then
+				echo "[33mSkipping client test for LD_PRELOAD shim[0m"
+				eotup
+			fi
+		done
+	esac
+
 	case $tupos in
 	CYGWIN*)
 		echo "Not supported in Windows. Skipping test."

@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -31,7 +31,7 @@ update
 
 # On Gentoo, stdout points to output-0, while on Ubuntu, it points to the
 # redirected file (fds.txt). This might be a bash vs dash thing.
-text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors'`
+text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors' | grep -v ' 3 .*deps-'`
 if [ "$text" != "total 0" ]; then
 	echo "Error: These fds shouldn't be open: $text" 1>&2
 	exit 1

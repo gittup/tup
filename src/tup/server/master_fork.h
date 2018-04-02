@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,8 +23,6 @@
 
 #include "tup/compat.h"
 #include "tup/tupid.h"
-
-struct tup_env;
 
 struct execmsg {
 	tupid_t sid;

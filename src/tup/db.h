@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -184,7 +184,8 @@ int tup_db_scan_end(void);
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
 				struct mapping_head *mapping_list,
-				int *write_bork);
+				int *write_bork,
+				int do_unlink);
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,

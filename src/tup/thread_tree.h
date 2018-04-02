@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -39,8 +39,9 @@ RB_PROTOTYPE(thread_entries, thread_tree, linkage, x);
 struct thread_root {
 	struct thread_entries root;
 	pthread_mutex_t lock;
+	pthread_cond_t cond;
 };
-#define THREAD_ROOT_INITIALIZER {{NULL}, PTHREAD_MUTEX_INITIALIZER}
+#define THREAD_ROOT_INITIALIZER {{NULL}, PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER}
 
 struct thread_tree *thread_tree_search(struct thread_root *troot, int id);
 int thread_tree_insert(struct thread_root *troot, struct thread_tree *data);

@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2013  Rendaw <rendaw@zarbosoft.com>
- * Copyright (C) 2013-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2013-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -530,10 +530,7 @@ static int tuplua_function_creategitignore(lua_State *ls)
 	return 0;
 }
 
-#ifdef _WIN32
-#include "open_notify.h"
-#endif
-static int tuplua_function_chdir(lua_State *ls)
+static int tuplua_function_handle_fileread(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	const char *filename;
@@ -549,9 +546,12 @@ static int tuplua_function_chdir(lua_State *ls)
 	if(strcmp(mode, "r") != 0) {
 		return luaL_error(ls, "io.open in the parser can only open files read-only");
 	}
-#ifdef _WIN32
-	open_notify(ACCESS_READ, filename);
-#endif
+	if(handle_file_dtent(ACCESS_READ, tf->curtent, filename, &tf->ps->s.finfo) < 0)
+		return luaL_error(ls, "unable to save file read access in the lua parser");
+
+	/* builtin.lua will call unchdir after doing the actual file open,
+	 * which is expected to be relative to the current directory.
+	 */
 	if(fchdir(tf->cur_dfd) < 0) {
 		perror("fchdir");
 		return luaL_error(ls, "tup error: Unable to chdir into virtual tup directory for io.open");
@@ -750,7 +750,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
 		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
-		tuplua_register_function(ls, "chdir", tuplua_function_chdir, tf);
+		tuplua_register_function(ls, "handle_fileread", tuplua_function_handle_fileread, tf);
 		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);
 		tuplua_register_function(ls, "run", tuplua_function_run, tf);
 

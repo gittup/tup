@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2009-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2009-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -43,7 +43,7 @@
 int tup_init(void)
 {
 	if(find_tup_dir() != 0) {
-		fprintf(stderr, "tup %s usage: tup [args]\n", tup_version());
+		fprintf(stderr, "tup %s usage: tup [args]\n", tup_version);
 		fprintf(stderr, "For information on Tupfiles and other commands, see the tup(1) man page.\n");
 		fprintf(stderr, "No .tup directory found. Either create a Tupfile.ini file at the top of your project, or manually run 'tup init' there.\n");
 		return -1;
@@ -225,18 +225,6 @@ int init_command(int argc, char **argv)
 		return -1;
 	}
 
-	if(creat(TUP_OBJECT_LOCK, 0666) < 0) {
-		perror(TUP_OBJECT_LOCK);
-		return -1;
-	}
-	if(creat(TUP_SHARED_LOCK, 0666) < 0) {
-		perror(TUP_SHARED_LOCK);
-		return -1;
-	}
-	if(creat(TUP_TRI_LOCK, 0666) < 0) {
-		perror(TUP_TRI_LOCK);
-		return -1;
-	}
 	if(!db_sync) {
 		FILE *f = fopen(TUP_OPTIONS_FILE, "w");
 		if(!f) {

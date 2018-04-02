@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -21,6 +21,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_ldpreload mozilla-unneeded
 if ! whoami | grep marf > /dev/null; then
 	echo "[33mSkip t4031 - you're not marf.[0m"
 	eotup

@@ -1,4 +1,4 @@
-.TH "tup" "1" "2017/01/12" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2017/10/02" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -16,7 +16,7 @@ Tup is a file-based build system. You should use tup if you are developing softw
 .P
 Tup has no domain specific knowledge. You must tell tup how to build your program, such as by saying that all .c files are converted to .o files by using gcc. This is done by writing one or more Tupfiles.
 .SH "PRIMARY COMMAND: tup"
-You can do all of your development with just 'tup', along with writing Tupfiles. See also the \fBINI FILES\fR and \fBTUPFILES\fR sections below.
+You can do all of your development with just 'tup', along with writing Tupfiles. See also the \fBINI FILE\fR, \fBOPTIONS FILES\fR and \fBTUPFILES\fR sections below.
 .TP
 .B tup [<output_1> ... <output_n>]
 Updates the set of outputs based on the dependency graph and the current state of the filesystem. If no outputs are specified then the whole project is updated. This is what you run every time you make changes to your software to bring it up-to-date. You can run this anywhere in the tup hierarchy, and it will always update the requested output. By default, the list of files that are changed are determined by scanning the filesystem and checking modification times. For very large projects this may be slow, but you can skip the scanning time by running the file monitor (see SECONDARY COMMANDS for a description of the monitor).
@@ -166,7 +166,7 @@ Displays the current tup database configuration. These are internal values used 
 .B options
 Displays all of the current tup options, as well as where they originated.
 
-For details on all of the available options and how to set them, see the section \fBINI FILES\fR below.
+For details on all of the available options and how to set them, see the \fBOPTIONS FILES\fR section below.
 .TP
 .B graph [--dirs] [--ghosts] [--env] [--combine] [--stickies] [<output_1> ... <output_n>]
 Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph. This operates directly on the tup database, so unless you are running the file monitor you may want to run 'tup scan' first. This is generally used for debugging tup -- you may or may not find it helpful for trying to look at the structure of your program.
@@ -178,7 +178,7 @@ Temporarily override the graph.dirs option to '1'. This will show the directory 
 .B --ghosts
 Temporarily override the graph.ghosts option to '1'. This will show ghost nodes (files that a command tried to access, but don't actually exist).
 .TP
-.B --environment
+.B --env
 Temporarily override the graph.environment option to '1'. This will show the environment variables, such as PATH.
 .RE
 .TP
@@ -228,10 +228,13 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .TP
 .B upd
 Legacy secondary command. Calling 'tup upd' is equivalent to simply calling 'tup'.
-.SH INI FILES
-Tup allows for a variety of configuration files. These files affect the behavior of tup as a program, but not tup as a build system. That is to say, changing any of these options should not affect the end result of a successful build, but may affect how tup gets there (e.g. how many compile jobs to run in parallel).
+.SH INI FILE
+The tup command can be run from anywhere in the source tree. It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory located at the root of the project. The .tup directory can be created manually with the "tup init" command, but it is much more common to use a Tupfile.ini, which can be added to the project's version control repository. Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run.
 
-In addition to setting options, Tupfile.ini files have a special property. Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run. This file may be empty. At a minimum, the root directory of a project should contain a file named 'Tupfile.ini' so that users do not need to explicitly run 'tup init' when first setting up a new project.
+The contents of the Tupfile.ini file are ignored.
+
+.SH OPTIONS FILES
+Tup allows for a variety of configuration files. These files affect the behavior of tup as a program, but not tup as a build system. That is to say, changing any of these options should not affect the end result of a successful build, but may affect how tup gets there (e.g. how many compile jobs to run in parallel).
 
 The options are read in the following precedence order:
 
@@ -259,7 +262,7 @@ All files use the same .ini-style syntax. A section header is enclosed in square
 [updater]
 .fi
 
-The section header is followed by one or more variable definitions, of the form 'variable = value'. Comments start with a semi-colon and continue to the end of the line.  The variable definitions can all be set to integers. For boolean flags, "true"/"yes" and "false"/"no" are synonyms for 1 and 0, respectively. For example, if you have a .tup/options file that contains:
+The section header is followed by one or more variable definitions, of the form 'variable = value'. Comments start with a semi-colon and continue to the end of the line. The variable definitions can all be set to integers. For boolean flags, "true"/"yes" and "false"/"no" are synonyms for 1 and 0, respectively. For example, if you have a .tup/options file that contains:
 
 .nf
 [updater]
@@ -284,7 +287,7 @@ Set to '1' to keep building as much as possible even if errors are encountered. 
 Set to '1' to track dependencies on files outside of the tup hierarchy. The default is '0', which only tracks dependencies within the tup hierarchy. For example, if you want all C files to be re-compiled when gcc is updated on your system, you should set this to '1'. In Linux and OSX, using full dependencies requires that the tup binary is suid as root so that it can run sub-processes in a chroot environment. Alternatively on Linux, if your kernel supports user namespaces, then you don't need to make the binary suid. Note that if this value is set to '1' from '0', tup will rebuild the entire project. Disabling this option when it was previously enabled does not require a full rebuild, but does take some time since the nodes representing external files are cleared out. NOTE: This does not currently work with ccache or other programs that may write to external files due to issues with locking. This may be fixed in the future.
 .TP
 .B updater.warnings (defaults to '1')
-Set to '0' to disable warnings about writing to hidden files. Tup doesn't track files that have a hidden path component (those that begin with a '.' character). If a sub-process writes to a hidden file, such as ".foo", then by default tup will display a warning that this file was created. By disabling this option, those warnings are not displayed. In either case, writing to hidden files is allowed and is not tracked by tup.
+Set to '0' to disable warnings about writing to hidden files. Tup doesn't track files that are hidden. If a sub-process writes to a hidden file, then by default tup will display a warning that this file was created. By disabling this option, those warnings are not displayed. Hidden filenames (or directories) include: ., .., .tup, .git, .hg, .bzr, .svn.
 .TP
 .B display.color (default 'auto')
 Set to 'never' to disable ANSI escape codes for colored output, or 'always' to always use ANSI escape codes for colored output. The default is 'auto', which displays uses colored output if stdout is connected to a tty, and uses no colors otherwise (ie: if stdout is redirected to a file).
@@ -499,7 +502,18 @@ will produce "../submodules/<submodgroup>" in submodules_f.txt, but "../submodul
 .TP
 .B var := value
 .PD 1
-Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file. Note that you may see a syntax using back-ticks when setting variables, such as:
+Set the $-variable "var" to the value on the right-hand side. Both forms are the same, and are allowed to more easily support converting old Makefiles. The $-variable "var" can later be referenced by using "$(var)". Variables referenced here are always expanded immediately. As such, setting a variable to have a %-flag does not make sense, because a %-flag is only valid in a :-rule. The syntax $(var_%e) is allowed in a :-rule. Variable references do not nest, so something like $(var1_$(var2)) does not make sense. You also cannot pass variable definitions in the command line or through the environment. Any reference to a variable that has not had its value set returns an empty string.
+.nf
+
+CFLAGS = -Dfoo
+: bar.c |> cc $(CFLAGS) $(other) -o %o -c %f |> %B.o
+
+.fi
+will generate the command "cc -Dfoo  -o bar.o -c bar.c" when run.
+.P
+Any $-variable that begins with the string "CONFIG_" is automatically converted to the @-variable of the same name minus the "CONFIG_" prefix. In other words, $(CONFIG_FOO) and @(FOO) are interchangeable. Attempting to assign a value to a CONFIG_ variable in a Tupfile results in an error, since these can only be set in the tup.config file.
+.P
+Note that you may see a syntax using back-ticks when setting variables, such as:
 .nf
 
 CFLAGS += `pkg-config fuse --cflags`
@@ -522,11 +536,54 @@ No other special $-variables exist yet, but to be on the safe side you should as
 .PD 0
 .TP
 .B &var += file
-.PD 1
-Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines.
+p.PD 1
+Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines, and they are later be referenced by using "&(var)".
+.nf
+
+# Tuprules.tup
+&libdir = src/lib
+!cc = |> cc -I&(libdir) -c %f -o %o |> %B.o
+
+# src/lib/Tupfile
+: foreach *.c |> !cc |>
+: *.o |> ar crs %o %f |> libstuff.a
+
+# src/lib/test/Tupfile
+: test_stuff.c |> !cc |>
+: test_stuff.o &(libdir)/libstuff.a |> cc -o %o %f |> test_stuff
+
+# src/Tupfile
+: main.c |> !cc |> main.o
+: main.o &(libdir)/libstuff.a |> cc -o %o %f |> main_app
+
+.fi
+will generate the following build.sh commands (via "tup generate build.sh"):
+.nf
+
+cd src/lib
+cc -I. -c lib1.c -o lib1.o
+cc -I. -c lib2.c -o lib2.o
+ar crs libstuff.a lib1.o lib2.o
+cd test
+cc -I.. -c test_stuff.c -o test_stuff.o
+cc -o test_stuff test_stuff.o ../libstuff.a
+cd ../..
+cc -Ilib -c main.c -o main.o
+cc -o main_app main.o lib/libstuff.a
+
+.fi
 .TP
 .B ifeq (lval,rval)
-Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored. Note that no whitespace is pruned for the values - all text between the '(' and ',' comprise 'lval', and all text between the ',' and ')' comprise 'rval'. This means that ifeq (foo, foo) is false, while ifeq(foo,foo) is true. This is for compatibility with Makefile if statements.
+Evaluates the 'lval' and 'rval' parameters (ie: substitutes all $-variables and @-variables), and does a string comparison to see if they match. If so, all lines between the 'ifeq' and following 'endif' statement are processed; otherwise, they are ignored. Note that no whitespace is pruned for the values - all text between the '(' and ',' comprise 'lval', and all text between the ',' and ')' comprise 'rval'. This means that ifeq (foo, foo) is false, while ifeq (foo,foo) is true. This is for compatibility with Makefile if statements.
+.nf
+
+ifeq (@(FOO),y)
+CFLAGS += -DFOO
+else
+CFLAGS += -g
+endif
+
+.fi
 .TP
 .B ifneq (lval,rval)
 Same as 'ifeq', but with the logic inverted.
@@ -626,6 +683,15 @@ export FOO
 .fi
 
 Tup will save the current value of FOO and pass it to the environment when executing command2. If FOO has a different value during the next update, then command2 will execute again with the new value in the environment. In this example, command1 will not have FOO in its environment and will not re-execute when its value changes.
+
+Note that the FOO above is passed to the environment; it is not provided as an internal variable within tup. Thus, given the following:
+.nf
+
+export FOO
+: |> echo myFOO=$(FOO) envFOO=${FOO} > %o |> foo.txt
+
+.fi
+when run as "$ FOO=silly tup" would result in the contents of the foo.txt file being "myFOO= envFOO=silly". If the "export FOO" was removed from the Tupfile, the contents of the file would be "myFOO= envFOO=" because tup does not propogate environment variables unless they are explicitly exported. This helps preserve repeatable and deterministic builds.
 
 If you wish to export a variable to a specific value rather than get the value from the environment, you can do that in your shell instead of through tup. For example, in Linux you can do:
 

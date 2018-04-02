@@ -1,55 +1,60 @@
 include_rules
 
+ifeq ($(TUP_SERVER),ldpreload)
+ifeq ($(X86_ARCH_SIBLINGS),y)
+  : src/ldpreload/*.64.o |> !ld |> tup-ldpreload.so
+else
+  : src/ldpreload/*.o |> !ld |> tup-ldpreload.so
+endif
+endif
+
+ifneq ($(TARGET),win32)
 client_objs += src/tup/vardict.o
 client_objs += src/tup/send_event.o
 client_objs += src/tup/flock/fcntl.o
 : $(client_objs) |> !ar |> libtup_client.a
 : src/tup/vardict.h |> !cp |> tup_client.h
+endif
 
 srcs = src/tup/*.o
+srcs += src/tup/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
+srcs += src/tup/version/*.o
+srcs += src/inih/*.o
+srcs += src/compat/*.o
 ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
 LDFLAGS += -lsqlite3
 else
 srcs += src/sqlite3/*.o
 endif
-srcs += src/inih/*.o
-srcs += src/compat/*.o
-: $(srcs) |> !ar |> libtup.a
-
+ifneq ($(TARGET),win32)
 ifeq (@(TUP_SUDO_SUID),y)
 suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
+ifeq ($(TUP_SERVER),fuse)
 LDFLAGS += `pkg-config fuse --libs`
+endif
 LDFLAGS += -lm
-: src/tup/tup/main.o libtup.a src/lua/liblua.a |> ^ LINK tup^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | $(CC) -x c -c - -o tup-version.o $(CFLAGS) -Wno-missing-prototypes; $(CC) %f tup-version.o -o tup -lpthread $(LDFLAGS) $(suid) |> tup tup-version.o
+LDFLAGS += -lpthread
+else
+: src/dllinject/*.o |> !dll -lpsapi |> tup-dllinject.dll
+: src/dllinject/*.o32 |> !dll32 -lpsapi |> tup-dllinject32.dll
+: src/compat/win32/detect/*.o32 |> !ld32 |> tup32detect$(PROGRAM_SUFFIX)
 
-ifneq (@(TUP_MINGW),)
-: src/dllinject/*.omingw |> ^ MINGWLINK %o^ @(TUP_MINGW)-gcc -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject.dll
-: src/dllinject/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc -shared -static-libgcc %f -lpsapi -o %o |> tup-dllinject32.dll
+srcs += src/compat/win32/*.o
+srcs += tup-dllinject.dll
 
-mingwsrcs = src/tup/*.omingw
-mingwsrcs += src/tup/monitor/*.omingw
-mingwsrcs += src/tup/tup/*.omingw
-mingwsrcs += src/tup/flock/*.omingw
-mingwsrcs += src/tup/server/*.omingw
-mingwsrcs += src/inih/*.omingw
-mingwsrcs += src/sqlite3/*.omingw
-mingwsrcs += src/compat/*.omingw
-mingwsrcs += src/compat/win32/*.omingw
-MINGWLDFLAGS += -Wl,--wrap=open
-MINGWLDFLAGS += -Wl,--wrap=close
-MINGWLDFLAGS += -Wl,--wrap=tmpfile
-MINGWLDFLAGS += -Wl,--wrap=dup
-MINGWLDFLAGS += -Wl,--wrap=__mingw_vprintf
-MINGWLDFLAGS += -Wl,--wrap=__mingw_vfprintf
+LDFLAGS += -Wl,--wrap=open
+LDFLAGS += -Wl,--wrap=close
+LDFLAGS += -Wl,--wrap=tmpfile
+LDFLAGS += -Wl,--wrap=dup
+LDFLAGS += -Wl,--wrap=__mingw_vprintf
+LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 
 # This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
-MINGWLDFLAGS += -lole32
-
-: $(mingwsrcs) tup-dllinject.dll src/lua/liblua-mingw.a |> ^ MINGWLINK tup.exe^ version=`git describe`; echo "const char *tup_version(void) {return \"$version\";}" | @(TUP_MINGW)-gcc -x c -c - -o tup-version.omingw; @(TUP_MINGW)-gcc -static-libgcc %f tup-version.omingw $(MINGWLDFLAGS) -o tup.exe |> tup.exe tup-version.omingw
-: src/compat/win32/detect/*.omingw32 |> ^ MINGW32LINK %o^ @(TUP_MINGW32)-gcc %f -o %o -m32 |> tup32detect.exe
+LDFLAGS += -lole32
 endif
+: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(suid) |> tup$(PROGRAM_SUFFIX)

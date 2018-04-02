@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2013-2017  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2013-2018  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -19,11 +19,9 @@
 . ./tup.sh
 
 tup init --force foo
-for i in db object shared tri; do
-	if [ ! -f "foo/.tup/$i" ]; then
-		echo "foo/.tup/$i not created!" 1>&2
-		exit 1
-	fi
-done
+if [ ! -f "foo/.tup/db" ]; then
+	echo "foo/.tup/db not created!" 1>&2
+	exit 1
+fi
 
 eotup

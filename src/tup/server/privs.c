@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,14 +18,27 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef tup_open_notify_h
-#define tup_open_notify_h
+/* Server privilege stub implementation for servers that don't require root
+ * privileges for full dependency tracking.
+ */
+#include "tup/privs.h"
 
-#include "tup/access_event.h"
-struct file_info;
+int tup_privileged(void)
+{
+	return 1;
+}
 
-int open_notify_push(struct file_info *finfo);
-int open_notify_pop(struct file_info *finfo);
-int open_notify(enum access_type at, const char *pathname);
+int tup_drop_privs(void)
+{
+	return 0;
+}
 
-#endif
+int tup_temporarily_drop_privs(void)
+{
+	return 0;
+}
+
+int tup_restore_privs(void)
+{
+	return 0;
+}

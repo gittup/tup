@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2008-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -87,7 +87,7 @@ int find_tup_dir(void)
 
 int open_tup_top(void)
 {
-	top_fd = open(".", O_RDONLY);
+	top_fd = open(".", O_RDONLY | O_CLOEXEC);
 	if(top_fd < 0) {
 		perror(".");
 		fprintf(stderr, "tup error: Unable to open the tup root directory.\n");

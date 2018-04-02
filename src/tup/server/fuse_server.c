@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -41,6 +41,10 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/mount.h>
+#ifdef __linux__
+#include <sys/sysmacros.h>
+#include <grp.h>
+#endif
 #include <sys/wait.h>
 
 #define TUP_MNT ".tup/mnt"
@@ -55,6 +59,10 @@ static volatile sig_atomic_t sig_quit = 0;
 static int server_inited = 0;
 static int null_fd = -1;
 static struct parser_server *curps;
+static int privileges_dropped = 0;
+static int temporarily_dropped_privileges = 0;
+static gid_t original_egid;
+static uid_t original_euid;
 static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t fuse_tid;
 
@@ -559,6 +567,14 @@ int server_postexec(struct server *s)
 	return 0;
 }
 
+int server_unlink(void)
+{
+	/* No need to unlink errant files with the FUSE server since they are
+	 * created in a temporary sandbox.
+	 */
+	return 0;
+}
+
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tupid_entries *env_root, char **rules)
 {
@@ -577,7 +593,7 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.signalled = 0;
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
-	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir);
+	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir, 0);
 	if(exec_internal(&s, cmdline, &te, tent, 0, 0, 0) < 0)
 		return -1;
 	environ_free(&te);
@@ -704,6 +720,70 @@ out_unps:
 out_err:
 	pthread_mutex_unlock(&curps_lock);
 	return rc;
+}
+
+int tup_privileged(void)
+{
+	if(privileges_dropped)
+		return 1;
+	return geteuid() == 0;
+}
+
+int tup_drop_privs(void)
+{
+	if(geteuid() == 0) {
+#ifdef __linux__
+		/* On Linux this ensures that we don't have any lingering
+		 * groups with root privileges after the setgid(). On OSX we
+		 * still need some groups in order to actually do the FUSE
+		 * mounts.
+		 */
+		setgroups(0, NULL);
+#endif
+		if(setgid(getgid()) != 0) {
+			perror("setgid");
+			return -1;
+		}
+		if(setuid(getuid()) != 0) {
+			perror("setuid");
+			return -1;
+		}
+		privileges_dropped = 1;
+	}
+	return 0;
+}
+
+int tup_temporarily_drop_privs(void)
+{
+	if (geteuid() == 0) {
+		original_egid = getegid();
+		original_euid = geteuid();
+		if (setegid(getgid()) != 0) {
+			perror("setegid dropping");
+			return -1;
+		}
+		if (seteuid(getuid()) != 0) {
+			perror("seteuid dropping");
+			return -1;
+		}
+		temporarily_dropped_privileges = 1;
+	}
+	return 0;
+}
+
+int tup_restore_privs(void)
+{
+	if (temporarily_dropped_privileges) {
+		if (setegid(original_egid) != 0) {
+			perror("setegid restoring");
+			return -1;
+		}
+		if (seteuid(original_euid) != 0) {
+			perror("seteuid restoring");
+			return -1;
+		}
+	}
+	return 0;
 }
 
 static void sighandler(int sig)

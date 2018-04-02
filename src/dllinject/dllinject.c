@@ -3,7 +3,7 @@
  * tup - A file-based build system
  *
  * Copyright (C) 2010  James McKaskill
- * Copyright (C) 2010-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2010-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,10 +46,20 @@
 
 #ifndef __in
 #define __in
+#endif
+#ifndef __out
 #define __out
+#endif
+#ifndef __inout
 #define __inout
+#endif
+#ifndef __in_opt
 #define __in_opt
+#endif
+#ifndef __inout_opt
 #define __inout_opt
+#endif
+#ifndef __reserved
 #define __reserved
 #endif
 
@@ -1421,10 +1431,12 @@ static const wchar_t *wcscasestr(const wchar_t *arg1, const wchar_t *arg2)
 	return(NULL);
 }
 
-static int ignore_file_w(const wchar_t* file)
+static int ignore_file_w(const wchar_t *file)
 {
 	if (!file)
 		return 0;
+	if (wcsicmp(file, L"\\??\\nul") == 0)
+		return 1;
 	if (wcsicmp(file, L"nul") == 0)
 		return 1;
 	if (wcsicmp(file, L"nul:") == 0)
@@ -1469,7 +1481,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 		goto out_empty;
 	}
 	if(!file[0]) {
-		DEBUG_HOOK("canon_path: nul file - return 0\n");
+		DEBUG_HOOK("canon_path: empty string - return 0\n");
 		goto out_empty;
 	}
 	if(filelen > WIDE_PATH_MAX - prefix_len - 1) {

@@ -2,7 +2,7 @@
  *
  * tup - A file-based build system
  *
- * Copyright (C) 2011-2017  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2011-2018  Mike Shal <marfey@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,7 @@
 #include "fslurp.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -134,6 +135,7 @@ static int var_replace(int ifd, int ofd, int binmode)
 		}
 		
 	} while(p < e);
+	free(b.s);
 
 	return 0;
 }
