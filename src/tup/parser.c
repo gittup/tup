@@ -1115,7 +1115,7 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 	 */
 	if(tup_db_select_tent(tf->tupid, "Tuprules.tup", &tent) < 0)
 		return -1;
-	if(!tent)
+	if(!tent || tent->type == TUP_NODE_GHOST)
 		return 0;
 	fd = parser_entry_open(tf, tent);
 	if(fd < 0) {
