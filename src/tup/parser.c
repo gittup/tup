@@ -3379,10 +3379,6 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring, command_modified) < 0)
-		return -1;
-	free_tupid_tree(&output_root);
-
 	TAILQ_FOREACH(nle, &nl->entries, list) {
 		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
 			return -1;
@@ -3412,8 +3408,25 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 	}
+
+	RB_FOREACH(tt, tupid_entries, &output_root) {
+		if(tupid_tree_search(&input_root, tt->tupid) != NULL) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0) {
+				fprintf(tf->f, "tup error: Command ID %lli lists this file ID as both an input and an output: %lli\n", cmdid, tt->tupid);
+				return -1;
+			}
+			fprintf(tf->f, "tup error: Command ID %lli lists this file as both an input and an output: ", cmdid);
+			print_tup_entry(tf->f, tent);
+			fprintf(tf->f, "\n");
+			return -1;
+		}
+	}
+	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring, command_modified) < 0)
+		return -1;
 	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;
+	free_tupid_tree(&output_root);
 	free_tupid_tree(&input_root);
 	return 0;
 }
