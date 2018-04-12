@@ -1517,7 +1517,7 @@ int tup_db_delete_node(tupid_t tupid)
 	if(delete_node(tupid) < 0)
 		return -1;
 	if(parent->type == TUP_NODE_GENERATED_DIR && ghost_reclaimable1(parent->tnode.tupid)) {
-		return tup_db_delete_node(parent->tnode.tupid);
+		return delete_name_file(parent->tnode.tupid);
 	}
 
 	return 0;
@@ -7090,8 +7090,9 @@ out_reset:
 
 static int reclaim_ghosts(void)
 {
-	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST. Just
-	 * make sure they are no longer needed before deleting them by checking:
+	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST,
+	 * TUP_NODE_GROUP, or TUP_NODE_GENERATED_DIR. Just make sure they are
+	 * no longer needed before deleting them by checking:
 	 *  - no other node references it in 'dir'
 	 *  - no other node is pointed to by it
 	 *  - we are not a ghost 'tup.config' file used for holding @-variables.
@@ -7135,16 +7136,7 @@ static int reclaim_ghosts(void)
 			if(rm_generated_dir(tent) < 0)
 				return -1;
 
-			/* Groups can be in the modify list (ghosts can't) */
-			if(tent->type == TUP_NODE_GROUP)
-				if(tup_db_unflag_modify(tent->tnode.tupid) < 0)
-					return -1;
-			/* Ghost nodes can be in the create list when cleaning up outputs in
-			 * other directories.
-			 */
-			if(tup_db_unflag_create(tent->tnode.tupid) < 0)
-				return -1;
-			if(delete_node(tent->tnode.tupid) < 0)
+			if(delete_name_file(tent->tnode.tupid) < 0)
 				return -1;
 		}
 
