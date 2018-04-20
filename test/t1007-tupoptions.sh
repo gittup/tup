@@ -32,14 +32,12 @@ check_no_windows HOME environment variable
 
 # Override HOME so we can control ~/.tupoptions
 export HOME=`pwd`
-re_init
 check keep_going 0
 
 cat > .tupoptions << HERE
 [updater]
 num_jobs = 2
 HERE
-re_init
 check num_jobs 2
 check keep_going 0
 
@@ -48,7 +46,6 @@ cat > .tupoptions << HERE
 num_jobs = 3
 keep_going = 1
 HERE
-re_init
 check num_jobs 3
 check keep_going 1
 
