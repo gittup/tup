@@ -519,13 +519,6 @@ static void mark_nodes(struct node *n)
 static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verbose)
 {
 	if(n->tent->type == g->count_flags && n->expanded) {
-		g->num_nodes--;
-		if(g->total_mtime != -1) {
-			if(n->tent->mtime != -1)
-				g->total_mtime -= n->tent->mtime;
-		}
-		(*num_pruned)++;
-
 		if(n->tent->type != TUP_NODE_CMD) {
 			fprintf(stderr, "tup internal error: node of type %i trying to add to the modify list in prune_graph\n", n->tent->type);
 			return -1;
@@ -536,6 +529,13 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verb
 		 */
 		if(tup_db_add_modify_list(n->tent->tnode.tupid) < 0)
 			return -1;
+
+		g->num_nodes--;
+		if(g->total_mtime != -1) {
+			if(n->tent->mtime != -1)
+				g->total_mtime -= n->tent->mtime;
+		}
+		(*num_pruned)++;
 		if(verbose) {
 			printf("Skipping: ");
 			print_tup_entry(stdout, n->tent);
