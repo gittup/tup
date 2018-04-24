@@ -542,7 +542,13 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verb
 			printf("\n");
 		}
 	}
-	remove_node_internal(g, n);
+	/* Normal files are not pruned so we can make sure we update the mtime
+	 * in the tup database (t6079). Any dependent commands are flagged as
+	 * modify above, so they will still run later.
+	 */
+	if(n->tent->type != TUP_NODE_FILE) {
+		remove_node_internal(g, n);
+	}
 	return 0;
 }
 
