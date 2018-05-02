@@ -607,19 +607,18 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			goto out_skip;
 		}
 
+		tent = NULL;
 		newdt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, 0, 0);
-		if(newdt <= 0) {
-			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
-			return -1;
-		}
-		if(!pel) {
-			fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointerfor file: %s[0m\n", w->filename);
-			return -1;
-		}
+		if(newdt > 0) {
+			if(!pel) {
+				fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s[0m\n", w->filename);
+				return -1;
+			}
 
-		if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
-			return -1;
-		free(pel);
+			if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
+				return -1;
+			free(pel);
+		}
 		if(!tent) {
 			struct mapping *map;
 
