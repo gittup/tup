@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : |> touch %o |> foo/bar/out.txt
 : foo/bar/*.txt foo/baz/*.txt |> cat %f > %o |> output.txt
 HERE
-update_fail_msg "Expected node 'baz' to be in directory 'foo'"
+update_fail_msg "Failed to find directory ID for dir 'foo/baz/\*.txt' relative to '.'"
 
 rm Tupfile
 

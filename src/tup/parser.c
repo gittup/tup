@@ -350,7 +350,7 @@ out_server_stop:
 				fprintf(tf.f, "\n");
 			}
 		}
-		if(add_parser_files(tf.f, &ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
+		if(add_parser_files(&ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid) < 0)
 			rc = -1;
 		if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root) < 0)
 			rc = -1;
@@ -1213,7 +1213,7 @@ int parser_include_file(struct tupfile *tf, const char *file)
 		fprintf(tf->f, "tup error: Unable to include file with hidden path element.\n");
 		goto out_del_pg;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->f, tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
+	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
 	if(newdt <= 0) {
 		fprintf(tf->f, "tup error: Unable to find directory for include file '%s' relative to '", file);
 		print_tup_entry(tf->f, tf->curtent);
@@ -2258,7 +2258,7 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 
 	if(create_output_dirs || pg.pg_flags & PG_GROUP)
 		sotgv = SOTGV_CREATE_DIRS;
-	pl->dt = find_dir_tupid_dt_pg(tf->f, dt, &pg, &pl->pel, sotgv, 0);
+	pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, sotgv, 0);
 	if(pl->dt <= 0) {
 		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", pl->path);
 		print_tup_entry(tf->f, tup_entry_get(dt));

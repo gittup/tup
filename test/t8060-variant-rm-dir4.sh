@@ -58,7 +58,7 @@ echo "normal" | diff - build/foo2/output.txt
 echo "normal" | diff - build-debug/foo2/output.txt
 
 rm -rf sub
-update_fail_msg "Expected node 'sub'.*but it is not there"
+update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to 'build-debug/foo'"
 
 # Make sure that if we try to re-parse the Tupfile we still get the same error message.
 tup touch foo/Tupfile
