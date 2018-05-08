@@ -472,7 +472,7 @@ static int graph(int argc, char **argv)
 
 	if(pruned != -1) {
 		int num_pruned;
-		if(prune_graph(&g, argc-pruned, argv+pruned, &num_pruned, 0) < 0)
+		if(prune_graph(&g, argc-pruned, argv+pruned, &num_pruned, GRAPH_PRUNE_ALL, 0) < 0)
 			return -1;
 	}
 	dump_graph(&g, stdout, show_dirs, combine);

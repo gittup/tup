@@ -44,6 +44,11 @@ struct tupid_entries;
 #define STATE_FINISHED 2
 #define STATE_REMOVING 3
 
+enum graph_prune_type {
+	GRAPH_PRUNE_GENERATED,
+	GRAPH_PRUNE_ALL,
+};
+
 struct node {
 	TAILQ_ENTRY(node) list;
 	struct edge_head edges;
@@ -95,7 +100,7 @@ int build_graph(struct graph *g);
 int graph_empty(struct graph *g);
 int add_graph_stickies(struct graph *g);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
-		int verbose);
+		enum graph_prune_type gpt, int verbose);
 int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
 			int *connected);
 void trim_graph(struct graph *g);

@@ -516,7 +516,7 @@ static void mark_nodes(struct node *n)
 	}
 }
 
-static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verbose)
+static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum graph_prune_type gpt, int verbose)
 {
 	if(n->tent->type == g->count_flags && n->expanded) {
 		if(n->tent->type != TUP_NODE_CMD) {
@@ -546,14 +546,14 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verb
 	 * in the tup database (t6079). Any dependent commands are flagged as
 	 * modify above, so they will still run later.
 	 */
-	if(n->tent->type != TUP_NODE_FILE) {
+	if(gpt == GRAPH_PRUNE_ALL || n->tent->type != TUP_NODE_FILE) {
 		remove_node_internal(g, n);
 	}
 	return 0;
 }
 
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
-		int verbose)
+		enum graph_prune_type gpt, int verbose)
 {
 	struct tup_entry_head *prune_list;
 	struct tupid_entries dir_root = {NULL};
@@ -630,7 +630,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 
 		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
 			if(!n->marked && n != g->root)
-				if(prune_node(g, n, num_pruned, verbose) < 0)
+				if(prune_node(g, n, num_pruned, gpt, verbose) < 0)
 					goto out_err;
 		}
 	}
