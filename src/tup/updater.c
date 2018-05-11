@@ -2351,9 +2351,13 @@ static int process_output(struct server *s, struct node *n,
 	}
 
 	fflush(f);
-	rewind(f);
-
 	always_display = 0;
+	/* If there are any tup messages, always display the banner. */
+	if(ftell(f) > 0) {
+		always_display = 1;
+	}
+
+	rewind(f);
 	if(s->output_fd >= 0) {
 		/* If there's any output, always display the banner. */
 		if(lseek(s->output_fd, 0, SEEK_END))

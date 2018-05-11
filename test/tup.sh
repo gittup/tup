@@ -712,6 +712,11 @@ set_full_deps()
 	(echo "[updater]"; echo "full_deps=1") >> .tup/options
 }
 
+set_quiet()
+{
+	(echo "[display]"; echo "quiet=1") >> .tup/options
+}
+
 clear_full_deps()
 {
 	(echo "[updater]"; echo "full_deps=0") >> .tup/options
