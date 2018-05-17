@@ -110,21 +110,20 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_head *bl, int required);
+			       struct bin_head *bl);
 static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
 				struct path_list_head *outputs,
 				struct path_list_head *extra_outputs);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl,
-			       int required);
+			       struct name_list *nl, struct bin_head *bl);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl);
 static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes);
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int required, int orderid);
+		       struct name_list *nl, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
@@ -1344,7 +1343,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	} else {
 		r.empty_input = 1;
 	}
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, 1) < 0)
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl) < 0)
 		return -1;
 
 	r.command = cmd;
@@ -1660,7 +1659,7 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 				return -1;
 			}
 		}
-		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 1) < 0)
+		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL) < 0)
 			return -1;
 		free(tinput);
 	}
@@ -1844,7 +1843,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_head *bl, int required)
+			       struct bin_head *bl)
 {
 	char *oosep;
 
@@ -1864,11 +1863,11 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			*oosep = 0;
 			oosep++;
 		}
-		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, required) < 0)
+		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl) < 0)
 			return -1;
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, input_pattern, inputs, bl, required) < 0)
+		if(input_pattern_to_nl(tf, input_pattern, inputs, bl) < 0)
 			return -1;
 	} else {
 		if(input_pattern[0]) {
@@ -2050,8 +2049,7 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 }
 
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl,
-			       int required)
+			       struct name_list *nl, struct bin_head *bl)
 {
 	struct path_list_head plist;
 
@@ -2062,7 +2060,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
-	if(get_name_list(tf, &plist, nl, required) < 0)
+	if(get_name_list(tf, &plist, nl) < 0)
 		return -1;
 	free_path_list(&plist);
 	return 0;
@@ -2401,7 +2399,7 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 }
 
 int get_name_list(struct tupfile *tf, struct path_list_head *plist,
-		  struct name_list *nl, int required)
+		  struct name_list *nl)
 {
 	struct path_list *pl;
 
@@ -2410,7 +2408,7 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			if(nl_add_bin(pl->bin, nl, pl->orderid) < 0)
 				return -1;
 		} else {
-			if(nl_add_path(tf, pl, nl, required, pl->orderid) < 0)
+			if(nl_add_path(tf, pl, nl, pl->orderid) < 0)
 				return -1;
 		}
 	}
@@ -2431,13 +2429,16 @@ static int char_find(const char *s, int len, const char *list)
 }
 
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int required, int orderid)
+		       struct name_list *nl, int orderid)
 {
 	struct build_name_list_args args;
+	int required;
 
 	args.excluding = pl->mem[0] == '^';
 	if(args.excluding) {
 		required = 0;
+	} else {
+		required = 1;
 	}
 
 	if(pl->path != NULL) {

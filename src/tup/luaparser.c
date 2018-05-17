@@ -241,11 +241,11 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &input_path_list, &r.inputs, 1) < 0)
+	if(get_name_list(tf, &input_path_list, &r.inputs) < 0)
 		return luaL_error(ls, "Error parsing input list");
 	if(parse_dependent_tupfiles(&extra_input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs, 1) < 0)
+	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs) < 0)
 		return luaL_error(ls, "Error parsing extra input list");
 
 	if(TAILQ_EMPTY(&input_path_list))
