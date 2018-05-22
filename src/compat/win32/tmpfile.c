@@ -25,6 +25,7 @@
  * CreateFile().
  */
 #include <stdio.h>
+#include <errno.h>
 #include "tup/config.h"
 #include "compat/dir_mutex.h"
 

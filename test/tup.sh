@@ -240,7 +240,7 @@ set_leak_check()
 
 __update()
 {
-	if [ `tup server` = "fuse" ]; then
+	if [ "`tup server`" = "fuse" ]; then
 		sim_hints="--sim-hints=fuse-compatible"
 	fi
 	if [ -n "$TUP_VALGRIND" ]; then
