@@ -345,6 +345,19 @@ typedef NTSTATUS (WINAPI *NtQueryDirectoryFile_t)(
   PUNICODE_STRING FileName,
   BOOLEAN RestartScan);
 
+typedef NTSTATUS (WINAPI *NtQueryDirectoryFileEx_t)(
+  HANDLE FileHandle,
+  HANDLE Event,
+  PIO_APC_ROUTINE ApcRoutine,
+  PVOID ApcContext,
+  PIO_STATUS_BLOCK IoStatusBlock,
+  PVOID FileInformation,
+  ULONG Length,
+  FILE_INFORMATION_CLASS FileInformationClass,
+  ULONG QueryFlags,
+  PUNICODE_STRING FileName
+  );
+
 typedef int (*access_t)(const char *pathname, int mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
 
@@ -387,6 +400,7 @@ static NtCreateFile_t			NtCreateFile_orig;
 static NtOpenFile_t			NtOpenFile_orig;
 static NtCreateUserProcess_t		NtCreateUserProcess_orig;
 static NtQueryDirectoryFile_t		NtQueryDirectoryFile_orig;
+static NtQueryDirectoryFileEx_t		NtQueryDirectoryFileEx_orig;
 static access_t				_access_orig;
 static rename_t				rename_orig;
 
@@ -627,6 +641,66 @@ NTSTATUS WINAPI NtQueryDirectoryFile_hook(
 	}
 	swprintf(widepath+len, WIDE_PATH_MAX-len, L"\\%.*ls", FileName->Length/2, FileName->Buffer);
 	DEBUG_HOOK(" - got full NtQueryDirectoryFile path: '%ls'\n", widepath);
+	handle_file_w(widepath, -1, NULL, ACCESS_READ);
+
+out_exit:
+	SetLastError(save_error);
+	return rc;
+}
+
+NTSTATUS WINAPI NtQueryDirectoryFileEx_hook(
+  HANDLE FileHandle,
+  HANDLE Event,
+  PIO_APC_ROUTINE ApcRoutine,
+  PVOID ApcContext,
+  PIO_STATUS_BLOCK IoStatusBlock,
+  PVOID FileInformation,
+  ULONG Length,
+  FILE_INFORMATION_CLASS FileInformationClass,
+  ULONG QueryFlags,
+  PUNICODE_STRING FileName)
+{
+	wchar_t widepath[WIDE_PATH_MAX];
+	NTSTATUS rc;
+	DWORD len;
+	if(FileName) {
+		DEBUG_HOOK("NtQueryDirectoryFileEx: %.*ls\n", FileName->Length/2, FileName->Buffer);
+	} else {
+		DEBUG_HOOK("NtQueryDirectoryFileEx: (No Filename)\n");
+	}
+
+	rc = NtQueryDirectoryFileEx_orig(FileHandle,
+					 Event,
+					 ApcRoutine,
+					 ApcContext,
+					 IoStatusBlock,
+					 FileInformation,
+					 Length,
+					 FileInformationClass,
+					 QueryFlags,
+					 FileName);
+	if(!FileName) {
+		/* There's no FileName if we're doing the equivalent of
+		 * readdir(), and in that case we already had to CreateFile()
+		 * on the directory name in order to get here, so just return.
+		 */
+		return rc;
+	}
+	DWORD save_error = GetLastError();
+
+	len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
+	if(len == 0) {
+		/* Failed to get path for some reason */
+		DEBUG_HOOK("NtQueryDirectoryFileEx Error - failed to GetFinalPathNameByHandle\n");
+		goto out_exit;
+	}
+	if(len + 1 + FileName->Length/2 + 1 > WIDE_PATH_MAX) {
+		/* Path too large. */
+		DEBUG_HOOK("NtQueryDirectorFileEx Error - path too long (%i, %i)\n", len, FileName->Length);
+		goto out_exit;
+	}
+	swprintf(widepath+len, WIDE_PATH_MAX-len, L"\\%.*ls", FileName->Length/2, FileName->Buffer);
+	DEBUG_HOOK(" - got full NtQueryDirectoryFileEx path: '%ls'\n", widepath);
 	handle_file_w(widepath, -1, NULL, ACCESS_READ);
 
 out_exit:
@@ -1368,6 +1442,7 @@ static struct patch_entry patch_table[] = {
 	HOOK(NtOpenFile),
 	HOOK(NtCreateUserProcess),
 	HOOK(NtQueryDirectoryFile),
+	HOOK(NtQueryDirectoryFileEx),
 #undef MODULE_NAME
 #define MODULE_NAME "msvcrt.dll"
 	HOOK(_access),
