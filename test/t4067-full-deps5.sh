@@ -27,7 +27,7 @@ filename="gcc"
 case $tupos in
 	CYGWIN*)
 		if which gcc | grep MinGW > /dev/null; then
-			path="c:\\MinGW\\bin\\"
+			path="c:\\MinGW\\mingw32\\bin\\"
 		else
 			path="c:\\cygwin64\\bin\\"
 		fi

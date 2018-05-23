@@ -1459,8 +1459,7 @@ static char execdir[MAX_PATH];
 
 void tup_inject_setexecdir(const char* dir)
 {
-	execdir[0] = '\0';
-	strncat(execdir, dir, MAX_PATH);
+	strncpy(execdir, dir, MAX_PATH - 1);
 	execdir[MAX_PATH - 1] = '\0';
 }
 
