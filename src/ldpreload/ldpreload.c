@@ -73,6 +73,7 @@ static int (*s_rename)(const char*, const char*);
 static int (*s_renameat)(int, const char*, int, const char*);
 static int (*s_mkstemp)(char *template);
 static int (*s_mkostemp)(char *template, int flags);
+static int (*s_remove)(const char *);
 static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
@@ -361,6 +362,17 @@ int mkostemp(char *template, int flags)
 	if(rc != -1) {
 		handle_file(template, "", ACCESS_WRITE);
 	}
+	return rc;
+}
+
+int remove(const char *pathname)
+{
+	int rc;
+
+	WRAP(s_remove, "remove");
+	rc = s_remove(pathname);
+	if(rc == 0)
+		handle_file(pathname, "", ACCESS_UNLINK);
 	return rc;
 }
 
