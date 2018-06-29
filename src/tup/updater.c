@@ -39,6 +39,7 @@
 #include "variant.h"
 #include "flist.h"
 #include "estring.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -165,6 +166,8 @@ int updater(int argc, char **argv, int phase)
 			do_scan = 0;
 		} else if(strcmp(argv[x], "--no-environ-check") == 0) {
 			environ_check = 0;
+		} else if(strcmp(argv[x], "--debug-logging") == 0) {
+			logging_enable(argc, argv);
 		} else if(strcmp(argv[x], "--quiet") == 0 ||
 			  strcmp(argv[x], "-q") == 0) {
 			progress_quiet();
@@ -1316,6 +1319,7 @@ static int process_create_nodes(void)
 
 	if(build_graph(&g) < 0)
 		return -1;
+	log_graph(&g, "create");
 	if(g.num_nodes) {
 		tup_main_progress("Parsing Tupfiles...\n");
 	} else {
@@ -1430,6 +1434,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	if(prune_graph(&g, argc, argv, num_pruned, GRAPH_PRUNE_GENERATED, verbose) < 0)
 		return -1;
 
+	log_graph(&g, "update");
 	if(g.num_nodes) {
 		tup_main_progress("Executing Commands...\n");
 	} else {

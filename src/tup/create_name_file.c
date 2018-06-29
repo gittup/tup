@@ -28,6 +28,7 @@
 #include "option.h"
 #include "variant.h"
 #include "config.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +106,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(!tent) {
 		if(create_name_file(dt, file, mtime, &tent) < 0)
 			return -1;
+		log_debug_tent("Create", tent, ", mtime=%li\n", mtime);
 		new = 1;
 	} else {
 		/* Always ignore generated files when it's a .gitignore file, since that happens during parsing. */
@@ -118,14 +120,18 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		 */
 		if(ignore_generated && tent->type == TUP_NODE_GENERATED)
 			force = 0;
-		if(tent->mtime != mtime || force)
+		if(tent->mtime != mtime || force) {
+			log_debug_tent("Update", tent, ", oldmtime=%li, newmtime=%li, force=%i\n", tent->mtime, mtime, force);
 			changed = 1;
+		}
 
 		if(tent->type == TUP_NODE_GHOST) {
+			log_debug_tent("Create(overwrite ghost)", tent, "\n");
 			if(ghost_to_file(tent) < 0)
 				return -1;
 		} else if(tent->type != TUP_NODE_FILE &&
 			  tent->type != TUP_NODE_GENERATED) {
+			log_debug_tent("Create(overwrite)", tent, ", oldtype=%i\n", tent->type);
 			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1, NULL) < 0)
 				return -1;
 			if(tup_db_select_tent(dt, file, &tent) < 0)
@@ -298,6 +304,7 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
+	log_debug_tent("Delete", tent, ", type=%i, force=%i\n", type, force);
 
 	if(check_rm_tup_config(tent, &dont_delete) < 0)
 		return -1;

@@ -673,7 +673,8 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 		perror("asprintf");
 		return;
 	}
-	fprintf(err, "tup: saving graph '%s'\n", realfile);
+	if(err)
+		fprintf(err, "tup: saving graph '%s'\n", realfile);
 
 	count++;
 	f = fopen(realfile, "w");
