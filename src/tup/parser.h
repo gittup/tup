@@ -156,7 +156,7 @@ void move_name_list_entry(struct name_list *newnl, struct name_list *oldnl,
 			  struct name_list_entry *nle);
 void delete_name_list(struct name_list *nl);
 int get_name_list(struct tupfile *tf, struct path_list_head *plist,
-		  struct name_list *nl, int required);
+		  struct name_list *nl);
 void make_name_list_unique(struct name_list *nl);
 void init_rule(struct rule *r);
 int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl);

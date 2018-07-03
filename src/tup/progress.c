@@ -219,7 +219,18 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	/* If we aren't going to show a progress bar, then %-complete here is
 	 * helpful.
 	 */
-	if(total && !display_progress) fprintf(f, "%3i%% ", percent_complete());
+	if(total && !display_progress) {
+		int perc = percent_complete();
+		if(total_time == -1) {
+			if(perc == 100) {
+				fprintf(f, "%3i%% ", perc);
+			} else {
+				fprintf(f, "~%2i%% ", perc);
+			}
+		} else {
+			fprintf(f, "%3i%% ", perc);
+		}
+	}
 	if(display_job_numbers) fprintf(f, "%*i) ", sum_width, sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);

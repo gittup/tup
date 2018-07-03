@@ -21,7 +21,9 @@
 
 entry()
 {
-	if ! tup entry $1 | grep "^$2$"; then
+	# sed is for some versions of grep on Windows that don't detect line
+	# endings properly.
+	if ! tup entry $1 | sed 's/\r$//' | grep "^$2$"; then
 		echo "Expected entry $1 to be: $2" 1>&2
 		exit 1
 	fi

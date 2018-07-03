@@ -73,6 +73,7 @@ static int (*s_rename)(const char*, const char*);
 static int (*s_renameat)(int, const char*, int, const char*);
 static int (*s_mkstemp)(char *template);
 static int (*s_mkostemp)(char *template, int flags);
+static int (*s_remove)(const char *);
 static int (*s_unlink)(const char*);
 static int (*s_unlinkat)(int, const char*, int);
 static int (*s_execve)(const char *filename, char *const argv[],
@@ -154,8 +155,7 @@ int open(const char *pathname, int flags, ...)
 			at = ACCESS_WRITE;
 		handle_file(pathname, "", at);
 	} else {
-		if(errno == ENOENT || errno == ENOTDIR)
-			handle_file(pathname, "", ACCESS_READ);
+		handle_file(pathname, "", ACCESS_READ);
 	}
 	return rc;
 }
@@ -180,8 +180,7 @@ int open64(const char *pathname, int flags, ...)
 			at = ACCESS_WRITE;
 		handle_file(pathname, "", at);
 	} else {
-		if(errno == ENOENT || errno == ENOTDIR)
-			handle_file(pathname, "", ACCESS_READ);
+		handle_file(pathname, "", ACCESS_READ);
 	}
 	return rc;
 }
@@ -195,8 +194,7 @@ FILE *fopen(const char *path, const char *mode)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT || errno == ENOTDIR)
-			handle_file(path, "", ACCESS_READ);
+		handle_file(path, "", ACCESS_READ);
 	}
 	return f;
 }
@@ -210,8 +208,7 @@ FILE *fopen64(const char *path, const char *mode)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT || errno == ENOTDIR)
-			handle_file(path, "", ACCESS_READ);
+		handle_file(path, "", ACCESS_READ);
 	}
 	return f;
 }
@@ -225,8 +222,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 	if(f) {
 		handle_file(path, "", !(mode[0] == 'r'));
 	} else {
-		if(errno == ENOENT || errno == ENOTDIR)
-			handle_file(path, "", ACCESS_READ);
+		handle_file(path, "", ACCESS_READ);
 	}
 	return f;
 }
@@ -364,6 +360,17 @@ int mkostemp(char *template, int flags)
 	return rc;
 }
 
+int remove(const char *pathname)
+{
+	int rc;
+
+	WRAP(s_remove, "remove");
+	rc = s_remove(pathname);
+	if(rc == 0)
+		handle_file(pathname, "", ACCESS_UNLINK);
+	return rc;
+}
+
 int unlink(const char *pathname)
 {
 	int rc;
@@ -480,11 +487,7 @@ int __xstat(int vers, const char *name, struct stat *buf)
 	int rc;
 	WRAP(s_xstat, "__xstat");
 	rc = s_xstat(vers, name, buf);
-	if(rc < 0) {
-		if(errno == ENOENT || errno == ENOTDIR) {
-			handle_file(name, "", ACCESS_READ);
-		}
-	}
+	handle_file(name, "", ACCESS_READ);
 	return rc;
 }
 
@@ -493,11 +496,7 @@ int stat64(const char *filename, struct stat64 *buf)
 	int rc;
 	WRAP(s_stat64, "stat64");
 	rc = s_stat64(filename, buf);
-	if(rc < 0) {
-		if(errno == ENOENT || errno == ENOTDIR) {
-			handle_file(filename, "", ACCESS_READ);
-		}
-	}
+	handle_file(filename, "", ACCESS_READ);
 	return rc;
 }
 
@@ -507,11 +506,7 @@ int __xstat64(int __ver, __const char *__filename,
 	int rc;
 	WRAP(s_xstat64, "__xstat64");
 	rc = s_xstat64(__ver, __filename, __stat_buf);
-	if(rc < 0) {
-		if(errno == ENOENT || errno == ENOTDIR) {
-			handle_file(__filename, "", ACCESS_READ);
-		}
-	}
+	handle_file(__filename, "", ACCESS_READ);
 	return rc;
 }
 
@@ -520,11 +515,7 @@ int __lxstat64(int vers, const char *path, struct stat64 *buf)
 	int rc;
 	WRAP(s_lxstat64, "__lxstat64");
 	rc = s_lxstat64(vers, path, buf);
-	if(rc < 0) {
-		if(errno == ENOENT || errno == ENOTDIR) {
-			handle_file(path, "", ACCESS_READ);
-		}
-	}
+	handle_file(path, "", ACCESS_READ);
 	return rc;
 }
 

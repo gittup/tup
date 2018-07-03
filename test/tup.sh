@@ -240,7 +240,7 @@ set_leak_check()
 
 __update()
 {
-	if [ `tup server` = "fuse" ]; then
+	if [ "`tup server`" = "fuse" ]; then
 		sim_hints="--sim-hints=fuse-compatible"
 	fi
 	if [ -n "$TUP_VALGRIND" ]; then
@@ -710,6 +710,11 @@ set_autoupdate()
 set_full_deps()
 {
 	(echo "[updater]"; echo "full_deps=1") >> .tup/options
+}
+
+set_quiet()
+{
+	(echo "[display]"; echo "quiet=1") >> .tup/options
 }
 
 clear_full_deps()

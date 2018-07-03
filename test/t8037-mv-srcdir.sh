@@ -39,7 +39,7 @@ check_exist build/foo.o build/sub/bar.o build/prog
 check_not_exist foo.o sub/bar.o prog
 
 mv sub newsub
-update_fail_msg "Expected node 'sub' to be in directory"
+update_fail_msg "Failed to find directory ID for dir 'sub/\*.o' relative to 'build'"
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

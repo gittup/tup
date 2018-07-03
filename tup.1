@@ -1,4 +1,4 @@
-.TH "tup" "1" "2017/10/02" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2018/04/11" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -435,6 +435,9 @@ The 'o' flag causes the command to compare the new outputs against the outputs f
 .B %-flags
 Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs.
 .RS
+.TP
+.B %%
+Expands to a single "%" character in the command string. This should be used when you want the percent character to be interpreted by the command itself rather than by tup's parser.
 .TP
 .B %f
 The filename from the "inputs" section. This includes the path and extension. This is most useful in a command, since it lists each input file name with the path relative to the current directory. For example, "src/foo.c" would be copied exactly as "src/foo.c"

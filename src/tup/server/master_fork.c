@@ -620,8 +620,14 @@ static int master_fork_loop(void)
 			exit(1);
 		}
 		waiter->umount_dev = 0;
-		snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job);
-		snprintf(waiter->proc, sizeof(waiter->proc), "%s/proc", job);
+		if(snprintf(waiter->dev, sizeof(waiter->dev), "%s/dev", job) >= (signed)sizeof(waiter->dev)) {
+			fprintf(stderr, "tup internal error: waiter->dev is sized incorrectly.\n");
+			return -1;
+		}
+		if(snprintf(waiter->proc, sizeof(waiter->proc), "%s/proc", job) >= (signed)sizeof(waiter->proc)) {
+			fprintf(stderr, "tup internal error: waiter->proc is sized incorrectly.\n");
+			return -1;
+		}
 #ifdef __APPLE__
 		if(full_deps || (em.need_namespacing && privileged)) {
 			waiter->umount_dev = 1;

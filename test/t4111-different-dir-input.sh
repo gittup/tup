@@ -47,7 +47,7 @@ cat > foo/Tupfile << HERE
 : ../out/gen.txt |> cat %f |>
 HERE
 tup touch foo/Tupfile bar/Tupfile
-update_fail_msg "Expected node 'out' to be in directory '.', but it is not there."
+update_fail_msg "Failed to find directory ID for dir '../out/gen.txt' relative to 'foo'"
 
 # case 3: The generated file is not present when we try to use it as an input
 tmkdir out

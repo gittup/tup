@@ -47,7 +47,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
-static int add_parser_files_locked(FILE *f, struct file_info *finfo,
+static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt);
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
@@ -234,11 +234,11 @@ int add_config_files(struct file_info *finfo, struct tup_entry *tent)
 	return rc;
 }
 
-int add_parser_files(FILE *f, struct file_info *finfo, struct tupid_entries *root, tupid_t vardt)
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt)
 {
 	int rc;
 	finfo_lock(finfo);
-	rc = add_parser_files_locked(f, finfo, root, vardt);
+	rc = add_parser_files_locked(finfo, root, vardt);
 	finfo_unlock(finfo);
 	return rc;
 }
@@ -264,14 +264,14 @@ static int set_directories_to_zero(tupid_t dt, tupid_t slash)
 	return set_directories_to_zero(tent->dt, slash);
 }
 
-static int add_node_to_list(FILE *f, tupid_t dt, struct pel_group *pg,
+static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 			    struct tup_entry_head *head, int full_deps, const char *full_path)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(f, dt, pg, &pel, 1, full_deps);
+	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, 1, full_deps);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
@@ -385,7 +385,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 		struct tup_entry *tmp;
 		r = LIST_FIRST(&finfo->read_list);
 
-		if(add_node_to_list(stderr, DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
 			return -1;
 
 		/* Don't link to ourself */
@@ -403,7 +403,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 	return 0;
 }
 
-static int add_parser_files_locked(FILE *f, struct file_info *finfo,
+static int add_parser_files_locked(struct file_info *finfo,
 				   struct tupid_entries *root, tupid_t vardt)
 {
 	struct file_entry *r;
@@ -416,14 +416,14 @@ static int add_parser_files_locked(FILE *f, struct file_info *finfo,
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
 		r = LIST_FIRST(&finfo->read_list);
-		if(add_node_to_list(f, DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
 			return -1;
 		del_file_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
-		if(add_node_to_list(f, vardt, &r->pg, entrylist, 0, NULL) < 0)
+		if(add_node_to_list(vardt, &r->pg, entrylist, 0, NULL) < 0)
 			return -1;
 		del_file_entry(r);
 	}
@@ -607,19 +607,18 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			goto out_skip;
 		}
 
-		newdt = find_dir_tupid_dt_pg(f, DOT_DT, &w->pg, &pel, 0, 0);
-		if(newdt <= 0) {
-			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
-			return -1;
-		}
-		if(!pel) {
-			fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointerfor file: %s[0m\n", w->filename);
-			return -1;
-		}
+		tent = NULL;
+		newdt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, 0, 0);
+		if(newdt > 0) {
+			if(!pel) {
+				fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s[0m\n", w->filename);
+				return -1;
+			}
 
-		if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
-			return -1;
-		free(pel);
+			if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
+				return -1;
+			free(pel);
+		}
 		if(!tent) {
 			struct mapping *map;
 
@@ -717,7 +716,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->read_list)) {
 		r = LIST_FIRST(&info->read_list);
 
-		if(add_node_to_list(f, DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
 			return -1;
 		del_file_entry(r);
 	}
@@ -725,7 +724,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->var_list)) {
 		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(f, vardt, &r->pg, entryhead, 0, NULL) < 0)
+		if(add_node_to_list(vardt, &r->pg, entryhead, 0, NULL) < 0)
 			return -1;
 		del_file_entry(r);
 	}

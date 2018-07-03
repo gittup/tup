@@ -516,16 +516,9 @@ static void mark_nodes(struct node *n)
 	}
 }
 
-static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verbose)
+static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum graph_prune_type gpt, int verbose)
 {
 	if(n->tent->type == g->count_flags && n->expanded) {
-		g->num_nodes--;
-		if(g->total_mtime != -1) {
-			if(n->tent->mtime != -1)
-				g->total_mtime -= n->tent->mtime;
-		}
-		(*num_pruned)++;
-
 		if(n->tent->type != TUP_NODE_CMD) {
 			fprintf(stderr, "tup internal error: node of type %i trying to add to the modify list in prune_graph\n", n->tent->type);
 			return -1;
@@ -536,18 +529,31 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, int verb
 		 */
 		if(tup_db_add_modify_list(n->tent->tnode.tupid) < 0)
 			return -1;
+
+		g->num_nodes--;
+		if(g->total_mtime != -1) {
+			if(n->tent->mtime != -1)
+				g->total_mtime -= n->tent->mtime;
+		}
+		(*num_pruned)++;
 		if(verbose) {
 			printf("Skipping: ");
 			print_tup_entry(stdout, n->tent);
 			printf("\n");
 		}
 	}
-	remove_node_internal(g, n);
+	/* Normal files are not pruned so we can make sure we update the mtime
+	 * in the tup database (t6079). Any dependent commands are flagged as
+	 * modify above, so they will still run later.
+	 */
+	if(gpt == GRAPH_PRUNE_ALL || n->tent->type != TUP_NODE_FILE) {
+		remove_node_internal(g, n);
+	}
 	return 0;
 }
 
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
-		int verbose)
+		enum graph_prune_type gpt, int verbose)
 {
 	struct tup_entry_head *prune_list;
 	struct tupid_entries dir_root = {NULL};
@@ -624,7 +630,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 
 		TAILQ_FOREACH_SAFE(n, &g->node_list, list, tmp) {
 			if(!n->marked && n != g->root)
-				if(prune_node(g, n, num_pruned, verbose) < 0)
+				if(prune_node(g, n, num_pruned, gpt, verbose) < 0)
 					goto out_err;
 		}
 	}

@@ -47,6 +47,8 @@
 #include "tup/option.h"
 #include "tup/privs.h"
 #include "tup/flist.h"
+#include "tup/vardb.h"
+#include "tup/container.h"
 
 #ifdef _WIN32
 #define mkdir(a,b) mkdir(a)
@@ -470,7 +472,7 @@ static int graph(int argc, char **argv)
 
 	if(pruned != -1) {
 		int num_pruned;
-		if(prune_graph(&g, argc-pruned, argv+pruned, &num_pruned, 0) < 0)
+		if(prune_graph(&g, argc-pruned, argv+pruned, &num_pruned, GRAPH_PRUNE_ALL, 0) < 0)
 			return -1;
 	}
 	dump_graph(&g, stdout, show_dirs, combine);
@@ -867,17 +869,21 @@ static int rm(int argc, char **argv)
 	return 0;
 }
 
-static int varshow_cb(void *arg, tupid_t tupid, const char *var, const char *value, enum TUP_NODE_TYPE type)
+static int varshow_vdb(struct vardb *vdb)
 {
 	const char *color1 = "";
 	const char *color2 = "";
-	if(arg) {}
-	if(tupid) {}
-	if(type == TUP_NODE_GHOST) {
-		color1 = "[47;30m";
-		color2 = "[0m";
+	struct string_tree *st;
+	struct var_entry *ve;
+
+	RB_FOREACH(st, string_entries, &vdb->root) {
+		ve = container_of(st, struct var_entry, var);
+		if(ve->tent->type == TUP_NODE_GHOST) {
+			color1 = "[47;30m";
+			color2 = "[0m";
+		}
+		printf(" - Var[%s%s%s] = '%s'\n", color1, ve->var.s, color2, ve->value);
 	}
-	printf(" - Var[%s%s%s] = '%s'\n", color1, var, color2, value);
 	return 0;
 }
 
@@ -890,8 +896,13 @@ static int varshow(int argc, char **argv)
 		return -1;
 	if(vartent) {
 		if(argc == 1) {
-			if(tup_db_var_foreach(vartent->tnode.tupid, varshow_cb, NULL) < 0)
+			struct vardb vdb;
+			if(vardb_init(&vdb) < 0)
 				return -1;
+			if(tup_db_get_vardb(vartent->tnode.tupid, &vdb) < 0)
+				return -1;
+			varshow_vdb(&vdb);
+			vardb_close(&vdb);
 		} else {
 			int x;
 			struct tup_entry *tent;

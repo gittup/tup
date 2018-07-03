@@ -1427,7 +1427,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	if(build_graph(&g) < 0)
 		return -1;
 
-	if(prune_graph(&g, argc, argv, num_pruned, verbose) < 0)
+	if(prune_graph(&g, argc, argv, num_pruned, GRAPH_PRUNE_GENERATED, verbose) < 0)
 		return -1;
 
 	if(g.num_nodes) {
@@ -1548,7 +1548,7 @@ static int check_update_todo(int argc, char **argv)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
-	if(prune_graph(&g, argc, argv, &num_pruned, verbose) < 0)
+	if(prune_graph(&g, argc, argv, &num_pruned, GRAPH_PRUNE_GENERATED, verbose) < 0)
 		return -1;
 	if(g.num_nodes) {
 		printf("Tup phase 3: The following %i command%s will be executed:\n", g.num_nodes, g.num_nodes == 1 ? "" : "s");
@@ -2351,9 +2351,13 @@ static int process_output(struct server *s, struct node *n,
 	}
 
 	fflush(f);
-	rewind(f);
-
 	always_display = 0;
+	/* If there are any tup messages, always display the banner. */
+	if(ftell(f) > 0) {
+		always_display = 1;
+	}
+
+	rewind(f);
 	if(s->output_fd >= 0) {
 		/* If there's any output, always display the banner. */
 		if(lseek(s->output_fd, 0, SEEK_END))

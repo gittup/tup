@@ -18,6 +18,11 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+/* _GNU_SOURCE lets us use the %lli flag correctly */
+#define _GNU_SOURCE
+
+/* Minimum version is windows Vista (for GetFinalPathNameByHandle, at least) */
+#define _WIN32_WINNT 0x600
 #define __USE_MINGW_ANSI_STDIO 1
 #include <stddef.h> /* get size_t */
 #include <fcntl.h> /* get mode_t (mingw with gcc 4.5) */
@@ -27,6 +32,13 @@
 
 #define O_CLOEXEC 0
 #define F_DUPFD_CLOEXEC 1030
+
+#define S_ISLNK(a) 0
+#define AT_REMOVEDIR 0x200
+
+/* Use wchar functions for Windows (we use UTF8 internally) */
+#define UNICODE
+#define _UNICODE
 
 struct stat;
 

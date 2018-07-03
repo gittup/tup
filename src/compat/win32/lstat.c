@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <windows.h>
 #include <stdio.h>
+#include <errno.h>
 #include "tup/compat.h"
 
 #define WINDOWS_TICK 10000000

@@ -21,7 +21,6 @@ srcs += src/tup/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
-srcs += src/tup/version/*.o
 srcs += src/inih/*.o
 srcs += src/compat/*.o
 ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
@@ -57,4 +56,4 @@ LDFLAGS += -Wl,--wrap=__mingw_vfprintf
 # This seems to only be needed on older (14.04 Ubuntu) MinGW toolchains, and can be removed for 16.04+
 LDFLAGS += -lole32
 endif
-: $(srcs) src/lua/liblua.a |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(suid) |> tup$(PROGRAM_SUFFIX)
+: $(srcs) src/lua/liblua.a |> ^ LINK %o^ ./src/tup/link.sh "$(CC)" "$(CFLAGS)" "$(LDFLAGS)" "%o" "%f" $(suid) |> tup$(PROGRAM_SUFFIX) | tup-version.o
