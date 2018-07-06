@@ -37,7 +37,8 @@ static void check_unlink_list(const struct pel_group *pg,
 			      struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			     int *warnings, struct tup_entry_head *entryhead);
+			     int *warnings, struct tup_entry_head *entryhead,
+			     enum check_type_t check_only);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
@@ -164,7 +165,7 @@ int handle_open_file(enum access_type at, const char *filename,
 }
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
-		int check_only, struct tupid_entries *sticky_root,
+		enum check_type_t check_only, struct tupid_entries *sticky_root,
 		struct tupid_entries *normal_root,
 		struct tupid_entries *group_sticky_root,
 		int full_deps, tupid_t vardt,
@@ -174,12 +175,12 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
 	int tmpdir_bork = 0;
-	int rc1 = 0, rc2;
+	int rc1 = 0, rc2 = 0;
 
 	finfo_lock(info);
 	handle_unlink(info);
 
-	if(!check_only) {
+	if(check_only == CHECK_SUCCESS) {
 		LIST_FOREACH(tmpdir, &info->tmpdir_list, list) {
 			fprintf(f, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
 			tmpdir_bork = 1;
@@ -191,25 +192,36 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	}
 
 	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(f, cmdid, info, warnings, entrylist);
+	rc1 = update_write_info(f, cmdid, info, warnings, entrylist, check_only);
 	tup_entry_release_list();
 
-	entrylist = tup_entry_get_list();
-	rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root, important_link_removed);
-	tup_entry_release_list();
+	/* Only process file inputs if the command wasn't signaled. We
+	 * obviously need to check them if the command succeeded to ensure DAG
+	 * consistency, and they can also help to check when the command
+	 * returns a failure code (ie: if a header file was missing because it
+	 * hasn't been generated yet since we didn't declare it as an input).
+	 * When the command fails due to a signal, however, there's no value
+	 * in checking file inputs since presumably the user just wants to get
+	 * back to the commandline ASAP.
+	 */
+	if(check_only != CHECK_SIGNALLED) {
+		entrylist = tup_entry_get_list();
+		rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root, important_link_removed);
+		tup_entry_release_list();
+	}
 	finfo_unlock(info);
 
 	if(rc1 == 0 && rc2 == 0)
 		return 0;
 	if(rc2 < 0) {
-		if(check_only) {
-			fprintf(f, " *** Additionally, the command failed to process input dependencies. These should probably be fixed before addressing the command failure.\n");
-		} else {
+		if(check_only == CHECK_SUCCESS) {
 			if(rc1 < 0) {
 				fprintf(f, " *** Command ran successfully, but failed due to errors processing both the input and output dependencies.\n");
 			} else {
 				fprintf(f, " *** Command ran successfully, but failed due to errors processing input dependencies.\n");
 			}
+		} else {
+			fprintf(f, " *** Additionally, the command failed to process input dependencies. These should probably be fixed before addressing the command failure.\n");
 		}
 	} else {
 		if(rc1 < 0) {
@@ -217,7 +229,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 			 * We generally expect not to write the output files if
 			 * the command fails.
 			 */
-			if(!check_only) {
+			if(check_only == CHECK_SUCCESS) {
 				fprintf(f, " *** Command failed due to errors processing the output dependencies.\n");
 			}
 		}
@@ -578,7 +590,8 @@ static void handle_unlink(struct file_info *info)
 }
 
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			     int *warnings, struct tup_entry_head *entryhead)
+			     int *warnings, struct tup_entry_head *entryhead,
+			     enum check_type_t check_only)
 {
 	struct file_entry *w;
 	struct file_entry *r;
@@ -671,7 +684,7 @@ out_skip:
 		del_file_entry(w);
 	}
 
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork, info->do_unlink) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {

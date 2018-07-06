@@ -5776,7 +5776,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
 				struct mapping_head *mapping_list,
 				int *write_bork,
-				int do_unlink)
+				int do_unlink, int complain_missing)
 {
 	struct tupid_entries output_root = {NULL};
 	struct actual_output_data aod = {
@@ -5786,11 +5786,15 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.mapping_list = mapping_list,
 		.do_unlink = do_unlink,
 	};
+	int (*missing)(tupid_t, void*) = NULL;
+
+	if(complain_missing)
+		missing = missing_output;
 
 	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0)
 		return -1;
 	if(compare_list_tree(writehead, &output_root, &aod,
-			     extra_output, missing_output) < 0)
+			     extra_output, missing) < 0)
 		return -1;
 	free_tupid_tree(&output_root);
 	if(aod.output_error)

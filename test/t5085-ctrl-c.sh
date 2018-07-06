@@ -26,13 +26,13 @@ cat > Tupfile << HERE
 : |> sh ctrlctup-$mypid.sh 0.1 |>
 : |> sh ctrlctup-$mypid.sh 0.2 |>
 : |> sh ctrlctup-$mypid.sh 0.3 |>
-: |> sh ctrlctup-$mypid.sh 2.0 |>
+: |> sh ctrlctup-$mypid.sh 2.0 && touch %o |> outfile
 HERE
 cat > ctrlctup-$mypid.sh << HERE
 sleep \$1
 HERE
 set +e
-tup upd > /dev/null 2>&1  &
+tup upd > /tmp/tup-out1-$$.txt 2>&1 &
 pid=$!
 sleep 1
 kill $pid
@@ -45,12 +45,17 @@ if pgrep -f ctrlctup-$mypid.sh; then
 	echo "Error: Subprocess is still running." 1>&2
 	exit 1
 fi
-tup todo > /tmp/tup-out-$$.txt
-if ! grep 'The following 1 command' /tmp/tup-out-$$.txt > /dev/null; then
-	cat /tmp/tup-out-$$.txt
+if grep 'Expected to write to file.*outfile' /tmp/tup-out1-$$.txt > /dev/null; then
+	cat /tmp/tup-out1-$$.txt
+	echo "Error: Expected not to receive error message for missing outfile" 1>&2
+	exit 1
+fi
+tup todo > /tmp/tup-out2-$$.txt
+if ! grep 'The following 1 command' /tmp/tup-out2-$$.txt > /dev/null; then
+	cat /tmp/tup-out2-$$.txt
 	echo "Error: Expecting 1 command to update" 1>&2
 	exit 1
 fi
-rm -f /tmp/tup-out-$$.txt
+rm -f /tmp/tup-out1-$$.txt /tmp/tup-out2-$$.txt
 
 eotup
