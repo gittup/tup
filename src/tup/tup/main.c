@@ -55,6 +55,8 @@
 #endif
 
 static int entry(int argc, char **argv);
+static int tupid(int argc, char **argv);
+static int inputs(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
@@ -204,6 +206,10 @@ int main(int argc, char **argv)
 		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "entry") == 0) {
 		rc = entry(argc, argv);
+	} else if(strcmp(cmd, "tupid") == 0) {
+		rc = tupid(argc, argv);
+	} else if(strcmp(cmd, "inputs") == 0) {
+		rc = inputs(argc, argv);
 	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
@@ -322,6 +328,63 @@ static int entry(int argc, char **argv)
 		if(tent) {
 			print_tup_entry(stdout, tent);
 			printf("\n");
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+static int tupid(int argc, char **argv)
+{
+	struct tup_entry *tent;
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		if(gimme_tent(argv[x], &tent) < 0) {
+			fprintf(stderr, "No tent :(\n");
+			return -1;
+		}
+		if(tent) {
+			printf("%lli\n", tent->tnode.tupid);
+		} else {
+			fprintf(stderr, "tup error: entry not found for '%s'\n", argv[x]);
+			return -1;
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+static int inputs(int argc, char **argv)
+{
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		struct tupid_entries inputs = RB_INITIALIZER(&inputs);
+		struct tupid_tree *tt;
+		tupid_t cmdid;
+
+		cmdid = strtol(argv[x], NULL, 10);
+		if(cmdid <= 0) {
+			fprintf(stderr, "tup error: %s is not a valid command ID.\n", argv[x]);
+			return -1;
+		}
+		if(tup_db_get_inputs(cmdid, NULL, &inputs, NULL) < 0)
+			return -1;
+		RB_FOREACH(tt, tupid_entries, &inputs) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(tent->type != TUP_NODE_GHOST) {
+				print_tup_entry(stdout, tent);
+				printf("\n");
+			}
 		}
 	}
 	if(tup_db_commit() < 0)
