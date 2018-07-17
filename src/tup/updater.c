@@ -1889,6 +1889,7 @@ static int update_work(struct graph *g, struct node *n)
 			pthread_mutex_unlock(&display_mutex);
 		} else {
 			pthread_mutex_lock(&display_mutex);
+			log_debug_tent("Skip cmd", n->tent, "\n");
 			skip_result(n->tent);
 			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
@@ -2235,7 +2236,9 @@ static int check_outputs(struct node *n)
 			}
 			if(compare_paths(tmppath, curpath, &eq) < 0)
 				return -1;
-			if(!eq) {
+			if(eq) {
+				log_debug_tent("Skip file", output->tent, "\n");
+			} else {
 				output->skip = 0;
 			}
 		}
