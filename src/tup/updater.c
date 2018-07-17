@@ -638,12 +638,17 @@ static int delete_files(struct graph *g)
 		if(server_is_dead())
 			goto out_err;
 		if(tent->type == TUP_NODE_GENERATED) {
+			if(tup_db_modify_cmds_by_input(tent->tnode.tupid) < 0)
+				goto out_err;
+			if(tup_db_delete_links(tent->tnode.tupid) < 0)
+				goto out_err;
 			if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 				goto out_err;
+			log_debug_tent("Convert generated -> normal", tent, "\n");
 			show_result(tent, 0, NULL, "generated -> normal", 1);
 			show_progress(-1, TUP_NODE_FILE);
 		} else {
-			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be generated or a directory: ", tent->type);
+			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be a generated file: ", tent->type);
 			print_tup_entry(stderr, tent);
 			fprintf(stderr, "\n");
 			return -1;
