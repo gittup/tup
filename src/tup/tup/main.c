@@ -50,10 +50,6 @@
 #include "tup/vardb.h"
 #include "tup/container.h"
 
-#ifdef _WIN32
-#define mkdir(a,b) mkdir(a)
-#endif
-
 static int entry(int argc, char **argv);
 static int tupid(int argc, char **argv);
 static int inputs(int argc, char **argv);

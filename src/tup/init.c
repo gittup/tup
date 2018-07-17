@@ -36,10 +36,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#ifdef _WIN32
-#define mkdir(a,b) mkdir(a)
-#endif
-
 int tup_init(void)
 {
 	if(find_tup_dir() != 0) {

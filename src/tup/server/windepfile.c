@@ -102,7 +102,7 @@ int server_init(enum server_mode mode)
 		perror("fchdir");
 		return -1;
 	}
-	if(mkdir(TUP_TMP) < 0) {
+	if(mkdir(TUP_TMP, 0777) < 0) {
 		if(errno != EEXIST) {
 			perror(TUP_TMP);
 			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");

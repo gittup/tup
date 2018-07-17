@@ -42,7 +42,7 @@ FILE *__wrap_tmpfile(void)
 
 	dir_mutex_lock(tup_top_fd());
 
-	if(mkdir(".tup/tmp") < 0) {
+	if(mkdir(".tup/tmp", 0777) < 0) {
 		if(errno != EEXIST) {
 			perror(".tup/tmp");
 			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
