@@ -1567,6 +1567,14 @@ int tup_db_delete_dir(tupid_t dt, int force)
 {
 	struct half_entry_head subdir_list;
 
+	/* If we remove a directory, we need to re-parse any Tupfiles that
+	 * write files to this directory so that this node can potentially be
+	 * recreated as a generated directory (t4195) or report an error if
+	 * this node is no longer a directory (t4196).
+	 */
+	if(tup_db_set_srcid_dir_flags(dt) < 0)
+		return -1;
+
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(dt, &subdir_list) < 0)
 		return -1;
@@ -1591,21 +1599,31 @@ int tup_db_delete_dir(tupid_t dt, int force)
 	return 0;
 }
 
-int tup_db_flag_generated_dirs(tupid_t dt)
+int tup_db_flag_generated_dir(tupid_t dt, int force)
 {
 	struct half_entry_head subdir_list;
-	struct tup_entry *tent;
 
-	if(tup_entry_add(dt, &tent) < 0)
-		return -1;
-	if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
-		return -1;
-	/* If the generated dir was converted from a ghost, it may have
-	 * modify set (t4128).
-	 */
-	if(tup_db_unflag_modify(tent->tnode.tupid) < 0)
-		return -1;
-	tup_entry_add_ghost_list(tent, &ghost_list);
+	if(force) {
+		struct tup_entry *tent;
+
+		if(tup_entry_add(dt, &tent) < 0)
+			return -1;
+		/* We only need to re-parse other Tupfiles that write to this
+		 * directory when force-removed. If the directory is missing
+		 * we can just make sure that the command is scheduled to be
+		 * executed in the while loop below.
+		 */
+		if(tup_db_set_srcid_dir_flags(tent->tnode.tupid) < 0)
+			return -1;
+
+		/* When we're force removed, set this node to be a ghost
+		 * temporarily so that we don't try to call rmdir on it as if
+		 * it were a generated directory.
+		 */
+		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
+			return -1;
+		tup_entry_add_ghost_list(tent, &ghost_list);
+	}
 
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(dt, &subdir_list) < 0)
@@ -1613,12 +1631,17 @@ int tup_db_flag_generated_dirs(tupid_t dt)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 
-		if(he->type == TUP_NODE_GENERATED_DIR) {
-			if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
-				return -1;
-		} else {
+		if(force) {
 			if(tup_del_id_force(he->tupid, he->type) < 0)
 				return -1;
+		} else {
+			if(he->type == TUP_NODE_GENERATED_DIR) {
+				if(tup_db_flag_generated_dir(he->tupid, force) < 0)
+					return -1;
+			} else if(he->type == TUP_NODE_GENERATED) {
+				if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
+					return -1;
+			}
 		}
 		LIST_REMOVE(he, list);
 		free(he);
