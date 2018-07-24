@@ -1631,18 +1631,8 @@ int tup_db_flag_generated_dir(tupid_t dt, int force)
 	while(!LIST_EMPTY(&subdir_list)) {
 		struct half_entry *he = LIST_FIRST(&subdir_list);
 
-		if(force) {
-			if(tup_del_id_force(he->tupid, he->type) < 0)
-				return -1;
-		} else {
-			if(he->type == TUP_NODE_GENERATED_DIR) {
-				if(tup_db_flag_generated_dir(he->tupid, force) < 0)
-					return -1;
-			} else if(he->type == TUP_NODE_GENERATED) {
-				if(tup_del_id_type(he->tupid, he->type, 0, NULL) < 0)
-					return -1;
-			}
-		}
+		if(tup_del_id_type(he->tupid, he->type, force, NULL) < 0)
+			return -1;
 		LIST_REMOVE(he, list);
 		free(he);
 	}

@@ -327,6 +327,8 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 	if(type == TUP_NODE_GENERATED_DIR) {
 		if(tup_db_flag_generated_dir(tupid, force) < 0)
 			return -1;
+		if(rmdir_callback)
+			rmdir_callback(tupid);
 		return 0;
 	}
 
