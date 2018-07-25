@@ -19,14 +19,15 @@
 # Check %1f, %2f, %1o, etc
 
 . ./tup.sh
+
 cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %1f %3f %2o %1o |> out1 out2
+: file1.ext file2.ext foo/file3.ext file4.ext foo/file5.ext |> cmd %1f %3f %2o %1o %4B %5b |> out1 out2
 HERE
-tup touch file1 file2
 tmkdir foo
-tup touch foo/file3
+tup touch file1.ext file2.ext file4.ext
+tup touch foo/file3.ext foo/file5.ext
 parse
 
-tup_object_exist . 'cmd file1 foo/file3 out2 out1'
+tup_object_exist . 'cmd file1.ext foo/file3.ext out2 out1 file4 file5.ext'
 
 eotup
