@@ -20,18 +20,20 @@
 
 . ./tup.sh
 cat > Tupfile << HERE
-files += f1
-files += f2
-files += f3
+files += f1.e
+files += f2.e
+files += f3.e
+files += f/f4.e
 libs += l1
 libs += l2
 libs += l3
 libs += l4
-: test1 \$(files) \$(libs) |> cmd T %1f F %2f L %3f O %1o 2 %2o |> \$(empty) out2
+: test1 \$(files) \$(libs) |> cmd T %1f F %2f b %2b B %2B L %3f O %1o 2 %2o |> \$(empty) out2
 HERE
-tup touch test1 f1 f2 f3 l1 l2 l3 l4
+tmkdir f
+tup touch test1 f1.e f2.e f3.e f/f4.e l1 l2 l3 l4
 parse
 
-tup_object_exist . 'cmd T test1 F f1 f2 f3 L l1 l2 l3 l4 O  2 out2'
+tup_object_exist . 'cmd T test1 F f1.e f2.e f3.e f/f4.e b f1.e f2.e f3.e f4.e B f1 f2 f3 f4 L l1 l2 l3 l4 O  2 out2'
 
 eotup

@@ -3736,6 +3736,22 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				estring_append(&e, nle->base, nle->extlessbaselen);
 				first = 0;
 			}
+		} else if(*next == 'i') {
+			int first = 1;
+			if(!ooinput_nl) {
+				fprintf(tf->f, "tup error: %%i is only valid in a command string.\n");
+				return NULL;
+			} else if(ooinput_nl->num_entries == 0) {
+				fprintf(tf->f, "tup error: %%i used in rule pattern and no order-only input files were specified.\n");
+				return NULL;
+			}
+			TAILQ_FOREACH(nle, &ooinput_nl->entries, list) {
+				if(!first) {
+					estring_append(&e, " ", 1);
+				}
+				estring_append(&e, nle->path, nle->len);
+				first = 0;
+			}
 		} else if(*next == 'e') {
 			if(!ext) {
 				fprintf(tf->f, "tup error: %%e is only valid with a foreach rule for files that have extensions.\n");
@@ -3883,27 +3899,36 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: Expected number from 1-99 (base 10) for %%-flag, but got %i\n", num);
 				return NULL;
 			}
-			if(endp[0] == 'f') {
+			if (*endp == '\0') {
+				fprintf(tf->f, "tup error: Unfinished %%%i-flag at the end of the string '%s'\n", num, cmd);
+				return NULL;
+			} else if(strchr("fBb", *endp)) {
 				tmpnl = nl;
-			} else if(endp[0] == 'o') {
+			} else if(*endp == 'o') {
 				tmpnl = onl;
-			} else if(endp[0] == 'i') {
+			} else if(*endp == 'i') {
 				if(!ooinput_nl) {
 					fprintf(tf->f, "tup error: %%%ii is only valid in a command string.\n", num);
 					return NULL;
 				}
 				tmpnl = ooinput_nl;
 			} else {
-				fprintf(tf->f, "tup error: Expected 'f', 'o', or 'i' after number in %%-flag, but got '%c'\n", endp[0]);
+				fprintf(tf->f, "tup error: Expected 'f', 'b', 'B', 'o', or 'i' after number in %%%i-flag, but got '%c'\n", num, *endp);
 				return NULL;
 			}
 			TAILQ_FOREACH(nle, &tmpnl->entries, list) {
 				if(nle->orderid == num) {
-					if(!first) {
-						if(estring_append(&e, " ", 1) < 0)
-							return NULL;
+					if(!first && estring_append(&e, " ", 1) < 0)
+						return NULL;
+					int err;
+					if(*endp == 'B') {
+						err = estring_append(&e, nle->base, nle->extlessbaselen);
+					} else if(*endp == 'b') {
+						err = estring_append(&e, nle->base, nle->baselen);
+					} else {
+						err = estring_append(&e, nle->path, nle->len);
 					}
-					if(estring_append(&e, nle->path, nle->len) < 0)
+					if(err < 0)
 						return NULL;
 					first = 0;
 				} else if(nle->orderid > num) {

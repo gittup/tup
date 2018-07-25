@@ -16,31 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try some failure cases in %1f
+# Check %i works for order-only inputs
 
 . ./tup.sh
-tup touch file1 file2
-tmkdir foo
-tup touch foo/file3
 
 cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %0o |> out1 out2
+: |> echo foo > %o |> foo.txt
+: |> echo bar > %o |> bar.txt
+: dat.in | foo.txt bar.txt |> cat %f > %o && echo %i >> %o |> %B.out
 HERE
-parse_fail_msg "Expected number from 1-99"
+echo dat > dat.in
+parse
 
-cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %100o |> out1 out2
-HERE
-parse_fail_msg "Expected number from 1-99"
-
-cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %1d |> out1 out2
-HERE
-parse_fail_msg "Expected.*after number in"
-
-cat > Tupfile << HERE
-: file1 |> cmd %1|> out1
-HERE
-parse_fail_msg "Unfinished %1-flag at the end of the string"
+tup_object_exist . 'cat dat.in > dat.out && echo foo.txt bar.txt >> dat.out'
 
 eotup
