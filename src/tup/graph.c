@@ -293,6 +293,35 @@ static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
 	return n;
 }
 
+/* Callback for adding group dependencies to the regular update graph. This
+ * just adds a link from <group1> -> <group2> so that if we 'tup upd
+ * <group2>', we also build everything in group1. See t3088, t3089.
+ */
+static int build_graph_group_cb(void *arg, struct tup_entry *tent,
+				struct tup_entry *cmdtent)
+{
+	struct graph *g = arg;
+	struct node *n;
+
+	if(cmdtent) {/* unused */}
+
+	n = find_or_create_node(g, tent);
+	if(!n)
+		return -1;
+
+	if(n->expanded == 0) {
+		expand_node(g, n);
+	}
+
+	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
+		return -1;
+
+	return 0;
+}
+
+/* Callback for adding group dependencies to the circular dependency check
+ * graph.
+ */
 static int build_group_cb(void *arg, struct tup_entry *tent,
 			  struct tup_entry *cmdtent)
 {
@@ -338,6 +367,10 @@ int build_graph(struct graph *g)
 			} else {
 				if(tup_db_select_node_by_link(build_graph_cb, g, cur->tnode.tupid) < 0)
 					return -1;
+				if(g->cur->tent->type == TUP_NODE_GROUP) {
+					if(tup_db_select_node_by_group_link(build_graph_group_cb, g, cur->tnode.tupid) < 0)
+						return -1;
+				}
 			}
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
