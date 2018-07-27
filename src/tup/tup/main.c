@@ -514,6 +514,10 @@ static int graph(int argc, char **argv)
 		g.cur = TAILQ_FIRST(&g.plist);
 		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tnode.tupid) < 0)
 			return -1;
+		if(g.cur->tent->type == TUP_NODE_GROUP) {
+			if(tup_db_select_node_by_group_link(build_graph_group_cb, &g, g.cur->tnode.tupid) < 0)
+				return -1;
+		}
 		TAILQ_REMOVE(&g.plist, g.cur, list);
 		TAILQ_INSERT_HEAD(&g.node_list, g.cur, list);
 

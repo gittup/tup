@@ -297,8 +297,8 @@ static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
  * just adds a link from <group1> -> <group2> so that if we 'tup upd
  * <group2>', we also build everything in group1. See t3088, t3089.
  */
-static int build_graph_group_cb(void *arg, struct tup_entry *tent,
-				struct tup_entry *cmdtent)
+int build_graph_group_cb(void *arg, struct tup_entry *tent,
+			 struct tup_entry *cmdtent)
 {
 	struct graph *g = arg;
 	struct node *n;
