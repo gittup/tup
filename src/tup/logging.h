@@ -21,6 +21,7 @@
 struct graph;
 struct tup_entry;
 void logging_enable(int argc, char **argv);
+void logging_shutdown(void);
 void log_debug(const char *format, ...);
 void log_debug_tent(const char *identifier, struct tup_entry *tent, const char *format, ...);
 void log_graph(struct graph *g, const char *name);

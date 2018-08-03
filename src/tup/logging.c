@@ -81,6 +81,10 @@ static int rotate(const char *name)
 			}
 		}
 	}
+	if(close(fd) < 0) {
+		perror("close(fd)");
+		return -1;
+	}
 	return 0;
 }
 
@@ -131,6 +135,14 @@ void logging_enable(int argc, char **argv)
 		log_debug(" '%s'", argv[x]);
 	}
 	log_debug("\n");
+}
+
+void logging_shutdown(void)
+{
+	if(logfile) {
+		fclose(logfile);
+		logfile = NULL;
+	}
 }
 
 void log_debug(const char *format, ...)

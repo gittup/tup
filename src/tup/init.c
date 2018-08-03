@@ -22,6 +22,7 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
+#include "logging.h"
 #include "entry.h"
 #include "server.h"
 #include "option.h"
@@ -81,6 +82,7 @@ int tup_cleanup(void)
 		perror("close(tup_top_fd())");
 	if(server_post_exit() < 0)
 		return -1;
+	logging_shutdown();
 	return 0;
 }
 

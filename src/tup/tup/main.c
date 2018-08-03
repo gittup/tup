@@ -149,6 +149,7 @@ int main(int argc, char **argv)
 		}
 		if(generate(argc, argv) < 0)
 			return 1;
+		tup_valgrind_cleanup();
 		return 0;
 	} else if(strcmp(cmd, "privileged") == 0) {
 #ifdef __linux__
