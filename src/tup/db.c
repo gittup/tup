@@ -109,6 +109,7 @@ enum {
 	DB_SET_DEPENDENT_CONFIG_FLAGS,
 	DB_SELECT_NODE_BY_LINK,
 	DB_SELECT_NODE_BY_GROUP_LINK,
+	DB_SELECT_NODE_BY_DISTINCT_GROUP_LINK,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
 	DB_CONFIG_SET_STRING,
@@ -4446,6 +4447,72 @@ out_reset:
 			free(pair);
 		}
 	}
+
+	return rc;
+}
+
+int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup_entry *),
+					      void *arg, tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_DISTINCT_GROUP_LINK];
+	static char s[] = "select distinct(to_id) from group_link where from_id=?";
+	struct tupid_entries root = {NULL};
+	struct tupid_tree *tt;
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	while(1) {
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			rc = 0;
+			goto out_reset;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			goto out_reset;
+		}
+		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+			rc = -1;
+			goto out_reset;
+		}
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc == 0) {
+		RB_FOREACH(tt, tupid_entries, &root) {
+			struct tup_entry *tent;
+
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(callback(arg, tent) < 0) {
+				return -1;
+			}
+		}
+	}
+	free_tupid_tree(&root);
 
 	return rc;
 }

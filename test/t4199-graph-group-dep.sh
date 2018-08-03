@@ -23,11 +23,19 @@ cat > Tupfile << HERE
 : input.txt |> cp %f %o |> out.txt <group>
 : <group> |> touch %o |> out2.txt <newgroup>
 : <newgroup> |> touch %o |> out3.txt <final>
+: <newgroup> |> touch %o |> out4.txt <final>
 HERE
 tup touch input.txt
-update
+update --debug-logging
 
 tup graph input.txt > ok.dot
+for i in ok.dot .tup/log/update.dot.0; do
+	if cat $i | grep -- '->' | sort | uniq -c | awk '{print $1}' | grep 2 > /dev/null; then
+		echo "Error: Shouldn't have more than one unique link in graph [$i]: " 1>&2
+		cat $i 1>&2
+		exit 1
+	fi
+done
 
 gitignore_good '<group>' ok.dot
 gitignore_good '<newgroup>' ok.dot

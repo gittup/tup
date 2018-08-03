@@ -96,7 +96,7 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_
 int destroy_graph(struct graph *g);
 void save_graphs(struct graph *g);
 int build_graph_cb(void *arg, struct tup_entry *tent);
-int build_graph_group_cb(void *arg, struct tup_entry *tent, struct tup_entry *cmdtent);
+int build_graph_group_cb(void *arg, struct tup_entry *tent);
 int build_graph(struct graph *g);
 int graph_empty(struct graph *g);
 int add_graph_stickies(struct graph *g);
