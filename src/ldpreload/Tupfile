@@ -8,6 +8,7 @@ CFLAGS += -Wno-redundant-decls
 
 srcs += *.c
 srcs += ../tup/flock/fcntl.c
+srcs += ../tup/ccache.c
 
 ifeq ($(X86_ARCH_SIBLINGS),y)
   : foreach $(srcs) |> !cc |> %B.64.o

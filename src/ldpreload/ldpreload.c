@@ -33,6 +33,7 @@
 #define _GNU_SOURCE
 #include "tup/access_event.h"
 #include "tup/flock.h"
+#include "tup/ccache.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -618,6 +619,8 @@ static int ignore_file(const char *file)
 	if(strncmp(file, "/dev/", 5) == 0)
 		return 1;
 	if(strncmp(file, "/proc/", 6) == 0)
+		return 1;
+	if(is_ccache_path(file))
 		return 1;
 	return 0;
 }

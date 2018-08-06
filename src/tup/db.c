@@ -5254,6 +5254,8 @@ int tup_db_get_environ(struct tupid_entries *root,
 	struct var_entry *ve;
 	struct tupid_tree *tt;
 	struct tup_entry *tent;
+	char ccache_nodirect[] = "CCACHE_NODIRECT=1";
+	int ccache_nodirect_len = strlen(ccache_nodirect);
 	char *cur;
 
 	te->block_size = 1;
@@ -5286,6 +5288,9 @@ int tup_db_get_environ(struct tupid_entries *root,
 				tupid_tree_remove(normal_root, tt->tupid);
 		}
 	}
+	te->block_size += ccache_nodirect_len + 1;
+	te->num_entries++;
+
 	te->envblock = malloc(te->block_size);
 	if(!te->envblock) {
 		perror("malloc");
@@ -5307,6 +5312,10 @@ int tup_db_get_environ(struct tupid_entries *root,
 			}
 		}
 	}
+	memcpy(cur, ccache_nodirect, ccache_nodirect_len);
+	cur[ccache_nodirect_len] = 0;
+	cur += ccache_nodirect_len + 1;
+
 	*cur = 0;
 	return 0;
 }

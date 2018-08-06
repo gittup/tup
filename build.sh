@@ -97,7 +97,7 @@ if [ "$server" = "ldpreload" ]; then
 	mkdir ldpreload
 	cd ldpreload
 	CFLAGS="$CFLAGS -fpic"
-	for i in ../../src/ldpreload/*.c ../../src/tup/flock/fcntl.c; do
+	for i in ../../src/ldpreload/*.c ../../src/tup/flock/fcntl.c ../../src/tup/ccache.c; do
 		echo "  bootstrap CC $CFLAGS $i"
 		$CC $CFLAGS -c $i -I../../src $plat_cflags -o `basename $i`.64.o
 	done

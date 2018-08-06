@@ -25,6 +25,7 @@
 #include "tup/environ.h"
 #include "tup/entry.h"
 #include "tup/variant.h"
+#include "tup/ccache.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/dir_mutex.h"
@@ -563,6 +564,9 @@ static int process_depfile(struct server *s, HANDLE h)
 
 		if(!event.len) {
 			/* We have to check this after reading the nul bytes for the empty events. */
+			continue;
+		}
+		if(is_ccache_path(event1) || is_ccache_path(event2)) {
 			continue;
 		}
 
