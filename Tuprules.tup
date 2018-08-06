@@ -13,10 +13,11 @@ CC = gcc
 endif
 
 ifeq (@(TUP_DEBUG),y)
-CFLAGS += -g
+CFLAGS += -Og
 else
 CFLAGS += -Os
 endif
+CFLAGS += -g
 
 ifeq (@(TUP_SANITIZE),y)
 CFLAGS += -fsanitize=address
