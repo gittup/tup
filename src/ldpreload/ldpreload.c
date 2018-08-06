@@ -307,9 +307,7 @@ int rename(const char *old, const char *new)
 	WRAP(s_rename, "rename");
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		if(!ignore_file(old) && !ignore_file(new)) {
-			handle_file(old, new, ACCESS_RENAME);
-		}
+		handle_file(old, new, ACCESS_RENAME);
 	}
 	return rc;
 }
@@ -329,9 +327,7 @@ int renameat(int oldfd, const char *old, int newfd, const char *new)
 	WRAP(s_renameat, "renameat");
 	rc = s_renameat(oldfd, old, newfd, new);
 	if(rc == 0) {
-		if(!ignore_file(old) && !ignore_file(new)) {
-			handle_file(old, new, ACCESS_RENAME);
-		}
+		handle_file(old, new, ACCESS_RENAME);
 	}
 	return rc;
 }
@@ -538,6 +534,8 @@ static void handle_file_locked(const char *dirname, int dirlen, const char *file
 	if(errored)
 		return;
 	if(ignore_file(file))
+		return;
+	if(ignore_file(file2))
 		return;
 
 	if(tup_flock(depfd) < 0) {
