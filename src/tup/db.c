@@ -1029,7 +1029,18 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 				 */
 				if(tup_del_id_force(tent->tnode.tupid, tent->type) < 0)
 					return NULL;
-				goto out_create;
+
+				/* Even after a delete, we may just now be a
+				 * ghost, since non-directories can have
+				 * ghosts attached to them in the ldpreload
+				 * server. So call back into this function to
+				 * get potential ghost handling (t6081,
+				 * t6082).
+				 */
+				return tup_db_create_node_part_display(dt, name, namelen,
+								       display, displaylen,
+								       flags, flagslen,
+								       type, srcid, node_changed);
 			}
 		}
 		/* During the initial scan, srcid will be -1 so we don't want
@@ -1069,7 +1080,6 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 		return tent;
 	}
 
-out_create:
 	tent = node_insert(dt, name, namelen, display, displaylen, flags, flagslen, type, -1, srcid);
 	if(node_changed)
 		*node_changed = 1;
