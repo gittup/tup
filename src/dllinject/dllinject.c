@@ -358,6 +358,14 @@ typedef NTSTATUS (WINAPI *NtQueryDirectoryFileEx_t)(
   PUNICODE_STRING FileName
   );
 
+typedef NTSTATUS (WINAPI *NtSetInformationFile_t)(
+  HANDLE                 FileHandle,
+  PIO_STATUS_BLOCK       IoStatusBlock,
+  PVOID                  FileInformation,
+  ULONG                  Length,
+  FILE_INFORMATION_CLASS FileInformationClass
+);
+
 typedef int (*access_t)(const char *pathname, int mode);
 typedef int (*rename_t)(const char *oldpath, const char *newpath);
 
@@ -401,6 +409,7 @@ static NtOpenFile_t			NtOpenFile_orig;
 static NtCreateUserProcess_t		NtCreateUserProcess_orig;
 static NtQueryDirectoryFile_t		NtQueryDirectoryFile_orig;
 static NtQueryDirectoryFileEx_t		NtQueryDirectoryFileEx_orig;
+static NtSetInformationFile_t		NtSetInformationFile_orig;
 static access_t				_access_orig;
 static rename_t				rename_orig;
 
@@ -704,6 +713,63 @@ NTSTATUS WINAPI NtQueryDirectoryFileEx_hook(
 	handle_file_w(widepath, -1, NULL, ACCESS_READ);
 
 out_exit:
+	SetLastError(save_error);
+	return rc;
+}
+
+NTSTATUS WINAPI NtSetInformationFile_hook(
+  HANDLE                 FileHandle,
+  PIO_STATUS_BLOCK       IoStatusBlock,
+  PVOID                  FileInformation,
+  ULONG                  Length,
+  FILE_INFORMATION_CLASS FileInformationClass
+)
+{
+	wchar_t widepath[WIDE_PATH_MAX];
+	wchar_t destpath[WIDE_PATH_MAX];
+	NTSTATUS rc;
+	DWORD len;
+	FILE_RENAME_INFORMATION *info = FileInformation;
+	int failed = 0;
+
+	if(FileInformationClass == FileRenameInformation) {
+		len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
+		if(len == 0) {
+			/* Failed to get path for some reason */
+			DEBUG_HOOK("NtSetInformationFile Error - failed to GetFinalPathNameByHandle\n");
+			failed = 1;
+		}
+		if(len + 1 + info->FileNameLength/2 + 1 > WIDE_PATH_MAX) {
+			/* Path too large. */
+			DEBUG_HOOK("NtSetInformationFile Error - path too long (%i, %i)\n", len, info->FileNameLength);
+			failed = 1;
+		}
+	}
+
+	rc = NtSetInformationFile_orig(FileHandle,
+				       IoStatusBlock,
+				       FileInformation,
+				       Length,
+				       FileInformationClass);
+	if(rc != STATUS_SUCCESS || failed)
+		return rc;
+
+	/* We're only checking this to see if a file gets renamed via this call. */
+	if(FileInformationClass != FileRenameInformation)
+		return rc;
+
+	if(info->FileNameLength / 2 >= WIDE_PATH_MAX) {
+		DEBUG_HOOK("NtSetInformationFile error - new path is too long.\n");
+		return rc;
+	}
+	DWORD save_error = GetLastError();
+
+	wcsncpy(destpath, info->FileName, info->FileNameLength);
+	destpath[info->FileNameLength / 2] = 0;
+
+	DEBUG_HOOK("NtSetInformationFile: rename '%S' -> '%S'\n", widepath, destpath);
+	handle_file_w(widepath, -1, destpath, ACCESS_RENAME);
+
 	SetLastError(save_error);
 	return rc;
 }
@@ -1443,6 +1509,7 @@ static struct patch_entry patch_table[] = {
 	HOOK(NtCreateUserProcess),
 	HOOK(NtQueryDirectoryFile),
 	HOOK(NtQueryDirectoryFileEx),
+	HOOK(NtSetInformationFile),
 #undef MODULE_NAME
 #define MODULE_NAME "msvcrt.dll"
 	HOOK(_access),
