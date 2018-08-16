@@ -80,4 +80,5 @@ SHARED = -shared
 LDFLAGS_tup-ldpreload.so += $(FPIC)
 LDFLAGS_tup-ldpreload.so += $(SHARED)
 LDFLAGS_tup-ldpreload.so += -ldl
+LDFLAGS_tup-ldpreload.so += -pthread
 endif

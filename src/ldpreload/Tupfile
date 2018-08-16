@@ -5,6 +5,7 @@ CFLAGS += $(FPIC)
 
 # __realpath_chk is defined with -Os but undefined without optimization.
 CFLAGS += -Wno-redundant-decls
+CFLAGS += -pthread
 
 srcs += *.c
 srcs += ../tup/flock/fcntl.c

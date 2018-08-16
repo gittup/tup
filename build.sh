@@ -99,10 +99,10 @@ if [ "$server" = "ldpreload" ]; then
 	CFLAGS="$CFLAGS -fpic"
 	for i in ../../src/ldpreload/*.c ../../src/tup/flock/fcntl.c ../../src/tup/ccache.c; do
 		echo "  bootstrap CC $CFLAGS $i"
-		$CC $CFLAGS -c $i -I../../src $plat_cflags -o `basename $i`.64.o
+		$CC $CFLAGS -c $i -I../../src $plat_cflags -o `basename $i`.64.o -pthread
 	done
 	echo "  bootstrap LD tup-ldpreload.so"
-	$CC *.o -o ../tup-ldpreload.so -fpic -shared -ldl $plat_ldflags $LDFLAGS
+	$CC *.o -o ../tup-ldpreload.so -fpic -shared -ldl $plat_ldflags $LDFLAGS -pthread
 	cd ..
 fi
 

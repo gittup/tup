@@ -112,10 +112,39 @@ static int errored = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int depfd = -1;
 
+static void prepare(void)
+{
+	pthread_mutex_lock(&mutex);
+}
+
+static void parent(void)
+{
+	int rc;
+	rc = pthread_mutex_unlock(&mutex);
+	if(rc != 0) {
+		fprintf(stderr, "tup error: pthread_mutex_unlock() failed in parent atfork handler with rc=%i\n", rc);
+		errored = 1;
+	}
+}
+
+static void child(void)
+{
+	int rc;
+	rc = pthread_mutex_unlock(&mutex);
+	if(rc != 0) {
+		fprintf(stderr, "tup error: pthread_mutex_unlock() failed in child atfork handler with rc=%i\n", rc);
+		errored = 1;
+	}
+}
+
 static void init_fd(void) __attribute__((constructor));
 static void init_fd(void)
 {
 	const char *depfile;
+	if(pthread_atfork(prepare, parent, child) != 0) {
+		fprintf(stderr, "tup error: Unable to set pthread atfork handlers.\n");
+		goto out_error;
+	}
 	depfile = getenv(TUP_DEPFILE);
 	if(!depfile) {
 		fprintf(stderr, "tup error: Unable to find dependency filename in the TUP_DEPFILE environment variable.\n");
