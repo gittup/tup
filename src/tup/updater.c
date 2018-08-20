@@ -1146,32 +1146,42 @@ static int gitignore(tupid_t tupid)
 			perror("fdopen");
 			goto err_out;
 		}
-		fd_old = openat(dfd, ".gitignore", O_CREAT|O_RDONLY, 0666);
-		if(fd_old < 0) {
+		fd_old = openat(dfd, ".gitignore", O_RDONLY);
+		if(fd_old < 0 && errno != ENOENT) {
 			perror(".gitignore");
 			goto err_close;
 		}
-		while(1) {
-			if(read(fd_old, &nextchar, 1) < 1) {
-				break;
+		if(fd_old >= 0) {
+			while(1) {
+				int rc;
+
+				rc = read(fd_old, &nextchar, 1);
+				if(rc < 0) {
+					perror("read");
+					goto err_close_both;
+				}
+				if(rc == 0) {
+					break;
+				}
+
+				if(tg_str[tg_idx] == nextchar) {
+					tg_idx++;
+				} else {
+					tg_idx = 0;
+				}
+				if(fprintf(f, "%c", nextchar) < 0) {
+					perror("fprintf");
+					goto err_close_both;
+				}
+				if(tg_idx == 26) {
+					copied_tg_str = 1;
+					break;
+				}
 			}
-			if(tg_str[tg_idx] == nextchar) {
-				tg_idx++;
-			} else {
-				tg_idx = 0;
+			if(close(fd_old) < 0) {
+				perror("close(fd_old)");
+				goto err_close;
 			}
-			if(fprintf(f, "%c", nextchar) < 0) {
-				perror("fprintf");
-				goto err_close_both;
-			}
-			if(tg_idx == 26) {
-				copied_tg_str = 1;
-				break;
-			}
-		}
-		if(close(fd_old) < 0) {
-			perror("close(fd_old)");
-			goto err_close;
 		}
 		if(!copied_tg_str) {
 			if(fprintf(f, "%s", tg_str) < 0) {

@@ -93,6 +93,7 @@ static int error_directive(struct tupfile *tf, char *cmdline);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
+static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int gitignore(struct tupfile *tf, tupid_t dt);
 static int check_toplevel_gitignore(struct tupfile *tf);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
@@ -301,14 +302,16 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			goto out_free_bs;
 		}
 	} else {
-		if(refactoring) {
-			struct tup_entry *tent;
-			if(tup_db_select_tent(tf.tupid, ".gitignore", &tent) < 0)
-				goto out_free_bs;
-			if(tent && tent->type == TUP_NODE_GENERATED) {
+		struct tup_entry *tent;
+		if(tup_db_select_tent(tf.tupid, ".gitignore", &tent) < 0)
+			goto out_free_bs;
+		if(tent && tent->type == TUP_NODE_GENERATED) {
+			if(refactoring) {
 				fprintf(tf.f, "tup refactoring error: Attempting to remove the .gitignore file.\n");
 				goto out_free_bs;
 			}
+			if(remove_tup_gitignore(&tf, tent) < 0)
+				goto out_free_bs;
 		}
 	}
 	rc = 0;
@@ -1064,6 +1067,108 @@ int export(struct tupfile *tf, const char *cmdline)
 	return 0;
 }
 
+/* If a .gitignore directive is removed, we need to either revert back to the
+ * user's explicit .gitignore file, or remove it entirely.
+ */
+static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
+{
+	int dfd;
+	int fdold;
+	int fdnew;
+	const char *tg_str = "##### TUP GITIGNORE #####\n";
+	int tg_str_len = 26;
+	int tg_idx = 0;
+	int copied_tg_str = 0;
+	int bytes_copied = 0;
+
+	dfd = tup_entry_open(tent->parent);
+	if(dfd < 0)
+		return -1;
+
+	fdold = openat(dfd, ".gitignore", O_RDONLY);
+	if(fdold < 0) {
+		perror(".gitignore");
+		fprintf(stderr, "tup error: Unable to open gitignore file in directory: ");
+		print_tup_entry(stderr, tent->parent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	fdnew = openat(dfd, ".gitignore.new", O_CREAT | O_WRONLY | O_TRUNC, 0666);
+	if(fdnew < 0) {
+		perror(".gitignore.new");
+		fprintf(stderr, "tup error: Unable to create new gitignore file in directory: ");
+		print_tup_entry(stderr, tent->parent);
+		fprintf(stderr, "\n");
+		return -1;
+	}
+	while(1) {
+		char nextchar;
+		if(read(fdold, &nextchar, 1) < 1) {
+			break;
+		}
+		if(tg_str[tg_idx] == nextchar) {
+			tg_idx++;
+		} else {
+			tg_idx = 0;
+		}
+		if(write(fdnew, &nextchar, 1) != 1) {
+			perror("write");
+			return -1;
+		}
+		bytes_copied += 1;
+		if(tg_idx == tg_str_len) {
+			copied_tg_str = 1;
+			break;
+		}
+	}
+	if(copied_tg_str) {
+		bytes_copied -= tg_str_len;
+		if(ftruncate(fdnew, bytes_copied) < 0) {
+			perror("ftruncate");
+			fprintf(stderr, "tup error: Unable to truncate .gitignore.new file\n");
+			return -1;
+		}
+	}
+	if(close(fdnew) < 0) {
+		perror("close(fdnew)");
+		return -1;
+	}
+	if(close(fdold) < 0) {
+		perror("close(fdold)");
+		return -1;
+	}
+	if(bytes_copied) {
+		if(renameat(dfd, ".gitignore.new", dfd, ".gitignore") < 0) {
+			perror("renameat");
+			fprintf(stderr, "tup error: Unable to move .gitignore.new file over .gitignore");
+			return -1;
+		}
+		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
+			return -1;
+		if(tup_db_set_srcid(tent, -1) < 0)
+			return -1;
+		tree_entry_remove(&tf->g->gen_delete_root,
+				  tent->tnode.tupid,
+				  &tf->g->gen_delete_count);
+	} else {
+		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
+			perror("unlinkat");
+			fprintf(stderr, "tup error: Unable to unlink .gitignore.new file in directory: ");
+			print_tup_entry(stderr, tent->parent);
+			fprintf(stderr, "\n");
+			return -1;
+		}
+		/* The .gitignore tent is in the delete root, so the updater
+		 * will clean it up.
+		 */
+	}
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
+	return 0;
+}
+
 static int gitignore(struct tupfile *tf, tupid_t dt)
 {
 	struct tup_entry *tent;
@@ -1082,10 +1187,13 @@ static int gitignore(struct tupfile *tf, tupid_t dt)
 				  tent->tnode.tupid,
 				  &tf->g->gen_delete_count);
 		/* It may be a ghost if we are going from a variant
-		 * to an in-tree build.
+		 * to an in-tree build, or a normal file if we are appending
+		 * definitions to a user-created .gitignore file.
 		 */
-		if(tent->type == TUP_NODE_GHOST) {
+		if(tent->type != TUP_NODE_GENERATED) {
 			if(tup_db_set_type(tent, TUP_NODE_GENERATED) < 0)
+				return -1;
+			if(tup_db_set_srcid(tent, dt) < 0)
 				return -1;
 		}
 	}
