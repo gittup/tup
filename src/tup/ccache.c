@@ -23,11 +23,18 @@
 
 int is_ccache_path(const char *path)
 {
+	/* ccache paths */
 	if(strstr(path, "/.ccache") != NULL)
 		return 1;
 #ifdef _WIN32
 	if(strstr(path, "\\.ccache") != NULL)
 		return 1;
 #endif
+
+	/* icecream file lcok. This file gets created if icecream falls back
+	 * to local compilation mode.
+	 */
+	if(strncmp(path, "/tmp/.icecream-", 15) == 0)
+		return 1;
 	return 0;
 }
