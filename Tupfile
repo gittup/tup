@@ -28,6 +28,13 @@ LDFLAGS += -lsqlite3
 else
 srcs += src/sqlite3/*.o
 endif
+
+ifeq ($(TUP_USE_SYSTEM_PCRE),y)
+LDFLAGS += `pcre-config --libs`
+else
+srcs += src/pcre/*.o
+endif
+
 ifneq ($(TARGET),win32)
 ifeq (@(TUP_SUDO_SUID),y)
 suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup

@@ -25,6 +25,7 @@
 #include "string_tree.h"
 #include "timespan.h"
 #include "vardb.h"
+#include <pcre.h>
 
 #define TUPLUA_NOERROR 0
 #define TUPLUA_PENDINGERROR 1
@@ -121,6 +122,9 @@ struct path_list {
 
 	/* For bins: */
 	struct bin *bin;
+
+	/* For exclusions: */
+	pcre *re;
 
 	/* Copy of the full string */
 	char mem[0];

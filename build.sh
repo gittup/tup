@@ -17,6 +17,8 @@ else
 	exit 1
 fi
 LDFLAGS="$LDFLAGS -lm"
+CFLAGS="$CFLAGS `pcre-config --cflags`"
+LDFLAGS="$LDFLAGS `pcre-config --libs`"
 : ${CC:=gcc}
 case "$os" in
 	Linux)

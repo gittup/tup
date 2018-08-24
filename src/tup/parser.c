@@ -78,7 +78,6 @@ struct build_name_list_args {
 	const char *globstr;  /* Pointer to the basename of the filename in the tupfile */
 	int globstrlen;       /* Length of the basename */
 	int wildcard;
-	int excluding;
 	struct tupfile *tf;
 	int orderid;
 };
@@ -126,6 +125,7 @@ static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struc
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
+static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
 static char *set_path(const char *name, const char *dir, int dirlen);
 static void set_nle_base(struct name_list_entry *nle);
@@ -2193,6 +2193,7 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 	pl->dt = -1;
 	pl->pel = NULL;
 	pl->bin = NULL;
+	pl->re = NULL;
 	memcpy(pl->mem, s, len);
 	pl->mem[len] = 0;
 
@@ -2215,6 +2216,15 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 		pl->bin = bin_find(p+1, bl);
 		if(!pl->bin) {
 			fprintf(tf->f, "tup error: Unable to find bin '%s'\n", p+1);
+			return NULL;
+		}
+	} else if(p[0] == '^') {
+		/* Exclusion */
+		const char *error;
+		int erroffset;
+		pl->re = pcre_compile(&pl->mem[1], 0, &error, &erroffset, NULL);
+		if(!pl->re) {
+			fprintf(tf->f, "tup error: Unable to compile regular expression '%s' at offset %i: %s\n", &pl->mem[1], erroffset, error);
 			return NULL;
 		}
 	} else {
@@ -2343,20 +2353,20 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 {
 	struct pel_group pg;
 	int sotgv = 0;
-	int offset = 0;
 
 	/* Bins get skipped. */
 	if(pl->bin)
+		return 0;
+
+	/* Exclusions get skipped */
+	if(pl->re)
 		return 0;
 
 	/* If we already filled it out, just return. */
 	if(pl->dt != -1)
 		return 0;
 
-	if(pl->mem[0] == '^') {
-		offset = 1;
-	}
-	if(get_path_elements(pl->mem + offset, &pg) < 0)
+	if(get_path_elements(pl->mem, &pg) < 0)
 		return -1;
 	if(pg.pg_flags & PG_HIDDEN) {
 		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", pl->mem);
@@ -2380,12 +2390,12 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->mem);
 		return -1;
 	}
-	if(pl->mem != pl->pel->path - offset) {
+	if(pl->mem != pl->pel->path) {
 		/* File points to somewhere later in the path,
 		 * so set the dir and dirlen parameters.
 		 */
-		pl->dir = pl->mem + offset;
-		pl->dirlen = pl->pel->path - pl->mem - offset;
+		pl->dir = pl->mem;
+		pl->dirlen = pl->pel->path - pl->mem;
 	}
 	return 0;
 }
@@ -2416,6 +2426,9 @@ void free_path_list(struct path_list_head *plist)
 void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
+	if(pl->re) {
+		pcre_free(pl->re);
+	}
 	free(pl->pel);
 	free(pl);
 }
@@ -2456,10 +2469,10 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 	TAILQ_FOREACH(pl, plist, list) {
 		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 0) < 0)
 			return -1;
-		/* Only care about non-bins, and directories that are not our
-		 * own.
+		/* Only care about non-bins, non-groups, non-exclusions, and
+		 * directories that are not our own.
 		 */
-		if(!pl->bin && pl->dt != tf->tupid && !pl->group) {
+		if(!pl->bin && !pl->group && !pl->re && pl->dt != tf->tupid) {
 			struct node *n;
 			struct tup_entry *dtent;
 
@@ -2514,6 +2527,9 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 		if(pl->bin) {
 			if(nl_add_bin(pl->bin, nl, pl->orderid) < 0)
 				return -1;
+		} else if(pl->re) {
+			if(nl_rm_exclusion(tf, pl, nl) < 0)
+				return -1;
 		} else {
 			if(nl_add_path(tf, pl, nl, pl->orderid) < 0)
 				return -1;
@@ -2539,14 +2555,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int orderid)
 {
 	struct build_name_list_args args;
-	int required;
-
-	args.excluding = pl->mem[0] == '^';
-	if(args.excluding) {
-		required = 0;
-	} else {
-		required = 1;
-	}
 
 	if(pl->dir != NULL) {
 		args.dir = pl->dir;
@@ -2590,8 +2598,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		}
 
 		if(!tent) {
-			if(!required)
-				return 0;
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir '", pl->pel->len, pl->pel->path);
 			print_tupid(tf->f, pl->dt);
 			fprintf(tf->f, "'\n");
@@ -2603,17 +2609,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST) {
-			if(!required)
-				return 0;
-			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an %sinput.\n", pl->pel->len, pl->pel->path, args.excluding ? "excluding " : "");
+			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			return -1;
 		}
 		if(tupid_tree_search(&tf->g->gen_delete_root, tent->tnode.tupid) != NULL) {
 			struct tup_entry *srctent = NULL;
 			int valid_input = 0;
-
-			if(!required)
-				return 0;
 
 			/* If the file now exists in the srctree (ie: we
 			 * deleted the rule to create a generated file and
@@ -2708,6 +2709,25 @@ static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid)
 	return 0;
 }
 
+static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name_list *nl)
+{
+	struct name_list_entry *nle;
+	struct name_list_entry *tmp;
+
+	TAILQ_FOREACH_SAFE(nle, &nl->entries, list, tmp) {
+		int rc;
+
+		rc = pcre_exec(pl->re, NULL, nle->path, nle->len, 0, 0, NULL, 0);
+		if(rc == 0) {
+			delete_name_list_entry(nl, nle);
+		} else if(rc != PCRE_ERROR_NOMATCH) {
+			fprintf(tf->f, "tup error: Regex failed to execute: %s\n", pl->mem);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static int build_name_list_cb(void *arg, struct tup_entry *tent)
 {
 	struct build_name_list_args *args = arg;
@@ -2738,18 +2758,6 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 
-	char* path = set_path(tent->name.s, args->dir, args->dirlen);
-	if(args->excluding && path != NULL) {
-		struct name_list_entry *n;
-		struct name_list_entry *tmp;
-		TAILQ_FOREACH_SAFE(n, &args->nl->entries, list, tmp) {
-			if(strncmp(n->path, path, n->len) == 0) {
-				delete_name_list_entry(args->nl, n);
-			}
-		}
-		free(path);
-		return 0;
-	}
 	len = tent->name.len + args->dirlen;
 	extlesslen = tent->name.len - 1;
 	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
@@ -2761,11 +2769,10 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	nle = malloc(sizeof *nle);
 	if(!nle) {
 		perror("malloc");
-		free(path);
 		return -1;
 	}
 
-	nle->path = path;
+	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
 	if(!nle->path) {
 		free(nle);
 		return -1;
@@ -2943,7 +2950,7 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 		}
 
 		memcpy(path, dir, dirlen-1);
-		path[dirlen-1] = path_sep();
+		path[dirlen-1] = '/';
 		strcpy(path + dirlen, name);
 	} else {
 		path = strdup(name);
