@@ -469,9 +469,9 @@ static int tuplua_function_glob(lua_State *ls)
 		return lua_error(ls);
 	}
 
-	if(pl->path != NULL) {
-		tgd.directory = pl->path;
-		tgd.directory_size = pl->pel->path - pl->path - 1;
+	if(pl->dir != NULL) {
+		tgd.directory = pl->dir;
+		tgd.directory_size = pl->dirlen;
 	}
 
 	lua_newtable(ls);
@@ -481,7 +481,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return lua_error(ls);
 	}
 	if(dtent->type == TUP_NODE_GHOST) {
-		lua_pushfstring(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->path);
+		lua_pushfstring(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->mem);
 		free(pl->pel);
 		return lua_error(ls);
 	}

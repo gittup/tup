@@ -111,7 +111,8 @@ struct path_list {
 	int orderid;
 
 	/* For files: */
-	char *path;
+	char *dir;
+	int dirlen;
 	int group;
 
 	/* After path_list_fill_dt_pel */

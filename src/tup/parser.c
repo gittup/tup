@@ -2187,7 +2187,8 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 		parser_error(tf, "malloc");
 		return NULL;
 	}
-	pl->path = NULL;
+	pl->dir = NULL;
+	pl->dirlen = 0;
 	pl->group = 0;
 	pl->dt = -1;
 	pl->pel = NULL;
@@ -2218,9 +2219,6 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 		}
 	} else {
 		/* Path */
-		if(p[0] == '^')
-			p++;
-
 		if(strchr(p, '<') != NULL) {
 			/* Group */
 			char *endb;
@@ -2231,7 +2229,6 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 			}
 			pl->group = 1;
 		}
-		pl->path = p;
 	}
 	return pl;
 }
@@ -2346,6 +2343,7 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 {
 	struct pel_group pg;
 	int sotgv = 0;
+	int offset = 0;
 
 	/* Bins get skipped. */
 	if(pl->bin)
@@ -2355,10 +2353,13 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 	if(pl->dt != -1)
 		return 0;
 
-	if(get_path_elements(pl->path, &pg) < 0)
+	if(pl->mem[0] == '^') {
+		offset = 1;
+	}
+	if(get_path_elements(pl->mem + offset, &pg) < 0)
 		return -1;
 	if(pg.pg_flags & PG_HIDDEN) {
-		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", pl->path);
+		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", pl->mem);
 		return -1;
 	}
 
@@ -2366,27 +2367,25 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 		sotgv = SOTGV_CREATE_DIRS;
 	pl->dt = find_dir_tupid_dt_pg(dt, &pg, &pl->pel, sotgv, 0);
 	if(pl->dt <= 0) {
-		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", pl->path);
+		fprintf(tf->f, "tup error: Failed to find directory ID for dir '%s' relative to '", pl->mem);
 		print_tup_entry(tf->f, tup_entry_get(dt));
 		fprintf(tf->f, "'\n");
 		return -1;
 	}
 	if(!pl->pel) {
-		if(strcmp(pl->path, ".") == 0) {
+		if(strcmp(pl->mem, ".") == 0) {
 			fprintf(tf->f, "tup error: Not expecting '.' path here.\n");
 			return -1;
 		}
-		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->path);
+		fprintf(tf->f, "tup internal error: Final pel missing for path: '%s'\n", pl->mem);
 		return -1;
 	}
-	/* TODO: What's this for? */
-	if(pl->path == pl->pel->path) {
-		pl->path = NULL;
-	} else {
+	if(pl->mem != pl->pel->path - offset) {
 		/* File points to somewhere later in the path,
-		 * so set the last '/' to 0.
+		 * so set the dir and dirlen parameters.
 		 */
-		pl->path[pl->pel->path - pl->path - 1] = 0;
+		pl->dir = pl->mem + offset;
+		pl->dirlen = pl->pel->path - pl->mem - offset;
 	}
 	return 0;
 }
@@ -2549,13 +2548,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		required = 1;
 	}
 
-	if(pl->path != NULL) {
-		/* Note that dirlen should be pl->pel->path - pl->path - 1,
-		 * but we add 1 to account for the trailing '/' that
-		 * will be added (since it won't be added in the next case).
-		 */
-		args.dir = pl->path;
-		args.dirlen = pl->pel->path - pl->path;
+	if(pl->dir != NULL) {
+		args.dir = pl->dir;
+		args.dirlen = pl->dirlen;
 	} else {
 		args.dir = "";
 		args.dirlen = 0;
@@ -2659,7 +2654,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(tup_entry_add(pl->dt, &dtent) < 0)
 			return -1;
 		if(dtent->type == TUP_NODE_GHOST) {
-			fprintf(tf->f, "tup error: Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->path);
+			fprintf(tf->f, "tup error: Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->mem);
 			return -1;
 		}
 
@@ -3129,7 +3124,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			if(*group) {
 				fprintf(tf->f, "tup error: Multiple output groups detected: '");
 				print_tup_entry(tf->f, *group);
-				fprintf(tf->f, "' and '%s/%.*s'\n", pl->path, pl->pel->len, pl->pel->path);
+				fprintf(tf->f, "' and '%s/%.*s'\n", pl->mem, pl->pel->len, pl->pel->path);
 				return -1;
 			}
 
@@ -3146,19 +3141,15 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		}
 		onle->orderid = pl->orderid;
 
-		if(pl->path) {
-			int plpathlen;
-			plpathlen = strlen(pl->path);
-			onle->path = malloc(plpathlen + pl->pel->len + 2);
+		if(pl->dir) {
+			onle->path = malloc(pl->dirlen + pl->pel->len + 1);
 			if(!onle->path) {
 				perror("malloc");
 				return -1;
 			}
-			strcpy(onle->path, pl->path);
-			onle->path[plpathlen] = path_sep();
-			onle->path[plpathlen + 1] = 0;
-			strncpy(onle->path + plpathlen + 1, pl->pel->path, pl->pel->len);
-			onle->path[plpathlen + 1 + pl->pel->len] = 0;
+			strncpy(onle->path, pl->dir, pl->dirlen);
+			strncpy(onle->path + pl->dirlen, pl->pel->path, pl->pel->len);
+			onle->path[pl->dirlen + pl->pel->len] = 0;
 		} else {
 			onle->path = malloc(pl->pel->len + 1);
 			if(!onle->path) {
@@ -3557,7 +3548,7 @@ static void set_nle_base(struct name_list_entry *nle)
 	nle->baselen = 0;
 	while(nle->base > nle->path) {
 		nle->base--;
-		if(nle->base[0] == path_sep()) {
+		if(is_path_sep(nle->base)) {
 			nle->base++;
 			goto out;
 		}
