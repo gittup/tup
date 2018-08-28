@@ -238,7 +238,13 @@ static int msqlite3_reset(sqlite3_stmt *stmt)
 	transaction_started = 0;
 	if(sql_debug) {
 		timespan_end(&transaction_ts);
-		fprintf(stderr, "[%fs] {%i} %s\n", timespan_seconds(&transaction_ts), sqlite3_changes(tup_db), transaction_buf);
+		if(strncmp(transaction_buf, "insert", 6) == 0 ||
+		   strncmp(transaction_buf, "update", 6) == 0 ||
+		   strncmp(transaction_buf, "delete", 6) == 0) {
+			fprintf(stderr, "[%fs] {%i} %s\n", timespan_seconds(&transaction_ts), sqlite3_changes(tup_db), transaction_buf);
+		} else {
+			fprintf(stderr, "[%fs] %s\n", timespan_seconds(&transaction_ts), transaction_buf);
+		}
 	}
 	return sqlite3_reset(stmt);
 }
