@@ -164,6 +164,7 @@ static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
 static struct vardb envdb = { {NULL}, 0, NULL, NULL};
 static int transaction = 0;
+static tupid_t local_env_dt = -1;
 static tupid_t local_slash_dt = -1;
 
 /* Simple counter to invalidate the tent->stickies field. If
@@ -175,6 +176,7 @@ static tupid_t local_slash_dt = -1;
 static int sticky_count = 1;
 
 static int version_check(void);
+static int init_virtual_dirs(void);
 static struct tup_entry *node_insert(tupid_t dt, const char *name, int namelen,
 				     const char *display, int displaylen, const char *flags, int flagslen,
 				     enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid);
@@ -280,6 +282,8 @@ int tup_db_open(void)
 		return -1;
 	if(version_check() < 0)
 		return -1;
+	if(init_virtual_dirs() < 0)
+		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;
@@ -359,6 +363,8 @@ int tup_db_create(int db_sync, int memory_db)
 	if(tup_db_config_set_int("db_version", DB_VERSION) < 0)
 		return -1;
 	if(tup_db_config_set_int("parser_version", PARSER_VERSION) < 0)
+		return -1;
+	if(init_virtual_dirs() < 0)
 		return -1;
 	if(tup_db_commit() < 0)
 		return -1;
@@ -5336,22 +5342,24 @@ int tup_db_get_environ(struct tupid_entries *root,
 	return 0;
 }
 
-tupid_t env_dt(void)
+static int init_virtual_dirs(void)
 {
-	static tupid_t local_env_dt = -1;
-	struct tup_entry *envtent;
-
-	if(local_env_dt != -1)
-		return local_env_dt;
+	struct tup_entry *tent;
 
 	if(tup_entry_add(DOT_DT, NULL) < 0)
 		return -1;
-	envtent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
-	if(!envtent) {
+
+	tent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
+	if(!tent) {
 		fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
 		return -1;
 	}
-	local_env_dt = envtent->tnode.tupid;
+	local_env_dt = tent->tnode.tupid;
+	return 0;
+}
+
+tupid_t env_dt(void)
+{
 	return local_env_dt;
 }
 
