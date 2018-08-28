@@ -160,8 +160,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	struct timeval orig_start;
 	char path[PATH_MAX];
 
-	/* Skip '$' */
-	if(n->tent->tnode.tupid == env_dt())
+	if(is_virtual_tent(n->tent))
 		return 0;
 
 	timespan_start(&tf.ts);
@@ -835,8 +834,7 @@ static int readdir_parser_cb(void *arg, struct tup_entry *tent)
 	struct readdir_parser_params *rpp = arg;
 	struct string_tree *st;
 
-	/* Skip '$' */
-	if(tent->tnode.tupid == env_dt())
+	if(is_virtual_tent(tent))
 		return 0;
 
 	st = malloc(sizeof *st);

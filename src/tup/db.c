@@ -1833,7 +1833,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 			return -1;
 		if(subsrc == destroot)
 			goto out_skip;
-		if(subsrc->tnode.tupid == env_dt())
+		if(is_virtual_tent(subsrc))
 			goto out_skip;
 		if(tup_entry_variant(subsrc)->tent->dt != DOT_DT)
 			goto out_skip;
@@ -5390,6 +5390,17 @@ tupid_t slash_dt(void)
 	return local_slash_dt;
 }
 
+int is_virtual_tent(struct tup_entry *tent)
+{
+	if(tent->dt == DOT_DT && tent->name.len == 1) {
+		if(tent->name.s[0] == '$')
+			return 1;
+		if(tent->name.s[0] == '/')
+			return 1;
+	}
+	return 0;
+}
+
 int tup_db_scan_begin(void)
 {
 	if(tup_db_begin() < 0)
@@ -6521,9 +6532,7 @@ static struct tup_entry *node_insert(tupid_t dt, const char *name, int namelen,
 	struct tup_entry *tent;
 	if(tup_db_node_insert_tent_display(dt, name, namelen, display, displaylen, flags, flagslen, type, mtime, srcid, &tent) < 0)
 		return NULL;
-	if(tent->type == TUP_NODE_DIR &&
-	   tent->tnode.tupid != env_dt() &&
-	   tent->tnode.tupid != slash_dt_no_create()) {
+	if(tent->type == TUP_NODE_DIR && !is_virtual_tent(tent)) {
 		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 			return NULL;
 	}

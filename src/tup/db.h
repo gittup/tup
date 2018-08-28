@@ -172,6 +172,7 @@ int tup_db_findenv(const char *var, struct tup_entry **tent);
 int tup_db_get_environ(struct tupid_entries *root,
 		       struct tupid_entries *normal_root, struct tup_env *te);
 tupid_t env_dt(void);
+int is_virtual_tent(struct tup_entry *tent);
 
 /* Tree operations */
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
