@@ -187,6 +187,7 @@ int tup_db_scan_end(void);
 /* updater operations */
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
+				struct tupid_entries *output_root,
 				struct mapping_head *mapping_list,
 				int *write_bork,
 				int do_unlink, int complain_missing);
@@ -195,6 +196,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
 			       struct tupid_entries *group_sticky_root,
+			       struct tupid_entries *output_root,
 			       int *important_link_removed);
 int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 

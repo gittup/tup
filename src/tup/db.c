@@ -5877,11 +5877,12 @@ static int missing_output(tupid_t tupid, void *data)
 
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
+				struct tupid_entries *output_root,
 				struct mapping_head *mapping_list,
 				int *write_bork,
 				int do_unlink, int complain_missing)
 {
-	struct tupid_entries output_root = {NULL};
+	struct tupid_entries output_copy = {NULL};
 	struct actual_output_data aod = {
 		.f = f,
 		.cmdid = cmdid,
@@ -5894,12 +5895,12 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 	if(complain_missing)
 		missing = missing_output;
 
-	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0)
+	if(tupid_tree_copy(&output_copy, output_root) < 0)
 		return -1;
-	if(compare_list_tree(writehead, &output_root, &aod,
+	if(compare_list_tree(writehead, &output_copy, &aod,
 			     extra_output, missing) < 0)
 		return -1;
-	free_tupid_tree(&output_root);
+	free_tupid_tree(&output_copy);
 	if(aod.output_error)
 		*write_bork = 1;
 	return 0;
@@ -6234,6 +6235,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
 			       struct tupid_entries *group_sticky_root,
+			       struct tupid_entries *output_root,
 			       int *important_link_removed)
 {
 	struct tupid_entries sticky_copy = {NULL};
@@ -6252,9 +6254,9 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		return -1;
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
-	if(tup_db_get_outputs(cmdid, &aid.output_root, NULL) < 0)
-		return -1;
 	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
+		return -1;
+	if(tupid_tree_copy(&aid.output_root, output_root) < 0)
 		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
