@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 static struct file_entry *new_entry(const char *filename);
@@ -60,6 +61,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	RB_INIT(&info->group_sticky_root);
 	RB_INIT(&info->used_groups_root);
 	RB_INIT(&info->output_root);
+	LIST_INIT(&info->exclusion_list);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
 	/* Root variant gets a NULL variant_dir so we can skip trying to do the
@@ -78,6 +80,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 
 void cleanup_file_info(struct file_info *info)
 {
+	free_re_list(&info->exclusion_list);
 	free_tupid_tree(&info->output_root);
 	free_tupid_tree(&info->used_groups_root);
 	free_tupid_tree(&info->group_sticky_root);
@@ -188,9 +191,27 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	handle_unlink(info);
 
 	if(check_only == CHECK_SUCCESS) {
-		LIST_FOREACH(tmpdir, &info->tmpdir_list, list) {
-			fprintf(f, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
-			tmpdir_bork = 1;
+		while(!LIST_EMPTY(&info->tmpdir_list)) {
+			int match = 0;
+
+			tmpdir = LIST_FIRST(&info->tmpdir_list);
+			if(re_entries_match(f, &info->exclusion_list, tmpdir->dirname, &match) < 0)
+				return -1;
+			if(match) {
+				if(mkdir(tmpdir->dirname, 0777) < 0) {
+					if(errno != EEXIST) {
+						perror(tmpdir->dirname);
+						fprintf(f, "tup error: Unable to create directory '%s'\n", tmpdir->dirname);
+						return -1;
+					}
+				}
+			} else {
+				fprintf(f, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
+				tmpdir_bork = 1;
+			}
+			LIST_REMOVE(tmpdir, list);
+			free(tmpdir->dirname);
+			free(tmpdir);
 		}
 		if(tmpdir_bork) {
 			finfo_unlock(info);
@@ -354,6 +375,7 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 	wchar_t widefile[WIDE_PATH_MAX];
 	int prefix_len = 4;
 	wchar_t *dest;
+	wchar_t *tmp;
 
 	dest = widefile;
 	if(is_full_path(file)) {
@@ -366,6 +388,12 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 	}
 	MultiByteToWideChar(CP_UTF8, 0, file, -1, dest, WIDE_PATH_MAX - prefix_len);
 	widefile[WIDE_PATH_MAX-1] = 0;
+	/* Backout the forward-slash conversion used for regex matching. */
+	for(tmp=dest; *tmp != 0; tmp++) {
+		if(*tmp == '/') {
+			*tmp = '\\';
+		}
+	}
 	if(!GetFileAttributesExW(widefile, GetFileExInfoStandard, &data)) {
 		fprintf(stderr, "tup error: GetFileAttributesExW(\"%ls\") failed: 0x%08lx\n", widefile, GetLastError());
 		return -1;
@@ -596,6 +624,28 @@ static void handle_unlink(struct file_info *info)
 	}
 }
 
+static int create_ignored_file(FILE *f, struct file_entry *w)
+{
+	struct path_element *pel = NULL;
+	struct tup_entry *tent;
+	tupid_t dt;
+
+	dt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, SOTGV_IGNORE_DIRS, 0);
+	if(dt < 0) {
+		fprintf(f, "tup error: Unable to create directory tree for ignored file: %s\n", w->filename);
+		return -1;
+	}
+	if(!pel) {
+		fprintf(f, "[31mtup internal error: create_ignored_file() didn't get a final pel pointer for file: %s[0m\n", w->filename);
+		return -1;
+	}
+	tent = tup_db_create_node_part(dt, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
+	if(!tent)
+		return -1;
+	free(pel);
+	return 0;
+}
+
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, struct tup_entry_head *entryhead,
 			     enum check_type_t check_only)
@@ -609,8 +659,17 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->write_list)) {
 		tupid_t newdt;
 		struct path_element *pel = NULL;
+		int match = 0;
 
 		w = LIST_FIRST(&info->write_list);
+
+		if(re_entries_match(f, &info->exclusion_list, w->filename, &match) < 0)
+			return -1;
+		if(match) {
+			if(create_ignored_file(f, w) < 0)
+				return -1;
+			goto out_skip;
+		}
 
 		/* Remove duplicate write entries */
 		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
@@ -730,10 +789,15 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	struct tupid_tree *tt;
 
 	while(!LIST_EMPTY(&info->read_list)) {
+		int match = 0;
 		r = LIST_FIRST(&info->read_list);
 
-		if(add_node_to_list(DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
+		if(re_entries_match(f, &info->exclusion_list, r->filename, &match) < 0)
 			return -1;
+		if(!match) {
+			if(add_node_to_list(DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
+				return -1;
+		}
 		del_file_entry(r);
 	}
 

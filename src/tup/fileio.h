@@ -32,6 +32,7 @@ struct path_element;
 struct pel_group;
 
 #define SOTGV_CREATE_DIRS 2
+#define SOTGV_IGNORE_DIRS 3
 
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);

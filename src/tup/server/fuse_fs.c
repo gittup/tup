@@ -32,6 +32,7 @@
 #include "tup/debug.h"
 #include "tup/server.h"
 #include "tup/container.h"
+#include "tup/entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1100,12 +1101,14 @@ static int tup_fs_truncate(const char *path, off_t size)
 	struct mapping *map;
 	struct file_info *finfo;
 	const char *peeled;
+	int match = 0;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	/* TODO: error check? */
 	tup_fuse_handle_file(path, NULL, ACCESS_WRITE);
+	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
@@ -1123,11 +1126,15 @@ static int tup_fs_truncate(const char *path, off_t size)
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		} else {
+			if(re_entries_match(stderr, &finfo->exclusion_list, peeled, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
 		}
 		put_finfo(finfo);
 	}
-	peeled = peel(path);
-	if(is_hidden(peeled)) {
+	if(match || is_hidden(peeled)) {
 		if(truncate(peeled, size) < 0)
 			return -errno;
 		return 0;
@@ -1142,10 +1149,12 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	const char *peeled;
 	struct mapping *map;
 	struct file_info *finfo;
+	int match = 0;
 
 	if(context_check() < 0)
 		return -EPERM;
 
+	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
@@ -1158,16 +1167,20 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		} else {
+			if(re_entries_match(stderr, &finfo->exclusion_list, peeled, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
 		}
 		put_finfo(finfo);
 	}
-	peeled = peel(path);
-	if(is_hidden(peeled)) {
+	if(match || is_hidden(peeled)) {
 		if(utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW) < 0)
 			return -errno;
 		return 0;
 	}
-	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", peel(path));
+	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", peeled);
 	return -EPERM;
 }
 

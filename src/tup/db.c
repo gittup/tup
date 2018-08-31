@@ -132,6 +132,7 @@ enum {
 	_DB_NODE_HAS_GHOSTS,
 	_DB_ADD_GHOST_CHECKS,
 	_DB_ADD_GROUP_CHECKS,
+	_DB_EXCLUSION_RECLAIMABLE,
 	_DB_GROUP_RECLAIMABLE1,
 	_DB_GROUP_RECLAIMABLE2,
 	_DB_GHOST_RECLAIMABLE1,
@@ -165,6 +166,7 @@ static int reclaim_ghost_debug = 0;
 static struct vardb envdb = { {NULL}, 0, NULL, NULL};
 static int transaction = 0;
 static tupid_t local_env_dt = -1;
+static tupid_t local_exclusion_dt = -1;
 static tupid_t local_slash_dt = -1;
 
 /* Simple counter to invalidate the tent->stickies field. If
@@ -192,9 +194,10 @@ static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost(tupid_t tupid);
 static int add_ghost_checks(tupid_t tupid);
-static int add_group_checks(tupid_t tupid);
+static int add_group_and_exclusion_checks(tupid_t tupid);
 static int reclaim_ghosts(void);
 static int ghost_reclaimable(struct tup_entry *tent);
+static int exclusion_reclaimable(tupid_t tupid);
 static int group_reclaimable1(tupid_t tupid);
 static int group_reclaimable2(tupid_t tupid);
 static int ghost_reclaimable1(tupid_t tupid);
@@ -3693,7 +3696,7 @@ int tup_db_delete_links(tupid_t tupid)
 {
 	if(add_ghost_checks(tupid) < 0)
 		return -1;
-	if(add_group_checks(tupid) < 0)
+	if(add_group_and_exclusion_checks(tupid) < 0)
 		return -1;
 	if(flag_group_users(tupid) < 0)
 		return -1;
@@ -5334,6 +5337,13 @@ static int init_virtual_dirs(void)
 		return -1;
 	}
 	local_slash_dt = tent->tnode.tupid;
+
+	tent = tup_db_create_node(DOT_DT, "^", TUP_NODE_DIR);
+	if(!tent) {
+		fprintf(stderr, "tup error: Unable to create virtual '^' directory for environment variables.\n");
+		return -1;
+	}
+	local_exclusion_dt = tent->tnode.tupid;
 	return 0;
 }
 
@@ -5347,12 +5357,19 @@ tupid_t slash_dt(void)
 	return local_slash_dt;
 }
 
+tupid_t exclusion_dt(void)
+{
+	return local_exclusion_dt;
+}
+
 int is_virtual_tent(struct tup_entry *tent)
 {
 	if(tent->dt == DOT_DT && tent->name.len == 1) {
 		if(tent->name.s[0] == '$')
 			return 1;
 		if(tent->name.s[0] == '/')
+			return 1;
+		if(tent->name.s[0] == '^')
 			return 1;
 	}
 	return 0;
@@ -5464,7 +5481,7 @@ static int load_all_nodes(void)
 	return rc;
 }
 
-int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group)
+int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tupid_entries *exclusion_root, struct tup_entry **group)
 {
 	int rc = 0;
 	int dbrc;
@@ -5539,6 +5556,12 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 				}
 				tupid_tree_rm(output_root, tt);
 				free(tt);
+			} else if(exclusion_root && tent->dt == local_exclusion_dt) {
+				tupid_tree_rm(output_root, tt);
+				if(tupid_tree_insert(exclusion_root, tt) < 0) {
+					fprintf(stderr, "tup error: Unable to insert node %lli into the exclusion tree\n", tt->tupid);
+					return -1;
+				}
 			}
 		}
 	}
@@ -5762,6 +5785,7 @@ struct actual_output_data {
 	tupid_t cmdid;
 	int output_error;
 	struct mapping_head *mapping_list;
+	struct tupid_entries exclusion_root;
 	int do_unlink;
 };
 
@@ -5858,6 +5882,7 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.cmdid = cmdid,
 		.output_error = 0,
 		.mapping_list = mapping_list,
+		.exclusion_root = {NULL},
 		.do_unlink = do_unlink,
 	};
 	int (*missing)(tupid_t, void*) = NULL;
@@ -6310,13 +6335,13 @@ static int add_output(tupid_t tupid, void *data)
 static int rm_output(tupid_t tupid, void *data)
 {
 	struct parse_output_data *pod = data;
+	struct tup_entry *tent;
 
 	pod->outputs_differ = 1;
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
 
 	if(pod->refactoring) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
 		fprintf(pod->f, "tup refactoring error: Attempting to remove an output from a command: ");
 		print_tup_entry(pod->f, tent);
 		fprintf(pod->f, "\n");
@@ -6332,15 +6357,23 @@ static int rm_output(tupid_t tupid, void *data)
 	if(pod->group)
 		if(link_remove(tupid, pod->group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
+	if(tent->type == TUP_NODE_GHOST) {
+		/* When an output exclusion is removed, we have to check that
+		 * it might now be unused.
+		 */
+		tup_entry_add_ghost_list(tent, &ghost_list);
+	}
 	return 0;
 }
 
 int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
+			 struct tupid_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified)
 {
 	struct tupid_entries output_root = {NULL};
+	struct tupid_entries orig_exclusion_root = {NULL};
 	struct parse_output_data pod = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6349,7 +6382,7 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 		.refactoring = refactoring,
 	};
 
-	if(tup_db_get_outputs(cmdid, &output_root, old_group) < 0)
+	if(tup_db_get_outputs(cmdid, &output_root, &orig_exclusion_root, old_group) < 0)
 		return -1;
 	if(*old_group == group) {
 		/* If we have the same group as before, we just update links to the
@@ -6407,6 +6440,10 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 	}
 	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
+	/* Exclusions don't go in groups */
+	pod.group = NULL;
+	if(compare_trees(&orig_exclusion_root, exclusion_root, &pod, rm_output, add_output) < 0)
+		return -1;
 	if(pod.outputs_differ == 1) {
 		if(refactoring)
 			return -1;
@@ -6420,6 +6457,7 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 				return -1;
 		}
 	}
+	free_tupid_tree(&orig_exclusion_root);
 	free_tupid_tree(&output_root);
 	return 0;
 }
@@ -7102,7 +7140,7 @@ out_reset:
 	return rc;
 }
 
-static int add_group_checks(tupid_t tupid)
+static int add_group_and_exclusion_checks(tupid_t tupid)
 {
 	int rc = 0;
 	int dbrc;
@@ -7156,7 +7194,8 @@ out_reset:
 			struct tup_entry *tent;
 			if(tup_entry_add(tt->tupid, &tent) < 0)
 				return -1;
-			if(tent->type == TUP_NODE_GROUP)
+			/* Ghost outputs here can be exclusions */
+			if(tent->type == TUP_NODE_GROUP || tent->type == TUP_NODE_GHOST)
 				tup_entry_add_ghost_list(tent, &ghost_list);
 		}
 	}
@@ -7229,7 +7268,10 @@ static int ghost_reclaimable(struct tup_entry *tent)
 {
 	int rc1, rc2;
 
-	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED_DIR) {
+	if(tent->dt == exclusion_dt()) {
+		rc1 = exclusion_reclaimable(tent->tnode.tupid);
+		rc2 = rc1;
+	} else if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED_DIR) {
 		rc1 = ghost_reclaimable1(tent->tnode.tupid);
 		if(rc1 == 0)
 			return 0;
@@ -7249,6 +7291,60 @@ static int ghost_reclaimable(struct tup_entry *tent)
 		return 1;
 	/* Otherwise, it is not reclaimable */
 	return 0;
+}
+
+static int exclusion_reclaimable(tupid_t tupid)
+{
+	int rc = -1;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_EXCLUSION_RECLAIMABLE];
+	static char s[] = "select exists(select 1 from normal_link where to_id=?)";
+
+	transaction_check("%s [37m[%lli][0m", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+
+	if(rc == SQLITE_DONE) {
+		fprintf(stderr, "tup error: Expected exclusion_reclaimable() to get an SQLite row returned.\n");
+		goto out_reset;
+	}
+	if(rc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		goto out_reset;
+	}
+	dbrc = sqlite3_column_int(*stmt, 0);
+	/* If the exists clause returns 0, then we are reclaimable, otherwise we aren't */
+	if(dbrc == 0) {
+		rc = 1;
+	} else if(dbrc == 1) {
+		rc = 0;
+	} else {
+		fprintf(stderr, "tup error: Expected exclusion_reclaimable() to get a 0 or 1 from SQLite\n");
+		goto out_reset;
+	}
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
 }
 
 static int group_reclaimable1(tupid_t tupid)

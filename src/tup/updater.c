@@ -691,10 +691,14 @@ static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 		return -1;
 
 	if(tent->type == TUP_NODE_CMD) {
+		struct tupid_entries exclusion_root = {NULL};
 		if(tup_db_get_inputs(tent->tnode.tupid, &s->finfo.sticky_root, &s->finfo.normal_root, &s->finfo.group_sticky_root) < 0)
 			return -1;
-		if(tup_db_get_outputs(tent->tnode.tupid, &s->finfo.output_root, NULL) < 0)
+		if(tup_db_get_outputs(tent->tnode.tupid, &s->finfo.output_root, &exclusion_root, NULL) < 0)
 			return -1;
+		if(exclusion_root_to_list(&exclusion_root, &s->finfo.exclusion_list) < 0)
+			return -1;
+		free_tupid_tree(&exclusion_root);
 	}
 	return 0;
 }
@@ -2025,6 +2029,15 @@ static int todo_work(struct graph *g, struct node *n)
 	return 0;
 }
 
+static int skip_output(struct tup_entry *tent)
+{
+	if(tent->type == TUP_NODE_GROUP)
+		return 1;
+	if(is_virtual_tent(tent->parent))
+		return 1;
+	return 0;
+}
+
 static int move_outputs(struct node *n)
 {
 	struct edge *e;
@@ -2034,7 +2047,7 @@ static int move_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int output_dfd;
 			/* TODO: This is only required to create generated
 			 * directories. This should probably be moved
@@ -2085,7 +2098,7 @@ static int restore_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			curpath[0] = '.';
 			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
 				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
@@ -2247,7 +2260,7 @@ static int check_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int eq = 0;
 
 			curpath[0] = '.';
@@ -2277,7 +2290,7 @@ static int unlink_outputs(int dfd, struct node *n)
 	struct node *output;
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int output_dfd = dfd;
 			output->skip = 0;
 			if(output->tent->dt != n->tent->dt) {

@@ -1617,6 +1617,7 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 	int len;
 	int count;
 	int branch;
+	int x;
 	if(!file) {
 		DEBUG_HOOK("canon_path: No file - return 0\n");
 		goto out_empty;
@@ -1710,6 +1711,11 @@ static int canon_path(const wchar_t *file, int filelen, char *dest)
 	count = WideCharToMultiByte(CP_UTF8, 0, widefullpath+prefix_len, len+1-prefix_len, dest, WIDE_PATH_MAX, NULL, NULL);
 	if(!count) {
 		goto out_empty;
+	}
+	/* Use forward-slashes inside tup, for things like regex matching. */
+	for(x=0; x<count; x++) {
+		if(dest[x] == '\\')
+			dest[x] = '/';
 	}
 	DEBUG_HOOK("WideCharToMultiByte[%ls] -> %i, '%s'\n", widefullpath, count, dest);
 

@@ -124,6 +124,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
+			 struct tupid_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified);
@@ -136,7 +137,7 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		      struct tupid_entries *normal_root,
 		      struct tupid_entries *group_sticky_root);
-int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group);
+int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tupid_entries *exclusion_root, struct tup_entry **group);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -173,6 +174,9 @@ int tup_db_get_environ(struct tupid_entries *root,
 		       struct tupid_entries *normal_root, struct tup_env *te);
 tupid_t env_dt(void);
 int is_virtual_tent(struct tup_entry *tent);
+
+/* Exclusion operations */
+tupid_t exclusion_dt(void);
 
 /* Tree operations */
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);

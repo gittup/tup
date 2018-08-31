@@ -2216,6 +2216,7 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 		const char *error;
 		int erroffset;
 		pl->re = pcre_compile(&pl->mem[1], 0, &error, &erroffset, NULL);
+		pl->dt = exclusion_dt();
 		if(!pl->re) {
 			fprintf(tf->f, "tup error: Unable to compile regular expression '%s' at offset %i: %s\n", &pl->mem[1], erroffset, error);
 			return NULL;
@@ -2714,7 +2715,7 @@ static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name
 		if(rc == 0) {
 			delete_name_list_entry(nl, nle);
 		} else if(rc != PCRE_ERROR_NOMATCH) {
-			fprintf(tf->f, "tup error: Regex failed to execute: %s\n", pl->mem);
+			fprintf(tf->f, "tup error: Regex failed to execute: %s\n", &pl->mem[1]);
 			return -1;
 		}
 	}
@@ -3063,6 +3064,7 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, struct name_list *nl,
 			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
 			   int *command_modified, struct tupid_entries *output_root,
+			   struct tupid_entries *exclusion_root,
 			   const char *ext, int extlen, int is_variant_copy)
 {
 	struct path_list *pl;
@@ -3133,6 +3135,22 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 				return -1;
 			continue;
 		}
+		if(pl->re) {
+			struct tup_entry *tent;
+
+			tent = tup_db_create_node(pl->dt, &pl->mem[1], TUP_NODE_GHOST);
+			if(!tent) {
+				fprintf(tf->f, "tup error: Unable to create exclusion output node for: %s\n", pl->mem);
+				return -1;
+			}
+			if(tupid_tree_add(exclusion_root, tent->tnode.tupid) < 0) {
+				fprintf(tf->f, "tup error: The exclusion '%s' is listed multiple times in a command.\n", pl->mem);
+				rc = -1;
+				continue;
+			}
+			continue;
+		}
+
 
 		onle = malloc(sizeof *onle);
 		if(!onle) {
@@ -3298,6 +3316,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	tupid_t cmdid = -1;
 	struct tupid_entries input_root = {NULL};
 	struct tupid_entries output_root = {NULL};
+	struct tupid_entries exclusion_root = {NULL};
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
@@ -3328,7 +3347,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
 	if(r->bin) {
 		TAILQ_FOREACH(onle, &onl.entries, list) {
@@ -3336,9 +3355,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 	}
-	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
-	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
 		return -1;
 
 	if(is_variant_copy) {
@@ -3522,10 +3541,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 	}
-	if(tup_db_write_outputs(tf->f, cmdid, &output_root, group, &old_group, tf->refactoring, command_modified) < 0)
+	if(tup_db_write_outputs(tf->f, cmdid, &output_root, &exclusion_root, group, &old_group, tf->refactoring, command_modified) < 0)
 		return -1;
 	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;
+	free_tupid_tree(&exclusion_root);
 	free_tupid_tree(&output_root);
 	free_tupid_tree(&input_root);
 	return 0;

@@ -27,11 +27,11 @@
 #include "tupid_tree.h"
 #include "thread_tree.h"
 #include "pel_group.h"
+#include "entry.h"
 #include <stdio.h>
 #include <pthread.h>
 
 struct tup_entry;
-struct tupid_entries;
 
 struct mapping {
 	LIST_ENTRY(mapping) list;
@@ -69,6 +69,7 @@ struct file_info {
 	struct tupid_entries group_sticky_root;
 	struct tupid_entries used_groups_root;
 	struct tupid_entries output_root;
+	struct re_entry_head exclusion_list;
 	const char *variant_dir;
 	int server_fail;
 	int open_count;

@@ -610,6 +610,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				}
 				if(sotgv == SOTGV_CREATE_DIRS)
 					type = TUP_NODE_GENERATED_DIR;
+				else if(sotgv == SOTGV_IGNORE_DIRS)
+					type = TUP_NODE_DIR;
 				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, -1, -1, &tent) < 0)
 					return -1;
 			}
