@@ -6604,6 +6604,9 @@ int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 	}
 
 	tupid = sqlite3_last_insert_rowid(tup_db);
+	if(sql_debug) {
+		fprintf(stderr, " - Inserted node id: %lli\n", tupid);
+	}
 	if(type == TUP_NODE_CMD) {
 		/* New commands go in the modify list so they are executed at
 		 * least once.
