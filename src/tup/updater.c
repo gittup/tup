@@ -1261,6 +1261,8 @@ static int process_create_nodes(void)
 
 		if(n->tent->type != TUP_NODE_DIR)
 			continue;
+		if(is_virtual_tent(n->tent))
+			continue;
 
 		if(node_variant->root_variant) {
 			struct variant *variant;

@@ -1782,11 +1782,11 @@ static int recurse_delete_ghost_tree(tupid_t tupid, int modify)
 		}
 		if(recurse_delete_ghost_tree(he->tupid, modify) < 0)
 			return -1;
+		if(delete_node(he->tupid) < 0)
+			return -1;
 		LIST_REMOVE(he, list);
 		free(he);
 	}
-	if(delete_node(tupid) < 0)
-		return -1;
 	return 0;
 }
 
@@ -1997,6 +1997,8 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST) {
 			if(recurse_delete_ghost_tree(tent->tnode.tupid, 1) < 0)
+				return -1;
+			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
 		} else {
 			fprintf(stderr, "tup error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
@@ -5355,6 +5357,13 @@ static int init_virtual_dirs(void)
 		return -1;
 	}
 	local_env_dt = tent->tnode.tupid;
+
+	tent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
+	if(!tent) {
+		fprintf(stderr, "tup error: Unable to create virtual '/' directory for full dependency detection.\n");
+		return -1;
+	}
+	local_slash_dt = tent->tnode.tupid;
 	return 0;
 }
 
@@ -5363,38 +5372,8 @@ tupid_t env_dt(void)
 	return local_env_dt;
 }
 
-static tupid_t slash_dt_no_create(void)
-{
-	struct tup_entry *slashtent;
-
-	if(local_slash_dt != -1)
-		return local_slash_dt;
-
-	if(tup_entry_add(DOT_DT, NULL) < 0)
-		return -1;
-	if(tup_db_select_tent(DOT_DT, "/", &slashtent) < 0)
-		return -1;
-	if(slashtent) {
-		local_slash_dt = slashtent->tnode.tupid;
-	}
-	return local_slash_dt;
-}
-
 tupid_t slash_dt(void)
 {
-	struct tup_entry *slashtent;
-	tupid_t tupid;
-
-	tupid = slash_dt_no_create();
-	if(tupid != -1)
-		return tupid;
-
-	slashtent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
-	if(!slashtent) {
-		fprintf(stderr, "tup error: Unable to create virtual '/' directory for paths outside the tup hierarchy.\n");
-		return -1;
-	}
-	local_slash_dt = slashtent->tnode.tupid;
 	return local_slash_dt;
 }
 
@@ -7539,8 +7518,6 @@ int tup_db_reparse_all(void)
 			errmsg, sql_parse_all);
 		return -1;
 	}
-	if(tup_db_unflag_create(env_dt()) < 0)
-		return -1;
 	return 0;
 }
 
