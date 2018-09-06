@@ -1,0 +1,6 @@
+include_rules
+ifeq ($(TUP_USE_SYSTEM_PCRE),n)
+CFLAGS += -DHAVE_CONFIG_H
+CFLAGS += -w
+: foreach *.c |> !cc |>
+endif
