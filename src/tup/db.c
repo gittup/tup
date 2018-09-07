@@ -7123,11 +7123,8 @@ out_reset:
 
 	if(rc == 0) {
 		RB_FOREACH(tt, tupid_entries, &root) {
-			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0) {
+			if(add_ghost(tt->tupid) < 0)
 				return -1;
-			}
-			tup_entry_add_ghost_list(tent, &ghost_list);
 		}
 	}
 	free_tupid_tree(&root);
