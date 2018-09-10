@@ -141,9 +141,8 @@ static int watch_path_internal(tupid_t dt, const char *file,
 
 		return 0;
 	} else {
-		fprintf(stderr, "tup error: File '%s' is not regular nor a dir?\n",
-			file);
-		return -1;
+		/* Ignore block devices, fifofs, and sockets */
+		return 0;
 	}
 }
 
