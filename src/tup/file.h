@@ -24,6 +24,7 @@
 #include "tupid.h"
 #include "access_event.h"
 #include "bsd/queue.h"
+#include "tupid_tree.h"
 #include "thread_tree.h"
 #include "pel_group.h"
 #include <stdio.h>
@@ -63,6 +64,10 @@ struct file_info {
 	struct file_entry_head var_list;
 	struct mapping_head mapping_list;
 	struct tmpdir_head tmpdir_list;
+	struct tupid_entries sticky_root;
+	struct tupid_entries normal_root;
+	struct tupid_entries group_sticky_root;
+	struct tupid_entries output_root;
 	const char *variant_dir;
 	int server_fail;
 	int open_count;
@@ -76,6 +81,7 @@ enum check_type_t {
 };
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink);
+void cleanup_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
 int handle_file_dtent(enum access_type at, struct tup_entry *dtent,

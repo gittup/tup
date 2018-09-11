@@ -38,14 +38,12 @@ static void check_unlink_list(const struct pel_group *pg,
 static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, struct tup_entry_head *entryhead,
-			     struct tupid_entries *output_root,
 			     enum check_type_t check_only);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    struct tupid_entries *sticky_root,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
-			    struct tupid_entries *output_root,
 			    int full_deps, tupid_t vardt,
 			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed);
@@ -61,6 +59,10 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	LIST_INIT(&info->var_list);
 	LIST_INIT(&info->mapping_list);
 	LIST_INIT(&info->tmpdir_list);
+	RB_INIT(&info->sticky_root);
+	RB_INIT(&info->normal_root);
+	RB_INIT(&info->group_sticky_root);
+	RB_INIT(&info->output_root);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
 	/* Root variant gets a NULL variant_dir so we can skip trying to do the
@@ -75,6 +77,14 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	info->open_count = 0;
 	info->do_unlink = do_unlink;
 	return 0;
+}
+
+void cleanup_file_info(struct file_info *info)
+{
+	free_tupid_tree(&info->output_root);
+	free_tupid_tree(&info->group_sticky_root);
+	free_tupid_tree(&info->normal_root);
+	free_tupid_tree(&info->sticky_root);
 }
 
 void finfo_lock(struct file_info *info)
@@ -175,7 +185,6 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int *important_link_removed)
 {
 	struct tup_entry_head *entrylist;
-	struct tupid_entries output_root = {NULL};
 	struct tmpdir *tmpdir;
 	int tmpdir_bork = 0;
 	int rc1 = 0, rc2 = 0;
@@ -194,12 +203,8 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		}
 	}
 
-	if(tup_db_get_outputs(cmdid, &output_root, NULL) < 0) {
-		return -1;
-	}
-
 	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(f, cmdid, info, warnings, entrylist, &output_root, check_only);
+	rc1 = update_write_info(f, cmdid, info, warnings, entrylist, check_only);
 	tup_entry_release_list();
 
 	/* Only process file inputs if the command wasn't signaled. We
@@ -213,11 +218,10 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	 */
 	if(check_only != CHECK_SIGNALLED) {
 		entrylist = tup_entry_get_list();
-		rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, &output_root, full_deps, vardt, used_groups_root, important_link_removed);
+		rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root, important_link_removed);
 		tup_entry_release_list();
 	}
 	finfo_unlock(info);
-	free_tupid_tree(&output_root);
 
 	if(rc1 == 0 && rc2 == 0)
 		return 0;
@@ -599,7 +603,6 @@ static void handle_unlink(struct file_info *info)
 
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, struct tup_entry_head *entryhead,
-			     struct tupid_entries *output_root,
 			     enum check_type_t check_only)
 {
 	struct file_entry *w;
@@ -693,7 +696,7 @@ out_skip:
 		del_file_entry(w);
 	}
 
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead, output_root, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->output_root, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {
@@ -728,7 +731,6 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tupid_entries *sticky_root,
 			    struct tupid_entries *normal_root,
 			    struct tupid_entries *group_sticky_root,
-			    struct tupid_entries *output_root,
 			    int full_deps, tupid_t vardt,
 			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed)
@@ -759,7 +761,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		tup_entry_list_add(tent, entryhead);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root, output_root, important_link_removed) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root, &info->output_root, important_link_removed) < 0)
 		return -1;
 	return 0;
 }

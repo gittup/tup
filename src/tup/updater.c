@@ -677,7 +677,7 @@ static int delete_in_tree(void)
 	return 0;
 }
 
-static void initialize_server_struct(struct server *s, struct tup_entry *tent)
+static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 {
 	s->id = tent->tnode.tupid;
 	s->exited = 0;
@@ -687,7 +687,16 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
-	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink());
+	if(init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink()) < 0)
+		return -1;
+
+	if(tent->type == TUP_NODE_CMD) {
+		if(tup_db_get_inputs(tent->tnode.tupid, &s->finfo.sticky_root, &s->finfo.normal_root, &s->finfo.group_sticky_root) < 0)
+			return -1;
+		if(tup_db_get_outputs(tent->tnode.tupid, &s->finfo.output_root, NULL) < 0)
+			return -1;
+	}
+	return 0;
 }
 
 static int check_empty_variant(struct tup_entry *tent)
@@ -954,7 +963,8 @@ static int process_config_nodes(int environ_check)
 					show_result(n->tent, 0, NULL, "updated variant", 1);
 				}
 				compat_lock_disable();
-				initialize_server_struct(&ps.s, n->tent);
+				if(initialize_server_struct(&ps.s, n->tent) < 0)
+					goto err_rollback;
 				if(server_parser_start(&ps) < 0)
 					goto err_rollback;
 				rc = tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file);
@@ -2663,9 +2673,6 @@ static int update(struct node *n)
 	const char *cmd;
 	struct server s;
 	int rc;
-	struct tupid_entries sticky_root = {NULL};
-	struct tupid_entries normal_root = {NULL};
-	struct tupid_entries group_sticky_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
 	int need_namespacing = 0;
@@ -2718,16 +2725,15 @@ static int update(struct node *n)
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
+	rc = initialize_server_struct(&s, n->tent);
 	if(rc == 0)
-		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
+		rc = tup_db_get_environ(&s.finfo.sticky_root, &s.finfo.normal_root, &newenv);
 	if(rc == 0) {
-		if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0)
+		if(expand_command(&expanded_name, n->tent, cmd, &s.finfo.group_sticky_root, &used_groups_root) < 0)
 			rc = -1;
 		if(expanded_name)
 			cmd = expanded_name;
 	}
-	initialize_server_struct(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
@@ -2758,13 +2764,11 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name, compare_outputs);
+	rc = process_output(&s, n, &s.finfo.sticky_root, &s.finfo.normal_root, &s.finfo.group_sticky_root, &ts, &used_groups_root, expanded_name, compare_outputs);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free(expanded_name);
-	free_tupid_tree(&sticky_root);
-	free_tupid_tree(&normal_root);
-	free_tupid_tree(&group_sticky_root);
+	cleanup_file_info(&s.finfo);
 	free_tupid_tree(&used_groups_root);
 	if(use_server)
 		if(server_postexec(&s) < 0)
