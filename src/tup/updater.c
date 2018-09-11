@@ -1979,7 +1979,6 @@ static int generate_work(struct graph *g, struct node *n)
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries group_sticky_root = {NULL};
-	struct tupid_entries used_groups_root = {NULL};
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
@@ -1996,7 +1995,7 @@ static int generate_work(struct graph *g, struct node *n)
 		cmd = n->tent->name.s;
 		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
 		if (rc == 0) {
-			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0) {
+			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, NULL) < 0) {
 				fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
 				rc = -1;
 			}
@@ -2006,7 +2005,6 @@ static int generate_work(struct graph *g, struct node *n)
 		free_tupid_tree(&sticky_root);
 		free_tupid_tree(&normal_root);
 		free_tupid_tree(&group_sticky_root);
-		free_tupid_tree(&used_groups_root);
 		if(cmd)
 			fprintf(generate_f, "%s\n", cmd);
 		free(expanded_name);
@@ -2452,8 +2450,9 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 			struct tupid_entries inputs = {NULL};
 			struct tupid_tree *ttinput;
 
-			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
-				return -1;
+			if(info->used_groups_root)
+				if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+					return -1;
 			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
 				return -1;
 			RB_FOREACH(ttinput, tupid_entries, &inputs) {
