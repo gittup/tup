@@ -2313,9 +2313,6 @@ static int unlink_outputs(int dfd, struct node *n)
 }
 
 static int process_output(struct server *s, struct node *n,
-			  struct tupid_entries *sticky_root,
-			  struct tupid_entries *normal_root,
-			  struct tupid_entries *group_sticky_root,
 			  struct timespan *ts,
 			  struct tupid_entries *used_groups_root,
 			  const char *expanded_name,
@@ -2344,7 +2341,7 @@ static int process_output(struct server *s, struct node *n,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SUCCESS, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) == 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SUCCESS, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) == 0) {
 				timespan_end(ts);
 				show_ts = ts;
 				ms = timespan_milliseconds(ts);
@@ -2355,7 +2352,7 @@ static int process_output(struct server *s, struct node *n,
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
 			/* Call write_files just to check for dependency issues */
-			write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_CMDFAIL, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
+			write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_CMDFAIL, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
 		}
 	} else if(s->signalled) {
 		int sig = s->exit_sig;
@@ -2365,7 +2362,7 @@ static int process_output(struct server *s, struct node *n,
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
 		/* Call write_files just to check for dependency issues */
-		write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SIGNALLED, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
+		write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SIGNALLED, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
 	} else {
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
@@ -2764,7 +2761,7 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n, &s.finfo.sticky_root, &s.finfo.normal_root, &s.finfo.group_sticky_root, &ts, &used_groups_root, expanded_name, compare_outputs);
+	rc = process_output(&s, n, &ts, &used_groups_root, expanded_name, compare_outputs);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free(expanded_name);

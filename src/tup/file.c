@@ -41,9 +41,6 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     enum check_type_t check_only);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
-			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root,
-			    struct tupid_entries *group_sticky_root,
 			    int full_deps, tupid_t vardt,
 			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed);
@@ -177,9 +174,7 @@ int handle_open_file(enum access_type at, const char *filename,
 }
 
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
-		enum check_type_t check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root,
-		struct tupid_entries *group_sticky_root,
+		enum check_type_t check_only,
 		int full_deps, tupid_t vardt,
 		struct tupid_entries *used_groups_root,
 		int *important_link_removed)
@@ -218,7 +213,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	 */
 	if(check_only != CHECK_SIGNALLED) {
 		entrylist = tup_entry_get_list();
-		rc2 = update_read_info(f, cmdid, info, entrylist, sticky_root, normal_root, group_sticky_root, full_deps, vardt, used_groups_root, important_link_removed);
+		rc2 = update_read_info(f, cmdid, info, entrylist, full_deps, vardt, used_groups_root, important_link_removed);
 		tup_entry_release_list();
 	}
 	finfo_unlock(info);
@@ -728,9 +723,6 @@ out_skip:
 
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
-			    struct tupid_entries *sticky_root,
-			    struct tupid_entries *normal_root,
-			    struct tupid_entries *group_sticky_root,
 			    int full_deps, tupid_t vardt,
 			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed)
@@ -761,7 +753,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		tup_entry_list_add(tent, entryhead);
 	}
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, sticky_root, normal_root, group_sticky_root, &info->output_root, important_link_removed) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, entryhead, &info->sticky_root, &info->normal_root, &info->group_sticky_root, &info->output_root, important_link_removed) < 0)
 		return -1;
 	return 0;
 }
