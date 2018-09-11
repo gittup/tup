@@ -67,6 +67,7 @@ struct file_info {
 	struct tupid_entries sticky_root;
 	struct tupid_entries normal_root;
 	struct tupid_entries group_sticky_root;
+	struct tupid_entries used_groups_root;
 	struct tupid_entries output_root;
 	const char *variant_dir;
 	int server_fail;
@@ -94,7 +95,6 @@ int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		enum check_type_t check_only,
 		int full_deps, tupid_t vardt,
-		struct tupid_entries *used_groups_root,
 		int *important_link_removed);
 int add_config_files(struct file_info *finfo, struct tup_entry *tent);
 int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt);

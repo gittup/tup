@@ -42,7 +42,6 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
-			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
 static int add_parser_files_locked(struct file_info *finfo,
@@ -59,6 +58,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	RB_INIT(&info->sticky_root);
 	RB_INIT(&info->normal_root);
 	RB_INIT(&info->group_sticky_root);
+	RB_INIT(&info->used_groups_root);
 	RB_INIT(&info->output_root);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
@@ -79,6 +79,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 void cleanup_file_info(struct file_info *info)
 {
 	free_tupid_tree(&info->output_root);
+	free_tupid_tree(&info->used_groups_root);
 	free_tupid_tree(&info->group_sticky_root);
 	free_tupid_tree(&info->normal_root);
 	free_tupid_tree(&info->sticky_root);
@@ -176,7 +177,6 @@ int handle_open_file(enum access_type at, const char *filename,
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		enum check_type_t check_only,
 		int full_deps, tupid_t vardt,
-		struct tupid_entries *used_groups_root,
 		int *important_link_removed)
 {
 	struct tup_entry_head *entrylist;
@@ -213,7 +213,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	 */
 	if(check_only != CHECK_SIGNALLED) {
 		entrylist = tup_entry_get_list();
-		rc2 = update_read_info(f, cmdid, info, entrylist, full_deps, vardt, used_groups_root, important_link_removed);
+		rc2 = update_read_info(f, cmdid, info, entrylist, full_deps, vardt, important_link_removed);
 		tup_entry_release_list();
 	}
 	finfo_unlock(info);
@@ -724,7 +724,6 @@ out_skip:
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
-			    struct tupid_entries *used_groups_root,
 			    int *important_link_removed)
 {
 	struct file_entry *r;
@@ -746,7 +745,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		del_file_entry(r);
 	}
 
-	RB_FOREACH(tt, tupid_entries, used_groups_root) {
+	RB_FOREACH(tt, tupid_entries, &info->used_groups_root) {
 		struct tup_entry *tent;
 		if(tup_entry_add(tt->tupid, &tent) < 0)
 			return -1;
