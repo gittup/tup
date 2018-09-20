@@ -21,8 +21,8 @@
 . ./tup.sh
 check_no_windows shell
 
-if grep 'Fedora' /etc/system-release > /dev/null; then
-	echo "[33mSkipping on Fedora because coreutils' mv uses a syscall directly instead of renameat2[0m"
+if grep '^ID=\(fedora\|arch\)' /etc/os-release > /dev/null; then
+	echo "[33mSkipping on Fedora/Arch because coreutils' mv uses a syscall directly instead of renameat2[0m"
 	eotup
 fi
 
