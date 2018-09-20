@@ -849,12 +849,7 @@ static int readdir_parser_cb(void *arg, struct tup_entry *tent)
 
 static void free_dir_list(struct string_entries *root, struct parser_directory *pd)
 {
-	struct string_tree *st;
-	while(!RB_EMPTY(&pd->files)) {
-		st = RB_MIN(string_entries, &pd->files);
-		string_tree_remove(&pd->files, st);
-		free(st);
-	}
+	free_string_tree(&pd->files);
 	string_tree_remove(root, &pd->st);
 	free(pd);
 }

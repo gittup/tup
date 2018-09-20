@@ -79,3 +79,13 @@ void string_tree_remove(struct string_entries *root, struct string_tree *st)
 	RB_REMOVE(string_entries, root, st);
 	free(st->s);
 }
+
+void free_string_tree(struct string_entries *root)
+{
+	struct string_tree *st;
+
+	while((st = RB_ROOT(root)) != NULL) {
+		string_tree_remove(root, st);
+		free(st);
+	}
+}

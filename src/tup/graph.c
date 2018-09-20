@@ -895,16 +895,6 @@ static tupid_t command_name_hash(tupid_t hash, struct tup_entry *tent,
 	return hash;
 }
 
-static void free_string_tree(struct string_entries *root)
-{
-	struct string_tree *st;
-	while(!RB_EMPTY(root)) {
-		st = RB_MIN(string_entries, root);
-		string_tree_remove(root, st);
-		free(st);
-	}
-}
-
 static tupid_t command_outgoing_hash(tupid_t hash, struct node *n)
 {
 	struct edge *e;
