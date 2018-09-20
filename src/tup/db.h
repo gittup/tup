@@ -65,7 +65,7 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int namelen,
 int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 				    const char *display, int displaylen, const char *flags, int flagslen,
 				    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
-int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
+int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry **dest);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
 			    struct tup_entry **entry);

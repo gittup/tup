@@ -47,7 +47,6 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *display, int displaylen, const char *flags, int flagslen,
 				   enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid);
-static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
@@ -78,21 +77,14 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = new_entry(tupid, -1, NULL, 0, NULL, 0, NULL, 0, -1, -1, -1);
-	if(!tent)
+	if(tup_db_fill_tup_entry(tupid, &tent) < 0)
 		return -1;
-
-	if(tup_db_fill_tup_entry(tupid, tent) < 0)
-		return -1;
-	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
-		return -1;
-
-	if(tent->parent) {
-		if(string_tree_insert(&tent->parent->entries, &tent->name) < 0) {
-			fprintf(stderr, "tup error: Unable to insert node named '%s' into parent's (id=%lli) string tree.\n", tent->name.s, tent->parent->tnode.tupid);
+	if(tent->dt > 0) {
+		if(tup_entry_add(tent->dt, NULL) < 0)
 			return -1;
-		}
 	}
+	if(resolve_parent(tent) < 0)
+		return -1;
 	if(dest)
 		*dest = tent;
 	return 0;
@@ -275,16 +267,6 @@ int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 	return rc;
 }
 
-static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
-{
-	if(tupid == 0) {
-		if(dest)
-			*dest = NULL;
-		return 0;
-	}
-	return tup_entry_add(tupid, dest);
-}
-
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
@@ -303,13 +285,16 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags)
+		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
+		      struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
 	tent = new_entry(tupid, dt, name, strlen(name), display, -1, flags, -1, type, mtime, srcid);
 	if(!tent)
 		return -1;
+	if(dest)
+		*dest = tent;
 	return 0;
 }
 

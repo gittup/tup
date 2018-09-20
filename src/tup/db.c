@@ -1098,16 +1098,19 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 	return tent;
 }
 
-int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
+int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry **dest)
 {
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_FILL_TUP_ENTRY];
 	static char s[] = "select dir, type, mtime, srcid, name, display, flags from node where id=?";
+	tupid_t dt;
+	enum TUP_NODE_TYPE type;
+	time_t mtime;
+	tupid_t srcid;
 	const char *name;
 	const char *display;
 	const char *flags;
-	int len;
 
 	transaction_check("%s [37m[%lli][0m", s, tupid);
 	if(!*stmt) {
@@ -1135,49 +1138,16 @@ int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent)
 		goto out_reset;
 	}
 
-	tent->dt = sqlite3_column_int64(*stmt, 0);
-	tent->type = sqlite3_column_int(*stmt, 1);
-	tent->mtime = sqlite3_column_int(*stmt, 2);
-	tent->srcid = sqlite3_column_int64(*stmt, 3);
+	dt = sqlite3_column_int64(*stmt, 0);
+	type = sqlite3_column_int(*stmt, 1);
+	mtime = sqlite3_column_int(*stmt, 2);
+	srcid = sqlite3_column_int64(*stmt, 3);
 	name = (const char*)sqlite3_column_text(*stmt, 4);
-	len = strlen(name);
-	tent->name.s = malloc(len + 1);
-	if(!tent->name.s) {
-		perror("malloc");
-		goto out_reset;
-	}
-	strcpy(tent->name.s, name);
-	tent->name.len = len;
-
 	display = (const char*)sqlite3_column_text(*stmt, 5);
-	if(display) {
-		len = strlen(display);
-		tent->display = malloc(len +1);
-		if(!tent->display) {
-			perror("malloc");
-			goto out_reset;
-		}
-		strcpy(tent->display, display);
-		tent->displaylen = len;
-	} else {
-		tent->display = NULL;
-		tent->displaylen = 0;
-	}
-
 	flags = (const char*)sqlite3_column_text(*stmt, 6);
-	if(flags) {
-		len = strlen(flags);
-		tent->flags = malloc(len +1);
-		if(!tent->flags) {
-			perror("malloc");
-			goto out_reset;
-		}
-		strcpy(tent->flags, flags);
-		tent->flagslen = len;
-	} else {
-		tent->flags = NULL;
-		tent->flagslen = 0;
-	}
+
+	if(tup_entry_add_all(tupid, dt, type, mtime, srcid, name, display, flags, dest) < 0)
+		goto out_reset;
 
 	rc = 0;
 
@@ -5478,7 +5448,7 @@ static int load_all_nodes(void)
 		display = (const char*)sqlite3_column_text(*stmt, 6);
 		flags = (const char*)sqlite3_column_text(*stmt, 7);
 
-		if(tup_entry_add_all(tupid, dt, type, mtime, srcid, name, display, flags) < 0)
+		if(tup_entry_add_all(tupid, dt, type, mtime, srcid, name, display, flags, NULL) < 0)
 			break;
 	}
 
