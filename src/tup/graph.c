@@ -900,7 +900,7 @@ static void free_string_tree(struct string_entries *root)
 	struct string_tree *st;
 	while(!RB_EMPTY(root)) {
 		st = RB_MIN(string_entries, root);
-		string_tree_free(root, st);
+		string_tree_remove(root, st);
 		free(st);
 	}
 }

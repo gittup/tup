@@ -852,10 +852,10 @@ static void free_dir_list(struct string_entries *root, struct parser_directory *
 	struct string_tree *st;
 	while(!RB_EMPTY(&pd->files)) {
 		st = RB_MIN(string_entries, &pd->files);
-		string_tree_free(&pd->files, st);
+		string_tree_remove(&pd->files, st);
 		free(st);
 	}
-	string_tree_free(root, &pd->st);
+	string_tree_remove(root, &pd->st);
 	free(pd);
 }
 
@@ -1833,7 +1833,7 @@ static int parse_bang_rule(struct tupfile *tf, struct rule *r,
 
 static void free_bang_rule(struct string_entries *root, struct bang_rule *br)
 {
-	string_tree_free(root, &br->st);
+	string_tree_remove(root, &br->st);
 
 	if(br->value) {
 		/* For regular macros */
