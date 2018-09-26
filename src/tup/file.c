@@ -34,8 +34,7 @@
 #include <sys/stat.h>
 
 static struct file_entry *new_entry(const char *filename);
-static void check_unlink_list(const struct pel_group *pg,
-			      struct file_entry_head *u_head);
+static void check_unlink_list(const char *filename, struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, struct tup_entry_head *entryhead,
@@ -158,7 +157,7 @@ int handle_open_file(enum access_type at, const char *filename,
 			LIST_INSERT_HEAD(&info->read_list, fent, list);
 			break;
 		case ACCESS_WRITE:
-			check_unlink_list(&fent->pg, &info->unlink_list);
+			check_unlink_list(filename, &info->unlink_list);
 			LIST_INSERT_HEAD(&info->write_list, fent, list);
 			break;
 		case ACCESS_UNLINK:
@@ -539,16 +538,9 @@ void del_file_entry(struct file_entry *fent)
 int handle_rename(const char *from, const char *to, struct file_info *info)
 {
 	struct file_entry *fent;
-	struct pel_group pg_from;
-	struct pel_group pg_to;
-
-	if(get_path_elements(from, &pg_from) < 0)
-		return -1;
-	if(get_path_elements(to, &pg_to) < 0)
-		return -1;
 
 	LIST_FOREACH(fent, &info->write_list, list) {
-		if(pg_eq(&fent->pg, &pg_from)) {
+		if(strcmp(fent->filename, from) == 0) {
 			del_pel_group(&fent->pg);
 			free(fent->filename);
 
@@ -562,7 +554,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 		}
 	}
 	LIST_FOREACH(fent, &info->read_list, list) {
-		if(pg_eq(&fent->pg, &pg_from)) {
+		if(strcmp(fent->filename, from) == 0) {
 			del_pel_group(&fent->pg);
 			free(fent->filename);
 
@@ -576,9 +568,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 		}
 	}
 
-	check_unlink_list(&pg_to, &info->unlink_list);
-	del_pel_group(&pg_to);
-	del_pel_group(&pg_from);
+	check_unlink_list(to, &info->unlink_list);
 	return 0;
 }
 
@@ -590,13 +580,12 @@ void del_map(struct mapping *map)
 	free(map);
 }
 
-static void check_unlink_list(const struct pel_group *pg,
-			      struct file_entry_head *u_head)
+static void check_unlink_list(const char *filename, struct file_entry_head *u_head)
 {
 	struct file_entry *fent, *tmp;
 
 	LIST_FOREACH_SAFE(fent, u_head, list, tmp) {
-		if(pg_eq(&fent->pg, pg)) {
+		if(strcmp(filename, fent->filename) == 0) {
 			del_file_entry(fent);
 		}
 	}
@@ -610,12 +599,12 @@ static void handle_unlink(struct file_info *info)
 		u = LIST_FIRST(&info->unlink_list);
 
 		LIST_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
-			if(pg_eq(&fent->pg, &u->pg)) {
+			if(strcmp(fent->filename, u->filename) == 0) {
 				del_file_entry(fent);
 			}
 		}
 		LIST_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
-			if(pg_eq(&fent->pg, &u->pg)) {
+			if(strcmp(fent->filename, u->filename) == 0) {
 				del_file_entry(fent);
 			}
 		}
@@ -673,7 +662,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		/* Remove duplicate write entries */
 		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
-			if(r != w && pg_eq(&w->pg, &r->pg)) {
+			if(r != w && (strcmp(w->filename, r->filename) == 0)) {
 				del_file_entry(r);
 			}
 		}
