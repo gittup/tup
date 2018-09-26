@@ -50,7 +50,6 @@ LIST_HEAD(tmpdir_head, tmpdir);
 struct file_entry {
 	LIST_ENTRY(file_entry) list;
 	char *filename;
-	struct pel_group pg;
 };
 LIST_HEAD(file_entry_head, file_entry);
 

@@ -303,21 +303,27 @@ static int set_directories_to_zero(tupid_t dt, tupid_t slash)
 	return set_directories_to_zero(tent->dt, slash);
 }
 
-static int add_node_to_list(tupid_t dt, struct pel_group *pg,
+static int add_node_to_list(tupid_t dt, const char *filename,
 			    struct tup_entry_head *head, int full_deps, const char *full_path)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
+	struct pel_group pg;
 	struct tup_entry *tent;
 
-	new_dt = find_dir_tupid_dt_pg(dt, pg, &pel, 1, full_deps);
+	if(get_path_elements(filename, &pg) < 0)
+		return -1;
+
+	new_dt = find_dir_tupid_dt_pg(dt, &pg, &pel, 1, full_deps);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
+		del_pel_group(&pg);
 		return 0;
 	}
 	if(pel == NULL) {
 		/* This can happen for the '.' entry */
+		del_pel_group(&pg);
 		return 0;
 	}
 
@@ -325,7 +331,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		return -1;
 	if(!tent) {
 		time_t mtime = -1;
-		if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
+		if(full_deps && (pg.pg_flags & PG_OUTSIDE_TUP)) {
 			struct stat buf;
 			if(lstat(full_path, &buf) == 0) {
 				mtime = MTIME(buf);
@@ -342,6 +348,7 @@ static int add_node_to_list(tupid_t dt, struct pel_group *pg,
 		}
 	}
 	free(pel);
+	del_pel_group(&pg);
 
 	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
 		/* We don't track dependencies on directory nodes for commands. Note that
@@ -431,7 +438,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 		struct tup_entry *tmp;
 		r = LIST_FIRST(&finfo->read_list);
 
-		if(add_node_to_list(DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps, r->filename) < 0)
 			return -1;
 
 		/* Don't link to ourself */
@@ -462,14 +469,14 @@ static int add_parser_files_locked(struct file_info *finfo,
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
 		r = LIST_FIRST(&finfo->read_list);
-		if(add_node_to_list(DOT_DT, &r->pg, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps, r->filename) < 0)
 			return -1;
 		del_file_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
-		if(add_node_to_list(vardt, &r->pg, entrylist, 0, NULL) < 0)
+		if(add_node_to_list(vardt, r->filename, entrylist, 0, NULL) < 0)
 			return -1;
 		del_file_entry(r);
 	}
@@ -518,19 +525,12 @@ static struct file_entry *new_entry(const char *filename)
 		free(fent);
 		return NULL;
 	}
-
-	if(get_path_elements(fent->filename, &fent->pg) < 0) {
-		free(fent->filename);
-		free(fent);
-		return NULL;
-	}
 	return fent;
 }
 
 void del_file_entry(struct file_entry *fent)
 {
 	LIST_REMOVE(fent, list);
-	del_pel_group(&fent->pg);
 	free(fent->filename);
 	free(fent);
 }
@@ -541,7 +541,6 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 
 	LIST_FOREACH(fent, &info->write_list, list) {
 		if(strcmp(fent->filename, from) == 0) {
-			del_pel_group(&fent->pg);
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -549,13 +548,10 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 				perror("strdup");
 				return -1;
 			}
-			if(get_path_elements(fent->filename, &fent->pg) < 0)
-				return -1;
 		}
 	}
 	LIST_FOREACH(fent, &info->read_list, list) {
 		if(strcmp(fent->filename, from) == 0) {
-			del_pel_group(&fent->pg);
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -563,8 +559,6 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 				perror("strdup");
 				return -1;
 			}
-			if(get_path_elements(fent->filename, &fent->pg) < 0)
-				return -1;
 		}
 	}
 
@@ -619,7 +613,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 	struct tup_entry *tent;
 	tupid_t dt;
 
-	dt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, SOTGV_IGNORE_DIRS, 0);
+	dt = find_dir_tupid_dt(DOT_DT, w->filename, &pel, SOTGV_IGNORE_DIRS, 0);
 	if(dt < 0) {
 		fprintf(f, "tup error: Unable to create directory tree for ignored file: %s\n", w->filename);
 		return -1;
@@ -648,6 +642,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->write_list)) {
 		tupid_t newdt;
 		struct path_element *pel = NULL;
+		struct pel_group pg;
 		int match = 0;
 
 		w = LIST_FIRST(&info->write_list);
@@ -667,16 +662,20 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			}
 		}
 
-		if(w->pg.pg_flags & PG_HIDDEN) {
+		if(get_path_elements(w->filename, &pg) < 0)
+			return -1;
+		if(pg.pg_flags & PG_HIDDEN) {
 			if(warnings) {
 				fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
 				(*warnings)++;
 			}
+			del_pel_group(&pg);
 			goto out_skip;
 		}
 
 		tent = NULL;
-		newdt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, 0, 0);
+		newdt = find_dir_tupid_dt_pg(DOT_DT, &pg, &pel, 0, 0);
+		del_pel_group(&pg);
 		if(newdt > 0) {
 			if(!pel) {
 				fprintf(f, "tup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s\n", w->filename);
@@ -784,7 +783,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		if(re_entries_match(f, &info->exclusion_list, r->filename, &match) < 0)
 			return -1;
 		if(!match) {
-			if(add_node_to_list(DOT_DT, &r->pg, entryhead, full_deps, r->filename) < 0)
+			if(add_node_to_list(DOT_DT, r->filename, entryhead, full_deps, r->filename) < 0)
 				return -1;
 		}
 		del_file_entry(r);
@@ -793,7 +792,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->var_list)) {
 		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(vardt, &r->pg, entryhead, 0, NULL) < 0)
+		if(add_node_to_list(vardt, r->filename, entryhead, 0, NULL) < 0)
 			return -1;
 		del_file_entry(r);
 	}
