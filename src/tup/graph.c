@@ -529,10 +529,10 @@ static void mark_nodes(struct node *n)
 		LIST_FOREACH(e2, &n->edges, list) {
 			struct node *dest = e2->dest;
 
-			/* Groups are skipped, otherwise we end up
-			 * building everything in the group (t3058).
+			/* Groups and exclusions are skipped, otherwise we end
+			 * up building everything in the group (t3058, t5099).
 			 */
-			if(dest->tent->type != TUP_NODE_GROUP) {
+			if(dest->tent->type != TUP_NODE_GROUP && dest->tent->dt != exclusion_dt()) {
 				mark_nodes(dest);
 			}
 		}
