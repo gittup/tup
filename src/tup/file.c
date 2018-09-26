@@ -636,7 +636,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 		return -1;
 	}
 	if(!pel) {
-		fprintf(f, "[31mtup internal error: create_ignored_file() didn't get a final pel pointer for file: %s[0m\n", w->filename);
+		fprintf(f, "tup internal error: create_ignored_file() didn't get a final pel pointer for file: %s\n", w->filename);
 		return -1;
 	}
 	tent = tup_db_create_node_part(dt, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
@@ -690,7 +690,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		newdt = find_dir_tupid_dt_pg(DOT_DT, &w->pg, &pel, 0, 0);
 		if(newdt > 0) {
 			if(!pel) {
-				fprintf(f, "[31mtup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s[0m\n", w->filename);
+				fprintf(f, "tup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s\n", w->filename);
 				return -1;
 			}
 
@@ -704,7 +704,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			fprintf(f, "tup error: File '%s' was written to, but is not in .tup/db. You probably should specify it as an output\n", w->filename);
 			write_bork = 1;
 			if(info->do_unlink) {
-				fprintf(f, "[35m -- Delete: %s[0m\n", w->filename);
+				fprintf(f, " -- Delete: %s\n", w->filename);
 				unlink(w->filename);
 			}
 
