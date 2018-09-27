@@ -69,7 +69,12 @@ TUP_SUID_GROUP = root
 TUP_USE_SYSTEM_PCRE = y
 include $(TARGET).tup
 
-ifeq ($(TUP_USE_SYSTEM_PCRE),y)
+ifdef TUP_USE_SYSTEM_PCRE
+use_system_pcre = @(TUP_USE_SYSTEM_PCRE)
+else
+use_system_pcre = $(TUP_USE_SYSTEM_PCRE)
+endif
+ifeq ($(use_system_pcre),y)
 CFLAGS += `pcre-config --cflags`
 else
 CFLAGS += -I$(TUP_CWD)/src/pcre

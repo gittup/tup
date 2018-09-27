@@ -29,7 +29,7 @@ else
 srcs += src/sqlite3/*.o
 endif
 
-ifeq ($(TUP_USE_SYSTEM_PCRE),y)
+ifeq ($(use_system_pcre),y)
 LDFLAGS += `pcre-config --libs`
 else
 srcs += src/pcre/*.o
