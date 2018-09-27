@@ -17,8 +17,6 @@ else
 	exit 1
 fi
 LDFLAGS="$LDFLAGS -lm"
-CFLAGS="$CFLAGS `pcre-config --cflags`"
-LDFLAGS="$LDFLAGS `pcre-config --libs`"
 : ${CC:=gcc}
 case "$os" in
 	Linux)
@@ -80,12 +78,13 @@ mkdir luabuiltin
 ./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
 
 CFLAGS="$CFLAGS -DTUP_SERVER=\"$server\""
+CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
-for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/inih/ini.c $plat_files; do
+for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	# Put -I. first so we find our new luabuiltin.h file, not one built
 	# by a previous 'tup upd'.
-	$CC $CFLAGS -c $i -I. -I../src $plat_cflags
+	$CC $CFLAGS -c $i -I. -I../src -I../src/pcre $plat_cflags
 done
 
 echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"
