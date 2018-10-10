@@ -20,17 +20,16 @@
 
 #define _ATFILE_SOURCE
 #include "tup/flock.h"
-#include "tup/config.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 
-int tup_lock_open(const char *lockname, tup_lock_t *lock)
+int tup_lock_open(int basefd, const char *lockname, tup_lock_t *lock)
 {
 	int fd;
 
-	fd = openat(tup_top_fd(), lockname, O_RDWR | O_CREAT, 0666);
+	fd = openat(basefd, lockname, O_RDWR | O_CREAT, 0666);
 	if(fd < 0) {
 		perror(lockname);
 		fprintf(stderr, "tup error: Unable to open lockfile.\n");
