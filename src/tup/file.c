@@ -282,29 +282,8 @@ int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_
 	return rc;
 }
 
-/* Ghost directories in the /-tree have mtimes set to zero if they exist. This way we can
- * distinguish between a directory being created where there wasn't one previously (t4064).
- */
-static int set_directories_to_zero(tupid_t dt, tupid_t slash)
-{
-	struct tup_entry *tent;
-
-	if(dt == slash)
-		return 0;
-	if(tup_entry_add(dt, &tent) < 0)
-		return -1;
-
-	/* Short circuit if we found a dir that is already set */
-	if(tent->mtime == 0)
-		return 0;
-
-	if(tup_db_set_mtime(tent, 0) < 0)
-		return -1;
-	return set_directories_to_zero(tent->dt, slash);
-}
-
 static int add_node_to_list(tupid_t dt, const char *filename,
-			    struct tup_entry_head *head, int full_deps, const char *full_path)
+			    struct tup_entry_head *head, int full_deps)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
@@ -331,18 +310,16 @@ static int add_node_to_list(tupid_t dt, const char *filename,
 		return -1;
 	if(!tent) {
 		time_t mtime = -1;
+		int type = TUP_NODE_GHOST;
 		if(full_deps && (pg.pg_flags & PG_OUTSIDE_TUP)) {
-			struct stat buf;
-			if(lstat(full_path, &buf) == 0) {
-				mtime = MTIME(buf);
-			}
-			if(set_directories_to_zero(new_dt, slash_dt()) < 0)
+			if(get_outside_tup_mtime(new_dt, pel, &mtime) < 0)
 				return -1;
 		}
-		/* Note that full-path entries are always ghosts since we don't scan them. They
-		 * can still have a valid mtime, though.
+		/* Note that full-path entries are always ghosts since we don't
+		 * scan them. Files can still have a valid mtime, and
+		 * directories have an mtime of 0, though.
 		 */
-		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
+		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, type, mtime, -1, &tent) < 0) {
 			fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
@@ -350,7 +327,7 @@ static int add_node_to_list(tupid_t dt, const char *filename,
 	free(pel);
 	del_pel_group(&pg);
 
-	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR) {
+	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR || tent->mtime == 0) {
 		/* We don't track dependencies on directory nodes for commands. Note that
 		 * some directory accesses may create ghost nodes as placeholders for the
 		 * directory until a real directory is created there (eg: t5077). In this
@@ -437,7 +414,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 		struct tup_entry *tmp;
 		r = LIST_FIRST(&finfo->read_list);
 
-		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps) < 0)
 			return -1;
 
 		/* Don't link to ourself */
@@ -467,14 +444,14 @@ static int add_parser_files_locked(struct file_info *finfo,
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
 		r = LIST_FIRST(&finfo->read_list);
-		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps, r->filename) < 0)
+		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps) < 0)
 			return -1;
 		del_file_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
-		if(add_node_to_list(vardt, r->filename, entrylist, 0, NULL) < 0)
+		if(add_node_to_list(vardt, r->filename, entrylist, 0) < 0)
 			return -1;
 		del_file_entry(r);
 	}
@@ -781,7 +758,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		if(re_entries_match(f, &info->exclusion_list, r->filename, &match) < 0)
 			return -1;
 		if(!match) {
-			if(add_node_to_list(DOT_DT, r->filename, entryhead, full_deps, r->filename) < 0)
+			if(add_node_to_list(DOT_DT, r->filename, entryhead, full_deps) < 0)
 				return -1;
 		}
 		del_file_entry(r);
@@ -790,7 +767,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->var_list)) {
 		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(vardt, r->filename, entryhead, 0, NULL) < 0)
+		if(add_node_to_list(vardt, r->filename, entryhead, 0) < 0)
 			return -1;
 		del_file_entry(r);
 	}

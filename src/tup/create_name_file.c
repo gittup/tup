@@ -604,6 +604,8 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				}
 			} else {
 				int type = TUP_NODE_GHOST;
+				time_t mtime = -1;
+
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
 					return -1;
@@ -612,7 +614,12 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					type = TUP_NODE_GENERATED_DIR;
 				else if(sotgv == SOTGV_IGNORE_DIRS)
 					type = TUP_NODE_DIR;
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, -1, -1, &tent) < 0)
+
+				if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
+					if(get_outside_tup_mtime(curdt, pel, &mtime) < 0)
+						return -1;
+				}
+				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, mtime, -1, &tent) < 0)
 					return -1;
 			}
 		}
@@ -621,6 +628,58 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	}
 
 	return tent->tnode.tupid;
+}
+
+int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
+{
+	int dfd;
+	struct tup_entry *parent;
+
+	if(tup_entry_add(dt, &parent) < 0)
+		return -1;
+
+	dfd = tup_entry_open(parent);
+	if(dfd == -ENOENT) {
+		*mtime = -1;
+	} else if(dfd < 0) {
+		perror("tup_entry_open");
+		fprintf(stderr, "tup error: Unable to open tup entry: ");
+		print_tup_entry(stderr, parent);
+		fprintf(stderr, "\n");
+		return -1;
+	} else {
+		struct stat buf;
+		char tmppath[PATH_MAX];
+
+		/* Pel's aren't nul-terminated, so unfortunately we have to
+		 * make a copy here.
+		 */
+		strncpy(tmppath, pel->path, pel->len);
+		tmppath[pel->len] = 0;
+		if(fstatat(dfd, tmppath, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
+			if(errno != ENOENT) {
+				perror("fstatat");
+				fprintf(stderr, "tup error: Unable to stat file: %.*s\n", pel->len, pel->path);
+				return -1;
+			}
+			*mtime = -1;
+		} else {
+			/* Ghost directories in the /-tree have mtimes set to
+			 * zero if they exist. This way we can distinguish
+			 * between a directory being created where there wasn't
+			 * one previously (t4064, t4205).
+			 */
+			if(S_ISDIR(buf.st_mode))
+				*mtime = 0;
+			else
+				*mtime = MTIME(buf);
+		}
+		if(close(dfd) < 0) {
+			perror("close(dfd)");
+			return -1;
+		}
+	}
+	return 0;
 }
 
 int gimme_tent(const char *name, struct tup_entry **entry)

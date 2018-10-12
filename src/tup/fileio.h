@@ -51,6 +51,7 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, int sotgv, int full_deps);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv, int full_deps);
+int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime);
 int gimme_tent(const char *name, struct tup_entry **entry);
 
 int delete_file(struct tup_entry *tent);
