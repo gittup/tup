@@ -433,6 +433,22 @@ static int get_symlink(const char *filename, char **ret)
 	return 0;
 }
 
+static int add_symlinks(const char *path, struct file_info *finfo)
+{
+	char *linkpath = NULL;
+
+	if(get_symlink(path, &linkpath) < 0)
+		return -1;
+	if(linkpath) {
+		if(handle_file(ACCESS_READ, linkpath, "", finfo) < 0) {
+			fprintf(stderr, "tup error: Failed to call handle_file on a symlink event '%s'\n", linkpath);
+			return -1;
+		}
+		free(linkpath);
+	}
+	return 0;
+}
+
 static int process_depfile(struct server *s, int fd)
 {
 	char event1[PATH_MAX];
@@ -505,17 +521,8 @@ static int process_depfile(struct server *s, int fd)
 			return -1;
 		}
 		if(event.at == ACCESS_READ) {
-			char *linkpath = NULL;
-
-			if(get_symlink(event1, &linkpath) < 0)
+			if(add_symlinks(event1, &s->finfo) < 0)
 				return -1;
-			if(linkpath) {
-				if(handle_file(ACCESS_READ, linkpath, "", &s->finfo) < 0) {
-					fprintf(stderr, "tup error: Failed to call handle_file on a symlink event '%s'\n", linkpath);
-					return -1;
-				}
-				free(linkpath);
-			}
 		}
 	}
 	return 0;
