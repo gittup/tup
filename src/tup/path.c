@@ -29,6 +29,7 @@
 #include "entry.h"
 #include "option.h"
 #include "pel_group.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -216,9 +217,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 		}
 
 		if(mtime != tent->mtime) {
-			printf("External file has changed: ");
-			print_tup_entry(stdout, tent);
-			printf("\n");
+			log_debug_tent("Update external", tent, ", oldmtime=%li, newmtime=%li\n", tent->mtime, mtime);
 			/* Mark the commands as modify rather than the ghost node, since we don't
 			 * expect a ghost to have flags set.
 			 */
