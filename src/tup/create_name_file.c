@@ -628,7 +628,7 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 	tupid_t dt;
 	struct path_element *pel = NULL;
 
-	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0, 0);
+	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0, 1);
 	if(dt < 0)
 		return -1;
 	if(dt == 0) {
