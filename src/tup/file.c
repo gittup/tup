@@ -43,9 +43,9 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
 			    int *important_link_removed);
-static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent);
+static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent, int full_deps);
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root, tupid_t vardt);
+				   struct tupid_entries *root, tupid_t vardt, int full_deps);
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
@@ -264,20 +264,20 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	return -1;
 }
 
-int add_config_files(struct file_info *finfo, struct tup_entry *tent)
+int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_deps)
 {
 	int rc;
 	finfo_lock(finfo);
-	rc = add_config_files_locked(finfo, tent);
+	rc = add_config_files_locked(finfo, tent, full_deps);
 	finfo_unlock(finfo);
 	return rc;
 }
 
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt)
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt, int full_deps)
 {
 	int rc;
 	finfo_lock(finfo);
-	rc = add_parser_files_locked(finfo, root, vardt);
+	rc = add_parser_files_locked(finfo, root, vardt, full_deps);
 	finfo_unlock(finfo);
 	return rc;
 }
@@ -427,11 +427,10 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 }
 #endif
 
-static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent)
+static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent, int full_deps)
 {
 	struct file_entry *r;
 	struct tup_entry_head *entrylist;
-	int full_deps = tup_option_get_flag("updater.full_deps");
 
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
@@ -457,14 +456,13 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 }
 
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root, tupid_t vardt)
+				   struct tupid_entries *root, tupid_t vardt, int full_deps)
 {
 	struct file_entry *r;
 	struct mapping *map;
 	struct tup_entry_head *entrylist;
 	struct tup_entry *tent;
 	int map_bork = 0;
-	int full_deps = tup_option_get_flag("updater.full_deps");
 
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {

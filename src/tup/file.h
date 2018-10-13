@@ -96,8 +96,8 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		enum check_type_t check_only,
 		int full_deps, tupid_t vardt,
 		int *important_link_removed);
-int add_config_files(struct file_info *finfo, struct tup_entry *tent);
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt);
+int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_deps);
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt, int full_deps);
 void del_map(struct mapping *map);
 void del_file_entry(struct file_entry *fent);
 

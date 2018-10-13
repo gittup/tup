@@ -67,6 +67,7 @@ struct tupfile {
 	struct lua_State *ls;
 	int luaerror;
 	int use_server;
+	int full_deps;
 };
 
 #define MAX_GLOBS 10
@@ -173,7 +174,7 @@ struct graph;
 struct timespan;
 
 void parser_debug_run(void);
-int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server);
+int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server, int full_deps);
 char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 #endif

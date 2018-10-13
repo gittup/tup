@@ -358,7 +358,7 @@ int generate(int argc, char **argv)
 
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		if(!n->already_used)
-			if(parse(n, &g, NULL, 0, 0) < 0)
+			if(parse(n, &g, NULL, 0, 0, full_deps) < 0)
 				return -1;
 		TAILQ_REMOVE(&g.plist, n, list);
 		while(!LIST_EMPTY(&n->incoming)) {
@@ -976,7 +976,7 @@ static int process_config_nodes(int environ_check)
 					goto err_rollback;
 				if(rc < 0)
 					goto err_rollback;
-				if(add_config_files(&ps.s.finfo, n->tent) < 0)
+				if(add_config_files(&ps.s.finfo, n->tent, full_deps) < 0)
 					goto err_rollback;
 				compat_lock_enable();
 
@@ -1859,7 +1859,7 @@ static int create_work(struct graph *g, struct node *n)
 			if(n->already_used) {
 				rc = 0;
 			} else {
-				rc = parse(n, g, NULL, refactoring, 1);
+				rc = parse(n, g, NULL, refactoring, 1, full_deps);
 			}
 			show_progress(-1, TUP_NODE_DIR);
 		}
