@@ -447,10 +447,10 @@ static int graph(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	show_dirs = tup_option_get_int("graph.dirs");
-	show_ghosts = tup_option_get_int("graph.ghosts");
-	show_env = tup_option_get_int("graph.environment");
-	combine = tup_option_get_int("graph.combine");
+	show_dirs = tup_option_get_flag("graph.dirs");
+	show_ghosts = tup_option_get_flag("graph.ghosts");
+	show_env = tup_option_get_flag("graph.environment");
+	combine = tup_option_get_flag("graph.combine");
 
 	if(create_graph(&g, -1, -1) < 0)
 		return -1;

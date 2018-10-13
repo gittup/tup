@@ -145,7 +145,7 @@ int server_pre_init(void)
 {
 	char c = 0;
 	int rc;
-	full_deps = tup_option_get_int("updater.full_deps");
+	full_deps = tup_option_get_flag("updater.full_deps");
 	if(setpgid(0, 0) < 0) {
 		perror("setpgid");
 		fprintf(stderr, "tup error: Unable to set process group for tup's subprocesses.\n");

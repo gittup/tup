@@ -246,7 +246,7 @@ static int scan_full_deps(void)
 	int rc;
 	struct tup_entry_head *head;
 
-	if(!tup_option_get_int("updater.full_deps")) {
+	if(!tup_option_get_flag("updater.full_deps")) {
 		return 0;
 	}
 

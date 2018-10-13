@@ -431,7 +431,7 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 {
 	struct file_entry *r;
 	struct tup_entry_head *entrylist;
-	int full_deps = tup_option_get_int("updater.full_deps");
+	int full_deps = tup_option_get_flag("updater.full_deps");
 
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
@@ -464,7 +464,7 @@ static int add_parser_files_locked(struct file_info *finfo,
 	struct tup_entry_head *entrylist;
 	struct tup_entry *tent;
 	int map_bork = 0;
-	int full_deps = tup_option_get_int("updater.full_deps");
+	int full_deps = tup_option_get_flag("updater.full_deps");
 
 	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {

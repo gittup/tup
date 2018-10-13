@@ -144,8 +144,8 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
-	full_deps = tup_option_get_int("updater.full_deps");
-	show_warnings = tup_option_get_int("updater.warnings");
+	full_deps = tup_option_get_flag("updater.full_deps");
+	show_warnings = tup_option_get_flag("updater.warnings");
 	progress_init();
 
 	if(check_full_deps_rebuild() < 0)
