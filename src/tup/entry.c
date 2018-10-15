@@ -345,8 +345,8 @@ static int entry_openat_internal(int root_dfd, struct tup_entry *tent)
 		return -1;
 	}
 	if(newdfd < 0) {
-		if(errno == ENOENT)
-			return -ENOENT;
+		if(errno == ENOENT || errno == ENOTDIR)
+			return -errno;
 		perror(tent->name.s);
 		return -1;
 	}

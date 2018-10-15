@@ -639,7 +639,7 @@ int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
 		return -1;
 
 	dfd = tup_entry_open(parent);
-	if(dfd == -ENOENT) {
+	if(dfd == -ENOENT || dfd == -ENOTDIR) {
 		*mtime = -1;
 	} else if(dfd < 0) {
 		perror("tup_entry_open");
@@ -657,7 +657,7 @@ int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
 		strncpy(tmppath, pel->path, pel->len);
 		tmppath[pel->len] = 0;
 		if(fstatat(dfd, tmppath, &buf, AT_SYMLINK_NOFOLLOW) < 0) {
-			if(errno != ENOENT) {
+			if(errno != ENOENT && errno != ENOTDIR) {
 				perror("fstatat");
 				fprintf(stderr, "tup error: Unable to stat file: %.*s\n", pel->len, pel->path);
 				return -1;
