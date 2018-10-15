@@ -203,14 +203,35 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				mtime = 0;
 			} else {
 				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
+					int link_to_dir = 0;
+
 					if(S_ISDIR(buf.st_mode)) {
 						mtime = 0;
-						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
+					} else {
+						if(S_ISLNK(buf.st_mode)) {
+							/* If we have an external
+							 * symlink, we want to keep
+							 * going down the tree as if it
+							 * were a directory. Otherwise,
+							 * we use the mtime of the
+							 * symlink itself as if it were
+							 * a file.
+							 */
+							struct stat lnkbuf;
+							if(fstatat(dfd, tent->name.s, &lnkbuf, 0) == 0) {
+								if(S_ISDIR(lnkbuf.st_mode)) {
+									link_to_dir = 1;
+								}
+							}
+						}
+						mtime = MTIME(buf);
+					}
+
+					if(S_ISDIR(buf.st_mode) || link_to_dir) {
 						/* If we fail to open, new_dfd is -1 which means any
 						 * future nodes are assumed to be un-openable as well.
 						 */
-					} else {
-						mtime = MTIME(buf);
+						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
 					}
 				}
 			}
