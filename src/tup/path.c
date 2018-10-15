@@ -170,7 +170,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 {
 	struct tup_entry *tent;
 
-	/* This is kinda tricky. We start with a dfd (for "/"), and it's tupid. Then we get add the
+	/* This is kinda tricky. We start with a dfd (for "/"), and its tupid. Then we add the
 	 * tup entries for the current dt to the front of the tup_entry list. We only use one
 	 * list for the whole scan, and when we hit a dt that isn't ours that means we're done
 	 * a single level of the directory. We keep our dfd open until the whole subtree is
