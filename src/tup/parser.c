@@ -124,6 +124,7 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int orderid);
+static int nl_add_external_path(struct path_list *pl, struct name_list *nl, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
@@ -2363,6 +2364,13 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 
 	if(get_path_elements(pl->mem, &pg) < 0)
 		return -1;
+
+	/* External files get skipped */
+	if(pg.pg_flags & PG_OUTSIDE_TUP) {
+		del_pel_group(&pg);
+		return 0;
+	}
+
 	if(pg.pg_flags & PG_HIDDEN) {
 		fprintf(tf->f, "tup error: You specified a path '%s' that contains a hidden filename (since it begins with a '.' character). Tup ignores these files - please remove references to it from the Tupfile.\n", pl->mem);
 		return -1;
@@ -2448,6 +2456,8 @@ void make_name_list_unique(struct name_list *nl)
 	 */
 	input_list = tup_entry_get_list();
 	TAILQ_FOREACH_SAFE(nle, &nl->entries, list, tmp) {
+		if(!nle->tent)
+			continue;
 		if(tup_entry_in_list(nle->tent)) {
 			delete_name_list_entry(nl, nle);
 		} else {
@@ -2464,10 +2474,10 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 	TAILQ_FOREACH(pl, plist, list) {
 		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 0) < 0)
 			return -1;
-		/* Only care about non-bins, non-groups, non-exclusions, and
-		 * directories that are not our own.
+		/* Only care about non-bins, non-groups, non-exclusions,
+		 * non-external files, and directories that are not our own.
 		 */
-		if(!pl->bin && !pl->group && !pl->re && pl->dt != tf->tupid) {
+		if(!pl->bin && !pl->group && !pl->re && pl->dt != -1 && pl->dt != tf->tupid) {
 			struct node *n;
 			struct tup_entry *dtent;
 
@@ -2524,6 +2534,9 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 				return -1;
 		} else if(pl->re) {
 			if(nl_rm_exclusion(tf, pl, nl) < 0)
+				return -1;
+		} else if(pl->dt == -1) {
+			if(nl_add_external_path(pl, nl, pl->orderid) < 0)
 				return -1;
 		} else {
 			if(nl_add_path(tf, pl, nl, pl->orderid) < 0)
@@ -2593,17 +2606,30 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		}
 
 		if(!tent) {
-			fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir '", pl->pel->len, pl->pel->path);
-			print_tupid(tf->f, pl->dt);
-			fprintf(tf->f, "'\n");
-			return -1;
+			if(tf->full_deps) {
+				struct stat buf;
+				time_t mtime = -1;
+
+				if(lstat(pl->mem, &buf) == 0) {
+					mtime = MTIME(buf);
+				}
+				if(tup_db_node_insert_tent(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
+					fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pl->pel->len, pl->pel->path, pl->dt);
+					return -1;
+				}
+			} else {
+				fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir '", pl->pel->len, pl->pel->path);
+				print_tupid(tf->f, pl->dt);
+				fprintf(tf->f, "'\n");
+				return -1;
+			}
 		}
 		variant = tup_entry_variant(tent);
 		if(!variant->root_variant && variant != tf->variant) {
 			fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
 			return -1;
 		}
-		if(tent->type == TUP_NODE_GHOST) {
+		if(tent->type == TUP_NODE_GHOST && tent->mtime == -1) {
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			return -1;
 		}
@@ -2664,6 +2690,39 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				return -1;
 		}
 	}
+	return 0;
+}
+
+static int nl_add_external_path(struct path_list *pl, struct name_list *nl, int orderid)
+{
+	struct name_list_entry *nle;
+	int extlesslen;
+
+	nle = malloc(sizeof *nle);
+	if(!nle) {
+		perror("malloc");
+		return -1;
+	}
+
+	nle->path = strdup(pl->mem);
+	if(!nle->path) {
+		perror("strdup");
+		free(nle);
+		return -1;
+	}
+
+	nle->len = strlen(nle->path);
+	extlesslen = nle->len - 1;
+	while(extlesslen > 0 && nle->path[extlesslen] != '.')
+		extlesslen--;
+	if(extlesslen == 0)
+		extlesslen = nle->len;
+	nle->extlesslen = extlesslen;
+	nle->tent = NULL;
+	set_nle_base(nle);
+	nle->orderid = orderid;
+
+	add_name_list_entry(nl, nle);
 	return 0;
 }
 
@@ -3500,16 +3559,19 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 
 	TAILQ_FOREACH(nle, &nl->entries, list) {
-		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
-			return -1;
+		if(nle->tent)
+			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
-		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
-			return -1;
+		if(nle->tent)
+			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
-		if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
-			return -1;
+		if(nle->tent)
+			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+				return -1;
 	}
 	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
 		if(add_input(tf, &input_root, tt->tupid) < 0)
