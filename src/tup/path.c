@@ -187,6 +187,8 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 	LIST_FOREACH(tent, head, list) {
 		int new_dfd = -1;
 		time_t mtime = -1;
+		int scan_subdir = 0;
+
 		if(tent->dt != dt)
 			return 0;
 
@@ -201,6 +203,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				 */
 				new_dfd = open(tent->name.s, O_RDONLY);
 				mtime = 0;
+				scan_subdir = 1;
 			} else {
 				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
 					int link_to_dir = 0;
@@ -232,6 +235,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 						 * future nodes are assumed to be un-openable as well.
 						 */
 						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
+						scan_subdir = 1;
 					}
 				}
 			}
@@ -239,6 +243,8 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 
 		if(mtime != tent->mtime) {
 			log_debug_tent("Update external", tent, ", oldmtime=%li, newmtime=%li\n", tent->mtime, mtime);
+
+			scan_subdir = 1;
 			/* Mark the commands as modify rather than the ghost node, since we don't
 			 * expect a ghost to have flags set.
 			 */
@@ -248,8 +254,10 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				return -1;
 		}
 
-		if(full_scan_dir(head, new_dfd, tent->tnode.tupid) < 0)
-			return -1;
+		if(scan_subdir) {
+			if(full_scan_dir(head, new_dfd, tent->tnode.tupid) < 0)
+				return -1;
+		}
 		if(new_dfd != -1) {
 			if(close(new_dfd) < 0) {
 				perror("close(new_dfd)");
