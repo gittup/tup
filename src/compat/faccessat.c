@@ -29,7 +29,9 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags)
 
 	if(flags) {/* No way to access() a symlink? */}
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	rc = access(pathname, mode);
 	dir_mutex_unlock();
 	return rc;

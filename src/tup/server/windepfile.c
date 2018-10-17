@@ -464,8 +464,11 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 	char dest[PATH_MAX];
 	wchar_t wtarget[PATH_MAX];
 	wchar_t wdest[PATH_MAX];
+	int rc;
 
-	dir_mutex_lock(dfd);
+	rc = dir_mutex_lock(dfd);
+	if(rc < 0)
+		return rc;
 	if(snprintf(dest, sizeof(dest), "%s/%s", win32_get_dirpath(dfd), linkpath) >= PATH_MAX) {
 		fprintf(stderr, "tup error: dest path sized too small in symlinkat compat function\n");
 		goto out_err;

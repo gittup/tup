@@ -30,7 +30,9 @@ int mkdirat(int dirfd, const char *pathname, mode_t mode)
 
 	if(mode) {/* for win32 */}
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	rc = mkdir(pathname, mode);
 	dir_mutex_unlock();
 	return rc;

@@ -29,7 +29,11 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags)
 {
 	int rc;
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0) {
+		printf("fstatat[%s]: %i\n", pathname, rc);
+		return rc;
+	}
 	if(flags & AT_SYMLINK_NOFOLLOW) {
 		rc = lstat(pathname, buf);
 	} else {

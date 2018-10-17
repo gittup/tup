@@ -27,7 +27,9 @@ int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flag
 {
 	int rc;
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	if(flags & AT_SYMLINK_NOFOLLOW) {
 		rc = lchown(pathname, owner, group);
 	} else {

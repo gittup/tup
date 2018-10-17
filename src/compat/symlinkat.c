@@ -27,7 +27,9 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 {
 	int rc;
 
-	dir_mutex_lock(newdirfd);
+	rc = dir_mutex_lock(newdirfd);
+	if(rc < 0)
+		return rc;
 	rc = symlink(oldpath, newpath);
 	dir_mutex_unlock();
 	return rc;

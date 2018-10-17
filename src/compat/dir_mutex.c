@@ -46,16 +46,23 @@ void compat_lock_disable(void)
 	dir_mutex_enabled = 0;
 }
 
-void dir_mutex_lock(int dfd)
+int dir_mutex_lock(int dfd)
 {
 	if(dir_mutex_enabled)
 		pthread_mutex_lock(&dir_mutex);
 
 	if(fchdir(dfd) < 0) {
-		perror("fchdir");
-		fprintf(stderr, "tup error: Failed to fchdir in a compat wrapper function.\n");
-		exit(1);
+		dir_mutex_unlock();
+		if(errno == EBADF) {
+			/* get_outside_tup_mtime expects ENOENT or ENOTDIR, not
+			 * EBADF, which is what an fchdir on a non-directory
+			 * file descriptor gives.
+			 */
+			errno = ENOENT;
+		}
+		return -errno;
 	}
+	return 0;
 }
 
 void dir_mutex_unlock(void)
