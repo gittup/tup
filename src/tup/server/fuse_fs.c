@@ -295,7 +295,13 @@ static int context_check(void)
 
 static int ignore_file(const char *path)
 {
-	if(strncmp(path, "/proc/", 6) == 0)
+	if(strncmp(path, "/dev", 4) == 0)
+		return 1;
+	if(strncmp(path, "/proc", 5) == 0)
+		return 1;
+	if(strncmp(path, "/run", 4) == 0)
+		return 1;
+	if(strncmp(path, "/var/run", 8) == 0)
 		return 1;
 	if(is_ccache_path(path))
 		return 1;

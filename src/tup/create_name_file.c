@@ -507,6 +507,8 @@ tupid_t find_dir_tupid(const char *dir)
 	 */
 	if(strcmp(dir, "0") == 0)
 		return 0;
+	if(strcmp(dir, "/") == 0)
+		return slash_dt();
 	tent = get_tent_dt(dt, dir);
 	if(!tent)
 		return -1;

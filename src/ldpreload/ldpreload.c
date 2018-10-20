@@ -649,6 +649,12 @@ static int ignore_file(const char *file)
 		return 1;
 	if(strncmp(file, "/proc/", 6) == 0)
 		return 1;
+	if(strncmp(file, "/run/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/var/run/", 9) == 0)
+		return 1;
+	if(strcmp(file, "/etc/resolv.conf") == 0)
+		return 1;
 	if(is_ccache_path(file))
 		return 1;
 	return 0;
