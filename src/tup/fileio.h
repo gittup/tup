@@ -31,6 +31,8 @@ struct tup_entry_head;
 struct path_element;
 struct pel_group;
 
+#define EXTERNAL_DIRECTORY_MTIME 0
+
 #define SOTGV_CREATE_DIRS 2
 #define SOTGV_IGNORE_DIRS 3
 

@@ -202,14 +202,14 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				 * so just open the new one and be on our way.
 				 */
 				new_dfd = open(tent->name.s, O_RDONLY);
-				mtime = 0;
+				mtime = EXTERNAL_DIRECTORY_MTIME;
 				scan_subdir = 1;
 			} else {
 				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
 					int link_to_dir = 0;
 
 					if(S_ISDIR(buf.st_mode)) {
-						mtime = 0;
+						mtime = EXTERNAL_DIRECTORY_MTIME;
 					} else {
 						if(S_ISLNK(buf.st_mode)) {
 							/* If we have an external

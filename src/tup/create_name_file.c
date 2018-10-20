@@ -670,7 +670,7 @@ int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
 			 * one previously (t4064, t4205).
 			 */
 			if(S_ISDIR(buf.st_mode))
-				*mtime = 0;
+				*mtime = EXTERNAL_DIRECTORY_MTIME;
 			else
 				*mtime = MTIME(buf);
 		}
