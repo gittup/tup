@@ -201,7 +201,7 @@ int init_command(int argc, char **argv)
 			fprintf(stderr, "tup warning: database already exists in directory: %s\n", wd);
 		}
 		close(fd);
-		return 0;
+		return 1;
 	}
 
 	if(fchdir(fd) < 0) {
