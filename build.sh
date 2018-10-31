@@ -18,6 +18,7 @@ else
 fi
 LDFLAGS="$LDFLAGS -lm"
 : ${CC:=gcc}
+echo "CONFIG_CC=$CC" >tup.config
 case "$os" in
 	Linux)
 	plat_files="$plat_files ../src/compat/dummy.c"
