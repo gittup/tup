@@ -61,6 +61,7 @@ static int update_cwd(void);
 
 static int (*s_open)(const char *, int, ...);
 static int (*s_open64)(const char *, int, ...);
+static int (*s_openat)(int, const char *, int, ...);
 static FILE *(*s_fopen)(const char *, const char *);
 static FILE *(*s_fopen64)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
@@ -211,6 +212,31 @@ int open64(const char *pathname, int flags, ...)
 		handle_file(pathname, "", at);
 	} else {
 		handle_file(pathname, "", ACCESS_READ);
+	}
+	return rc;
+}
+
+int openat(int dfd, const char *pathname, int flags, ...)
+{
+	int rc;
+	mode_t mode = 0;
+
+	WRAP(s_openat, "openat");
+	if(flags & O_CREAT) {
+		va_list ap;
+		va_start(ap, flags);
+		mode = va_arg(ap, int);
+		va_end(ap);
+	}
+	rc = s_openat(dfd, pathname, flags, mode);
+	if(rc >= 0) {
+		int at = ACCESS_READ;
+
+		if(flags&O_WRONLY || flags&O_RDWR)
+			at = ACCESS_WRITE;
+		handle_file_dirfd(dfd, pathname, "", at);
+	} else {
+		handle_file_dirfd(dfd, pathname, "", ACCESS_READ);
 	}
 	return rc;
 }
