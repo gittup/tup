@@ -51,6 +51,7 @@ int __xstat64(int __ver, __const char *__filename,
 	      struct stat64 *__stat_buf);
 int __lxstat64(int vers, const char *path, struct stat64 *buf);
 char *__realpath_chk(const char *path, char *resolved_path, size_t resolvedlen);
+void _mcleanup(void);
 
 static char cwd[PATH_MAX];
 static int cwdlen = -1;
@@ -88,6 +89,7 @@ static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
+static void (*s_mcleanup)(void);
 
 #define WRAP(ptr, name) \
 	if(!ptr) { \
@@ -569,6 +571,19 @@ int __lxstat64(int vers, const char *path, struct stat64 *buf)
 	rc = s_lxstat64(vers, path, buf);
 	handle_file(path, "", ACCESS_READ);
 	return rc;
+}
+
+/* This function is called by glibc to write out the gmon.out file when
+ * programs are compiled with -pg. Unfortunately it does so using a direct
+ * syscall, so we miss the hook. The FUSE checker would catch gmon.out, which
+ * makes it hard to write an accurate Tupfile if FUSE sees it but ldpreload
+ * does not.
+ */
+void _mcleanup(void)
+{
+	WRAP(s_mcleanup, "_mcleanup");
+	handle_file("gmon.out", "", ACCESS_WRITE);
+	s_mcleanup();
 }
 
 static int write_all(int fd, const void *data, int size)
