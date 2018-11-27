@@ -58,6 +58,11 @@ CFLAGS += -m32
 LDFLAGS += -m32
 endif
 
+ifeq (@(TUP_PROFILING),y)
+CFLAGS += -pg
+LDFLAGS += -pg
+endif
+
 !cc = |> ^ CC %f^ $(CC) -c %f -o %o $(CFLAGS) $(CFLAGS_%f) |> %B.o
 !ld = |> ^ LINK %o^ $(CC) %f -o %o $(LDFLAGS) $(LDFLAGS_%o) |>
 !ar = |> ^ AR %o^ $(AR) crs %o %f |>

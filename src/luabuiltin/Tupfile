@@ -5,4 +5,8 @@ lua = $(dep)
 else
 lua = lua
 endif
-: builtin.lua | $(dep) |> $(lua) xxd.lua %f %o |> luabuiltin.h
+
+ifeq (@(TUP_PROFILING),y)
+gmon = gmon.out
+endif
+: builtin.lua | $(dep) |> $(lua) xxd.lua %f %o |> luabuiltin.h | $(gmon)
