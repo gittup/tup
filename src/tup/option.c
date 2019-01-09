@@ -47,6 +47,7 @@
 
 #define OPT_MAX 256
 
+static char xdg_config_home_loc[PATH_MAX];
 static char home_loc[PATH_MAX];
 
 static struct {
@@ -58,6 +59,7 @@ static struct {
 	{ .file = TUP_OPTIONS_FILE },
 	{ .file = home_loc },
 #ifndef _WIN32
+	{ .file = xdg_config_home_loc },
 	{ .file = "/etc/tup/options" },
 #endif
 };
@@ -67,6 +69,9 @@ static int parse_option_file(int x);
 static const char *cpu_number(void);
 static const char *stdout_isatty(void);
 static const char *get_console_width(void);
+#ifndef _WIN32
+static int init_xdg_config_home_loc(void);
+#endif
 static int init_home_loc(void);
 
 static struct option {
@@ -282,6 +287,11 @@ int tup_option_init(int argc, char **argv)
 		if(options[x].generator)
 			options[x].default_value = options[x].generator();
 	}
+
+#ifndef _WIN32
+	if (init_xdg_config_home_loc() < 0)
+		return -1;
+#endif
 
 	if(init_home_loc() < 0)
 		return -1;
@@ -534,6 +544,28 @@ static const char *stdout_isatty(void)
 	buf[sizeof(buf) - 1]= 0;
 	return buf;
 }
+
+#ifndef _WIN32
+static int init_xdg_config_home_loc(void) {
+	const char *base_dir;
+	const char *fmt_string;
+
+	if ((base_dir = getenv("XDG_CONFIG_HOME")) && *base_dir != '\0')
+		fmt_string = "%s/tup/options";
+	else if ((base_dir = getenv("HOME")))
+		fmt_string = "%s/.config/tup/options";
+	else
+		return 0;
+
+	if (snprintf(xdg_config_home_loc, sizeof(xdg_config_home_loc), fmt_string, base_dir)
+			>= (signed)sizeof(xdg_config_home_loc)) {
+		fprintf(stderr, "tup internal error: user-level options file string is too small.\n");
+		return -1;
+	}
+
+	return 0;
+}
+#endif
 
 static int init_home_loc(void)
 {
