@@ -588,7 +588,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 	struct tup_entry *tent;
 	tupid_t dt;
 
-	dt = find_dir_tupid_dt(DOT_DT, w->filename, &pel, SOTGV_IGNORE_DIRS, 0);
+	dt = find_dir_tupid_dt(DOT_DT, w->filename, &pel, SOTGV_IGNORE_DIRS, 1);
 	if(dt < 0) {
 		fprintf(f, "tup error: Unable to create directory tree for ignored file: %s\n", w->filename);
 		return -1;
