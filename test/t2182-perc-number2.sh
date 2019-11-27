@@ -29,7 +29,7 @@ HERE
 parse_fail_msg "Expected number from 1-99"
 
 cat > Tupfile << HERE
-: file1 file2 foo/file3 |> cmd %0o |> out1 out2
+: file1 file2 foo/file3 |> cmd %100o |> out1 out2
 HERE
 parse_fail_msg "Expected number from 1-99"
 
@@ -37,5 +37,10 @@ cat > Tupfile << HERE
 : file1 file2 foo/file3 |> cmd %1d |> out1 out2
 HERE
 parse_fail_msg "Expected.*after number in"
+
+cat > Tupfile << HERE
+: file1 |> cmd %1|> out1
+HERE
+parse_fail_msg "Unfinished %1-flag at the end of the string"
 
 eotup

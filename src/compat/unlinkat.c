@@ -27,7 +27,9 @@ int unlinkat(int dirfd, const char *pathname, int flags)
 {
 	int rc;
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	if(flags == AT_REMOVEDIR)
 		rc = rmdir(pathname);
 	else

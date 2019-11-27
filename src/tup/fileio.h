@@ -31,7 +31,10 @@ struct tup_entry_head;
 struct path_element;
 struct pel_group;
 
+#define EXTERNAL_DIRECTORY_MTIME 0
+
 #define SOTGV_CREATE_DIRS 2
+#define SOTGV_IGNORE_DIRS 3
 
 int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		     struct tup_entry **entry);
@@ -50,6 +53,7 @@ tupid_t find_dir_tupid_dt(tupid_t dt, const char *dir,
 			  struct path_element **last, int sotgv, int full_deps);
 tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			     struct path_element **last, int sotgv, int full_deps);
+int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime);
 int gimme_tent(const char *name, struct tup_entry **entry);
 
 int delete_file(struct tup_entry *tent);

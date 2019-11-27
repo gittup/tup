@@ -29,6 +29,7 @@
 #include "entry.h"
 #include "option.h"
 #include "pel_group.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,9 +145,8 @@ static int watch_path_internal(tupid_t dt, const char *file,
 
 		return 0;
 	} else {
-		fprintf(stderr, "tup error: File '%s' is not regular nor a dir?\n",
-			file);
-		return -1;
+		/* Ignore block devices, fifofs, and sockets */
+		return 0;
 	}
 }
 
@@ -173,7 +173,7 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 {
 	struct tup_entry *tent;
 
-	/* This is kinda tricky. We start with a dfd (for "/"), and it's tupid. Then we get add the
+	/* This is kinda tricky. We start with a dfd (for "/"), and its tupid. Then we add the
 	 * tup entries for the current dt to the front of the tup_entry list. We only use one
 	 * list for the whole scan, and when we hit a dt that isn't ours that means we're done
 	 * a single level of the directory. We keep our dfd open until the whole subtree is
@@ -190,6 +190,8 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 	LIST_FOREACH(tent, head, list) {
 		int new_dfd = -1;
 		time_t mtime = -1;
+		int scan_subdir = 0;
+
 		if(tent->dt != dt)
 			return 0;
 
@@ -203,26 +205,49 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				 * so just open the new one and be on our way.
 				 */
 				new_dfd = open(tent->name.s, O_RDONLY);
-				mtime = 0;
+				mtime = EXTERNAL_DIRECTORY_MTIME;
+				scan_subdir = 1;
 			} else {
 				if(fstatat(dfd, tent->name.s, &buf, AT_SYMLINK_NOFOLLOW) == 0) {
+					int link_to_dir = 0;
+
 					if(S_ISDIR(buf.st_mode)) {
-						mtime = 0;
-						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
+						mtime = EXTERNAL_DIRECTORY_MTIME;
+					} else {
+						if(S_ISLNK(buf.st_mode)) {
+							/* If we have an external
+							 * symlink, we want to keep
+							 * going down the tree as if it
+							 * were a directory. Otherwise,
+							 * we use the mtime of the
+							 * symlink itself as if it were
+							 * a file.
+							 */
+							struct stat lnkbuf;
+							if(fstatat(dfd, tent->name.s, &lnkbuf, 0) == 0) {
+								if(S_ISDIR(lnkbuf.st_mode)) {
+									link_to_dir = 1;
+								}
+							}
+						}
+						mtime = MTIME(buf);
+					}
+
+					if(S_ISDIR(buf.st_mode) || link_to_dir) {
 						/* If we fail to open, new_dfd is -1 which means any
 						 * future nodes are assumed to be un-openable as well.
 						 */
-					} else {
-						mtime = MTIME(buf);
+						new_dfd = openat(dfd, tent->name.s, O_RDONLY);
+						scan_subdir = 1;
 					}
 				}
 			}
 		}
 
 		if(mtime != tent->mtime) {
-			printf("External file has changed: ");
-			print_tup_entry(stdout, tent);
-			printf("\n");
+			log_debug_tent("Update external", tent, ", oldmtime=%li, newmtime=%li\n", tent->mtime, mtime);
+
+			scan_subdir = 1;
 			/* Mark the commands as modify rather than the ghost node, since we don't
 			 * expect a ghost to have flags set.
 			 */
@@ -232,8 +257,10 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 				return -1;
 		}
 
-		if(full_scan_dir(head, new_dfd, tent->tnode.tupid) < 0)
-			return -1;
+		if(scan_subdir) {
+			if(full_scan_dir(head, new_dfd, tent->tnode.tupid) < 0)
+				return -1;
+		}
 		if(new_dfd != -1) {
 			if(close(new_dfd) < 0) {
 				perror("close(new_dfd)");
@@ -251,7 +278,7 @@ static int scan_full_deps(void)
 	int rc;
 	struct tup_entry_head *head;
 
-	if(!tup_option_get_int("updater.full_deps")) {
+	if(!tup_option_get_flag("updater.full_deps")) {
 		return 0;
 	}
 

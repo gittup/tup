@@ -39,6 +39,7 @@
 #include "variant.h"
 #include "flist.h"
 #include "estring.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,8 +144,8 @@ int updater(int argc, char **argv, int phase)
 
 	do_keep_going = tup_option_get_flag("updater.keep_going");
 	num_jobs = tup_option_get_int("updater.num_jobs");
-	full_deps = tup_option_get_int("updater.full_deps");
-	show_warnings = tup_option_get_int("updater.warnings");
+	full_deps = tup_option_get_flag("updater.full_deps");
+	show_warnings = tup_option_get_flag("updater.warnings");
 	progress_init();
 
 	if(check_full_deps_rebuild() < 0)
@@ -165,6 +166,8 @@ int updater(int argc, char **argv, int phase)
 			do_scan = 0;
 		} else if(strcmp(argv[x], "--no-environ-check") == 0) {
 			environ_check = 0;
+		} else if(strcmp(argv[x], "--debug-logging") == 0) {
+			logging_enable(argc, argv);
 		} else if(strcmp(argv[x], "--quiet") == 0 ||
 			  strcmp(argv[x], "-q") == 0) {
 			progress_quiet();
@@ -355,7 +358,7 @@ int generate(int argc, char **argv)
 
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		if(!n->already_used)
-			if(parse(n, &g, NULL, 0, 0) < 0)
+			if(parse(n, &g, NULL, 0, 0, full_deps) < 0)
 				return -1;
 		TAILQ_REMOVE(&g.plist, n, list);
 		while(!LIST_EMPTY(&n->incoming)) {
@@ -635,12 +638,17 @@ static int delete_files(struct graph *g)
 		if(server_is_dead())
 			goto out_err;
 		if(tent->type == TUP_NODE_GENERATED) {
+			if(tup_db_modify_cmds_by_input(tent->tnode.tupid) < 0)
+				goto out_err;
+			if(tup_db_delete_links(tent->tnode.tupid) < 0)
+				goto out_err;
 			if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 				goto out_err;
+			log_debug_tent("Convert generated -> normal", tent, "\n");
 			show_result(tent, 0, NULL, "generated -> normal", 1);
 			show_progress(-1, TUP_NODE_FILE);
 		} else {
-			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be generated or a directory: ", tent->type);
+			fprintf(stderr, "tup internal error: type of node is %i in delete_files() - should be a generated file: ", tent->type);
 			print_tup_entry(stderr, tent);
 			fprintf(stderr, "\n");
 			return -1;
@@ -669,7 +677,7 @@ static int delete_in_tree(void)
 	return 0;
 }
 
-static void initialize_server_struct(struct server *s, struct tup_entry *tent)
+static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 {
 	s->id = tent->tnode.tupid;
 	s->exited = 0;
@@ -679,7 +687,20 @@ static void initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
-	init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink());
+	if(init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink()) < 0)
+		return -1;
+
+	if(tent->type == TUP_NODE_CMD) {
+		struct tupid_entries exclusion_root = {NULL};
+		if(tup_db_get_inputs(tent->tnode.tupid, &s->finfo.sticky_root, &s->finfo.normal_root, &s->finfo.group_sticky_root) < 0)
+			return -1;
+		if(tup_db_get_outputs(tent->tnode.tupid, &s->finfo.output_root, &exclusion_root, NULL) < 0)
+			return -1;
+		if(exclusion_root_to_list(&exclusion_root, &s->finfo.exclusion_list) < 0)
+			return -1;
+		free_tupid_tree(&exclusion_root);
+	}
+	return 0;
 }
 
 static int check_empty_variant(struct tup_entry *tent)
@@ -946,7 +967,8 @@ static int process_config_nodes(int environ_check)
 					show_result(n->tent, 0, NULL, "updated variant", 1);
 				}
 				compat_lock_disable();
-				initialize_server_struct(&ps.s, n->tent);
+				if(initialize_server_struct(&ps.s, n->tent) < 0)
+					goto err_rollback;
 				if(server_parser_start(&ps) < 0)
 					goto err_rollback;
 				rc = tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file);
@@ -954,7 +976,7 @@ static int process_config_nodes(int environ_check)
 					goto err_rollback;
 				if(rc < 0)
 					goto err_rollback;
-				if(add_config_files(&ps.s.finfo, n->tent) < 0)
+				if(add_config_files(&ps.s.finfo, n->tent, full_deps) < 0)
 					goto err_rollback;
 				compat_lock_enable();
 
@@ -1138,32 +1160,42 @@ static int gitignore(tupid_t tupid)
 			perror("fdopen");
 			goto err_out;
 		}
-		fd_old = openat(dfd, ".gitignore", O_CREAT|O_RDONLY, 0666);
-		if(fd_old < 0) {
+		fd_old = openat(dfd, ".gitignore", O_RDONLY);
+		if(fd_old < 0 && errno != ENOENT) {
 			perror(".gitignore");
 			goto err_close;
 		}
-		while(1) {
-			if(read(fd_old, &nextchar, 1) < 1) {
-				break;
+		if(fd_old >= 0) {
+			while(1) {
+				int rc;
+
+				rc = read(fd_old, &nextchar, 1);
+				if(rc < 0) {
+					perror("read");
+					goto err_close_both;
+				}
+				if(rc == 0) {
+					break;
+				}
+
+				if(tg_str[tg_idx] == nextchar) {
+					tg_idx++;
+				} else {
+					tg_idx = 0;
+				}
+				if(fprintf(f, "%c", nextchar) < 0) {
+					perror("fprintf");
+					goto err_close_both;
+				}
+				if(tg_idx == 26) {
+					copied_tg_str = 1;
+					break;
+				}
 			}
-			if(tg_str[tg_idx] == nextchar) {
-				tg_idx++;
-			} else {
-				tg_idx = 0;
+			if(close(fd_old) < 0) {
+				perror("close(fd_old)");
+				goto err_close;
 			}
-			if(fprintf(f, "%c", nextchar) < 0) {
-				perror("fprintf");
-				goto err_close_both;
-			}
-			if(tg_idx == 26) {
-				copied_tg_str = 1;
-				break;
-			}
-		}
-		if(close(fd_old) < 0) {
-			perror("close(fd_old)");
-			goto err_close;
 		}
 		if(!copied_tg_str) {
 			if(fprintf(f, "%s", tg_str) < 0) {
@@ -1243,6 +1275,8 @@ static int process_create_nodes(void)
 
 		if(n->tent->type != TUP_NODE_DIR)
 			continue;
+		if(is_virtual_tent(n->tent))
+			continue;
 
 		if(node_variant->root_variant) {
 			struct variant *variant;
@@ -1316,6 +1350,7 @@ static int process_create_nodes(void)
 
 	if(build_graph(&g) < 0)
 		return -1;
+	log_graph(&g, "create");
 	if(g.num_nodes) {
 		tup_main_progress("Parsing Tupfiles...\n");
 	} else {
@@ -1430,6 +1465,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	if(prune_graph(&g, argc, argv, num_pruned, GRAPH_PRUNE_GENERATED, verbose) < 0)
 		return -1;
 
+	log_graph(&g, "update");
 	if(g.num_nodes) {
 		tup_main_progress("Executing Commands...\n");
 	} else {
@@ -1823,7 +1859,7 @@ static int create_work(struct graph *g, struct node *n)
 			if(n->already_used) {
 				rc = 0;
 			} else {
-				rc = parse(n, g, NULL, refactoring, 1);
+				rc = parse(n, g, NULL, refactoring, 1, full_deps);
 			}
 			show_progress(-1, TUP_NODE_DIR);
 		}
@@ -1884,6 +1920,7 @@ static int update_work(struct graph *g, struct node *n)
 			pthread_mutex_unlock(&display_mutex);
 		} else {
 			pthread_mutex_lock(&display_mutex);
+			log_debug_tent("Skip cmd", n->tent, "\n");
 			skip_result(n->tent);
 			show_progress(jobs_active, TUP_NODE_CMD);
 			pthread_mutex_unlock(&display_mutex);
@@ -1946,7 +1983,6 @@ static int generate_work(struct graph *g, struct node *n)
 	struct tupid_entries sticky_root = {NULL};
 	struct tupid_entries normal_root = {NULL};
 	struct tupid_entries group_sticky_root = {NULL};
-	struct tupid_entries used_groups_root = {NULL};
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
@@ -1963,7 +1999,7 @@ static int generate_work(struct graph *g, struct node *n)
 		cmd = n->tent->name.s;
 		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
 		if (rc == 0) {
-			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0) {
+			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, NULL) < 0) {
 				fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
 				rc = -1;
 			}
@@ -1973,7 +2009,6 @@ static int generate_work(struct graph *g, struct node *n)
 		free_tupid_tree(&sticky_root);
 		free_tupid_tree(&normal_root);
 		free_tupid_tree(&group_sticky_root);
-		free_tupid_tree(&used_groups_root);
 		if(cmd)
 			fprintf(generate_f, "%s\n", cmd);
 		free(expanded_name);
@@ -1994,6 +2029,15 @@ static int todo_work(struct graph *g, struct node *n)
 	return 0;
 }
 
+static int skip_output(struct tup_entry *tent)
+{
+	if(tent->type == TUP_NODE_GROUP)
+		return 1;
+	if(is_virtual_tent(tent->parent))
+		return 1;
+	return 0;
+}
+
 static int move_outputs(struct node *n)
 {
 	struct edge *e;
@@ -2003,7 +2047,7 @@ static int move_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int output_dfd;
 			/* TODO: This is only required to create generated
 			 * directories. This should probably be moved
@@ -2054,7 +2098,7 @@ static int restore_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			curpath[0] = '.';
 			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
 				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
@@ -2216,7 +2260,7 @@ static int check_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int eq = 0;
 
 			curpath[0] = '.';
@@ -2230,7 +2274,9 @@ static int check_outputs(struct node *n)
 			}
 			if(compare_paths(tmppath, curpath, &eq) < 0)
 				return -1;
-			if(!eq) {
+			if(eq) {
+				log_debug_tent("Skip file", output->tent, "\n");
+			} else {
 				output->skip = 0;
 			}
 		}
@@ -2244,7 +2290,7 @@ static int unlink_outputs(int dfd, struct node *n)
 	struct node *output;
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(output->tent->type != TUP_NODE_GROUP) {
+		if(!skip_output(output->tent)) {
 			int output_dfd = dfd;
 			output->skip = 0;
 			if(output->tent->dt != n->tent->dt) {
@@ -2278,11 +2324,7 @@ static int unlink_outputs(int dfd, struct node *n)
 }
 
 static int process_output(struct server *s, struct node *n,
-			  struct tupid_entries *sticky_root,
-			  struct tupid_entries *normal_root,
-			  struct tupid_entries *group_sticky_root,
 			  struct timespan *ts,
-			  struct tupid_entries *used_groups_root,
 			  const char *expanded_name,
 			  int compare_outputs)
 {
@@ -2309,7 +2351,7 @@ static int process_output(struct server *s, struct node *n,
 	}
 	if(s->exited) {
 		if(s->exit_status == 0) {
-			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 0, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed) == 0) {
+			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SUCCESS, full_deps, tup_entry_vardt(tent), &important_link_removed) == 0) {
 				timespan_end(ts);
 				show_ts = ts;
 				ms = timespan_milliseconds(ts);
@@ -2320,7 +2362,7 @@ static int process_output(struct server *s, struct node *n,
 		} else {
 			fprintf(f, " *** Command ID=%lli failed with return value %i\n", tent->tnode.tupid, s->exit_status);
 			/* Call write_files just to check for dependency issues */
-			write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
+			write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_CMDFAIL, full_deps, tup_entry_vardt(tent), &important_link_removed);
 		}
 	} else if(s->signalled) {
 		int sig = s->exit_sig;
@@ -2330,7 +2372,7 @@ static int process_output(struct server *s, struct node *n,
 			errmsg = signal_err[sig];
 		fprintf(f, " *** Command ID=%lli killed by signal %i (%s)\n", tent->tnode.tupid, sig, errmsg);
 		/* Call write_files just to check for dependency issues */
-		write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, 1, sticky_root, normal_root, group_sticky_root, full_deps, tup_entry_vardt(tent), used_groups_root, &important_link_removed);
+		write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SIGNALLED, full_deps, tup_entry_vardt(tent), &important_link_removed);
 	} else {
 		fprintf(f, "tup internal error: Expected s->exited or s->signalled to be set for command ID=%lli", tent->tnode.tupid);
 	}
@@ -2420,8 +2462,9 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 			struct tupid_entries inputs = {NULL};
 			struct tupid_tree *ttinput;
 
-			if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
-				return -1;
+			if(info->used_groups_root)
+				if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+					return -1;
 			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
 				return -1;
 			RB_FOREACH(ttinput, tupid_entries, &inputs) {
@@ -2638,16 +2681,12 @@ static int update(struct node *n)
 	const char *cmd;
 	struct server s;
 	int rc;
-	struct tupid_entries sticky_root = {NULL};
-	struct tupid_entries normal_root = {NULL};
-	struct tupid_entries group_sticky_root = {NULL};
 	struct tup_env newenv;
 	struct timespan ts;
 	int need_namespacing = 0;
 	int compare_outputs = 0;
 	int run_in_bash = 0;
 	int use_server = 0;
-	struct tupid_entries used_groups_root = {NULL};
 
 	timespan_start(&ts);
 	if(n->tent->flags) {
@@ -2693,16 +2732,15 @@ static int update(struct node *n)
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
+	rc = initialize_server_struct(&s, n->tent);
 	if(rc == 0)
-		rc = tup_db_get_environ(&sticky_root, &normal_root, &newenv);
+		rc = tup_db_get_environ(&s.finfo.sticky_root, &s.finfo.normal_root, &newenv);
 	if(rc == 0) {
-		if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, &used_groups_root) < 0)
+		if(expand_command(&expanded_name, n->tent, cmd, &s.finfo.group_sticky_root, &s.finfo.used_groups_root) < 0)
 			rc = -1;
 		if(expanded_name)
 			cmd = expanded_name;
 	}
-	initialize_server_struct(&s, n->tent);
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
 		goto err_close_dfd;
@@ -2733,14 +2771,11 @@ static int update(struct node *n)
 
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
-	rc = process_output(&s, n, &sticky_root, &normal_root, &group_sticky_root, &ts, &used_groups_root, expanded_name, compare_outputs);
+	rc = process_output(&s, n, &ts, expanded_name, compare_outputs);
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free(expanded_name);
-	free_tupid_tree(&sticky_root);
-	free_tupid_tree(&normal_root);
-	free_tupid_tree(&group_sticky_root);
-	free_tupid_tree(&used_groups_root);
+	cleanup_file_info(&s.finfo);
 	if(use_server)
 		if(server_postexec(&s) < 0)
 			return -1;

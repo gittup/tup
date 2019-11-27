@@ -67,10 +67,10 @@ void progress_init(void)
 	color_len = strlen(color_type(TUP_NODE_CMD)) +
 		strlen(color_append_reverse()) +
 		strlen(color_end());
-	display_progress = tup_option_get_int("display.progress");
-	display_job_numbers = tup_option_get_int("display.job_numbers");
-	display_job_time = tup_option_get_int("display.job_time");
-	quiet = tup_option_get_int("display.quiet");
+	display_progress = tup_option_get_flag("display.progress");
+	display_job_numbers = tup_option_get_flag("display.job_numbers");
+	display_job_time = tup_option_get_flag("display.job_time");
+	quiet = tup_option_get_flag("display.quiet");
 	timespan_start(&main_ts);
 }
 
@@ -231,7 +231,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 			fprintf(f, "%3i%% ", perc);
 		}
 	}
-	if(display_job_numbers) fprintf(f, "%*i) ", sum_width, sum);
+	if(display_job_numbers) fprintf(f, "%*i) ", sum_width, total - sum);
 	if(display_job_time && ts) {
 		fprintf(f, "[%.3fs] ", tdiff);
 	}

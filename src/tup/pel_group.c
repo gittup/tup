@@ -255,26 +255,6 @@ int append_path_elements(struct pel_group *pg, tupid_t dt)
 	return append_path_elements_tent(pg, tent);
 }
 
-int pg_eq(const struct pel_group *pga, const struct pel_group *pgb)
-{
-	struct path_element *pela, *pelb;
-
-	pela = TAILQ_FIRST(&pga->path_list);
-	pelb = TAILQ_FIRST(&pgb->path_list);
-	while(pela != NULL && pelb != NULL) {
-		if(pela->len != pelb->len)
-			return 0;
-		if(name_cmp_n(pela->path, pelb->path, pela->len) != 0)
-			return 0;
-
-		pela = TAILQ_NEXT(pela, list);
-		pelb = TAILQ_NEXT(pelb, list);
-	}
-	if(pela != NULL || pelb != NULL)
-		return 0;
-	return 1;
-}
-
 void del_pel(struct path_element *pel, struct pel_group *pg)
 {
 	TAILQ_REMOVE(&pg->path_list, pel, list);

@@ -27,7 +27,9 @@ ssize_t readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz)
 {
 	int rc;
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	rc = readlink(pathname, buf, bufsiz);
 	dir_mutex_unlock();
 	return rc;

@@ -28,9 +28,11 @@
 #include "compat/utimensat.h"
 #include "tup_fuse_fs.h"
 #include "tup/config.h"
+#include "tup/ccache.h"
 #include "tup/debug.h"
 #include "tup/server.h"
 #include "tup/container.h"
+#include "tup/entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,6 +99,8 @@ static int is_hidden(const char *path)
 	if(strstr(path, "/.svn") != NULL)
 		return 1;
 	if(strstr(path, "/.bzr") != NULL)
+		return 1;
+	if(is_ccache_path(path))
 		return 1;
 	return 0;
 }
@@ -193,10 +197,12 @@ static struct mapping *add_mapping(const char *path)
 
 		peeled = peel(path);
 
-		if(handle_open_file(ACCESS_WRITE, peeled, finfo) < 0) {
-			/* TODO: Set failure on internal server? */
-			fprintf(stderr, "tup internal error: handle open file failed\n");
-			return NULL;
+		if(!is_hidden(peeled)) {
+			if(handle_open_file(ACCESS_WRITE, peeled, finfo) < 0) {
+				/* TODO: Set failure on internal server? */
+				fprintf(stderr, "tup internal error: handle open file failed\n");
+				return NULL;
+			}
 		}
 
 		map = malloc(sizeof *map);
@@ -289,7 +295,15 @@ static int context_check(void)
 
 static int ignore_file(const char *path)
 {
-	if(strncmp(path, "/proc/", 6) == 0)
+	if(strncmp(path, "/dev", 4) == 0)
+		return 1;
+	if(strncmp(path, "/proc", 5) == 0)
+		return 1;
+	if(strncmp(path, "/run", 4) == 0)
+		return 1;
+	if(strncmp(path, "/var/run", 8) == 0)
+		return 1;
+	if(is_ccache_path(path))
 		return 1;
 	return 0;
 }
@@ -832,11 +846,25 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 {
 	struct tmpdir *tmpdir;
 	struct file_info *finfo;
+	const char *peeled;
 
 	if(mode) {}
 
 	if(context_check() < 0)
 		return -EPERM;
+
+	peeled = peel(path);
+	if(ignore_file(peeled)) {
+		int rc;
+
+		/* Things like ccache need to just call mkdir rather than use
+		 * our temporary directories.
+		 */
+		rc = mkdir(peeled, mode);
+		if(rc < 0)
+			return -errno;
+		return 0;
+	}
 
 	finfo = get_finfo(path);
 	if(finfo) {
@@ -1078,12 +1106,15 @@ static int tup_fs_truncate(const char *path, off_t size)
 {
 	struct mapping *map;
 	struct file_info *finfo;
+	const char *peeled;
+	int match = 0;
 
 	if(context_check() < 0)
 		return -EPERM;
 
 	/* TODO: error check? */
 	tup_fuse_handle_file(path, NULL, ACCESS_WRITE);
+	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
@@ -1101,11 +1132,15 @@ static int tup_fs_truncate(const char *path, off_t size)
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		} else {
+			if(re_entries_match(stderr, &finfo->exclusion_list, peeled, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
 		}
 		put_finfo(finfo);
 	}
-	if(is_hidden(path)) {
-		const char *peeled = peel(path);
+	if(match || is_hidden(peeled)) {
 		if(truncate(peeled, size) < 0)
 			return -errno;
 		return 0;
@@ -1120,10 +1155,12 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	const char *peeled;
 	struct mapping *map;
 	struct file_info *finfo;
+	int match = 0;
 
 	if(context_check() < 0)
 		return -EPERM;
 
+	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
 		map = find_mapping(finfo, path);
@@ -1136,16 +1173,20 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 				rc = -errno;
 			put_finfo(finfo);
 			return rc;
+		} else {
+			if(re_entries_match(stderr, &finfo->exclusion_list, peeled, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
 		}
 		put_finfo(finfo);
 	}
-	if(is_hidden(path)) {
-		peeled = peel(path);
+	if(match || is_hidden(peeled)) {
 		if(utimensat(tup_top_fd(), peeled, ts, AT_SYMLINK_NOFOLLOW) < 0)
 			return -errno;
 		return 0;
 	}
-	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", peel(path));
+	fprintf(stderr, "tup error: Unable to utimens() files not created by this job: %s\n", peeled);
 	return -EPERM;
 }
 

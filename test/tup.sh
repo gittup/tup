@@ -429,6 +429,21 @@ gitignore_good()
 	fi
 }
 
+log_good()
+{
+	gitignore_good "$1" .tup/log/debug.log.0
+}
+
+log_graph_good()
+{
+	gitignore_good "$2" .tup/log/$1.dot.0
+}
+
+log_graph_bad()
+{
+	gitignore_bad "$2" .tup/log/$1.dot.0
+}
+
 vardict_exist()
 {
 	if grep "\<$1\>" .tup/vardict > /dev/null; then

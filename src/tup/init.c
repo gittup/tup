@@ -22,6 +22,7 @@
 #include "config.h"
 #include "db.h"
 #include "lock.h"
+#include "logging.h"
 #include "entry.h"
 #include "server.h"
 #include "option.h"
@@ -35,10 +36,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
-
-#ifdef _WIN32
-#define mkdir(a,b) mkdir(a)
-#endif
 
 int tup_init(void)
 {
@@ -85,6 +82,7 @@ int tup_cleanup(void)
 		perror("close(tup_top_fd())");
 	if(server_post_exit() < 0)
 		return -1;
+	logging_shutdown();
 	return 0;
 }
 
@@ -203,7 +201,7 @@ int init_command(int argc, char **argv)
 			fprintf(stderr, "tup warning: database already exists in directory: %s\n", wd);
 		}
 		close(fd);
-		return 0;
+		return 1;
 	}
 
 	if(fchdir(fd) < 0) {

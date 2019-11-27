@@ -63,13 +63,11 @@ gitignore_good libsub.a sub/.gitignore
 rm -f Tuprules.tup
 tup rm Tuprules.tup
 update
-if [ -f .gitignore ]; then
-	echo "Error: .gitignore exists when it shouldn't" 1>&2
-	exit 1
-fi
-if [ -f sub/.gitignore ]; then
-	echo "Error: sub/.gitignore exists when it shouldn't" 1>&2
-	exit 1
-fi
+for f in .gitignore sub/.gitignore .gitignore.new sub/.gitignore.new; do
+	if [ -f $f ]; then
+		echo "Error: $f exists when it shouldn't" 1>&2
+		exit 1
+	fi
+done
 
 eotup

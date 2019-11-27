@@ -5,9 +5,11 @@ CFLAGS += $(FPIC)
 
 # __realpath_chk is defined with -Os but undefined without optimization.
 CFLAGS += -Wno-redundant-decls
+CFLAGS += -pthread
 
 srcs += *.c
 srcs += ../tup/flock/fcntl.c
+srcs += ../tup/ccache.c
 
 ifeq ($(X86_ARCH_SIBLINGS),y)
   : foreach $(srcs) |> !cc |> %B.64.o

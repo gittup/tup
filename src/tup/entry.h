@@ -27,6 +27,7 @@
 #include "bsd/queue.h"
 #include <stdio.h>
 #include <time.h>
+#include <pcre.h>
 
 struct variant;
 struct estring;
@@ -47,6 +48,9 @@ struct tup_entry {
 	int retrieved_stickies;
 	struct tup_entry *incoming;
 
+	/* For exclusions */
+	pcre *re;
+
 	/* For command strings */
 	char *flags;
 	int flagslen;
@@ -64,6 +68,18 @@ struct tup_entry {
 
 LIST_HEAD(tup_entry_head, tup_entry);
 
+struct re_entry {
+	/* Points to the re from tup_entry */
+	pcre *re;
+
+	/* Points to name.s from tup_entry */
+	const char *s;
+
+	LIST_ENTRY(re_entry) list;
+};
+
+LIST_HEAD(re_entry_head, re_entry);
+
 int tup_entry_init(void);
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
@@ -75,7 +91,8 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest);
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags);
+		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
+		      struct tup_entry **dest);
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);
 int tup_entry_change_display(struct tup_entry *tent, const char *display, int displaylen);
@@ -115,5 +132,8 @@ TAILQ_HEAD(tent_list_head, tent_list);
 void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist);
 void free_tent_list(struct tent_list_head *head);
 int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end);
+int exclusion_root_to_list(struct tupid_entries *root, struct re_entry_head *head);
+int re_entries_match(FILE *f, struct re_entry_head *head, const char *s, int *match);
+void free_re_list(struct re_entry_head *head);
 
 #endif

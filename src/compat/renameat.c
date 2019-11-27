@@ -32,7 +32,9 @@ int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpat
 		return -1;
 	}
 
-	dir_mutex_lock(olddirfd);
+	rc = dir_mutex_lock(olddirfd);
+	if(rc < 0)
+		return rc;
 #ifdef _WIN32
 	wchar_t woldpath[PATH_MAX];
 	wchar_t wnewpath[PATH_MAX];

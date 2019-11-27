@@ -25,6 +25,7 @@
 #include "tup/environ.h"
 #include "tup/entry.h"
 #include "tup/variant.h"
+#include "tup/ccache.h"
 #include "dllinject/dllinject.h"
 #include "compat/win32/dirpath.h"
 #include "compat/dir_mutex.h"
@@ -102,7 +103,7 @@ int server_init(enum server_mode mode)
 		perror("fchdir");
 		return -1;
 	}
-	if(mkdir(TUP_TMP) < 0) {
+	if(mkdir(TUP_TMP, 0777) < 0) {
 		if(errno != EEXIST) {
 			perror(TUP_TMP);
 			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
@@ -463,8 +464,11 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 	char dest[PATH_MAX];
 	wchar_t wtarget[PATH_MAX];
 	wchar_t wdest[PATH_MAX];
+	int rc;
 
-	dir_mutex_lock(dfd);
+	rc = dir_mutex_lock(dfd);
+	if(rc < 0)
+		return rc;
 	if(snprintf(dest, sizeof(dest), "%s/%s", win32_get_dirpath(dfd), linkpath) >= PATH_MAX) {
 		fprintf(stderr, "tup error: dest path sized too small in symlinkat compat function\n");
 		goto out_err;
@@ -563,6 +567,9 @@ static int process_depfile(struct server *s, HANDLE h)
 
 		if(!event.len) {
 			/* We have to check this after reading the nul bytes for the empty events. */
+			continue;
+		}
+		if(is_ccache_path(event1) || is_ccache_path(event2)) {
 			continue;
 		}
 

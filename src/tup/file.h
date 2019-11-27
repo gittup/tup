@@ -24,13 +24,14 @@
 #include "tupid.h"
 #include "access_event.h"
 #include "bsd/queue.h"
+#include "tupid_tree.h"
 #include "thread_tree.h"
 #include "pel_group.h"
+#include "entry.h"
 #include <stdio.h>
 #include <pthread.h>
 
 struct tup_entry;
-struct tupid_entries;
 
 struct mapping {
 	LIST_ENTRY(mapping) list;
@@ -49,7 +50,6 @@ LIST_HEAD(tmpdir_head, tmpdir);
 struct file_entry {
 	LIST_ENTRY(file_entry) list;
 	char *filename;
-	struct pel_group pg;
 };
 LIST_HEAD(file_entry_head, file_entry);
 
@@ -63,13 +63,26 @@ struct file_info {
 	struct file_entry_head var_list;
 	struct mapping_head mapping_list;
 	struct tmpdir_head tmpdir_list;
+	struct tupid_entries sticky_root;
+	struct tupid_entries normal_root;
+	struct tupid_entries group_sticky_root;
+	struct tupid_entries used_groups_root;
+	struct tupid_entries output_root;
+	struct re_entry_head exclusion_list;
 	const char *variant_dir;
 	int server_fail;
 	int open_count;
 	int do_unlink;
 };
 
+enum check_type_t {
+	CHECK_SUCCESS = 0,
+	CHECK_CMDFAIL,
+	CHECK_SIGNALLED,
+};
+
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink);
+void cleanup_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);
 int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
@@ -80,14 +93,11 @@ int handle_open_file(enum access_type at, const char *filename,
 		     struct file_info *info);
 int handle_rename(const char *from, const char *to, struct file_info *info);
 int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
-		int check_only, struct tupid_entries *sticky_root,
-		struct tupid_entries *normal_root,
-		struct tupid_entries *group_sticky_root,
+		enum check_type_t check_only,
 		int full_deps, tupid_t vardt,
-		struct tupid_entries *used_groups_root,
 		int *important_link_removed);
-int add_config_files(struct file_info *finfo, struct tup_entry *tent);
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt);
+int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_deps);
+int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt, int full_deps);
 void del_map(struct mapping *map);
 void del_file_entry(struct file_entry *fent);
 

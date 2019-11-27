@@ -37,4 +37,10 @@ HERE
 tup touch Tupfile
 parse_fail_msg "%B used in rule pattern and no input files were specified"
 
+cat > Tupfile << HERE
+: |> cat %i > %o |> bar
+HERE
+tup touch Tupfile
+parse_fail_msg "%i used in rule pattern and no order-only input files were specified"
+
 eotup

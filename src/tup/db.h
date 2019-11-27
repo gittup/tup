@@ -65,7 +65,7 @@ int tup_db_node_insert_tent(tupid_t dt, const char *name, int namelen,
 int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 				    const char *display, int displaylen, const char *flags, int flagslen,
 				    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
-int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry *tent);
+int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry **dest);
 int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
 			    struct tup_entry **entry);
@@ -79,7 +79,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				int include_directories);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt, int force);
-int tup_db_flag_generated_dirs(tupid_t dt);
+int tup_db_flag_generated_dir(tupid_t dt, int force);
 int tup_db_delete_variant(struct tup_entry *tent, void *arg, int (*callback)(void *, struct tup_entry *));
 int tup_db_duplicate_directory_structure(struct tup_entry *dest);
 int tup_db_chdir(tupid_t dt);
@@ -124,6 +124,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
+			 struct tupid_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified);
@@ -136,7 +137,7 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		      struct tupid_entries *normal_root,
 		      struct tupid_entries *group_sticky_root);
-int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tup_entry **group);
+int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tupid_entries *exclusion_root, struct tup_entry **group);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -149,6 +150,8 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid);
 int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *, struct tup_entry *),
 				     void *arg, tupid_t tupid);
+int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup_entry *),
+					      void *arg, tupid_t tupid);
 
 /* Config operations */
 int tup_db_show_config(void);
@@ -170,6 +173,10 @@ int tup_db_findenv(const char *var, struct tup_entry **tent);
 int tup_db_get_environ(struct tupid_entries *root,
 		       struct tupid_entries *normal_root, struct tup_env *te);
 tupid_t env_dt(void);
+int is_virtual_tent(struct tup_entry *tent);
+
+/* Exclusion operations */
+tupid_t exclusion_dt(void);
 
 /* Tree operations */
 int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
@@ -184,14 +191,16 @@ int tup_db_scan_end(void);
 /* updater operations */
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				struct tup_entry_head *writehead,
+				struct tupid_entries *output_root,
 				struct mapping_head *mapping_list,
 				int *write_bork,
-				int do_unlink);
+				int do_unlink, int complain_missing);
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tup_entry_head *readhead,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
 			       struct tupid_entries *group_sticky_root,
+			       struct tupid_entries *output_root,
 			       int *important_link_removed);
 int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 

@@ -25,6 +25,7 @@
 #include "string_tree.h"
 #include "timespan.h"
 #include "vardb.h"
+#include <pcre.h>
 
 #define TUPLUA_NOERROR 0
 #define TUPLUA_PENDINGERROR 1
@@ -66,6 +67,7 @@ struct tupfile {
 	struct lua_State *ls;
 	int luaerror;
 	int use_server;
+	int full_deps;
 };
 
 #define MAX_GLOBS 10
@@ -111,7 +113,8 @@ struct path_list {
 	int orderid;
 
 	/* For files: */
-	char *path;
+	char *dir;
+	int dirlen;
 	int group;
 
 	/* After path_list_fill_dt_pel */
@@ -120,6 +123,9 @@ struct path_list {
 
 	/* For bins: */
 	struct bin *bin;
+
+	/* For exclusions: */
+	pcre *re;
 
 	/* Copy of the full string */
 	char mem[0];
@@ -168,7 +174,7 @@ struct graph;
 struct timespan;
 
 void parser_debug_run(void);
-int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server);
+int parse(struct node *n, struct graph *g, struct timespan *ts, int refactoring, int use_server, int full_deps);
 char *eval(struct tupfile *tf, const char *string, int allow_nodes);
 
 #endif

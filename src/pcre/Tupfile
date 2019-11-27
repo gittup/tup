@@ -1,0 +1,6 @@
+include_rules
+ifeq ($(use_system_pcre),n)
+CFLAGS += -DHAVE_CONFIG_H
+CFLAGS += -w
+: foreach *.c |> !cc |>
+endif

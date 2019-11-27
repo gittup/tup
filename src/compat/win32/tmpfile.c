@@ -38,11 +38,14 @@ FILE *__wrap_tmpfile(void)
 	char filename[64];
 	wchar_t wfilename[64];
 	FILE *f = NULL;
+	int rc;
 	HANDLE h;
 
-	dir_mutex_lock(tup_top_fd());
+	rc = dir_mutex_lock(tup_top_fd());
+	if(rc < 0)
+		return NULL;
 
-	if(mkdir(".tup/tmp") < 0) {
+	if(mkdir(".tup/tmp", 0777) < 0) {
 		if(errno != EEXIST) {
 			perror(".tup/tmp");
 			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");

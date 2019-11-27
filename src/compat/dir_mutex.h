@@ -25,7 +25,7 @@
 
 extern pthread_mutex_t dir_mutex;
 
-void dir_mutex_lock(int dfd);
+int dir_mutex_lock(int dfd);
 void dir_mutex_unlock(void);
 
 #endif

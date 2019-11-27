@@ -166,8 +166,8 @@ int display_output(int fd, int iserr, const char *name, int display_name, FILE *
 				displayed = 1;
 				clear_active(out);
 				if(iserr == 2) {
-					/* For tup errors (eg: missing deps) */
-					fprintf(out, " *** tup errors ***\n");
+					/* For tup messages (eg: missing deps, verbose messages) */
+					fprintf(out, " *** tup messages ***\n");
 				}
 				if(iserr == 1) {
 					/* This is for run-scripts */

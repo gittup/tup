@@ -293,6 +293,32 @@ static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
 	return n;
 }
 
+/* Callback for adding group dependencies to the regular update graph. This
+ * just adds a link from <group1> -> <group2> so that if we 'tup upd
+ * <group2>', we also build everything in group1. See t3088, t3089.
+ */
+int build_graph_group_cb(void *arg, struct tup_entry *tent)
+{
+	struct graph *g = arg;
+	struct node *n;
+
+	n = find_or_create_node(g, tent);
+	if(!n)
+		return -1;
+
+	if(n->expanded == 0) {
+		expand_node(g, n);
+	}
+
+	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
+		return -1;
+
+	return 0;
+}
+
+/* Callback for adding group dependencies to the circular dependency check
+ * graph.
+ */
 static int build_group_cb(void *arg, struct tup_entry *tent,
 			  struct tup_entry *cmdtent)
 {
@@ -338,6 +364,10 @@ int build_graph(struct graph *g)
 			} else {
 				if(tup_db_select_node_by_link(build_graph_cb, g, cur->tnode.tupid) < 0)
 					return -1;
+				if(g->cur->tent->type == TUP_NODE_GROUP) {
+					if(tup_db_select_node_by_distinct_group_link(build_graph_group_cb, g, cur->tnode.tupid) < 0)
+						return -1;
+				}
 			}
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
@@ -499,10 +529,10 @@ static void mark_nodes(struct node *n)
 		LIST_FOREACH(e2, &n->edges, list) {
 			struct node *dest = e2->dest;
 
-			/* Groups are skipped, otherwise we end up
-			 * building everything in the group (t3058).
+			/* Groups and exclusions are skipped, otherwise we end
+			 * up building everything in the group (t3058, t5099).
 			 */
-			if(dest->tent->type != TUP_NODE_GROUP) {
+			if(dest->tent->type != TUP_NODE_GROUP && dest->tent->dt != exclusion_dt()) {
 				mark_nodes(dest);
 			}
 		}
@@ -673,7 +703,8 @@ void save_graph(FILE *err, struct graph *g, const char *filename)
 		perror("asprintf");
 		return;
 	}
-	fprintf(err, "tup: saving graph '%s'\n", realfile);
+	if(err)
+		fprintf(err, "tup: saving graph '%s'\n", realfile);
 
 	count++;
 	f = fopen(realfile, "w");
@@ -862,16 +893,6 @@ static tupid_t command_name_hash(tupid_t hash, struct tup_entry *tent,
 		hash = get_hash(hash, name[x], mult);
 	}
 	return hash;
-}
-
-static void free_string_tree(struct string_entries *root)
-{
-	struct string_tree *st;
-	while(!RB_EMPTY(root)) {
-		st = RB_MIN(string_entries, root);
-		string_tree_free(root, st);
-		free(st);
-	}
 }
 
 static tupid_t command_outgoing_hash(tupid_t hash, struct node *n)

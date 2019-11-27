@@ -60,4 +60,9 @@ else
 	exit 1
 fi
 
+if [ "`tup entry $path$filename`" = "" ]; then
+	echo "Error: tup entry failed on $path$filename" 1>&2
+	exit 1
+fi
+
 eotup

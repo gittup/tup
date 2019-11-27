@@ -40,6 +40,8 @@
 #define UNICODE
 #define _UNICODE
 
+#define mkdir(a,b) mkdir(a)
+
 struct stat;
 
 #define lstat(a, b) win_lstat(a, b)

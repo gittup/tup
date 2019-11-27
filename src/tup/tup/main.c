@@ -50,11 +50,9 @@
 #include "tup/vardb.h"
 #include "tup/container.h"
 
-#ifdef _WIN32
-#define mkdir(a,b) mkdir(a)
-#endif
-
 static int entry(int argc, char **argv);
+static int tupid(int argc, char **argv);
+static int inputs(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 /* Testing commands */
@@ -151,6 +149,7 @@ int main(int argc, char **argv)
 		}
 		if(generate(argc, argv) < 0)
 			return 1;
+		tup_valgrind_cleanup();
 		return 0;
 	} else if(strcmp(cmd, "privileged") == 0) {
 #ifdef __linux__
@@ -204,6 +203,10 @@ int main(int argc, char **argv)
 		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "entry") == 0) {
 		rc = entry(argc, argv);
+	} else if(strcmp(cmd, "tupid") == 0) {
+		rc = tupid(argc, argv);
+	} else if(strcmp(cmd, "inputs") == 0) {
+		rc = inputs(argc, argv);
 	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
@@ -329,6 +332,63 @@ static int entry(int argc, char **argv)
 	return 0;
 }
 
+static int tupid(int argc, char **argv)
+{
+	struct tup_entry *tent;
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		if(gimme_tent(argv[x], &tent) < 0) {
+			fprintf(stderr, "No tent :(\n");
+			return -1;
+		}
+		if(tent) {
+			printf("%lli\n", tent->tnode.tupid);
+		} else {
+			fprintf(stderr, "tup error: entry not found for '%s'\n", argv[x]);
+			return -1;
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+static int inputs(int argc, char **argv)
+{
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		struct tupid_entries inputs = RB_INITIALIZER(&inputs);
+		struct tupid_tree *tt;
+		tupid_t cmdid;
+
+		cmdid = strtol(argv[x], NULL, 10);
+		if(cmdid <= 0) {
+			fprintf(stderr, "tup error: %s is not a valid command ID.\n", argv[x]);
+			return -1;
+		}
+		if(tup_db_get_inputs(cmdid, NULL, &inputs, NULL) < 0)
+			return -1;
+		RB_FOREACH(tt, tupid_entries, &inputs) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tt->tupid, &tent) < 0)
+				return -1;
+			if(tent->type != TUP_NODE_GHOST) {
+				print_tup_entry(stdout, tent);
+				printf("\n");
+			}
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
 static int show_dirs;
 static int show_ghosts;
 static int show_env;
@@ -387,10 +447,10 @@ static int graph(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	show_dirs = tup_option_get_int("graph.dirs");
-	show_ghosts = tup_option_get_int("graph.ghosts");
-	show_env = tup_option_get_int("graph.environment");
-	combine = tup_option_get_int("graph.combine");
+	show_dirs = tup_option_get_flag("graph.dirs");
+	show_ghosts = tup_option_get_flag("graph.ghosts");
+	show_env = tup_option_get_flag("graph.environment");
+	combine = tup_option_get_flag("graph.combine");
 
 	if(create_graph(&g, -1, -1) < 0)
 		return -1;
@@ -455,6 +515,10 @@ static int graph(int argc, char **argv)
 		g.cur = TAILQ_FIRST(&g.plist);
 		if(tup_db_select_node_by_link(graph_cb, &g, g.cur->tnode.tupid) < 0)
 			return -1;
+		if(g.cur->tent->type == TUP_NODE_GROUP) {
+			if(tup_db_select_node_by_distinct_group_link(build_graph_group_cb, &g, g.cur->tnode.tupid) < 0)
+				return -1;
+		}
 		TAILQ_REMOVE(&g.plist, g.cur, list);
 		TAILQ_INSERT_HEAD(&g.node_list, g.cur, list);
 

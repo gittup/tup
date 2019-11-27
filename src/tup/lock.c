@@ -83,7 +83,7 @@ int tup_lock_init(void)
 {
 	int ret;
 
-	if(tup_lock_open(TUP_SHARED_LOCK, &sh_lock) < 0)
+	if(tup_lock_open(tup_top_fd(), TUP_SHARED_LOCK, &sh_lock) < 0)
 		return -1;
 	ret = tup_try_flock(sh_lock);
 	if(ret > 0) {
@@ -94,12 +94,12 @@ int tup_lock_init(void)
 		return -1;
 	}
 
-	if(tup_lock_open(TUP_OBJECT_LOCK, &obj_lock) < 0)
+	if(tup_lock_open(tup_top_fd(), TUP_OBJECT_LOCK, &obj_lock) < 0)
 		return -1;
 	if(tup_flock(obj_lock) < 0)
 		return -1;
 
-	if(tup_lock_open(TUP_TRI_LOCK, &tri_lock) < 0)
+	if(tup_lock_open(tup_top_fd(), TUP_TRI_LOCK, &tri_lock) < 0)
 		return -1;
 	return 0;
 }

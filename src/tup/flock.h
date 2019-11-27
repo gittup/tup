@@ -24,7 +24,7 @@
 #include "tup_lock_t.h"
 
 /* Wrappers for fcntl */
-int tup_lock_open(const char *lockname, tup_lock_t *lock);
+int tup_lock_open(int basefd, const char *lockname, tup_lock_t *lock);
 void tup_lock_close(tup_lock_t lock);
 int tup_flock(tup_lock_t fd);
 int tup_try_flock(tup_lock_t fd); /* Returns: -1 error, 0 got lock, 1 would block */

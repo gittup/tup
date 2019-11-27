@@ -23,10 +23,12 @@
 #include <stdio.h>
 #include <errno.h>
 
-int tup_lock_open(const char *lockname, tup_lock_t *lock)
+int tup_lock_open(int basefd, const char *lockname, tup_lock_t *lock)
 {
 	HANDLE h;
 	wchar_t wlockname[PATH_MAX];
+
+	if(basefd) {/* unused */}
 
 	MultiByteToWideChar(CP_UTF8, 0, lockname, -1, wlockname, PATH_MAX);
 

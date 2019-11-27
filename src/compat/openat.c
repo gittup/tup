@@ -27,9 +27,12 @@
 int openat(int dirfd, const char *pathname, int flags, ...)
 {
 	int fd;
+	int rc;
 	mode_t mode = 0;
 
-	dir_mutex_lock(dirfd);
+	rc = dir_mutex_lock(dirfd);
+	if(rc < 0)
+		return rc;
 	if(flags & O_CREAT) {
 		va_list ap;
 		va_start(ap, flags);

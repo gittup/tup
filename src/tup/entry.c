@@ -47,7 +47,6 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *display, int displaylen, const char *flags, int flagslen,
 				   enum TUP_NODE_TYPE type,
 				   time_t mtime, tupid_t srcid);
-static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
@@ -78,21 +77,14 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 		return 0;
 	}
 
-	tent = new_entry(tupid, -1, NULL, 0, NULL, 0, NULL, 0, -1, -1, -1);
-	if(!tent)
+	if(tup_db_fill_tup_entry(tupid, &tent) < 0)
 		return -1;
-
-	if(tup_db_fill_tup_entry(tupid, tent) < 0)
-		return -1;
-	if(tup_entry_add_null(tent->dt, &tent->parent) < 0)
-		return -1;
-
-	if(tent->parent) {
-		if(string_tree_insert(&tent->parent->entries, &tent->name) < 0) {
-			fprintf(stderr, "tup error: Unable to insert node named '%s' into parent's (id=%lli) string tree.\n", tent->name.s, tent->parent->tnode.tupid);
+	if(tent->dt > 0) {
+		if(tup_entry_add(tent->dt, NULL) < 0)
 			return -1;
-		}
 	}
+	if(resolve_parent(tent) < 0)
+		return -1;
 	if(dest)
 		*dest = tent;
 	return 0;
@@ -177,6 +169,9 @@ static int rm_entry(tupid_t tupid, int safe)
 	tupid_tree_rm(&tup_root, &tent->tnode);
 	if(tent->parent) {
 		string_tree_rm(&tent->parent->entries, &tent->name);
+	}
+	if(tent->re) {
+		pcre_free(tent->re);
 	}
 	free_tupid_tree(&tent->stickies);
 	free_tupid_tree(&tent->group_stickies);
@@ -275,16 +270,6 @@ int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 	return rc;
 }
 
-static int tup_entry_add_null(tupid_t tupid, struct tup_entry **dest)
-{
-	if(tupid == 0) {
-		if(dest)
-			*dest = NULL;
-		return 0;
-	}
-	return tup_entry_add(tupid, dest);
-}
-
 int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
@@ -303,13 +288,16 @@ int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags)
+		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
+		      struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
 	tent = new_entry(tupid, dt, name, strlen(name), display, -1, flags, -1, type, mtime, srcid);
 	if(!tent)
 		return -1;
+	if(dest)
+		*dest = tent;
 	return 0;
 }
 
@@ -357,8 +345,8 @@ static int entry_openat_internal(int root_dfd, struct tup_entry *tent)
 		return -1;
 	}
 	if(newdfd < 0) {
-		if(errno == ENOENT)
-			return -ENOENT;
+		if(errno == ENOENT || errno == ENOTDIR)
+			return -errno;
 		perror(tent->name.s);
 		return -1;
 	}
@@ -538,6 +526,18 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 		return NULL;
 	RB_INIT(&tent->entries);
 
+	if(tent->dt == exclusion_dt()) {
+		const char *error;
+		int erroffset;
+		tent->re = pcre_compile(tent->name.s, 0, &error, &erroffset, NULL);
+		if(!tent->re) {
+			fprintf(stderr, "tup error: Unable to compile regular expression '%s' at offset %i: %s\n", tent->name.s, erroffset, error);
+			return NULL;
+		}
+	} else {
+		tent->re = NULL;
+	}
+
 	if(tupid_tree_insert(&tup_root, &tent->tnode) < 0) {
 		fprintf(stderr, "tup error: Unable to insert node %lli into the tupid tree in new_entry\n", tent->tnode.tupid);
 		tup_db_print(stderr, tent->tnode.tupid);
@@ -711,7 +711,7 @@ int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root)
 		subtent = container_of(st, struct tup_entry, name);
 		if(subtent->type != TUP_NODE_GHOST &&
 		   subtent->type != TUP_NODE_CMD &&
-		   subtent->tnode.tupid != env_dt())
+		   !is_virtual_tent(subtent))
 			if(tupid_tree_add(root, subtent->tnode.tupid) < 0)
 				return -1;
 	}
@@ -877,4 +877,58 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	free_tent_list(&endlist);
 	free_tent_list(&startlist);
 	return 0;
+}
+
+int exclusion_root_to_list(struct tupid_entries *root, struct re_entry_head *head)
+{
+	struct tupid_tree *tt;
+
+	RB_FOREACH(tt, tupid_entries, root) {
+		struct tup_entry *tent;
+		struct re_entry *re;
+
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		re = malloc(sizeof *re);
+		if(!re) {
+			perror("malloc");
+			return -1;
+		}
+		re->re = tent->re;
+		re->s = tent->name.s;
+		LIST_INSERT_HEAD(head, re, list);
+	}
+	return 0;
+}
+
+int re_entries_match(FILE *f, struct re_entry_head *head, const char *s, int *match)
+{
+	struct re_entry *re;
+	int len = strlen(s);
+
+	*match = 0;
+	LIST_FOREACH(re, head, list) {
+		int rc;
+		rc = pcre_exec(re->re, NULL, s, len, 0, 0, NULL, 0);
+		if(rc == 0) {
+			*match = 1;
+			if(do_verbose) {
+				fprintf(f, "tup info: Ignoring file '%s' because it matched the regex '%s'\n", s, re->s);
+			}
+			break;
+		} else if(rc != PCRE_ERROR_NOMATCH) {
+			fprintf(f, "tup error: Regex failed to execute: %s\n", re->s);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+void free_re_list(struct re_entry_head *head)
+{
+	while(!LIST_EMPTY(head)) {
+		struct re_entry *re = LIST_FIRST(head);
+		LIST_REMOVE(re, list);
+		free(re);
+	}
 }

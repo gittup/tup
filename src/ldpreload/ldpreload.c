@@ -33,6 +33,7 @@
 #define _GNU_SOURCE
 #include "tup/access_event.h"
 #include "tup/flock.h"
+#include "tup/ccache.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +51,7 @@ int __xstat64(int __ver, __const char *__filename,
 	      struct stat64 *__stat_buf);
 int __lxstat64(int vers, const char *path, struct stat64 *buf);
 char *__realpath_chk(const char *path, char *resolved_path, size_t resolvedlen);
+void _mcleanup(void);
 
 static char cwd[PATH_MAX];
 static int cwdlen = -1;
@@ -60,6 +62,7 @@ static int update_cwd(void);
 
 static int (*s_open)(const char *, int, ...);
 static int (*s_open64)(const char *, int, ...);
+static int (*s_openat)(int, const char *, int, ...);
 static FILE *(*s_fopen)(const char *, const char *);
 static FILE *(*s_fopen64)(const char *, const char *);
 static FILE *(*s_freopen)(const char *, const char *, FILE *);
@@ -86,6 +89,7 @@ static int (*s_xstat)(int vers, const char *name, struct stat *buf);
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
+static void (*s_mcleanup)(void);
 
 #define WRAP(ptr, name) \
 	if(!ptr) { \
@@ -111,10 +115,39 @@ static int errored = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int depfd = -1;
 
+static void prepare(void)
+{
+	pthread_mutex_lock(&mutex);
+}
+
+static void parent(void)
+{
+	int rc;
+	rc = pthread_mutex_unlock(&mutex);
+	if(rc != 0) {
+		fprintf(stderr, "tup error: pthread_mutex_unlock() failed in parent atfork handler with rc=%i\n", rc);
+		errored = 1;
+	}
+}
+
+static void child(void)
+{
+	int rc;
+	rc = pthread_mutex_unlock(&mutex);
+	if(rc != 0) {
+		fprintf(stderr, "tup error: pthread_mutex_unlock() failed in child atfork handler with rc=%i\n", rc);
+		errored = 1;
+	}
+}
+
 static void init_fd(void) __attribute__((constructor));
 static void init_fd(void)
 {
 	const char *depfile;
+	if(pthread_atfork(prepare, parent, child) != 0) {
+		fprintf(stderr, "tup error: Unable to set pthread atfork handlers.\n");
+		goto out_error;
+	}
 	depfile = getenv(TUP_DEPFILE);
 	if(!depfile) {
 		fprintf(stderr, "tup error: Unable to find dependency filename in the TUP_DEPFILE environment variable.\n");
@@ -181,6 +214,31 @@ int open64(const char *pathname, int flags, ...)
 		handle_file(pathname, "", at);
 	} else {
 		handle_file(pathname, "", ACCESS_READ);
+	}
+	return rc;
+}
+
+int openat(int dfd, const char *pathname, int flags, ...)
+{
+	int rc;
+	mode_t mode = 0;
+
+	WRAP(s_openat, "openat");
+	if(flags & O_CREAT) {
+		va_list ap;
+		va_start(ap, flags);
+		mode = va_arg(ap, int);
+		va_end(ap);
+	}
+	rc = s_openat(dfd, pathname, flags, mode);
+	if(rc >= 0) {
+		int at = ACCESS_READ;
+
+		if(flags&O_WRONLY || flags&O_RDWR)
+			at = ACCESS_WRITE;
+		handle_file_dirfd(dfd, pathname, "", at);
+	} else {
+		handle_file_dirfd(dfd, pathname, "", ACCESS_READ);
 	}
 	return rc;
 }
@@ -307,9 +365,7 @@ int rename(const char *old, const char *new)
 	WRAP(s_rename, "rename");
 	rc = s_rename(old, new);
 	if(rc == 0) {
-		if(!ignore_file(old) && !ignore_file(new)) {
-			handle_file(old, new, ACCESS_RENAME);
-		}
+		handle_file(old, new, ACCESS_RENAME);
 	}
 	return rc;
 }
@@ -329,9 +385,7 @@ int renameat(int oldfd, const char *old, int newfd, const char *new)
 	WRAP(s_renameat, "renameat");
 	rc = s_renameat(oldfd, old, newfd, new);
 	if(rc == 0) {
-		if(!ignore_file(old) && !ignore_file(new)) {
-			handle_file(old, new, ACCESS_RENAME);
-		}
+		handle_file(old, new, ACCESS_RENAME);
 	}
 	return rc;
 }
@@ -519,6 +573,19 @@ int __lxstat64(int vers, const char *path, struct stat64 *buf)
 	return rc;
 }
 
+/* This function is called by glibc to write out the gmon.out file when
+ * programs are compiled with -pg. Unfortunately it does so using a direct
+ * syscall, so we miss the hook. The FUSE checker would catch gmon.out, which
+ * makes it hard to write an accurate Tupfile if FUSE sees it but ldpreload
+ * does not.
+ */
+void _mcleanup(void)
+{
+	WRAP(s_mcleanup, "_mcleanup");
+	handle_file("gmon.out", "", ACCESS_WRITE);
+	s_mcleanup();
+}
+
 static int write_all(int fd, const void *data, int size)
 {
 	if(write(fd, data, size) != size) {
@@ -538,6 +605,8 @@ static void handle_file_locked(const char *dirname, int dirlen, const char *file
 	if(errored)
 		return;
 	if(ignore_file(file))
+		return;
+	if(ignore_file(file2))
 		return;
 
 	if(tup_flock(depfd) < 0) {
@@ -620,6 +689,14 @@ static int ignore_file(const char *file)
 	if(strncmp(file, "/dev/", 5) == 0)
 		return 1;
 	if(strncmp(file, "/proc/", 6) == 0)
+		return 1;
+	if(strncmp(file, "/run/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/var/run/", 9) == 0)
+		return 1;
+	if(strcmp(file, "/etc/resolv.conf") == 0)
+		return 1;
+	if(is_ccache_path(file))
 		return 1;
 	return 0;
 }
