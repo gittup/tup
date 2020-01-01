@@ -9,7 +9,7 @@ Upstream Author:
 
 Copyright:
 
-    Copyright 2011, Mike Shal
+    Copyright (C) 2008-2020, Mike Shal
 
 License: GPL-2
 
@@ -20,5 +20,5 @@ License: GPL-2
     On Debian systems, the complete text of the GNU General Public License
     can be found in the /usr/share/common-licenses/GPL-2 file.
 
-The Debian packaging is copyright 2011, Mike Shal and
+The Debian packaging is Copyright (C) 2008-2020, Mike Shal
 is licensed under the GPL, see `/usr/share/common-licenses/GPL-2'.

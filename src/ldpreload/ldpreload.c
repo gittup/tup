@@ -2,7 +2,7 @@
  *
  * ldpreload - Shared library shim for file accesses.
  *
- * Copyright (c) 2008-2018  Mike Shal <marfey@gmail.com>
+ * Copyright (C) 2008-2020  Mike Shal <marfey@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
