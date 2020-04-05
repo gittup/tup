@@ -31,7 +31,8 @@ update
 
 # On Gentoo, stdout points to output-0, while on Ubuntu, it points to the
 # redirected file (fds.txt). This might be a bash vs dash thing.
-text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors' | grep -v ' 3 .*deps-'`
+# On Fedora, something keeps /var/lib/sss/mc/passwd open (maybe https://bugzilla.redhat.com/show_bug.cgi?id=1356542)
+text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors' | grep -v ' 3 .*deps-' | grep -v '/var/lib/sss/mc/passwd'`
 if [ "$text" != "total 0" ]; then
 	echo "Error: These fds shouldn't be open: $text" 1>&2
 	exit 1
