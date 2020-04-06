@@ -25,16 +25,17 @@ check_tup_suid
 set_full_deps
 
 cat > Tupfile << HERE
-: |> sh run.sh /etc/resolv.conf %o |> out.txt
-: |> sh run.sh /run/resolvconf/resolv.conf %o |> out2.txt
-: |> sh run.sh /var/run/resolvconf/resolv.conf %o |> out3.txt
+: |> sh run.sh /etc/resolv.conf %o |> out.txt ^/resolv.conf
+: |> sh run.sh /run/systemd/resolve/resolv.conf %o |> out2.txt ^/resolv.conf
+: |> sh run.sh /var/run/systemd/resolve/resolv.conf %o |> out3.txt ^/resolv.conf
 HERE
 cat > run.sh << HERE
 if [ -f \$1 ]; then cat \$1; else echo nofile; fi > \$2
 HERE
 update
 
-tup_object_no_exist / run
-tup_object_no_exist /var run
+tup_object_no_exist /etc resolv.conf
+tup_object_no_exist /run/systemd/resolve resolv.conf
+tup_object_no_exist /var/run/systemd/resolve resolv.conf
 
 eotup
