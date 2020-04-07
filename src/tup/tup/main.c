@@ -194,9 +194,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	if(tup_option_init(argc, argv) < 0)
-		return -1;
-	if(tup_init() < 0)
+	if(tup_init(argc, argv) < 0)
 		return 1;
 
 	if(strcmp(cmd, "monitor") == 0) {

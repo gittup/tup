@@ -271,7 +271,6 @@ static int parse_cmdline_options(struct vardb *vdb, int argc, char **argv)
 int tup_option_init(int argc, char **argv)
 {
 	unsigned int x;
-	if(argc || argv) {/*TODO */}
 
 #ifdef _WIN32
 	if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))

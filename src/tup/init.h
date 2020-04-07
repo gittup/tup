@@ -18,7 +18,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-int tup_init(void);
+int tup_init(int argc, char **argv);
 int tup_cleanup(void);
 void tup_valgrind_cleanup(void);
 int init_command(int argc, char **argv);
