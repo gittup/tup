@@ -26,7 +26,7 @@ cat > ok.c << HERE
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/mount.h>
 #else
 #include <sys/vfs.h>

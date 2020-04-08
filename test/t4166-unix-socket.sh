@@ -23,6 +23,7 @@ check_no_windows unix socket
 # OSX fails to bind() for some reason. Also the socket name is off by one
 # character for some reason.
 check_no_osx unix socket
+check_no_freebsd unix socket
 
 cat > unix.c <<  HERE
 // Adapted from Beej's guide: http://beej.us/guide/bgipc/output/html/multipage/unixsock.html

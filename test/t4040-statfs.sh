@@ -26,7 +26,7 @@ cat > ok.c << HERE
 #include <stdio.h>
 #ifdef __linux__
 #include <sys/vfs.h>
-#elif __APPLE__
+#elif __APPLE__  || defined(__FreeBSD__)
 #include <sys/mount.h>
 #else
 #error Please add support for this test in t4040-statfs.sh

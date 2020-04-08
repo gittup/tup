@@ -665,6 +665,16 @@ check_no_osx()
 	esac
 }
 
+check_no_freebsd()
+{
+	case $tupos in
+	FreeBSD*)
+		echo "Not supported in FreeBSD. Skipping test."
+		eotup
+		;;
+	esac
+}
+
 check_tup_no_suid()
 {
 	if ! tup privileged; then

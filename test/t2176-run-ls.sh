@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows run-script
+check_bash
 
 # Use a variant to make sure we don't get double directories
 tmkdir build
@@ -29,7 +30,7 @@ touch sub/foo.txt
 touch bar.txt baz.txt
 
 cat > gen.sh << HERE
-#! /bin/bash
+#! /usr/bin/env bash
 for i in *; do
 	echo ": |> echo \$i |>"
 done

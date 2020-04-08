@@ -1,1 +1,4 @@
+CC = clang
 CFLAGS += -include compat/freebsd.h
+
+TUP_SERVER = fuse

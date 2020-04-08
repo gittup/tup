@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_osx pg
+check_no_freebsd pg
 
 cat > prog.c << HERE
 #include <stdio.h>
