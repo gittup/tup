@@ -20,10 +20,11 @@
 
 . ./tup.sh
 check_no_windows run-script shell
+check_bash
 
 # Need bash for 'echo -n'
 cat > gen.sh << HERE
-#! /bin/bash
+#! /usr/bin/env bash
 echo -n ": \$@ |> do_cmd |> "
 for i in \$@; do
 	echo -n \`basename \$i .in\`.out

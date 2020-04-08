@@ -56,12 +56,20 @@ int main(void)
 	return -1;
 }
 HERE
+
 tup touch Tupfile main.c
-if [ "$tupos" = "Darwin" ]; then
-	update_fail_msg "bar.*referenced from" "Missing input dependency"
-else
-	update_fail_msg "undefined reference.*bar" "Missing input dependency"
-fi
+
+case $tupos in
+	Darwin*)
+		update_fail_msg "bar.*referenced from" "Missing input dependency"
+		;;
+	FreeBSD*)
+		update_fail_msg "undefined symbol: bar" "Missing input dependency"
+		;;
+	*)
+		update_fail_msg "undefined reference.*bar" "Missing input dependency"
+		;;
+esac
 
 cat > sub/lib2.c << HERE
 int bar(void) {return 2;}

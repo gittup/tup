@@ -20,6 +20,7 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_freebsd TODO
 
 touch foo
 

@@ -23,11 +23,11 @@ check_no_windows paths
 
 tmkdir sub
 cat > sub/Tupfile << HERE
-: input.txt |> !tup_ln |> $PWD/sub/link.txt
+: input.txt |> !tup_ln |> `pwd -P`/sub/link.txt
 HERE
 tup touch sub/input.txt
 update
 
-tup_dep_exist sub "!tup_ln input.txt $PWD/sub/link.txt" sub link.txt
+tup_dep_exist sub "!tup_ln input.txt `pwd -P`/sub/link.txt" sub link.txt
 
 eotup

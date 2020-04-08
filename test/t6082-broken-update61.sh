@@ -21,6 +21,8 @@
 
 . ./tup.sh
 check_no_windows shell
+check_no_freebsd TODO
+
 cat > Tupfile << HERE
 : |> cat sub/foo 2>/dev/null || true; touch bar |> bar
 : bar |> cat bar 2>/dev/null; touch sub |>

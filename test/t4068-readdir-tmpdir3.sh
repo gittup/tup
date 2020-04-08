@@ -19,6 +19,7 @@
 # Verify that readdir will correctly list nested tmp subdirectories.
 
 . ./tup.sh
+check_no_freebsd TODO
 
 tmkdir sub
 cd sub
