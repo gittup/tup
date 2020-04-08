@@ -2365,10 +2365,10 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 	if(get_path_elements(pl->mem, &pg) < 0)
 		return -1;
 
-	/* External files get skipped */
 	if(pg.pg_flags & PG_OUTSIDE_TUP) {
+		fprintf(stderr, "tup error: You specified a path '%s' that contains a file outside of Tup's control.\n", pl->mem);
 		del_pel_group(&pg);
-		return 0;
+		return -1;
 	}
 
 	if(pg.pg_flags & PG_HIDDEN) {
