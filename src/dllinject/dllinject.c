@@ -1943,7 +1943,7 @@ static void WINAPI remote_init( remote_thread_t *r )
 	if (!h)
 		return;
 
-	p = (tup_init_t) r->get_proc_address(h, r->func_name);
+	p = (tup_init_t)(void (*)(void)) r->get_proc_address(h, r->func_name);
 	if (!p)
 		return;
 
@@ -2240,7 +2240,7 @@ int tup_inject_dll(
 
 		unsigned char code[code_size];
 
-		memcpy( code, &remote_stub32, code_size );
+		memcpy( code, &remote_stub32, sizeof(remote_stub32) );
 
 		*(DWORD*)(code + 0x1) = ctx.Eip;											// Return addr
 		*(DWORD*)(code + 0x8) = (DWORD)((DWORD_PTR)remote_data + code_size);							// Arg (ptr to remote (TCB))
@@ -2269,8 +2269,8 @@ int tup_inject_dll(
 
 		memset(&remote, 0, sizeof(remote));
 		kernel32 = LoadLibraryA("kernel32.dll");
-		remote.load_library = (LoadLibraryA_t) GetProcAddress(kernel32, "LoadLibraryA");
-		remote.get_proc_address = (GetProcAddress_t) GetProcAddress(kernel32, "GetProcAddress");
+		remote.load_library = (LoadLibraryA_t)(void (*)(void)) GetProcAddress(kernel32, "LoadLibraryA");
+		remote.get_proc_address = (GetProcAddress_t)(void (*)(void)) GetProcAddress(kernel32, "GetProcAddress");
 		strcpy(remote.depfilename, depfilename);
 		strcpy(remote.vardict_file, vardict_file);
 		strcat(remote.execdir, execdir);
