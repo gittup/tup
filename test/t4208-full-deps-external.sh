@@ -58,12 +58,12 @@ tup touch Tupfile
 update
 
 if [ "$in_windows" = "1" ]; then
-	prefix="c:/cygwin"
+	prefix="`echo $root | sed 's,/cygdrive/c,c:,'`"
 else
-	prefix=""
+	prefix="$root"
 fi
-tup_object_no_exist $prefix$root/external missing.txt
-tup_object_exist $prefix$root/external foo.txt
+tup_object_no_exist $prefix/external missing.txt
+tup_object_exist $prefix/external foo.txt
 
 cat > Tupfile << HERE
 HERE

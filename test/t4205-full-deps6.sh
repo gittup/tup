@@ -45,12 +45,12 @@ tup touch Tupfile foo.c bar.c
 update
 
 if [ "$in_windows" = "1" ]; then
-	prefix="c:/cygwin"
+	prefix="`echo $PWD | sed 's,/cygdrive/c,c:,'`"
 else
-	prefix=""
+	prefix="$PWD"
 fi
-tup_dep_no_exist $prefix$PWD/.. external . 'sh run.sh 1'
-tup_dep_no_exist $prefix$PWD/.. external . 'sh run.sh 2'
+tup_dep_no_exist $prefix/.. external . 'sh run.sh 1'
+tup_dep_no_exist $prefix/.. external . 'sh run.sh 2'
 
 sleep 1
 touch ../external/bar.txt
