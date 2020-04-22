@@ -1744,7 +1744,7 @@ static void mhandle_file(const char* file, const char* file2, enum access_type a
 		dest += e->len;
 		*(dest++) = '\0';
 		*(dest++) = '\0';
-		DEBUG_HOOK("WRITE EVENT %s: '%s' '%s'\n", access_type_name[at], ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
+		DEBUG_HOOK("SEND EVENT %s: '%s' '%s'\n", access_type_name[at], ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
 		ret = writef((char*) e, dest - (char*) e);
 		DEBUG_HOOK("writef %d\n", ret);
 		if(ret) {}
@@ -1797,7 +1797,7 @@ static void mhandle_file_w(const wchar_t* file, int filelen, const wchar_t* file
 	DEBUG_HOOK("Canonicalize2: '%ls' -> '%s' len2=%i\n", file2, dest, e->len2);
 	dest += e->len2 + 1;
 
-	DEBUG_HOOK("WRITE EVENT %s [%i, %i]: '%s' '%s'\n", access_type_name[at], e->len, e->len2, ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
+	DEBUG_HOOK("SEND EVENT %s [%i, %i]: '%s' '%s'\n", access_type_name[at], e->len, e->len2, ((char*)e) + sizeof(*e), ((char*)e) + sizeof(*e) + e->len + 1);
 
 	ret = writef(buf, dest - buf);
 	DEBUG_HOOK("writef [wide] %d\n", ret);
