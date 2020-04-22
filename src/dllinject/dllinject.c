@@ -492,7 +492,9 @@ NTSTATUS WINAPI NtCreateFile_hook(
 
 	DEBUG_HOOK("NtCreateFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, CreateOptions);
 
-	if (rc == STATUS_SUCCESS && DesiredAccess & TUP_CREATE_WRITE_FLAGS) {
+	if (rc == STATUS_SUCCESS &&
+	    (DesiredAccess & TUP_CREATE_WRITE_FLAGS) &&
+	    !(CreateOptions & FILE_DIRECTORY_FILE)) {
 		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_READ);
