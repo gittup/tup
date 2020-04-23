@@ -74,6 +74,7 @@ static char *(*s_realpath)(const char *, char *);
 static char *(*s_realpath_chk)(const char *, char *, size_t);
 static int (*s_rename)(const char*, const char*);
 static int (*s_renameat)(int, const char*, int, const char*);
+static int (*s_renameat2)(int, const char*, int, const char*, unsigned int flags);
 static int (*s_mkstemp)(char *template);
 static int (*s_mkostemp)(char *template, int flags);
 static int (*s_remove)(const char *);
@@ -384,6 +385,26 @@ int renameat(int oldfd, const char *old, int newfd, const char *new)
 	}
 	WRAP(s_renameat, "renameat");
 	rc = s_renameat(oldfd, old, newfd, new);
+	if(rc == 0) {
+		handle_file(old, new, ACCESS_RENAME);
+	}
+	return rc;
+}
+
+int renameat2(int oldfd, const char *old, int newfd, const char *new, unsigned int flags)
+{
+	int rc;
+
+	/* This shouldn't be too hard to implement, but at the moment we only
+	 * need renameat() with AT_FDCWD for 'ln -s' on arch and fedora.
+	 */
+	if(oldfd != AT_FDCWD || newfd != AT_FDCWD) {
+		fprintf(stderr, "tup error: renameat2() with fd != AT_FDCWD is not yet supported.\n");
+		errno = ENOSYS;
+		return -1;
+	}
+	WRAP(s_renameat2, "renameat2");
+	rc = s_renameat2(oldfd, old, newfd, new, flags);
 	if(rc == 0) {
 		handle_file(old, new, ACCESS_RENAME);
 	}
