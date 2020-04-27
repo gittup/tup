@@ -1170,9 +1170,17 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 			put_finfo(finfo);
 			return rc;
 		} else {
+			struct tmpdir *tmpdir;
 			if(re_entries_match(stderr, &finfo->exclusion_list, peeled, &match) < 0) {
 				put_finfo(finfo);
 				return -ENOSYS;
+			}
+			/* Ignore a touch on a temporary directory */
+			LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+				if(strcmp(tmpdir->dirname, peeled) == 0) {
+					put_finfo(finfo);
+					return 0;
+				}
 			}
 		}
 		put_finfo(finfo);

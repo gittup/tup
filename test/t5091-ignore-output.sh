@@ -29,6 +29,7 @@ touch ignore1
 touch ignore2
 mkdir ignoredir
 touch ignoredir/file.txt
+touch ignoredir
 HERE
 update
 
