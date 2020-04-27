@@ -22,7 +22,7 @@ tupcurdir=$PWD
 PATH=$PWD/..:$PATH
 export PATH
 
-testname=`echo $0 | sed 's/\.\///; s/\.sh//'`
+testname=`echo $0 | sed 's/.*\///; s/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
 
 # tupos may be set already by test.sh - this is an optimization to
