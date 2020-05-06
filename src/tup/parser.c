@@ -2365,8 +2365,13 @@ static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid
 	if(get_path_elements(pl->mem, &pg) < 0)
 		return -1;
 
-	/* External files get skipped */
 	if(pg.pg_flags & PG_OUTSIDE_TUP) {
+		if(create_output_dirs) {
+			/* External output files produce an error */
+			fprintf(tf->f, "tup error: Unable to write to a file outside of the tup hierarchy: %s\n", pl->mem);
+			return -1;
+		}
+		/* External input files get skipped */
 		del_pel_group(&pg);
 		return 0;
 	}
