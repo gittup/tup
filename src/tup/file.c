@@ -515,7 +515,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 	struct file_entry *fent;
 
 	LIST_FOREACH(fent, &info->write_list, list) {
-		if(strcmp(fent->filename, from) == 0) {
+		if(name_cmp(fent->filename, from) == 0) {
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -526,7 +526,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 		}
 	}
 	LIST_FOREACH(fent, &info->read_list, list) {
-		if(strcmp(fent->filename, from) == 0) {
+		if(name_cmp(fent->filename, from) == 0) {
 			free(fent->filename);
 
 			fent->filename = strdup(to);
@@ -554,7 +554,7 @@ static void check_unlink_list(const char *filename, struct file_entry_head *u_he
 	struct file_entry *fent, *tmp;
 
 	LIST_FOREACH_SAFE(fent, u_head, list, tmp) {
-		if(strcmp(filename, fent->filename) == 0) {
+		if(name_cmp(filename, fent->filename) == 0) {
 			del_file_entry(fent);
 		}
 	}
@@ -568,12 +568,12 @@ static void handle_unlink(struct file_info *info)
 		u = LIST_FIRST(&info->unlink_list);
 
 		LIST_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
-			if(strcmp(fent->filename, u->filename) == 0) {
+			if(name_cmp(fent->filename, u->filename) == 0) {
 				del_file_entry(fent);
 			}
 		}
 		LIST_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
-			if(strcmp(fent->filename, u->filename) == 0) {
+			if(name_cmp(fent->filename, u->filename) == 0) {
 				del_file_entry(fent);
 			}
 		}
@@ -632,7 +632,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		/* Remove duplicate write entries */
 		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
-			if(r != w && (strcmp(w->filename, r->filename) == 0)) {
+			if(r != w && (name_cmp(w->filename, r->filename) == 0)) {
 				del_file_entry(r);
 			}
 		}

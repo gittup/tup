@@ -63,6 +63,15 @@
 #define __reserved
 #endif
 
+#ifndef FileRenameInformationEx
+/* This doesn't appear in MinGW (or at least the version I have), so we have to
+ * define it manually. The cygwin version of mv can use FileRenameInformationEx
+ * in certain circumstances, so we also have to check for that in
+ * NtSetInformationFile
+ */
+#define FileRenameInformationEx 65
+#endif
+
 typedef HFILE (WINAPI *OpenFile_t)(
     __in    LPCSTR lpFileName,
     __inout LPOFSTRUCT lpReOpenBuff,
@@ -734,7 +743,7 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 	FILE_RENAME_INFORMATION *info = FileInformation;
 	int failed = 0;
 
-	if(FileInformationClass == FileRenameInformation) {
+	if(FileInformationClass == FileRenameInformation || FileInformationClass == FileRenameInformationEx) {
 		len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
 		if(len == 0) {
 			/* Failed to get path for some reason */
@@ -757,8 +766,9 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 		return rc;
 
 	/* We're only checking this to see if a file gets renamed via this call. */
-	if(FileInformationClass != FileRenameInformation)
+	if(FileInformationClass != FileRenameInformation && FileInformationClass != FileRenameInformationEx) {
 		return rc;
+	}
 
 	if(info->FileNameLength / 2 >= WIDE_PATH_MAX) {
 		DEBUG_HOOK("NtSetInformationFile error - new path is too long.\n");
@@ -769,7 +779,7 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 	wcsncpy(destpath, info->FileName, info->FileNameLength);
 	destpath[info->FileNameLength / 2] = 0;
 
-	DEBUG_HOOK("NtSetInformationFile: rename '%S' -> '%S'\n", widepath, destpath);
+	DEBUG_HOOK("NtSetInformationFile[%i]: rename '%S' -> '%S'\n", FileInformationClass, widepath, destpath);
 	handle_file_w(widepath, -1, destpath, ACCESS_RENAME);
 
 	SetLastError(save_error);
@@ -1427,6 +1437,7 @@ int _access_hook(const char *pathname, int mode)
 
 int rename_hook(const char *oldpath, const char *newpath)
 {
+	DEBUG_HOOK("rename(%s, %s)\n", oldpath, newpath);
 	handle_file(oldpath, newpath, ACCESS_RENAME);
 	return rename_orig(oldpath, newpath);
 }
