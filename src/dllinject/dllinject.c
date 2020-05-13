@@ -739,20 +739,19 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 	wchar_t widepath[WIDE_PATH_MAX];
 	wchar_t destpath[WIDE_PATH_MAX];
 	NTSTATUS rc;
-	DWORD len;
-	FILE_RENAME_INFORMATION *info = FileInformation;
+	DWORD len = 0;
 	int failed = 0;
 
-	if(FileInformationClass == FileRenameInformation || FileInformationClass == FileRenameInformationEx) {
+	/* We need to get the old path before calling NtSetInformationFile in
+	 * case of a rename, in which case that information is lost.
+	 */
+	if(FileInformationClass == FileRenameInformation ||
+	   FileInformationClass == FileRenameInformationEx ||
+	   FileInformationClass == FileDispositionInformation) {
 		len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
 		if(len == 0) {
 			/* Failed to get path for some reason */
 			DEBUG_HOOK("NtSetInformationFile Error - failed to GetFinalPathNameByHandle\n");
-			failed = 1;
-		}
-		if(len + 1 + info->FileNameLength/2 + 1 > WIDE_PATH_MAX) {
-			/* Path too large. */
-			DEBUG_HOOK("NtSetInformationFile Error - path too long (%i, %i)\n", len, info->FileNameLength);
 			failed = 1;
 		}
 	}
@@ -764,24 +763,32 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 				       FileInformationClass);
 	if(rc != STATUS_SUCCESS || failed)
 		return rc;
-
-	/* We're only checking this to see if a file gets renamed via this call. */
-	if(FileInformationClass != FileRenameInformation && FileInformationClass != FileRenameInformationEx) {
-		return rc;
-	}
-
-	if(info->FileNameLength / 2 >= WIDE_PATH_MAX) {
-		DEBUG_HOOK("NtSetInformationFile error - new path is too long.\n");
-		return rc;
-	}
 	DWORD save_error = GetLastError();
 
-	wcsncpy(destpath, info->FileName, info->FileNameLength);
-	destpath[info->FileNameLength / 2] = 0;
+	if(FileInformationClass == FileRenameInformation || FileInformationClass == FileRenameInformationEx) {
+		FILE_RENAME_INFORMATION *info = FileInformation;
+		if(info->FileNameLength / 2 >= WIDE_PATH_MAX) {
+			DEBUG_HOOK("NtSetInformationFile error - new path is too long.\n");
+			goto out_exit;
+		}
 
-	DEBUG_HOOK("NtSetInformationFile[%i]: rename '%S' -> '%S'\n", FileInformationClass, widepath, destpath);
-	handle_file_w(widepath, -1, destpath, ACCESS_RENAME);
+		wcsncpy(destpath, info->FileName, info->FileNameLength);
+		destpath[info->FileNameLength / 2] = 0;
 
+		DEBUG_HOOK("NtSetInformationFile[%i]: rename '%S' -> '%S'\n", FileInformationClass, widepath, destpath);
+		handle_file_w(widepath, len, destpath, ACCESS_RENAME);
+	} else if(FileInformationClass == FileDispositionInformation) {
+		FILE_DISPOSITION_INFORMATION *info = FileInformation;
+		if(info->DoDeleteFile) {
+			DEBUG_HOOK("NtSetInformationFile[%i]: delete on close '%S'\n", FileInformationClass, widepath);
+			handle_file_w(widepath, len, NULL, ACCESS_UNLINK);
+		} else {
+			DEBUG_HOOK("NtSetInformationFile[%i]: dont delete on close '%S'\n", FileInformationClass, widepath);
+			handle_file_w(widepath, len, NULL, ACCESS_WRITE);
+		}
+	}
+
+out_exit:
 	SetLastError(save_error);
 	return rc;
 }
