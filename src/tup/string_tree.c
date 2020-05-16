@@ -26,11 +26,7 @@
 
 static int string_tree_cmp(struct string_tree *st1, struct string_tree *st2)
 {
-	int result;
-	result = name_cmp_n(st1->s, st2->s, st1->len);
-	if(result == 0)
-		result = st1->len - st2->len;
-	return result;
+	return name_cmp(st1->s, st2->s);
 }
 
 RB_GENERATE(string_entries, string_tree, linkage, string_tree_cmp);
