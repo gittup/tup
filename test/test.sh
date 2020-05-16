@@ -62,6 +62,6 @@ done
 if [ $n_failed -ne 0 ]; then
 	echo ""
 	echo "Summary of failed tests:" 1>&2
-	echo -n "$fail_text" 1>&2
+	printf "$fail_text" 1>&2
 	exit 1
 fi
