@@ -25,6 +25,7 @@
 #include "entry.h"
 #include "estring.h"
 #include "string_tree.h"
+#include "tent_list.h"
 
 struct tup_entry;
 

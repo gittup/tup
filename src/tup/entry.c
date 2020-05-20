@@ -750,21 +750,6 @@ void dump_tup_entry(void)
 	}
 }
 
-void del_tent_list_entry(struct tent_list_head *head, struct tent_list *tlist)
-{
-	TAILQ_REMOVE(head, tlist, list);
-	free(tlist);
-}
-
-void free_tent_list(struct tent_list_head *head)
-{
-	struct tent_list *tlist;
-	while(!TAILQ_EMPTY(head)) {
-		tlist = TAILQ_FIRST(head);
-		del_tent_list_entry(head, tlist);
-	}
-}
-
 /* Note: when used with variants, this function will skip over the variant
  * root tent, meaning that the returned list of tents isn't a correct parent
  * list, but when converted to a path it will refer to the correct file.
@@ -772,7 +757,6 @@ void free_tent_list(struct tent_list_head *head)
 static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
-	struct tent_list *tlist;
 	struct variant *variant;
 
 	tent = tup_entry_get(tupid);
@@ -789,13 +773,8 @@ static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 				continue;
 			}
 		}
-		tlist = malloc(sizeof *tlist);
-		if(!tlist) {
-			perror("malloc");
+		if(tent_list_add_head(head, tent) < 0)
 			return -1;
-		}
-		tlist->tent = tent;
-		TAILQ_INSERT_HEAD(head, tlist, list);
 
 		tent = tent->parent;
 	}
@@ -810,26 +789,26 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	struct tent_list *endentry;
 	int first = 0;
 
-	TAILQ_INIT(&startlist);
-	TAILQ_INIT(&endlist);
+	tent_list_init(&startlist);
+	tent_list_init(&endlist);
 	if(get_full_path_tents(start, &startlist) < 0)
 		return -1;
 	if(get_full_path_tents(end, &endlist) < 0)
 		return -1;
 
-	while(!TAILQ_EMPTY(&startlist) && !TAILQ_EMPTY(&endlist)) {
-		startentry = TAILQ_FIRST(&startlist);
-		endentry = TAILQ_FIRST(&endlist);
+	while(!tent_list_empty(&startlist) && !tent_list_empty(&endlist)) {
+		startentry = tent_list_first(&startlist);
+		endentry = tent_list_first(&endlist);
 
 		if(startentry->tent == endentry->tent) {
-			del_tent_list_entry(&startlist, startentry);
-			del_tent_list_entry(&endlist, endentry);
+			tent_list_delete(&startlist, startentry);
+			tent_list_delete(&endlist, endentry);
 		} else {
 			break;
 		}
 	}
 
-	TAILQ_FOREACH(startentry, &startlist, list) {
+	tent_list_foreach(startentry, &startlist) {
 		if(!first) {
 			first = 1;
 		} else {
@@ -849,7 +828,7 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 			if(estring_append(e, "..", 2) < 0)
 				return -1;
 	}
-	TAILQ_FOREACH(endentry, &endlist, list) {
+	tent_list_foreach(endentry, &endlist) {
 		if(!first) {
 			first = 1;
 		} else {
