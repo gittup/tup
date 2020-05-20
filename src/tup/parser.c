@@ -3128,8 +3128,8 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 
 static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, struct name_list *nl,
 			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
-			   int *command_modified, struct tupid_entries *output_root,
-			   struct tupid_entries *exclusion_root,
+			   int *command_modified, struct tent_entries *output_root,
+			   struct tent_entries *exclusion_root,
 			   const char *ext, int extlen, int is_variant_copy)
 {
 	struct path_list *pl;
@@ -3208,7 +3208,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 				fprintf(tf->f, "tup error: Unable to create exclusion output node for: %s\n", pl->mem);
 				return -1;
 			}
-			if(tupid_tree_add(exclusion_root, tent->tnode.tupid) < 0) {
+			if(tent_tree_add(exclusion_root, tent) < 0) {
 				fprintf(tf->f, "tup error: The exclusion '%s' is listed multiple times in a command.\n", pl->mem);
 				rc = -1;
 				continue;
@@ -3294,7 +3294,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			free(onle);
 			return -1;
 		}
-		if(tupid_tree_add(output_root, onle->tent->tnode.tupid) < 0) {
+		if(tent_tree_add(output_root, onle->tent) < 0) {
 			fprintf(tf->f, "tup error: The output file '%s' is listed multiple times in a command.\n", onle->path);
 			rc = -1;
 			continue;
@@ -3378,10 +3378,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	int real_displaylen;
 	struct tupid_tree *tt;
 	struct tupid_tree *cmd_tt;
+	struct tent_tree *ttree;
 	tupid_t cmdid = -1;
 	struct tupid_entries input_root = {NULL};
-	struct tupid_entries output_root = {NULL};
-	struct tupid_entries exclusion_root = {NULL};
+	struct tent_entries output_root = {NULL};
+	struct tent_entries exclusion_root = {NULL};
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
@@ -3596,15 +3597,10 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 	}
 
-	RB_FOREACH(tt, tupid_entries, &output_root) {
-		if(tupid_tree_search(&input_root, tt->tupid) != NULL) {
-			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0) {
-				fprintf(tf->f, "tup error: Command ID %lli lists this file ID as both an input and an output: %lli\n", cmdid, tt->tupid);
-				return -1;
-			}
+	RB_FOREACH(ttree, tent_entries, &output_root) {
+		if(tupid_tree_search(&input_root, ttree->tent->tnode.tupid) != NULL) {
 			fprintf(tf->f, "tup error: Command ID %lli lists this file as both an input and an output: ", cmdid);
-			print_tup_entry(tf->f, tent);
+			print_tup_entry(tf->f, ttree->tent);
 			fprintf(tf->f, "\n");
 			return -1;
 		}
@@ -3613,8 +3609,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;
-	free_tupid_tree(&exclusion_root);
-	free_tupid_tree(&output_root);
+	free_tent_tree(&exclusion_root);
+	free_tent_tree(&output_root);
 	free_tupid_tree(&input_root);
 	return 0;
 }

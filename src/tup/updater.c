@@ -694,14 +694,14 @@ static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 		return -1;
 
 	if(tent->type == TUP_NODE_CMD) {
-		struct tupid_entries exclusion_root = {NULL};
+		struct tent_entries exclusion_root = {NULL};
 		if(tup_db_get_inputs(tent->tnode.tupid, &s->finfo.sticky_root, &s->finfo.normal_root, &s->finfo.group_sticky_root) < 0)
 			return -1;
 		if(tup_db_get_outputs(tent->tnode.tupid, &s->finfo.output_root, &exclusion_root, NULL) < 0)
 			return -1;
 		if(exclusion_root_to_list(&exclusion_root, &s->finfo.exclusion_list) < 0)
 			return -1;
-		free_tupid_tree(&exclusion_root);
+		free_tent_tree(&exclusion_root);
 	}
 	return 0;
 }

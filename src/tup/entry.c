@@ -27,6 +27,7 @@
 #include "container.h"
 #include "variant.h"
 #include "estring.h"
+#include "tent_tree.h"
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -858,23 +859,20 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	return 0;
 }
 
-int exclusion_root_to_list(struct tupid_entries *root, struct re_entry_head *head)
+int exclusion_root_to_list(struct tent_entries *root, struct re_entry_head *head)
 {
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 
-	RB_FOREACH(tt, tupid_entries, root) {
-		struct tup_entry *tent;
+	RB_FOREACH(tt, tent_entries, root) {
 		struct re_entry *re;
 
-		if(tup_entry_add(tt->tupid, &tent) < 0)
-			return -1;
 		re = malloc(sizeof *re);
 		if(!re) {
 			perror("malloc");
 			return -1;
 		}
-		re->re = tent->re;
-		re->s = tent->name.s;
+		re->re = tt->tent->re;
+		re->s = tt->tent->name.s;
 		LIST_INSERT_HEAD(head, re, list);
 	}
 	return 0;

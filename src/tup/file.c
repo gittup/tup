@@ -37,8 +37,7 @@ static struct file_entry *new_entry(const char *filename);
 static void check_unlink_list(const char *filename, struct file_entry_head *u_head);
 static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			     int *warnings, struct tup_entry_head *entryhead,
-			     enum check_type_t check_only);
+			     int *warnings, enum check_type_t check_only);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
@@ -80,7 +79,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 void cleanup_file_info(struct file_info *info)
 {
 	free_re_list(&info->exclusion_list);
-	free_tupid_tree(&info->output_root);
+	free_tent_tree(&info->output_root);
 	free_tupid_tree(&info->used_groups_root);
 	free_tupid_tree(&info->group_sticky_root);
 	free_tupid_tree(&info->normal_root);
@@ -218,9 +217,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		}
 	}
 
-	entrylist = tup_entry_get_list();
-	rc1 = update_write_info(f, cmdid, info, warnings, entrylist, check_only);
-	tup_entry_release_list();
+	rc1 = update_write_info(f, cmdid, info, warnings, check_only);
 
 	/* Only process file inputs if the command wasn't signaled. We
 	 * obviously need to check them if the command succeeded to ensure DAG
@@ -605,13 +602,13 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 }
 
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			     int *warnings, struct tup_entry_head *entryhead,
-			     enum check_type_t check_only)
+			     int *warnings, enum check_type_t check_only)
 {
 	struct file_entry *w;
 	struct file_entry *r;
 	struct file_entry *tmp;
 	struct tup_entry *tent;
+	struct tent_entries root = {NULL};
 	int write_bork = 0;
 
 	while(!LIST_EMPTY(&info->write_list)) {
@@ -680,7 +677,9 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		} else {
 			struct mapping *map;
 			int mapping_set = 0;
-			tup_entry_list_add(tent, entryhead);
+
+			if(tent_tree_add_dup(&root, tent) < 0)
+				return -1;
 
 			LIST_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
@@ -713,7 +712,7 @@ out_skip:
 		del_file_entry(w);
 	}
 
-	if(tup_db_check_actual_outputs(f, cmdid, entryhead, &info->output_root, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
+	if(tup_db_check_actual_outputs(f, cmdid, &root, &info->output_root, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
 		return -1;
 
 	while(!LIST_EMPTY(&info->mapping_list)) {
@@ -737,6 +736,7 @@ out_skip:
 		del_map(map);
 	}
 
+	free_tent_tree(&root);
 	if(write_bork)
 		return -1;
 

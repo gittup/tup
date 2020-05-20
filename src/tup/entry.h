@@ -31,6 +31,7 @@
 
 struct variant;
 struct estring;
+struct tent_entries;
 
 /* Local cache of the entries in the 'node' database table */
 struct tup_entry {
@@ -123,7 +124,7 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head);
 int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root);
 void dump_tup_entry(void);
 int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end);
-int exclusion_root_to_list(struct tupid_entries *root, struct re_entry_head *head);
+int exclusion_root_to_list(struct tent_entries *root, struct re_entry_head *head);
 int re_entries_match(FILE *f, struct re_entry_head *head, const char *s, int *match);
 void free_re_list(struct re_entry_head *head);
 

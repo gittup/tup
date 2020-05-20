@@ -37,6 +37,7 @@ struct tup_env;
 struct variant;
 struct mapping_head;
 struct vardb;
+struct tent_entries;
 
 /* General operations */
 int tup_db_open(void);
@@ -123,8 +124,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
-			 struct tupid_entries *exclusion_root,
+int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
+			 struct tent_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified);
@@ -137,7 +138,9 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
 int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		      struct tupid_entries *normal_root,
 		      struct tupid_entries *group_sticky_root);
-int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tupid_entries *exclusion_root, struct tup_entry **group);
+int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
+		       struct tent_entries *exclusion_root,
+		       struct tup_entry **group);
 
 /* Combo operations */
 int tup_db_modify_cmds_by_output(tupid_t output, int *modified);
@@ -190,8 +193,8 @@ int tup_db_scan_end(void);
 
 /* updater operations */
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
-				struct tup_entry_head *writehead,
-				struct tupid_entries *output_root,
+				struct tent_entries *write_root,
+				struct tent_entries *output_root,
 				struct mapping_head *mapping_list,
 				int *write_bork,
 				int do_unlink, int complain_missing);
@@ -200,7 +203,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
 			       struct tupid_entries *group_sticky_root,
-			       struct tupid_entries *output_root,
+			       struct tent_entries *output_root,
 			       int *important_link_removed);
 int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
 

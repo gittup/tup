@@ -25,6 +25,7 @@
 #include "access_event.h"
 #include "bsd/queue.h"
 #include "tupid_tree.h"
+#include "tent_tree.h"
 #include "thread_tree.h"
 #include "pel_group.h"
 #include "entry.h"
@@ -67,7 +68,7 @@ struct file_info {
 	struct tupid_entries normal_root;
 	struct tupid_entries group_sticky_root;
 	struct tupid_entries used_groups_root;
-	struct tupid_entries output_root;
+	struct tent_entries output_root;
 	struct re_entry_head exclusion_list;
 	const char *variant_dir;
 	int server_fail;

@@ -5480,13 +5480,16 @@ static int load_all_nodes(void)
 	return rc;
 }
 
-int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct tupid_entries *exclusion_root, struct tup_entry **group)
+int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
+		       struct tent_entries *exclusion_root,
+		       struct tup_entry **group)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_TREE];
 	static char s[] = "select to_id from normal_link where from_id=?";
 	struct tupid_tree *tt;
+	struct tupid_entries tupid_root = {NULL};
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5520,7 +5523,7 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add(output_root, tupid);
+		rc = tupid_tree_add(&tupid_root, tupid);
 		if(rc < 0) {
 			fprintf(stderr, "tup error: tup_db_get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
 			break;
@@ -5534,8 +5537,7 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 	}
 
 	if(rc == 0) {
-		struct tupid_tree *tmp;
-		RB_FOREACH_SAFE(tt, tupid_entries, output_root, tmp) {
+		RB_FOREACH(tt, tupid_entries, &tupid_root) {
 			struct tup_entry *tent;
 			if(tup_entry_add(tt->tupid, &tent) < 0)
 				return -1;
@@ -5553,17 +5555,16 @@ int tup_db_get_outputs(tupid_t cmdid, struct tupid_entries *output_root, struct 
 						break;
 					}
 				}
-				tupid_tree_rm(output_root, tt);
-				free(tt);
 			} else if(exclusion_root && tent->dt == local_exclusion_dt) {
-				tupid_tree_rm(output_root, tt);
-				if(tupid_tree_insert(exclusion_root, tt) < 0) {
-					fprintf(stderr, "tup error: Unable to insert node %lli into the exclusion tree\n", tt->tupid);
+				if(tent_tree_add(exclusion_root, tent) < 0)
 					return -1;
-				}
+			} else {
+				if(tent_tree_add(output_root, tent) < 0)
+					return -1;
 			}
 		}
 	}
+	free_tupid_tree(&tupid_root);
 
 	return rc;
 }
@@ -5779,23 +5780,58 @@ static int compare_trees(struct tupid_entries *a, struct tupid_entries *b,
 	return 0;
 }
 
+static int compare_tent_trees(struct tent_entries *a, struct tent_entries *b,
+			      void *data,
+			      int (*extra_a)(struct tup_entry *tent, void *data),
+			      int (*extra_b)(struct tup_entry *tent, void *data))
+{
+	struct tent_tree *tta;
+	struct tent_tree *ttb;
+
+	tta = RB_MIN(tent_entries, a);
+	ttb = RB_MIN(tent_entries, b);
+
+	while(tta || ttb) {
+		if(!tta) {
+			if(extra_b && extra_b(ttb->tent, data) < 0)
+				return -1;
+			ttb = RB_NEXT(tent_entries, b, ttb);
+		} else if(!ttb) {
+			if(extra_a && extra_a(tta->tent, data) < 0)
+				return -1;
+			tta = RB_NEXT(tent_entries, a, tta);
+		} else {
+			if(tta->tent == ttb->tent) {
+				/* Would call same() here if necessary */
+				tta = RB_NEXT(tent_entries, a, tta);
+				ttb = RB_NEXT(tent_entries, b, ttb);
+			} else if(tta->tent->tnode.tupid < ttb->tent->tnode.tupid) {
+				if(extra_a && extra_a(tta->tent, data) < 0)
+					return -1;
+				tta = RB_NEXT(tent_entries, a, tta);
+			} else {
+				if(extra_b && extra_b(ttb->tent, data) < 0)
+					return -1;
+				ttb = RB_NEXT(tent_entries, b, ttb);
+			}
+		}
+	}
+	return 0;
+}
+
 struct actual_output_data {
 	FILE *f;
 	tupid_t cmdid;
 	int output_error;
 	struct mapping_head *mapping_list;
-	struct tupid_entries exclusion_root;
+	struct tent_entries exclusion_root;
 	int do_unlink;
 };
 
-static int extra_output(tupid_t tupid, void *data)
+static int extra_output(struct tup_entry *tent, void *data)
 {
-	struct tup_entry *tent;
 	struct actual_output_data *aod = data;
 	struct mapping *map;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	if(!(aod->output_error & 1)) {
 		aod->output_error |= 1;
@@ -5844,14 +5880,10 @@ static int extra_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-static int missing_output(tupid_t tupid, void *data)
+static int missing_output(struct tup_entry *tent, void *data)
 {
-	struct tup_entry *tent;
 	struct tup_entry *cmdtent;
 	struct actual_output_data *aod = data;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	if(tup_entry_add(aod->cmdid, &cmdtent) < 0)
 		return -1;
@@ -5869,13 +5901,13 @@ static int missing_output(tupid_t tupid, void *data)
 }
 
 int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
-				struct tup_entry_head *writehead,
-				struct tupid_entries *output_root,
+				struct tent_entries *write_root,
+				struct tent_entries *output_root,
 				struct mapping_head *mapping_list,
 				int *write_bork,
 				int do_unlink, int complain_missing)
 {
-	struct tupid_entries output_copy = {NULL};
+	struct tent_entries output_copy = {NULL};
 	struct actual_output_data aod = {
 		.f = f,
 		.cmdid = cmdid,
@@ -5884,17 +5916,17 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 		.exclusion_root = {NULL},
 		.do_unlink = do_unlink,
 	};
-	int (*missing)(tupid_t, void*) = NULL;
+	int (*missing)(struct tup_entry *, void*) = NULL;
 
 	if(complain_missing)
 		missing = missing_output;
 
-	if(tupid_tree_copy(&output_copy, output_root) < 0)
+	if(tent_tree_copy(&output_copy, output_root) < 0)
 		return -1;
-	if(compare_list_tree(writehead, &output_copy, &aod,
-			     extra_output, missing) < 0)
+	if(compare_tent_trees(write_root, &output_copy, &aod,
+			      extra_output, missing) < 0)
 		return -1;
-	free_tupid_tree(&output_copy);
+	free_tent_tree(&output_copy);
 	if(aod.output_error)
 		*write_bork = 1;
 	return 0;
@@ -6089,7 +6121,7 @@ struct actual_input_data {
 	tupid_t cmdid;
 	struct variant *cmd_variant;
 	struct tupid_entries *sticky_root;
-	struct tupid_entries output_root;
+	struct tent_entries *output_root;
 	struct tupid_entries missing_input_root;
 	int important_link_removed;
 };
@@ -6100,12 +6132,12 @@ static int new_input(tupid_t tupid, void *data)
 	struct actual_input_data *aid = data;
 	struct variant *file_variant;
 
-	/* Skip any files that are supposed to be used as outputs */
-	if(tupid_tree_search(&aid->output_root, tupid) != NULL)
-		return 0;
-
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
+
+	/* Skip any files that are supposed to be used as outputs */
+	if(tent_tree_search(aid->output_root, tent) != NULL)
+		return 0;
 
 	file_variant = tup_entry_variant(tent);
 	if(!file_variant->root_variant && file_variant != aid->cmd_variant) {
@@ -6126,15 +6158,16 @@ static int new_normal_link(tupid_t tupid, void *data)
 	struct actual_input_data *aid = data;
 	struct tup_entry *tent;
 
+	if(tup_entry_add(tupid, &tent) < 0)
+		return -1;
+
 	/* Skip any files that are supposed to be used as outputs */
-	if(tupid_tree_search(&aid->output_root, tupid) != NULL)
+	if(tent_tree_search(aid->output_root, tent) != NULL)
 		return 0;
 	/* t6057 - Skip any files that were reported as errors in new_input() */
 	if(tupid_tree_search(&aid->missing_input_root, tupid) != NULL)
 		return 0;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->type == TUP_NODE_CMD) {
 		fprintf(aid->f, "tup error: Attempted to read from a file with the same name as an existing command string. Existing command is: ");
 		print_tup_entry(aid->f, tent);
@@ -6229,7 +6262,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tupid_entries *sticky_root,
 			       struct tupid_entries *normal_root,
 			       struct tupid_entries *group_sticky_root,
-			       struct tupid_entries *output_root,
+			       struct tent_entries *output_root,
 			       int *important_link_removed)
 {
 	struct tupid_entries sticky_copy = {NULL};
@@ -6237,7 +6270,7 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		.f = f,
 		.cmdid = cmdid,
 		.sticky_root = sticky_root,
-		.output_root = {NULL},
+		.output_root = output_root,
 		.missing_input_root = {NULL},
 		.important_link_removed = 0,
 	};
@@ -6249,8 +6282,6 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
 	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
-		return -1;
-	if(tupid_tree_copy(&aid.output_root, output_root) < 0)
 		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
@@ -6265,7 +6296,6 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			     new_normal_link, del_normal_link) < 0)
 		return -1;
 	free_tupid_tree(&sticky_copy);
-	free_tupid_tree(&aid.output_root);
 	free_tupid_tree(&aid.missing_input_root);
 	*important_link_removed = aid.important_link_removed;
 	return rc;
@@ -6276,13 +6306,14 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 	struct actual_input_data aid = {
 		.f = stdout,
 		.cmdid = tent->tnode.tupid,
-		.output_root = {NULL},
 		.missing_input_root = {NULL},
 	};
+	struct tent_entries output_root = {NULL};
 	struct tupid_entries sticky_root = RB_INITIALIZER(&sticky_root);
 	struct tupid_entries normal_root = RB_INITIALIZER(&normal_root);
 
 	aid.sticky_root = &sticky_root;
+	aid.output_root = &output_root;
 
 	if(tup_db_get_inputs(tent->tnode.tupid, &sticky_root, &normal_root, NULL) < 0)
 		return -1;
@@ -6303,16 +6334,13 @@ struct parse_output_data {
 	int refactoring;
 };
 
-static int add_output(tupid_t tupid, void *data)
+static int add_output(struct tup_entry *tent, void *data)
 {
 	struct parse_output_data *pod = data;
 
 	pod->outputs_differ = 1;
 
 	if(pod->refactoring) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
 		fprintf(pod->f, "tup refactoring error: Attempting to add a new output to a command: ");
 		print_tup_entry(pod->f, tent);
 		fprintf(pod->f, "\n");
@@ -6323,22 +6351,19 @@ static int add_output(tupid_t tupid, void *data)
 		return 0;
 	}
 
-	if(link_insert(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
+	if(link_insert(pod->cmdid, tent->tnode.tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 	if(pod->group)
-		if(link_insert(tupid, pod->group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+		if(link_insert(tent->tnode.tupid, pod->group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
 	return 0;
 }
 
-static int rm_output(tupid_t tupid, void *data)
+static int rm_output(struct tup_entry *tent, void *data)
 {
 	struct parse_output_data *pod = data;
-	struct tup_entry *tent;
 
 	pod->outputs_differ = 1;
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	if(pod->refactoring) {
 		fprintf(pod->f, "tup refactoring error: Attempting to remove an output from a command: ");
@@ -6351,10 +6376,10 @@ static int rm_output(tupid_t tupid, void *data)
 		return 0;
 	}
 
-	if(link_remove(pod->cmdid, tupid, TUP_LINK_NORMAL) < 0)
+	if(link_remove(pod->cmdid, tent->tnode.tupid, TUP_LINK_NORMAL) < 0)
 		return -1;
 	if(pod->group)
-		if(link_remove(tupid, pod->group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+		if(link_remove(tent->tnode.tupid, pod->group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
 	if(tent->type == TUP_NODE_GHOST) {
 		/* When an output exclusion is removed, we have to check that
@@ -6365,14 +6390,14 @@ static int rm_output(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
-			 struct tupid_entries *exclusion_root,
+int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
+			 struct tent_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified)
 {
-	struct tupid_entries output_root = {NULL};
-	struct tupid_entries orig_exclusion_root = {NULL};
+	struct tent_entries output_root = {NULL};
+	struct tent_entries orig_exclusion_root = {NULL};
 	struct parse_output_data pod = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6389,7 +6414,7 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 		 */
 		pod.group = group;
 	} else {
-		struct tupid_tree *tt;
+		struct tent_tree *tt;
 		pod.outputs_differ = 1;
 		if(group) {
 			if(refactoring) {
@@ -6399,8 +6424,8 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 				tup_db_print(f, cmdid);
 			}
 			/* New group - add links from all new outputs */
-			RB_FOREACH(tt, tupid_entries, root) {
-				if(link_insert(tt->tupid, group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+			RB_FOREACH(tt, tent_entries, root) {
+				if(link_insert(tt->tent->tnode.tupid, group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 					return -1;
 			}
 			if(link_insert(cmdid, group->tnode.tupid, TUP_LINK_NORMAL) < 0)
@@ -6414,15 +6439,15 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 				tup_db_print(f, cmdid);
 			}
 			/* Removed from old group - rm links from all old outputs */
-			RB_FOREACH(tt, tupid_entries, &output_root) {
-				if(link_remove(tt->tupid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
+			RB_FOREACH(tt, tent_entries, &output_root) {
+				if(link_remove(tt->tent->tnode.tupid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
 					return -1;
 
 				/* Explicitly add any dependent commands to the
 				 * modify_list, so they aren't skipped in case
 				 * our outputs are the same (t5078).
 				 */
-				if(tup_db_modify_cmds_by_input(tt->tupid) < 0)
+				if(tup_db_modify_cmds_by_input(tt->tent->tnode.tupid) < 0)
 					return -1;
 			}
 			if(link_remove(cmdid, (*old_group)->tnode.tupid, TUP_LINK_NORMAL) < 0)
@@ -6437,11 +6462,11 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 			tup_entry_add_ghost_list(*old_group, &ghost_list);
 		}
 	}
-	if(compare_trees(&output_root, root, &pod, rm_output, add_output) < 0)
+	if(compare_tent_trees(&output_root, root, &pod, rm_output, add_output) < 0)
 		return -1;
 	/* Exclusions don't go in groups */
 	pod.group = NULL;
-	if(compare_trees(&orig_exclusion_root, exclusion_root, &pod, rm_output, add_output) < 0)
+	if(compare_tent_trees(&orig_exclusion_root, exclusion_root, &pod, rm_output, add_output) < 0)
 		return -1;
 	if(pod.outputs_differ == 1) {
 		if(refactoring)
@@ -6456,8 +6481,8 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tupid_entries *root,
 				return -1;
 		}
 	}
-	free_tupid_tree(&orig_exclusion_root);
-	free_tupid_tree(&output_root);
+	free_tent_tree(&orig_exclusion_root);
+	free_tent_tree(&output_root);
 	return 0;
 }
 
