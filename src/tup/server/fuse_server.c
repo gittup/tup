@@ -465,7 +465,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	/* dirlen includes the \0, which snprintf does not count. Hence the -1/+1
 	 * adjusting.
 	 */
-	strncpy(dir, get_tup_top() + 1, sizeof(dir));
+	strncpy(dir, get_tup_top() + 1, sizeof(dir) - 1);
 	em.dirlen = get_tup_top_len() - 1;
 	em.dirlen += snprint_tup_entry(dir + em.dirlen,
 				       sizeof(dir) - em.dirlen - 1,

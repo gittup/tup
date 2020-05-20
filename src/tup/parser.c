@@ -605,7 +605,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			continue;
 		}
 
-		strncpy(line_debug, line, sizeof(line_debug));
+		strncpy(line_debug, line, sizeof(line_debug) - 1);
 		memcpy(line_debug + sizeof(line_debug) - 4, "...", 4);
 
 		rc = 0;
