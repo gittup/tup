@@ -573,10 +573,12 @@ static int delete_files(struct graph *g)
 {
 	struct tupid_tree *tt;
 	struct tup_entry *tent;
-	struct tup_entry_head *entrylist;
+	struct tent_list_head save_list;
+	struct tent_list *tlist;
 	int file_resurrection = 0;
 	int rc = -1;
 
+	tent_list_init(&save_list);
 	if(g->cmd_delete_count) {
 		char buf[64];
 		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_count, g->cmd_delete_count == 1 ? "" : "s");
@@ -601,7 +603,6 @@ static int delete_files(struct graph *g)
 	}
 
 	start_progress(g->gen_delete_count, -1, -1);
-	entrylist = tup_entry_get_list();
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int tmp;
@@ -616,7 +617,8 @@ static int delete_files(struct graph *g)
 		if(tmp < 0)
 			goto out_err;
 		if(tmp == 1) {
-			tup_entry_list_add(tent, entrylist);
+			if(tent_list_add_tail(&save_list, tent) < 0)
+				goto out_err;
 			file_resurrection = 1;
 		} else {
 			/* Only delete if the file wasn't modified (t6031) */
@@ -634,7 +636,8 @@ static int delete_files(struct graph *g)
 	if(file_resurrection) {
 		tup_show_message("Converting generated files to normal files...\n");
 	}
-	LIST_FOREACH(tent, entrylist, list) {
+	tent_list_foreach(tlist, &save_list) {
+		tent = tlist->tent;
 		if(server_is_dead())
 			goto out_err;
 		if(tent->type == TUP_NODE_GENERATED) {
@@ -657,7 +660,7 @@ static int delete_files(struct graph *g)
 
 	rc = 0;
 out_err:
-	tup_entry_release_list();
+	free_tent_list(&save_list);
 	return rc;
 }
 
