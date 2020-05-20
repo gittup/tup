@@ -859,53 +859,25 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	return 0;
 }
 
-int exclusion_root_to_list(struct tent_entries *root, struct re_entry_head *head)
+int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match)
 {
 	struct tent_tree *tt;
-
-	RB_FOREACH(tt, tent_entries, root) {
-		struct re_entry *re;
-
-		re = malloc(sizeof *re);
-		if(!re) {
-			perror("malloc");
-			return -1;
-		}
-		re->re = tt->tent->re;
-		re->s = tt->tent->name.s;
-		LIST_INSERT_HEAD(head, re, list);
-	}
-	return 0;
-}
-
-int re_entries_match(FILE *f, struct re_entry_head *head, const char *s, int *match)
-{
-	struct re_entry *re;
 	int len = strlen(s);
 
 	*match = 0;
-	LIST_FOREACH(re, head, list) {
+	RB_FOREACH(tt, tent_entries, exclusion_root) {
 		int rc;
-		rc = pcre_exec(re->re, NULL, s, len, 0, 0, NULL, 0);
+		rc = pcre_exec(tt->tent->re, NULL, s, len, 0, 0, NULL, 0);
 		if(rc == 0) {
 			*match = 1;
 			if(do_verbose) {
-				fprintf(f, "tup info: Ignoring file '%s' because it matched the regex '%s'\n", s, re->s);
+				fprintf(f, "tup info: Ignoring file '%s' because it matched the regex '%s'\n", s, tt->tent->name.s);
 			}
 			break;
 		} else if(rc != PCRE_ERROR_NOMATCH) {
-			fprintf(f, "tup error: Regex failed to execute: %s\n", re->s);
+			fprintf(f, "tup error: Regex failed to execute: %s\n", tt->tent->name.s);
 			return -1;
 		}
 	}
 	return 0;
-}
-
-void free_re_list(struct re_entry_head *head)
-{
-	while(!LIST_EMPTY(head)) {
-		struct re_entry *re = LIST_FIRST(head);
-		LIST_REMOVE(re, list);
-		free(re);
-	}
 }

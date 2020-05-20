@@ -59,7 +59,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	RB_INIT(&info->group_sticky_root);
 	RB_INIT(&info->used_groups_root);
 	RB_INIT(&info->output_root);
-	LIST_INIT(&info->exclusion_list);
+	RB_INIT(&info->exclusion_root);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
 	/* Root variant gets a NULL variant_dir so we can skip trying to do the
@@ -78,7 +78,7 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 
 void cleanup_file_info(struct file_info *info)
 {
-	free_re_list(&info->exclusion_list);
+	free_tent_tree(&info->exclusion_root);
 	free_tent_tree(&info->output_root);
 	free_tupid_tree(&info->used_groups_root);
 	free_tupid_tree(&info->group_sticky_root);
@@ -193,7 +193,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 			int match = 0;
 
 			tmpdir = LIST_FIRST(&info->tmpdir_list);
-			if(re_entries_match(f, &info->exclusion_list, tmpdir->dirname, &match) < 0)
+			if(exclusion_match(f, &info->exclusion_root, tmpdir->dirname, &match) < 0)
 				return -1;
 			if(match) {
 				if(mkdir(tmpdir->dirname, 0777) < 0) {
@@ -619,7 +619,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		w = LIST_FIRST(&info->write_list);
 
-		if(re_entries_match(f, &info->exclusion_list, w->filename, &match) < 0)
+		if(exclusion_match(f, &info->exclusion_root, w->filename, &match) < 0)
 			return -1;
 		if(match) {
 			if(create_ignored_file(f, w) < 0)
@@ -755,7 +755,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		int match = 0;
 		r = LIST_FIRST(&info->read_list);
 
-		if(re_entries_match(f, &info->exclusion_list, r->filename, &match) < 0)
+		if(exclusion_match(f, &info->exclusion_root, r->filename, &match) < 0)
 			return -1;
 		if(!match) {
 			if(add_node_to_list(DOT_DT, r->filename, entryhead, full_deps) < 0)

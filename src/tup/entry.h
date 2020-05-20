@@ -69,18 +69,6 @@ struct tup_entry {
 
 LIST_HEAD(tup_entry_head, tup_entry);
 
-struct re_entry {
-	/* Points to the re from tup_entry */
-	pcre *re;
-
-	/* Points to name.s from tup_entry */
-	const char *s;
-
-	LIST_ENTRY(re_entry) list;
-};
-
-LIST_HEAD(re_entry_head, re_entry);
-
 int tup_entry_init(void);
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
@@ -124,8 +112,6 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head);
 int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root);
 void dump_tup_entry(void);
 int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end);
-int exclusion_root_to_list(struct tent_entries *root, struct re_entry_head *head);
-int re_entries_match(FILE *f, struct re_entry_head *head, const char *s, int *match);
-void free_re_list(struct re_entry_head *head);
+int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match);
 
 #endif
