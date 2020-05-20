@@ -256,25 +256,6 @@ void vardb_dump(struct vardb *v)
 	}
 }
 
-// todo - move this to entry.c ?
-static int add_tent(struct tent_list_head *head, struct tup_entry *tent)
-{
-	struct tent_list *tlist = NULL;
-
-	/* not an error, just add nothing to the list */
-	if (!tent)
-		return 0;
-
-	tlist = malloc(sizeof *tlist);
-	if(!tlist) {
-		perror("malloc");
-		return -1;
-	}
-	tlist->tent = tent;
-	TAILQ_INSERT_TAIL(head, tlist, list);
-	return 0;
-}
-
 int nodedb_init(struct node_vardb *v)
 {
 	RB_INIT(&v->root);
@@ -306,7 +287,7 @@ int nodedb_set(struct node_vardb *v, const char *var, struct tup_entry *tent)
 	if(st) {
 		ve = container_of(st, struct node_var_entry, var);
 		free_tent_list(&ve->nodes);
-		if (add_tent(&ve->nodes, tent) < 0)
+		if(tent_list_add_tail(&ve->nodes, tent) < 0)
 			return -1;
 	} else {
 		ve = malloc(sizeof *ve);
@@ -325,8 +306,8 @@ int nodedb_set(struct node_vardb *v, const char *var, struct tup_entry *tent)
 		memcpy(ve->var.s, var, ve->var.len);
 		ve->var.s[ve->var.len] = 0;
 
-		TAILQ_INIT(&ve->nodes);
-		if (add_tent(&ve->nodes, tent) < 0) {
+		tent_list_init(&ve->nodes);
+		if(tent_list_add_tail(&ve->nodes, tent) < 0) {
 			free(ve->var.s);
 			free(ve);
 			return -1;
@@ -353,7 +334,7 @@ int nodedb_append(struct node_vardb *v, const char *var, struct tup_entry *tent)
 	st = string_tree_search(&v->root, var, strlen(var));
 	if(st) {
 		struct node_var_entry *ve = container_of(st, struct node_var_entry, var);
-		return add_tent(&ve->nodes, tent);
+		return tent_list_add_tail(&ve->nodes, tent);
 	} else {
 		return nodedb_set(v, var, tent);
 	}
@@ -371,7 +352,7 @@ int nodedb_copy(struct node_vardb *v, const char *var, int varlen, struct estrin
 	if(!ve)
 		return 0;	/* not found, string is "" */
 
-	TAILQ_FOREACH(tlist, &ve->nodes, list) {
+	tent_list_foreach(tlist, &ve->nodes) {
 		if(!first) {
 			first = 1;
 		} else {
