@@ -552,6 +552,7 @@ static int mlink(int argc, char **argv)
 	int x;
 	tupid_t cmdid;
 	struct tup_entry *tent;
+	struct tup_entry *root_tent;
 
 	if(argc < 4) {
 		fprintf(stderr, "Usage: %s cmd -iread_file -owrite_file\n",
@@ -561,7 +562,7 @@ static int mlink(int argc, char **argv)
 
 	if(tup_db_begin() < 0)
 		return -1;
-	if(tup_entry_add(DOT_DT, NULL) < 0)
+	if(tup_entry_add(DOT_DT, &root_tent) < 0)
 		return -1;
 	cmdid = create_command_file(DOT_DT, argv[1], NULL, 0, NULL, 0);
 	if(cmdid < 0) {
@@ -585,7 +586,7 @@ static int mlink(int argc, char **argv)
 			return 1;
 		}
 
-		if(tup_db_select_tent(DOT_DT, name+2, &tent) < 0)
+		if(tup_db_select_tent(root_tent, name+2, &tent) < 0)
 			return -1;
 		if(!tent)
 			return 1;
@@ -718,6 +719,7 @@ static int node_exists(int argc, char **argv)
 {
 	int x;
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 	tupid_t dt;
 
 	if(tup_db_begin() < 0)
@@ -733,7 +735,9 @@ static int node_exists(int argc, char **argv)
 	argc--;
 	for(x=1; x<argc; x++) {
 		char *p = argv[x];
-		if(tup_db_select_tent(dt, argv[x], &tent) < 0)
+		if(tup_entry_add(dt, &dtent) < 0)
+			return -1;
+		if(tup_db_select_tent(dtent, argv[x], &tent) < 0)
 			return -1;
 		if(!tent) {
 			/* Path replacement is a hack for windows to work. This
@@ -752,7 +756,7 @@ static int node_exists(int argc, char **argv)
 				}
 				p++;
 			}
-			if(tup_db_select_tent(dt, argv[x], &tent) < 0)
+			if(tup_db_select_tent(dtent, argv[x], &tent) < 0)
 				return -1;
 			if(!tent)
 				return -1;
@@ -767,6 +771,8 @@ static int link_exists(int argc, char **argv)
 {
 	struct tup_entry *tenta;
 	struct tup_entry *tentb;
+	struct tup_entry *dtenta;
+	struct tup_entry *dtentb;
 	int exists;
 	int style;
 	tupid_t dta, dtb;
@@ -791,7 +797,9 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	if(tup_db_select_tent(dta, argv[2], &tenta) < 0)
+	if(tup_entry_add(dta, &dtenta) < 0)
+		return -1;
+	if(tup_db_select_tent(dtenta, argv[2], &tenta) < 0)
 		return -1;
 	if(!tenta) {
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[2]);
@@ -804,7 +812,9 @@ static int link_exists(int argc, char **argv)
 		return -1;
 	}
 
-	if(tup_db_select_tent(dtb, argv[4], &tentb) < 0)
+	if(tup_entry_add(dtb, &dtentb) < 0)
+		return -1;
+	if(tup_db_select_tent(dtentb, argv[4], &tentb) < 0)
 		return -1;
 	if(!tentb) {
 		fprintf(stderr, "[31mError: node '%s' doesn't exist.[0m\n", argv[4]);
@@ -836,6 +846,7 @@ static int touch(int argc, char **argv)
 	for(x=1; x<argc; x++) {
 		struct stat buf;
 		struct path_element *pel = NULL;
+		struct tup_entry *dtent;
 		tupid_t dt;
 
 		if(lstat(argv[x], &buf) < 0) {
@@ -852,8 +863,10 @@ static int touch(int argc, char **argv)
 			fprintf(stderr, "Error finding dt for dir '%s' relative to dir %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
+		if(tup_entry_add(dt, &dtent) < 0)
+			return -1;
 		if(S_ISDIR(buf.st_mode)) {
-			if(tup_db_create_node(dt, pel->path, TUP_NODE_DIR) == NULL)
+			if(tup_db_create_node(dtent, pel->path, TUP_NODE_DIR) == NULL)
 				return -1;
 		} else if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 			if(tup_file_mod_mtime(dt, pel->path, MTIME(buf), 1, 0, NULL) < 0)
@@ -949,16 +962,19 @@ static int varshow_vdb(struct vardb *vdb)
 static int varshow(int argc, char **argv)
 {
 	struct tup_entry *vartent;
+	struct tup_entry *root_tent;
 	if(tup_db_begin() < 0)
 		return -1;
-	if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0)
+	if(tup_entry_add(DOT_DT, &root_tent) < 0)
+		return -1;
+	if(tup_db_select_tent(root_tent, TUP_CONFIG, &vartent) < 0)
 		return -1;
 	if(vartent) {
 		if(argc == 1) {
 			struct vardb vdb;
 			if(vardb_init(&vdb) < 0)
 				return -1;
-			if(tup_db_get_vardb(vartent->tnode.tupid, &vdb) < 0)
+			if(tup_db_get_vardb(vartent, &vdb) < 0)
 				return -1;
 			varshow_vdb(&vdb);
 			vardb_close(&vdb);
@@ -967,7 +983,7 @@ static int varshow(int argc, char **argv)
 			struct tup_entry *tent;
 			for(x=1; x<argc; x++) {
 				char *value;
-				if(tup_db_select_tent(vartent->tnode.tupid, argv[x], &tent) < 0)
+				if(tup_db_select_tent(vartent, argv[x], &tent) < 0)
 					return -1;
 				if(!tent) {
 					fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
@@ -1015,6 +1031,7 @@ static int options(int argc, char **argv)
 static int fake_mtime(int argc, char **argv)
 {
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 	time_t mtime;
 	tupid_t dt;
 	tupid_t sub_dir_dt;
@@ -1034,7 +1051,9 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "tup error: Unable to find dt for node: %s\n", argv[1]);
 		return -1;
 	}
-	if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 		return -1;
 	if(tent == NULL) {
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);

@@ -149,16 +149,11 @@ int variant_list_empty(void)
 	return LIST_EMPTY(&variant_list);
 }
 
-int variant_get_srctent(struct variant *variant, tupid_t tupid, struct tup_entry **srctent)
+int variant_get_srctent(struct variant *variant, struct tup_entry *tent, struct tup_entry **srctent)
 {
-	struct tup_entry *tent;
-
 	*srctent = NULL;
 	if(variant->root_variant)
 		return 0;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	/* srcid can be -1 if the variant node is a ghost */
 	if(tent->srcid != -1)

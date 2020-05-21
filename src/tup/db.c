@@ -179,10 +179,10 @@ static int sticky_count = 1;
 
 static int version_check(void);
 static int init_virtual_dirs(void);
-static struct tup_entry *node_insert(tupid_t dt, const char *name, int namelen,
+static struct tup_entry *node_insert(struct tup_entry *dtent, const char *name, int namelen,
 				     const char *display, int displaylen, const char *flags, int flagslen,
 				     enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid);
-static int node_select(tupid_t dt, const char *name, int len,
+static int node_select(struct tup_entry *dtent, const char *name, int len,
 		       struct tup_entry **entry);
 
 static int link_insert(tupid_t a, tupid_t b, int style);
@@ -444,12 +444,15 @@ err_open:
 int tup_db_get_tup_config_tent(struct tup_entry **tent)
 {
 	struct tup_entry *vartent = NULL;
-	if(tup_db_select_tent(DOT_DT, TUP_CONFIG, &vartent) < 0) {
+	struct tup_entry *root_tent;
+	if(tup_entry_add(DOT_DT, &root_tent) < 0)
+		return -1;
+	if(tup_db_select_tent(root_tent, TUP_CONFIG, &vartent) < 0) {
 		fprintf(stderr, "tup internal error: Unable to check for tup.config node in the project root.\n");
 		return -1;
 	}
 	if(!vartent) {
-		vartent = tup_db_create_node(DOT_DT, TUP_CONFIG, TUP_NODE_GHOST);
+		vartent = tup_db_create_node(root_tent, TUP_CONFIG, TUP_NODE_GHOST);
 		if(!vartent) {
 			fprintf(stderr, "tup internal error: Unable to create virtual node for tup.config changes in the project root.\n");
 			return -1;
@@ -949,30 +952,30 @@ const char *tup_db_type(enum TUP_NODE_TYPE type)
 	return str;
 }
 
-struct tup_entry *tup_db_create_node(tupid_t dt, const char *name, enum TUP_NODE_TYPE type)
+struct tup_entry *tup_db_create_node(struct tup_entry *dtent, const char *name, enum TUP_NODE_TYPE type)
 {
-	return tup_db_create_node_part(dt, name, -1, type, -1, NULL);
+	return tup_db_create_node_part(dtent, name, -1, type, -1, NULL);
 }
 
-struct tup_entry *tup_db_create_node_srcid(tupid_t dt, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
+struct tup_entry *tup_db_create_node_srcid(struct tup_entry *dtent, const char *name, enum TUP_NODE_TYPE type, tupid_t srcid,
 					   int *node_changed)
 {
-	return tup_db_create_node_part(dt, name, -1, type, srcid, node_changed);
+	return tup_db_create_node_part(dtent, name, -1, type, srcid, node_changed);
 }
 
-struct tup_entry *tup_db_create_node_part(tupid_t dt, const char *name, int len,
+struct tup_entry *tup_db_create_node_part(struct tup_entry *dtent, const char *name, int len,
 					  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
-	return tup_db_create_node_part_display(dt, name, len, NULL, 0, NULL, 0, type, srcid, node_changed);
+	return tup_db_create_node_part_display(dtent, name, len, NULL, 0, NULL, 0, type, srcid, node_changed);
 }
 
-struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, int namelen,
+struct tup_entry *tup_db_create_node_part_display(struct tup_entry *dtent, const char *name, int namelen,
 						  const char *display, int displaylen, const char *flags, int flagslen,
 						  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed)
 {
 	struct tup_entry *tent;
 
-	if(node_select(dt, name, namelen, &tent) < 0) {
+	if(node_select(dtent, name, namelen, &tent) < 0) {
 		return NULL;
 	}
 
@@ -1051,7 +1054,7 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 				 * get potential ghost handling (t6081,
 				 * t6082).
 				 */
-				return tup_db_create_node_part_display(dt, name, namelen,
+				return tup_db_create_node_part_display(dtent, name, namelen,
 								       display, displaylen,
 								       flags, flagslen,
 								       type, srcid, node_changed);
@@ -1094,7 +1097,7 @@ struct tup_entry *tup_db_create_node_part_display(tupid_t dt, const char *name, 
 		return tent;
 	}
 
-	tent = node_insert(dt, name, namelen, display, displaylen, flags, flagslen, type, -1, srcid);
+	tent = node_insert(dtent, name, namelen, display, displaylen, flags, flagslen, type, -1, srcid);
 	if(node_changed)
 		*node_changed = 1;
 	return tent;
@@ -1113,6 +1116,16 @@ int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry **dest)
 	const char *name;
 	const char *display;
 	const char *flags;
+
+	if(tupid == 0) {
+		/* Create a dummy tup_entry for DOT_DT's parent, so we can
+		 * tup_entry_add(tupid == 0) and get a valid pointer.
+		 */
+		if(tup_entry_add_all(0, 0, TUP_NODE_ROOT, -1, -1, "{root}", "{root}", "", dest) < 0) {
+			return -1;
+		}
+		return 0;
+	}
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -1163,15 +1176,15 @@ out_reset:
 	return rc;
 }
 
-int tup_db_select_tent(tupid_t dt, const char *name, struct tup_entry **entry)
+int tup_db_select_tent(struct tup_entry *dtent, const char *name, struct tup_entry **entry)
 {
-	return node_select(dt, name, -1, entry);
+	return node_select(dtent, name, -1, entry);
 }
 
-int tup_db_select_tent_part(tupid_t dt, const char *name, int len,
+int tup_db_select_tent_part(struct tup_entry *dtent, const char *name, int len,
 			    struct tup_entry **entry)
 {
-	return node_select(dt, name, len, entry);
+	return node_select(dtent, name, len, entry);
 }
 
 int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
@@ -1328,8 +1341,9 @@ out_reset:
 }
 
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
-				void *arg, tupid_t dt, const char *glob,
-				int len, struct tupid_entries *delete_root,
+				void *arg, struct tup_entry *dtent,
+				const char *glob, int len,
+				struct tupid_entries *delete_root,
 				int include_directories)
 {
 	int rc;
@@ -1347,7 +1361,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		extra_type = TUP_NODE_GENERATED;
 	}
 
-	transaction_check("%s [%lli, %i, %i, %i, '%s']", s, dt, TUP_NODE_FILE, TUP_NODE_GENERATED, extra_type, glob);
+	transaction_check("%s [%lli, %i, %i, %i, '%s']", s, dtent->tnode.tupid, TUP_NODE_FILE, TUP_NODE_GENERATED, extra_type, glob);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -1356,7 +1370,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dtent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -1415,7 +1429,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				display = (const char *)sqlite3_column_text(*stmt, 5);
 				flags = (const char *)sqlite3_column_text(*stmt, 6);
 
-				if(tup_entry_add_to_dir(dt, tupid, name, -1, display, -1, flags, -1, type, mtime, srcid, &tent) < 0) {
+				if(tup_entry_add_to_dir(dtent, tupid, name, -1, display, -1, flags, -1, type, mtime, srcid, &tent) < 0) {
 					rc = -1;
 					goto out_reset;
 				}
@@ -1823,7 +1837,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 				return -1;
 			}
 		}
-		subdest = tup_db_create_node_srcid(dest->tnode.tupid, subsrc->name.s, TUP_NODE_DIR, subsrc->tnode.tupid, NULL);
+		subdest = tup_db_create_node_srcid(dest, subsrc->name.s, TUP_NODE_DIR, subsrc->tnode.tupid, NULL);
 		if(!subdest) {
 			fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
 			print_tup_entry(stderr, subdest);
@@ -1956,14 +1970,14 @@ out_reset:
 	return rc;
 }
 
-int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
+int tup_db_change_node(tupid_t tupid, const char *new_name, struct tup_entry *new_dtent)
 {
 	int rc;
 	struct tup_entry *tent;
 	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
 	static char s[] = "update node set name=?, dir=? where id=?";
 
-	if(node_select(new_dt, new_name, -1, &tent) < 0) {
+	if(node_select(new_dtent, new_name, -1, &tent) < 0) {
 		return -1;
 	}
 	if(tent) {
@@ -1973,13 +1987,13 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 			if(delete_node(tent->tnode.tupid) < 0)
 				return -1;
 		} else {
-			fprintf(stderr, "tup error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dt);
-			tup_db_print(stderr, new_dt);
+			fprintf(stderr, "tup error: Attempting to overwrite node '%s' in dir %lli in tup_db_change_node()\n", new_name, new_dtent->tnode.tupid);
+			tup_db_print(stderr, new_dtent->tnode.tupid);
 			return -1;
 		}
 	}
 
-	transaction_check("%s ['%s', %lli, %lli]", s, new_name, new_dt, tupid);
+	transaction_check("%s ['%s', %lli, %lli]", s, new_name, new_dtent->tnode.tupid, tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -1993,7 +2007,7 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	if(sqlite3_bind_int64(*stmt, 2, new_dt) != 0) {
+	if(sqlite3_bind_int64(*stmt, 2, new_dtent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -2016,7 +2030,7 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, tupid_t new_dt)
 		return -1;
 	}
 
-	if(tup_entry_change_name_dt(tupid, new_name, new_dt) < 0)
+	if(tup_entry_change_name_dt(tupid, new_name, new_dtent->tnode.tupid) < 0)
 		return -1;
 	if(recurse_modify_dir(tupid) < 0)
 		return -1;
@@ -4789,10 +4803,10 @@ static struct var_entry *get_var(struct variant *variant, const char *var, int v
 	if(!ve) {
 		struct tup_entry *tent;
 
-		if(node_select(variant->tent->tnode.tupid, var, varlen, &tent) < 0)
+		if(node_select(variant->tent, var, varlen, &tent) < 0)
 			return NULL;
 		if(!tent) {
-			tent = node_insert(variant->tent->tnode.tupid, var, varlen,
+			tent = node_insert(variant->tent, var, varlen,
 					   NULL, 0, NULL, 0,
 					   TUP_NODE_GHOST, -1, -1);
 			if(!tent)
@@ -4977,23 +4991,20 @@ static int remove_var_tupid(tupid_t tupid)
 	return 0;
 }
 
-static int remove_var(struct var_entry *ve, tupid_t vardt)
+static int remove_var(struct var_entry *ve, struct tup_entry *var_dtent)
 {
-	if(vardt) {}
+	if(var_dtent) {}
 
 	return remove_var_tupid(ve->tent->tnode.tupid);
 }
 
-static int add_var(struct var_entry *ve, tupid_t vardt)
+static int add_var(struct var_entry *ve, struct tup_entry *var_dtent)
 {
 	struct tup_entry *tent;
-	struct tup_entry *var_tent;
 
 	tup_db_var_changed++;
 
-	if(tup_entry_add(vardt, &var_tent) < 0)
-		return -1;
-	tent = tup_db_create_node(var_tent->tnode.tupid, ve->var.s, TUP_NODE_VAR);
+	tent = tup_db_create_node(var_dtent, ve->var.s, TUP_NODE_VAR);
 	if(!tent)
 		return -1;
 	return tup_db_set_var(tent->tnode.tupid, ve->value);
@@ -5017,24 +5028,20 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
-		     const char *vardict_file)
+int tup_db_read_vars(int root_fd, struct tup_entry *dtent, const char *file,
+		     struct tup_entry *var_dtent, const char *vardict_file)
 {
 	struct vardb db_tree;
 	struct vardb file_tree;
 	int dfd;
 	int fd;
 	int rc;
-	struct tup_entry *tent;
-
-	if(tup_entry_add(dt, &tent) < 0)
-		return -1;
 
 	vardb_init(&db_tree);
 	vardb_init(&file_tree);
-	if(tup_db_get_vardb(vardt, &db_tree) < 0)
+	if(tup_db_get_vardb(var_dtent, &db_tree) < 0)
 		return -1;
-	dfd = tup_entry_openat(root_fd, tent);
+	dfd = tup_entry_openat(root_fd, dtent);
 	if(dfd < 0) {
 		rc = 0;
 	} else {
@@ -5062,7 +5069,7 @@ int tup_db_read_vars(int root_fd, tupid_t dt, const char *file, tupid_t vardt,
 		return -1;
 
 	if(vardb_compare(&db_tree, &file_tree, remove_var, add_var,
-			 compare_vars, vardt) < 0)
+			 compare_vars, var_dtent) < 0)
 		return -1;
 
 	if(vardict_file)
@@ -5205,7 +5212,7 @@ int tup_db_check_env(int environ_check)
 
 	if(vardb_init(&vdb) < 0)
 		return -1;
-	if(tup_db_get_vardb(env_dt(), &vdb) < 0)
+	if(tup_db_get_vardb(env_dtent(), &vdb) < 0)
 		return -1;
 	RB_FOREACH(st, string_entries, &vdb.root) {
 		ve = container_of(st, struct var_entry, var);
@@ -5229,7 +5236,7 @@ int tup_db_findenv(const char *var, struct tup_entry **tent)
 		const char *newenv;
 		int newenvlen = 0;
 
-		newtent = node_insert(env_dt(), var, varlen, NULL, 0, NULL, 0, TUP_NODE_VAR, -1, -1);
+		newtent = node_insert(env_dtent(), var, varlen, NULL, 0, NULL, 0, TUP_NODE_VAR, -1, -1);
 		if(!newtent)
 			return -1;
 		newenv = getenv(var);
@@ -5315,25 +5322,26 @@ int tup_db_get_environ(struct tent_entries *root,
 static int init_virtual_dirs(void)
 {
 	struct tup_entry *tent;
+	struct tup_entry *root_tent;
 
-	if(tup_entry_add(DOT_DT, NULL) < 0)
+	if(tup_entry_add(DOT_DT, &root_tent) < 0)
 		return -1;
 
-	tent = tup_db_create_node(DOT_DT, "$", TUP_NODE_DIR);
+	tent = tup_db_create_node(root_tent, "$", TUP_NODE_DIR);
 	if(!tent) {
 		fprintf(stderr, "tup error: Unable to create virtual '$' directory for environment variables.\n");
 		return -1;
 	}
 	local_env_dt = tent->tnode.tupid;
 
-	tent = tup_db_create_node(DOT_DT, "/", TUP_NODE_DIR);
+	tent = tup_db_create_node(root_tent, "/", TUP_NODE_DIR);
 	if(!tent) {
 		fprintf(stderr, "tup error: Unable to create virtual '/' directory for full dependency detection.\n");
 		return -1;
 	}
 	local_slash_dt = tent->tnode.tupid;
 
-	tent = tup_db_create_node(DOT_DT, "^", TUP_NODE_DIR);
+	tent = tup_db_create_node(root_tent, "^", TUP_NODE_DIR);
 	if(!tent) {
 		fprintf(stderr, "tup error: Unable to create virtual '^' directory for environment variables.\n");
 		return -1;
@@ -5345,6 +5353,18 @@ static int init_virtual_dirs(void)
 tupid_t env_dt(void)
 {
 	return local_env_dt;
+}
+
+struct tup_entry *env_dtent(void)
+{
+	static struct tup_entry *tent = NULL;
+	if(!tent) {
+		if(tup_entry_add(env_dt(), &tent) < 0) {
+			fprintf(stderr, "fatal tup error: env_dtent() failed in tup_entry_add()\n");
+			exit(1);
+		}
+	}
+	return tent;
 }
 
 tupid_t slash_dt(void)
@@ -6465,12 +6485,12 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tent_entries *root)
 	return 0;
 }
 
-static struct tup_entry *node_insert(tupid_t dt, const char *name, int namelen,
+static struct tup_entry *node_insert(struct tup_entry *dtent, const char *name, int namelen,
 				     const char *display, int displaylen, const char *flags, int flagslen,
 				     enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
-	if(tup_db_node_insert_tent_display(dt, name, namelen, display, displaylen, flags, flagslen, type, mtime, srcid, &tent) < 0)
+	if(tup_db_node_insert_tent_display(dtent, name, namelen, display, displaylen, flags, flagslen, type, mtime, srcid, &tent) < 0)
 		return NULL;
 	if(tent->type == TUP_NODE_DIR && !is_virtual_tent(tent)) {
 		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
@@ -6479,13 +6499,13 @@ static struct tup_entry *node_insert(tupid_t dt, const char *name, int namelen,
 	return tent;
 }
 
-int tup_db_node_insert_tent(tupid_t dt, const char *name, int namelen,
+int tup_db_node_insert_tent(struct tup_entry *dtent, const char *name, int namelen,
 			    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry)
 {
-	return tup_db_node_insert_tent_display(dt, name, namelen, NULL, 0, NULL, 0, type, mtime, srcid, entry);
+	return tup_db_node_insert_tent_display(dtent, name, namelen, NULL, 0, NULL, 0, type, mtime, srcid, entry);
 }
 
-int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
+int tup_db_node_insert_tent_display(struct tup_entry *dtent, const char *name, int namelen,
 				    const char *display, int displaylen, const char *flags, int flagslen,
 				    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry)
 {
@@ -6494,7 +6514,7 @@ int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 	static char s[] = "insert into node(dir, type, name, display, flags, mtime, srcid) values(?, ?, ?, ?, ?, ?, ?)";
 	tupid_t tupid;
 
-	transaction_check("%s [%lli, %i, '%.*s', '%.*s', '%.*s', %li, %lli]", s, dt, type, namelen, name, displaylen, display, flagslen, flags, mtime, srcid);
+	transaction_check("%s [%lli, %i, '%.*s', '%.*s', '%.*s', %li, %lli]", s, dtent->tnode.tupid, type, namelen, name, displaylen, display, flagslen, flags, mtime, srcid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -6503,7 +6523,7 @@ int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dtent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -6564,7 +6584,7 @@ int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 			return -1;
 	}
 
-	if(tup_entry_add_to_dir(dt, tupid, name, namelen, display, displaylen, flags, flagslen, type, mtime, srcid, entry) < 0)
+	if(tup_entry_add_to_dir(dtent, tupid, name, namelen, display, displaylen, flags, flagslen, type, mtime, srcid, entry) < 0)
 		return -1;
 	/* It's ok for refactoring to create new nodes, such as for ghosts that
 	 * are new inputs (eg: Tuprules.tup or a Tupfile for a new directory.)
@@ -6574,7 +6594,7 @@ int tup_db_node_insert_tent_display(tupid_t dt, const char *name, int namelen,
 	return 0;
 }
 
-static int node_select(tupid_t dt, const char *name, int len,
+static int node_select(struct tup_entry *dtent, const char *name, int len,
 		       struct tup_entry **entry)
 {
 	int rc;
@@ -6590,12 +6610,12 @@ static int node_select(tupid_t dt, const char *name, int len,
 
 	*entry = NULL;
 
-	if(tup_entry_find_name_in_dir_dt(dt, name, len, entry) < 0)
+	if(tup_entry_find_name_in_dir_dt(dtent, name, len, entry) < 0)
 		return -1;
 	if(*entry)
 		return 0;
 
-	transaction_check("%s [%lli, '%.*s']", s, dt, len, name);
+	transaction_check("%s [%lli, '%.*s']", s, dtent->tnode.tupid, len, name);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -6604,7 +6624,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dtent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
@@ -6635,7 +6655,7 @@ static int node_select(tupid_t dt, const char *name, int len,
 	display = (const char*)sqlite3_column_text(*stmt, 4);
 	flags = (const char*)sqlite3_column_text(*stmt, 5);
 
-	if(tup_entry_add_to_dir(dt, tupid, name, len, display, -1, flags, -1, type, mtime, srcid, entry) < 0) {
+	if(tup_entry_add_to_dir(dtent, tupid, name, len, display, -1, flags, -1, type, mtime, srcid, entry) < 0) {
 		rc = -1;
 		goto out_reset;
 	}
@@ -7529,14 +7549,14 @@ int tup_db_reparse_all(void)
 	return 0;
 }
 
-int tup_db_get_vardb(tupid_t dt, struct vardb *vdb)
+int tup_db_get_vardb(struct tup_entry *dtent, struct vardb *vdb)
 {
 	int rc = -1;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_GET_VARDB];
 	static char s[] = "select node.id, name, value, type from node, var where dir=? and node.id=var.id";
 
-	transaction_check("%s [%i]", s, dt);
+	transaction_check("%s [%i]", s, dtent->tnode.tupid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
 			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
@@ -7545,15 +7565,11 @@ int tup_db_get_vardb(tupid_t dt, struct vardb *vdb)
 		}
 	}
 
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
+	if(sqlite3_bind_int64(*stmt, 1, dtent->tnode.tupid) != 0) {
 		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-
-	/* t7042 - make sure we have the dt entry */
-	if(tup_entry_add(dt, NULL) < 0)
-		return -1;
 
 	do {
 		tupid_t tupid;
@@ -7584,7 +7600,7 @@ int tup_db_get_vardb(tupid_t dt, struct vardb *vdb)
 		 */
 		tent = tup_entry_find(tupid);
 		if(!tent)
-			if(tup_entry_add_to_dir(dt, tupid, var, -1, NULL, 0, NULL, 0, type, -1, -1, &tent) <0)
+			if(tup_entry_add_to_dir(dtent, tupid, var, -1, NULL, 0, NULL, 0, type, -1, -1, &tent) <0)
 				goto out_reset;
 		if(vardb_set(vdb, var, value, tent) < 0)
 			goto out_reset;

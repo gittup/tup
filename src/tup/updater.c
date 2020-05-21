@@ -336,7 +336,7 @@ int generate(int argc, char **argv)
 	} else {
 		varfiletent = vartent;
 	}
-	if(tup_db_read_vars(tup_top_fd(), varfiletent->dt, varfiletent->name.s, vartent->tnode.tupid, NULL) < 0)
+	if(tup_db_read_vars(tup_top_fd(), varfiletent->parent, varfiletent->name.s, vartent, NULL) < 0)
 		return -1;
 
 	printf("Parsing...\n");
@@ -754,7 +754,7 @@ static int delete_variant_dirs(struct tup_entry *tent)
 		if(!variant->root_variant) {
 			struct tup_entry *cleanup_tent;
 
-			if(tup_db_select_tent(variant->tent->dt, tent->name.s, &cleanup_tent) < 0)
+			if(tup_db_select_tent(variant->tent->parent, tent->name.s, &cleanup_tent) < 0)
 				return -1;
 			if(cleanup_tent) {
 				if(tup_db_delete_variant(cleanup_tent, NULL, NULL) < 0)
@@ -970,7 +970,7 @@ static int process_config_nodes(int environ_check)
 					goto err_rollback;
 				if(server_parser_start(&ps) < 0)
 					goto err_rollback;
-				rc = tup_db_read_vars(ps.root_fd, n->tent->dt, TUP_CONFIG, n->tent->tnode.tupid, variant->vardict_file);
+				rc = tup_db_read_vars(ps.root_fd, n->tent->parent, TUP_CONFIG, n->tent, variant->vardict_file);
 				if(server_parser_stop(&ps) < 0)
 					goto err_rollback;
 				if(rc < 0)
@@ -1071,7 +1071,7 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 	if(!new)
 		return NULL;
 
-	sub = tup_db_create_node_srcid(new->tnode.tupid, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid, &do_mkdir);
+	sub = tup_db_create_node_srcid(new, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid, &do_mkdir);
 	if(!sub) {
 		fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
 		print_tup_entry(stderr, base);
@@ -1137,7 +1137,7 @@ static int gitignore(tupid_t tupid)
 
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
-	if(tup_db_select_tent(tupid, ".gitignore", &gitignore_tent) < 0)
+	if(tup_db_select_tent(tent, ".gitignore", &gitignore_tent) < 0)
 		return -1;
 	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
 		const char *tg_str = "##### TUP GITIGNORE #####\n";

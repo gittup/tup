@@ -1128,21 +1128,27 @@ static int handle_event(struct monitor_event *m, int *modified)
 	if(m->e.mask & IN_MOVED_TO && m->from_event) {
 		struct moved_from_event *mfe = m->from_event;
 		struct dircache *from_dc;
+		struct tup_entry *from_dtent;
+		struct tup_entry *dtent;
 
 		from_dc = dircache_lookup_wd(&droot, mfe->m->e.wd);
 		if(!from_dc) {
 			fprintf(stderr, "tup error: dircache entry not found for from event wd %i\n", mfe->m->e.wd);
 			return -1;
 		}
+		if(tup_entry_add(from_dc->dt_node.tupid, &from_dtent) < 0)
+			return -1;
+		if(tup_entry_add(dc->dt_node.tupid, &dtent) < 0)
+			return -1;
 		if(m->e.mask & IN_ISDIR) {
 			struct tup_entry *tent;
 			int rc;
 
-			if(tup_db_select_tent(from_dc->dt_node.tupid, mfe->m->e.name, &tent) < 0)
+			if(tup_db_select_tent(from_dtent, mfe->m->e.name, &tent) < 0)
 				return -1;
 			if(!tent)
 				return -1;
-			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dc->dt_node.tupid) < 0)
+			if(tup_db_change_node(tent->tnode.tupid, m->e.name, dtent) < 0)
 				return -1;
 			if(tup_db_chdir(dc->dt_node.tupid) < 0) {
 				fprintf(stderr, "tup error: Unable to chdir to directory for tupid %lli\n", dc->dt_node.tupid);
@@ -1174,6 +1180,7 @@ static int handle_event(struct monitor_event *m, int *modified)
 	if(m->e.mask & IN_CREATE || m->e.mask & IN_MOVED_TO) {
 		int rc;
 		struct tup_entry *tent;
+		struct tup_entry *dtent;
 
 		if(tup_db_chdir(dc->dt_node.tupid) < 0) {
 			fprintf(stderr, "tup error: Unable to chdir to directory for tupid %lli\n", dc->dt_node.tupid);
@@ -1186,7 +1193,9 @@ static int handle_event(struct monitor_event *m, int *modified)
 		 * this case (t7052). Note we may not get a tent if the file was
 		 * already removed.
 		 */
-		if(tup_db_select_tent(dc->dt_node.tupid, m->e.name, &tent) < 0)
+		if(tup_entry_add(dc->dt_node.tupid, &dtent) < 0)
+			return -1;
+		if(tup_db_select_tent(dtent, m->e.name, &tent) < 0)
 			return -1;
 		if(tent && tent->type != TUP_NODE_GENERATED) {
 			if(m->e.mask & IN_MOVED_TO) {

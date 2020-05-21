@@ -47,7 +47,7 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 	struct tup_entry *dtent;
 	if(tup_entry_add(dt, &dtent) < 0)
 		return -1;
-	if(tup_db_node_insert_tent(dt, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
+	if(tup_db_node_insert_tent(dtent, file, -1, TUP_NODE_FILE, mtime, -1, entry) < 0)
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
@@ -65,7 +65,10 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 tupid_t create_command_file(tupid_t dt, const char *cmd, const char *display, int displaylen, const char *flags, int flagslen)
 {
 	struct tup_entry *tent;
-	tent = tup_db_create_node_part_display(dt, cmd, -1, display, displaylen, flags, flagslen,
+	struct tup_entry *dtent;
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	tent = tup_db_create_node_part_display(dtent, cmd, -1, display, displaylen, flags, flagslen,
 					       TUP_NODE_CMD, -1, NULL);
 	if(tent)
 		return tent->tnode.tupid;
@@ -97,10 +100,13 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			   int force, int ignore_generated, int *modified)
 {
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 	int new = 0;
 	int changed = 0;
 
-	if(tup_db_select_tent(dt, file, &tent) < 0)
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	if(tup_db_select_tent(dtent, file, &tent) < 0)
 		return -1;
 
 	if(!tent) {
@@ -134,7 +140,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			log_debug_tent("Create(overwrite)", tent, ", oldtype=%i\n", tent->type);
 			if(tup_del_id_type(tent->tnode.tupid, tent->type, 1, NULL) < 0)
 				return -1;
-			if(tup_db_select_tent(dt, file, &tent) < 0)
+			if(tup_db_select_tent(dtent, file, &tent) < 0)
 				return -1;
 			if(!tent) {
 				if(create_name_file(dt, file, mtime, &tent) < 0)
@@ -215,11 +221,14 @@ static int check_rm_tup_config(struct tup_entry *tent, int *dont_delete)
 int tup_file_del(tupid_t dt, const char *file, int len, int *modified)
 {
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
 	if(len < 0)
 		len = strlen(file);
 
-	if(tup_db_select_tent_part(dt, file, len, &tent) < 0)
+	if(tup_db_select_tent_part(dtent, file, len, &tent) < 0)
 		return -1;
 	if(!tent) {
 		/* If we are trying to delete a file that isn't in tup, that's
@@ -291,7 +300,7 @@ static struct tup_entry *get_variant_tent(struct tup_entry *srctent, struct vari
 	if(!parent_tent) {
 		return NULL;
 	}
-	if(tup_db_select_tent(parent_tent->tnode.tupid, srctent->name.s, &variant_tent) < 0) {
+	if(tup_db_select_tent(parent_tent, srctent->name.s, &variant_tent) < 0) {
 		return NULL;
 	}
 	return variant_tent;
@@ -374,7 +383,7 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 			 * can be cleaned up as necessary (t8020).
 			 */
 			struct tup_entry *tuptent;
-			if(tup_db_select_tent(tupid, "Tupfile", &tuptent) < 0)
+			if(tup_db_select_tent(tent, "Tupfile", &tuptent) < 0)
 				return -1;
 			if(tuptent) {
 				if(tup_db_set_dependent_dir_flags(tuptent->tnode.tupid) < 0)
@@ -477,13 +486,17 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 {
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 
 	dt = find_dir_tupid_dt(dt, path, &pel, 0, 1);
 	if(dt <= 0)
 		return NULL;
 
+	if(tup_entry_add(dt, &dtent) < 0)
+		return NULL;
+
 	if(pel) {
-		if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+		if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 			return NULL;
 		free(pel);
 		if(!tent)
@@ -584,10 +597,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 			}
 			tent = tent->parent;
 		} else {
-			tupid_t curdt;
+			struct tup_entry *curtent = tent;
 
-			curdt = tent->tnode.tupid;
-			if(tup_db_select_tent_part(curdt, pel->path, pel->len, &tent) < 0)
+			if(tup_db_select_tent_part(tent, pel->path, pel->len, &tent) < 0)
 				return -1;
 			if(tent) {
 				if(sotgv == SOTGV_CREATE_DIRS) {
@@ -618,10 +630,10 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					type = TUP_NODE_DIR;
 
 				if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
-					if(get_outside_tup_mtime(curdt, pel, &mtime) < 0)
+					if(get_outside_tup_mtime(curtent->tnode.tupid, pel, &mtime) < 0)
 						return -1;
 				}
-				if(tup_db_node_insert_tent(curdt, pel->path, pel->len, type, mtime, -1, &tent) < 0)
+				if(tup_db_node_insert_tent(curtent, pel->path, pel->len, type, mtime, -1, &tent) < 0)
 					return -1;
 			}
 		}
@@ -687,6 +699,7 @@ int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
 int gimme_tent(const char *name, struct tup_entry **entry)
 {
 	tupid_t dt;
+	struct tup_entry *dtent;
 	struct path_element *pel = NULL;
 
 	dt = find_dir_tupid_dt(DOT_DT, name, &pel, 0, 1);
@@ -700,7 +713,9 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 		*entry = tup_entry_get(dt);
 		return 0;
 	}
-	if(tup_db_select_tent_part(dt, pel->path, pel->len, entry) < 0)
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	if(tup_db_select_tent_part(dtent, pel->path, pel->len, entry) < 0)
 		return -1;
 	free(pel);
 	return 0;

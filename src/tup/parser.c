@@ -93,7 +93,7 @@ static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno,
 		      struct bin_head *bl);
 static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent);
-static int gitignore(struct tupfile *tf, tupid_t dt);
+static int gitignore(struct tupfile *tf, struct tup_entry *dtent);
 static int check_toplevel_gitignore(struct tupfile *tf);
 static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
@@ -219,8 +219,8 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		ps.root_fd = tup_top_fd();
 	}
 
-	tf.tupid = n->tnode.tupid;
-	tf.curtent = tup_entry_get(tf.tupid);
+	tf.tent = n->tent;
+	tf.curtent = tf.tent;
 	tf.root_fd = ps.root_fd;
 	tf.g = g;
 	tf.refactoring = refactoring;
@@ -228,7 +228,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(tf.variant->root_variant) {
 		tf.srctent = NULL;
 	} else {
-		if(variant_get_srctent(tf.variant, tf.tupid, &tf.srctent) < 0)
+		if(variant_get_srctent(tf.variant, tf.tent, &tf.srctent) < 0)
 			goto out_server_stop;
 	}
 	tf.ign = 0;
@@ -244,13 +244,13 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype_to_tree(tf.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype_to_tree(tf.tent->tnode.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
-	if(tup_db_srcid_to_tree(tf.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_srcid_to_tree(tf.tent->tnode.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
 	if(refactoring) {
-		if(tup_db_dirtype_to_tree(tf.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
+		if(tup_db_dirtype_to_tree(tf.tent->tnode.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
 			goto out_close_vdb;
 	}
 
@@ -263,7 +263,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	} else {
 		tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
 		if(tf.cur_dfd < 0) {
-			fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tupid);
+			fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tent->tnode.tupid);
 			goto out_close_vdb;
 		}
 
@@ -273,7 +273,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			/* No Tupfile means we have nothing to do */
 			if(n->tent->tnode.tupid == DOT_DT) {
 				/* Check to see if the top-level rules file would .gitignore. We disable
-				 * tf.tupid so no rules get created.
+				 * tf.tent->tnode.tupid so no rules get created.
 				 */
 				if(check_toplevel_gitignore(&tf) < 0)
 					goto out_close_dfd;
@@ -294,17 +294,20 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(tf.ign) {
 		if(!tf.variant->root_variant) {
 			if(n->tent->srcid == DOT_DT) {
-				if(gitignore(&tf, n->tent->srcid) < 0) {
+				struct tup_entry *srctent;
+				if(tup_entry_add(n->tent->srcid, &srctent) < 0)
+					return -1;
+				if(gitignore(&tf, srctent) < 0) {
 					goto out_free_bs;
 				}
 			}
 		}
-		if(gitignore(&tf, tf.tupid) < 0) {
+		if(gitignore(&tf, tf.tent) < 0) {
 			goto out_free_bs;
 		}
 	} else {
 		struct tup_entry *tent;
-		if(tup_db_select_tent(tf.tupid, ".gitignore", &tent) < 0)
+		if(tup_db_select_tent(tf.tent, ".gitignore", &tent) < 0)
 			goto out_free_bs;
 		if(tent && tent->type == TUP_NODE_GENERATED) {
 			if(refactoring) {
@@ -355,7 +358,7 @@ out_server_stop:
 		}
 		if(add_parser_files(&ps.s.finfo, &tf.input_root, tf.variant->tent->tnode.tupid, full_deps) < 0)
 			rc = -1;
-		if(tup_db_write_dir_inputs(tf.f, tf.tupid, &tf.input_root) < 0)
+		if(tup_db_write_dir_inputs(tf.f, tf.tent->tnode.tupid, &tf.input_root) < 0)
 			rc = -1;
 	}
 
@@ -404,10 +407,10 @@ static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char
 	struct tup_entry *tupfile_tent;
 	if(handle_file_dtent(ACCESS_READ, dtent, path, &tf->ps->s.finfo) < 0)
 		return -1;
-	if(tup_db_select_tent(dtent->tnode.tupid, path, &tupfile_tent) < 0)
+	if(tup_db_select_tent(dtent, path, &tupfile_tent) < 0)
 		return -1;
 	if(!tupfile_tent) {
-		if(tup_db_node_insert_tent(dtent->tnode.tupid, path, strlen(path), TUP_NODE_GHOST, -1, -1, &tupfile_tent) < 0) {
+		if(tup_db_node_insert_tent(dtent, path, strlen(path), TUP_NODE_GHOST, -1, -1, &tupfile_tent) < 0) {
 			fprintf(tf->f, "tup error: Node '%s' doesn't exist and we couldn't create a ghost in directory: ", path);
 			print_tup_entry(tf->f, dtent);
 			fprintf(tf->f, "\n");
@@ -891,13 +894,13 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 		fprintf(tf->f, "tup internal error: ps.path is sized incorrectly in gen_dir_list()\n");
 		return -1;
 	}
-	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, dt,
+	if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, tent,
 				       "*", -1, &tf->g->gen_delete_root, 1) < 0)
 		return -EIO;
-	if(variant_get_srctent(tf->variant, dt, &srctent) < 0)
+	if(variant_get_srctent(tf->variant, tent, &srctent) < 0)
 		return -1;
 	if(srctent) {
-		if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, srctent->tnode.tupid,
+		if(tup_db_select_node_dir_glob(readdir_parser_cb, &rpp, srctent,
 					       "*", -1, &tf->g->gen_delete_root, 1) < 0)
 			return -EIO;
 	}
@@ -934,16 +937,16 @@ static int preload(struct tupfile *tf, char *cmdline)
 
 		if(path_list_fill_dt_pel(tf, pl, tf->curtent->tnode.tupid, 0) < 0)
 			return -1;
+		if(tup_entry_add(pl->dt, &tent) < 0)
+			return -1;
 		if(pl->pel->len == 2 && strncmp(pl->pel->path, "..", 2) == 0) {
-			if(tup_entry_add(pl->dt, &tent) < 0)
-				return -1;
 			if(!tent->parent) {
 				fprintf(tf->f, "tup error: Unable to preload a directory beyond the tup hierarchy.\n");
 				return -1;
 			}
 			tent = tent->parent;
 		} else {
-			if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0)
+			if(tup_db_select_tent_part(tent, pl->pel->path, pl->pel->len, &tent) < 0)
 				return -1;
 			if(!tent) {
 				fprintf(tf->f, "tup error: Unable to find node '%.*s' for preloading in directory %lli\n", pl->pel->len, pl->pel->path, pl->dt);
@@ -993,7 +996,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 	struct tent_tree *tt;
 
 	pthread_mutex_lock(&tf->ps->lock);
-	rc = gen_dir_list(tf, tf->tupid);
+	rc = gen_dir_list(tf, tf->tent->tnode.tupid);
 	pthread_mutex_unlock(&tf->ps->lock);
 	if(rc < 0)
 		return -1;
@@ -1008,7 +1011,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 		if(tent_tree_add_dup(&tf->input_root, tt->tent) < 0)
 			return -1;
 	}
-	rc = server_run_script(tf->f, tf->tupid, cmdline, &tf->env_root, &rules);
+	rc = server_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
 	if(rc < 0)
 		return -1;
 
@@ -1164,18 +1167,18 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 	return 0;
 }
 
-static int gitignore(struct tupfile *tf, tupid_t dt)
+static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 {
 	struct tup_entry *tent;
 
-	if(tup_db_select_tent(dt, ".gitignore", &tent) < 0)
+	if(tup_db_select_tent(dtent, ".gitignore", &tent) < 0)
 		return -1;
 	if(!tent) {
 		if(tf->refactoring) {
 			fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
 			return -1;
 		}
-		if(tup_db_node_insert_tent(dt, ".gitignore", -1, TUP_NODE_GENERATED, -1, dt, &tent) < 0)
+		if(tup_db_node_insert_tent(dtent, ".gitignore", -1, TUP_NODE_GENERATED, -1, dtent->tnode.tupid, &tent) < 0)
 			return -1;
 	} else {
 		tree_entry_remove(&tf->g->gen_delete_root,
@@ -1188,11 +1191,11 @@ static int gitignore(struct tupfile *tf, tupid_t dt)
 		if(tent->type != TUP_NODE_GENERATED) {
 			if(tup_db_set_type(tent, TUP_NODE_GENERATED) < 0)
 				return -1;
-			if(tup_db_set_srcid(tent, dt) < 0)
+			if(tup_db_set_srcid(tent, dtent->tnode.tupid) < 0)
 				return -1;
 		}
 	}
-	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dt) < 0)
+	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dtent->tnode.tupid) < 0)
 		return -1;
 	return 0;
 }
@@ -1215,7 +1218,7 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 	 * .gitignore directive inside a conditional, but that doesn't really
 	 * make sense anyway.
 	 */
-	if(tup_db_select_tent(tf->tupid, "Tuprules.tup", &tent) < 0)
+	if(tup_db_select_tent(tf->tent, "Tuprules.tup", &tent) < 0)
 		return -1;
 	if(!tent || tent->type == TUP_NODE_GHOST)
 		return 0;
@@ -1334,11 +1337,11 @@ int parser_include_file(struct tupfile *tf, const char *file)
 	}
 	tf->curtent = newtent;
 
-	if(variant_get_srctent(tf->variant, newdt, &srctent) < 0)
+	if(variant_get_srctent(tf->variant, newtent, &srctent) < 0)
 		return -1;
 	if(!srctent)
 		srctent = tf->curtent;
-	if(tup_db_select_tent_part(srctent->tnode.tupid, pel->path, pel->len, &tent) < 0 || !tent) {
+	if(tup_db_select_tent_part(srctent, pel->path, pel->len, &tent) < 0 || !tent) {
 		fprintf(tf->f, "tup error: Unable to find tup entry for file '%s'\n", file);
 		goto out_free_pel;
 	}
@@ -1706,7 +1709,7 @@ static int set_variable(struct tupfile *tf, char *line)
 		if(!tent || tent->type == TUP_NODE_GHOST) {
 			/* didn't find the given file; if using a variant, check the source dir */
 			struct tup_entry *srctent;
-			if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
+			if(variant_get_srctent(tf->variant, tf->curtent, &srctent) < 0)
 				return -1;
 			if(srctent)
 				tent = get_tent_dt(srctent->tnode.tupid, value);
@@ -2477,12 +2480,12 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 	struct path_list *pl;
 
 	TAILQ_FOREACH(pl, plist, list) {
-		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 0) < 0)
+		if(path_list_fill_dt_pel(tf, pl, tf->tent->tnode.tupid, 0) < 0)
 			return -1;
 		/* Only care about non-bins, non-groups, non-exclusions,
 		 * non-external files, and directories that are not our own.
 		 */
-		if(!pl->bin && !pl->group && !pl->re && pl->dt != -1 && pl->dt != tf->tupid) {
+		if(!pl->bin && !pl->group && !pl->re && pl->dt != -1 && pl->dt != tf->tent->tnode.tupid) {
 			struct node *n;
 			struct tup_entry *dtent;
 
@@ -2587,14 +2590,17 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.orderid = orderid;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent;
+		struct tup_entry *dtent;
 		struct variant *variant;
 
-		if(tup_db_select_tent_part(pl->dt, pl->pel->path, pl->pel->len, &tent) < 0) {
+		if(tup_entry_add(pl->dt, &dtent) < 0)
+			return -1;
+		if(tup_db_select_tent_part(dtent, pl->pel->path, pl->pel->len, &tent) < 0) {
 			return -1;
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
 			if(pl->pel->path[0] == '<') {
-				tent = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+				tent = tup_db_create_node_part(dtent, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 				if(!tent) {
 					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
 					return -1;
@@ -2602,10 +2608,10 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			} else {
 				struct tup_entry *srctent = NULL;
 
-				if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+				if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
 					return -1;
 				if(srctent)
-					if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tent) < 0)
+					if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tent) < 0)
 						return -1;
 			}
 		}
@@ -2618,7 +2624,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				if(lstat(pl->mem, &buf) == 0) {
 					mtime = MTIME(buf);
 				}
-				if(tup_db_node_insert_tent(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
+				if(tup_db_node_insert_tent(dtent, pl->pel->path, pl->pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
 					fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pl->pel->len, pl->pel->path, pl->dt);
 					return -1;
 				}
@@ -2647,11 +2653,11 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			 * created a regular file in the srctree), then we are
 			 * good (t8072).
 			 */
-			if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+			if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
 				return -1;
 			if(srctent) {
 				struct tup_entry *tmp;
-				if(tup_db_select_tent_part(srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tmp) < 0)
+				if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tmp) < 0)
 					return -1;
 				if(tmp && tmp->type != TUP_NODE_GHOST) {
 					valid_input = 1;
@@ -2686,12 +2692,12 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		}
 
 		args.wildcard = 1;
-		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
+		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, dtent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
 			return -1;
-		if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0)
+		if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
 			return -1;
 		if(srctent) {
-			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
+			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
 				return -1;
 		}
 	}
@@ -2798,12 +2804,12 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	/* If the file is generated from another directory, we can't use it in
 	 * a wildcard.
 	 * 1) srcid == -1 is for normal files
-	 * 2) tent->srcid == tf->tupid is for files generated by our Tupfile,
+	 * 2) tent->srcid == tf->tent->tnode.tupid is for files generated by our Tupfile,
 	 *    even if they are in another directory
 	 * 3) tent->srcid == tent->dt is for files generated by the directory's
 	 *    own Tupfile, which are still wildcard-able.
 	 */
-	if(tent->srcid != -1 && tent->srcid != tf->tupid && tent->srcid != tent->dt) {
+	if(tent->srcid != -1 && tent->srcid != tf->tent->tnode.tupid && tent->srcid != tent->dt) {
 		struct tup_entry *srctent;
 		if(args->wildcard)
 			return 0;
@@ -3074,12 +3080,12 @@ static int add_input(struct tupfile *tf, struct tent_entries *input_root,
 	return 0;
 }
 
-static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
+static int validate_output(struct tupfile *tf, struct tup_entry *dtent, const char *name,
 			   const char *fullname, struct tupid_entries *del_root)
 {
 	struct tup_entry *tent;
 
-	if(tup_db_select_tent(dt, name, &tent) < 0)
+	if(tup_db_select_tent(dtent, name, &tent) < 0)
 		return -1;
 	if(tent) {
 		if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED) {
@@ -3108,8 +3114,8 @@ static int validate_output(struct tupfile *tf, tupid_t dt, const char *name,
 			}
 		} else {
 			fprintf(tf->f, "tup error: Attempting to insert '");
-			if(dt != tf->tupid) {
-				get_relative_dir(tf->f, NULL, tf->tupid, dt);
+			if(dtent != tf->tent) {
+				get_relative_dir(tf->f, NULL, tf->tent->tnode.tupid, dtent->tnode.tupid);
 				fprintf(tf->f, "/");
 			}
 			fprintf(tf->f, "%s' as a generated node when it already exists as a different type (%s). You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", name, tup_db_type(tent->type));
@@ -3175,9 +3181,13 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 
 	TAILQ_FOREACH(pl, &tmplist2, list) {
 		struct tup_entry *dest_tent;
+		struct tup_entry *tmp_tent;
 		struct name_list_entry *onle;
 
-		if(path_list_fill_dt_pel(tf, pl, tf->tupid, 1) < 0)
+		if(path_list_fill_dt_pel(tf, pl, tf->tent->tnode.tupid, 1) < 0)
+			return -1;
+
+		if(tup_entry_add(pl->dt, &dest_tent) < 0)
 			return -1;
 
 		if(pl->group) {
@@ -3188,7 +3198,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 				return -1;
 			}
 
-			*group = tup_db_create_node_part(pl->dt, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			*group = tup_db_create_node_part(dest_tent, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
 			if(!*group)
 				return -1;
 			continue;
@@ -3196,7 +3206,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		if(pl->re) {
 			struct tup_entry *tent;
 
-			tent = tup_db_create_node(pl->dt, &pl->mem[1], TUP_NODE_GHOST);
+			tent = tup_db_create_node(dest_tent, &pl->mem[1], TUP_NODE_GHOST);
 			if(!tent) {
 				fprintf(tf->f, "tup error: Unable to create exclusion output node for: %s\n", pl->mem);
 				return -1;
@@ -3253,7 +3263,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 
 		if(tf->srctent && !is_variant_copy) {
 			struct tup_entry *tent;
-			if(tup_db_select_tent(tf->srctent->tnode.tupid, onle->path, &tent) < 0)
+			if(tup_db_select_tent(tf->srctent, onle->path, &tent) < 0)
 				return -1;
 			if(tent && tent->type != TUP_NODE_GHOST) {
 				fprintf(tf->f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s) in the source directory. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", onle->path, tup_db_type(tent->type));
@@ -3261,27 +3271,25 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			}
 		}
 
-		if(tup_entry_add(pl->dt, &dest_tent) < 0)
-			return -1;
-
 		/* Go up until we find a non-generated dir, so we can try to
 		 * gitignore there.
 		 */
-		while(dest_tent->type == TUP_NODE_GENERATED_DIR) {
-			dest_tent = dest_tent->parent;
+		tmp_tent = dest_tent;
+		while(tmp_tent->type == TUP_NODE_GENERATED_DIR) {
+			tmp_tent = tmp_tent->parent;
 		}
-		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dest_tent->tnode.tupid) < 0)
+		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, tmp_tent->tnode.tupid) < 0)
 			return -1;
 
 		set_nle_base(onle);
-		if(validate_output(tf, pl->dt, onle->base, onle->path, &tf->g->cmd_delete_root) < 0) {
+		if(validate_output(tf, dest_tent, onle->base, onle->path, &tf->g->cmd_delete_root) < 0) {
 			rc = -1;
 			continue;
 		}
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
-		onle->tent = tup_db_create_node_part(pl->dt, onle->base, -1,
-						     TUP_NODE_GENERATED, tf->tupid, command_modified);
+		onle->tent = tup_db_create_node_part(dest_tent, onle->base, -1,
+						     TUP_NODE_GENERATED, tf->tent->tnode.tupid, command_modified);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
@@ -3451,7 +3459,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	 * node. Note we require a case-sensitive comparison, since we want to
 	 * re-run the command if the case of a string or filename has changed.
 	 */
-	if(tup_db_select_tent(tf->tupid, cmd, &tmptent) < 0)
+	if(tup_db_select_tent(tf->tent, cmd, &tmptent) < 0)
 		return -1;
 	if(tmptent && strcmp(tmptent->name.s, cmd) == 0) {
 		cmdid = tmptent->tnode.tupid;
@@ -3468,7 +3476,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
 				return -1;
 			}
-			cmdid = create_command_file(tf->tupid, cmd, real_display, real_displaylen, cs.flags, cs.flagslen);
+			cmdid = create_command_file(tf->tent->tnode.tupid, cmd, real_display, real_displaylen, cs.flags, cs.flagslen);
 		} else {
 			if(tf->refactoring) {
 				struct tup_entry *old;
@@ -3479,7 +3487,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				fprintf(tf->f, "New: '%s'\n", cmd);
 				return -1;
 			}
-			if(tup_db_set_name(cmdid, cmd, tf->tupid) < 0)
+			if(tup_db_set_name(cmdid, cmd, tf->tent->tnode.tupid) < 0)
 				return -1;
 
 			/* Since we changed the name, we have to run the
@@ -3905,7 +3913,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			}
 			p++;
 		} else if(*next == 'd') {
-			if(tf->tupid == DOT_DT) {
+			if(tf->tent->tnode.tupid == DOT_DT) {
 				/* At the top of the tup-hierarchy, we get the
 				 * directory from where .tup is stored, since
 				 * the top-level tup entry is just "."
@@ -3924,7 +3932,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				estring_append(&e, dirstring, len);
 			} else {
 				struct tup_entry *tent;
-				if(tup_entry_add(tf->tupid, &tent) < 0)
+				if(tup_entry_add(tf->tent->tnode.tupid, &tent) < 0)
 					return NULL;
 				/* Anywhere else in the hierarchy can just use
 				 * the last tup entry of the parsed directory
@@ -4072,9 +4080,9 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				var = s + 2;
 				if(rparen-var == 7 &&
 				   strncmp(var, "TUP_CWD", 7) == 0) {
-					if(get_relative_dir(NULL, &e, tf->tupid, tf->curtent->tnode.tupid) < 0) {
-						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
-						tup_db_print(tf->f, tf->tupid);
+					if(get_relative_dir(NULL, &e, tf->tent->tnode.tupid, tf->curtent->tnode.tupid) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tent->tnode.tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->tent->tnode.tupid);
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
 					}

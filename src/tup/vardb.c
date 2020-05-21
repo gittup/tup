@@ -195,10 +195,10 @@ struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen)
 }
 
 int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
-		  int (*extra_a)(struct var_entry *ve, tupid_t vardt),
-		  int (*extra_b)(struct var_entry *ve, tupid_t vardt),
+		  int (*extra_a)(struct var_entry *ve, struct tup_entry *var_dtent),
+		  int (*extra_b)(struct var_entry *ve, struct tup_entry *var_dtent),
 		  int (*same)(struct var_entry *vea, struct var_entry *veb),
-		  tupid_t vardt)
+		  struct tup_entry *var_dtent)
 {
 	struct string_tree *sta;
 	struct string_tree *stb;
@@ -213,12 +213,12 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 	while(sta || stb) {
 		if(!sta) {
 			veb = container_of(stb, struct var_entry, var);
-			if(extra_b && extra_b(veb, vardt) < 0)
+			if(extra_b && extra_b(veb, var_dtent) < 0)
 				return -1;
 			stb = RB_NEXT(string_entries, b, stb);
 		} else if(!stb) {
 			vea = container_of(sta, struct var_entry, var);
-			if(extra_a && extra_a(vea, vardt) < 0)
+			if(extra_a && extra_a(vea, var_dtent) < 0)
 				return -1;
 			sta = RB_NEXT(string_entries, a, sta);
 		} else {
@@ -232,11 +232,11 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 				sta = RB_NEXT(string_entries, a, sta);
 				stb = RB_NEXT(string_entries, b, stb);
 			} else if(rc < 0) {
-				if(extra_a && extra_a(vea, vardt) < 0)
+				if(extra_a && extra_a(vea, var_dtent) < 0)
 					return -1;
 				sta = RB_NEXT(string_entries, a, sta);
 			} else {
-				if(extra_b && extra_b(veb, vardt) < 0)
+				if(extra_b && extra_b(veb, var_dtent) < 0)
 					return -1;
 				stb = RB_NEXT(string_entries, b, stb);
 			}

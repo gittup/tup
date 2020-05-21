@@ -43,7 +43,7 @@ struct parser_server;
 struct lua_State;
 
 struct tupfile {
-	tupid_t tupid;
+	struct tup_entry *tent;
 	struct variant *variant;
 	struct tup_entry *curtent;
 	struct tup_entry *srctent;

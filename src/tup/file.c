@@ -284,6 +284,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 	struct path_element *pel = NULL;
 	struct pel_group pg;
 	struct tup_entry *tent;
+	struct tup_entry *new_dtent;
 
 	if(get_path_elements(filename, &pg) < 0)
 		return -1;
@@ -301,7 +302,9 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 		return 0;
 	}
 
-	if(tup_db_select_tent_part(new_dt, pel->path, pel->len, &tent) < 0)
+	if(tup_entry_add(new_dt, &new_dtent) < 0)
+		return -1;
+	if(tup_db_select_tent_part(new_dtent, pel->path, pel->len, &tent) < 0)
 		return -1;
 	if(!tent) {
 		time_t mtime = -1;
@@ -314,7 +317,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 		 * scan them. Files can still have a valid mtime, and
 		 * directories have an mtime of 0, though.
 		 */
-		if(tup_db_node_insert_tent(new_dt, pel->path, pel->len, type, mtime, -1, &tent) < 0) {
+		if(tup_db_node_insert_tent(new_dtent, pel->path, pel->len, type, mtime, -1, &tent) < 0) {
 			fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pel->len, pel->path, new_dt);
 			return -1;
 		}
@@ -580,6 +583,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 {
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
+	struct tup_entry *dtent;
 	tupid_t dt;
 
 	dt = find_dir_tupid_dt(DOT_DT, w->filename, &pel, SOTGV_IGNORE_DIRS, 0);
@@ -591,7 +595,9 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 		fprintf(f, "tup internal error: create_ignored_file() didn't get a final pel pointer for file: %s\n", w->filename);
 		return -1;
 	}
-	tent = tup_db_create_node_part(dt, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	tent = tup_db_create_node_part(dtent, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
 	if(!tent)
 		return -1;
 	free(pel);
@@ -646,12 +652,15 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		newdt = find_dir_tupid_dt_pg(DOT_DT, &pg, &pel, 0, 0);
 		del_pel_group(&pg);
 		if(newdt > 0) {
+			struct tup_entry *dtent;
+			if(tup_entry_add(newdt, &dtent) < 0)
+				return -1;
 			if(!pel) {
 				fprintf(f, "tup internal error: find_dir_tupid_dt_pg() in write_files() didn't get a final pel pointer for file: %s\n", w->filename);
 				return -1;
 			}
 
-			if(tup_db_select_tent_part(newdt, pel->path, pel->len, &tent) < 0)
+			if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 				return -1;
 			free(pel);
 		}

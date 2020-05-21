@@ -49,7 +49,7 @@ int variant_enable(struct variant *variant);
 struct variant *variant_search(tupid_t dt);
 struct variant_head *get_variant_list(void);
 int variant_list_empty(void);
-int variant_get_srctent(struct variant *variant, tupid_t tupid, struct tup_entry **srctent);
+int variant_get_srctent(struct variant *variant, struct tup_entry *tent, struct tup_entry **srctent);
 void variants_free(void);
 
 #endif

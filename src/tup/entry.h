@@ -73,9 +73,9 @@ int tup_entry_init(void);
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
 			       struct tup_entry **dest);
-int tup_entry_find_name_in_dir_dt(tupid_t dt, const char *name, int len,
+int tup_entry_find_name_in_dir_dt(struct tup_entry *dtent, const char *name, int len,
 				  struct tup_entry **dest);
-int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
+int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest);

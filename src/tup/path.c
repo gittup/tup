@@ -66,11 +66,19 @@ static int watch_path_internal(tupid_t dt, const char *file,
 	} else if(S_ISDIR(buf.st_mode)) {
 		struct tupid_entries root = {NULL};
 		struct tup_entry *tent;
+		struct tup_entry *dtent;
 		int skip = 0;
 
-		tent = tup_db_create_node(dt, file, TUP_NODE_DIR);
-		if(!tent)
-			return -1;
+		if(dt == 0) {
+			if(tup_entry_add(DOT_DT, &tent) < 0)
+				return -1;
+		} else {
+			if(tup_entry_add(dt, &dtent) < 0)
+				return -1;
+			tent = tup_db_create_node(dtent, file, TUP_NODE_DIR);
+			if(!tent)
+				return -1;
+		}
 
 		if(callback) {
 			if(callback(tent->tnode.tupid, file, &skip) < 0)

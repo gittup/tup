@@ -65,7 +65,7 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	if(tupid <= 0) {
+	if(tupid < 0) {
 		fprintf(stderr, "tup error: Tupid is %lli in tup_entry_add()\n",
 			tupid);
 		return -1;
@@ -91,28 +91,22 @@ int tup_entry_add(tupid_t tupid, struct tup_entry **dest)
 	return 0;
 }
 
-int tup_entry_find_name_in_dir_dt(tupid_t dt, const char *name, int len,
+int tup_entry_find_name_in_dir_dt(struct tup_entry *dtent, const char *name, int len,
 				  struct tup_entry **dest)
 {
-	struct tup_entry *parent;
-
 	if(len < 0)
 		len = strlen(name);
 
-	if(dt == 0) {
+	if(dtent->tnode.tupid == 0) {
 		if(strncmp(name, ".", len) == 0) {
 			*dest = tup_entry_find(DOT_DT);
 			return 0;
 		}
-		fprintf(stderr, "tup error: entry '%.*s' shouldn't have dt == 0\n", len, name);
+		fprintf(stderr, "tup error: entry '%.*s' shouldn't have dtent == NULL\n", len, name);
 		return -1;
 	}
 
-	if(tup_entry_add(dt, &parent) < 0) {
-		fprintf(stderr, "tup error: Unable to find parent entry [%lli] for node '%.*s'\n", dt, len, name);
-		return -1;
-	}
-	return tup_entry_find_name_in_dir(parent, name, len, dest);
+	return tup_entry_find_name_in_dir(dtent, name, len, dest);
 }
 
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
@@ -271,14 +265,14 @@ int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 	return rc;
 }
 
-int tup_entry_add_to_dir(tupid_t dt, tupid_t tupid, const char *name, int len,
+int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
 
-	tent = new_entry(tupid, dt, name, len, display, displaylen, flags, flagslen, type, mtime, srcid);
+	tent = new_entry(tupid, dtent->tnode.tupid, name, len, display, displaylen, flags, flagslen, type, mtime, srcid);
 	if(!tent)
 		return -1;
 	if(resolve_parent(tent) < 0)

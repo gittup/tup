@@ -128,9 +128,12 @@ skip_num_elements:
 int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 {
 	struct path_element *pel;
-	tupid_t dt = DOT_DT;
+	struct tup_entry *dtent;
 	struct tup_entry *tent;
 	const char *top = get_tup_top();
+
+	if(tup_entry_add(DOT_DT, &dtent) < 0)
+		return -1;
 
 	if(pg->pg_flags & PG_ROOT) {
 		TAILQ_FOREACH(pel, &pg->path_list, list) {
@@ -144,14 +147,14 @@ int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 				}
 				top += pel->len;
 			} else {
-				if(tup_db_select_tent_part(dt, pel->path, pel->len, &tent) < 0)
+				if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 					return -1;
 				if(tent == NULL) {
-					fprintf(stderr, "tup error: Unable to find tup_entry for node '%.*s' relative to directory %lli\n", pel->len, pel->path, dt);
-					tup_db_print(stderr, dt);
+					fprintf(stderr, "tup error: Unable to find tup_entry for node '%.*s' relative to directory %lli\n", pel->len, pel->path, dtent->tnode.tupid);
+					tup_db_print(stderr, dtent->tnode.tupid);
 					return -1;
 				}
-				dt = tent->tnode.tupid;
+				dtent = tent->parent;
 			}
 		}
 	} else {
@@ -163,7 +166,7 @@ int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
 	 * tup hierarchy, so set tupid to -1.
 	 */
 	if(*top == 0) {
-		*tupid = dt;
+		*tupid = dtent->tnode.tupid;
 	} else {
 		*tupid = -1;
 	}

@@ -271,7 +271,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	TAILQ_FOREACH(nle, &return_nl.entries, list) {
 		struct estring e;
 		estring_init(&e);
-		if(get_relative_dir(NULL, &e, tf->tupid, nle->tent->tnode.tupid) < 0)
+		if(get_relative_dir(NULL, &e, tf->tent->tnode.tupid, nle->tent->tnode.tupid) < 0)
 			return luaL_error(ls, "Unable to get relative path of output file.");
 		lua_pushinteger(ls, count);
 		lua_pushlstring(ls, e.s, e.len);
@@ -313,9 +313,9 @@ static int tuplua_function_getcwd(lua_State *ls)
 	if(estring_init(&e) < 0)
 		return luaL_error(ls, "Error allocating memory in tuplua_function_getcwd()");
 
-	if(get_relative_dir(NULL, &e, tf->tupid, tf->curtent->tnode.tupid) < 0) {
-		fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tupid, tf->curtent->tnode.tupid);
-		tup_db_print(tf->f, tf->tupid);
+	if(get_relative_dir(NULL, &e, tf->tent->tnode.tupid, tf->curtent->tnode.tupid) < 0) {
+		fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->tent->tnode.tupid, tf->curtent->tnode.tupid);
+		tup_db_print(tf->f, tf->tent->tnode.tupid);
 		tup_db_print(tf->f, tf->curtent->tnode.tupid);
 		return luaL_error(ls, "Failed to get relative directory in getcwd.");
 	}
@@ -329,7 +329,7 @@ static int tuplua_function_getdirectory(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 
-	if(tf->tupid == DOT_DT) {
+	if(tf->tent->tnode.tupid == DOT_DT) {
 		/* At the top of the tup-hierarchy, we get the
 		 * directory from where .tup is stored, since
 		 * the top-level tup entry is just "."
@@ -368,11 +368,11 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 	dirname = tuplua_tostring(ls, -1);
 	if(!dirname)
 		return luaL_error(ls, "tup.getrelativedir() called with a nil path");
-	dest = find_dir_tupid_dt(tf->tupid, dirname, NULL, 0, 0);
+	dest = find_dir_tupid_dt(tf->tent->tnode.tupid, dirname, NULL, 0, 0);
 	if(dest < 0)
 		return luaL_error(ls, "Failed to find tup entry for '%s' relative to the current Tupfile", dirname);
-	if(get_relative_dir(NULL, &e, dest, tf->tupid) < 0)
-		return luaL_error(ls, "tup.getrelativedir() failed to get relative path from tupid %lli to %lli", dest, tf->tupid);
+	if(get_relative_dir(NULL, &e, dest, tf->tent->tnode.tupid) < 0)
+		return luaL_error(ls, "tup.getrelativedir() failed to get relative path from tupid %lli to %lli", dest, tf->tent->tnode.tupid);
 	lua_pushlstring(ls, e.s, e.len);
 	free(e.s);
 	return 1;
@@ -485,19 +485,19 @@ static int tuplua_function_glob(lua_State *ls)
 		free(pl->pel);
 		return lua_error(ls);
 	}
-	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, pl->dt, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
+	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, dtent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
 		lua_pushfstring(ls, "Failed to glob for pattern '%s' in build(?) tree.", pattern);
 		free_path_list(&plist);
 		return lua_error(ls);
 	}
 
-	if(variant_get_srctent(tf->variant, pl->dt, &srctent) < 0) {
+	if(variant_get_srctent(tf->variant, dtent, &srctent) < 0) {
 		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern '%s'.", pattern);
 		free(pl->pel);
 		return lua_error(ls);
 	}
 	if(srctent) {
-		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent->tnode.tupid, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
+		if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, srctent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
 			lua_pushfstring(ls, "Failed to glob for pattern '%s' in source(?) tree.", pattern);
 			free_path_list(&plist);
 			return lua_error(ls);
@@ -599,7 +599,7 @@ static int tuplua_function_nodevariable(lua_State *ls)
 	if(!tent) {
 		/* didn't find the given file; if using a variant, check the source dir */
 		struct tup_entry *srctent;
-		if(variant_get_srctent(tf->variant, tf->curtent->tnode.tupid, &srctent) < 0)
+		if(variant_get_srctent(tf->variant, tf->curtent, &srctent) < 0)
 			return luaL_error(ls, "tup error: Internal error locating source tup entry for node variable.");
 		if(srctent)
 			tent = get_tent_dt(srctent->tnode.tupid, tuplua_tostring(ls, 1));

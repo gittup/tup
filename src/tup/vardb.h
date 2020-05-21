@@ -53,10 +53,10 @@ int vardb_append(struct vardb *v, const char *var, const char *value);
 int vardb_copy(struct vardb *v, const char *var, int varlen, struct estring *e);
 struct var_entry *vardb_get(struct vardb *v, const char *var, int varlen);
 int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
-		  int (*extra_a)(struct var_entry *ve, tupid_t vardt),
-		  int (*extra_b)(struct var_entry *ve, tupid_t vardt),
+		  int (*extra_a)(struct var_entry *ve, struct tup_entry *var_dtent),
+		  int (*extra_b)(struct var_entry *ve, struct tup_entry *var_dtent),
 		  int (*same)(struct var_entry *vea, struct var_entry *veb),
-		  tupid_t vardt);
+		  struct tup_entry *var_dtent);
 void vardb_dump(struct vardb *v);
 
 /* Node variables */
