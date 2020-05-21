@@ -576,7 +576,7 @@ int server_unlink(void)
 }
 
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
-		      struct tupid_entries *env_root, char **rules)
+		      struct tent_entries *env_root, char **rules)
 {
 	struct tup_entry *tent;
 	struct server s;

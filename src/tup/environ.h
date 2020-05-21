@@ -21,9 +21,9 @@
 #ifndef tup_environ_h
 #define tup_environ_h
 
-struct tupid_entries;
+struct tent_entries;
 
-int environ_add_defaults(struct tupid_entries *root);
+int environ_add_defaults(struct tent_entries *root);
 
 /* This returns the environment in the Windows-style format, where it is one
  * long string with a "\0\0" to terminate the array. Each individual environment

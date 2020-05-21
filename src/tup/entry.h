@@ -22,6 +22,7 @@
 #define entry_h
 
 #include "tupid_tree.h"
+#include "tent_tree.h"
 #include "string_tree.h"
 #include "db_types.h"
 #include "bsd/queue.h"
@@ -31,7 +32,6 @@
 
 struct variant;
 struct estring;
-struct tent_entries;
 
 /* Local cache of the entries in the 'node' database table */
 struct tup_entry {
@@ -44,8 +44,8 @@ struct tup_entry {
 	struct variant *variant;
 	struct string_tree name;
 	struct string_entries entries;
-	struct tupid_entries stickies;
-	struct tupid_entries group_stickies;
+	struct tent_entries stickies;
+	struct tent_entries group_stickies;
 	int retrieved_stickies;
 	struct tup_entry *incoming;
 

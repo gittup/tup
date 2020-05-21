@@ -72,8 +72,8 @@ static int generate_work(struct graph *g, struct node *n);
 static int todo_work(struct graph *g, struct node *n);
 static int expand_command(char **res,
 			  struct tup_entry *tent, const char *cmd,
-			  struct tupid_entries *group_sticky_root,
-			  struct tupid_entries *used_groups_root);
+			  struct tent_entries *group_sticky_root,
+			  struct tent_entries *used_groups_root);
 static int update(struct node *n);
 
 static int do_keep_going;
@@ -1979,9 +1979,9 @@ static int generate_work(struct graph *g, struct node *n)
 {
 	int rc = 0;
 	char *expanded_name = NULL;
-	struct tupid_entries sticky_root = {NULL};
-	struct tupid_entries normal_root = {NULL};
-	struct tupid_entries group_sticky_root = {NULL};
+	struct tent_entries sticky_root = {NULL};
+	struct tent_entries normal_root = {NULL};
+	struct tent_entries group_sticky_root = {NULL};
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
@@ -2005,9 +2005,9 @@ static int generate_work(struct graph *g, struct node *n)
 			if(expanded_name)
 				cmd = expanded_name;
 		}
-		free_tupid_tree(&sticky_root);
-		free_tupid_tree(&normal_root);
-		free_tupid_tree(&group_sticky_root);
+		free_tent_tree(&sticky_root);
+		free_tent_tree(&normal_root);
+		free_tent_tree(&group_sticky_root);
 		if(cmd)
 			fprintf(generate_f, "%s\n", cmd);
 		free(expanded_name);
@@ -2442,46 +2442,42 @@ struct expand_info {
 	struct tup_entry *tent;
 	const char *groupname;
 	int grouplen;
-	struct tupid_entries *group_sticky_root;
-	struct tupid_entries *used_groups_root;
+	struct tent_entries *group_sticky_root;
+	struct tent_entries *used_groups_root;
 };
 
 static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 {
 	int group_found = 0;
 	int first = 1;
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 
-	RB_FOREACH(tt, tupid_entries, info->group_sticky_root) {
-		struct tup_entry *group_tent;
-		if(tup_entry_add(tt->tupid, &group_tent) < 0)
-			return -1;
+	RB_FOREACH(tt, tent_entries, info->group_sticky_root) {
+		struct tup_entry *group_tent = tt->tent;
 
 		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
-			struct tupid_entries inputs = {NULL};
-			struct tupid_tree *ttinput;
+			struct tent_entries inputs = {NULL};
+			struct tent_tree *ttinput;
 
 			if(info->used_groups_root)
-				if(tupid_tree_add_dup(info->used_groups_root, tt->tupid) < 0)
+				if(tent_tree_add_dup(info->used_groups_root, group_tent) < 0)
 					return -1;
-			if(tup_db_get_inputs(tt->tupid, NULL, &inputs, NULL) < 0)
+			if(tup_db_get_inputs(group_tent->tnode.tupid, NULL, &inputs, NULL) < 0)
 				return -1;
-			RB_FOREACH(ttinput, tupid_entries, &inputs) {
-				struct tup_entry *input_tent;
-				if(tup_entry_add(ttinput->tupid, &input_tent) < 0)
-					return -1;
+			RB_FOREACH(ttinput, tent_entries, &inputs) {
+				struct tup_entry *input_tent = ttinput->tent;
 				if(input_tent->type == TUP_NODE_GENERATED) {
 					if(e && !first)
 						if(estring_append(e, " ", 1) < 0)
 							return -1;
-					if(get_relative_dir(f, e, info->tent->parent->tnode.tupid, ttinput->tupid) < 0)
+					if(get_relative_dir(f, e, info->tent->parent->tnode.tupid, input_tent->tnode.tupid) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");
 					first = 0;
 				}
 			}
-			free_tupid_tree(&inputs);
+			free_tent_tree(&inputs);
 			group_found = 1;
 		}
 	}
@@ -2548,8 +2544,8 @@ static int expand_res_file(struct estring *expanded_name,
 
 static int expand_command(char **res,
 			  struct tup_entry *tent, const char *cmd,
-			  struct tupid_entries *group_sticky_root,
-			  struct tupid_entries *used_groups_root)
+			  struct tent_entries *group_sticky_root,
+			  struct tent_entries *used_groups_root)
 {
 	struct estring expanded_name;
 	const char *percgroup;

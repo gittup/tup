@@ -64,10 +64,10 @@ struct file_info {
 	struct file_entry_head var_list;
 	struct mapping_head mapping_list;
 	struct tmpdir_head tmpdir_list;
-	struct tupid_entries sticky_root;
-	struct tupid_entries normal_root;
-	struct tupid_entries group_sticky_root;
-	struct tupid_entries used_groups_root;
+	struct tent_entries sticky_root;
+	struct tent_entries normal_root;
+	struct tent_entries group_sticky_root;
+	struct tent_entries used_groups_root;
 	struct tent_entries output_root;
 	struct tent_entries exclusion_root;
 	const char *variant_dir;
@@ -98,7 +98,8 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int full_deps, tupid_t vardt,
 		int *important_link_removed);
 int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_deps);
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt, int full_deps);
+int add_parser_files(struct file_info *finfo, struct tent_entries *root,
+		     tupid_t vardt, int full_deps);
 void del_map(struct mapping *map);
 void del_file_entry(struct file_entry *fent);
 

@@ -364,11 +364,11 @@ out_server_stop:
 	pthread_mutex_unlock(&ps.lock);
 
 	lua_parser_cleanup(&tf);
-	free_tupid_tree(&tf.env_root);
+	free_tent_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
 	free_tupid_tree(&tf.directory_root);
 	free_bang_tree(&tf.bang_root);
-	free_tupid_tree(&tf.input_root);
+	free_tent_tree(&tf.input_root);
 
 	timespan_end(&tf.ts);
 	if(retts) {
@@ -415,7 +415,7 @@ static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char
 		}
 	}
 	if(tupfile_tent->type == TUP_NODE_GHOST) {
-		if(tupid_tree_add_dup(&tf->input_root, tupfile_tent->tnode.tupid) < 0)
+		if(tent_tree_add_dup(&tf->input_root, tupfile_tent) < 0)
 			return -1;
 		return 0;
 	}
@@ -755,7 +755,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 	} else {
 		rc = 0;
 	}
-	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
+	if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 		return -1;
 	return rc;
 }
@@ -990,7 +990,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 	char *p;
 	int rslno = 0;
 	int rc;
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 
 	pthread_mutex_lock(&tf->ps->lock);
 	rc = gen_dir_list(tf, tf->tupid);
@@ -1004,8 +1004,8 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 	/* Make sure we have a dependency on each environment variable, since
 	 * these are passed to the run script.
 	 */
-	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
-		if(tupid_tree_add_dup(&tf->input_root, tt->tupid) < 0)
+	RB_FOREACH(tt, tent_entries, &tf->env_root) {
+		if(tent_tree_add_dup(&tf->input_root, tt->tent) < 0)
 			return -1;
 	}
 	rc = server_run_script(tf->f, tf->tupid, cmdline, &tf->env_root, &rules);
@@ -1057,7 +1057,7 @@ int export(struct tupfile *tf, const char *cmdline)
 		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
 		return -1;
 	}
-	if(tupid_tree_add_dup(&tf->env_root, tent->tnode.tupid) < 0)
+	if(tent_tree_add_dup(&tf->env_root, tent) < 0)
 		return -1;
 	return 0;
 }
@@ -2521,7 +2521,7 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 				 */
 				timespan_add_delta(&tf->ts, &ts);
 			}
-			if(tupid_tree_add_dup(&tf->input_root, pl->dt) < 0)
+			if(tent_tree_add_dup(&tf->input_root, dtent) < 0)
 				return -1;
 		}
 	}
@@ -3040,20 +3040,17 @@ static int find_existing_command(const struct name_list *onl, tupid_t *cmdid)
 	return 0;
 }
 
-static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid_t tupid)
+static int add_input(struct tupfile *tf, struct tent_entries *input_root,
+		     struct tup_entry *tent)
 {
-	struct tup_entry *tent;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
-		struct tupid_entries extra_group_root = {NULL};
-		struct tupid_tree *tt;
+		struct tent_entries extra_group_root = {NULL};
+		struct tent_tree *tt;
 		tupid_t cmdid;
 
-		if(tupid_tree_add_dup(input_root, tupid) < 0)
+		if(tent_tree_add_dup(input_root, tent) < 0)
 			return -1;
-		if(tup_db_get_incoming_link(tupid, &cmdid) < 0)
+		if(tup_db_get_incoming_link(tent->tnode.tupid, &cmdid) < 0)
 			return -1;
 		if(cmdid < 0) {
 			fprintf(tf->f, "tup error: Unable to find command id for output file: ");
@@ -3063,19 +3060,15 @@ static int add_input(struct tupfile *tf, struct tupid_entries *input_root, tupid
 		}
 		if(tup_db_get_inputs(cmdid, &extra_group_root, NULL, NULL) < 0)
 			return -1;
-		RB_FOREACH(tt, tupid_entries, &extra_group_root) {
-			struct tup_entry *extra_tent;
-
-			if(tup_entry_add(tt->tupid, &extra_tent) < 0)
-				return -1;
-			if(extra_tent->type == TUP_NODE_GROUP) {
-				if(tupid_tree_add_dup(input_root, tt->tupid) < 0)
+		RB_FOREACH(tt, tent_entries, &extra_group_root) {
+			if(tt->tent->type == TUP_NODE_GROUP) {
+				if(tent_tree_add_dup(input_root, tt->tent) < 0)
 					return -1;
 			}
 		}
-		free_tupid_tree(&extra_group_root);
+		free_tent_tree(&extra_group_root);
 	} else if(tent->type == TUP_NODE_VAR || tent->type == TUP_NODE_GROUP) {
-		if(tupid_tree_add_dup(input_root, tupid) < 0)
+		if(tent_tree_add_dup(input_root, tent) < 0)
 			return -1;
 	}
 	return 0;
@@ -3376,11 +3369,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *cmd;
 	char *real_display;
 	int real_displaylen;
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 	struct tupid_tree *cmd_tt;
 	struct tent_tree *ttree;
 	tupid_t cmdid = -1;
-	struct tupid_entries input_root = {NULL};
+	struct tent_entries input_root = {NULL};
 	struct tent_entries output_root = {NULL};
 	struct tent_entries exclusion_root = {NULL};
 	struct tup_entry *tmptent = NULL;
@@ -3566,21 +3559,21 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	TAILQ_FOREACH(nle, &nl->entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+			if(add_input(tf, &input_root, nle->tent) < 0)
 				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+			if(add_input(tf, &input_root, nle->tent) < 0)
 				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent->tnode.tupid) < 0)
+			if(add_input(tf, &input_root, nle->tent) < 0)
 				return -1;
 	}
-	RB_FOREACH(tt, tupid_entries, &tf->env_root) {
-		if(add_input(tf, &input_root, tt->tupid) < 0)
+	RB_FOREACH(tt, tent_entries, &tf->env_root) {
+		if(add_input(tf, &input_root, tt->tent) < 0)
 			return -1;
 	}
 	if(group) {
@@ -3588,7 +3581,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * can be done before the full check after all parsing is
 		 * complete.
 		 */
-		if(tupid_tree_search(&input_root, group->tnode.tupid) != NULL) {
+		if(tent_tree_search(&input_root, group) != NULL) {
 			fprintf(tf->f, "tup error: Command ID %lli both reads from and writes to this group: ", cmdid);
 			print_tup_entry(tf->f, group);
 			fprintf(tf->f, "\n");
@@ -3598,7 +3591,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	}
 
 	RB_FOREACH(ttree, tent_entries, &output_root) {
-		if(tupid_tree_search(&input_root, ttree->tent->tnode.tupid) != NULL) {
+		if(tent_tree_search(&input_root, ttree->tent) != NULL) {
 			fprintf(tf->f, "tup error: Command ID %lli lists this file as both an input and an output: ", cmdid);
 			print_tup_entry(tf->f, ttree->tent);
 			fprintf(tf->f, "\n");
@@ -3611,7 +3604,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return -1;
 	free_tent_tree(&exclusion_root);
 	free_tent_tree(&output_root);
-	free_tupid_tree(&input_root);
+	free_tent_tree(&input_root);
 	return 0;
 }
 
@@ -4094,7 +4087,7 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					tent = tup_db_get_var(tf->variant, atvar, rparen-atvar, &e);
 					if(!tent)
 						return NULL;
-					if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
+					if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 						return NULL;
 				} else {
 					if(vardb_copy(&tf->vdb, var, rparen-var, &e) < 0)
@@ -4121,7 +4114,7 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				tent = tup_db_get_var(tf->variant, var, rparen-var, &e);
 				if(!tent)
 					return NULL;
-				if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
+				if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {

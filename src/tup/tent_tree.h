@@ -35,6 +35,7 @@ int tent_tree_add(struct tent_entries *root, struct tup_entry *tent);
 int tent_tree_add_dup(struct tent_entries *root, struct tup_entry *tent);
 struct tent_tree *tent_tree_search(struct tent_entries *root, struct tup_entry *tent);
 int tent_tree_copy(struct tent_entries *dest, struct tent_entries *src);
+void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent);
 static inline void tent_tree_rm(struct tent_entries *root, struct tent_tree *tt)
 {
 	RB_REMOVE(tent_entries, root, tt);

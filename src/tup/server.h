@@ -26,7 +26,7 @@
 #include "string_tree.h"
 #include <pthread.h>
 
-struct tupid_entries;
+struct tent_entries;
 struct tup_entry;
 struct tup_env;
 
@@ -77,7 +77,7 @@ int server_parser_start(struct parser_server *ps);
 int server_parser_stop(struct parser_server *ps);
 
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
-		      struct tupid_entries *env_root, char **rules);
+		      struct tent_entries *env_root, char **rules);
 int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath);
 
 #endif

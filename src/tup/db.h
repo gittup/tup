@@ -129,15 +129,15 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified);
-int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root,
-			struct tupid_entries *env_root,
+int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tent_entries *input_root,
+			struct tent_entries *env_root,
 			struct tup_entry *group,
 			struct tup_entry *old_group,
 			int refactoring);
-int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root);
-int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
-		      struct tupid_entries *normal_root,
-		      struct tupid_entries *group_sticky_root);
+int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tent_entries *root);
+int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
+		      struct tent_entries *normal_root,
+		      struct tent_entries *group_sticky_root);
 int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 		       struct tent_entries *exclusion_root,
 		       struct tup_entry **group);
@@ -173,8 +173,8 @@ int tup_db_delete_tup_config(struct tup_entry *tent);
 /* Environment operations */
 int tup_db_check_env(int environ_check);
 int tup_db_findenv(const char *var, struct tup_entry **tent);
-int tup_db_get_environ(struct tupid_entries *root,
-		       struct tupid_entries *normal_root, struct tup_env *te);
+int tup_db_get_environ(struct tent_entries *root,
+		       struct tent_entries *normal_root, struct tup_env *te);
 tupid_t env_dt(void);
 int is_virtual_tent(struct tup_entry *tent);
 
@@ -199,12 +199,13 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				int *write_bork,
 				int do_unlink, int complain_missing);
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
-			       struct tup_entry_head *readhead,
-			       struct tupid_entries *sticky_root,
-			       struct tupid_entries *normal_root,
-			       struct tupid_entries *group_sticky_root,
+			       struct tent_entries *read_root,
+			       struct tent_entries *sticky_root,
+			       struct tent_entries *normal_root,
+			       struct tent_entries *group_sticky_root,
 			       struct tent_entries *output_root,
 			       int *important_link_removed);
-int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead);
+int tup_db_check_config_inputs(struct tup_entry *tent,
+			       struct tent_entries *read_root);
 
 #endif

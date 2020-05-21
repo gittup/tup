@@ -37,7 +37,7 @@ struct edge {
 LIST_HEAD(edge_head, edge);
 
 struct tup_entry;
-struct tupid_entries;
+struct tent_entries;
 
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
@@ -102,7 +102,7 @@ int graph_empty(struct graph *g);
 int add_graph_stickies(struct graph *g);
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 		enum graph_prune_type gpt, int verbose);
-int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
+int nodes_are_connected(struct tup_entry *src, struct tent_entries *valid_root,
 			int *connected);
 void trim_graph(struct graph *g);
 void save_graph(FILE *err, struct graph *g, const char *filename);

@@ -402,20 +402,20 @@ int add_graph_stickies(struct graph *g)
 
 	TAILQ_FOREACH(n, &g->node_list, list) {
 		if(n->tent->type == TUP_NODE_CMD) {
-			struct tupid_entries sticky_root = {NULL};
-			struct tupid_tree *tt;
+			struct tent_entries sticky_root = {NULL};
+			struct tent_tree *tt;
 			struct node *inputn;
 
 			if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, NULL, NULL) < 0)
 				return -1;
-			RB_FOREACH(tt, tupid_entries, &sticky_root) {
-				inputn = find_node(g, tt->tupid);
+			RB_FOREACH(tt, tent_entries, &sticky_root) {
+				inputn = find_node(g, tt->tent->tnode.tupid);
 				if(inputn) {
 					if(create_edge(inputn, n, TUP_LINK_STICKY) < 0)
 						return -1;
 				}
 			}
-			free_tupid_tree(&sticky_root);
+			free_tent_tree(&sticky_root);
 		}
 	}
 	return 0;
@@ -456,7 +456,7 @@ edge_create:
 	return 0;
 }
 
-int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
+int nodes_are_connected(struct tup_entry *src, struct tent_entries *valid_root,
 			int *connected)
 {
 	struct graph g;
@@ -478,7 +478,7 @@ int nodes_are_connected(struct tup_entry *src, struct tupid_entries *valid_root,
 		n = TAILQ_FIRST(&g.plist);
 
 		if(src != n->tent &&
-		   tupid_tree_search(valid_root, n->tent->tnode.tupid) != NULL) {
+		   tent_tree_search(valid_root, n->tent) != NULL) {
 			*connected = 1;
 			goto out_cleanup;
 		}

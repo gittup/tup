@@ -174,8 +174,8 @@ static int rm_entry(tupid_t tupid, int safe)
 	if(tent->re) {
 		pcre_free(tent->re);
 	}
-	free_tupid_tree(&tent->stickies);
-	free_tupid_tree(&tent->group_stickies);
+	free_tent_tree(&tent->stickies);
+	free_tent_tree(&tent->group_stickies);
 	free(tent->name.s);
 	free(tent->display);
 	free(tent->flags);

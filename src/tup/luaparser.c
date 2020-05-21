@@ -397,7 +397,7 @@ static int tuplua_function_getconfig(lua_State *ls)
 	if(!tent)
 		return luaL_error(ls, "Failed to get config variable.");
 
-	if(tupid_tree_add_dup(&tf->input_root, tent->tnode.tupid) < 0)
+	if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 		return luaL_error(ls, "Failed to get config variable (add_dup).");
 
 	lua_pushstring(ls, e.s);

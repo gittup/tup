@@ -39,6 +39,9 @@ int tent_tree_add(struct tent_entries *root, struct tup_entry *tent)
 	}
 	tt->tent = tent;
 	if(RB_INSERT(tent_entries, root, tt) != NULL) {
+		fprintf(stderr, "tup error: Unable to insert duplicate tup_entry: ");
+		print_tup_entry(stderr, tent);
+		fprintf(stderr, "\n");
 		free(tt);
 		return -1;
 	}
@@ -73,10 +76,23 @@ int tent_tree_copy(struct tent_entries *dest, struct tent_entries *src)
 {
 	struct tent_tree *tt;
 	RB_FOREACH(tt, tent_entries, src) {
-		if(tent_tree_add(dest, tt->tent) < 0)
+		if(tent_tree_add(dest, tt->tent) < 0) {
 			return -1;
+		}
 	}
 	return 0;
+}
+
+void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent)
+{
+	struct tent_tree *tt;
+
+	tt = tent_tree_search(root, tent);
+	if(!tt) {
+		return;
+	}
+	tent_tree_rm(root, tt);
+	free(tt);
 }
 
 void free_tent_tree(struct tent_entries *root)

@@ -5244,11 +5244,11 @@ int tup_db_findenv(const char *var, struct tup_entry **tent)
 	return 0;
 }
 
-int tup_db_get_environ(struct tupid_entries *root,
-		       struct tupid_entries *normal_root, struct tup_env *te)
+int tup_db_get_environ(struct tent_entries *root,
+		       struct tent_entries *normal_root, struct tup_env *te)
 {
 	struct var_entry *ve;
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 	struct tup_entry *tent;
 	char ccache_nodirect[] = "CCACHE_NODIRECT=1";
 	int ccache_nodirect_len = strlen(ccache_nodirect);
@@ -5256,13 +5256,9 @@ int tup_db_get_environ(struct tupid_entries *root,
 
 	te->block_size = 1;
 	te->num_entries = 0;
-	RB_FOREACH(tt, tupid_entries, root) {
-		tent = tup_entry_find(tt->tupid);
-		/* If we don't find the tent, that means it can't be an
-		 * environment variable, since all environment variables are
-		 * added during the env_cb or during export from the parser.
-		 */
-		if(tent && tent->dt == env_dt()) {
+	RB_FOREACH(tt, tent_entries, root) {
+		tent = tt->tent;
+		if(tent->dt == env_dt()) {
 			ve = vardb_get(&envdb, tent->name.s, tent->name.len);
 			if(!ve) {
 				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
@@ -5281,7 +5277,7 @@ int tup_db_get_environ(struct tupid_entries *root,
 			 * execution.
 			 */
 			if(normal_root)
-				tupid_tree_remove(normal_root, tt->tupid);
+				tent_tree_remove(normal_root, tent);
 		}
 	}
 	te->block_size += ccache_nodirect_len + 1;
@@ -5293,9 +5289,9 @@ int tup_db_get_environ(struct tupid_entries *root,
 		return -1;
 	}
 	cur = te->envblock;
-	RB_FOREACH(tt, tupid_entries, root) {
-		tent = tup_entry_find(tt->tupid);
-		if(tent && tent->dt == env_dt()) {
+	RB_FOREACH(tt, tent_entries, root) {
+		tent = tt->tent;
+		if(tent->dt == env_dt()) {
 			ve = vardb_get(&envdb, tent->name.s, tent->name.len);
 			if(!ve) {
 				fprintf(stderr, "tup internal error: Expected environment variable '%s' to be in envdb.\n", tent->name.s);
@@ -5569,12 +5565,14 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 	return rc;
 }
 
-static int get_normal_inputs(tupid_t cmdid, struct tupid_entries *root)
+static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS1];
 	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tupid_tree *tt;
+	struct tupid_entries tupid_root = {NULL};
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5606,7 +5604,7 @@ static int get_normal_inputs(tupid_t cmdid, struct tupid_entries *root)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add_dup(root, tupid);
+		rc = tupid_tree_add_dup(&tupid_root, tupid);
 
 		if(rc < 0) {
 			fprintf(stderr, "tup error: get_normal_inputs() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
@@ -5620,17 +5618,27 @@ static int get_normal_inputs(tupid_t cmdid, struct tupid_entries *root)
 		return -1;
 	}
 
+	RB_FOREACH(tt, tupid_entries, &tupid_root) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tt->tupid, &tent) < 0)
+			return -1;
+		if(tent_tree_add(root, tent) < 0)
+			return -1;
+	}
+	free_tupid_tree(&tupid_root);
+
 	return rc;
 }
 
-static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
-			     struct tupid_entries *group_root)
+static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
+			     struct tent_entries *group_root)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS2];
 	static char s[] = "select from_id from sticky_link where to_id=?";
 	struct tupid_tree *tt;
+	struct tupid_entries tupid_root = {NULL};
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5659,7 +5667,7 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 			break;
 		}
 
-		if(tupid_tree_add(root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_tree_add(&tupid_root, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			break;
 		}
@@ -5671,22 +5679,25 @@ static int get_sticky_inputs(tupid_t cmdid, struct tupid_entries *root,
 		return -1;
 	}
 
-	if(rc == 0 && group_root) {
-		RB_FOREACH(tt, tupid_entries, root) {
+	if(rc == 0) {
+		RB_FOREACH(tt, tupid_entries, &tupid_root) {
 			struct tup_entry *tent;
 			if(tup_entry_add(tt->tupid, &tent) < 0)
 				return -1;
 			if(tent->type == TUP_NODE_GROUP)
-				if(tupid_tree_add_dup(group_root, tt->tupid) < 0)
+				if(tent_tree_add_dup(group_root, tent) < 0)
 					return -1;
+			if(tent_tree_add_dup(root, tent) < 0)
+				return -1;
 		}
 	}
+	free_tupid_tree(&tupid_root);
 	return rc;
 }
 
-int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
-		      struct tupid_entries *normal_root,
-		      struct tupid_entries *group_sticky_root)
+int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
+		      struct tent_entries *normal_root,
+		      struct tent_entries *group_sticky_root)
 {
 	if(normal_root)
 		if(get_normal_inputs(cmdid, normal_root) < 0)
@@ -5696,8 +5707,8 @@ int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 		if(tup_entry_add(cmdid, &tent) < 0)
 			return -1;
 		if(tent->retrieved_stickies != sticky_count) {
-			free_tupid_tree(&tent->stickies);
-			free_tupid_tree(&tent->group_stickies);
+			free_tent_tree(&tent->stickies);
+			free_tent_tree(&tent->group_stickies);
 			tent->retrieved_stickies = 0;
 		}
 		if(!tent->retrieved_stickies) {
@@ -5705,77 +5716,13 @@ int tup_db_get_inputs(tupid_t cmdid, struct tupid_entries *sticky_root,
 			if(get_sticky_inputs(cmdid, &tent->stickies, &tent->group_stickies) < 0)
 				return -1;
 		}
-		if(tupid_tree_copy_dup(sticky_root, &tent->stickies) < 0)
+		if(tent_tree_copy(sticky_root, &tent->stickies) < 0) {
 			return -1;
+		}
 		if(group_sticky_root)
-			if(tupid_tree_copy_dup(group_sticky_root, &tent->group_stickies) < 0)
+			if(tent_tree_copy(group_sticky_root, &tent->group_stickies) < 0) {
 				return -1;
-	}
-	return 0;
-}
-
-static int compare_list_tree(struct tup_entry_head *a, struct tupid_entries *b,
-			     void *data,
-			     int (*extra_a)(tupid_t tupid, void *data),
-			     int (*extra_b)(tupid_t tupid, void *data))
-{
-	struct tup_entry *tent;
-	struct tupid_tree *ttb;
-
-	LIST_FOREACH(tent, a, list) {
-		ttb = tupid_tree_search(b, tent->tnode.tupid);
-		if(!ttb) {
-			if(extra_a && extra_a(tent->tnode.tupid, data) < 0)
-				return -1;
-		} else {
-			tupid_tree_rm(b, ttb);
-			free(ttb);
-		}
-	}
-
-	RB_FOREACH(ttb, tupid_entries, b) {
-		if(extra_b && extra_b(ttb->tupid, data) < 0)
-			return -1;
-	}
-
-	return 0;
-}
-
-static int compare_trees(struct tupid_entries *a, struct tupid_entries *b,
-			 void *data,
-			 int (*extra_a)(tupid_t tupid, void *data),
-			 int (*extra_b)(tupid_t tupid, void *data))
-{
-	struct tupid_tree *tta;
-	struct tupid_tree *ttb;
-
-	tta = RB_MIN(tupid_entries, a);
-	ttb = RB_MIN(tupid_entries, b);
-
-	while(tta || ttb) {
-		if(!tta) {
-			if(extra_b && extra_b(ttb->tupid, data) < 0)
-				return -1;
-			ttb = RB_NEXT(tupid_entries, b, ttb);
-		} else if(!ttb) {
-			if(extra_a && extra_a(tta->tupid, data) < 0)
-				return -1;
-			tta = RB_NEXT(tupid_entries, a, tta);
-		} else {
-			if(tta->tupid == ttb->tupid) {
-				/* Would call same() here if necessary */
-				tta = RB_NEXT(tupid_entries, a, tta);
-				ttb = RB_NEXT(tupid_entries, b, ttb);
-			} else if(tta->tupid < ttb->tupid) {
-				if(extra_a && extra_a(tta->tupid, data) < 0)
-					return -1;
-				tta = RB_NEXT(tupid_entries, a, tta);
-			} else {
-				if(extra_b && extra_b(ttb->tupid, data) < 0)
-					return -1;
-				ttb = RB_NEXT(tupid_entries, b, ttb);
 			}
-		}
 	}
 	return 0;
 }
@@ -5938,18 +5885,14 @@ struct write_input_data {
 	tupid_t groupid;
 	int new_groups;
 	int normal_links_invalid;
-	struct tupid_entries *env_root;
+	struct tent_entries *env_root;
 	int refactoring;
 	int refactoring_failed;
 };
 
-static int add_sticky(tupid_t tupid, void *data)
+static int add_sticky(struct tup_entry *tent, void *data)
 {
 	struct write_input_data *wid = data;
-	struct tup_entry *tent;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	if(wid->refactoring) {
 		wid->refactoring_failed = 1;
@@ -5960,16 +5903,16 @@ static int add_sticky(tupid_t tupid, void *data)
 	}
 
 	if(tent->type == TUP_NODE_GROUP && wid->groupid != -1) {
-		if(group_link_insert(tupid, wid->groupid, wid->cmdid) < 0)
+		if(group_link_insert(tent->tnode.tupid, wid->groupid, wid->cmdid) < 0)
 			return -1;
 		wid->new_groups = 1;
 	}
 
-	if(tupid_tree_search(wid->env_root, tupid) != NULL) {
+	if(tent_tree_search(wid->env_root, tent) != NULL) {
 		/* Environment links have to be normal so we can build the
 		 * graph properly when they are modified.
 		 */
-		if(link_insert(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+		if(link_insert(tent->tnode.tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
 
 		/* Also need to make sure we run the command in case this is a
@@ -5978,18 +5921,15 @@ static int add_sticky(tupid_t tupid, void *data)
 		if(tup_db_add_modify_list(wid->cmdid) < 0)
 			return -1;
 	}
-	return link_insert(tupid, wid->cmdid, TUP_LINK_STICKY);
+	return link_insert(tent->tnode.tupid, wid->cmdid, TUP_LINK_STICKY);
 }
 
-static int rm_sticky(tupid_t tupid, void *data)
+static int rm_sticky(struct tup_entry *tent, void *data)
 {
 	struct write_input_data *wid = data;
-	struct tup_entry *tent;
 	int exists = 0;
 
 	if(wid->refactoring) {
-		if(tup_entry_add(tupid, &tent) < 0)
-			return -1;
 		wid->refactoring_failed = 1;
 		fprintf(wid->f, "tup refactoring error: Attempting to remove an input link: ");
 		print_tup_entry(wid->f, tent);
@@ -5997,16 +5937,16 @@ static int rm_sticky(tupid_t tupid, void *data)
 		return 0;
 	}
 
-	if(link_remove(tupid, wid->cmdid, TUP_LINK_STICKY) < 0)
+	if(link_remove(tent->tnode.tupid, wid->cmdid, TUP_LINK_STICKY) < 0)
 		return -1;
 
-	if(tup_db_link_exists(tupid, wid->cmdid, TUP_LINK_NORMAL, &exists) < 0)
+	if(tup_db_link_exists(tent->tnode.tupid, wid->cmdid, TUP_LINK_NORMAL, &exists) < 0)
 		return -1;
 	if(exists) {
 		 /* Make sure the normal link is removed as well to avoid a circular
 		 * dependency (t6045) and environment issues (t4178).
 		 */
-		if(link_remove(tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
+		if(link_remove(tent->tnode.tupid, wid->cmdid, TUP_LINK_NORMAL) < 0)
 			return -1;
 
 		/* Make sure we re-run the command to check for required
@@ -6017,8 +5957,6 @@ static int rm_sticky(tupid_t tupid, void *data)
 	}
 
 	/* Also check for groups that might need to be removed. */
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->type == TUP_NODE_GROUP) {
 		/* Removing an input group means we need to check if the group
 		 * also needs to be removed from the database.
@@ -6029,7 +5967,7 @@ static int rm_sticky(tupid_t tupid, void *data)
 		 * the group_link for this input group.
 		 */
 		if(wid->groupid != -1) {
-			if(group_link_remove(tupid, wid->groupid, wid->cmdid) < 0)
+			if(group_link_remove(tent->tnode.tupid, wid->groupid, wid->cmdid) < 0)
 				return -1;
 		}
 
@@ -6042,13 +5980,13 @@ static int rm_sticky(tupid_t tupid, void *data)
 	return 0;
 }
 
-int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root,
-			struct tupid_entries *env_root,
+int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tent_entries *input_root,
+			struct tent_entries *env_root,
 			struct tup_entry *group,
 			struct tup_entry *old_group,
 			int refactoring)
 {
-	struct tupid_entries sticky_root = {NULL};
+	struct tent_entries sticky_root = {NULL};
 	struct write_input_data wid = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6066,23 +6004,23 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 
 	if(tup_db_get_inputs(cmdid, &sticky_root, NULL, NULL) < 0)
 		return -1;
-	if(compare_trees(input_root, &sticky_root, &wid,
-			 add_sticky, rm_sticky) < 0)
+	if(compare_tent_trees(input_root, &sticky_root, &wid,
+			      add_sticky, rm_sticky) < 0)
 		return -1;
 	if(wid.normal_links_invalid) {
-		struct tupid_tree *tt;
+		struct tent_tree *tt;
 
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
 		if(delete_normal_inputs(cmdid) < 0)
 			return -1;
 		/* Need to re-add the environment links as normal links (t3082) */
-		RB_FOREACH(tt, tupid_entries, env_root) {
-			if(link_insert(tt->tupid, cmdid, TUP_LINK_NORMAL) < 0)
+		RB_FOREACH(tt, tent_entries, env_root) {
+			if(link_insert(tt->tent->tnode.tupid, cmdid, TUP_LINK_NORMAL) < 0)
 				return -1;
 		}
 	}
-	free_tupid_tree(&sticky_root);
+	free_tent_tree(&sticky_root);
 
 	if(group != old_group) {
 		if(old_group) {
@@ -6090,18 +6028,15 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tupid_entries *input_root
 				return -1;
 		}
 		if(group) {
-			struct tupid_tree *tt;
+			struct tent_tree *tt;
 
 			wid.new_groups = 1;
 			/* We now output to a group, so add all of our
 			 * group_links.
 			 */
-			RB_FOREACH(tt, tupid_entries, input_root) {
-				struct tup_entry *tent;
-				if(tup_entry_add(tt->tupid, &tent) < 0)
-					return -1;
-				if(tent->type == TUP_NODE_GROUP) {
-					if(group_link_insert(tt->tupid, group->tnode.tupid, cmdid) < 0)
+			RB_FOREACH(tt, tent_entries, input_root) {
+				if(tt->tent->type == TUP_NODE_GROUP) {
+					if(group_link_insert(tt->tent->tnode.tupid, group->tnode.tupid, cmdid) < 0)
 						return -1;
 				}
 			}
@@ -6120,20 +6055,16 @@ struct actual_input_data {
 	FILE *f;
 	tupid_t cmdid;
 	struct variant *cmd_variant;
-	struct tupid_entries *sticky_root;
+	struct tent_entries *sticky_root;
 	struct tent_entries *output_root;
-	struct tupid_entries missing_input_root;
+	struct tent_entries missing_input_root;
 	int important_link_removed;
 };
 
-static int new_input(tupid_t tupid, void *data)
+static int new_input(struct tup_entry *tent, void *data)
 {
-	struct tup_entry *tent;
 	struct actual_input_data *aid = data;
 	struct variant *file_variant;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	/* Skip any files that are supposed to be used as outputs */
 	if(tent_tree_search(aid->output_root, tent) != NULL)
@@ -6146,26 +6077,22 @@ static int new_input(tupid_t tupid, void *data)
 	}
 
 	if(tent->type == TUP_NODE_GENERATED) {
-		if(tupid_tree_add(&aid->missing_input_root, tent->tnode.tupid) < 0)
+		if(tent_tree_add(&aid->missing_input_root, tent) < 0)
 			return -1;
 		return 0;
 	}
 	return 0;
 }
 
-static int new_normal_link(tupid_t tupid, void *data)
+static int new_normal_link(struct tup_entry *tent, void *data)
 {
 	struct actual_input_data *aid = data;
-	struct tup_entry *tent;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 
 	/* Skip any files that are supposed to be used as outputs */
 	if(tent_tree_search(aid->output_root, tent) != NULL)
 		return 0;
 	/* t6057 - Skip any files that were reported as errors in new_input() */
-	if(tupid_tree_search(&aid->missing_input_root, tupid) != NULL)
+	if(tent_tree_search(&aid->missing_input_root, tent) != NULL)
 		return 0;
 
 	if(tent->type == TUP_NODE_CMD) {
@@ -6175,16 +6102,13 @@ static int new_normal_link(tupid_t tupid, void *data)
 		return -1;
 	}
 
-	return link_insert(tupid, aid->cmdid, TUP_LINK_NORMAL);
+	return link_insert(tent->tnode.tupid, aid->cmdid, TUP_LINK_NORMAL);
 }
 
-static int del_normal_link(tupid_t tupid, void *data)
+static int del_normal_link(struct tup_entry *tent, void *data)
 {
 	struct actual_input_data *aid = data;
-	struct tup_entry *tent;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
 		/* A dependent command may be relying on us for
 		 * having this file as a dependency. Make sure they
@@ -6194,39 +6118,36 @@ static int del_normal_link(tupid_t tupid, void *data)
 		aid->important_link_removed = 1;
 	}
 
-	if(link_remove(tupid, aid->cmdid, TUP_LINK_NORMAL) < 0)
+	if(link_remove(tent->tnode.tupid, aid->cmdid, TUP_LINK_NORMAL) < 0)
 		return -1;
-	if(tupid_tree_search(aid->sticky_root, tupid) == NULL) {
+	if(tent_tree_search(aid->sticky_root, tent) == NULL) {
 		/* Not a sticky link, so check if it was a ghost (t5054). */
-		if(add_ghost(tupid) < 0)
+		if(add_ghost(tent->tnode.tupid) < 0)
 			return -1;
 	}
 	return 0;
 }
 
-static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_root,
-				  struct tupid_entries *valid_input_root,
-				  struct tupid_entries *group_root)
+static int check_generated_inputs(FILE *f, struct tent_entries *missing_input_root,
+				  struct tent_entries *valid_input_root,
+				  struct tent_entries *group_root)
 {
 	int found_error = 0;
-	struct tupid_tree *tt;
-	struct tupid_tree *tmp;
+	struct tent_tree *tt;
+	struct tent_tree *tmp;
 
 	/* First, repeatedly go through the list of missing inputs (ie:
 	 * generated files that we read from, but didn't specify in the
 	 * Tupfile) to see if we can reach them from a group or from another
 	 * generated file that we *did* specify in the Tupfile.
 	 */
-	RB_FOREACH_SAFE(tt, tupid_entries, missing_input_root, tmp) {
-		struct tup_entry *tent;
-		struct tupid_tree *grouptt;
+	RB_FOREACH_SAFE(tt, tent_entries, missing_input_root, tmp) {
+		struct tent_tree *grouptt;
 		int connected = 0;
-		if(tup_entry_add(tt->tupid, &tent) < 0)
-			return -1;
 
-		RB_FOREACH(grouptt, tupid_entries, group_root) {
+		RB_FOREACH(grouptt, tent_entries, group_root) {
 			int exists;
-			if(tup_db_link_exists(tt->tupid, grouptt->tupid, TUP_LINK_NORMAL, &exists) < 0)
+			if(tup_db_link_exists(tt->tent->tnode.tupid, grouptt->tent->tnode.tupid, TUP_LINK_NORMAL, &exists) < 0)
 				return -1;
 			if(exists) {
 				connected = 1;
@@ -6234,23 +6155,23 @@ static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_r
 			}
 		}
 		if(!connected) {
-			if(nodes_are_connected(tent, valid_input_root, &connected) < 0)
+			if(nodes_are_connected(tt->tent, valid_input_root, &connected) < 0)
 				return -1;
 		}
 
 		if(connected) {
-			tupid_tree_rm(missing_input_root, tt);
+			tent_tree_rm(missing_input_root, tt);
 			free(tt);
 		}
 	}
 
 	/* Anything we couldn't connect is an error. */
-	RB_FOREACH(tt, tupid_entries, missing_input_root) {
+	RB_FOREACH(tt, tent_entries, missing_input_root) {
 		if(!found_error) {
 			fprintf(f, "tup error: Missing input dependency - a file was read from, and was not specified as an input link for the command. This is an issue because the file was created from another command, and without the input link the commands may execute out of order. You should add this file as an input, since it is possible this could randomly break in the future.\n");
 			found_error = 1;
 		}
-		tup_db_print(f, tt->tupid);
+		tup_db_print(f, tt->tent->tnode.tupid);
 	}
 	if(found_error)
 		return -1;
@@ -6258,14 +6179,14 @@ static int check_generated_inputs(FILE *f, struct tupid_entries *missing_input_r
 }
 
 int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
-			       struct tup_entry_head *readhead,
-			       struct tupid_entries *sticky_root,
-			       struct tupid_entries *normal_root,
-			       struct tupid_entries *group_sticky_root,
+			       struct tent_entries *read_root,
+			       struct tent_entries *sticky_root,
+			       struct tent_entries *normal_root,
+			       struct tent_entries *group_sticky_root,
 			       struct tent_entries *output_root,
 			       int *important_link_removed)
 {
-	struct tupid_entries sticky_copy = {NULL};
+	struct tent_entries sticky_copy = {NULL};
 	struct actual_input_data aid = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6281,27 +6202,28 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 		return -1;
 	aid.cmd_variant = tup_entry_variant(cmd_tent);
 
-	if(tupid_tree_copy(&sticky_copy, aid.sticky_root) < 0)
+	if(tent_tree_copy(&sticky_copy, aid.sticky_root) < 0)
 		return -1;
 	/* First check if we are missing any links that should be sticky. We
 	 * don't care about any links that are marked sticky but aren't used.
 	 */
-	if(compare_list_tree(readhead, &sticky_copy, &aid,
-			     new_input, NULL) < 0)
+	if(compare_tent_trees(read_root, &sticky_copy, &aid,
+			      new_input, NULL) < 0)
 		return -1;
 
 	rc = check_generated_inputs(f, &aid.missing_input_root, aid.sticky_root, group_sticky_root);
 
-	if(compare_list_tree(readhead, normal_root, &aid,
-			     new_normal_link, del_normal_link) < 0)
+	if(compare_tent_trees(read_root, normal_root, &aid,
+			      new_normal_link, del_normal_link) < 0)
 		return -1;
-	free_tupid_tree(&sticky_copy);
-	free_tupid_tree(&aid.missing_input_root);
+	free_tent_tree(&sticky_copy);
+	free_tent_tree(&aid.missing_input_root);
 	*important_link_removed = aid.important_link_removed;
 	return rc;
 }
 
-int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *readhead)
+int tup_db_check_config_inputs(struct tup_entry *tent,
+			       struct tent_entries *read_root)
 {
 	struct actual_input_data aid = {
 		.f = stdout,
@@ -6309,8 +6231,8 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 		.missing_input_root = {NULL},
 	};
 	struct tent_entries output_root = {NULL};
-	struct tupid_entries sticky_root = RB_INITIALIZER(&sticky_root);
-	struct tupid_entries normal_root = RB_INITIALIZER(&normal_root);
+	struct tent_entries sticky_root = {NULL};
+	struct tent_entries normal_root = {NULL};
 
 	aid.sticky_root = &sticky_root;
 	aid.output_root = &output_root;
@@ -6318,11 +6240,11 @@ int tup_db_check_config_inputs(struct tup_entry *tent, struct tup_entry_head *re
 	if(tup_db_get_inputs(tent->tnode.tupid, &sticky_root, &normal_root, NULL) < 0)
 		return -1;
 
-	if(compare_list_tree(readhead, &normal_root, &aid,
-			     new_normal_link, del_normal_link) < 0)
+	if(compare_tent_trees(read_root, &normal_root, &aid,
+			      new_normal_link, del_normal_link) < 0)
 		return -1;
-	free_tupid_tree(&normal_root);
-	free_tupid_tree(&sticky_root);
+	free_tent_tree(&normal_root);
+	free_tent_tree(&sticky_root);
 	return 0;
 }
 
@@ -6491,41 +6413,38 @@ struct write_dir_input_data {
 	FILE *f;
 };
 
-static int add_dir_link(tupid_t tupid, void *data)
+static int add_dir_link(struct tup_entry *tent, void *data)
 {
 	struct write_dir_input_data *wdid = data;
-	struct tup_entry *tent;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->type == TUP_NODE_GENERATED) {
 		fprintf(wdid->f, "tup error: Unable to read from generated file '");
 		print_tup_entry(wdid->f, tent);
 		fprintf(wdid->f, "'. Your build configuration must be comprised of files you wrote yourself.\n");
 		return -1;
 	}
-	if(link_insert(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
+	if(link_insert(tent->tnode.tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
 		return -1;
 	expected_changes++;
 	return 0;
 }
 
-static int rm_dir_link(tupid_t tupid, void *data)
+static int rm_dir_link(struct tup_entry *tent, void *data)
 {
 	struct write_dir_input_data *wdid = data;
 
-	if(add_ghost(tupid) < 0)
+	if(add_ghost(tent->tnode.tupid) < 0)
 		return -1;
-	if(link_remove(tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
+	if(link_remove(tent->tnode.tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
 		return -1;
 	expected_changes++;
 	return 0;
 }
 
-int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root)
+int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tent_entries *root)
 {
-	struct tupid_entries sticky_root = {NULL};
-	struct tupid_entries normal_root = {NULL};
+	struct tent_entries sticky_root = {NULL};
+	struct tent_entries normal_root = {NULL};
 	struct write_dir_input_data wdid = {
 		.dt = dt,
 		.f = f,
@@ -6538,11 +6457,11 @@ int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tupid_entries *root)
 		fprintf(f, "tup internal error: sticky link found to dir %lli\n", dt);
 		return -1;
 	}
-	if(compare_trees(root, &normal_root, &wdid,
-			 add_dir_link, rm_dir_link) < 0)
+	if(compare_tent_trees(root, &normal_root, &wdid,
+			      add_dir_link, rm_dir_link) < 0)
 		return -1;
-	free_tupid_tree(&sticky_root);
-	free_tupid_tree(&normal_root);
+	free_tent_tree(&sticky_root);
+	free_tent_tree(&normal_root);
 	return 0;
 }
 
@@ -6806,10 +6725,10 @@ static int link_insert(tupid_t a, tupid_t b, int style)
 		if(tup_entry_add(a, &srctent) < 0)
 			return -1;
 		if(tent->retrieved_stickies) {
-			if(tupid_tree_add(&tent->stickies, a) < 0)
+			if(tent_tree_add(&tent->stickies, srctent) < 0)
 				return -1;
 			if(srctent->type == TUP_NODE_GROUP) {
-				if(tupid_tree_add(&tent->group_stickies, a) < 0)
+				if(tent_tree_add(&tent->group_stickies, srctent) < 0)
 					return -1;
 			}
 		}
@@ -6884,9 +6803,9 @@ static int link_remove(tupid_t a, tupid_t b, int style)
 		if(tup_entry_add(a, &srctent) < 0)
 			return -1;
 		if(tent->retrieved_stickies) {
-			tupid_tree_remove(&tent->stickies, a);
+			tent_tree_remove(&tent->stickies, srctent);
 			if(srctent->type == TUP_NODE_GROUP) {
-				tupid_tree_remove(&tent->group_stickies, a);
+				tent_tree_remove(&tent->group_stickies, srctent);
 			}
 		}
 	}

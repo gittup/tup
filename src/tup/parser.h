@@ -54,9 +54,9 @@ struct tupfile {
 	struct vardb vdb;
 	struct node_vardb node_db;
 	struct tupid_entries cmd_root;
-	struct tupid_entries env_root;
+	struct tent_entries env_root;
 	struct string_entries bang_root;
-	struct tupid_entries input_root;
+	struct tent_entries input_root;
 	struct tupid_entries directory_root;
 	struct tupid_entries refactoring_cmd_delete_root;
 	FILE *f;

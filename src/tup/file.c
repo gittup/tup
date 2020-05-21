@@ -39,12 +39,12 @@ static void handle_unlink(struct file_info *info);
 static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			     int *warnings, enum check_type_t check_only);
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
 			    int *important_link_removed);
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent, int full_deps);
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root, tupid_t vardt, int full_deps);
+				   struct tent_entries *root, tupid_t vardt,
+				   int full_deps);
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
@@ -80,10 +80,10 @@ void cleanup_file_info(struct file_info *info)
 {
 	free_tent_tree(&info->exclusion_root);
 	free_tent_tree(&info->output_root);
-	free_tupid_tree(&info->used_groups_root);
-	free_tupid_tree(&info->group_sticky_root);
-	free_tupid_tree(&info->normal_root);
-	free_tupid_tree(&info->sticky_root);
+	free_tent_tree(&info->used_groups_root);
+	free_tent_tree(&info->group_sticky_root);
+	free_tent_tree(&info->normal_root);
+	free_tent_tree(&info->sticky_root);
 }
 
 void finfo_lock(struct file_info *info)
@@ -180,7 +180,6 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 		int full_deps, tupid_t vardt,
 		int *important_link_removed)
 {
-	struct tup_entry_head *entrylist;
 	struct tmpdir *tmpdir;
 	int tmpdir_bork = 0;
 	int rc1 = 0, rc2 = 0;
@@ -229,9 +228,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	 * back to the commandline ASAP.
 	 */
 	if(check_only != CHECK_SIGNALLED) {
-		entrylist = tup_entry_get_list();
-		rc2 = update_read_info(f, cmdid, info, entrylist, full_deps, vardt, important_link_removed);
-		tup_entry_release_list();
+		rc2 = update_read_info(f, cmdid, info, full_deps, vardt, important_link_removed);
 	}
 	finfo_unlock(info);
 
@@ -270,7 +267,8 @@ int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_d
 	return rc;
 }
 
-int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_t vardt, int full_deps)
+int add_parser_files(struct file_info *finfo, struct tent_entries *root,
+		     tupid_t vardt, int full_deps)
 {
 	int rc;
 	finfo_lock(finfo);
@@ -279,8 +277,8 @@ int add_parser_files(struct file_info *finfo, struct tupid_entries *root, tupid_
 	return rc;
 }
 
-static int add_node_to_list(tupid_t dt, const char *filename,
-			    struct tup_entry_head *head, int full_deps)
+static int add_node_to_tree(tupid_t dt, const char *filename,
+			    struct tent_entries *root, int full_deps)
 {
 	tupid_t new_dt;
 	struct path_element *pel = NULL;
@@ -334,7 +332,9 @@ static int add_node_to_list(tupid_t dt, const char *filename,
 		 */
 		return 0;
 	}
-	tup_entry_list_add(tent, head);
+	if(tent_tree_add_dup(root, tent) < 0) {
+		return -1;
+	}
 
 	return 0;
 }
@@ -404,60 +404,57 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent, int full_deps)
 {
 	struct file_entry *r;
-	struct tup_entry_head *entrylist;
+	struct tent_entries root = {NULL};
 
-	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
-		struct tup_entry *tmp;
 		r = LIST_FIRST(&finfo->read_list);
 
-		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps) < 0)
+		if(add_node_to_tree(DOT_DT, r->filename, &root, full_deps) < 0)
 			return -1;
-
-		/* Don't link to ourself */
-		tmp = LIST_FIRST(entrylist);
-		if(tmp == tent) {
-			tup_entry_list_del(tmp);
-		}
 
 		del_file_entry(r);
 	}
-	if(tup_db_check_config_inputs(tent, entrylist) < 0)
+
+	/* Don't link to ourself */
+	tent_tree_remove(&root, tent);
+
+	if(tup_db_check_config_inputs(tent, &root) < 0)
 		return -1;
-	tup_entry_release_list();
+	free_tent_tree(&root);
 
 	return 0;
 }
 
 static int add_parser_files_locked(struct file_info *finfo,
-				   struct tupid_entries *root, tupid_t vardt, int full_deps)
+				   struct tent_entries *root, tupid_t vardt,
+				   int full_deps)
 {
 	struct file_entry *r;
 	struct mapping *map;
-	struct tup_entry_head *entrylist;
 	struct tup_entry *tent;
+	struct tent_entries tmproot = {NULL};
+	struct tent_tree *tt;
 	int map_bork = 0;
 
-	entrylist = tup_entry_get_list();
 	while(!LIST_EMPTY(&finfo->read_list)) {
 		r = LIST_FIRST(&finfo->read_list);
-		if(add_node_to_list(DOT_DT, r->filename, entrylist, full_deps) < 0)
+		if(add_node_to_tree(DOT_DT, r->filename, &tmproot, full_deps) < 0)
 			return -1;
 		del_file_entry(r);
 	}
 	while(!LIST_EMPTY(&finfo->var_list)) {
 		r = LIST_FIRST(&finfo->var_list);
 
-		if(add_node_to_list(vardt, r->filename, entrylist, 0) < 0)
+		if(add_node_to_tree(vardt, r->filename, &tmproot, 0) < 0)
 			return -1;
 		del_file_entry(r);
 	}
-	LIST_FOREACH(tent, entrylist, list) {
-		if(strcmp(tent->name.s, ".gitignore") != 0)
-			if(tupid_tree_add_dup(root, tent->tnode.tupid) < 0)
+	RB_FOREACH(tt, tent_entries, &tmproot) {
+		if(strcmp(tt->tent->name.s, ".gitignore") != 0)
+			if(tent_tree_add_dup(root, tt->tent) < 0)
 				return -1;
 	}
-	tup_entry_release_list();
+	free_tent_tree(&tmproot);
 
 	/* TODO: write_list not needed here? */
 	while(!LIST_EMPTY(&finfo->write_list)) {
@@ -744,12 +741,11 @@ out_skip:
 }
 
 static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
-			    struct tup_entry_head *entryhead,
 			    int full_deps, tupid_t vardt,
 			    int *important_link_removed)
 {
 	struct file_entry *r;
-	struct tupid_tree *tt;
+	struct tent_entries root = {NULL};
 
 	while(!LIST_EMPTY(&info->read_list)) {
 		int match = 0;
@@ -758,7 +754,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		if(exclusion_match(f, &info->exclusion_root, r->filename, &match) < 0)
 			return -1;
 		if(!match) {
-			if(add_node_to_list(DOT_DT, r->filename, entryhead, full_deps) < 0)
+			if(add_node_to_tree(DOT_DT, r->filename, &root, full_deps) < 0)
 				return -1;
 		}
 		del_file_entry(r);
@@ -767,19 +763,15 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	while(!LIST_EMPTY(&info->var_list)) {
 		r = LIST_FIRST(&info->var_list);
 
-		if(add_node_to_list(vardt, r->filename, entryhead, 0) < 0)
+		if(add_node_to_tree(vardt, r->filename, &root, 0) < 0)
 			return -1;
 		del_file_entry(r);
 	}
 
-	RB_FOREACH(tt, tupid_entries, &info->used_groups_root) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tt->tupid, &tent) < 0)
-			return -1;
-		tup_entry_list_add(tent, entryhead);
-	}
+	tent_tree_copy(&root, &info->used_groups_root);
 
-	if(tup_db_check_actual_inputs(f, cmdid, entryhead, &info->sticky_root, &info->normal_root, &info->group_sticky_root, &info->output_root, important_link_removed) < 0)
+	if(tup_db_check_actual_inputs(f, cmdid, &root, &info->sticky_root, &info->normal_root, &info->group_sticky_root, &info->output_root, important_link_removed) < 0)
 		return -1;
+	free_tent_tree(&root);
 	return 0;
 }
