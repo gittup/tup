@@ -22,6 +22,7 @@
 #include "db.h"
 #include "array_size.h"
 #include "tupid_tree.h"
+#include "tupid_list.h"
 #include "file.h"
 #include "fileio.h"
 #include "config.h"
@@ -1199,8 +1200,10 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
 	static char s4[] = "select * from variant_list";
 	char *sql;
 	int sqlsize;
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	if(flags == TUP_FLAGS_CONFIG) {
 		stmt = &stmts[DB_SELECT_NODE_BY_FLAGS_1];
@@ -1245,7 +1248,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
 			goto out_reset;
 		}
 
-		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -1259,17 +1262,17 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
 
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(callback(arg, tent) < 0) {
 				return -1;
 			}
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -1281,9 +1284,10 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_DIR];
 	static char s[] = "select id from node where dir=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
 
+	tupid_list_init(&tupid_list);
 	transaction_check("%s [%lli]", s, dt);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -1312,7 +1316,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 			goto out_reset;
 		}
 
-		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -1326,16 +1330,16 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
 
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(callback(arg, tent) < 0)
 				return -1;
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -4208,8 +4212,10 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SET_SRCID_DIR_FLAGS];
 	static char s[] = "select srcid from node where dir=? and type=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli, %i]", s, tupid, TUP_NODE_GENERATED);
 	if(!*stmt) {
@@ -4244,7 +4250,7 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 			goto out_reset;
 		}
 
-		if(tupid_tree_add_dup(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -4257,17 +4263,17 @@ out_reset:
 		return -1;
 	}
 
-	RB_FOREACH(tt, tupid_entries, &root) {
+	tupid_list_foreach(tl, &tupid_list) {
 		struct tup_entry *tent;
 
-		if(tup_entry_add(tt->tupid, &tent) < 0)
+		if(tup_entry_add(tl->tupid, &tent) < 0)
 			return -1;
 		if(tent->type == TUP_NODE_DIR) {
 			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 				return -1;
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -4321,8 +4327,10 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_LINK];
 	static char s[] = "select to_id from normal_link where from_id=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -4352,7 +4360,7 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			goto out_reset;
 		}
 
-		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -4366,15 +4374,15 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(callback(arg, tent) < 0)
 				return -1;
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -4468,8 +4476,10 @@ int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SELECT_NODE_BY_DISTINCT_GROUP_LINK];
 	static char s[] = "select distinct(to_id) from group_link where from_id=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -4498,7 +4508,7 @@ int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup
 			rc = -1;
 			goto out_reset;
 		}
-		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -4512,17 +4522,17 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
 
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(callback(arg, tent) < 0) {
 				return -1;
 			}
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -5504,8 +5514,10 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUT_TREE];
 	static char s[] = "select to_id from normal_link where from_id=?";
-	struct tupid_tree *tt;
-	struct tupid_entries tupid_root = {NULL};
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5525,8 +5537,6 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 		*group = NULL;
 
 	while(1) {
-		tupid_t tupid;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			break;
@@ -5538,10 +5548,8 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 			break;
 		}
 
-		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add(&tupid_root, tupid);
-		if(rc < 0) {
-			fprintf(stderr, "tup error: tup_db_get_outputs() unable to insert tupid %lli into tree - duplicate output link in the database for command %lli?\n", tupid, cmdid);
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
+			rc = -1;
 			break;
 		}
 	}
@@ -5553,9 +5561,9 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &tupid_root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(tent->type == TUP_NODE_GROUP) {
 				if(group) {
@@ -5580,7 +5588,7 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 			}
 		}
 	}
-	free_tupid_tree(&tupid_root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -5591,9 +5599,10 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS1];
 	static char s[] = "select from_id from normal_link where to_id=?";
-	struct tupid_tree *tt;
-	struct tupid_entries tupid_root = {NULL};
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
 
+	tupid_list_init(&tupid_list);
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -5624,10 +5633,8 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		rc = tupid_tree_add_dup(&tupid_root, tupid);
-
-		if(rc < 0) {
-			fprintf(stderr, "tup error: get_normal_inputs() unable to insert tupid %lli into tree - duplicate input link in the database for command %lli?\n", tupid, cmdid);
+		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
+			rc = -1;
 			break;
 		}
 	}
@@ -5638,14 +5645,14 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 		return -1;
 	}
 
-	RB_FOREACH(tt, tupid_entries, &tupid_root) {
+	tupid_list_foreach(tl, &tupid_list) {
 		struct tup_entry *tent;
-		if(tup_entry_add(tt->tupid, &tent) < 0)
+		if(tup_entry_add(tl->tupid, &tent) < 0)
 			return -1;
 		if(tent_tree_add(root, tent) < 0)
 			return -1;
 	}
-	free_tupid_tree(&tupid_root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -5657,8 +5664,10 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS2];
 	static char s[] = "select from_id from sticky_link where to_id=?";
-	struct tupid_tree *tt;
-	struct tupid_entries tupid_root = {NULL};
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5687,7 +5696,7 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 			break;
 		}
 
-		if(tupid_tree_add(&tupid_root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			break;
 		}
@@ -5700,9 +5709,9 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &tupid_root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(tent->type == TUP_NODE_GROUP)
 				if(tent_tree_add_dup(group_root, tent) < 0)
@@ -5711,7 +5720,7 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 				return -1;
 		}
 	}
-	free_tupid_tree(&tupid_root);
+	free_tupid_list(&tupid_list);
 	return rc;
 }
 
@@ -7046,8 +7055,10 @@ static int add_ghost_checks(tupid_t tupid)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_CHECKS];
 	static char s[] = "select from_id from normal_link where to_id=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -7065,8 +7076,6 @@ static int add_ghost_checks(tupid_t tupid)
 	}
 
 	do {
-		tupid_t link_tupid;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			break;
@@ -7078,8 +7087,7 @@ static int add_ghost_checks(tupid_t tupid)
 			goto out_reset;
 		}
 
-		link_tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_tree_add(&root, link_tupid) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -7093,12 +7101,12 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
-			if(add_ghost(tt->tupid) < 0)
+		tupid_list_foreach(tl, &tupid_list) {
+			if(add_ghost(tl->tupid) < 0)
 				return -1;
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -7109,8 +7117,10 @@ static int add_group_and_exclusion_checks(tupid_t tupid)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_ADD_GROUP_CHECKS];
 	static char s[] = "select to_id from normal_link where from_id=?";
-	struct tupid_entries root = {NULL};
-	struct tupid_tree *tt;
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -7139,7 +7149,7 @@ static int add_group_and_exclusion_checks(tupid_t tupid)
 			goto out_reset;
 		}
 
-		if(tupid_tree_add(&root, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -7153,16 +7163,16 @@ out_reset:
 	}
 
 	if(rc == 0) {
-		RB_FOREACH(tt, tupid_entries, &root) {
+		tupid_list_foreach(tl, &tupid_list) {
 			struct tup_entry *tent;
-			if(tup_entry_add(tt->tupid, &tent) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			/* Ghost outputs here can be exclusions */
 			if(tent->type == TUP_NODE_GROUP || tent->type == TUP_NODE_GHOST)
 				tup_entry_add_ghost_list(tent, &ghost_list);
 		}
 	}
-	free_tupid_tree(&root);
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
