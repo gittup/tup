@@ -79,26 +79,6 @@ int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid)
 	return 0;
 }
 
-int tupid_tree_copy(struct tupid_entries *dest, struct tupid_entries *src)
-{
-	struct tupid_tree *tt;
-	RB_FOREACH(tt, tupid_entries, src) {
-		if(tupid_tree_add(dest, tt->tupid) < 0)
-			return -1;
-	}
-	return 0;
-}
-
-int tupid_tree_copy_dup(struct tupid_entries *dest, struct tupid_entries *src)
-{
-	struct tupid_tree *tt;
-	RB_FOREACH(tt, tupid_entries, src) {
-		if(tupid_tree_add_dup(dest, tt->tupid) < 0)
-			return -1;
-	}
-	return 0;
-}
-
 void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid)
 {
 	struct tupid_tree *tt;

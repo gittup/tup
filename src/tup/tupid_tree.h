@@ -41,8 +41,6 @@ struct tupid_tree *tupid_tree_search(struct tupid_entries *root, tupid_t tupid);
 int tupid_tree_insert(struct tupid_entries *root, struct tupid_tree *data);
 int tupid_tree_add(struct tupid_entries *root, tupid_t tupid);
 int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid);
-int tupid_tree_copy(struct tupid_entries *dest, struct tupid_entries *src);
-int tupid_tree_copy_dup(struct tupid_entries *dest, struct tupid_entries *src);
 void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid);
 static inline void tupid_tree_rm(struct tupid_entries *root, struct tupid_tree *tt)
 {

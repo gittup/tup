@@ -407,52 +407,6 @@ tupid_t tup_entry_vardt(struct tup_entry *tent)
 	return tup_entry_variant(tent)->tent->tnode.tupid;
 }
 
-static int create_dir(int dfd, struct tup_entry *tent)
-{
-	int curfd;
-	int newfd;
-
-	if(!tent->parent) {
-		return dup(dfd);
-	}
-
-	curfd = create_dir(dfd, tent->parent);
-	if(curfd < 0)
-		return -1;
-
-	if(mkdirat(curfd, tent->name.s, 0777) < 0) {
-		if(errno != EEXIST) {
-			perror(tent->name.s);
-			fprintf(stderr, "tup error: Unable to create sub-directory in the build tree.\n");
-			return -1;
-		}
-	}
-	newfd = openat(curfd, tent->name.s, O_RDONLY | O_CLOEXEC);
-	if(newfd < 0) {
-		perror(tent->name.s);
-		fprintf(stderr, "tup error: Unable to open newly-created sub-directory in the build tree.\n");
-		return -1;
-	}
-	if(close(curfd) < 0) {
-		perror("close(curfd)");
-		return -1;
-	}
-	return newfd;
-}
-
-int tup_entry_create_dirs(int root_dfd, struct tup_entry *tent)
-{
-	int newfd;
-	newfd = create_dir(root_dfd, tent);
-	if(newfd < 0)
-		return -1;
-	if(close(newfd) < 0) {
-		perror("close(newfd)");
-		return -1;
-	}
-	return 0;
-}
-
 static int set_string(char **dest, int *destlen, const char *src, int srclen)
 {
 	if(src) {

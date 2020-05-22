@@ -110,7 +110,6 @@ int tup_db_maybe_add_create_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
 int tup_db_add_modify_list(tupid_t tupid);
 int tup_db_add_variant_list(tupid_t tupid);
-int tup_db_in_config_list(tupid_t tupid);
 int tup_db_in_create_list(tupid_t tupid);
 int tup_db_in_modify_list(tupid_t tupid);
 int tup_db_unflag_config(tupid_t tupid);
@@ -161,7 +160,6 @@ int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup
 int tup_db_show_config(void);
 int tup_db_config_set_int(const char *lval, int x);
 int tup_db_config_get_int(const char *lval, int def, int *result);
-int tup_db_config_set_string(const char *lval, const char *rval);
 
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);

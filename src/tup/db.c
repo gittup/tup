@@ -80,7 +80,6 @@ enum {
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_VARIANT_LIST,
-	DB_IN_CONFIG_LIST,
 	DB_IN_CREATE_LIST,
 	DB_IN_MODIFY_LIST,
 	DB_UNFLAG_CONFIG,
@@ -113,7 +112,6 @@ enum {
 	DB_SELECT_NODE_BY_DISTINCT_GROUP_LINK,
 	DB_CONFIG_SET_INT,
 	DB_CONFIG_GET_INT,
-	DB_CONFIG_SET_STRING,
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
 	DB_GET_VAR_ID_ALLOC,
@@ -2828,52 +2826,6 @@ int tup_db_add_variant_list(tupid_t tupid)
 	return 0;
 }
 
-int tup_db_in_config_list(tupid_t tupid)
-{
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_IN_CONFIG_LIST];
-	static char s[] = "select id from config_list where id=?";
-
-	transaction_check("%s [%lli]", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		rc = 0;
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		rc = -1;
-		goto out_reset;
-	}
-
-	rc = 1;
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return rc;
-}
-
 int tup_db_in_create_list(tupid_t tupid)
 {
 	int rc;
@@ -4662,48 +4614,6 @@ out_reset:
 	}
 
 	return rc;
-}
-
-int tup_db_config_set_string(const char *lval, const char *rval)
-{
-	int rc;
-	sqlite3_stmt **stmt = &stmts[DB_CONFIG_SET_STRING];
-	static char s[] = "insert or replace into config values(?, ?)";
-
-	transaction_check("%s ['%s', '%s']", s, lval, rval);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, lval, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_text(*stmt, 2, rval, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return 0;
 }
 
 int tup_db_set_var(tupid_t tupid, const char *value)
