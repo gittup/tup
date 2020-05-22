@@ -43,9 +43,7 @@ struct pel_group {
 
 void init_pel_group(struct pel_group *pg);
 int pel_ignored(const char *path, int len);
-int get_path_tupid(struct pel_group *pg, tupid_t *tupid);
 int get_path_elements(const char *dir, struct pel_group *pg);
-int append_path_elements(struct pel_group *pg, tupid_t dt);
 void del_pel(struct path_element *pel, struct pel_group *pg);
 void del_pel_group(struct pel_group *pg);
 void print_pel_group(struct pel_group *pg);

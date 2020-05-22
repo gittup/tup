@@ -125,54 +125,6 @@ skip_num_elements:
 	return 0;
 }
 
-int get_path_tupid(struct pel_group *pg, tupid_t *tupid)
-{
-	struct path_element *pel;
-	struct tup_entry *dtent;
-	struct tup_entry *tent;
-	const char *top = get_tup_top();
-
-	if(tup_entry_add(DOT_DT, &dtent) < 0)
-		return -1;
-
-	if(pg->pg_flags & PG_ROOT) {
-		TAILQ_FOREACH(pel, &pg->path_list, list) {
-			if(is_path_sep(top)) {
-				while(*top && is_path_sep(top))
-					top++;
-				if(name_cmp_n(top, pel->path, pel->len) != 0) {
-					/* Directory is outside tup */
-					*tupid = -1;
-					return 0;
-				}
-				top += pel->len;
-			} else {
-				if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
-					return -1;
-				if(tent == NULL) {
-					fprintf(stderr, "tup error: Unable to find tup_entry for node '%.*s' relative to directory %lli\n", pel->len, pel->path, dtent->tnode.tupid);
-					tup_db_print(stderr, dtent->tnode.tupid);
-					return -1;
-				}
-				dtent = tent->parent;
-			}
-		}
-	} else {
-		fprintf(stderr, "tup internal error: trying to get_path_tupid() on a pel_group where PG_ROOT isn't set. Is there some funky chdir()ing going on?\n");
-		return -1;
-	}
-	/* If we've reached the end of the full path to the root of the tup
-	 * directory, then set our new dt. Otherwise, we are outside of the
-	 * tup hierarchy, so set tupid to -1.
-	 */
-	if(*top == 0) {
-		*tupid = dtent->tnode.tupid;
-	} else {
-		*tupid = -1;
-	}
-	return 0;
-}
-
 int get_path_elements(const char *path, struct pel_group *pg)
 {
 	struct path_element *pel;
@@ -232,30 +184,6 @@ int get_path_elements(const char *path, struct pel_group *pg)
 		}
 	}
 	return 0;
-}
-
-static int append_path_elements_tent(struct pel_group *pg, struct tup_entry *tent)
-{
-	if(tent->tnode.tupid != DOT_DT) {
-		if(append_path_elements_tent(pg, tent->parent) < 0)
-			return -1;
-		if(add_pel(tent->name.s, tent->name.len, pg) < 0)
-			return -1;
-		pg->num_elements++;
-	}
-	return 0;
-}
-
-int append_path_elements(struct pel_group *pg, tupid_t dt)
-{
-	struct tup_entry *tent;
-
-	tent = tup_entry_find(dt);
-	if(!tent) {
-		fprintf(stderr, "tup internal error: tup entry not found for node %lli in append_path_elements\n", dt);
-		return -1;
-	}
-	return append_path_elements_tent(pg, tent);
 }
 
 void del_pel(struct path_element *pel, struct pel_group *pg)
