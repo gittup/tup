@@ -17,7 +17,10 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 . ./tup.sh
-cp ../testTupfile.tup Tupfile
+cat > Tupfile << HERE
+: foreach *.c |> gcc -fcommon -c %f -o %o |> %B.o
+: *.o |> gcc -fcommon %f -o %o |> prog.exe
+HERE
 
 (echo "#include \"foo.h\""; echo "int main(void) {}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
@@ -44,13 +47,13 @@ update --no-scan
 check_same_link bar.o oldbar.o
 rm oldbar.o
 sym_check foo.o main marfx
-tup_dep_no_exist . foo.h . "gcc -c bar.c -o bar.o"
+tup_dep_no_exist . foo.h . "gcc -fcommon -c bar.c -o bar.o"
 
 # Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
 # some reason.
 tup touch foo.h
 update
-tup_dep_exist . foo.h . "gcc -c foo.c -o foo.o"
-tup_dep_exist . "gcc -c foo.c -o foo.o" . foo.o
+tup_dep_exist . foo.h . "gcc -fcommon -c foo.c -o foo.o"
+tup_dep_exist . "gcc -fcommon -c foo.c -o foo.o" . foo.o
 
 eotup
