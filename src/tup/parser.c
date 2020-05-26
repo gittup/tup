@@ -3565,10 +3565,18 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	TAILQ_FOREACH(nle, &nl->entries, list) {
-		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent) < 0)
-				return -1;
+	/* Add all regular inputs, except for !tup_preserve. Those are expected
+	 * to be normal files, which would normally be dropped. However, we
+	 * create a file with the same name in the build directory, which gets
+	 * picked up instead of the source file on a subsequent update, and
+	 * breaks on the same input & output check later (t8092).
+	 */
+	if(!is_variant_copy) {
+		TAILQ_FOREACH(nle, &nl->entries, list) {
+			if(nle->tent)
+				if(add_input(tf, &input_root, nle->tent) < 0)
+					return -1;
+		}
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
 		if(nle->tent)
