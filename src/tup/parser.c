@@ -110,20 +110,23 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_head *bl);
+			       struct bin_head *bl,
+			       int is_variant_copy);
 static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
 				struct path_list_head *outputs,
 				struct path_list_head *extra_outputs);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl);
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl);
+			       struct name_list *nl, struct bin_head *bl,
+			       int is_variant_copy);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl);
 static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes);
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int orderid);
+		       struct name_list *nl, int orderid,
+		       int is_variant_copy);
 static int nl_add_external_path(struct path_list *pl, struct name_list *nl, int orderid);
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name_list *nl);
@@ -1419,6 +1422,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	int cmd_len;
 	struct rule r;
 	struct name_list output_nl;
+	int is_variant_copy = 0;
 	int rc;
 
 	init_rule(&r);
@@ -1449,7 +1453,9 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	} else {
 		r.empty_input = 1;
 	}
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl) < 0)
+	if(strcmp(cmd, "!tup_preserve") == 0)
+		is_variant_copy = 1;
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, is_variant_copy) < 0)
 		return -1;
 
 	r.command = cmd;
@@ -1765,7 +1771,7 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 				return -1;
 			}
 		}
-		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL) < 0)
+		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 0) < 0)
 			return -1;
 		free(tinput);
 	}
@@ -1949,7 +1955,8 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
 			       struct name_list *order_only_inputs,
-			       struct bin_head *bl)
+			       struct bin_head *bl,
+			       int is_variant_copy)
 {
 	char *oosep;
 
@@ -1969,11 +1976,11 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			*oosep = 0;
 			oosep++;
 		}
-		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl) < 0)
+		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, is_variant_copy) < 0)
 			return -1;
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, input_pattern, inputs, bl) < 0)
+		if(input_pattern_to_nl(tf, input_pattern, inputs, bl, is_variant_copy) < 0)
 			return -1;
 	} else {
 		if(input_pattern[0]) {
@@ -2155,7 +2162,8 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 }
 
 static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl)
+			       struct name_list *nl, struct bin_head *bl,
+			       int is_variant_copy)
 {
 	struct path_list_head plist;
 
@@ -2166,7 +2174,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
-	if(get_name_list(tf, &plist, nl) < 0)
+	if(get_name_list(tf, &plist, nl, is_variant_copy) < 0)
 		return -1;
 	free_path_list(&plist);
 	return 0;
@@ -2532,7 +2540,7 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 }
 
 int get_name_list(struct tupfile *tf, struct path_list_head *plist,
-		  struct name_list *nl)
+		  struct name_list *nl, int is_variant_copy)
 {
 	struct path_list *pl;
 
@@ -2547,7 +2555,7 @@ int get_name_list(struct tupfile *tf, struct path_list_head *plist,
 			if(nl_add_external_path(pl, nl, pl->orderid) < 0)
 				return -1;
 		} else {
-			if(nl_add_path(tf, pl, nl, pl->orderid) < 0)
+			if(nl_add_path(tf, pl, nl, pl->orderid, is_variant_copy) < 0)
 				return -1;
 		}
 	}
@@ -2568,7 +2576,7 @@ static int char_find(const char *s, int len, const char *list)
 }
 
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
-		       struct name_list *nl, int orderid)
+		       struct name_list *nl, int orderid, int is_variant_copy)
 {
 	struct build_name_list_args args;
 
@@ -2589,14 +2597,21 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.tf = tf;
 	args.orderid = orderid;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
-		struct tup_entry *tent;
+		struct tup_entry *tent = NULL;
 		struct tup_entry *dtent;
 		struct variant *variant;
 
 		if(tup_entry_add(pl->dt, &dtent) < 0)
 			return -1;
-		if(tup_db_select_tent_part(dtent, pl->pel->path, pl->pel->len, &tent) < 0) {
-			return -1;
+		/* Only look for an input in the variant directory if it's not
+		 * a !tup_preserve command (!is_variant_copy), or if this is
+		 * not a variant build (tf->variant->root_variant). In the
+		 * latter case, dtent is a tent in the srcdir, of course.
+		 */
+		if(!is_variant_copy || tf->variant->root_variant) {
+			if(tup_db_select_tent_part(dtent, pl->pel->path, pl->pel->len, &tent) < 0) {
+				return -1;
+			}
 		}
 		if(!tent || tent->type == TUP_NODE_GHOST) {
 			if(pl->pel->path[0] == '<') {
@@ -2608,6 +2623,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			} else {
 				struct tup_entry *srctent = NULL;
 
+				/* If we're a variant build, also look for the
+				 * file in the srcdir.
+				 */
 				if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
 					return -1;
 				if(srctent)
@@ -3565,18 +3583,10 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		delete_name_list_entry(&extra_onl, onle);
 	}
 
-	/* Add all regular inputs, except for !tup_preserve. Those are expected
-	 * to be normal files, which would normally be dropped. However, we
-	 * create a file with the same name in the build directory, which gets
-	 * picked up instead of the source file on a subsequent update, and
-	 * breaks on the same input & output check later (t8092).
-	 */
-	if(!is_variant_copy) {
-		TAILQ_FOREACH(nle, &nl->entries, list) {
-			if(nle->tent)
-				if(add_input(tf, &input_root, nle->tent) < 0)
-					return -1;
-		}
+	TAILQ_FOREACH(nle, &nl->entries, list) {
+		if(nle->tent)
+			if(add_input(tf, &input_root, nle->tent) < 0)
+				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
 		if(nle->tent)

@@ -220,6 +220,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	struct name_list return_nl;
 	struct name_list_entry *nle;
 	size_t command_len = 0;
+	int is_variant_copy = 0;
 	int count = 1;
 
 	init_rule(&r);
@@ -239,13 +240,22 @@ static int tuplua_function_definerule(lua_State *ls)
 	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &r.extra_outputs, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_outputs'.");
 
+	lua_getfield(ls, 1, "command");
+	r.command = tuplua_tolstring(ls, -1, &command_len);
+	if(!r.command) {
+		return luaL_error(ls, "Parameter 'command' must be a string containing command specification.");
+	}
+	r.command_len = command_len;
+	if(strcmp(r.command, "!tup_preserve") == 0)
+		is_variant_copy = 1;
+
 	if(parse_dependent_tupfiles(&input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &input_path_list, &r.inputs) < 0)
+	if(get_name_list(tf, &input_path_list, &r.inputs, is_variant_copy) < 0)
 		return luaL_error(ls, "Error parsing input list");
 	if(parse_dependent_tupfiles(&extra_input_path_list, tf) < 0)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs) < 0)
+	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs, 0) < 0)
 		return luaL_error(ls, "Error parsing extra input list");
 
 	if(TAILQ_EMPTY(&input_path_list))
@@ -253,13 +263,6 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	lua_getfield(ls, 1, "foreach");
 	r.foreach = lua_toboolean(ls, -1);
-
-	lua_getfield(ls, 1, "command");
-	r.command = tuplua_tolstring(ls, -1, &command_len);
-	if(!r.command) {
-		return luaL_error(ls, "Parameter 'command' must be a string containing command specification.");
-	}
-	r.command_len = command_len;
 
 	if(execute_rule(tf, &r, &return_nl) < 0)
 		return luaL_error(ls, "Failed to execute rule.");

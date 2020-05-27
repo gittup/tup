@@ -16,43 +16,40 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# !tup_preserve has no effect without variants
+# Make sure !tup_preserve fails if given the output of another command.
 
 . ./tup.sh
 check_no_windows variant
 
-cat > Tupfile << HERE
-: file.txt |> !tup_preserve |>
+tmkdir sub
+cat > sub/Tupfile << HERE
+: |> touch %o |> foo.txt
 HERE
-
-echo 'some content' > file.txt
-
-# test that usage without variants don't result in errors
-update
-
-mkdir build-1
-touch build-1/tup.config
-mkdir build-2
-touch build-2/tup.config
+echo 'bar' > sub/bar.txt
+mkdir build
+touch build/tup.config
 
 update
 
-# test that the file contents have been preserved
-cmp file.txt build-1/file.txt
-cmp file.txt build-2/file.txt
+cat > sub/Tupfile << HERE
+: |> touch %o |> foo.txt
+: foo.txt |> !tup_preserve |>
+HERE
+tup touch sub/Tupfile
 
-# Make sure we can re-parse the Tupfile now that we have file.txt in the srcdir
-# and the build dir.
-tup touch Tupfile
-update > .tup/.tupoutput
-if grep 'preserve file.txt' .tup/.tupoutput > /dev/null; then
-	cat .tup/.tupoutput
-	echo "Error: No preserve commands should run when nothing was changed." 1>&2
-	exit 1
-fi
+# TODO: This should probably fail with a more explicit message that
+# !tup_preserve can't use a generate file, since foo.txt is only a ghost file
+# because of how fuse accesses variants. This will probably need to be updated
+# with a better message if explicit variants are enabled.
+update_fail_msg 'Explicitly.*foo.txt.*is a ghost file'
 
-# test that the file contents have been preserved
-cmp file.txt build-1/file.txt
-cmp file.txt build-2/file.txt
+cat > sub/Tupfile << HERE
+: |> touch %o |> foo.txt
+: bar.txt |> !tup_preserve |>
+HERE
+tup touch sub/Tupfile
+update
+
+cmp sub/bar.txt build/sub/bar.txt
 
 eotup

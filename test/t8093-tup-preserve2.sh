@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2016-2020  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2020  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,34 +16,45 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# !tup_preserve has no effect without variants
+# Make sure we can use a preserved file in a subsequent command.
 
 . ./tup.sh
 check_no_windows variant
 
 cat > Tupfile << HERE
 : file.txt |> !tup_preserve |>
+: file.txt |> bash gen.sh %f %o |> out.txt
 HERE
+tmkdir sub
+tmkdir sub/bar
+cp Tupfile sub/bar/Tupfile
+cat > gen.sh << HERE
+(echo -n "generated "; cat \$1) > \$2
+HERE
+cp gen.sh sub/bar
 
 echo 'some content' > file.txt
+echo 'subdir content' > sub/bar/file.txt
 
 # test that usage without variants don't result in errors
 update
 
-mkdir build-1
-touch build-1/tup.config
-mkdir build-2
-touch build-2/tup.config
+echo 'generated some content' | diff - out.txt
+echo 'generated subdir content' | diff - sub/bar/out.txt
 
+mkdir build
+touch build/tup.config
 update
 
-# test that the file contents have been preserved
-cmp file.txt build-1/file.txt
-cmp file.txt build-2/file.txt
+# test that a variant works as well
+cmp file.txt build/file.txt
+cmp sub/bar/file.txt build/sub/bar/file.txt
+echo 'generated some content' | diff - build/out.txt
+echo 'generated subdir content' | diff - build/sub/bar/out.txt
 
 # Make sure we can re-parse the Tupfile now that we have file.txt in the srcdir
 # and the build dir.
-tup touch Tupfile
+tup touch Tupfile sub/bar/Tupfile
 update > .tup/.tupoutput
 if grep 'preserve file.txt' .tup/.tupoutput > /dev/null; then
 	cat .tup/.tupoutput
@@ -52,7 +63,9 @@ if grep 'preserve file.txt' .tup/.tupoutput > /dev/null; then
 fi
 
 # test that the file contents have been preserved
-cmp file.txt build-1/file.txt
-cmp file.txt build-2/file.txt
+cmp file.txt build/file.txt
+cmp sub/bar/file.txt build/sub/bar/file.txt
+echo 'generated some content' | diff - build/out.txt
+echo 'generated subdir content' | diff - build/sub/bar/out.txt
 
 eotup
