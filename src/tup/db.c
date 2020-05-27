@@ -2544,13 +2544,13 @@ static int db_print(FILE *stream, tupid_t tupid)
 			fprintf(stream, "%s", path);
 			break;
 		case TUP_NODE_CMD:
-			fprintf(stream, "[[34m%s]", path);
+			fprintf(stream, "[[34m%s[0m]", path);
 			break;
 		case TUP_NODE_GHOST:
-			fprintf(stream, "[47;30m%s", path);
+			fprintf(stream, "[47;30m%s[0m", path);
 			break;
 		case TUP_NODE_GROUP:
-			fprintf(stream, "[36m%s", path);
+			fprintf(stream, "[36m%s[0m", path);
 			break;
 		case TUP_NODE_FILE:
 		case TUP_NODE_GENERATED:
