@@ -26,6 +26,7 @@
 #include "db.h"
 #include "container.h"
 #include "compat.h"
+#include "tent_list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -585,7 +586,7 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum gra
 int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 		enum graph_prune_type gpt, int verbose)
 {
-	struct tup_entry_head *prune_list;
+	struct tent_list_head prune_list;
 	struct tupid_entries dir_root = {NULL};
 	int x;
 	int dashdash = 0;
@@ -593,7 +594,7 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 
 	*num_pruned = 0;
 
-	prune_list = tup_entry_get_list();
+	tent_list_init(&prune_list);
 	for(x=0; x<argc; x++) {
 		struct tup_entry *tent;
 
@@ -621,19 +622,21 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 			if(tupid_tree_add_dup(&dir_root, tent->tnode.tupid) < 0)
 				return -1;
 		} else {
-			tup_entry_list_add(tent, prune_list);
+			if(tent_list_add_head(&prune_list, tent) < 0)
+				return -1;
 		}
 	}
 
 	if(do_prune) {
-		struct tup_entry *tent;
+		struct tent_list *tl;
 		struct node *n;
 		struct node *tmp;
 
 		/* For explicit files: Just see if we have the node in the
 		 * PDAG, and if so, mark it.
 		 */
-		LIST_FOREACH(tent, prune_list, list) {
+		tent_list_foreach(tl, &prune_list) {
+			struct tup_entry *tent = tl->tent;
 			n = find_node(g, tent->tnode.tupid);
 			if(n) {
 				mark_nodes(n);
@@ -665,11 +668,11 @@ int prune_graph(struct graph *g, int argc, char **argv, int *num_pruned,
 		}
 	}
 	free_tupid_tree(&dir_root);
-	tup_entry_release_list();
+	free_tent_list(&prune_list);
 	return 0;
 
 out_err:
-	tup_entry_release_list();
+	free_tent_list(&prune_list);
 	return -1;
 }
 
