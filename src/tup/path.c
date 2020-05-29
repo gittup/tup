@@ -30,6 +30,7 @@
 #include "option.h"
 #include "pel_group.h"
 #include "logging.h"
+#include "tent_list.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -169,14 +170,15 @@ int watch_path(tupid_t dt, const char *file,
 
 static int full_scan_cb(void *arg, struct tup_entry *tent)
 {
-	struct tup_entry_head *head = arg;
-	tup_entry_list_add(tent, head);
+	struct tent_list_head *head = arg;
+	if(tent_list_add_head(head, tent) < 0)
+		return -1;
 	return 0;
 }
 
-static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
+static int full_scan_dir(struct tent_list_head *head, int dfd, tupid_t dt)
 {
-	struct tup_entry *tent;
+	struct tent_list *tl;
 
 	/* This is kinda tricky. We start with a dfd (for "/"), and its tupid. Then we add the
 	 * tup entries for the current dt to the front of the tup_entry list. We only use one
@@ -192,7 +194,8 @@ static int full_scan_dir(struct tup_entry_head *head, int dfd, tupid_t dt)
 	 */
 	if(tup_db_select_node_dir(full_scan_cb, head, dt) < 0)
 		return -1;
-	LIST_FOREACH(tent, head, list) {
+	tent_list_foreach(tl, head) {
+		struct tup_entry *tent = tl->tent;
 		int new_dfd = -1;
 		time_t mtime = -1;
 		int scan_subdir = 0;
@@ -281,11 +284,12 @@ static int scan_full_deps(void)
 	tupid_t dt;
 	int dfd;
 	int rc;
-	struct tup_entry_head *head;
+	struct tent_list_head scan_list;
 
 	if(!tup_option_get_flag("updater.full_deps")) {
 		return 0;
 	}
+	tent_list_init(&scan_list);
 
 	dt = slash_dt();
 	dfd = open("/", O_RDONLY);
@@ -294,9 +298,8 @@ static int scan_full_deps(void)
 		fprintf(stderr, "tup error: Unable to open root directory entry for scanning full dependencies.\n");
 		return -1;
 	}
-	head = tup_entry_get_list();
-	rc = full_scan_dir(head, dfd, dt);
-	tup_entry_release_list();
+	rc = full_scan_dir(&scan_list, dfd, dt);
+	free_tent_list(&scan_list);
 
 	if(close(dfd) < 0) {
 		perror("close(/)");
