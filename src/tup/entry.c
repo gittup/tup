@@ -38,8 +38,6 @@
 #include <sys/stat.h>
 
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
-static int list_out = 0;
-static struct tup_entry_head entry_list;
 static int do_verbose = 0;
 static pthread_mutex_t entry_openat_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -144,10 +142,6 @@ static int rm_entry(tupid_t tupid, int safe)
 		}
 	}
 
-	if(tent->list.le_prev != NULL) {
-		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which is in the entry list [%lli:%s]\n", tupid, tent->dt, tent->name.s);
-		return -1;
-	}
 	tup_db_del_ghost_tree(tent);
 
 	tupid_tree_rm(&tup_root, &tent->tnode);
@@ -444,7 +438,6 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	}
 
 	tent->tnode.tupid = tupid;
-	tent->list.le_prev = NULL;
 	tent->dt = dt;
 	tent->parent = NULL;
 	tent->type = type;
@@ -551,56 +544,6 @@ int tup_entry_clear(void)
 		}
 	}
 	return 0;
-}
-
-struct tup_entry_head *tup_entry_get_list(void)
-{
-	if(list_out) {
-		fprintf(stderr, "tup internal error: entry list is already out\n");
-		exit(1);
-	}
-	list_out = 1;
-	LIST_INIT(&entry_list);
-	return &entry_list;
-}
-
-void tup_entry_release_list(void)
-{
-	if(!list_out) {
-		fprintf(stderr, "tup internal error: entry list isn't out\n");
-		exit(1);
-	}
-	while(!LIST_EMPTY(&entry_list)) {
-		struct tup_entry *tent = LIST_FIRST(&entry_list);
-		tup_entry_list_del(tent);
-	}
-	list_out = 0;
-}
-
-void tup_entry_list_add(struct tup_entry *tent, struct tup_entry_head *head)
-{
-	if(!list_out) {
-		fprintf(stderr, "tup internal error: tup_entry_list_add called without the list\n");
-		exit(1);
-	}
-	if(tent->list.le_prev == NULL) {
-		LIST_INSERT_HEAD(head, tent, list);
-	}
-}
-
-void tup_entry_list_del(struct tup_entry *tent)
-{
-	if(!list_out) {
-		fprintf(stderr, "tup internal error: tup_entry_list_del called without the list\n");
-		exit(1);
-	}
-	LIST_REMOVE(tent, list);
-	tent->list.le_prev = NULL;
-}
-
-int tup_entry_in_list(struct tup_entry *tent)
-{
-	return !(tent->list.le_prev == NULL);
 }
 
 int tup_entry_add_ghost_tree(struct tup_entry *tent, struct tent_entries *root)

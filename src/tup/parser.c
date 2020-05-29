@@ -2021,35 +2021,30 @@ static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
 	return 0;
 }
 
-static void make_name_list_unique(struct name_list *nl)
+static int make_name_list_unique(struct name_list *nl)
 {
 	struct name_list_entry *tmp;
-	struct tup_entry_head *input_list;
+	struct tent_entries root = {NULL};
 	struct name_list_entry *nle;
 
-	/* Use the tup entry list as an easy cheat to remove duplicates. Only
-	 * care about dups in the inputs namelist, since the others are just
-	 * added to the tupid_tree and aren't used in %-flags.
+	/* We only care about dupes in the inputs namelist, since the others
+	 * are just added to the tupid_tree and aren't used in %-flags.
 	 *
-	 * The trick here is that we need to prune duplicate inputs, but still
-	 * maintain the order. So we can't stick the input tupids in a tree and
-	 * use that, since that would kill the order. Also, just going through
-	 * the linked list twice would be O(n^2), which would suck. Since the
-	 * tup_entry's are already unique, we can use the entry list to
-	 * determine if the nle is already present or not. If it is already
-	 * present, the second and further duplicates will be removed.
+	 * Note that we need to prune duplicate inputs, but still maintain the
+	 * order.
 	 */
-	input_list = tup_entry_get_list();
 	TAILQ_FOREACH_SAFE(nle, &nl->entries, list, tmp) {
 		if(!nle->tent)
 			continue;
-		if(tup_entry_in_list(nle->tent)) {
+		if(tent_tree_search(&root, nle->tent) != NULL) {
 			delete_name_list_entry(nl, nle);
 		} else {
-			tup_entry_list_add(nle->tent, input_list);
+			if(tent_tree_add(&root, nle->tent) < 0)
+				return -1;
 		}
 	}
-	tup_entry_release_list();
+	free_tent_tree(&root);
+	return 0;
 }
 
 int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl)
@@ -2058,7 +2053,8 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 	int is_bang = 0;
 	int foreach = 0;
 
-	make_name_list_unique(&r->inputs);
+	if(make_name_list_unique(&r->inputs) < 0)
+		return -1;
 
 	if(r->command[0] == '!') {
 		struct string_tree *st;

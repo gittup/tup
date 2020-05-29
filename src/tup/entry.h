@@ -57,12 +57,6 @@ struct tup_entry {
 	int flagslen;
 	char *display;
 	int displaylen;
-
-	/* Only valid inside of get/release list. The next pointer is used to
-	 * determine whether or not it is in the list (next==NULL means it
-	 * isn't in the list).
-	 */
-	LIST_ENTRY(tup_entry) list;
 };
 
 LIST_HEAD(tup_entry_head, tup_entry);
@@ -97,11 +91,6 @@ void print_tup_entry(FILE *f, struct tup_entry *tent);
 void print_tupid(FILE *f, tupid_t tupid);
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent);
 int tup_entry_clear(void);
-struct tup_entry_head *tup_entry_get_list(void);
-void tup_entry_release_list(void);
-void tup_entry_list_add(struct tup_entry *tent, struct tup_entry_head *head);
-void tup_entry_list_del(struct tup_entry *tent);
-int tup_entry_in_list(struct tup_entry *tent);
 int tup_entry_add_ghost_tree(struct tup_entry *tent, struct tent_entries *root);
 int tup_entry_debug_add_all_ghosts(struct tent_entries *root);
 int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root);
