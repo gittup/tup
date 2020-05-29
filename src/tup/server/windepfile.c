@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 
 #define TUP_TMP ".tup/tmp"
 

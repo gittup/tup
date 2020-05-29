@@ -244,16 +244,6 @@ index a469466..7d56528 100644
  
  
  /*
-@@ -38,7 +39,9 @@ struct lua_longjmp;  /* defined in ldo.c */
- ** is thread safe
- */
- #if !defined(l_signalT)
-+#if !defined(_WIN32)
- #include <signal.h>
-+#endif
- #define l_signalT	sig_atomic_t
- #endif
- 
 @@ -181,6 +184,7 @@ struct lua_State {
    unsigned short nCcalls;  /* number of nested C calls */
    l_signalT hookmask;

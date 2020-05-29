@@ -40,8 +40,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#ifndef _WIN32
 #include <signal.h>
+#ifndef _WIN32
 #include <sys/ioctl.h>
 #endif
 

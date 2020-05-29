@@ -10,9 +10,6 @@ endif
 CFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h
 CFLAGS += -I$(TUP_CWD)/src/compat/win32
 
-# No sig_atomic_t on windows
-CFLAGS += -Dsig_atomic_t=int
-
 LDFLAGS += -static-libgcc
 
 !cc32 = |> ^ CC32 %f^ $(CC32) -c %f -o %o $(CFLAGS) $(CFLAGS32) $(CFLAGS32_%f) |> %B.o32
