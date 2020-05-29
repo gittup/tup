@@ -50,6 +50,7 @@ int tup_db_rollback(void);
 int tup_db_check_flags(int flags);
 void tup_db_enable_sql_debug(void);
 int tup_db_debug_add_all_ghosts(void);
+void tup_db_del_ghost_tree(struct tup_entry *tent);
 const char *tup_db_type(enum TUP_NODE_TYPE type);
 
 /* Node operations */

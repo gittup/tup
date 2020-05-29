@@ -158,7 +158,7 @@ LIST_HEAD(half_entry_head, half_entry);
 
 static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
-static struct tup_entry_head ghost_list;
+static struct tent_entries ghost_root = {NULL};
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
@@ -907,7 +907,7 @@ int tup_db_debug_add_all_ghosts(void)
 	if(load_all_nodes() < 0)
 		return -1;
 
-	if(tup_entry_debug_add_all_ghosts(&ghost_list) < 0)
+	if(tup_entry_debug_add_all_ghosts(&ghost_root) < 0)
 		return -1;
 
 	return 0;
@@ -1527,9 +1527,8 @@ int tup_db_delete_node(tupid_t tupid)
 
 	if(delete_node(tupid) < 0)
 		return -1;
-	if(parent->type == TUP_NODE_GENERATED_DIR && ghost_reclaimable1(parent->tnode.tupid)) {
-		return delete_name_file(parent->tnode.tupid);
-	}
+	if(tup_entry_add_ghost_tree(parent, &ghost_root) < 0)
+		return -1;
 
 	return 0;
 }
@@ -1633,7 +1632,8 @@ int tup_db_flag_generated_dir(tupid_t dt, int force)
 		 */
 		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
-		tup_entry_add_ghost_list(tent, &ghost_list);
+		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+			return -1;
 	}
 
 	LIST_INIT(&subdir_list);
@@ -3288,7 +3288,8 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 			 */
 			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
-			tup_entry_add_ghost_list(output_group, &ghost_list);
+			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
+				return -1;
 		}
 		/* Delete any old links (t6029) */
 		if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
@@ -3311,7 +3312,8 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 		if(output_group) {
 			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
-			tup_entry_add_ghost_list(output_group, &ghost_list);
+			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
+				return -1;
 		}
 	}
 	return 0;
@@ -5900,7 +5902,8 @@ static int rm_sticky(struct tup_entry *tent, void *data)
 		/* Removing an input group means we need to check if the group
 		 * also needs to be removed from the database.
 		 */
-		tup_entry_add_ghost_list(tent, &ghost_list);
+		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+			return -1;
 
 		/* If this command also writes to a group, we need to remove
 		 * the group_link for this input group.
@@ -6100,7 +6103,6 @@ static int check_generated_inputs(FILE *f, struct tent_entries *missing_input_ro
 
 		if(connected) {
 			tent_tree_rm(missing_input_root, tt);
-			free(tt);
 		}
 	}
 
@@ -6246,7 +6248,8 @@ static int rm_output(struct tup_entry *tent, void *data)
 		/* When an output exclusion is removed, we have to check that
 		 * it might now be unused.
 		 */
-		tup_entry_add_ghost_list(tent, &ghost_list);
+		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+			return -1;
 	}
 	return 0;
 }
@@ -6320,7 +6323,8 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
 			if(tup_db_add_modify_list((*old_group)->tnode.tupid) < 0)
 				return -1;
 			/* Possibly clean up this group if there are no more references. */
-			tup_entry_add_ghost_list(*old_group, &ghost_list);
+			if(tup_entry_add_ghost_tree(*old_group, &ghost_root) < 0)
+				return -1;
 		}
 	}
 	if(compare_tent_trees(&output_root, root, &pod, rm_output, add_output) < 0)
@@ -6954,7 +6958,8 @@ static int add_ghost(tupid_t tupid)
 	if(tup_entry_add(tupid, &tent) < 0)
 		return -1;
 
-	tup_entry_add_ghost_list(tent, &ghost_list);
+	if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+		return -1;
 
 	return 0;
 }
@@ -7079,7 +7084,8 @@ out_reset:
 				return -1;
 			/* Ghost outputs here can be exclusions */
 			if(tent->type == TUP_NODE_GROUP || tent->type == TUP_NODE_GHOST)
-				tup_entry_add_ghost_list(tent, &ghost_list);
+				if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+					return -1;
 		}
 	}
 	free_tupid_list(&tupid_list);
@@ -7087,9 +7093,14 @@ out_reset:
 	return rc;
 }
 
+void tup_db_del_ghost_tree(struct tup_entry *tent)
+{
+	tent_tree_remove(&ghost_root, tent);
+}
+
 static int reclaim_ghosts(void)
 {
-	/* All the nodes in ghost_list already are of type TUP_NODE_GHOST,
+	/* All the nodes in ghost_root already are of type TUP_NODE_GHOST,
 	 * TUP_NODE_GROUP, or TUP_NODE_GENERATED_DIR. Just make sure they are
 	 * no longer needed before deleting them by checking:
 	 *  - no other node references it in 'dir'
@@ -7104,22 +7115,21 @@ static int reclaim_ghosts(void)
 	 * having a ghost subdir - the subdir would be removed in one pass,
 	 * then the other dir in the next pass.
 	 */
-	struct tup_entry_head tmp_list;
+	struct tent_entries tmp_root = {NULL};
 
-	LIST_INIT(&tmp_list);
-
-	while(!LIST_EMPTY(&ghost_list)) {
+	while(!RB_EMPTY(&ghost_root)) {
 		struct tup_entry *tent;
+		struct tent_tree *tt;
 		int rc;
 
-		tent = LIST_FIRST(&ghost_list);
+		tt = RB_MIN(tent_entries, &ghost_root);
+		tent = tt->tent;
+		tent_tree_rm(&ghost_root, tt);
 		if(tent->type != TUP_NODE_GHOST && tent->type != TUP_NODE_GROUP &&
 		   tent->type != TUP_NODE_GENERATED_DIR) {
-			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_list shouldn't be type %i\n", tent->tnode.tupid, tent->type);
+			fprintf(stderr, "tup internal error: tup entry %lli in the ghost_root shouldn't be type %i\n", tent->tnode.tupid, tent->type);
 			return -1;
 		}
-		if(tup_entry_del_ghost_list(tent) < 0)
-			return -1;
 
 		rc = ghost_reclaimable(tent);
 		if(rc < 0)
@@ -7129,8 +7139,15 @@ static int reclaim_ghosts(void)
 				fprintf(stderr, "Ghost removed: %lli\n", tent->tnode.tupid);
 			}
 
+			/* Don't check us again later, in case we were added
+			 * there previously.
+			 */
+			tent_tree_remove(&tmp_root, tent);
+
 			/* Re-check the parent again later */
-			tup_entry_add_ghost_list(tent->parent, &tmp_list);
+			tent_tree_remove(&ghost_root, tent->parent);
+			if(tup_entry_add_ghost_tree(tent->parent, &tmp_root) < 0)
+				return -1;
 
 			if(rm_generated_dir(tent) < 0)
 				return -1;
@@ -7139,8 +7156,12 @@ static int reclaim_ghosts(void)
 				return -1;
 		}
 
-		if(LIST_EMPTY(&ghost_list)) {
-			LIST_SWAP(&ghost_list, &tmp_list, tup_entry, ghost_list);
+		if(RB_EMPTY(&ghost_root)) {
+			/* Swap the current tree with the tmp one where we
+			 * stored all the parents to check again.
+			 */
+			ghost_root.rbh_root = tmp_root.rbh_root;
+			tmp_root.rbh_root = NULL;
 		}
 	}
 

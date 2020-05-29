@@ -148,9 +148,7 @@ static int rm_entry(tupid_t tupid, int safe)
 		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which is in the entry list [%lli:%s]\n", tupid, tent->dt, tent->name.s);
 		return -1;
 	}
-	if(tent->ghost_list.le_prev != NULL) {
-		LIST_REMOVE(tent, ghost_list);
-	}
+	tup_db_del_ghost_tree(tent);
 
 	tupid_tree_rm(&tup_root, &tent->tnode);
 	if(tent->parent) {
@@ -447,7 +445,6 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 
 	tent->tnode.tupid = tupid;
 	tent->list.le_prev = NULL;
-	tent->ghost_list.le_prev = NULL;
 	tent->dt = dt;
 	tent->parent = NULL;
 	tent->type = type;
@@ -606,31 +603,17 @@ int tup_entry_in_list(struct tup_entry *tent)
 	return !(tent->list.le_prev == NULL);
 }
 
-void tup_entry_add_ghost_list(struct tup_entry *tent, struct tup_entry_head *head)
+int tup_entry_add_ghost_tree(struct tup_entry *tent, struct tent_entries *root)
 {
 	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GROUP ||
 	   tent->type == TUP_NODE_GENERATED_DIR) {
-		/* It is fine if the ghost is already in the list - just make
-		 * sure we don't try to add it twice.
-		 */
-		if(tent->ghost_list.le_prev == NULL) {
-			LIST_INSERT_HEAD(head, tent, ghost_list);
-		}
+		if(tent_tree_add_dup(root, tent) < 0)
+			return -1;
 	}
-}
-
-int tup_entry_del_ghost_list(struct tup_entry *tent)
-{
-	if(tent->ghost_list.le_prev == NULL) {
-		fprintf(stderr, "tup internal error: ghost_list.next is NULL in tup_entry_del_ghost_list %lli [%lli:%s]\n", tent->tnode.tupid, tent->dt, tent->name.s);
-		return -1;
-	}
-	LIST_REMOVE(tent, ghost_list);
-	tent->ghost_list.le_prev = NULL;
 	return 0;
 }
 
-int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head)
+int tup_entry_debug_add_all_ghosts(struct tent_entries *root)
 {
 	struct tupid_tree *tt;
 
@@ -638,7 +621,8 @@ int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head)
 		struct tup_entry *tent;
 
 		tent = container_of(tt, struct tup_entry, tnode);
-		tup_entry_add_ghost_list(tent, head);
+		if(tup_entry_add_ghost_tree(tent, root) < 0)
+			return -1;
 	}
 	return 0;
 }

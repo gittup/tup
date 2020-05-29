@@ -92,6 +92,11 @@ void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent)
 		return;
 	}
 	tent_tree_rm(root, tt);
+}
+
+void tent_tree_rm(struct tent_entries *root, struct tent_tree *tt)
+{
+	RB_REMOVE(tent_entries, root, tt);
 	free(tt);
 }
 
@@ -101,6 +106,5 @@ void free_tent_tree(struct tent_entries *root)
 
 	while((tt = RB_ROOT(root)) != NULL) {
 		tent_tree_rm(root, tt);
-		free(tt);
 	}
 }

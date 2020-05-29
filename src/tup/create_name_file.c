@@ -723,8 +723,7 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 
 static int ghost_to_file(struct tup_entry *tent)
 {
-	if(tent->ghost_list.le_prev != NULL)
-		tup_entry_del_ghost_list(tent);
+	tup_db_del_ghost_tree(tent);
 	if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 		return -1;
 	/* Only add dirs, not generated dirs, to the create list. */

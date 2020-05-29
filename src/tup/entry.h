@@ -58,8 +58,6 @@ struct tup_entry {
 	char *display;
 	int displaylen;
 
-	LIST_ENTRY(tup_entry) ghost_list;
-
 	/* Only valid inside of get/release list. The next pointer is used to
 	 * determine whether or not it is in the list (next==NULL means it
 	 * isn't in the list).
@@ -104,9 +102,8 @@ void tup_entry_release_list(void);
 void tup_entry_list_add(struct tup_entry *tent, struct tup_entry_head *head);
 void tup_entry_list_del(struct tup_entry *tent);
 int tup_entry_in_list(struct tup_entry *tent);
-void tup_entry_add_ghost_list(struct tup_entry *tent, struct tup_entry_head *head);
-int tup_entry_del_ghost_list(struct tup_entry *tent);
-int tup_entry_debug_add_all_ghosts(struct tup_entry_head *head);
+int tup_entry_add_ghost_tree(struct tup_entry *tent, struct tent_entries *root);
+int tup_entry_debug_add_all_ghosts(struct tent_entries *root);
 int tup_entry_get_dir_tree(struct tup_entry *tent, struct tupid_entries *root);
 void dump_tup_entry(void);
 int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end);
