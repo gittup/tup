@@ -84,8 +84,8 @@ static int show_warnings;
 static int refactoring;
 static int verbose;
 
-static pthread_mutex_t db_mutex;
-static pthread_mutex_t display_mutex;
+static pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t display_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const char *signal_err[] = {
 	NULL, /* 0 */
@@ -1476,14 +1476,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	if(graph_empty(&g))
 		goto out_destroy;
 
-	if(pthread_mutex_init(&db_mutex, NULL) != 0) {
-		perror("pthread_mutex_init");
-		return -1;
-	}
-	if(pthread_mutex_init(&display_mutex, NULL) != 0) {
-		perror("pthread_mutex_init");
-		return -1;
-	}
 	warnings = 0;
 	if(server_init(SERVER_UPDATER_MODE) < 0) {
 		return -1;
@@ -1496,8 +1488,6 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 		fprintf(stderr, "tup error: execute_graph returned %i - abort. This is probably a bug.\n", rc);
 		return -1;
 	}
-	pthread_mutex_destroy(&display_mutex);
-	pthread_mutex_destroy(&db_mutex);
 out_destroy:
 	if(destroy_graph(&g) < 0)
 		return -1;
@@ -1637,8 +1627,8 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	int x;
 	int active = 0;
 	int failed = 0;
-	pthread_mutex_t list_mutex;
-	pthread_cond_t list_cond;
+	pthread_mutex_t list_mutex = PTHREAD_MUTEX_INITIALIZER;
+	pthread_cond_t list_cond = PTHREAD_COND_INITIALIZER;
 	struct worker_thread_head active_list;
 	struct worker_thread_head fin_list;
 	struct worker_thread_head free_list;
@@ -1646,14 +1636,6 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 	LIST_INIT(&active_list);
 	LIST_INIT(&fin_list);
 	LIST_INIT(&free_list);
-	if(pthread_mutex_init(&list_mutex, NULL) != 0) {
-		perror("pthread_mutex_init");
-		return -2;
-	}
-	if(pthread_cond_init(&list_cond, NULL) != 0) {
-		perror("pthread_cond_init");
-		return -2;
-	}
 
 	workers = malloc(sizeof(*workers) * jobs);
 	if(!workers) {
@@ -1801,8 +1783,6 @@ check_empties:
 	}
 
 	free(workers); /* Viva la revolucion! */
-	pthread_mutex_destroy(&list_mutex);
-	pthread_cond_destroy(&list_cond);
 	return rc;
 }
 
