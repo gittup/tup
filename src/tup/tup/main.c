@@ -106,11 +106,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if(compat_init() < 0) {
-		fprintf(stderr, "tup error: Unable to initialize compatibility lib\n");
-		return -1;
-	}
-
 	argc = argc - cmd_arg;
 	argv = &argv[cmd_arg];
 

@@ -19,13 +19,15 @@
  */
 
 #include "dirpath.h"
-#include "compat/dir_mutex.h"
 #include "tup/tupid_tree.h"
 #include "tup/compat.h"
 #include "tup/config.h"
 #include "tup/container.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
 
+static pthread_mutex_t dirpath_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct tupid_entries root = {NULL};
 static int dp_fd = 10000;
 
@@ -41,9 +43,9 @@ const char *win32_get_dirpath(int dfd)
 	if(dfd == tup_top_fd()) {
 		return get_tup_top();
 	}
-	pthread_mutex_lock(&dir_mutex);
+	pthread_mutex_lock(&dirpath_mutex);
 	tt = tupid_tree_search(&root, dfd);
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	if(tt) {
 		struct dirpath *dp = container_of(tt, struct dirpath, tnode);
 		return dp->path;
@@ -89,7 +91,7 @@ int win32_add_dirpath(const char *path)
 		dp->path[len2] = 0;
 	}
 
-	pthread_mutex_lock(&dir_mutex);
+	pthread_mutex_lock(&dirpath_mutex);
 	dp->tnode.tupid = dp_fd;
 	dp_fd++;
 
@@ -97,11 +99,11 @@ int win32_add_dirpath(const char *path)
 		fprintf(stderr, "tup error: Unable to add dirpath for '%s'\n", path);
 		goto out_err;
 	}
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	return dp->tnode.tupid;
 
 out_err:
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	return -1;
 }
 
@@ -110,7 +112,7 @@ int win32_rm_dirpath(int dfd)
 	struct tupid_tree *tt;
 	int rc = 0;
 
-	pthread_mutex_lock(&dir_mutex);
+	pthread_mutex_lock(&dirpath_mutex);
 	tt = tupid_tree_search(&root, dfd);
 	if(tt) {
 		struct dirpath *dp = container_of(tt, struct dirpath, tnode);
@@ -119,7 +121,7 @@ int win32_rm_dirpath(int dfd)
 		free(dp);
 		rc = 1;
 	}
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	return rc;
 }
 
@@ -128,7 +130,7 @@ int win32_dup(int oldfd)
 	struct tupid_tree *tt;
 	int rc = -2;
 
-	pthread_mutex_lock(&dir_mutex);
+	pthread_mutex_lock(&dirpath_mutex);
 	tt = tupid_tree_search(&root, oldfd);
 	if(tt) {
 		struct dirpath *dp = container_of(tt, struct dirpath, tnode);
@@ -152,10 +154,10 @@ int win32_dup(int oldfd)
 		rc = dp_fd;
 		dp_fd++;
 	}
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	return rc;
 
 out_err:
-	pthread_mutex_unlock(&dir_mutex);
+	pthread_mutex_unlock(&dirpath_mutex);
 	return -1;
 }

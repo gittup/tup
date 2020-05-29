@@ -343,6 +343,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 }
 
 #ifdef _WIN32
+#include <windows.h>
 #define WINDOWS_TICK 10000000
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 

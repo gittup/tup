@@ -26,15 +26,8 @@
 #include <unistd.h>
 #include <errno.h>
 
-pthread_mutex_t dir_mutex;
+pthread_mutex_t dir_mutex = PTHREAD_MUTEX_INITIALIZER;
 int dir_mutex_enabled = 1;
-
-int compat_init(void)
-{
-	if(pthread_mutex_init(&dir_mutex, NULL) < 0)
-		return -1;
-	return 0;
-}
 
 void compat_lock_enable(void)
 {

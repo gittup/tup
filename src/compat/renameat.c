@@ -22,6 +22,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "dir_mutex.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath)
 {

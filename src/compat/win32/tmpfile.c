@@ -24,6 +24,7 @@
  * the delete-on-close semantics of tmpfile() by setting the appropriate flag in
  * CreateFile().
  */
+#include <windows.h>
 #include <stdio.h>
 #include <errno.h>
 #include "tup/config.h"
