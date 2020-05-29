@@ -304,8 +304,6 @@ int generate(int argc, char **argv)
 		}
 	}
 #endif
-	if(tup_entry_init() < 0)
-		return -1;
 	if(tup_db_create(0, 1) < 0)
 		return -1;
 	if(tup_option_init(argc, argv) < 0)

@@ -48,9 +48,6 @@ int tup_init(int argc, char **argv)
 	if(tup_option_init(argc, argv) < 0) {
 		return -1;
 	}
-	if(tup_entry_init() < 0) {
-		return -1;
-	}
 	if(server_pre_init() < 0) {
 		return -1;
 	}
