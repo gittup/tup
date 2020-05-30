@@ -153,6 +153,10 @@ static int rm_entry(tupid_t tupid, int safe)
 	}
 	free_tent_tree(&tent->stickies);
 	free_tent_tree(&tent->group_stickies);
+	if(tent->refcount != 0) {
+		fprintf(stderr, "tup internal error: tup_entry_rm called on tupid %lli, which still has refcount=%i\n", tupid, tent->refcount);
+		return -1;
+	}
 	free(tent->name.s);
 	free(tent->display);
 	free(tent->flags);
@@ -349,6 +353,16 @@ int tup_entry_openat(int root_dfd, struct tup_entry *tent)
 	return rc;
 }
 
+void tup_entry_add_ref(struct tup_entry *tent)
+{
+	tent->refcount++;
+}
+
+void tup_entry_del_ref(struct tup_entry *tent)
+{
+	tent->refcount--;
+}
+
 struct variant *tup_entry_variant(struct tup_entry *tent)
 {
 	/* The variant field isn't set when we initially create tup_entrys, since
@@ -448,6 +462,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	RB_INIT(&tent->group_stickies);
 	tent->retrieved_stickies = 0;
 	tent->incoming = NULL;
+	tent->refcount = 0;
 	if(set_string(&tent->name.s, &tent->name.len, name, len) < 0)
 		return NULL;
 	if(set_string(&tent->display, &tent->displaylen, display, displaylen) < 0)
@@ -524,6 +539,20 @@ int tup_entry_change_flags(struct tup_entry *tent, const char *flags, int flagsl
 
 int tup_entry_clear(void)
 {
+	/* First delete all stickies & group_stickies. Even though these are
+	 * freed in rm_entry(), the refcount check would fail since we don't
+	 * delete nodes in any particular order. And unlike the entries tree
+	 * for directory entries, we don't have a way to remove a node from all
+	 * places where it might point to as a sticky link when it gets
+	 * deleted.
+	 */
+	struct tupid_tree *tt;
+	RB_FOREACH(tt, tupid_entries, &tup_root) {
+		struct tup_entry *tent = container_of(tt, struct tup_entry, tnode);
+		free_tent_tree(&tent->stickies);
+		free_tent_tree(&tent->group_stickies);
+	}
+
 	/* The rm_entry with safe=1 will only remove the node if all of the
 	 * children nodes are gone. Rather than try to smartly remove things
 	 * in the correct order, the outer loop will just keep going until
@@ -535,7 +564,6 @@ int tup_entry_clear(void)
 	 * upgrades.
 	 */
 	while(!RB_EMPTY(&tup_root)) {
-		struct tupid_tree *tt;
 		struct tupid_tree *tmp;
 
 		RB_FOREACH_SAFE(tt, tupid_entries, &tup_root, tmp) {

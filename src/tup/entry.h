@@ -48,6 +48,7 @@ struct tup_entry {
 	struct tent_entries group_stickies;
 	int retrieved_stickies;
 	struct tup_entry *incoming;
+	_Atomic int refcount;
 
 	/* For exclusions */
 	pcre *re;
@@ -79,6 +80,8 @@ int tup_entry_change_display(struct tup_entry *tent, const char *display, int di
 int tup_entry_change_flags(struct tup_entry *tent, const char *flags, int flagslen);
 int tup_entry_open(struct tup_entry *tent);
 int tup_entry_openat(int root_dfd, struct tup_entry *tent);
+void tup_entry_add_ref(struct tup_entry *tent);
+void tup_entry_del_ref(struct tup_entry *tent);
 struct variant *tup_entry_variant(struct tup_entry *tent);
 struct variant *tup_entry_variant_null(struct tup_entry *tent);
 tupid_t tup_entry_vardt(struct tup_entry *tent);

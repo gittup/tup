@@ -45,6 +45,7 @@ int tent_tree_add(struct tent_entries *root, struct tup_entry *tent)
 		free(tt);
 		return -1;
 	}
+	tup_entry_add_ref(tent);
 	return 0;
 }
 
@@ -60,6 +61,8 @@ int tent_tree_add_dup(struct tent_entries *root, struct tup_entry *tent)
 	tt->tent = tent;
 	if(RB_INSERT(tent_entries, root, tt) != NULL) {
 		free(tt);
+	} else {
+		tup_entry_add_ref(tent);
 	}
 	return 0;
 }
@@ -97,6 +100,7 @@ void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent)
 void tent_tree_rm(struct tent_entries *root, struct tent_tree *tt)
 {
 	RB_REMOVE(tent_entries, root, tt);
+	tup_entry_del_ref(tt->tent);
 	free(tt);
 }
 

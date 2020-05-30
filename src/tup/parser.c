@@ -2675,6 +2675,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 					return -1;
 				if(tmp && tmp->type != TUP_NODE_GHOST) {
 					valid_input = 1;
+					tent = tmp;
 				}
 			}
 

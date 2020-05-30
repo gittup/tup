@@ -19,6 +19,7 @@
  */
 
 #include "tent_list.h"
+#include "entry.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -32,6 +33,7 @@ int tent_list_add_head(struct tent_list_head *head, struct tup_entry *tent)
 		return -1;
 	}
 	tlist->tent = tent;
+	tup_entry_add_ref(tent);
 	TAILQ_INSERT_HEAD(head, tlist, list);
 	return 0;
 }
@@ -46,12 +48,14 @@ int tent_list_add_tail(struct tent_list_head *head, struct tup_entry *tent)
 		return -1;
 	}
 	tlist->tent = tent;
+	tup_entry_add_ref(tent);
 	TAILQ_INSERT_TAIL(head, tlist, list);
 	return 0;
 }
 
 void tent_list_delete(struct tent_list_head *head, struct tent_list *tlist)
 {
+	tup_entry_del_ref(tlist->tent);
 	TAILQ_REMOVE(head, tlist, list);
 	free(tlist);
 }
