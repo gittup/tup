@@ -191,7 +191,6 @@ static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
 static int delete_group_links(tupid_t cmdid);
 static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
-static int add_ghost(tupid_t tupid);
 static int add_ghost_checks(tupid_t tupid);
 static int add_group_and_exclusion_checks(tupid_t tupid);
 static int reclaim_ghosts(void);
@@ -1493,10 +1492,13 @@ int tup_db_delete_node(tupid_t tupid)
 	parent = tent->parent;
 
 	if(tent->srcid >= 0) {
+		struct tup_entry *srctent;
 		/* We may need to remove the directory that created us if it
 		 * was also removed.
 		 */
-		if(add_ghost(tent->srcid) < 0)
+		if(tup_entry_add(tent->srcid, &srctent) < 0)
+			return -1;
+		if(tup_entry_add_ghost_tree(srctent, &ghost_root) < 0)
 			return -1;
 	}
 
@@ -6064,7 +6066,7 @@ static int del_normal_link(struct tup_entry *tent, void *data)
 		return -1;
 	if(tent_tree_search(aid->sticky_root, tent) == NULL) {
 		/* Not a sticky link, so check if it was a ghost (t5054). */
-		if(add_ghost(tent->tnode.tupid) < 0)
+		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
 			return -1;
 	}
 	return 0;
@@ -6376,7 +6378,7 @@ static int rm_dir_link(struct tup_entry *tent, void *data)
 {
 	struct write_dir_input_data *wdid = data;
 
-	if(add_ghost(tent->tnode.tupid) < 0)
+	if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
 		return -1;
 	if(link_remove(tent->tnode.tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
 		return -1;
@@ -6951,19 +6953,6 @@ out_reset:
 	return rc;
 }
 
-static int add_ghost(tupid_t tupid)
-{
-	struct tup_entry *tent;
-
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
-
-	if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
-		return -1;
-
-	return 0;
-}
-
 static int add_ghost_checks(tupid_t tupid)
 {
 	int rc = 0;
@@ -7017,7 +7006,10 @@ out_reset:
 
 	if(rc == 0) {
 		tupid_list_foreach(tl, &tupid_list) {
-			if(add_ghost(tl->tupid) < 0)
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
 				return -1;
 		}
 	}
