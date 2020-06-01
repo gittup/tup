@@ -64,7 +64,6 @@ enum {
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
 	DB_CHDIR,
-	DB_CHANGE_NODE_NAME,
 	DB_SET_NAME,
 	DB_SET_DISPLAY,
 	DB_SET_FLAGS,
@@ -1962,10 +1961,7 @@ out_reset:
 
 int tup_db_change_node(tupid_t tupid, const char *new_name, struct tup_entry *new_dtent)
 {
-	int rc;
 	struct tup_entry *tent;
-	sqlite3_stmt **stmt = &stmts[DB_CHANGE_NODE_NAME];
-	static char s[] = "update node set name=?, dir=? where id=?";
 
 	if(node_select(new_dtent, new_name, -1, &tent) < 0) {
 		return -1;
@@ -1983,48 +1979,10 @@ int tup_db_change_node(tupid_t tupid, const char *new_name, struct tup_entry *ne
 		}
 	}
 
-	transaction_check("%s ['%s', %lli, %lli]", s, new_name, new_dtent->tnode.tupid, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_text(*stmt, 1, new_name, -1, SQLITE_STATIC) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int64(*stmt, 2, new_dtent->tnode.tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int64(*stmt, 3, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	rc = sqlite3_step(*stmt);
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(rc != SQLITE_DONE) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(tup_entry_change_name_dt(tupid, new_name, new_dtent->tnode.tupid) < 0)
+	if(tup_db_set_name(tupid, new_name, new_dtent->tnode.tupid) < 0)
 		return -1;
 	if(recurse_modify_dir(tupid) < 0)
 		return -1;
-
 	return 0;
 }
 
