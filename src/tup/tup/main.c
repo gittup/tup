@@ -48,6 +48,7 @@
 #include "tup/privs.h"
 #include "tup/flist.h"
 #include "tup/vardb.h"
+#include "tup/variant.h"
 #include "tup/container.h"
 
 static int entry(int argc, char **argv);
@@ -958,11 +959,14 @@ static int varshow(int argc, char **argv)
 {
 	struct tup_entry *vartent;
 	struct tup_entry *root_tent;
+	struct variant *variant;
 	if(tup_db_begin() < 0)
 		return -1;
 	if(tup_entry_add(DOT_DT, &root_tent) < 0)
 		return -1;
 	if(tup_db_select_tent(root_tent, TUP_CONFIG, &vartent) < 0)
+		return -1;
+	if(variant_add(vartent, 1, &variant) < 0)
 		return -1;
 	if(vartent) {
 		if(argc == 1) {
@@ -977,18 +981,19 @@ static int varshow(int argc, char **argv)
 			int x;
 			struct tup_entry *tent;
 			for(x=1; x<argc; x++) {
-				char *value;
-				if(tup_db_select_tent(vartent, argv[x], &tent) < 0)
-					return -1;
+				tent = tup_db_get_var(variant, argv[x], strlen(argv[x]), NULL);
 				if(!tent) {
 					fprintf(stderr, "Unable to find tupid for variable '%s'\n", argv[x]);
 					continue;
 				}
 				if(tent->type == TUP_NODE_VAR) {
-					if(tup_db_get_var_id_alloc(tent->tnode.tupid, &value) < 0)
-						return -1;
-					printf(" - Var[%s] = '%s'\n", argv[x], value);
-					free(value);
+					struct var_entry *ve;
+					ve = vardb_get(&variant->vdb, argv[x], strlen(argv[x]));
+					if(!ve) {
+						fprintf(stderr, "Unable to find vdb entry for variable '%s'\n", argv[x]);
+						continue;
+					}
+					printf(" - Var[%s] = '%s'\n", argv[x], ve->value);
 				} else if(tent->type == TUP_NODE_GHOST) {
 					printf(" - Var[[47;30m%s[0m] is a ghost\n", argv[x]);
 				} else {

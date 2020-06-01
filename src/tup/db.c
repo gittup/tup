@@ -111,7 +111,6 @@ enum {
 	DB_CONFIG_GET_INT,
 	DB_SET_VAR,
 	_DB_GET_VAR_ID,
-	DB_GET_VAR_ID_ALLOC,
 	DB_FILES_TO_TREE,
 	_DB_GET_LINKS1,
 	_DB_GET_LINKS2,
@@ -4632,68 +4631,6 @@ struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int v
 			exit(1);
 	}
 	return ve->tent;
-}
-
-int tup_db_get_var_id_alloc(tupid_t tupid, char **dest)
-{
-	int rc = -1;
-	int dbrc;
-	int len;
-	const char *value;
-	sqlite3_stmt **stmt = &stmts[DB_GET_VAR_ID_ALLOC];
-	static char s[] = "select value, length(value) from var where var.id=?";
-
-	transaction_check("%s [%lli]", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		fprintf(stderr,"tup error: Variable id %lli not found in .tup/db.\n", tupid);
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		goto out_reset;
-	}
-
-	len = sqlite3_column_int(*stmt, 1);
-	if(len < 0) {
-		goto out_reset;
-	}
-	value = (const char *)sqlite3_column_text(*stmt, 0);
-	if(!value) {
-		goto out_reset;
-	}
-	*dest = malloc(len + 1);
-	if(!*dest) {
-		perror("malloc");
-		goto out_reset;
-	}
-	memcpy(*dest, value, len);
-	(*dest)[len] = 0;
-	rc = 0;
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return rc;
 }
 
 static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
