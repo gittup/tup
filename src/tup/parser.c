@@ -1148,9 +1148,9 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
 			return -1;
-		tree_entry_remove(&tf->g->gen_delete_root,
-				  tent->tnode.tupid,
-				  &tf->g->gen_delete_count);
+		tupid_tree_remove_count(&tf->g->gen_delete_root,
+					tent->tnode.tupid,
+					&tf->g->gen_delete_count);
 	} else {
 		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
 			perror("unlinkat");
@@ -1184,9 +1184,9 @@ static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 		if(tup_db_node_insert_tent(dtent, ".gitignore", -1, TUP_NODE_GENERATED, -1, dtent->tnode.tupid, &tent) < 0)
 			return -1;
 	} else {
-		tree_entry_remove(&tf->g->gen_delete_root,
-				  tent->tnode.tupid,
-				  &tf->g->gen_delete_count);
+		tupid_tree_remove_count(&tf->g->gen_delete_root,
+					tent->tnode.tupid,
+					&tf->g->gen_delete_count);
 		/* It may be a ghost if we are going from a variant
 		 * to an in-tree build, or a normal file if we are appending
 		 * definitions to a user-created .gitignore file.
@@ -3550,9 +3550,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		tup_db_print(tf->f, cmdid);
 		return -1;
 	}
-	tree_entry_remove(&tf->g->cmd_delete_root, cmdid, &tf->g->cmd_delete_count);
+	tupid_tree_remove_count(&tf->g->cmd_delete_root, cmdid, &tf->g->cmd_delete_count);
 	if(tf->refactoring) {
-		tree_entry_remove(&tf->refactoring_cmd_delete_root, cmdid, NULL);
+		tupid_tree_remove(&tf->refactoring_cmd_delete_root, cmdid);
 	}
 
 	while(!TAILQ_EMPTY(&onl.entries)) {
@@ -3561,8 +3561,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
 			return -1;
 		}
-		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
-				  &tf->g->gen_delete_count);
+		tupid_tree_remove_count(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
+					&tf->g->gen_delete_count);
 		if(output_nl) {
 			move_name_list_entry(output_nl, &onl, onle);
 		} else {
@@ -3575,8 +3575,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
 			return -1;
 		}
-		tree_entry_remove(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
-				  &tf->g->gen_delete_count);
+		tupid_tree_remove_count(&tf->g->gen_delete_root, onle->tent->tnode.tupid,
+					&tf->g->gen_delete_count);
 		delete_name_list_entry(&extra_onl, onle);
 	}
 

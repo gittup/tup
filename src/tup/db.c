@@ -3687,10 +3687,12 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 
 		tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(tree_entry_add(root, tupid, type, count) < 0) {
+		if(tupid_tree_add(root, tupid) < 0) {
 			rc = -1;
 			break;
 		}
+		if(count)
+			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {
@@ -3744,11 +3746,12 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, 
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-
-		if(tree_entry_add(root, tupid, type, count) < 0) {
+		if(tupid_tree_add(root, tupid) < 0) {
 			rc = -1;
 			break;
 		}
+		if(count)
+			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {
@@ -3797,11 +3800,12 @@ int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TY
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-
-		if(tree_entry_add(root, tupid, type, count) < 0) {
+		if(tupid_tree_add(root, tupid) < 0) {
 			rc = -1;
 			break;
 		}
+		if(count)
+			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {

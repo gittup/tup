@@ -91,6 +91,20 @@ void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid)
 	free(tt);
 }
 
+void tupid_tree_remove_count(struct tupid_entries *root, tupid_t tupid, int *count)
+{
+	struct tupid_tree *tt;
+
+	tt = tupid_tree_search(root, tupid);
+	if(!tt) {
+		return;
+	}
+	if(count)
+		(*count)--;
+	tupid_tree_rm(root, tt);
+	free(tt);
+}
+
 void free_tupid_tree(struct tupid_entries *root)
 {
 	struct tupid_tree *tt;
@@ -99,41 +113,4 @@ void free_tupid_tree(struct tupid_entries *root)
 		tupid_tree_rm(root, tt);
 		free(tt);
 	}
-}
-
-int tree_entry_add(struct tupid_entries *root, tupid_t tupid, int type, int *count)
-{
-	struct tree_entry *te;
-
-	te = malloc(sizeof *te);
-	if(!te) {
-		perror("malloc");
-		return -1;
-	}
-	te->tnode.tupid = tupid;
-	te->type = type;
-	if(tupid_tree_insert(root, &te->tnode) < 0) {
-		fprintf(stderr, "tup internal error: Duplicate tupid %lli in tree_entry_add?\n", tupid);
-		free(te);
-		return -1;
-	} else {
-		if(count)
-			(*count)++;
-	}
-	return 0;
-}
-
-void tree_entry_remove(struct tupid_entries *root, tupid_t tupid, int *count)
-{
-	struct tree_entry *te;
-	struct tupid_tree *tt;
-
-	tt = tupid_tree_search(root, tupid);
-	if(!tt)
-		return;
-	tupid_tree_rm(root, tt);
-	te = container_of(tt, struct tree_entry, tnode);
-	if(count)
-		(*count)--;
-	free(te);
 }

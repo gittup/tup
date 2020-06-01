@@ -585,11 +585,9 @@ static int delete_files(struct graph *g)
 		start_progress(g->cmd_delete_count, -1, -1);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
-		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
-
 		if(server_is_dead())
 			goto out_err;
-		if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
+		if(tup_del_id_force(tt->tupid, TUP_NODE_CMD) < 0)
 			goto out_err;
 		skip_result(NULL);
 		/* Use TUP_NODE_GENERATED to make the bar purple since
@@ -597,12 +595,11 @@ static int delete_files(struct graph *g)
 		 */
 		show_progress(-1, TUP_NODE_GENERATED);
 		tupid_tree_rm(&g->cmd_delete_root, tt);
-		free(te);
+		free(tt);
 	}
 
 	start_progress(g->gen_delete_count, -1, -1);
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
-		struct tree_entry *te = container_of(tt, struct tree_entry, tnode);
 		int tmp;
 
 		if(server_is_dead())
@@ -625,11 +622,11 @@ static int delete_files(struct graph *g)
 
 			if(delete_file(tent) < 0)
 				goto out_err;
-			if(tup_del_id_force(te->tnode.tupid, te->type) < 0)
+			if(tup_del_id_force(tt->tupid, TUP_NODE_GENERATED) < 0)
 				goto out_err;
 		}
 		tupid_tree_rm(&g->gen_delete_root, tt);
-		free(te);
+		free(tt);
 	}
 	if(file_resurrection) {
 		tup_show_message("Converting generated files to normal files...\n");
