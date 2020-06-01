@@ -4536,10 +4536,9 @@ static struct var_entry *get_var_id(struct vardb *vdb, struct tup_entry *tent,
 {
 	struct var_entry *ve = NULL;
 	int dbrc;
-	int len;
 	const char *value;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_VAR_ID];
-	static char s[] = "select value, length(value) from var where var.id=?";
+	static char s[] = "select value from var where var.id=?";
 
 	transaction_check("%s [%lli]", s, tent->tnode.tupid);
 	if(!*stmt) {
@@ -4567,10 +4566,6 @@ static struct var_entry *get_var_id(struct vardb *vdb, struct tup_entry *tent,
 		goto out_reset;
 	}
 
-	len = sqlite3_column_int(*stmt, 1);
-	if(len < 0) {
-		goto out_reset;
-	}
 	value = (const char *)sqlite3_column_text(*stmt, 0);
 	if(!value) {
 		goto out_reset;
