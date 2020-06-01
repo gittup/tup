@@ -138,12 +138,6 @@ enum {
 	DB_NUM_STATEMENTS
 };
 
-struct id_entry {
-	LIST_ENTRY(id_entry) list;
-	tupid_t tupid;
-};
-LIST_HEAD(id_entry_head, id_entry);
-
 struct half_entry {
 	LIST_ENTRY(half_entry) list;
 	tupid_t tupid;
@@ -203,7 +197,7 @@ static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int db_print(FILE *stream, tupid_t tupid);
-static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head);
+static int get_recurse_dirs(tupid_t dt, struct tupid_list_head *head);
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
 
 static char transaction_buf[1024];
@@ -1811,25 +1805,25 @@ static int recurse_modify_dir(tupid_t dt)
 static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct tup_entry *src,
 					 struct tup_entry *destroot)
 {
-	struct id_entry_head subdir_list;
+	struct tupid_list *tl;
+	struct tupid_list_head subdir_list;
 
-	LIST_INIT(&subdir_list);
+	tupid_list_init(&subdir_list);
 	if(get_recurse_dirs(src->tnode.tupid, &subdir_list) < 0)
 		return -1;
-	while(!LIST_EMPTY(&subdir_list)) {
-		struct id_entry *ide = LIST_FIRST(&subdir_list);
+	tupid_list_foreach(tl, &subdir_list) {
 		struct tup_entry *subdest;
 		struct tup_entry *subsrc;
 		int newfd;
 
-		if(tup_entry_add(ide->tupid, &subsrc) < 0)
+		if(tup_entry_add(tl->tupid, &subsrc) < 0)
 			return -1;
 		if(subsrc == destroot)
-			goto out_skip;
+			continue;
 		if(is_virtual_tent(subsrc))
-			goto out_skip;
+			continue;
 		if(tup_entry_variant(subsrc)->tent->dt != DOT_DT)
-			goto out_skip;
+			continue;
 
 		if(mkdirat(fd, subsrc->name.s, 0777) < 0) {
 			if(errno != EEXIST) {
@@ -1861,11 +1855,8 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 			perror("close(newfd)");
 			return -1;
 		}
-
-out_skip:
-		LIST_REMOVE(ide, list);
-		free(ide);
 	}
+	free_tupid_list(&subdir_list);
 	return 0;
 }
 
@@ -3070,7 +3061,7 @@ int tup_db_unflag_variant(tupid_t tupid)
 	return 0;
 }
 
-static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head)
+static int get_recurse_dirs(tupid_t dt, struct tupid_list_head *head)
 {
 	int rc;
 	int dbrc;
@@ -3098,8 +3089,6 @@ static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head)
 	}
 
 	while(1) {
-		struct id_entry *ide;
-
 		dbrc = sqlite3_step(*stmt);
 		if(dbrc == SQLITE_DONE) {
 			rc = 0;
@@ -3112,14 +3101,10 @@ static int get_recurse_dirs(tupid_t dt, struct id_entry_head *head)
 			goto out_reset;
 		}
 
-		ide = malloc(sizeof *ide);
-		if(ide == NULL) {
-			perror("malloc");
+		if(tupid_list_add_tail(head, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
-		ide->tupid = sqlite3_column_int64(*stmt, 0);
-		LIST_INSERT_HEAD(head, ide, list);
 	}
 
 out_reset:
