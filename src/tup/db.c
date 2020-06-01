@@ -86,7 +86,6 @@ enum {
 	DB_UNFLAG_CREATE,
 	DB_UNFLAG_MODIFY,
 	DB_UNFLAG_VARIANT,
-	_DB_GET_RECURSE_DIRS,
 	_DB_GET_DIR_ENTRIES,
 	_DB_GET_OUTPUT_GROUP,
 	DB_LINK_EXISTS1,
@@ -96,7 +95,7 @@ enum {
 	_DB_DELETE_STICKY_LINKS,
 	_DB_FLAG_GROUP_USERS1,
 	_DB_FLAG_GROUP_USERS2,
-	DB_DIRTYPE_TO_TREE,
+	DB_DIRTYPE,
 	DB_SRCID_TO_TREE,
 	DB_TYPE_TO_TREE,
 	_DB_IS_GENERATED_DIR1,
@@ -197,7 +196,6 @@ static int delete_var_entry(tupid_t tupid);
 static int no_sync(void);
 static int delete_node(tupid_t tupid);
 static int db_print(FILE *stream, tupid_t tupid);
-static int get_recurse_dirs(tupid_t dt, struct tupid_list_head *head);
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head);
 
 static char transaction_buf[1024];
@@ -1809,7 +1807,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 	struct tupid_list_head subdir_list;
 
 	tupid_list_init(&subdir_list);
-	if(get_recurse_dirs(src->tnode.tupid, &subdir_list) < 0)
+	if(tup_db_dirtype(src->tnode.tupid, &subdir_list, NULL, NULL, TUP_NODE_DIR) < 0)
 		return -1;
 	tupid_list_foreach(tl, &subdir_list) {
 		struct tup_entry *subdest;
@@ -3061,62 +3059,6 @@ int tup_db_unflag_variant(tupid_t tupid)
 	return 0;
 }
 
-static int get_recurse_dirs(tupid_t dt, struct tupid_list_head *head)
-{
-	int rc;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_GET_RECURSE_DIRS];
-	static char s[] = "select id from node where dir=? and type=?";
-
-	transaction_check("%s [%lli, %i]", s, dt, TUP_NODE_DIR);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, dt) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_DIR) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	while(1) {
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			rc = 0;
-			goto out_reset;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			rc = -1;
-			goto out_reset;
-		}
-
-		if(tupid_list_add_tail(head, sqlite3_column_int64(*stmt, 0)) < 0) {
-			rc = -1;
-			goto out_reset;
-		}
-	}
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	return rc;
-}
-
 static int get_dir_entries(tupid_t dt, struct half_entry_head *head)
 {
 	int rc;
@@ -3644,11 +3586,11 @@ int tup_db_normal_dir_to_generated(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE_TO_TREE];
+	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE];
 	static char s[] = "select id from node where dir=? and type=?";
 
 	transaction_check("%s [%lli, %i]", s, dt, type);
@@ -3687,9 +3629,17 @@ int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, e
 
 		tupid = sqlite3_column_int64(*stmt, 0);
 
-		if(tupid_tree_add(root, tupid) < 0) {
-			rc = -1;
-			break;
+		if(head) {
+			if(tupid_list_add_tail(head, tupid) < 0) {
+				rc = -1;
+				break;
+			}
+		}
+		if(root) {
+			if(tupid_tree_add(root, tupid) < 0) {
+				rc = -1;
+				break;
+			}
 		}
 		if(count)
 			(*count)++;

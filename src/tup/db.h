@@ -38,6 +38,7 @@ struct variant;
 struct mapping_head;
 struct vardb;
 struct tent_entries;
+struct tupid_list_head;
 
 /* General operations */
 int tup_db_open(void);
@@ -183,7 +184,7 @@ int is_virtual_tent(struct tup_entry *tent);
 tupid_t exclusion_dt(void);
 
 /* Tree operations */
-int tup_db_dirtype_to_tree(tupid_t dt, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_is_generated_dir(tupid_t dt);

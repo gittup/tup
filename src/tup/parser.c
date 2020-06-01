@@ -247,13 +247,13 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype_to_tree(tf.tent->tnode.tupid, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
 	if(tup_db_srcid_to_tree(tf.tent->tnode.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 
 	if(refactoring) {
-		if(tup_db_dirtype_to_tree(tf.tent->tnode.tupid, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
+		if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
 			goto out_close_vdb;
 	}
 
