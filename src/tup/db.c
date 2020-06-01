@@ -91,7 +91,6 @@ enum {
 	_DB_GET_OUTPUT_GROUP,
 	DB_LINK_EXISTS1,
 	DB_LINK_EXISTS2,
-	DB_GET_INCOMING_LINK,
 	_DB_DELETE_NORMAL_LINKS,
 	_DB_DELETE_NORMAL_INPUTS,
 	_DB_DELETE_STICKY_LINKS,
@@ -129,7 +128,6 @@ enum {
 	_DB_GROUP_LINK_REMOVE,
 	_DB_DELETE_GROUP_LINKS,
 	_DB_NODE_HAS_GHOSTS,
-	_DB_ADD_GHOST_CHECKS,
 	_DB_ADD_GROUP_CHECKS,
 	_DB_EXCLUSION_RECLAIMABLE,
 	_DB_GROUP_RECLAIMABLE1,
@@ -189,6 +187,7 @@ static int link_remove(tupid_t a, tupid_t b, int style);
 static int group_link_insert(tupid_t a, tupid_t b, tupid_t cmdid);
 static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
 static int delete_group_links(tupid_t cmdid);
+static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head);
 static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost_checks(tupid_t tupid);
@@ -3386,12 +3385,12 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 {
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[DB_GET_INCOMING_LINK];
-	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tupid_list_head tupid_list;
+	struct tupid_list *tl;
 	struct tup_entry *tent;
-	struct tup_entry *incoming_tent;
+	struct tup_entry *incoming_tent = NULL;
+	int set = 0;
+	int rc = 0;
 
 	*incoming = -1;
 
@@ -3402,56 +3401,25 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 		return 0;
 	}
 
-	transaction_check("%s [%lli]", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
+	tupid_list_init(&tupid_list);
+	if(get_normal_inputs(tupid, &tupid_list) < 0)
+		return -1;
+
+	tupid_list_foreach(tl, &tupid_list) {
+		if(!set) {
+			set = 1;
+			if(tup_entry_add(tl->tupid, &incoming_tent) < 0)
+				return -1;
+			*incoming = incoming_tent->tnode.tupid;
+		} else {
+			fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
+			rc = -1;
+			break;
 		}
 	}
+	free_tupid_list(&tupid_list);
 
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc == SQLITE_DONE) {
-		goto out_reset;
-	}
-	if(dbrc != SQLITE_ROW) {
-		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		rc = -1;
-		goto out_reset;
-	}
-	*incoming = sqlite3_column_int64(*stmt, 0);
-
-	/* Do a quick double-check to make sure there isn't a duplicate link. */
-	dbrc = sqlite3_step(*stmt);
-	if(dbrc != SQLITE_DONE) {
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			return -1;
-		}
-		fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
-		rc = -1;
-		goto out_reset;
-	}
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc == 0 && *incoming != -1) {
-		if(tup_entry_add(*incoming, &incoming_tent) < 0)
-			return -1;
+	if(rc == 0 && incoming_tent) {
 		tent->incoming = incoming_tent;
 	}
 
@@ -5507,16 +5475,13 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 	return rc;
 }
 
-static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
+static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS1];
 	static char s[] = "select from_id from normal_link where to_id=?";
-	struct tupid_list *tl;
-	struct tupid_list_head tupid_list;
 
-	tupid_list_init(&tupid_list);
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
 		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
@@ -5547,7 +5512,7 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
+		if(tupid_list_add_tail(head, tupid) < 0) {
 			rc = -1;
 			break;
 		}
@@ -5558,15 +5523,6 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tent_tree_add(root, tent) < 0)
-			return -1;
-	}
-	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -5642,9 +5598,23 @@ int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
 		      struct tent_entries *normal_root,
 		      struct tent_entries *group_sticky_root)
 {
-	if(normal_root)
-		if(get_normal_inputs(cmdid, normal_root) < 0)
+	if(normal_root) {
+		struct tupid_list_head tupid_list;
+		struct tupid_list *tl;
+
+		tupid_list_init(&tupid_list);
+		if(get_normal_inputs(cmdid, &tupid_list) < 0)
 			return -1;
+
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tent_tree_add(normal_root, tent) < 0)
+				return -1;
+		}
+		free_tupid_list(&tupid_list);
+	}
 	if(sticky_root) {
 		struct tup_entry *tent;
 		if(tup_entry_add(cmdid, &tent) < 0)
@@ -6955,67 +6925,24 @@ out_reset:
 
 static int add_ghost_checks(tupid_t tupid)
 {
-	int rc = 0;
-	int dbrc;
-	sqlite3_stmt **stmt = &stmts[_DB_ADD_GHOST_CHECKS];
-	static char s[] = "select from_id from normal_link where to_id=?";
 	struct tupid_list *tl;
 	struct tupid_list_head tupid_list;
 
 	tupid_list_init(&tupid_list);
 
-	transaction_check("%s [%lli]", s, tupid);
-	if(!*stmt) {
-		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
-			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
+	if(get_normal_inputs(tupid, &tupid_list) < 0)
+		return -1;
+
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tl->tupid, &tent) < 0)
 			return -1;
-		}
-	}
-
-	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
-		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	do {
-		dbrc = sqlite3_step(*stmt);
-		if(dbrc == SQLITE_DONE) {
-			break;
-		}
-		if(dbrc != SQLITE_ROW) {
-			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
-			fprintf(stderr, "Statement was: %s\n", s);
-			rc = -1;
-			goto out_reset;
-		}
-
-		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
-			rc = -1;
-			goto out_reset;
-		}
-	} while(1);
-
-out_reset:
-	if(msqlite3_reset(*stmt) != 0) {
-		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
-		fprintf(stderr, "Statement was: %s\n", s);
-		return -1;
-	}
-
-	if(rc == 0) {
-		tupid_list_foreach(tl, &tupid_list) {
-			struct tup_entry *tent;
-			if(tup_entry_add(tl->tupid, &tent) < 0)
-				return -1;
-			if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
-				return -1;
-		}
+		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+			return -1;
 	}
 	free_tupid_list(&tupid_list);
 
-	return rc;
+	return 0;
 }
 
 static int add_group_and_exclusion_checks(tupid_t tupid)
