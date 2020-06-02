@@ -2715,13 +2715,9 @@ static int update(struct node *n)
 	if(rc < 0)
 		goto err_close_dfd;
 	if(strncmp(cmd, "!tup_ln ", 8) == 0) {
-		pthread_mutex_lock(&db_mutex);
 		rc = do_ln(&s, n->tent->parent, dfd, cmd + 8);
-		pthread_mutex_unlock(&db_mutex);
 	} else if (strncmp(cmd, "!tup_preserve ", 14) == 0) {
-		pthread_mutex_lock(&db_mutex);
 		rc = do_ln(&s, n->tent->parent, dfd, cmd + 14);
-		pthread_mutex_unlock(&db_mutex);
 	} else {
 		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);
 		use_server = 1;
