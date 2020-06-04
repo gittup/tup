@@ -358,19 +358,39 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 	WIN32_FILE_ATTRIBUTE_DATA data;
 	wchar_t widefile[WIDE_PATH_MAX];
 	int prefix_len = 4;
+	int pos = 0;
 	wchar_t *dest;
 	wchar_t *tmp;
 
 	dest = widefile;
-	if(is_full_path(file)) {
-		/* Everything from the DLL injection is a full path, but we
-		 * need to prefix with \\?\ make GetFileAttributesEx work with
-		 * >260 character paths.
+	/* Everything from the DLL injection is a full path, but we need to
+	 * prefix with \\?\ make GetFileAttributesEx work with >260 character
+	 * paths.
+	 */
+	wcscpy(widefile, L"\\\\?\\");
+	dest += prefix_len;
+	pos += prefix_len;
+	if(!is_full_path(file)) {
+		/* !tup_ln links give us ACCESS_WRITE files with tup-top
+		 * relative paths, so we need to prefix with the working
+		 * directory or else GetFileAttributesExW below can fail since
+		 * we don't have the dir_mutex.
 		 */
-		wcscpy(widefile, L"\\\\?\\");
-		dest += prefix_len;
+		if(file[0] != '.' && file[1] != '/') {
+			fprintf(stderr, "tup internal error: Expected relative path to start with ./ in file_set_mtime(): %s\n", file);
+			return -1;
+		}
+		MultiByteToWideChar(CP_UTF8, 0, get_tup_top(), -1, dest, WIDE_PATH_MAX - pos);
+		dest += get_tup_top_len();
+		pos += get_tup_top_len();
+		if(pos >= WIDE_PATH_MAX) {
+			fprintf(stderr, "tup error: WIDE_PATH_MAX is too small in file_set_mtime()\n");
+			return -1;
+		}
+		/* Skip the '.' part of the path */
+		file++;
 	}
-	MultiByteToWideChar(CP_UTF8, 0, file, -1, dest, WIDE_PATH_MAX - prefix_len);
+	MultiByteToWideChar(CP_UTF8, 0, file, -1, dest, WIDE_PATH_MAX - pos);
 	widefile[WIDE_PATH_MAX-1] = 0;
 	/* Backout the forward-slash conversion used for regex matching. */
 	for(tmp=dest; *tmp != 0; tmp++) {
