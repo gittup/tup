@@ -29,6 +29,7 @@ cat > save.c << HERE
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/attr.h>
+#include <errno.h>
 
 int main(void)
 {
@@ -47,7 +48,17 @@ int main(void)
 	fwrite("int y;\\n", 1, 7, fout);
 	fclose(fin);
 	fclose(fout);
-	exchangedata(".tmp.txt", "foo.c", 0);
+	if(exchangedata(".tmp.txt", "foo.c", 0) < 0) {
+		if(errno == ENOTSUP) {
+			/* Some volumes don't support exchange data. Nothing we
+			 * can do.
+			 */
+			printf("[33mSkipping test: exchangedata not supported.[0m\n");
+			rename(".tmp.txt", "foo.c");
+			return 0;
+		}
+		perror("exchangedata");
+	}
 	return 0;
 }
 HERE
