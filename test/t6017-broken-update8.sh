@@ -24,15 +24,41 @@
 # gone. I solved this by moving the file deletions out into its own phase.
 #
 # This test case merely mimics this process because when I upgraded to gcc
-# 4.3.2 from 4.1.something, gcj became slow as crap. The 'ls | grep' part is
-# to mimic the getdents() syscall that javac and gcj appear to use.
+# 4.3.2 from 4.1.something, gcj became slow as crap. The 'mls | grep' part is
+# to mimic the getdents() syscall that javac and gcj appear to use. We use a
+# custom ls wrapper called "mls" because ls calls getattr() on every file on
+# OSX 10.15
 
 . ./tup.sh
 check_no_windows shell
 
+cat > mls.c << HERE
+#include <stdio.h>
+#include <dirent.h>
+
+int main(void)
+{
+	DIR *dirp;
+	struct dirent *ent;
+
+	dirp = opendir(".");
+	if(!dirp) {
+		perror("opendir");
+		return 1;
+	}
+	while((ent = readdir(dirp)) != NULL) {
+		printf("%s\n", ent->d_name);
+	}
+	closedir(dirp);
+
+	return 0;
+}
+HERE
+gcc mls.c -o mls
+
 cat > Tupfile << HERE
 : B.java |> cat %f > %o |> B.class
-: A.java | B.class |> (if ls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.class
+: A.java | B.class |> (if ./mls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.class
 HERE
 echo "A" > A.java
 echo "B" > B.java
@@ -44,7 +70,7 @@ echo 'B' | diff - B.class
 
 cat > Tupfile << HERE
 : B.java |> cat %f > %o |> B.o
-: A.java |> (if ls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.o
+: A.java |> sleep 0.5; (if ./mls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.o
 HERE
 tup touch Tupfile
 update
