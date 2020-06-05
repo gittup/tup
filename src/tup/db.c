@@ -176,7 +176,7 @@ static int link_remove(tupid_t a, tupid_t b, int style);
 static int group_link_insert(tupid_t a, tupid_t b, tupid_t cmdid);
 static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
 static int delete_group_links(tupid_t cmdid);
-static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head);
+static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost_check);
 static int node_has_ghosts(tupid_t tupid);
 static int load_all_nodes(void);
 static int add_ghost_checks(tupid_t tupid);
@@ -3267,8 +3267,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 
 int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 {
-	struct tupid_list_head tupid_list;
-	struct tupid_list *tl;
+	struct tent_entries root = {NULL};
+	struct tent_tree *tt;
 	struct tup_entry *tent;
 	struct tup_entry *incoming_tent = NULL;
 	int set = 0;
@@ -3283,15 +3283,13 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 		return 0;
 	}
 
-	tupid_list_init(&tupid_list);
-	if(get_normal_inputs(tupid, &tupid_list) < 0)
+	if(get_normal_inputs(tupid, &root, 0) < 0)
 		return -1;
 
-	tupid_list_foreach(tl, &tupid_list) {
+	RB_FOREACH(tt, tent_entries, &root) {
 		if(!set) {
 			set = 1;
-			if(tup_entry_add(tl->tupid, &incoming_tent) < 0)
-				return -1;
+			incoming_tent = tt->tent;
 			*incoming = incoming_tent->tnode.tupid;
 		} else {
 			fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
@@ -3299,7 +3297,7 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 			break;
 		}
 	}
-	free_tupid_list(&tupid_list);
+	free_tent_tree(&root);
 
 	if(rc == 0 && incoming_tent) {
 		tent->incoming = incoming_tent;
@@ -5268,12 +5266,16 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 	return rc;
 }
 
-static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head)
+static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost_check)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_LINKS1];
 	static char s[] = "select from_id from normal_link where to_id=?";
+	struct tupid_list_head tupid_list;
+	struct tupid_list *tl;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, cmdid);
 	if(!*stmt) {
@@ -5305,7 +5307,7 @@ static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head)
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_list_add_tail(head, tupid) < 0) {
+		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
 			rc = -1;
 			break;
 		}
@@ -5316,6 +5318,19 @@ static int get_normal_inputs(tupid_t cmdid, struct tupid_list_head *head)
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tl->tupid, &tent) < 0)
+			return -1;
+		if(ghost_check) {
+			if(tup_entry_add_ghost_tree(tent, root) < 0)
+				return -1;
+		} else {
+			if(tent_tree_add(root, tent) < 0)
+				return -1;
+		}
+	}
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }
@@ -5392,21 +5407,8 @@ int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
 		      struct tent_entries *group_sticky_root)
 {
 	if(normal_root) {
-		struct tupid_list_head tupid_list;
-		struct tupid_list *tl;
-
-		tupid_list_init(&tupid_list);
-		if(get_normal_inputs(cmdid, &tupid_list) < 0)
+		if(get_normal_inputs(cmdid, normal_root, 0) < 0)
 			return -1;
-
-		tupid_list_foreach(tl, &tupid_list) {
-			struct tup_entry *tent;
-			if(tup_entry_add(tl->tupid, &tent) < 0)
-				return -1;
-			if(tent_tree_add(normal_root, tent) < 0)
-				return -1;
-		}
-		free_tupid_list(&tupid_list);
 	}
 	if(sticky_root) {
 		struct tup_entry *tent;
@@ -6718,23 +6720,8 @@ out_reset:
 
 static int add_ghost_checks(tupid_t tupid)
 {
-	struct tupid_list *tl;
-	struct tupid_list_head tupid_list;
-
-	tupid_list_init(&tupid_list);
-
-	if(get_normal_inputs(tupid, &tupid_list) < 0)
+	if(get_normal_inputs(tupid, &ghost_root, 1) < 0)
 		return -1;
-
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
-			return -1;
-	}
-	free_tupid_list(&tupid_list);
-
 	return 0;
 }
 
