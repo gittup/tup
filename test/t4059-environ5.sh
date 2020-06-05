@@ -39,7 +39,7 @@ tup touch foo.c Tupfile sub/gcc
 update
 sym_check foo.o foo
 
-export PATH=$PWD/sub:$PATH
+export PATH="$PWD/sub:$PATH"
 update
 
 echo "hey" | diff - foo.o

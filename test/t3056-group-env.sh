@@ -36,7 +36,7 @@ tup_dep_exist . foo.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . bar.h . 'gcc -c foo.c -o foo.o'
 tup_dep_exist . bar.h . 'gcc -c bar.c -o bar.o'
 
-export PATH=$PATH:$PWD
+export PATH="$PATH:$PWD"
 update
 
 eotup

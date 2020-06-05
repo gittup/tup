@@ -21,7 +21,7 @@
 
 tuppath=`which tup`
 tupdir=`dirname $tuppath`
-export PATH=`echo $PATH | sed "s,$tupdir:,,"`
+export PATH="`echo $PATH | sed "s,$tupdir:,,"`"
 
 cp ../testTupfile.tup Tupfile
 echo "int main(void) {}" > foo.c
