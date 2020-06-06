@@ -4136,12 +4136,16 @@ int tup_db_set_dependent_config_flags(tupid_t tupid)
 	return 0;
 }
 
-static int get_outputs(tupid_t tupid, struct tupid_list_head *head)
+static int get_outputs(tupid_t tupid, struct tent_list_head *head)
 {
 	int rc;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[_DB_GET_OUTPUTS];
 	static char s[] = "select to_id from normal_link where from_id=?";
+	struct tupid_list_head tupid_list;
+	struct tupid_list *tl;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -4171,7 +4175,7 @@ static int get_outputs(tupid_t tupid, struct tupid_list_head *head)
 			goto out_reset;
 		}
 
-		if(tupid_list_add_tail(head, sqlite3_column_int64(*stmt, 0)) < 0) {
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
 			rc = -1;
 			goto out_reset;
 		}
@@ -4184,28 +4188,35 @@ out_reset:
 		return -1;
 	}
 
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+
+		if(tup_entry_add(tl->tupid, &tent) < 0)
+			return -1;
+		if(tent_list_add_tail(head, tent) < 0)
+			return -1;
+	}
+	free_tupid_list(&tupid_list);
+
 	return rc;
 }
 
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid)
 {
-	struct tupid_list_head tupid_list;
-	struct tupid_list *tl;
+	struct tent_list_head tent_list;
+	struct tent_list *tl;
 
-	tupid_list_init(&tupid_list);
+	tent_list_init(&tent_list);
 
-	if(get_outputs(tupid, &tupid_list) < 0)
+	if(get_outputs(tupid, &tent_list) < 0)
 		return -1;
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(callback(arg, tent) < 0)
+	tent_list_foreach(tl, &tent_list) {
+		if(callback(arg, tl->tent) < 0)
 			return -1;
 	}
-	free_tupid_list(&tupid_list);
+	free_tent_list(&tent_list);
 
 	return 0;
 }
@@ -5224,21 +5235,19 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 		       struct tent_entries *exclusion_root,
 		       struct tup_entry **group)
 {
-	struct tupid_list *tl;
-	struct tupid_list_head tupid_list;
+	struct tent_list *tl;
+	struct tent_list_head tent_list;
 	int rc = 0;
 
-	tupid_list_init(&tupid_list);
+	tent_list_init(&tent_list);
 
-	if(get_outputs(cmdid, &tupid_list) < 0)
+	if(get_outputs(cmdid, &tent_list) < 0)
 		return -1;
 	if(group)
 		*group = NULL;
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
+	tent_list_foreach(tl, &tent_list) {
+		struct tup_entry *tent = tl->tent;
 		if(tent->type == TUP_NODE_GROUP) {
 			if(group) {
 				if(*group == NULL) {
@@ -5261,7 +5270,7 @@ int tup_db_get_outputs(tupid_t cmdid, struct tent_entries *output_root,
 				return -1;
 		}
 	}
-	free_tupid_list(&tupid_list);
+	free_tent_list(&tent_list);
 
 	return rc;
 }
@@ -6727,24 +6736,19 @@ static int add_ghost_checks(tupid_t tupid)
 
 static int add_group_and_exclusion_checks(tupid_t tupid)
 {
-	struct tupid_list *tl;
-	struct tupid_list_head tupid_list;
+	struct tent_list *tl;
+	struct tent_list_head tent_list;
 
-	tupid_list_init(&tupid_list);
+	tent_list_init(&tent_list);
 
-	if(get_outputs(tupid, &tupid_list) < 0)
+	if(get_outputs(tupid, &tent_list) < 0)
 		return -1;
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
+	tent_list_foreach(tl, &tent_list) {
+		if(tup_entry_add_ghost_tree(tl->tent, &ghost_root) < 0)
 			return -1;
-		/* Ghost outputs here can be exclusions */
-		if(tent->type == TUP_NODE_GROUP || tent->type == TUP_NODE_GHOST)
-			if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
-				return -1;
 	}
-	free_tupid_list(&tupid_list);
+	free_tent_list(&tent_list);
 
 	return 0;
 }
