@@ -310,7 +310,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 		time_t mtime = -1;
 		int type = TUP_NODE_GHOST;
 		if(full_deps && (pg.pg_flags & PG_OUTSIDE_TUP)) {
-			if(get_outside_tup_mtime(new_dt, pel, &mtime) < 0)
+			if(get_outside_tup_mtime(new_dtent, pel, &mtime) < 0)
 				return -1;
 		}
 		/* Note that full-path entries are always ghosts since we don't

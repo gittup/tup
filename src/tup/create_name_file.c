@@ -630,7 +630,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 					type = TUP_NODE_DIR;
 
 				if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
-					if(get_outside_tup_mtime(curtent->tnode.tupid, pel, &mtime) < 0)
+					if(get_outside_tup_mtime(curtent, pel, &mtime) < 0)
 						return -1;
 				}
 				if(tup_db_node_insert_tent(curtent, pel->path, pel->len, type, mtime, -1, &tent) < 0)
@@ -644,13 +644,9 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int get_outside_tup_mtime(tupid_t dt, struct path_element *pel, time_t *mtime)
+int get_outside_tup_mtime(struct tup_entry *parent, struct path_element *pel, time_t *mtime)
 {
 	int dfd;
-	struct tup_entry *parent;
-
-	if(tup_entry_add(dt, &parent) < 0)
-		return -1;
 
 	dfd = tup_entry_open(parent);
 	if(dfd == -ENOENT || dfd == -ENOTDIR) {
