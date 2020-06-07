@@ -284,8 +284,14 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		}
 	}
 	if(fd >= 0) {
-		if(fslurp_null(fd, &b) < 0)
-			goto out_close_file;
+		int tmprc;
+		tmprc = fslurp_null(fd, &b);
+		if(close(fd) < 0) {
+			parser_error(&tf, "close(fd)");
+			tmprc = -1;
+		}
+		if(tmprc < 0)
+			goto out_free_bs;
 		if(!parser_lua) {
 			if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 				goto out_free_bs;
@@ -324,11 +330,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	rc = 0;
 out_free_bs:
 	free(b.s);
-out_close_file:
-	if(fd >= 0 && close(fd) < 0) {
-		parser_error(&tf, "close(fd)");
-		rc = -1;
-	}
 out_close_dfd:
 	if(tf.cur_dfd >= 0 && close(tf.cur_dfd) < 0) {
 		parser_error(&tf, "close(tf.cur_dfd)");
