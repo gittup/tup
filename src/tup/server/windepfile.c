@@ -39,6 +39,7 @@
 static int initialize_depfile(struct server *s, char *depfile, HANDLE *h);
 static int process_depfile(struct server *s, HANDLE h);
 static int server_inited = 0;
+static HANDLE nul_handle;
 static BOOL WINAPI console_handler(DWORD cevent);
 static sig_atomic_t event_got = -1;
 
@@ -62,6 +63,7 @@ int server_init(enum server_mode mode)
 	struct flist f = FLIST_INITIALIZER;
 	int cwdlen;
 	wchar_t wwintmpdir[PATH_MAX];
+	SECURITY_ATTRIBUTES sec;
 
 	if(mode) {/* unused */}
 
@@ -70,6 +72,12 @@ int server_init(enum server_mode mode)
 
 	if(GetModuleFileNameA(NULL, mycwd, PATH_MAX - 1) == 0)
 		return -1;
+
+	memset(&sec, 0, sizeof(sec));
+	sec.nLength = sizeof(sec);
+	sec.lpSecurityDescriptor = NULL;
+	sec.bInheritHandle = TRUE;
+	nul_handle = CreateFile(L"NUL", GENERIC_READ, FILE_SHARE_READ, &sec, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	GetTempPath(PATH_MAX, wwintmpdir);
 	WideCharToMultiByte(CP_UTF8, 0, wwintmpdir, -1, wintmpdir, PATH_MAX, NULL, NULL);
@@ -146,6 +154,7 @@ int server_init(enum server_mode mode)
 
 int server_quit(void)
 {
+	CloseHandle(nul_handle);
 	return 0;
 }
 
@@ -182,6 +191,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 	}
 	swprintf(buf, 64, L".tup\\tmp\\output-%i", s->id);
 	buf[63] = 0;
+	sa.hStdInput = nul_handle;
 	sa.hStdOutput = CreateFile(buf, GENERIC_WRITE, 0, &sec, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
 	if(sa.hStdOutput == INVALID_HANDLE_VALUE) {
 		fprintf(stderr, "tup error: Unable to create temporary file for stdout\n");
@@ -258,6 +268,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 
 	int need_sh = 0;
 	int need_cmd = 0;
+	int append_quote = 0;
 
 	if(dtent) {}
 	if(need_namespacing) {}
@@ -294,14 +305,16 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 			strchr(cmd, '<') != NULL;
 		if(run_in_bash) {
 			strcat(cmdline, BASHSTR);
+			append_quote = 1;
 		} else if(need_sh) {
 			strcat(cmdline, SHSTR);
+			append_quote = 1;
 		} else if(need_cmd) {
 			strcat(cmdline, CMDSTR);
 		}
 	}
 	strcat(cmdline, cmd);
-	if(need_sh) {
+	if(append_quote) {
 		strcat(cmdline, "'");
 	}
 
