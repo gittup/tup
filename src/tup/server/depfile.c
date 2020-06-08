@@ -43,6 +43,7 @@
 static void sighandler(int sig);
 static int process_depfile(struct server *s, int fd);
 static int server_inited = 0;
+static int null_fd = -1;
 static char ldpreload_path[PATH_MAX];
 
 static struct sigaction sigact = {
@@ -141,6 +142,12 @@ int server_init(enum server_mode mode)
 			return -1;
 		}
 	}
+	null_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+	if(null_fd < 0) {
+		perror("/dev/null");
+		fprintf(stderr, "tup error: Unable to open /dev/null for dup'ing stdin\n");
+		return -1;
+	}
 
 	/* Go into the tmp directory and remove any files that may have been
 	 * left over from a previous tup invocation.
@@ -194,13 +201,13 @@ int server_init(enum server_mode mode)
 
 int server_quit(void)
 {
+	close(null_fd);
 	return 0;
 }
 
 static int run_subprocess(int ofd, int dfd, const char *cmd, const char *depfile, struct tup_env *env, int run_in_bash, int *status)
 {
 	int pid;
-	int null_fd;
 	int vardict_fd = -1; /* TODO */
 	pid = fork();
 	if(pid == 0) {
@@ -216,20 +223,10 @@ static int run_subprocess(int ofd, int dfd, const char *cmd, const char *depfile
 			fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
 			exit(1);
 		}
-		null_fd = open("/dev/null", O_RDONLY);
-		if(null_fd < 0) {
-			perror("/dev/null");
-			fprintf(stderr, "tup error: Unable to open /dev/null for dup'ing stdin\n");
-			return -1;
-		}
 		if(dup2(null_fd, STDIN_FILENO) < 0) {
 			perror("dup2");
 			fprintf(stderr, "tup error: Unable to dup stdin for child processes.\n");
 			return -1;
-		}
-		if(close(null_fd) < 0) {
-			perror("close(null_fd)");
-			exit(1);
 		}
 
 		if(fchdir(dfd) < 0) {
