@@ -77,8 +77,8 @@ echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"
 $CC $CFLAGS -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags
 
 echo "  bootstrap LD tup $LDFLAGS"
-echo "const char *tup_version(void) {return \"$label\";}" | $CC -x c -c - -o tup_version.o
-$CC *.o -o tup -lpthread $plat_ldflags $LDFLAGS
+objs="$(echo *.o)"
+../src/tup/link.sh "$CC" "$CFLAGS -I../src" "-lpthread $plat_ldflags $LDFLAGS" "tup" "$objs"
 
 if [ "$server" = "ldpreload" ]; then
 	mkdir ldpreload
