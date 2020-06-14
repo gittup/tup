@@ -3150,37 +3150,34 @@ out_reset:
 	return rc;
 }
 
-int tup_db_create_unique_link(tupid_t a, tupid_t b)
+int tup_db_create_unique_link(struct tup_entry *a, struct tup_entry *b)
 {
 	int rc;
-	tupid_t incoming;
+	struct tup_entry *incoming;
 
 	rc = tup_db_get_incoming_link(b, &incoming);
 	if(rc < 0)
 		return -1;
-	if(incoming != -1 && incoming != a) {
+	if(incoming != NULL && incoming != a) {
 		struct tup_entry *output_group = NULL;
-		struct tup_entry *tent;
 
-		if(get_output_group(incoming, &output_group) < 0)
+		if(get_output_group(incoming->tnode.tupid, &output_group) < 0)
 			return -1;
 		if(output_group) {
 			/* Make sure we remove the old group for the
 			 * output (t3065)
 			 */
-			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+			if(link_remove(b->tnode.tupid, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
 				return -1;
 		}
 		/* Delete any old links (t6029) */
-		if(link_remove(incoming, b, TUP_LINK_NORMAL) < 0)
+		if(link_remove(incoming->tnode.tupid, b->tnode.tupid, TUP_LINK_NORMAL) < 0)
 			return -1;
 
-		if(tup_entry_add(b, &tent) < 0)
-			return -1;
-		tent->incoming = NULL;
-	} else if(incoming == -1) {
+		b->incoming = NULL;
+	} else if(incoming == NULL) {
 		/* It's possible the output was orphaned when a command was
 		 * wiped out because its source directory was removed, but the
 		 * output can still point to its old group because the output
@@ -3189,10 +3186,10 @@ int tup_db_create_unique_link(tupid_t a, tupid_t b)
 		 */
 		struct tup_entry *output_group = NULL;
 
-		if(get_output_group(b, &output_group) < 0)
+		if(get_output_group(b->tnode.tupid, &output_group) < 0)
 			return -1;
 		if(output_group) {
-			if(link_remove(b, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
+			if(link_remove(b->tnode.tupid, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
 			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
 				return -1;
@@ -3264,34 +3261,30 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 	return 0;
 }
 
-int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
+int tup_db_get_incoming_link(struct tup_entry *tent, struct tup_entry **incoming)
 {
 	struct tent_entries root = {NULL};
 	struct tent_tree *tt;
-	struct tup_entry *tent;
 	struct tup_entry *incoming_tent = NULL;
 	int set = 0;
 	int rc = 0;
 
-	*incoming = -1;
+	*incoming = NULL;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tent->incoming) {
-		*incoming = tent->incoming->tnode.tupid;
+		*incoming = tent->incoming;
 		return 0;
 	}
 
-	if(get_normal_inputs(tupid, &root, 0) < 0)
+	if(get_normal_inputs(tent->tnode.tupid, &root, 0) < 0)
 		return -1;
 
 	RB_FOREACH(tt, tent_entries, &root) {
 		if(!set) {
 			set = 1;
 			incoming_tent = tt->tent;
-			*incoming = incoming_tent->tnode.tupid;
 		} else {
-			fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tupid);
+			fprintf(stderr, "tup error: Node %lli is supposed to only have one incoming link, but multiple were found. The database is probably in a bad state. Sadness :(\n", tent->tnode.tupid);
 			rc = -1;
 			break;
 		}
@@ -3300,6 +3293,7 @@ int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming)
 
 	if(rc == 0 && incoming_tent) {
 		tent->incoming = incoming_tent;
+		*incoming = tent->incoming;
 	}
 
 	return rc;

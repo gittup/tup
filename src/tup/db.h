@@ -122,10 +122,10 @@ int tup_db_unflag_variant(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
-int tup_db_create_unique_link(tupid_t a, tupid_t b);
+int tup_db_create_unique_link(struct tup_entry *a, struct tup_entry *b);
 int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
-int tup_db_get_incoming_link(tupid_t tupid, tupid_t *incoming);
+int tup_db_get_incoming_link(struct tup_entry *tent, struct tup_entry **incoming);
 int tup_db_delete_links(tupid_t tupid);
 int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
 			 struct tent_entries *exclusion_root,

@@ -3040,22 +3040,20 @@ static char *set_path(const char *name, const char *dir, int dirlen)
 	return path;
 }
 
-static int find_existing_command(const struct name_list *onl, tupid_t *cmdid)
+static int find_existing_command(const struct name_list *onl, struct tup_entry **cmd)
 {
 	struct name_list_entry *onle;
 	TAILQ_FOREACH(onle, &onl->entries, list) {
 		int rc;
-		tupid_t incoming;
 
-		rc = tup_db_get_incoming_link(onle->tent->tnode.tupid, &incoming);
+		rc = tup_db_get_incoming_link(onle->tent, cmd);
 		if(rc < 0)
 			return -1;
-		if(incoming != -1) {
-			*cmdid = incoming;
+		if(*cmd) {
 			return 0;
 		}
 	}
-	*cmdid = -1;
+	*cmd = NULL;
 	return 0;
 }
 
@@ -3065,19 +3063,19 @@ static int add_input(struct tupfile *tf, struct tent_entries *input_root,
 	if(tent->type == TUP_NODE_GENERATED) {
 		struct tent_entries extra_group_root = {NULL};
 		struct tent_tree *tt;
-		tupid_t cmdid;
+		struct tup_entry *cmd;
 
 		if(tent_tree_add_dup(input_root, tent) < 0)
 			return -1;
-		if(tup_db_get_incoming_link(tent->tnode.tupid, &cmdid) < 0)
+		if(tup_db_get_incoming_link(tent, &cmd) < 0)
 			return -1;
-		if(cmdid < 0) {
+		if(!cmd) {
 			fprintf(tf->f, "tup error: Unable to find command id for output file: ");
 			print_tup_entry(tf->f, tent);
 			fprintf(tf->f, "\n");
 			return -1;
 		}
-		if(tup_db_get_inputs(cmdid, &extra_group_root, NULL, NULL) < 0)
+		if(tup_db_get_inputs(cmd->tnode.tupid, &extra_group_root, NULL, NULL) < 0)
 			return -1;
 		RB_FOREACH(tt, tent_entries, &extra_group_root) {
 			if(tt->tent->type == TUP_NODE_GROUP) {
@@ -3104,13 +3102,13 @@ static int validate_output(struct tupfile *tf, struct tup_entry *dtent, const ch
 		if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GENERATED) {
 			int available = 0;
 			int rc;
-			tupid_t incoming;
+			struct tup_entry *incoming;
 
-			rc = tup_db_get_incoming_link(tent->tnode.tupid, &incoming);
+			rc = tup_db_get_incoming_link(tent, &incoming);
 			if(rc < 0)
 				return -1;
-			if(incoming != -1) {
-				if(tent_tree_search_tupid(del_root, incoming) != NULL)
+			if(incoming) {
+				if(tent_tree_search(del_root, incoming) != NULL)
 					available = 1;
 				if(!available) {
 					struct node *n;
@@ -3120,8 +3118,8 @@ static int validate_output(struct tupfile *tf, struct tup_entry *dtent, const ch
 					}
 				}
 				if(!available) {
-					fprintf(tf->f, "tup error: Unable to create output file '%s' because it is already owned by command %lli.\n", fullname, incoming);
-					tup_db_print(tf->f, incoming);
+					fprintf(tf->f, "tup error: Unable to create output file '%s' because it is already owned by command %lli.\n", fullname, incoming->tnode.tupid);
+					tup_db_print(tf->f, incoming->tnode.tupid);
 					return -1;
 				}
 			}
@@ -3391,9 +3389,8 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	char *real_display;
 	int real_displaylen;
 	struct tent_tree *tt;
-	struct tupid_tree *cmd_tt;
 	struct tent_tree *ttree;
-	tupid_t cmdid = -1;
+	struct tup_entry *cmdtent = NULL;
 	struct tent_entries input_root = {NULL};
 	struct tent_entries output_root = {NULL};
 	struct tent_entries exclusion_root = {NULL};
@@ -3475,32 +3472,32 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	if(tup_db_select_tent(tf->tent, cmd, &tmptent) < 0)
 		return -1;
 	if(tmptent && strcmp(tmptent->name.s, cmd) == 0) {
-		cmdid = tmptent->tnode.tupid;
+		cmdtent = tmptent;
 		if(tmptent->type != TUP_NODE_CMD) {
 			fprintf(tf->f, "tup error: Unable to create command '%s' because the node already exists in the database as type '%s'\n", cmd, tup_db_type(tmptent->type));
 			return -1;
 		}
 		compare_display_flags = 1;
 	} else {
-		if(find_existing_command(&onl, &cmdid) < 0)
+		if(find_existing_command(&onl, &cmdtent) < 0)
 			return -1;
-		if(cmdid == -1) {
+		if(!cmdtent) {
+			tupid_t cmdid;
 			if(tf->refactoring) {
 				fprintf(tf->f, "tup refactoring error: Attempting to create a new command: %s\n", cmd);
 				return -1;
 			}
 			cmdid = create_command_file(tf->tent->tnode.tupid, cmd, real_display, real_displaylen, cs.flags, cs.flagslen);
+			if(tup_entry_add(cmdid, &cmdtent) < 0)
+				return -1;
 		} else {
 			if(tf->refactoring) {
-				struct tup_entry *old;
-				if(tup_entry_add(cmdid, &old) < 0)
-					return -1;
 				fprintf(tf->f, "tup refactoring error: Attempting to modify a command string:\n");
-				fprintf(tf->f, "Old: '%s'\n", old->name.s);
+				fprintf(tf->f, "Old: '%s'\n", cmdtent->name.s);
 				fprintf(tf->f, "New: '%s'\n", cmd);
 				return -1;
 			}
-			if(tup_db_set_name(cmdid, cmd, tf->tent->tnode.tupid) < 0)
+			if(tup_db_set_name(cmdtent->tnode.tupid, cmd, tf->tent->tnode.tupid) < 0)
 				return -1;
 
 			/* Since we changed the name, we have to run the
@@ -3512,21 +3509,18 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 	}
 	if(compare_display_flags) {
-		struct tup_entry *tent;
-		if(tup_entry_add(cmdid, &tent) < 0)
-			return -1;
-		if(tent->displaylen != real_displaylen || (real_displaylen > 0 && strncmp(tent->display, real_display, real_displaylen) != 0)) {
-			if(tup_db_set_display(tent, real_display, real_displaylen) < 0)
+		if(cmdtent->displaylen != real_displaylen || (real_displaylen > 0 && strncmp(cmdtent->display, real_display, real_displaylen) != 0)) {
+			if(tup_db_set_display(cmdtent, real_display, real_displaylen) < 0)
 				return -1;
 		}
-		if(tent->flagslen != cs.flagslen || (cs.flagslen > 0 && strncmp(tent->flags, cs.flags, cs.flagslen)) != 0) {
+		if(cmdtent->flagslen != cs.flagslen || (cs.flagslen > 0 && strncmp(cmdtent->flags, cs.flags, cs.flagslen)) != 0) {
 			if(tf->refactoring) {
 				fprintf(tf->f, "tup refactoring error: Attempting to modify a command's flags:\n");
-				fprintf(tf->f, "Old: '%.*s'\n", tent->flagslen, tent->flags);
+				fprintf(tf->f, "Old: '%.*s'\n", cmdtent->flagslen, cmdtent->flags);
 				fprintf(tf->f, "New: '%.*s'\n", cs.flagslen, cs.flags);
 				return -1;
 			}
-			if(tup_db_set_flags(tent, cs.flags, cs.flagslen) < 0)
+			if(tup_db_set_flags(cmdtent, cs.flags, cs.flagslen) < 0)
 				return -1;
 			command_modified = 1;
 		}
@@ -3534,23 +3528,14 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	free(real_display);
 	free(cmd);
-	if(cmdid < 0)
+	if(!cmdtent)
 		return -1;
 
-	cmd_tt = malloc(sizeof *cmd_tt);
-	if(!cmd_tt) {
-		parser_error(tf, "malloc");
+	if(tupid_tree_add(&tf->cmd_root, cmdtent->tnode.tupid) < 0) {
+		fprintf(tf->f, "tup error: Attempted to add duplicate command ID %lli\n", cmdtent->tnode.tupid);
+		tup_db_print(tf->f, cmdtent->tnode.tupid);
 		return -1;
 	}
-	cmd_tt->tupid = cmdid;
-	if(tupid_tree_insert(&tf->cmd_root, cmd_tt) < 0) {
-		fprintf(tf->f, "tup error: Attempted to add duplicate command ID %lli\n", cmdid);
-		tup_db_print(tf->f, cmdid);
-		return -1;
-	}
-	struct tup_entry *cmdtent; /* TODO */
-	if(tup_entry_add(cmdid, &cmdtent) < 0)
-		return -1;
 	tent_tree_remove_count(&tf->g->cmd_delete_root, cmdtent, &tf->g->cmd_delete_count);
 	if(tf->refactoring) {
 		tent_tree_remove(&tf->refactoring_cmd_delete_root, cmdtent);
@@ -3559,7 +3544,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	while(!TAILQ_EMPTY(&onl.entries)) {
 		onle = TAILQ_FIRST(&onl.entries);
 
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
+		if(tup_db_create_unique_link(cmdtent, onle->tent) < 0) {
 			return -1;
 		}
 		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
@@ -3573,7 +3558,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	while(!TAILQ_EMPTY(&extra_onl.entries)) {
 		onle = TAILQ_FIRST(&extra_onl.entries);
-		if(tup_db_create_unique_link(cmdid, onle->tent->tnode.tupid) < 0) {
+		if(tup_db_create_unique_link(cmdtent, onle->tent) < 0) {
 			return -1;
 		}
 		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
@@ -3606,25 +3591,25 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		 * complete.
 		 */
 		if(tent_tree_search(&input_root, group) != NULL) {
-			fprintf(tf->f, "tup error: Command ID %lli both reads from and writes to this group: ", cmdid);
+			fprintf(tf->f, "tup error: Command ID %lli both reads from and writes to this group: ", cmdtent->tnode.tupid);
 			print_tup_entry(tf->f, group);
 			fprintf(tf->f, "\n");
-			tup_db_print(tf->f, cmdid);
+			tup_db_print(tf->f, cmdtent->tnode.tupid);
 			return -1;
 		}
 	}
 
 	RB_FOREACH(ttree, tent_entries, &output_root) {
 		if(tent_tree_search(&input_root, ttree->tent) != NULL) {
-			fprintf(tf->f, "tup error: Command ID %lli lists this file as both an input and an output: ", cmdid);
+			fprintf(tf->f, "tup error: Command ID %lli lists this file as both an input and an output: ", cmdtent->tnode.tupid);
 			print_tup_entry(tf->f, ttree->tent);
 			fprintf(tf->f, "\n");
 			return -1;
 		}
 	}
-	if(tup_db_write_outputs(tf->f, cmdid, &output_root, &exclusion_root, group, &old_group, tf->refactoring, command_modified) < 0)
+	if(tup_db_write_outputs(tf->f, cmdtent->tnode.tupid, &output_root, &exclusion_root, group, &old_group, tf->refactoring, command_modified) < 0)
 		return -1;
-	if(tup_db_write_inputs(tf->f, cmdid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
+	if(tup_db_write_inputs(tf->f, cmdtent->tnode.tupid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;
 	free_tent_tree(&exclusion_root);
 	free_tent_tree(&output_root);
