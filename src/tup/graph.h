@@ -80,8 +80,8 @@ struct graph {
 	int gen_delete_count;
 	struct tent_entries cmd_delete_root;
 	int cmd_delete_count;
-	struct tupid_entries normal_dir_root;
-	struct tupid_entries parse_gitignore_root;
+	struct tent_entries normal_dir_root;
+	struct tent_entries parse_gitignore_root;
 	int style;
 };
 

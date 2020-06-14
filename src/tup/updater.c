@@ -1120,15 +1120,12 @@ static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
 	return 0;
 }
 
-static int gitignore(tupid_t tupid)
+static int gitignore(struct tup_entry *tent)
 {
 	int fd_old, fd_new;
 	int dfd;
-	struct tup_entry *tent;
 	struct tup_entry *gitignore_tent;
 
-	if(tup_entry_add(tupid, &tent) < 0)
-		return -1;
 	if(tup_db_select_tent(tent, ".gitignore", &gitignore_tent) < 0)
 		return -1;
 	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
@@ -1202,13 +1199,13 @@ static int gitignore(tupid_t tupid)
 			perror("fprintf");
 			goto err_close;
 		}
-		if(tupid == 1) {
+		if(tent->tnode.tupid == DOT_DT) {
 			if(fprintf(f, ".tup\n") < 0) {
 				perror("fprintf");
 				goto err_close;
 			}
 		}
-		if(tup_db_write_gitignore(f, tupid) < 0)
+		if(tup_db_write_gitignore(f, tent->tnode.tupid) < 0)
 			goto err_close;
 		fclose(f);
 		if(renameat(dfd, ".gitignore.new", dfd, ".gitignore") < 0) {
@@ -1243,7 +1240,7 @@ static int process_create_nodes(void)
 	struct graph g;
 	struct node *n;
 	struct node *tmp;
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 	int rc;
 	int old_changes = 0;
 
@@ -1377,45 +1374,43 @@ static int process_create_nodes(void)
 			int msg_shown = 0;
 			while(!RB_EMPTY(&g.normal_dir_root)) {
 				int dbrc;
-				tt = RB_MIN(tupid_entries, &g.normal_dir_root);
-				dbrc = tup_db_is_generated_dir(tt->tupid);
+				struct tup_entry *tent;
+				tt = RB_MIN(tent_entries, &g.normal_dir_root);
+				tent = tt->tent;
+				tent_tree_rm(&g.normal_dir_root, tt);
+				dbrc = tup_db_is_generated_dir(tent->tnode.tupid);
 				if(dbrc < 0)
 					return -1;
 				if(dbrc) {
-					struct tup_entry *tent;
 					if(!msg_shown) {
 						msg_shown = 1;
 						tup_show_message("Converting normal directories to generated directories...\n");
 					}
-					if(tup_entry_add(tt->tupid, &tent) < 0)
-						return -1;
 					printf("tup: Converting ");
 					print_tup_entry(stdout, tent);
 					printf(" to a generated directory.\n");
 					if(tup_db_normal_dir_to_generated(tent) < 0)
 						return -1;
 					/* Also check the parent. */
-					if(tupid_tree_add_dup(&g.normal_dir_root, tent->dt) < 0)
+					if(tent_tree_add_dup(&g.normal_dir_root, tent->parent) < 0)
 						return -1;
 					/* And check if the parent needs us in
 					 * gitignore.
 					 */
-					if(tupid_tree_add_dup(&g.parse_gitignore_root, tent->dt) < 0)
+					if(tent_tree_add_dup(&g.parse_gitignore_root, tent->parent) < 0)
 						return -1;
 				}
-				tupid_tree_rm(&g.normal_dir_root, tt);
-				free(tt);
 			}
 		}
 		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
 			tup_show_message("Generating .gitignore files...\n");
-			RB_FOREACH(tt, tupid_entries, &g.parse_gitignore_root) {
-				if(gitignore(tt->tupid) < 0) {
+			RB_FOREACH(tt, tent_entries, &g.parse_gitignore_root) {
+				if(gitignore(tt->tent) < 0) {
 					rc = -1;
 					break;
 				}
 			}
-			free_tupid_tree(&g.parse_gitignore_root);
+			free_tent_tree(&g.parse_gitignore_root);
 		}
 	}
 	if(rc < 0) {

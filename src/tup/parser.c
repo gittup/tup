@@ -196,7 +196,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	 * so add this one to check.
 	 */
 	if(tf.variant->root_variant) {
-		if(tupid_tree_add_dup(&g->normal_dir_root, n->tent->tnode.tupid) < 0)
+		if(tent_tree_add_dup(&g->normal_dir_root, n->tent) < 0)
 			return -1;
 	}
 
@@ -1196,7 +1196,7 @@ static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 				return -1;
 		}
 	}
-	if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, dtent->tnode.tupid) < 0)
+	if(tent_tree_add_dup(&tf->g->parse_gitignore_root, dtent) < 0)
 		return -1;
 	return 0;
 }
@@ -3291,7 +3291,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		while(tmp_tent->type == TUP_NODE_GENERATED_DIR) {
 			tmp_tent = tmp_tent->parent;
 		}
-		if(tupid_tree_add_dup(&tf->g->parse_gitignore_root, tmp_tent->tnode.tupid) < 0)
+		if(tent_tree_add_dup(&tf->g->parse_gitignore_root, tmp_tent) < 0)
 			return -1;
 
 		set_nle_base(onle);
