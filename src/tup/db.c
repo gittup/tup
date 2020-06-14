@@ -3600,18 +3600,20 @@ int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries 
 		return -1;
 	}
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(head) {
-			if(tent_list_add_tail(head, tent) < 0) {
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
+			if(head) {
+				if(tent_list_add_tail(head, tent) < 0) {
+					return -1;
+				}
 			}
-		}
-		if(root) {
-			if(tent_tree_add(root, tent) < 0) {
-				return -1;
+			if(root) {
+				if(tent_tree_add(root, tent) < 0) {
+					return -1;
+				}
 			}
 		}
 	}
@@ -3680,12 +3682,14 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, e
 		return -1;
 	}
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tent_tree_add(root, tent) < 0)
-			return -1;
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tent_tree_add(root, tent) < 0)
+				return -1;
+		}
 	}
 	free_tupid_list(&tupid_list);
 
@@ -3747,12 +3751,14 @@ int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYP
 		return -1;
 	}
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tent_tree_add(root, tent) < 0)
-			return -1;
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tent_tree_add(root, tent) < 0)
+				return -1;
+		}
 	}
 	free_tupid_list(&tupid_list);
 
@@ -4116,14 +4122,16 @@ out_reset:
 		return -1;
 	}
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
 
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tent->type == TUP_NODE_DIR) {
-			if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
+			if(tent->type == TUP_NODE_DIR) {
+				if(tup_db_add_create_list(tent->tnode.tupid) < 0)
+					return -1;
+			}
 		}
 	}
 	free_tupid_list(&tupid_list);
@@ -4225,13 +4233,15 @@ out_reset:
 		return -1;
 	}
 
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
 
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(tent_list_add_tail(head, tent) < 0)
-			return -1;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tent_list_add_tail(head, tent) < 0)
+				return -1;
+		}
 	}
 	free_tupid_list(&tupid_list);
 
@@ -5364,16 +5374,18 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
-	tupid_list_foreach(tl, &tupid_list) {
-		struct tup_entry *tent;
-		if(tup_entry_add(tl->tupid, &tent) < 0)
-			return -1;
-		if(ghost_check) {
-			if(tup_entry_add_ghost_tree(tent, root) < 0)
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
-		} else {
-			if(tent_tree_add(root, tent) < 0)
-				return -1;
+			if(ghost_check) {
+				if(tup_entry_add_ghost_tree(tent, root) < 0)
+					return -1;
+			} else {
+				if(tent_tree_add(root, tent) < 0)
+					return -1;
+			}
 		}
 	}
 	free_tupid_list(&tupid_list);
