@@ -48,12 +48,12 @@ static int add_parser_files_locked(struct file_info *finfo,
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
-	LIST_INIT(&info->read_list);
-	LIST_INIT(&info->write_list);
-	LIST_INIT(&info->unlink_list);
-	LIST_INIT(&info->var_list);
-	LIST_INIT(&info->mapping_list);
-	LIST_INIT(&info->tmpdir_list);
+	TAILQ_INIT(&info->read_list);
+	TAILQ_INIT(&info->write_list);
+	TAILQ_INIT(&info->unlink_list);
+	TAILQ_INIT(&info->var_list);
+	TAILQ_INIT(&info->mapping_list);
+	TAILQ_INIT(&info->tmpdir_list);
 	RB_INIT(&info->sticky_root);
 	RB_INIT(&info->normal_root);
 	RB_INIT(&info->group_sticky_root);
@@ -153,17 +153,17 @@ int handle_open_file(enum access_type at, const char *filename,
 
 	switch(at) {
 		case ACCESS_READ:
-			LIST_INSERT_HEAD(&info->read_list, fent, list);
+			TAILQ_INSERT_TAIL(&info->read_list, fent, list);
 			break;
 		case ACCESS_WRITE:
 			check_unlink_list(filename, &info->unlink_list);
-			LIST_INSERT_HEAD(&info->write_list, fent, list);
+			TAILQ_INSERT_TAIL(&info->write_list, fent, list);
 			break;
 		case ACCESS_UNLINK:
-			LIST_INSERT_HEAD(&info->unlink_list, fent, list);
+			TAILQ_INSERT_TAIL(&info->unlink_list, fent, list);
 			break;
 		case ACCESS_VAR:
-			LIST_INSERT_HEAD(&info->var_list, fent, list);
+			TAILQ_INSERT_TAIL(&info->var_list, fent, list);
 			break;
 		case ACCESS_RENAME:
 		default:
@@ -188,10 +188,10 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 	handle_unlink(info);
 
 	if(check_only == CHECK_SUCCESS) {
-		while(!LIST_EMPTY(&info->tmpdir_list)) {
+		while(!TAILQ_EMPTY(&info->tmpdir_list)) {
 			int match = 0;
 
-			tmpdir = LIST_FIRST(&info->tmpdir_list);
+			tmpdir = TAILQ_FIRST(&info->tmpdir_list);
 			if(exclusion_match(f, &info->exclusion_root, tmpdir->dirname, &match) < 0)
 				return -1;
 			if(match) {
@@ -206,7 +206,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 				fprintf(f, "tup error: Directory '%s' was created, but not subsequently removed. Only temporary directories can be created by commands.\n", tmpdir->dirname);
 				tmpdir_bork = 1;
 			}
-			LIST_REMOVE(tmpdir, list);
+			TAILQ_REMOVE(&info->tmpdir_list, tmpdir, list);
 			free(tmpdir->dirname);
 			free(tmpdir);
 		}
@@ -430,13 +430,13 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 	struct file_entry *r;
 	struct tent_entries root = {NULL};
 
-	while(!LIST_EMPTY(&finfo->read_list)) {
-		r = LIST_FIRST(&finfo->read_list);
+	while(!TAILQ_EMPTY(&finfo->read_list)) {
+		r = TAILQ_FIRST(&finfo->read_list);
 
 		if(add_node_to_tree(DOT_DT, r->filename, &root, full_deps) < 0)
 			return -1;
 
-		del_file_entry(r);
+		del_file_entry(&finfo->read_list, r);
 	}
 
 	/* Don't link to ourself */
@@ -460,18 +460,18 @@ static int add_parser_files_locked(struct file_info *finfo,
 	struct tent_tree *tt;
 	int map_bork = 0;
 
-	while(!LIST_EMPTY(&finfo->read_list)) {
-		r = LIST_FIRST(&finfo->read_list);
+	while(!TAILQ_EMPTY(&finfo->read_list)) {
+		r = TAILQ_FIRST(&finfo->read_list);
 		if(add_node_to_tree(DOT_DT, r->filename, &tmproot, full_deps) < 0)
 			return -1;
-		del_file_entry(r);
+		del_file_entry(&finfo->read_list, r);
 	}
-	while(!LIST_EMPTY(&finfo->var_list)) {
-		r = LIST_FIRST(&finfo->var_list);
+	while(!TAILQ_EMPTY(&finfo->var_list)) {
+		r = TAILQ_FIRST(&finfo->var_list);
 
 		if(add_node_to_tree(vardt, r->filename, &tmproot, 0) < 0)
 			return -1;
-		del_file_entry(r);
+		del_file_entry(&finfo->var_list, r);
 	}
 	RB_FOREACH(tt, tent_entries, &tmproot) {
 		if(strcmp(tt->tent->name.s, ".gitignore") != 0)
@@ -481,13 +481,13 @@ static int add_parser_files_locked(struct file_info *finfo,
 	free_tent_tree(&tmproot);
 
 	/* TODO: write_list not needed here? */
-	while(!LIST_EMPTY(&finfo->write_list)) {
-		r = LIST_FIRST(&finfo->write_list);
-		del_file_entry(r);
+	while(!TAILQ_EMPTY(&finfo->write_list)) {
+		r = TAILQ_FIRST(&finfo->write_list);
+		del_file_entry(&finfo->write_list, r);
 	}
 
-	while(!LIST_EMPTY(&finfo->mapping_list)) {
-		map = LIST_FIRST(&finfo->mapping_list);
+	while(!TAILQ_EMPTY(&finfo->mapping_list)) {
+		map = TAILQ_FIRST(&finfo->mapping_list);
 
 		if(gimme_tent(map->realname, &tent) < 0)
 			return -1;
@@ -495,7 +495,7 @@ static int add_parser_files_locked(struct file_info *finfo,
 			fprintf(stderr, "tup error: Writing to file '%s' while parsing is not allowed\n", map->realname);
 			map_bork = 1;
 		}
-		del_map(map);
+		del_map(&finfo->mapping_list, map);
 	}
 	if(map_bork)
 		return -1;
@@ -521,9 +521,9 @@ static struct file_entry *new_entry(const char *filename)
 	return fent;
 }
 
-void del_file_entry(struct file_entry *fent)
+void del_file_entry(struct file_entry_head *head, struct file_entry *fent)
 {
-	LIST_REMOVE(fent, list);
+	TAILQ_REMOVE(head, fent, list);
 	free(fent->filename);
 	free(fent);
 }
@@ -532,7 +532,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 {
 	struct file_entry *fent;
 
-	LIST_FOREACH(fent, &info->write_list, list) {
+	TAILQ_FOREACH(fent, &info->write_list, list) {
 		if(name_cmp(fent->filename, from) == 0) {
 			free(fent->filename);
 
@@ -543,7 +543,7 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 			}
 		}
 	}
-	LIST_FOREACH(fent, &info->read_list, list) {
+	TAILQ_FOREACH(fent, &info->read_list, list) {
 		if(name_cmp(fent->filename, from) == 0) {
 			free(fent->filename);
 
@@ -559,9 +559,9 @@ int handle_rename(const char *from, const char *to, struct file_info *info)
 	return 0;
 }
 
-void del_map(struct mapping *map)
+void del_map(struct mapping_head *head, struct mapping *map)
 {
-	LIST_REMOVE(map, list);
+	TAILQ_REMOVE(head, map, list);
 	free(map->tmpname);
 	free(map->realname);
 	free(map);
@@ -571,9 +571,9 @@ static void check_unlink_list(const char *filename, struct file_entry_head *u_he
 {
 	struct file_entry *fent, *tmp;
 
-	LIST_FOREACH_SAFE(fent, u_head, list, tmp) {
+	TAILQ_FOREACH_SAFE(fent, u_head, list, tmp) {
 		if(name_cmp(filename, fent->filename) == 0) {
-			del_file_entry(fent);
+			del_file_entry(u_head, fent);
 		}
 	}
 }
@@ -582,21 +582,21 @@ static void handle_unlink(struct file_info *info)
 {
 	struct file_entry *u, *fent, *tmp;
 
-	while(!LIST_EMPTY(&info->unlink_list)) {
-		u = LIST_FIRST(&info->unlink_list);
+	while(!TAILQ_EMPTY(&info->unlink_list)) {
+		u = TAILQ_FIRST(&info->unlink_list);
 
-		LIST_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
+		TAILQ_FOREACH_SAFE(fent, &info->write_list, list, tmp) {
 			if(name_cmp(fent->filename, u->filename) == 0) {
-				del_file_entry(fent);
+				del_file_entry(&info->write_list, fent);
 			}
 		}
-		LIST_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
+		TAILQ_FOREACH_SAFE(fent, &info->read_list, list, tmp) {
 			if(name_cmp(fent->filename, u->filename) == 0) {
-				del_file_entry(fent);
+				del_file_entry(&info->read_list, fent);
 			}
 		}
 
-		del_file_entry(u);
+		del_file_entry(&info->unlink_list, u);
 	}
 }
 
@@ -635,13 +635,13 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	struct tent_entries root = {NULL};
 	int write_bork = 0;
 
-	while(!LIST_EMPTY(&info->write_list)) {
+	while(!TAILQ_EMPTY(&info->write_list)) {
 		tupid_t newdt;
 		struct path_element *pel = NULL;
 		struct pel_group pg;
 		int match = 0;
 
-		w = LIST_FIRST(&info->write_list);
+		w = TAILQ_FIRST(&info->write_list);
 
 		if(exclusion_match(f, &info->exclusion_root, w->filename, &match) < 0)
 			return -1;
@@ -652,9 +652,9 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		}
 
 		/* Remove duplicate write entries */
-		LIST_FOREACH_SAFE(r, &info->write_list, list, tmp) {
+		TAILQ_FOREACH_SAFE(r, &info->write_list, list, tmp) {
 			if(r != w && (name_cmp(w->filename, r->filename) == 0)) {
-				del_file_entry(r);
+				del_file_entry(&info->write_list, r);
 			}
 		}
 
@@ -695,9 +695,9 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 				unlink(w->filename);
 			}
 
-			LIST_FOREACH(map, &info->mapping_list, list) {
+			TAILQ_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
-					del_map(map);
+					del_map(&info->mapping_list, map);
 					break;
 				}
 			}
@@ -708,7 +708,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			if(tent_tree_add_dup(&root, tent) < 0)
 				return -1;
 
-			LIST_FOREACH(map, &info->mapping_list, list) {
+			TAILQ_FOREACH(map, &info->mapping_list, list) {
 				if(strcmp(map->realname, w->filename) == 0) {
 					map->tent = tent;
 					mapping_set = 1;
@@ -731,21 +731,21 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 					return -1;
 				}
 				map->tent = tent;
-				LIST_INSERT_HEAD(&info->mapping_list, map, list);
+				TAILQ_INSERT_TAIL(&info->mapping_list, map, list);
 			}
 		}
 
 out_skip:
-		del_file_entry(w);
+		del_file_entry(&info->write_list, w);
 	}
 
 	if(tup_db_check_actual_outputs(f, cmdid, &root, &info->output_root, &info->mapping_list, &write_bork, info->do_unlink, check_only==CHECK_SUCCESS) < 0)
 		return -1;
 
-	while(!LIST_EMPTY(&info->mapping_list)) {
+	while(!TAILQ_EMPTY(&info->mapping_list)) {
 		struct mapping *map;
 
-		map = LIST_FIRST(&info->mapping_list);
+		map = TAILQ_FIRST(&info->mapping_list);
 
 		/* TODO: strcmp only here for win32 support */
 		if(strcmp(map->tmpname, map->realname) != 0) {
@@ -760,7 +760,7 @@ out_skip:
 			if(file_set_mtime(map->tent, map->realname) < 0)
 				return -1;
 		}
-		del_map(map);
+		del_map(&info->mapping_list, map);
 	}
 
 	free_tent_tree(&root);
@@ -777,9 +777,9 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	struct file_entry *r;
 	struct tent_entries root = {NULL};
 
-	while(!LIST_EMPTY(&info->read_list)) {
+	while(!TAILQ_EMPTY(&info->read_list)) {
 		int match = 0;
-		r = LIST_FIRST(&info->read_list);
+		r = TAILQ_FIRST(&info->read_list);
 
 		if(exclusion_match(f, &info->exclusion_root, r->filename, &match) < 0)
 			return -1;
@@ -787,15 +787,15 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			if(add_node_to_tree(DOT_DT, r->filename, &root, full_deps) < 0)
 				return -1;
 		}
-		del_file_entry(r);
+		del_file_entry(&info->read_list, r);
 	}
 
-	while(!LIST_EMPTY(&info->var_list)) {
-		r = LIST_FIRST(&info->var_list);
+	while(!TAILQ_EMPTY(&info->var_list)) {
+		r = TAILQ_FIRST(&info->var_list);
 
 		if(add_node_to_tree(vardt, r->filename, &root, 0) < 0)
 			return -1;
-		del_file_entry(r);
+		del_file_entry(&info->var_list, r);
 	}
 
 	tent_tree_copy(&root, &info->used_groups_root);

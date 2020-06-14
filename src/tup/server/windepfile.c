@@ -390,9 +390,9 @@ end:
 		return -1;
 	}
 
-	LIST_FOREACH_SAFE(fent, &s->finfo.write_list, list, tmp) {
+	TAILQ_FOREACH_SAFE(fent, &s->finfo.write_list, list, tmp) {
 		if(strncmp(fent->filename, wintmpdir, strlen(wintmpdir)) == 0) {
-			del_file_entry(fent);
+			del_file_entry(&s->finfo.write_list, fent);
 		}
 	}
 
@@ -606,7 +606,7 @@ static int process_depfile(struct server *s, HANDLE h)
 				return -1;
 			}
 			map->tent = NULL; /* This is used when saving deps */
-			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
+			TAILQ_INSERT_TAIL(&s->finfo.mapping_list, map, list);
 		}
 		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
 			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);

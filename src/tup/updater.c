@@ -2616,7 +2616,7 @@ static int specify_pseudo_exec_output(struct server *s, const char *output)
 	map->tmpname = strdup(output);
 	map->tent = NULL;
 	finfo_lock(&s->finfo);
-	LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
+	TAILQ_INSERT_TAIL(&s->finfo.mapping_list, map, list);
 	finfo_unlock(&s->finfo);
 
 	s->exited = 1;

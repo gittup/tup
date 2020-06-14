@@ -233,7 +233,7 @@ static struct mapping *add_mapping(const char *path)
 			return NULL;
 		}
 
-		LIST_INSERT_HEAD(&finfo->mapping_list, map, list);
+		TAILQ_INSERT_TAIL(&finfo->mapping_list, map, list);
 		put_finfo(finfo);
 	}
 	return map;
@@ -245,7 +245,7 @@ static struct mapping *find_mapping(struct file_info *finfo, const char *path)
 	struct mapping *map;
 
 	peeled = peel(path);
-	LIST_FOREACH(map, &finfo->mapping_list, list) {
+	TAILQ_FOREACH(map, &finfo->mapping_list, list) {
 		if(strcmp(peeled, map->realname) == 0) {
 			return map;
 		}
@@ -387,7 +387,7 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 			return -EPERM;
 		}
 		rc = 0;
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				if(fstat(tup_top_fd(), stbuf) < 0)
 					rc = -errno;
@@ -479,7 +479,7 @@ static int tup_fs_access(const char *path, int mask)
 			variant_dir = finfo->variant_dir;
 
 
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				/* For a temporary directory, just use the same
 				 * access permissions as the top-level directory.
@@ -674,7 +674,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		 * sure we don't try to save the dependency or do a real
 		 * opendir(), since that won't work.
 		 */
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				is_tmpdir = 1;
 				break;
@@ -685,7 +685,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		 * we need to add to the list in addition to whatever we
 		 * get from the real opendir/readdir (if applicable).
 		 */
-		LIST_FOREACH(map, &finfo->mapping_list, list) {
+		TAILQ_FOREACH(map, &finfo->mapping_list, list) {
 			const char *realname;
 
 			/* Get the 'real' realname of the file. Eg: sub/bar.txt
@@ -720,7 +720,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		}
 
 		/* Check any tmpdir subdirs, and add them to the list */
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			int peeled_len;
 			int tmpdir_len;
 
@@ -876,7 +876,7 @@ static int tup_fs_mkdir(const char *path, mode_t mode)
 				rc = -ENOMEM;
 			}
 			if(tmpdir && tmpdir->dirname) {
-				LIST_INSERT_HEAD(&finfo->tmpdir_list, tmpdir, list);
+				TAILQ_INSERT_TAIL(&finfo->tmpdir_list, tmpdir, list);
 				rc = 0;
 			}
 		}
@@ -899,7 +899,7 @@ static int tup_fs_unlink(const char *path)
 		map = find_mapping(finfo, path);
 		if(map) {
 			unlinkat(tup_top_fd(), map->tmpname, 0);
-			del_map(map);
+			del_map(&finfo->mapping_list, map);
 			put_finfo(finfo);
 			tup_fuse_handle_file(path, NULL, ACCESS_UNLINK);
 			return 0;
@@ -926,23 +926,23 @@ static int tup_fs_rmdir(const char *path)
 		size_t len = strlen(peeled);
 
 		// Ensure that there are no subdirectories
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strncmp(tmpdir->dirname, peeled, len) == 0 && tmpdir->dirname[len] == '/') {
 				put_finfo(finfo);
 				return -ENOTEMPTY;
 			}
 		}
 		// Ensure that there are no files in the directory
-		LIST_FOREACH(map, &finfo->mapping_list, list) {
+		TAILQ_FOREACH(map, &finfo->mapping_list, list) {
 			if (strncmp(map->realname, peeled, len) == 0 && map->realname[len] == '/') {
 				put_finfo(finfo);
 				return -ENOTEMPTY;
 			}
 		}
 
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
-				LIST_REMOVE(tmpdir, list);
+				TAILQ_REMOVE(&finfo->tmpdir_list, tmpdir, list);
 				free(tmpdir->dirname);
 				free(tmpdir);
 				put_finfo(finfo);
@@ -1000,7 +1000,7 @@ static int tup_fs_rename(const char *from, const char *to)
 		map = find_mapping(finfo, to);
 		if(map) {
 			unlink(map->tmpname);
-			del_map(map);
+			del_map(&finfo->mapping_list, map);
 		}
 
 		map = find_mapping(finfo, from);
@@ -1053,7 +1053,7 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 			return rc;
 		}
 		peeled = peel(path);
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				put_finfo(finfo);
 				return 0;
@@ -1086,7 +1086,7 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 			return rc;
 		}
 		peeled = peel(path);
-		LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 			if(strcmp(tmpdir->dirname, peeled) == 0) {
 				put_finfo(finfo);
 				return 0;
@@ -1176,7 +1176,7 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 				return -ENOSYS;
 			}
 			/* Ignore a touch on a temporary directory */
-			LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 				if(strcmp(tmpdir->dirname, peeled) == 0) {
 					put_finfo(finfo);
 					return 0;
@@ -1370,7 +1370,7 @@ static int tup_fs_statfs(const char *path, struct statvfs *stbuf)
 		if(map) {
 			peeled = map->tmpname;
 		} else {
-			LIST_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
 				if(strcmp(tmpdir->dirname, peeled) == 0) {
 					if(fstatvfs(tup_top_fd(), stbuf) < 0)
 						rc = -errno;

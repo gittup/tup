@@ -35,24 +35,24 @@
 struct tup_entry;
 
 struct mapping {
-	LIST_ENTRY(mapping) list;
+	TAILQ_ENTRY(mapping) list;
 	char *realname;
 	char *tmpname;
 	struct tup_entry *tent;
 };
-LIST_HEAD(mapping_head, mapping);
+TAILQ_HEAD(mapping_head, mapping);
 
 struct tmpdir {
-	LIST_ENTRY(tmpdir) list;
+	TAILQ_ENTRY(tmpdir) list;
 	char *dirname;
 };
-LIST_HEAD(tmpdir_head, tmpdir);
+TAILQ_HEAD(tmpdir_head, tmpdir);
 
 struct file_entry {
-	LIST_ENTRY(file_entry) list;
+	TAILQ_ENTRY(file_entry) list;
 	char *filename;
 };
-LIST_HEAD(file_entry_head, file_entry);
+TAILQ_HEAD(file_entry_head, file_entry);
 
 struct file_info {
 	pthread_mutex_t lock;
@@ -100,7 +100,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 int add_config_files(struct file_info *finfo, struct tup_entry *tent, int full_deps);
 int add_parser_files(struct file_info *finfo, struct tent_entries *root,
 		     tupid_t vardt, int full_deps);
-void del_map(struct mapping *map);
-void del_file_entry(struct file_entry *fent);
+void del_map(struct mapping_head *head, struct mapping *map);
+void del_file_entry(struct file_entry_head *head, struct file_entry *fent);
 
 #endif

@@ -5572,12 +5572,12 @@ static int extra_output(struct tup_entry *tent, void *data)
 	 * we want to avoid moving the file out of the tmp directory and into
 	 * the real fs, so delete the mapping (t4081).
 	 */
-	LIST_FOREACH(map, aod->mapping_list, list) {
+	TAILQ_FOREACH(map, aod->mapping_list, list) {
 		/* Easiest to check for the tent, since the tent is already set
 		 * in update_write_info().
 		 */
 		if(map->tent == tent) {
-			del_map(map);
+			del_map(aod->mapping_list, map);
 			break;
 		}
 	}

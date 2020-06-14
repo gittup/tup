@@ -511,7 +511,7 @@ static int process_depfile(struct server *s, int fd)
 				return -1;
 			}
 			map->tent = NULL; /* This is used when saving deps */
-			LIST_INSERT_HEAD(&s->finfo.mapping_list, map, list);
+			TAILQ_INSERT_TAIL(&s->finfo.mapping_list, map, list);
 		}
 		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
 			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
