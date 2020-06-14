@@ -1331,7 +1331,7 @@ out_reset:
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, struct tup_entry *dtent,
 				const char *glob, int len,
-				struct tupid_entries *delete_root,
+				struct tent_entries *delete_root,
 				int include_directories)
 {
 	int rc;
@@ -1407,7 +1407,7 @@ int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_tree_search(delete_root, tupid) == NULL) {
+		if(tent_tree_search_tupid(delete_root, tupid) == NULL) {
 			tent = tup_entry_find(tupid);
 			if(!tent) {
 				name = (const char *)sqlite3_column_text(*stmt, 1);
@@ -1801,19 +1801,18 @@ static int recurse_modify_dir(tupid_t dt)
 static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct tup_entry *src,
 					 struct tup_entry *destroot)
 {
-	struct tupid_list *tl;
-	struct tupid_list_head subdir_list;
+	struct tent_list *tl;
+	struct tent_list_head subdir_list;
 
-	tupid_list_init(&subdir_list);
+	tent_list_init(&subdir_list);
 	if(tup_db_dirtype(src->tnode.tupid, &subdir_list, NULL, NULL, TUP_NODE_DIR) < 0)
 		return -1;
-	tupid_list_foreach(tl, &subdir_list) {
+	tent_list_foreach(tl, &subdir_list) {
 		struct tup_entry *subdest;
 		struct tup_entry *subsrc;
 		int newfd;
 
-		if(tup_entry_add(tl->tupid, &subsrc) < 0)
-			return -1;
+		subsrc = tl->tent;
 		if(subsrc == destroot)
 			continue;
 		if(is_virtual_tent(subsrc))
@@ -1852,7 +1851,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 			return -1;
 		}
 	}
-	free_tupid_list(&subdir_list);
+	free_tent_list(&subdir_list);
 	return 0;
 }
 
@@ -3541,12 +3540,16 @@ int tup_db_normal_dir_to_generated(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_DIRTYPE];
 	static char s[] = "select id from node where dir=? and type=?";
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli, %i]", s, dt, type);
 	if(!*stmt) {
@@ -3583,18 +3586,9 @@ int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entrie
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-
-		if(head) {
-			if(tupid_list_add_tail(head, tupid) < 0) {
-				rc = -1;
-				break;
-			}
-		}
-		if(root) {
-			if(tupid_tree_add(root, tupid) < 0) {
-				rc = -1;
-				break;
-			}
+		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
+			rc = -1;
+			break;
 		}
 		if(count)
 			(*count)++;
@@ -3606,15 +3600,36 @@ int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entrie
 		return -1;
 	}
 
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tl->tupid, &tent) < 0)
+			return -1;
+		if(head) {
+			if(tent_list_add_tail(head, tent) < 0) {
+				return -1;
+			}
+		}
+		if(root) {
+			if(tent_tree_add(root, tent) < 0) {
+				return -1;
+			}
+		}
+	}
+	free_tupid_list(&tupid_list);
+
 	return rc;
 }
 
-int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_SRCID_TO_TREE];
 	static char s[] = "select id from node where srcid=? and type=?";
+	struct tupid_list_head tupid_list;
+	struct tupid_list *tl;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%lli, %i]", s, srcid, type);
 	if(!*stmt) {
@@ -3651,7 +3666,7 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, 
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_tree_add(root, tupid) < 0) {
+		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
 			rc = -1;
 			break;
 		}
@@ -3665,15 +3680,28 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, 
 		return -1;
 	}
 
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tl->tupid, &tent) < 0)
+			return -1;
+		if(tent_tree_add(root, tent) < 0)
+			return -1;
+	}
+	free_tupid_list(&tupid_list);
+
 	return rc;
 }
 
-int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_TYPE_TO_TREE];
 	static char s[] = "select id from node where type=?";
+	struct tupid_list_head tupid_list;
+	struct tupid_list *tl;
+
+	tupid_list_init(&tupid_list);
 
 	transaction_check("%s [%i]", s, type);
 	if(!*stmt) {
@@ -3705,7 +3733,7 @@ int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TY
 		}
 
 		tupid = sqlite3_column_int64(*stmt, 0);
-		if(tupid_tree_add(root, tupid) < 0) {
+		if(tupid_list_add_tail(&tupid_list, tupid) < 0) {
 			rc = -1;
 			break;
 		}
@@ -3718,6 +3746,15 @@ int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TY
 		fprintf(stderr, "Statement was: %s\n", s);
 		return -1;
 	}
+
+	tupid_list_foreach(tl, &tupid_list) {
+		struct tup_entry *tent;
+		if(tup_entry_add(tl->tupid, &tent) < 0)
+			return -1;
+		if(tent_tree_add(root, tent) < 0)
+			return -1;
+	}
+	free_tupid_list(&tupid_list);
 
 	return rc;
 }

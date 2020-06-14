@@ -58,7 +58,7 @@ struct tupfile {
 	struct string_entries bang_root;
 	struct tent_entries input_root;
 	struct tupid_entries directory_root;
-	struct tupid_entries refactoring_cmd_delete_root;
+	struct tent_entries refactoring_cmd_delete_root;
 	FILE *f;
 	struct parser_server *ps;
 	struct timespan ts;

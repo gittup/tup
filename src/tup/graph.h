@@ -23,6 +23,7 @@
 
 #include "bsd/queue.h"
 #include "tupid_tree.h"
+#include "tent_tree.h"
 #include "db_types.h"
 #include <time.h>
 #include <stdio.h>
@@ -37,7 +38,6 @@ struct edge {
 LIST_HEAD(edge_head, edge);
 
 struct tup_entry;
-struct tent_entries;
 
 #define STATE_INITIALIZED 0
 #define STATE_PROCESSING 1
@@ -76,9 +76,9 @@ struct graph {
 	enum TUP_NODE_TYPE count_flags;
 	enum TUP_NODE_TYPE count_flags2;
 	time_t total_mtime;
-	struct tupid_entries gen_delete_root;
+	struct tent_entries gen_delete_root;
 	int gen_delete_count;
-	struct tupid_entries cmd_delete_root;
+	struct tent_entries cmd_delete_root;
 	int cmd_delete_count;
 	struct tupid_entries normal_dir_root;
 	struct tupid_entries parse_gitignore_root;

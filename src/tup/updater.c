@@ -569,7 +569,7 @@ static int cleanup_dir(struct tup_entry *tent)
 
 static int delete_files(struct graph *g)
 {
-	struct tupid_tree *tt;
+	struct tent_tree *tt;
 	struct tup_entry *tent;
 	struct tent_list_head save_list;
 	struct tent_list *tlist;
@@ -585,30 +585,29 @@ static int delete_files(struct graph *g)
 		start_progress(g->cmd_delete_count, -1, -1);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
+		tent = tt->tent;
+		tent_tree_rm(&g->cmd_delete_root, tt);
 		if(server_is_dead())
 			goto out_err;
-		if(tup_del_id_force(tt->tupid, TUP_NODE_CMD) < 0)
+		if(tup_del_id_force(tent->tnode.tupid, TUP_NODE_CMD) < 0)
 			goto out_err;
 		skip_result(NULL);
 		/* Use TUP_NODE_GENERATED to make the bar purple since
 		 * we are deleting (not executing) commands.
 		 */
 		show_progress(-1, TUP_NODE_GENERATED);
-		tupid_tree_rm(&g->cmd_delete_root, tt);
-		free(tt);
 	}
 
 	start_progress(g->gen_delete_count, -1, -1);
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		int tmp;
 
+		tent = tt->tent;
+		tent_tree_rm(&g->gen_delete_root, tt);
 		if(server_is_dead())
 			goto out_err;
 
-		if(tup_entry_add(tt->tupid, &tent) < 0)
-			goto out_err;
-
-		tmp = tup_db_in_modify_list(tt->tupid);
+		tmp = tup_db_in_modify_list(tent->tnode.tupid);
 		if(tmp < 0)
 			goto out_err;
 		if(tmp == 1) {
@@ -622,11 +621,9 @@ static int delete_files(struct graph *g)
 
 			if(delete_file(tent) < 0)
 				goto out_err;
-			if(tup_del_id_force(tt->tupid, TUP_NODE_GENERATED) < 0)
+			if(tup_del_id_force(tent->tnode.tupid, TUP_NODE_GENERATED) < 0)
 				goto out_err;
 		}
-		tupid_tree_rm(&g->gen_delete_root, tt);
-		free(tt);
 	}
 	if(file_resurrection) {
 		tup_show_message("Converting generated files to normal files...\n");

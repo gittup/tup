@@ -39,6 +39,7 @@ struct mapping_head;
 struct vardb;
 struct tent_entries;
 struct tupid_list_head;
+struct tent_list_head;
 
 /* General operations */
 int tup_db_open(void);
@@ -79,7 +80,7 @@ int tup_db_select_node_dir(int (*callback)(void *, struct tup_entry *),
 int tup_db_select_node_dir_glob(int (*callback)(void *, struct tup_entry *),
 				void *arg, struct tup_entry *dtent,
 				const char *glob, int len,
-				struct tupid_entries *delete_root,
+				struct tent_entries *delete_root,
 				int include_directories);
 int tup_db_delete_node(tupid_t tupid);
 int tup_db_delete_dir(tupid_t dt, int force);
@@ -183,9 +184,9 @@ int is_virtual_tent(struct tup_entry *tent);
 tupid_t exclusion_dt(void);
 
 /* Tree operations */
-int tup_db_dirtype(tupid_t dt, struct tupid_list_head *head, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
-int tup_db_srcid_to_tree(tupid_t srcid, struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
-int tup_db_type_to_tree(struct tupid_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
 int tup_db_is_generated_dir(tupid_t dt);
 
 /* scanner operations */

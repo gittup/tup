@@ -22,6 +22,7 @@
 #define tup_tent_tree
 
 #include "bsd/tree.h"
+#include "tupid.h"
 struct tup_entry;
 
 struct tent_tree {
@@ -34,8 +35,10 @@ RB_PROTOTYPE(tent_entries, tent_tree, linkage, x);
 int tent_tree_add(struct tent_entries *root, struct tup_entry *tent);
 int tent_tree_add_dup(struct tent_entries *root, struct tup_entry *tent);
 struct tent_tree *tent_tree_search(struct tent_entries *root, struct tup_entry *tent);
+struct tent_tree *tent_tree_search_tupid(struct tent_entries *root, tupid_t tupid);
 int tent_tree_copy(struct tent_entries *dest, struct tent_entries *src);
 void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent);
+void tent_tree_remove_count(struct tent_entries *root, struct tup_entry *tent, int *count);
 void tent_tree_rm(struct tent_entries *root, struct tent_tree *tt);
 void free_tent_tree(struct tent_entries *root);
 

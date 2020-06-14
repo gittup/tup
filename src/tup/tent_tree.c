@@ -75,6 +75,14 @@ struct tent_tree *tent_tree_search(struct tent_entries *root, struct tup_entry *
 	return RB_FIND(tent_entries, root, &tt);
 }
 
+struct tent_tree *tent_tree_search_tupid(struct tent_entries *root, tupid_t tupid)
+{
+	struct tup_entry tmptent = {
+		.tnode.tupid=tupid,
+	};
+	return tent_tree_search(root, &tmptent);
+}
+
 int tent_tree_copy(struct tent_entries *dest, struct tent_entries *src)
 {
 	struct tent_tree *tt;
@@ -94,6 +102,19 @@ void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent)
 	if(!tt) {
 		return;
 	}
+	tent_tree_rm(root, tt);
+}
+
+void tent_tree_remove_count(struct tent_entries *root, struct tup_entry *tent, int *count)
+{
+	struct tent_tree *tt;
+
+	tt = tent_tree_search(root, tent);
+	if(!tt) {
+		return;
+	}
+	if(count)
+		(*count)--;
 	tent_tree_rm(root, tt);
 }
 
