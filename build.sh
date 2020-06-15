@@ -78,7 +78,7 @@ $CC $CFLAGS -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAF
 
 echo "  bootstrap LD tup $LDFLAGS"
 objs="$(echo *.o)"
-../src/tup/link.sh "$CC" "$CFLAGS -I../src" "-lpthread $plat_ldflags $LDFLAGS" "tup" "$objs"
+../src/tup/link.sh "$CC" "$CFLAGS -I../src" "-lpthread $plat_ldflags $LDFLAGS" "tup" "$objs" "$label"
 
 if [ "$server" = "ldpreload" ]; then
 	mkdir ldpreload
