@@ -60,9 +60,13 @@ int win_lstat(const char *pathname, struct stat *buf)
 
 	if(!GetFileAttributesExW(wpathname, GetFileExInfoStandard, &data)) {
 		DWORD err = GetLastError();
-		if(err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
+		if(err == ERROR_FILE_NOT_FOUND ||
+		   err == ERROR_PATH_NOT_FOUND ||
+		   err == ERROR_INVALID_NAME) {
 			errno = ENOENT;
 			return -1;
+		} else {
+			errno = EINVAL;
 		}
 		fprintf(stderr, "tup error: GetFileAttributesExW(\"%ls\") failed: 0x%08lx\n", wpathname, err);
 		return -1;
