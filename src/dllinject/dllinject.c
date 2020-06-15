@@ -1598,6 +1598,8 @@ static int ignore_file_w(const wchar_t *file)
 		return 0;
 	if (wcsicmp(file, L"\\??\\nul") == 0)
 		return 1;
+	if (wcsicmp(file, L"\\??\\Nsi") == 0)
+		return 1;
 	if (wcsicmp(file, L"nul") == 0)
 		return 1;
 	if (wcsicmp(file, L"nul:") == 0)
