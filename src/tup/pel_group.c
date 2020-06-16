@@ -23,9 +23,11 @@
 #include "config.h"
 #include "entry.h"
 #include "compat.h"
+#include "mempool.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct path_element);
 
 int pel_ignored(const char *path, int len)
 {
@@ -53,9 +55,8 @@ static int add_pel(const char *path, int len, struct pel_group *pg)
 {
 	struct path_element *pel;
 
-	pel = malloc(sizeof *pel);
+	pel = mempool_alloc(&pool);
 	if(!pel) {
-		perror("malloc");
 		return -1;
 	}
 	pel->path = path;
@@ -186,10 +187,15 @@ int get_path_elements(const char *path, struct pel_group *pg)
 	return 0;
 }
 
+void free_pel(struct path_element *pel)
+{
+	mempool_free(&pool, pel);
+}
+
 void del_pel(struct path_element *pel, struct pel_group *pg)
 {
 	TAILQ_REMOVE(&pg->path_list, pel, list);
-	free(pel);
+	free_pel(pel);
 	pg->num_elements--;
 }
 

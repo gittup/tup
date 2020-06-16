@@ -498,7 +498,7 @@ struct tup_entry *get_tent_dt(tupid_t dt, const char *path)
 	if(pel) {
 		if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 			return NULL;
-		free(pel);
+		free_pel(pel);
 		if(!tent)
 			return NULL;
 		return tent;
@@ -589,7 +589,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				 * in the great beyond.
 				 */
 				if(last) {
-					free(*last);
+					free_pel(*last);
 					*last = NULL;
 				}
 				del_pel_group(pg);
@@ -713,7 +713,7 @@ int gimme_tent(const char *name, struct tup_entry **entry)
 		return -1;
 	if(tup_db_select_tent_part(dtent, pel->path, pel->len, entry) < 0)
 		return -1;
-	free(pel);
+	free_pel(pel);
 	return 0;
 }
 

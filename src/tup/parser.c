@@ -1382,7 +1382,7 @@ out_close_dfd:
 		rc = -1;
 	}
 out_free_pel:
-	free(pel);
+	free_pel(pel);
 out_del_pg:
 	del_pel_group(&pg);
 
@@ -2473,7 +2473,7 @@ void del_pl(struct path_list *pl, struct path_list_head *head)
 	if(pl->re) {
 		pcre_free(pl->re);
 	}
-	free(pl->pel);
+	free_pel(pl->pel);
 	free(pl);
 }
 

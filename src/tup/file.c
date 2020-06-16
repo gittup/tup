@@ -20,6 +20,7 @@
 
 #define _ATFILE_SOURCE
 #include "file.h"
+#include "mempool.h"
 #include "debug.h"
 #include "db.h"
 #include "fileio.h"
@@ -27,7 +28,6 @@
 #include "entry.h"
 #include "option.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -45,6 +45,8 @@ static int add_config_files_locked(struct file_info *finfo, struct tup_entry *te
 static int add_parser_files_locked(struct file_info *finfo,
 				   struct tent_entries *root, tupid_t vardt,
 				   int full_deps);
+
+static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct file_entry);
 
 int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
 {
@@ -322,7 +324,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 			return -1;
 		}
 	}
-	free(pel);
+	free_pel(pel);
 	del_pel_group(&pg);
 
 	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR || tent->mtime == 0) {
@@ -506,16 +508,15 @@ static struct file_entry *new_entry(const char *filename)
 {
 	struct file_entry *fent;
 
-	fent = malloc(sizeof *fent);
+	fent = mempool_alloc(&pool);
 	if(!fent) {
-		perror("malloc");
 		return NULL;
 	}
 
 	fent->filename = strdup(filename);
 	if(!fent->filename) {
 		perror("strdup");
-		free(fent);
+		mempool_free(&pool, fent);
 		return NULL;
 	}
 	return fent;
@@ -525,7 +526,7 @@ void del_file_entry(struct file_entry_head *head, struct file_entry *fent)
 {
 	TAILQ_REMOVE(head, fent, list);
 	free(fent->filename);
-	free(fent);
+	mempool_free(&pool, fent);
 }
 
 int handle_rename(const char *from, const char *to, struct file_info *info)
@@ -621,7 +622,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 	tent = tup_db_create_node_part(dtent, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
 	if(!tent)
 		return -1;
-	free(pel);
+	free_pel(pel);
 	return 0;
 }
 
@@ -683,7 +684,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 			if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0)
 				return -1;
-			free(pel);
+			free_pel(pel);
 		}
 		if(!tent) {
 			struct mapping *map;

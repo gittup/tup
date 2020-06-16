@@ -868,7 +868,7 @@ static int touch(int argc, char **argv)
 			if(tup_file_mod_mtime(dt, pel->path, MTIME(buf), 1, 0, NULL) < 0)
 				return -1;
 		}
-		free(pel);
+		free_pel(pel);
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -899,7 +899,7 @@ static int node(int argc, char **argv)
 			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", pel->path, dt);
 			return -1;
 		}
-		free(pel);
+		free_pel(pel);
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -929,7 +929,7 @@ static int rm(int argc, char **argv)
 		if(pel) {
 			if(tup_file_del(dt, pel->path, pel->len, NULL) < 0)
 				return -1;
-			free(pel);
+			free_pel(pel);
 		}
 	}
 	if(tup_db_commit() < 0)
@@ -1062,7 +1062,7 @@ static int fake_mtime(int argc, char **argv)
 	mtime = strtol(argv[2], NULL, 0);
 	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
-	free(pel);
+	free_pel(pel);
 	if(tup_db_commit() < 0)
 		return -1;
 	return 0;

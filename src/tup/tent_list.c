@@ -19,17 +19,18 @@
  */
 
 #include "tent_list.h"
+#include "mempool.h"
 #include "entry.h"
 #include <stdio.h>
-#include <stdlib.h>
+
+static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct tent_list);
 
 int tent_list_add_head(struct tent_list_head *head, struct tup_entry *tent)
 {
 	struct tent_list *tlist;
 
-	tlist = malloc(sizeof *tlist);
+	tlist = mempool_alloc(&pool);
 	if(!tlist) {
-		perror("malloc");
 		return -1;
 	}
 	tlist->tent = tent;
@@ -42,9 +43,8 @@ int tent_list_add_tail(struct tent_list_head *head, struct tup_entry *tent)
 {
 	struct tent_list *tlist;
 
-	tlist = malloc(sizeof *tlist);
+	tlist = mempool_alloc(&pool);
 	if(!tlist) {
-		perror("malloc");
 		return -1;
 	}
 	tlist->tent = tent;
@@ -57,7 +57,7 @@ void tent_list_delete(struct tent_list_head *head, struct tent_list *tlist)
 {
 	tup_entry_del_ref(tlist->tent);
 	TAILQ_REMOVE(head, tlist, list);
-	free(tlist);
+	mempool_free(&pool, tlist);
 }
 
 void free_tent_list(struct tent_list_head *head)

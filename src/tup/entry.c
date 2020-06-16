@@ -20,6 +20,7 @@
 
 #define _ATFILE_SOURCE
 #include "entry.h"
+#include "mempool.h"
 #include "config.h"
 #include "db.h"
 #include "compat.h"
@@ -40,6 +41,7 @@
 static struct tupid_entries tup_root = RB_INITIALIZER(&tup_root);
 static int do_verbose = 0;
 static pthread_mutex_t entry_openat_mutex = PTHREAD_MUTEX_INITIALIZER;
+static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct tup_entry);
 
 static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len,
@@ -160,7 +162,7 @@ static int rm_entry(tupid_t tupid, int safe)
 	free(tent->name.s);
 	free(tent->display);
 	free(tent->flags);
-	free(tent);
+	mempool_free(&pool, tent);
 	return 0;
 }
 
@@ -430,9 +432,8 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 {
 	struct tup_entry *tent;
 
-	tent = malloc(sizeof *tent);
+	tent = mempool_alloc(&pool);
 	if(!tent) {
-		perror("malloc");
 		return NULL;
 	}
 

@@ -485,7 +485,7 @@ static int tuplua_function_glob(lua_State *ls)
 	}
 	if(dtent->type == TUP_NODE_GHOST) {
 		lua_pushfstring(ls, "Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->mem);
-		free(pl->pel);
+		free_pel(pl->pel);
 		return lua_error(ls);
 	}
 	if(tup_db_select_node_dir_glob(tuplua_glob_callback, &tgd, dtent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0) {
@@ -496,7 +496,7 @@ static int tuplua_function_glob(lua_State *ls)
 
 	if(variant_get_srctent(tf->variant, dtent, &srctent) < 0) {
 		lua_pushfstring(ls, "Failed to find src tup entry while processing pattern '%s'.", pattern);
-		free(pl->pel);
+		free_pel(pl->pel);
 		return lua_error(ls);
 	}
 	if(srctent) {

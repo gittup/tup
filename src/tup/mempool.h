@@ -18,36 +18,31 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "tupid_list.h"
-#include "mempool.h"
-#include <stdio.h>
+#ifndef tup_mempool
+#define tup_mempool
 
-static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct tupid_list);
+#include "bsd/queue.h"
 
-int tupid_list_add_tail(struct tupid_list_head *head, tupid_t tupid)
-{
-	struct tupid_list *tlist;
+struct mementry {
+	SLIST_ENTRY(mementry) list;
+};
+SLIST_HEAD(mementry_head, mementry);
 
-	tlist = mempool_alloc(&pool);
-	if(!tlist) {
-		return -1;
-	}
-	tlist->tupid = tupid;
-	TAILQ_INSERT_TAIL(head, tlist, list);
-	return 0;
-}
+struct mempool {
+	struct mementry_head free_list;
+	unsigned int item_size;
+	unsigned int next_alloc_size;
+	unsigned int alignment;
+	int free_count;
+	char *mem;
+};
+TAILQ_HEAD(mempool_head, mempool);
 
-void tupid_list_delete(struct tupid_list_head *head, struct tupid_list *tlist)
-{
-	TAILQ_REMOVE(head, tlist, list);
-	mempool_free(&pool, tlist);
-}
+#define ALLOC_BLOCK_SIZE 4096
+#define MEMPOOL_INITIALIZER(a) {.free_list = {NULL}, .item_size=sizeof(a), .next_alloc_size=ALLOC_BLOCK_SIZE, .alignment=_Alignof(a), .free_count=0, .mem=NULL}
 
-void free_tupid_list(struct tupid_list_head *head)
-{
-	struct tupid_list *tlist;
-	while(!TAILQ_EMPTY(head)) {
-		tlist = TAILQ_FIRST(head);
-		tupid_list_delete(head, tlist);
-	}
-}
+void *mempool_alloc(struct mempool *pool);
+void mempool_free(struct mempool *pool, void *item);
+void mempool_clear(void);
+
+#endif
