@@ -349,7 +349,7 @@ int server_unlink(void)
 
 int server_is_dead(void)
 {
-	return 0;
+	return sig_quit;
 }
 
 int server_config_start(struct server *s)
