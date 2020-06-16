@@ -1739,20 +1739,18 @@ check_empties:
 		}
 	}
 	clear_progress();
-	if(failed) {
+	if(server_is_dead()) {
+		fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
+	} else if(failed) {
 		fprintf(stderr, " *** tup: %i job%s failed.\n", failed, failed == 1 ? "" : "s");
 		if(keep_going)
 			fprintf(stderr, " *** tup: Remaining nodes skipped due to errors in command execution.\n");
 	} else if(!TAILQ_EMPTY(&g->node_list) || !TAILQ_EMPTY(&g->plist)) {
-		if(server_is_dead()) {
-			fprintf(stderr, " *** tup: Remaining nodes skipped due to caught signal.\n");
-		} else {
-			fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency. See the dumped dependency graph for the dependency structure.\n");
-			if(fchdir(tup_top_fd()) < 0) {
-				perror("fchdir");
-			}
-			save_graphs(g);
+		fprintf(stderr, "fatal tup error: Graph is not empty after execution. This likely indicates a circular dependency. See the dumped dependency graph for the dependency structure.\n");
+		if(fchdir(tup_top_fd()) < 0) {
+			perror("fchdir");
 		}
+		save_graphs(g);
 	} else {
 		rc = 0;
 	}

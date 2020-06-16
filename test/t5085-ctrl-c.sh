@@ -50,6 +50,12 @@ if grep 'Expected to write to file.*outfile' /tmp/tup-out1-$$.txt > /dev/null; t
 	echo "Error: Expected not to receive error message for missing outfile" 1>&2
 	exit 1
 fi
+if ! grep 'Remaining nodes skipped due to caught signal' /tmp/tup-out1-$$.txt > /dev/null; then
+	cat /tmp/tup-out1-$$.txt
+	echo "Error: Expected to receive error message about caught signal" 1>&2
+	exit 1
+fi
+
 tup todo > /tmp/tup-out2-$$.txt
 if ! grep 'The following 1 command' /tmp/tup-out2-$$.txt > /dev/null; then
 	cat /tmp/tup-out2-$$.txt
