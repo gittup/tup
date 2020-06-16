@@ -491,8 +491,8 @@ int execv(const char *path, char *const argv[])
 
 int execl(const char *path, const char *arg, ...)
 {
-	if(path) {}
-	if(arg) {}
+	(void)path;
+	(void)arg;
 	fprintf(stderr, "tup error: execl() is not supported.\n");
 	errno = ENOSYS;
 	return -1;
@@ -500,8 +500,8 @@ int execl(const char *path, const char *arg, ...)
 
 int execlp(const char *file, const char *arg, ...)
 {
-	if(file) {}
-	if(arg) {}
+	(void)file;
+	(void)arg;
 	fprintf(stderr, "tup error: execlp() is not supported.\n");
 	errno = ENOSYS;
 	return -1;
@@ -509,8 +509,8 @@ int execlp(const char *file, const char *arg, ...)
 
 int execle(const char *file, const char *arg, ...)
 {
-	if(file) {}
-	if(arg) {}
+	(void)file;
+	(void)arg;
 	fprintf(stderr, "tup error: execle() is not supported.\n");
 	errno = ENOSYS;
 	return -1;
