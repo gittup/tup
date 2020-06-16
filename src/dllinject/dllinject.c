@@ -486,6 +486,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
     __in      PVOID EaBuffer,
     __in      ULONG EaLength)
 {
+	int is_directory = 0;
 	NTSTATUS rc = NtCreateFile_orig(FileHandle,
 					DesiredAccess,
 					ObjectAttributes,
@@ -500,10 +501,18 @@ NTSTATUS WINAPI NtCreateFile_hook(
 	PUNICODE_STRING uni = ObjectAttributes->ObjectName;
 
 	DEBUG_HOOK("NtCreateFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, CreateOptions);
+	if(rc == STATUS_SUCCESS && FileHandle) {
+		BY_HANDLE_FILE_INFORMATION info;
+		if(GetFileInformationByHandle(FileHandle, &info) != 0) {
+			if(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				is_directory = 1;
+			}
+		}
+	}
 
 	if (rc == STATUS_SUCCESS &&
 	    (DesiredAccess & TUP_CREATE_WRITE_FLAGS) &&
-	    !(CreateOptions & FILE_DIRECTORY_FILE)) {
+	    !is_directory) {
 		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_WRITE);
 	} else {
 		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_READ);
