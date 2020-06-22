@@ -11,7 +11,17 @@ output=$4
 files=$5
 version=$6
 if [ "$version" = "" ]; then
-	version=`git describe`
+	# If we don't pass in a version, try to get one from git
+	version=`git describe 2>/dev/null || true`
+	if [ "$version" = "" ]; then
+		# If we aren't using git, try to get one from the pathname (eg:
+		# for a tarball release
+		version=`echo "$PWD" | sed 's/.*\/tup-//'`
+		if [ "$version" = "" ]; then
+			# No other version source, use "unknown"
+			version="unknown"
+		fi
+	fi
 fi
 (echo "#include \"tup/version.h\""; echo "const char tup_version[] = \"$version\";") | $CC -x c -c - -o tup-version.o $CFLAGS
 $CC $files tup-version.o -o $output $LDFLAGS
