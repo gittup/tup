@@ -90,12 +90,11 @@ static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
 static int preload(struct tupfile *tf, char *cmdline);
-static int run_script(struct tupfile *tf, char *cmdline, int lno,
-		      struct bin_head *bl);
+static int run_script(struct tupfile *tf, char *cmdline, int lno);
 static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int gitignore(struct tupfile *tf, struct tup_entry *dtent);
 static int check_toplevel_gitignore(struct tupfile *tf);
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl);
+static int parse_rule(struct tupfile *tf, char *p, int lno);
 static int parse_bang_definition(struct tupfile *tf, char *p, int lno);
 static int set_variable(struct tupfile *tf, char *line);
 static int parse_empty_bang_rule(struct tupfile *tf, struct rule *r);
@@ -236,6 +235,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	}
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
+	LIST_INIT(&tf.bin_list);
 	if(nodedb_init(&tf.node_db) < 0)
 		goto out_server_stop;
 	if(vardb_init(&tf.vdb) < 0)
@@ -341,6 +341,7 @@ out_close_vdb:
 out_close_node_db:
 	if(nodedb_close(&tf.node_db) < 0)
 		rc = -1;
+	bin_list_del(&tf.bin_list);
 out_server_stop:
 	if(tf.use_server)
 		if(server_parser_stop(&ps) < 0)
@@ -549,12 +550,10 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 	char *p, *e;
 	char *line;
 	int lno = 0;
-	struct bin_head bl;
 	struct if_stmt ifs;
 	int rc = 0;
 	char line_debug[128];
 
-	LIST_INIT(&bl);
 	if_init(&ifs);
 
 	p = b->s;
@@ -661,13 +660,13 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 		} else if(strncmp(line, "preload ", 8) == 0) {
 			rc = preload(tf, line+8);
 		} else if(strncmp(line, "run ", 4) == 0) {
-			rc = run_script(tf, line+4, lno, &bl);
+			rc = run_script(tf, line+4, lno);
 		} else if(strncmp(line, "export ", 7) == 0) {
 			rc = export(tf, line+7);
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(line[0] == ':') {
-			rc = parse_rule(tf, line+1, lno, &bl);
+			rc = parse_rule(tf, line+1, lno);
 		} else if(line[0] == '!') {
 			rc = parse_bang_definition(tf, line, lno);
 		} else {
@@ -691,8 +690,6 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 		fprintf(tf->f, "tup error: Error parsing %s: missing endif before EOF.\n", filename);
 		return -1;
 	}
-
-	bin_list_del(&bl);
 
 	return 0;
 }
@@ -972,8 +969,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	return 0;
 }
 
-static int run_script(struct tupfile *tf, char *cmdline, int lno,
-		      struct bin_head *bl)
+static int run_script(struct tupfile *tf, char *cmdline, int lno)
 {
 	int rc;
 	char *eval_cmdline;
@@ -982,13 +978,12 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno,
 	if(!eval_cmdline) {
 		return -1;
 	}
-	rc = exec_run_script(tf, eval_cmdline, lno, bl);
+	rc = exec_run_script(tf, eval_cmdline, lno);
 	free(eval_cmdline);
 	return rc;
 }
 
-int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
-		    struct bin_head *bl)
+int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 {
 	char *rules;
 	char *p;
@@ -1032,7 +1027,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
 		*newline = 0;
 		if(debug_run)
 			fprintf(tf->f, "%s\n", p);
-		if(parse_rule(tf, p+1, lno, bl) < 0) {
+		if(parse_rule(tf, p+1, lno) < 0) {
 			fprintf(tf->f, "tup error: Unable to parse :-rule from run script: '%s'\n", p);
 			goto out_err;
 		}
@@ -1414,7 +1409,7 @@ void init_rule(struct rule *r)
 	r->line_number = -1;
 }
 
-static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
+static int parse_rule(struct tupfile *tf, char *p, int lno)
 {
 	char *input, *cmd, *output, *bin;
 	int cmd_len;
@@ -1428,7 +1423,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	if(split_input_pattern(tf, p, &input, &cmd, &cmd_len, &output, &bin) < 0)
 		return -1;
 	if(bin) {
-		if((r.bin = bin_add(bin, bl)) == NULL)
+		if((r.bin = bin_add(bin, &tf->bin_list)) == NULL)
 			return -1;
 	} else {
 		r.bin = NULL;
@@ -1453,7 +1448,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno, struct bin_head *bl)
 	}
 	if(strcmp(cmd, "!tup_preserve") == 0)
 		is_variant_copy = 1;
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, bl, is_variant_copy) < 0)
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, &tf->bin_list, is_variant_copy) < 0)
 		return -1;
 
 	r.command = cmd;

@@ -575,14 +575,12 @@ static int tuplua_function_run(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	const char *cmdline;
-	struct bin_head bl;
-	LIST_INIT(&bl);
 
 	cmdline = tuplua_tostring(ls, 1);
 	if(!cmdline)
 		return luaL_error(ls, "run() must be passed a string for the command-line to run");
 
-	if(exec_run_script(tf, cmdline, 0, &bl) < 0)
+	if(exec_run_script(tf, cmdline, 0) < 0)
 		return luaL_error(ls, "tup error: Failed to run external script.\n");
 
 	return 0;
