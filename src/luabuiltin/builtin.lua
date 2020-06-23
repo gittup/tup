@@ -83,6 +83,10 @@ tup.frule = function(arguments)
 				arguments.extra_outputs = tableize(arguments.outputs.extra_outputs)
 				arguments.outputs["extra_outputs"] = nil
 			end
+			if arguments.outputs.bin then
+				arguments.bin = arguments.outputs.bin:gsub('[{}]', '')
+				arguments.outputs["bin"] = nil
+			end
 		end
 		arguments.outputs = tableize(arguments.outputs)
 	end

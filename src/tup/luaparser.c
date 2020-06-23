@@ -220,6 +220,7 @@ static int tuplua_function_definerule(lua_State *ls)
 	struct name_list return_nl;
 	struct name_list_entry *nle;
 	size_t command_len = 0;
+	const char *bin;
 	int is_variant_copy = 0;
 	int count = 1;
 
@@ -239,6 +240,12 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
 	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &r.extra_outputs, ALLOW_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_outputs'.");
+
+	lua_getfield(ls, 1, "bin");
+	bin = tuplua_tolstring(ls, -1, NULL);
+	if(bin) {
+		r.bin = bin_add(bin, &tf->bin_list);
+	}
 
 	lua_getfield(ls, 1, "command");
 	r.command = tuplua_tolstring(ls, -1, &command_len);
@@ -857,7 +864,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 {
 	struct path_list *pl;
 
-	pl = new_pl(tf, p, -1, NULL);
+	pl = new_pl(tf, p, -1, &tf->bin_list);
 	if(!pl)
 		return -1;
 
