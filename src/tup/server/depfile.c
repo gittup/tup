@@ -56,7 +56,7 @@ int server_pre_init(void)
 {
 	int exelen;
 
-	if(setpgid(0, 0) < 0) {
+	if(getpid() != getpgid(0) && setpgid(0, 0) < 0) {
 		perror("setpgid");
 		fprintf(stderr, "tup error: Unable to set process group for tup's subprocesses.\n");
 		return -1;
