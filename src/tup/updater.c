@@ -639,6 +639,8 @@ static int delete_files(struct graph *g)
 				goto out_err;
 			if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 				goto out_err;
+			if(make_dirs_normal(tent->parent) < 0)
+				goto out_err;
 			log_debug_tent("Convert generated -> normal", tent, "\n");
 			show_result(tent, 0, NULL, "generated -> normal", 1);
 			show_progress(-1, TUP_NODE_FILE);

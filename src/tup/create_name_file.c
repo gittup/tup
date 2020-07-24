@@ -51,14 +51,8 @@ int create_name_file(tupid_t dt, const char *file, time_t mtime,
 		return -1;
 	if(tup_db_add_create_list(dt) < 0)
 		return -1;
-	while(dtent && dtent->type == TUP_NODE_GENERATED_DIR) {
-		printf("tup: Converting ");
-		print_tup_entry(stdout, dtent);
-		printf(" to a normal directory.\n");
-		if(tup_db_set_type(dtent, TUP_NODE_DIR) < 0)
-			return -1;
-		dtent = dtent->parent;
-	}
+	if(make_dirs_normal(dtent) < 0)
+		return -1;
 	return 0;
 }
 
@@ -73,6 +67,20 @@ tupid_t create_command_file(tupid_t dt, const char *cmd, const char *display, in
 	if(tent)
 		return tent->tnode.tupid;
 	return -1;
+}
+
+int make_dirs_normal(struct tup_entry *dtent)
+{
+	while(dtent && dtent->type == TUP_NODE_GENERATED_DIR) {
+		printf("tup: Converting ");
+		print_tup_entry(stdout, dtent);
+		printf(" to a normal directory.\n");
+		if(tup_db_set_type(dtent, TUP_NODE_DIR) < 0)
+			return -1;
+		tup_db_del_ghost_tree(dtent);
+		dtent = dtent->parent;
+	}
+	return 0;
 }
 
 tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)

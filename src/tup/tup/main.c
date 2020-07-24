@@ -52,6 +52,7 @@
 #include "tup/container.h"
 
 static int entry(int argc, char **argv);
+static int type(int argc, char **argv);
 static int tupid(int argc, char **argv);
 static int inputs(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
@@ -197,6 +198,8 @@ int main(int argc, char **argv)
 		rc = monitor(argc, argv);
 	} else if(strcmp(cmd, "entry") == 0) {
 		rc = entry(argc, argv);
+	} else if(strcmp(cmd, "type") == 0) {
+		rc = type(argc, argv);
 	} else if(strcmp(cmd, "tupid") == 0) {
 		rc = tupid(argc, argv);
 	} else if(strcmp(cmd, "inputs") == 0) {
@@ -319,6 +322,36 @@ static int entry(int argc, char **argv)
 		if(tent) {
 			print_tup_entry(stdout, tent);
 			printf("\n");
+		}
+	}
+	if(tup_db_commit() < 0)
+		return -1;
+	return 0;
+}
+
+static int type(int argc, char **argv)
+{
+	struct tup_entry *tent;
+	int x;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	for(x=1; x<argc; x++) {
+		char *endptr;
+		tupid_t tupid;
+
+		tupid = strtol(argv[x], &endptr, 10);
+		if(!*endptr) {
+			if(tup_entry_add(tupid, &tent) < 0)
+				return -1;
+		} else {
+			if(gimme_tent(argv[x], &tent) < 0) {
+				fprintf(stderr, "No tent :(\n");
+				return -1;
+			}
+		}
+		if(tent) {
+			printf("%s\n", tup_db_type(tent->type));
 		}
 	}
 	if(tup_db_commit() < 0)
