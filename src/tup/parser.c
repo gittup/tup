@@ -85,6 +85,7 @@ struct build_name_list_args {
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 			char *path, int *parser_lua, int *fd);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
+static int split_roots(struct tent_entries *root, struct tent_entries *save_root);
 static int parse_internal_definitions(struct tupfile *tf);
 static int var_ifdef(struct tupfile *tf, const char *var);
 static int eval_eq(struct tupfile *tf, char *expr, char *eol);
@@ -250,6 +251,8 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
 	if(tup_db_srcid_to_tree(tf.tent->tnode.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
+		goto out_close_vdb;
+	if(split_roots(&g->gen_delete_root, &g->save_root) < 0)
 		goto out_close_vdb;
 
 	if(refactoring) {
@@ -504,6 +507,25 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 		dtent = dtent->parent;
 	} while(dtent);
 
+	return 0;
+}
+
+static int split_roots(struct tent_entries *root, struct tent_entries *save_root)
+{
+	struct tent_tree *tt;
+	struct tent_tree *tmp;
+
+	RB_FOREACH_SAFE(tt, tent_entries, root, tmp) {
+		int mod;
+		mod = tup_db_in_modify_list(tt->tent->tnode.tupid);
+		if(mod < 0)
+			return -1;
+		if(mod) {
+			if(tent_tree_add(save_root, tt->tent) < 0)
+				return -1;
+			tent_tree_remove(root, tt->tent);
+		}
+	}
 	return 0;
 }
 
@@ -2672,12 +2694,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				}
 			}
 
-			/* If the file is in the modify list, it is going to be
-			 * resurrected, so it is still a valid input (t6053).
-			 */
-			if(tup_db_in_modify_list(tent->tnode.tupid))
-				valid_input = 1;
-
 			if(!valid_input) {
 				fprintf(tf->f, "tup error: Explicitly named file '%.*s' in subdir '", pl->pel->len, pl->pel->path);
 				print_tupid(tf->f, pl->dt);
@@ -3544,6 +3560,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
 				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->save_root, onle->tent);
 		if(output_nl) {
 			move_name_list_entry(output_nl, &onl, onle);
 		} else {
@@ -3558,6 +3575,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
 				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->save_root, onle->tent);
 		delete_name_list_entry(&extra_onl, onle);
 	}
 

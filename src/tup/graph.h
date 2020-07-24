@@ -24,6 +24,7 @@
 #include "bsd/queue.h"
 #include "tupid_tree.h"
 #include "tent_tree.h"
+#include "tent_list.h"
 #include "db_types.h"
 #include <time.h>
 #include <stdio.h>
@@ -77,6 +78,7 @@ struct graph {
 	enum TUP_NODE_TYPE count_flags2;
 	time_t total_mtime;
 	struct tent_entries gen_delete_root;
+	struct tent_entries save_root;
 	int gen_delete_count;
 	struct tent_entries cmd_delete_root;
 	int cmd_delete_count;
