@@ -297,6 +297,8 @@ static int ignore_file(const char *path)
 {
 	if(strncmp(path, "/dev", 4) == 0)
 		return 1;
+	if(strncmp(path, "/sys", 4) == 0)
+		return 1;
 	if(strncmp(path, "/proc", 5) == 0)
 		return 1;
 	if(is_ccache_path(path))
