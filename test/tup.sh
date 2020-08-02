@@ -240,7 +240,8 @@ set_leak_check()
 
 __update()
 {
-	if [ "`tup server`" = "fuse" ]; then
+	server=`tup server`
+	if [ "$server" = "fuse" -o "$server" = "fuse3" ]; then
 		sim_hints="--sim-hints=fuse-compatible"
 	fi
 	if [ -n "$TUP_VALGRIND" ]; then
@@ -479,7 +480,8 @@ varsetall()
 
 monitor()
 {
-	if [ `tup server` = "fuse" ]; then
+	server=`tup server`
+	if [ "$server"  = "fuse" -o "$server" = "fuse3" ]; then
 		sim_hints="--sim-hints=fuse-compatible"
 	fi
 	if [ -n "$TUP_VALGRIND" ]; then

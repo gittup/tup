@@ -182,58 +182,65 @@ static const char *prefix_strip(const char *peeled, const char *variant_dir)
 	return NULL;
 }
 
-static struct mapping *add_mapping(const char *path)
+static struct mapping *add_mapping_internal(struct file_info *finfo, const char *path)
 {
 	static int filenum = 0;
 	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+	struct mapping *map = NULL;
+	int size;
+	int myfile;
+	const char *peeled;
+
+	peeled = peel(path);
+
+	if(!is_hidden(peeled)) {
+		if(handle_open_file(ACCESS_WRITE, peeled, finfo) < 0) {
+			/* TODO: Set failure on internal server? */
+			fprintf(stderr, "tup internal error: handle open file failed\n");
+			return NULL;
+		}
+	}
+
+	map = malloc(sizeof *map);
+	if(!map) {
+		perror("malloc");
+		return NULL;
+	}
+	map->realname = strdup(peeled);
+	if(!map->realname) {
+		perror("strdup");
+		return NULL;
+	}
+	size = sizeof(int) * 2 + sizeof(TUP_TMP) + 1;
+	map->tmpname = malloc(size);
+	if(!map->tmpname) {
+		perror("malloc");
+		return NULL;
+	}
+	map->tent = NULL; /* This is used when saving dependencies */
+
+	pthread_mutex_lock(&lock);
+	myfile = filenum;
+	filenum++;
+	pthread_mutex_unlock(&lock);
+
+	if(snprintf(map->tmpname, size, TUP_TMP "/%x", myfile) >= size) {
+		fprintf(stderr, "tup internal error: mapping tmpname is sized incorrectly.\n");
+		return NULL;
+	}
+
+	TAILQ_INSERT_TAIL(&finfo->mapping_list, map, list);
+	return map;
+}
+
+static struct mapping *add_mapping(const char *path)
+{
 	struct file_info *finfo;
 	struct mapping *map = NULL;
 
 	finfo = get_finfo(path);
 	if(finfo) {
-		int size;
-		int myfile;
-		const char *peeled;
-
-		peeled = peel(path);
-
-		if(!is_hidden(peeled)) {
-			if(handle_open_file(ACCESS_WRITE, peeled, finfo) < 0) {
-				/* TODO: Set failure on internal server? */
-				fprintf(stderr, "tup internal error: handle open file failed\n");
-				return NULL;
-			}
-		}
-
-		map = malloc(sizeof *map);
-		if(!map) {
-			perror("malloc");
-			return NULL;
-		}
-		map->realname = strdup(peeled);
-		if(!map->realname) {
-			perror("strdup");
-			return NULL;
-		}
-		size = sizeof(int) * 2 + sizeof(TUP_TMP) + 1;
-		map->tmpname = malloc(size);
-		if(!map->tmpname) {
-			perror("malloc");
-			return NULL;
-		}
-		map->tent = NULL; /* This is used when saving dependencies */
-
-		pthread_mutex_lock(&lock);
-		myfile = filenum;
-		filenum++;
-		pthread_mutex_unlock(&lock);
-
-		if(snprintf(map->tmpname, size, TUP_TMP "/%x", myfile) >= size) {
-			fprintf(stderr, "tup internal error: mapping tmpname is sized incorrectly.\n");
-			return NULL;
-		}
-
-		TAILQ_INSERT_TAIL(&finfo->mapping_list, map, list);
+		map = add_mapping_internal(finfo, path);
 		put_finfo(finfo);
 	}
 	return map;
@@ -357,7 +364,11 @@ static const char *get_virtual_var(const char *peeled, const char *variant_dir)
 }
 
 /* tup_fs_* originally from fuse-2.8.5/example/fusexmp.c */
+#ifdef FUSE3
+static int tup_fs_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi)
+#else
 static int tup_fs_getattr(const char *path, struct stat *stbuf)
+#endif
 {
 	int res;
 	const char *peeled;
@@ -369,6 +380,9 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	const char *stripped = NULL;
 	int rc;
 
+#ifdef FUSE3
+	(void) fi;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -587,7 +601,7 @@ static void add_dir_entries(DIR *dp, void *buf, fuse_fill_dir_t filler,
 		st.st_mode = de->d_type << 12;
 
 		if(!ignore_dot_tup || strcmp(de->d_name, ".tup") != 0)
-			if(filler(buf, de->d_name, &st, 0))
+			if(mfiller(buf, de->d_name, &st, 0))
 				break;
 	}
 }
@@ -637,8 +651,13 @@ static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler, c
 	return 0;
 }
 
+#ifdef FUSE3
+static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+			  off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
+#else
 static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			  off_t offset, struct fuse_file_info *fi)
+#endif
 {
 	const char *peeled;
 	struct file_info *finfo;
@@ -648,6 +667,9 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	(void) offset;
 	(void) fi;
+#ifdef FUSE3
+	(void) flags;
+#endif
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -717,7 +739,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 				put_finfo(finfo);
 				return -1;
 			}
-			if(filler(buf, realname, &st, 0))
+			if(mfiller(buf, realname, &st, 0))
 				break;
 		}
 
@@ -749,7 +771,7 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 				if(strchr(realname, '/') != NULL)
 					continue;
 
-				if (filler(buf, realname, &st, 0))
+				if(mfiller(buf, realname, &st, 0))
 					break;
 			}
 		}
@@ -977,13 +999,20 @@ static int tup_fs_symlink(const char *from, const char *to)
 	return 0;
 }
 
+#ifdef FUSE3
+static int tup_fs_rename(const char *from, const char *to, unsigned int flags)
+#else
 static int tup_fs_rename(const char *from, const char *to)
+#endif
 {
 	struct file_info *finfo;
 	const char *peelfrom;
 	const char *peelto;
 	struct mapping *map;
 
+#ifdef FUSE3
+	(void) flags;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -1034,13 +1063,20 @@ static int tup_fs_link(const char *from, const char *to)
 	return -EPERM;
 }
 
+#ifdef FUSE3
+static int tup_fs_chmod(const char *path, mode_t mode, struct fuse_file_info *fi)
+#else
 static int tup_fs_chmod(const char *path, mode_t mode)
+#endif
 {
 	struct mapping *map;
 	struct file_info *finfo;
 	const char *peeled;
 	struct tmpdir *tmpdir;
 
+#ifdef FUSE3
+	(void) fi;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -1067,13 +1103,20 @@ static int tup_fs_chmod(const char *path, mode_t mode)
 	return -EPERM;
 }
 
+#ifdef FUSE3
+static int tup_fs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi)
+#else
 static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
+#endif
 {
 	struct mapping *map;
 	struct file_info *finfo;
 	const char *peeled;
 	struct tmpdir *tmpdir;
 
+#ifdef FUSE3
+	(void) fi;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -1100,13 +1143,20 @@ static int tup_fs_chown(const char *path, uid_t uid, gid_t gid)
 	return -EPERM;
 }
 
+#ifdef FUSE3
+static int tup_fs_truncate(const char *path, off_t size, struct fuse_file_info *fi)
+#else
 static int tup_fs_truncate(const char *path, off_t size)
+#endif
 {
 	struct mapping *map;
 	struct file_info *finfo;
 	const char *peeled;
 	int match = 0;
 
+#ifdef FUSE3
+	(void) fi;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -1147,7 +1197,11 @@ static int tup_fs_truncate(const char *path, off_t size)
 	return -EPERM;
 }
 
+#ifdef FUSE3
+static int tup_fs_utimens(const char *path, const struct timespec ts[2], struct fuse_file_info *fi)
+#else
 static int tup_fs_utimens(const char *path, const struct timespec ts[2])
+#endif
 {
 	int res;
 	const char *peeled;
@@ -1155,6 +1209,9 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	struct file_info *finfo;
 	int match = 0;
 
+#ifdef FUSE3
+	(void) fi;
+#endif
 	if(context_check() < 0)
 		return -EPERM;
 
@@ -1237,16 +1294,31 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 
 	finfo = get_finfo(path);
 	if(finfo) {
+		if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
+			at = ACCESS_WRITE;
 		map = find_mapping(finfo, path);
 		if(map) {
 			openfile = map->tmpname;
 		} else {
+#ifdef FUSE3
+			int match = 0;
+			if(exclusion_match(stderr, &finfo->exclusion_root, path, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
+			if(at == ACCESS_WRITE && !is_hidden(path) && !match) {
+				map = add_mapping_internal(finfo, path);
+				openfile = map->tmpname;
+			} else {
+				/* Only try the base dir if it's not a mapped file */
+				variant_dir = finfo->variant_dir;
+			}
+#else
 			/* Only try the base dir if it's not a mapped file */
 			variant_dir = finfo->variant_dir;
+#endif
 		}
 
-		if((fi->flags & O_RDWR) || (fi->flags & O_WRONLY))
-			at = ACCESS_WRITE;
 		fd = openat(tup_top_fd(), openfile, fi->flags);
 		if(fd < 0 && variant_dir) {
 			stripped = prefix_strip(peeled, variant_dir);
@@ -1433,9 +1505,16 @@ static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t init_cond = PTHREAD_COND_INITIALIZER;
 static int fuse_inited = 0;
 
+#ifdef FUSE3
+static void *tup_fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
+#else
 static void *tup_fs_init(struct fuse_conn_info *conn)
+#endif
 {
-	if(conn) {}
+	(void) conn;
+#ifdef FUSE3
+	(void) cfg;
+#endif
 	pthread_mutex_lock(&init_lock);
 	fuse_inited = 1;
 	pthread_cond_signal(&init_cond);

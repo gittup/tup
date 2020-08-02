@@ -1,14 +1,25 @@
 #! /bin/sh -e
 
 label=${TUP_LABEL:-bootstrap}
-server=${TUP_SERVER:-fuse}
 os=`uname -s`
+default_server=fuse
+case "$os" in
+	Linux)
+		default_server=fuse3
+	;;
+esac
+
+server=${TUP_SERVER:-$default_server}
 plat_cflags=""
 plat_ldflags=""
 plat_files=""
 if [ "$server" = "fuse" ]; then
 	plat_cflags="`pkg-config fuse --cflags`"
 	plat_ldflags="`pkg-config fuse --libs`"
+	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
+elif [ "$server" = "fuse3" ]; then
+	plat_cflags="`pkg-config fuse3 --cflags` -DFUSE3"
+	plat_ldflags="`pkg-config fuse3 --libs`"
 	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
 elif [ "$server" = "ldpreload" ]; then
 	plat_files="../src/tup/server/depfile.c ../src/tup/server/privs.c"

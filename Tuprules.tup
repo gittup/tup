@@ -87,8 +87,14 @@ CFLAGS += -DPCRE_STATIC
 endif
 
 ifeq ($(TUP_SERVER),fuse)
-CFLAGS += -D_FILE_OFFSET_BITS=64
 export PKG_CONFIG_PATH
+CFLAGS += `pkg-config fuse --cflags`
+endif
+
+ifeq ($(TUP_SERVER),fuse3)
+export PKG_CONFIG_PATH
+CFLAGS += `pkg-config fuse3 --cflags`
+CFLAGS += -DFUSE3
 endif
 
 ifeq ($(TUP_SERVER),ldpreload)

@@ -3,7 +3,7 @@ Section: devel
 Priority: optional
 Maintainer: Anatol Pomozov <anatol.pomozov@gmail.com>
 Build-Depends: debhelper (>= 7),
- libfuse-dev (>= 2.8.1),
+ libfuse3-dev (>= 3.9.2),
  pkg-config (>= 0.22),
 Standards-Version: 3.8.4
 Homepage: http://gittup.org/tup/
@@ -11,7 +11,7 @@ Homepage: http://gittup.org/tup/
 Package: tup
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
- libfuse2 (>= 2.8.1)
+ libfuse3 (>= 3.9.2)
 Description: Fast build system
  Tup is a file-based build system - it inputs a list of file changes and
  a directed acyclic graph (DAG), then processes the DAG to execute

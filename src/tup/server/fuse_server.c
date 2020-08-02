@@ -711,7 +711,7 @@ int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 	pd = container_of(st, struct parser_directory, st);
 
 	RB_FOREACH(st, string_entries, &pd->files) {
-		if(filler(buf, st->s, NULL, 0))
+		if(mfiller(buf, st->s, NULL, 0))
 			goto out_unps;
 	}
 	rc = 0;

@@ -21,7 +21,13 @@
 #ifndef tup_fuse_fs_h
 #define tup_fuse_fs_h
 
+#ifdef FUSE3
+#define FUSE_USE_VERSION 30
+#define mfiller(a, b, c, d) filler(a, b, c, d, FUSE_FILL_DIR_PLUS)
+#else
 #define FUSE_USE_VERSION 26
+#define mfiller filler
+#endif
 
 #include <fuse.h>
 #include "tup/tupid.h"

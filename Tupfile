@@ -43,6 +43,11 @@ endif
 ifeq ($(TUP_SERVER),fuse)
 LDFLAGS += `pkg-config fuse --libs`
 endif
+
+ifeq ($(TUP_SERVER),fuse3)
+LDFLAGS += `pkg-config fuse3 --libs`
+endif
+
 LDFLAGS += -lm
 LDFLAGS += -lpthread
 else
