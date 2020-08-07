@@ -1021,6 +1021,21 @@ static int tup_fs_rename(const char *from, const char *to)
 
 	finfo = get_finfo(to);
 	if(finfo) {
+		struct tmpdir *tmpdir;
+		TAILQ_FOREACH(tmpdir, &finfo->tmpdir_list, list) {
+			if(strcmp(tmpdir->dirname, peelfrom) == 0) {
+				free(tmpdir->dirname);
+				tmpdir->dirname = strdup(peelto);
+				if(!tmpdir->dirname) {
+					perror("strdup");
+					put_finfo(finfo);
+					return -ENOMEM;
+				}
+				put_finfo(finfo);
+				return 0;
+			}
+		}
+
 		/* If we are re-naming to a previously created file, then
 		 * delete the old mapping. (eg: 'ar' will create an empty
 		 * library, so we have one mapping, then create a new temp file
