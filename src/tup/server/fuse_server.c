@@ -106,7 +106,11 @@ static void *fuse_thread(void *arg)
 static int os_unmount(void)
 {
 	int rc;
+#ifdef FUSE3
+	rc = system("fusermount3 -u -z " TUP_MNT);
+#else
 	rc = system("fusermount -u -z " TUP_MNT);
+#endif
 	if(rc == -1) {
 		perror("system");
 	}
