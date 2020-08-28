@@ -2211,10 +2211,24 @@ int tup_inject_dll(
 	HANDLE process;
 	BOOL bWow64 = 0;
 
+#ifdef _WIN64
+	typedef WOW64_CONTEXT context_32_t;
+	BOOL (WINAPI *const get_thread_context_32)(HANDLE, context_32_t *) = Wow64GetThreadContext;
+	BOOL (WINAPI *const set_thread_context_32)(HANDLE, const context_32_t *) = Wow64SetThreadContext;
+	const DWORD context_32_control_flag = WOW64_CONTEXT_CONTROL;
+
 	IsWow64Process(lpProcessInformation->hProcess, &bWow64);
 
 	// WOW64
 	DEBUG_HOOK("%s is WOW64: %i\n", GetCommandLineA(), bWow64);
+#else
+	typedef CONTEXT context_32_t;
+	BOOL (WINAPI *const get_thread_context_32)(HANDLE, context_32_t *) = GetThreadContext;
+	BOOL (WINAPI *const set_thread_context_32)(HANDLE, const context_32_t *) = SetThreadContext;
+	const DWORD context_32_control_flag = CONTEXT_CONTROL;
+
+	bWow64 = 1;
+#endif
 	if (bWow64) {
 		remote_thread32_t remote;
 
@@ -2236,9 +2250,9 @@ int tup_inject_dll(
 		strcat(remote.dll_name, "tup-dllinject32.dll");
 		strcat(remote.func_name, "tup_inject_init");
 
-		WOW64_CONTEXT ctx;
-		ctx.ContextFlags = WOW64_CONTEXT_CONTROL;
-		if ( !Wow64GetThreadContext( lpProcessInformation->hThread, &ctx ) )
+		context_32_t ctx;
+		ctx.ContextFlags = context_32_control_flag;
+		if ( !get_thread_context_32( lpProcessInformation->hThread, &ctx ) )
 			return -1;
 
 		/* Align code_size to a 16 byte boundary */
@@ -2290,8 +2304,8 @@ int tup_inject_dll(
 			return -1;
 
 		ctx.Eip = (DWORD_PTR)remote_data;
-		ctx.ContextFlags = WOW64_CONTEXT_CONTROL;
-		if( !Wow64SetThreadContext( lpProcessInformation->hThread, &ctx ) )
+		ctx.ContextFlags = context_32_control_flag;
+		if( !set_thread_context_32( lpProcessInformation->hThread, &ctx ) )
 			return -1;
 	} else {
 #ifdef _WIN64
