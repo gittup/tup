@@ -40,6 +40,7 @@ void *mempool_alloc(struct mempool *pool)
 	}
 
 	if(!pool->free_count) {
+		size_t mem_offset;
 		/* If we don't have space in the pool to make a new item,
 		 * allocate a new block. The new block uses an SLIST_ENTRY to
 		 * get linked into the global mementry_head in this file so
@@ -61,14 +62,16 @@ void *mempool_alloc(struct mempool *pool)
 		pthread_mutex_unlock(&lock);
 
 		/* The available memory for items starts after the global
-		 * SLIST_ENTRY. Note that we don't add all new items to the
+		 * SLIST_ENTRY and any additional alignment that may be required
+		 * by the data type. Note that we don't add all new items to the
 		 * free list; both the free list itself and the free_count
 		 * items pointed to by mem are considered free. Items from the
 		 * free list are used first. The allocation size is doubled for
 		 * the next time we run out of items.
 		 */
-		pool->mem = (char*)block + sizeof(*block);
-		pool->free_count = (pool->next_alloc_size - sizeof(*block)) / pool->item_size;
+		mem_offset = ((sizeof(*block) + (pool->alignment - 1)) / pool->alignment) * pool->alignment;
+		pool->mem = (char*)block + mem_offset;
+		pool->free_count = (pool->next_alloc_size - mem_offset) / pool->item_size;
 		pool->next_alloc_size *= 2;
 	}
 
