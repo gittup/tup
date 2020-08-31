@@ -2115,6 +2115,7 @@ static uint32_t GET_PROC_ADDRESS_32 = 0;
 
 #define BUFSIZE 4096
 
+#ifdef _WIN64
 BOOL get_wow64_addresses(void)
 {
 	DWORD dwRead;
@@ -2197,6 +2198,14 @@ BOOL get_wow64_addresses(void)
 
 	return TRUE;
 }
+#else
+BOOL get_wow64_addresses(void)
+{
+	LOAD_LIBRARY_32 = (uint32_t)LoadLibraryA;
+	GET_PROC_ADDRESS_32 = (uint32_t)GetProcAddress;
+	return TRUE;
+}
+#endif
 
 
 
