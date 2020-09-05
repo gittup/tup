@@ -20,6 +20,7 @@
 # the outputs are still checked.
 . ./tup.sh
 check_no_windows segfault
+check_no_osx fuse
 
 cat > ok.c << HERE
 #include <stdio.h>
