@@ -95,6 +95,12 @@ ifeq ($(TUP_SERVER),fuse3)
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse3 --cflags`
 CFLAGS += -DFUSE3
+
+ifeq (@(TUP_ARCH),i386)
+# See /usr/include/fuse3/fuse_common.h comments near "fuse: off_t must be 64bit"
+CFLAGS += -D_FILE_OFFSET_BITS=64
+endif
+
 endif
 
 ifeq ($(TUP_SERVER),ldpreload)
