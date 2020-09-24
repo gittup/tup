@@ -1959,7 +1959,7 @@ static int generate_work(struct graph *g, struct node *n)
 		free_tent_tree(&normal_root);
 		free_tent_tree(&group_sticky_root);
 		if(cmd)
-			fprintf(generate_f, "%s\n", cmd);
+			fprintf(generate_f, "(%s)\n", cmd);
 		free(expanded_name);
 	} else {
 		rc = 0;
