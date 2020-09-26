@@ -60,7 +60,6 @@ srcs += tup-dllinject.dll
 
 LDFLAGS += -Wl,--wrap=open
 LDFLAGS += -Wl,--wrap=close
-LDFLAGS += -Wl,--wrap=tmpfile
 LDFLAGS += -Wl,--wrap=dup
 LDFLAGS += -Wl,--wrap=__mingw_vprintf
 LDFLAGS += -Wl,--wrap=__mingw_vfprintf
