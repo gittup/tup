@@ -48,7 +48,7 @@ n_failed=0
 fail_text=""
 for i in $files; do
 	echo "[36m --- Run $i --- [0m"
-	if sh $i; then
+	if sh -e $i; then
 		:
 	else
 		echo "[31m *** $i failed[0m" >&2
