@@ -20,13 +20,15 @@
 
 . ./tup.sh
 
-tmkdir sub1
+# 'tup generate' runs without a tup directory
+rm -rf .tup
+
+mkdir sub1
 cat > sub1/Tupfile << HERE
 : |> touch %o |> out/dir/foo.txt
 : |> touch %o |> out/bar.txt
 : |> touch %o |> out/dir/baz.txt
 HERE
-tup touch sub1/Tupfile
 
 generate $generate_script_name
 ./$generate_script_name

@@ -20,8 +20,11 @@
 
 . ./tup.sh
 
-tmkdir sub1
-tmkdir sub2
+# 'tup generate' runs without a tup directory
+rm -rf .tup
+
+mkdir sub1
+mkdir sub2
 cat > Tuprules.tup << HERE
 : foreach *.c |> ^ CC %f^ gcc -c %f -o %o |> %B.o
 HERE

@@ -19,6 +19,10 @@
 # Try to generate a shell script using a specific variant config
 
 . ./tup.sh
+
+# 'tup generate' runs without a tup directory
+rm -rf .tup
+
 cat > Tupfile << HERE
 : |> echo "asdf" > a |> a <foo>
 : |> echo "fdsa" > b |> b <foo>

@@ -93,6 +93,18 @@ int open_tup_top(void)
 		fprintf(stderr, "tup error: Unable to open the tup root directory.\n");
 		return -1;
 	}
+	if(tup_wd[0] == 0) {
+		/* This is used for 'tup generate' on Windows to set the root
+		 * directory, since we don't have a .tup hierarchy when
+		 * generating scripts, but still need a tup_wd for fchdir() to
+		 * work.
+		 */
+		if(getcwd(tup_wd, sizeof(tup_wd)) == NULL) {
+			perror("getcwd");
+			fprintf(stderr, "tup error: Unable to get the current directory in set_tup_top()\n");
+			return -1;
+		}
+	}
 	return 0;
 }
 

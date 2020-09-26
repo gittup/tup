@@ -20,8 +20,11 @@
 
 . ./tup.sh
 
-tmkdir sub1
-tmkdir sub2
+# 'tup generate' runs without a tup directory
+rm -rf .tup
+
+mkdir sub1
+mkdir sub2
 cat > Tupfile << HERE
 ifeq (@(FOO),1)
 : |> echo foo |>
@@ -32,7 +35,7 @@ ifeq (@(BAZ),1)
 : |> echo baz |>
 endif
 HERE
-tmkdir configs
+mkdir configs
 echo 'CONFIG_FOO=1' > configs/foo.config
 
 generate $generate_script_name
