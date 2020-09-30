@@ -510,6 +510,11 @@ NTSTATUS WINAPI NtCreateFile_hook(
 		}
 	}
 
+	if(CreateOptions & FILE_DELETE_ON_CLOSE) {
+		DEBUG_HOOK(" - requested DELETE_ON_CLOSE, calling unlink.\n");
+		handle_file_w(uni->Buffer, uni->Length/2, NULL, ACCESS_UNLINK);
+		return rc;
+	}
 	if (rc == STATUS_SUCCESS &&
 	    (DesiredAccess & TUP_CREATE_WRITE_FLAGS) &&
 	    !is_directory) {
