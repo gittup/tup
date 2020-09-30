@@ -325,7 +325,7 @@ int tup_db_create(int db_sync, int memory_db)
 	}
 	rc = sqlite3_open(dbname, &tup_db);
 	if(rc == 0) {
-		printf(".tup repository initialized.\n");
+		printf(".tup repository initialized: %s\n", dbname);
 	} else {
 		fprintf(stderr, "Unable to create database: %s\n",
 			sqlite3_errmsg(tup_db));
