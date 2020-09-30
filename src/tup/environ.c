@@ -41,6 +41,9 @@ static const char *default_env[] = {
 	"VS100COMNTOOLS",
 	"VS90COMNTOOLS",
 	"VSINSTALLDIR",
+	"VCToolsInstallDir",
+	"VCToolsRedistDir",
+	"VCToolsVersion",
 #endif
 /* NOTE: Please increment PARSER_VERSION if these are modified */
 };
