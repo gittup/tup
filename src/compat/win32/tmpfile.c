@@ -19,42 +19,29 @@
  */
 
 /* tmpfile() on Windows will occasionally fail with "Permission denied" because
- * it seems not to be implemented properly. This is a work-around that creates
- * a temporary file in the .tup/tmp directory with a sequential ID. It maintains
- * the delete-on-close semantics of tmpfile() by setting the appropriate flag in
- * CreateFile().
+ * it seems not to be implemented properly. In particular, I've noticed this
+ * happens in VS command-line shell (though not a bourne shell).
+ *
+ * This is a work-around that creates a temporary file in the getenv(TMP)
+ * directory with a sequential ID. It maintains the delete-on-close semantics
+ * of tmpfile() by setting the appropriate flag in CreateFile().
  */
 #include <windows.h>
 #include <stdio.h>
-#include <errno.h>
-#include "tup/config.h"
-#include "compat/dir_mutex.h"
+#include <unistd.h>
 
 FILE *__wrap_tmpfile(void) ATTRIBUTE_USED;
 
 FILE *__wrap_tmpfile(void)
 {
-	static int num = 0;
+	static _Atomic int num = 0;
 	int fd;
-	char filename[64];
-	wchar_t wfilename[64];
+	char filename[PATH_MAX];
+	wchar_t wfilename[PATH_MAX];
 	FILE *f = NULL;
-	int rc;
 	HANDLE h;
 
-	rc = dir_mutex_lock(tup_top_fd());
-	if(rc < 0)
-		return NULL;
-
-	if(mkdir(".tup/tmp", 0777) < 0) {
-		if(errno != EEXIST) {
-			perror(".tup/tmp");
-			fprintf(stderr, "tup error: Unable to create temporary working directory.\n");
-			goto err_out;
-		}
-	}
-
-	snprintf(filename, sizeof(filename), ".tup/tmp/tmpfile-%i", num);
+	snprintf(filename, sizeof(filename), "%s/tup-%i-%i.tmp", getenv("TMP"), getpid(), num);
 	filename[sizeof(filename)-1] = 0;
 	num++;
 
@@ -62,21 +49,19 @@ FILE *__wrap_tmpfile(void)
 	MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, PATH_MAX);
 	h = CreateFile(wfilename, GENERIC_WRITE | GENERIC_READ, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
 	if(h == INVALID_HANDLE_VALUE)
-		goto err_out;
+		return NULL;
 
 	/* Convert from HANDLE to FILE* */
 	fd = _open_osfhandle((intptr_t)h, 0);
 	if(fd < 0)
-		goto err_out;
+		return NULL;
 	f = fdopen(fd, "w+");
 	if(!f) {
 		if(!close(fd)) {
 			perror("close(fd) in tmpfile()");
-			goto err_out;
+			return NULL;
 		}
 	}
-err_out:
-	dir_mutex_unlock();
 
 	return f;
 }
