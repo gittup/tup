@@ -472,6 +472,14 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
+int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
+		          struct tent_entries *env_root, char **rules)
+{
+	if(f || tupid || cmdline || env_root || rules) {/* unsupported */}
+	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
+	return -1;
+}
+
 int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath)
 {
 	char depfile[PATH_MAX];
