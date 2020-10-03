@@ -19,7 +19,8 @@
 . ./tup.sh
 check_no_windows shell
 
-# 'tup generate' with run command requires a tup directory
+# 'tup generate' with run command generates own tup directory
+rm -rf .tup
 
 printf '#! /bin/sh -e\n printf ": |> printf a > output.txt |> output.txt\n"' > script.sh
 chmod +x script.sh

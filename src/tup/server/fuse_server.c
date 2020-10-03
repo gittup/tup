@@ -658,8 +658,13 @@ int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	int ofd = -1, efd = -1;
 	char buf[64];
 
-	int tmp_dir = mkdir(".tup/tmp", 0700);
+	int tmp_dir = mkdir(".tup", 0700);
+	if(tmp_dir != 0 && errno != EEXIST) {
+		perror("mkdir .tup");
+		return -1;
+	}
 
+	tmp_dir = mkdir(".tup/tmp", 0700);
 	if(tmp_dir != 0) {
 		perror("mkdir .tup/tmp");
 		return -1;
