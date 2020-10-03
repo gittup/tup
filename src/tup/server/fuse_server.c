@@ -647,13 +647,11 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		          struct tent_entries *env_root, char **rules)
 {
-	struct tup_entry *tent;
 	struct tup_env te;
 
 	if(tup_db_get_environ(env_root, NULL, &te) < 0)
 		return -1;
 
-	tent = tup_entry_get(tupid);
 	int exit_status = -1;
 	int ofd = -1, efd = -1;
 	char buf[64];
@@ -985,8 +983,12 @@ int tup_restore_privs(void)
 	return 0;
 }
 
-int serverless_cleanup_func(const char *path, const struct stat *sb,
-		            int typeflag, struct FTW * ftwbuf) {
+static int serverless_cleanup_func(const char *path, const struct stat *sb,
+		                   int typeflag, struct FTW *ftwbuf)
+{
+	if (sb) {}
+	if (ftwbuf) {}
+
 	if(typeflag == FTW_F || typeflag == FTW_DP || typeflag == FTW_SL) {
 		if (remove(path) != 0) {
 			perror("remove(path)");
@@ -1002,7 +1004,8 @@ int serverless_cleanup_func(const char *path, const struct stat *sb,
 	return 0;
 }
 
-int serverless_clean_tmp_dir(void) {
+int serverless_clean_tmp_dir(void)
+{
 	int cleanup_result = nftw(".tup/tmp", serverless_cleanup_func, 2, FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
 
 	if(cleanup_result != 0)

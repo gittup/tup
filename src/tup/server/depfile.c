@@ -26,6 +26,8 @@
 #include "tup/variant.h"
 #include "tup/lock.h"
 #include "tup/progress.h"
+#include "tup/fslurp.h"
+#include "tup/db.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,10 +38,13 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
+#define __USE_XOPEN_EXTENDED 1
+#include <ftw.h>
 
 #define TUP_TMP ".tup/tmp"
 #define LDPRELOAD_NAME "LD_PRELOAD"
 
+int serverless_clean_tmp_dir(void);
 static void sighandler(int sig);
 static int process_depfile(struct server *s, int fd);
 static int server_inited = 0;
@@ -385,6 +390,186 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
+int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
+		          struct tent_entries *env_root, char **rules)
+{
+	struct tup_env te;
+
+	if(tup_db_get_environ(env_root, NULL, &te) < 0)
+		return -1;
+
+	int exit_status = -1;
+	int ofd = -1, efd = -1;
+	char buf[64];
+
+	int tmp_dir = mkdir(".tup", 0700);
+	if(tmp_dir != 0 && errno != EEXIST) {
+		perror("mkdir .tup");
+		return -1;
+	}
+
+	tmp_dir = mkdir(".tup/tmp", 0700);
+	if(tmp_dir != 0) {
+		perror("mkdir .tup/tmp");
+		return -1;
+	}
+
+	pid_t pid = fork();
+
+	if(pid == -1) {
+		perror("fork");
+		goto failure;
+	} else if(pid > 0) {
+		waitpid(pid, &exit_status, 0);
+
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", tupid);
+		buf[sizeof(buf)-1] = 0;
+		ofd = open(buf, O_RDONLY);
+		if(ofd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+			goto failure;
+		}
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", tupid);
+		buf[sizeof(buf)-1] = 0;
+		efd = open(buf, O_RDONLY);
+		if(efd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+			goto failure;
+		}
+	} else {
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", tupid);
+		buf[sizeof(buf)-1] = 0;
+		ofd = creat(buf, 0600);
+		if(ofd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+			goto failure;
+		}
+		if(fchown(ofd, getuid(), getgid()) < 0) {
+			perror("fchown");
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+			goto failure;
+		}
+
+		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", tupid);
+		buf[sizeof(buf)-1] = 0;
+		efd = creat(buf, 0600);
+		if(efd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+			goto failure;
+		}
+		if(fchown(efd, getuid(), getgid()) < 0) {
+			perror("fchown");
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+			goto failure;
+		}
+
+		if(dup2(ofd, STDOUT_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+			exit(-1);
+		}
+		if(dup2(efd, STDERR_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
+			exit(-1);
+		}
+		if(close(ofd) < 0) {
+			perror("close(ofd)");
+			exit(-1);
+		}
+		int subprocess_null_fd = open("/dev/null", O_RDONLY);
+		if(subprocess_null_fd < 0) {
+			perror("/dev/null");
+			fprintf(stderr, "tup error: Unable to open /dev/null for dup'ing stdin\n");
+			exit(-1);
+		}
+		if(dup2(subprocess_null_fd, STDIN_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdin for child processes.\n");
+			exit(-1);
+		}
+		if(close(subprocess_null_fd) < 0) {
+			perror("close(null_fd)");
+			exit(-1);
+		}
+
+		char **envp;
+		char **curp;
+		char *curenv;
+
+		envp = malloc((te.num_entries + 2) * sizeof(*envp));
+		if(!envp) {
+			perror("malloc");
+			exit(1);
+		}
+		/* Convert from Windows-style environment to
+		 * Linux-style.
+		 */
+		curp = envp;
+		curenv = te.envblock;
+		int i = 0;
+		while(*curenv && i < te.num_entries) {
+			*curp = curenv;
+			curp++;
+			curenv += strlen(curenv) + 1;
+			i++;
+		}
+		*curp = NULL;
+		execle("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL, NULL);
+	}
+
+	if(display_output(efd, 1, cmdline, 1, f) < 0)
+		goto failure;
+	if(close(efd) < 0) {
+		perror("close(efd)");
+		goto failure;
+	}
+
+	int exited = 0;
+	int signalled = 0;
+	int exit_sig = 0;
+
+	if(WIFEXITED(exit_status)) {
+		exited = 1;
+		exit_status = WEXITSTATUS(exit_status);
+	} else if(WIFSIGNALED(exit_status)) {
+		signalled = 1;
+		exit_sig = WTERMSIG(exit_status);
+	} else {
+		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", exit_status);
+		goto failure;
+	}
+
+	if(exited) {
+		if(exit_status == 0) {
+			struct buf b;
+			if(fslurp_null(ofd, &b) < 0)
+				return -1;
+			if(close(ofd) < 0) {
+				perror("close(s.output_fd)");
+				return -1;
+			}
+			*rules = b.s;
+			serverless_clean_tmp_dir();
+			return 0;
+		}
+		fprintf(f, "tup error: run-script exited with failure code: %i\n", exit_status);
+	} else {
+		if(signalled) {
+			fprintf(f, "tup error: run-script terminated with signal %i\n", exit_sig);
+		} else {
+			fprintf(f, "tup error: run-script terminated abnormally.\n");
+		}
+	}
+failure:
+	serverless_clean_tmp_dir();
+	return -1;
+}
+
 int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath)
 {
 	if(s) {/* unused */}
@@ -523,6 +708,37 @@ static int process_depfile(struct server *s, int fd)
 		}
 	}
 	return 0;
+}
+
+static int serverless_cleanup_func(const char *path, const struct stat *sb,
+		                   int typeflag, struct FTW * ftwbuf)
+{
+	if (sb) {}
+	if (ftwbuf) {}
+
+	if(typeflag == FTW_F || typeflag == FTW_DP || typeflag == FTW_SL) {
+		if (remove(path) != 0) {
+			perror("remove(path)");
+			return -1;
+		}
+	} else if(typeflag == FTW_D) {
+		fprintf(stderr, "Failed to delete outputs in temporary directory: %s\n", path);
+		return -1;
+	} else {
+		fprintf(stderr, "Unknown file found found when deleting temporary output: %s\n", path);
+		remove(path);
+	}
+	return 0;
+}
+
+int serverless_clean_tmp_dir(void)
+{
+	int cleanup_result = nftw(TUP_TMP, serverless_cleanup_func, 2, FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+
+	if(cleanup_result != 0)
+		fprintf(stderr, "Failed to cleanup %s, got error code: %i\n", TUP_TMP, cleanup_result);
+
+	return cleanup_result;
 }
 
 static void sighandler(int sig)
