@@ -78,6 +78,8 @@ int server_parser_stop(struct parser_server *ps);
 
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tent_entries *env_root, char **rules);
+int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
+		          struct tent_entries *env_root, char **rules);
 int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath);
 
 #endif

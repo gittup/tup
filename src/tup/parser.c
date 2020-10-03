@@ -1029,7 +1029,10 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 		if(tent_tree_add_dup(&tf->input_root, tt->tent) < 0)
 			return -1;
 	}
-	rc = server_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
+	if (tf->use_server)
+		rc = server_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
+	else
+		rc = serverless_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
 	if(rc < 0)
 		return -1;
 
