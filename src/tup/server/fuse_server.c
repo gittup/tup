@@ -41,8 +41,6 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/mount.h>
-#define __USE_XOPEN_EXTENDED 1
-#include <ftw.h>
 #ifdef __linux__
 #include <sys/sysmacros.h>
 #include <grp.h>
@@ -51,7 +49,6 @@
 
 #define TUP_MNT ".tup/mnt"
 
-int serverless_clean_tmp_dir(void);
 static void sighandler(int sig);
 
 static struct sigaction sigact = {
@@ -644,7 +641,7 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	return -1;
 }
 
-int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
+int serverless_run_script(FILE *f, const char *cmdline,
 		          struct tent_entries *env_root, char **rules)
 {
 	struct tup_env te;
@@ -653,86 +650,46 @@ int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		return -1;
 
 	int exit_status = -1;
-	int ofd = -1, efd = -1;
-	char buf[64];
+	FILE *ofile;
+	FILE *efile;
 
-	int tmp_dir = mkdir(".tup", 0700);
-	if(tmp_dir != 0 && errno != EEXIST) {
-		perror("mkdir .tup");
+	ofile = tmpfile();
+	if(!ofile) {
+		perror("tmpfile");
+		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
 		return -1;
 	}
 
-	tmp_dir = mkdir(".tup/tmp", 0700);
-	if(tmp_dir != 0) {
-		perror("mkdir .tup/tmp");
+	efile = tmpfile();
+	if(!efile) {
+		perror("tmpfile");
+		fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
 		return -1;
 	}
-
 	pid_t pid = fork();
 
 	if(pid == -1) {
 		perror("fork");
-		goto failure;
+		return -1;
 	} else if(pid > 0) {
 		waitpid(pid, &exit_status, 0);
-
-		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", tupid);
-		buf[sizeof(buf)-1] = 0;
-		ofd = open(buf, O_RDONLY);
-		if(ofd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-			goto failure;
-		}
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", tupid);
-		buf[sizeof(buf)-1] = 0;
-		efd = open(buf, O_RDONLY);
-		if(efd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			goto failure;
-		}
 	} else {
-		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", tupid);
-		buf[sizeof(buf)-1] = 0;
-		ofd = creat(buf, 0600);
-		if(ofd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-			goto failure;
-		}
-		if(fchown(ofd, getuid(), getgid()) < 0) {
-			perror("fchown");
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-			goto failure;
-		}
-
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", tupid);
-		buf[sizeof(buf)-1] = 0;
-		efd = creat(buf, 0600);
-		if(efd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			goto failure;
-		}
-		if(fchown(efd, getuid(), getgid()) < 0) {
-			perror("fchown");
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			goto failure;
-		}
-
-		if(dup2(ofd, STDOUT_FILENO) < 0) {
+		if(dup2(fileno(ofile), STDOUT_FILENO) < 0) {
 			perror("dup2");
 			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
 			exit(-1);
 		}
-		if(dup2(efd, STDERR_FILENO) < 0) {
+		if(dup2(fileno(efile), STDERR_FILENO) < 0) {
 			perror("dup2");
 			fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
 			exit(-1);
 		}
-		if(close(ofd) < 0) {
-			perror("close(ofd)");
+		if(fclose(ofile) < 0) {
+			perror("fclose(ofile)");
+			exit(-1);
+		}
+		if(fclose(efile) < 0) {
+			perror("fclose(efile)");
 			exit(-1);
 		}
 		int subprocess_null_fd = open("/dev/null", O_RDONLY);
@@ -777,11 +734,14 @@ int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	}
 	environ_free(&te);
 
-	if(display_output(efd, 1, cmdline, 1, f) < 0)
-		goto failure;
-	if(close(efd) < 0) {
-		perror("close(efd)");
-		goto failure;
+	rewind(efile);
+	rewind(ofile);
+
+	if(display_output(fileno(efile), 1, cmdline, 1, f) < 0)
+		return -1;
+	if(fclose(efile) < 0) {
+		perror("close(efile)");
+		return -1;
 	}
 
 	int exited = 0;
@@ -796,20 +756,19 @@ int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		exit_sig = WTERMSIG(exit_status);
 	} else {
 		fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", exit_status);
-		goto failure;
+		return -1;
 	}
 
 	if(exited) {
 		if(exit_status == 0) {
 			struct buf b;
-			if(fslurp_null(ofd, &b) < 0)
+			if(fslurp_null(fileno(ofile), &b) < 0)
 				return -1;
-			if(close(ofd) < 0) {
-				perror("close(s.output_fd)");
+			if(fclose(ofile) < 0) {
+				perror("fclose(ofile)");
 				return -1;
 			}
 			*rules = b.s;
-			serverless_clean_tmp_dir();
 			return 0;
 		}
 		fprintf(f, "tup error: run-script exited with failure code: %i\n", exit_status);
@@ -820,8 +779,6 @@ int serverless_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 			fprintf(f, "tup error: run-script terminated abnormally.\n");
 		}
 	}
-failure:
-	serverless_clean_tmp_dir();
 	return -1;
 }
 
@@ -981,37 +938,6 @@ int tup_restore_privs(void)
 		}
 	}
 	return 0;
-}
-
-static int serverless_cleanup_func(const char *path, const struct stat *sb,
-		                   int typeflag, struct FTW *ftwbuf)
-{
-	if (sb) {}
-	if (ftwbuf) {}
-
-	if(typeflag == FTW_F || typeflag == FTW_DP || typeflag == FTW_SL) {
-		if (remove(path) != 0) {
-			perror("remove(path)");
-			return -1;
-		}
-	} else if(typeflag == FTW_D) {
-		fprintf(stderr, "Failed to delete outputs in temporary directory: %s\n", path);
-		return -1;
-	} else {
-		fprintf(stderr, "Unknown file found found when deleting temporary output: %s\n", path);
-		remove(path);
-	}
-	return 0;
-}
-
-int serverless_clean_tmp_dir(void)
-{
-	int cleanup_result = nftw(".tup/tmp", serverless_cleanup_func, 2, FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
-
-	if(cleanup_result != 0)
-		fprintf(stderr, "Failed to cleanup .tup/mnt, got error code: %i\n", cleanup_result);
-
-	return cleanup_result;
 }
 
 static void sighandler(int sig)

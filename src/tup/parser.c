@@ -1032,7 +1032,7 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 	if (tf->use_server)
 		rc = server_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
 	else
-		rc = serverless_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
+		rc = serverless_run_script(tf->f, cmdline, &tf->env_root, &rules);
 	if(rc < 0)
 		return -1;
 
