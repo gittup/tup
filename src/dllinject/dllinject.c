@@ -501,11 +501,15 @@ NTSTATUS WINAPI NtCreateFile_hook(
 	PUNICODE_STRING uni = ObjectAttributes->ObjectName;
 
 	DEBUG_HOOK("NtCreateFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, CreateOptions);
-	if(rc == STATUS_SUCCESS && *PFileHandle) {
-		BY_HANDLE_FILE_INFORMATION info;
-		if(GetFileInformationByHandle(*PFileHandle, &info) != 0) {
-			if(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+	if(CreateOptions & FILE_DIRECTORY_FILE) {
+		DEBUG_HOOK(" - Has FILE_DIRECTORY_FILE set.\n");
+		is_directory = 1;
+	} else {
+		if(rc == STATUS_SUCCESS && *PFileHandle != INVALID_HANDLE_VALUE && GetFileAttributesW_orig) {
+			DWORD attributes = GetFileAttributesW_orig(uni->Buffer);
+			if(attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)) {
 				is_directory = 1;
+				DEBUG_HOOK(" - determined to be a directory by GetFileAttributesW instead of FILE_DIRECTORY_FILE\n");
 			}
 		}
 	}
