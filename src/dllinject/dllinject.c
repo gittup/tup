@@ -307,7 +307,7 @@ typedef BOOL (WINAPI *CreateProcessWithTokenW_t)(
     __out       LPPROCESS_INFORMATION lpProcessInformation);
 
 typedef NTSTATUS (WINAPI *NtOpenFile_t)(
-    __out  PHANDLE FileHandle,
+    __out  PHANDLE PFileHandle,
     __in   ACCESS_MASK DesiredAccess,
     __in   POBJECT_ATTRIBUTES ObjectAttributes,
     __out  PIO_STATUS_BLOCK IoStatusBlock,
@@ -315,7 +315,7 @@ typedef NTSTATUS (WINAPI *NtOpenFile_t)(
     __in   ULONG OpenOptions);
 
 typedef NTSTATUS (WINAPI *NtCreateFile_t)(
-    __out     PHANDLE FileHandle,
+    __out     PHANDLE PFileHandle,
     __in      ACCESS_MASK DesiredAccess,
     __in      POBJECT_ATTRIBUTES ObjectAttributes,
     __out     PIO_STATUS_BLOCK IoStatusBlock,
@@ -474,7 +474,7 @@ static HFILE WINAPI OpenFile_hook(
 }
 
 NTSTATUS WINAPI NtCreateFile_hook(
-    __out     PHANDLE FileHandle,
+    __out     PHANDLE PFileHandle,
     __in      ACCESS_MASK DesiredAccess,
     __in      POBJECT_ATTRIBUTES ObjectAttributes,
     __out     PIO_STATUS_BLOCK IoStatusBlock,
@@ -487,7 +487,7 @@ NTSTATUS WINAPI NtCreateFile_hook(
     __in      ULONG EaLength)
 {
 	int is_directory = 0;
-	NTSTATUS rc = NtCreateFile_orig(FileHandle,
+	NTSTATUS rc = NtCreateFile_orig(PFileHandle,
 					DesiredAccess,
 					ObjectAttributes,
 					IoStatusBlock,
@@ -501,9 +501,9 @@ NTSTATUS WINAPI NtCreateFile_hook(
 	PUNICODE_STRING uni = ObjectAttributes->ObjectName;
 
 	DEBUG_HOOK("NtCreateFile[%08x] '%.*ls': %x, %x, %x\n", rc, uni->Length/2, uni->Buffer, ShareAccess, DesiredAccess, CreateOptions);
-	if(rc == STATUS_SUCCESS && FileHandle) {
+	if(rc == STATUS_SUCCESS && *PFileHandle) {
 		BY_HANDLE_FILE_INFORMATION info;
-		if(GetFileInformationByHandle(FileHandle, &info) != 0) {
+		if(GetFileInformationByHandle(*PFileHandle, &info) != 0) {
 			if(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 				is_directory = 1;
 			}
@@ -527,14 +527,14 @@ NTSTATUS WINAPI NtCreateFile_hook(
 }
 
 NTSTATUS WINAPI NtOpenFile_hook(
-    __out  PHANDLE FileHandle,
+    __out  PHANDLE PFileHandle,
     __in   ACCESS_MASK DesiredAccess,
     __in   POBJECT_ATTRIBUTES ObjectAttributes,
     __out  PIO_STATUS_BLOCK IoStatusBlock,
     __in   ULONG ShareAccess,
     __in   ULONG OpenOptions)
 {
-	NTSTATUS rc = NtOpenFile_orig(FileHandle,
+	NTSTATUS rc = NtOpenFile_orig(PFileHandle,
 				      DesiredAccess,
 				      ObjectAttributes,
 				      IoStatusBlock,
