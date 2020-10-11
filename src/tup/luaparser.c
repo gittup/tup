@@ -68,7 +68,7 @@ struct tuplua_glob_data {
 	int count;
 };
 
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist);
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, int orderid);
 
 static int debug_run = 0;
 
@@ -158,6 +158,7 @@ static int tuplua_function_include(lua_State *ls)
 
 static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
 {
+	int orderid = 1;
 	lua_getfield(ls, 1, table);
 	if(!lua_istable(ls, -1)) {
 		lua_pop(ls, 1);
@@ -175,10 +176,11 @@ static int tuplua_table_to_path_list(lua_State *ls, const char *table, struct tu
 		evalp = eval(tf, path, allow_nodes);
 		if(!evalp)
 			return luaL_error(ls, "tuplua_table_to_path_list() failed to evaluate string");
-		if(get_path_list(tf, evalp, plist) < 0)
+		if(get_path_list(tf, evalp, plist, orderid) < 0)
 			return luaL_error(ls, "tuplua_table_to_path_list() failed in get_path_list()");
 		free(evalp);
 		lua_pop(ls, 1);
+		orderid++;
 	}
 
 	return 0;
@@ -466,7 +468,7 @@ static int tuplua_function_glob(lua_State *ls)
 		return luaL_error(ls, "Must be passed a glob pattern as an argument.");
 	lua_pop(ls, 1);
 
-	if(get_path_list(tf, pattern, &plist) < 0) {
+	if(get_path_list(tf, pattern, &plist, 1) < 0) {
 		lua_pushfstring(ls, "%s:%d: Failed to parse paths in glob pattern '%s'.", __FILE__, __LINE__, pattern);
 		return lua_error(ls);
 	}
@@ -860,11 +862,11 @@ void lua_parser_debug_run(void)
 	debug_run = 1;
 }
 
-static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist)
+static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, int orderid)
 {
 	struct path_list *pl;
 
-	pl = new_pl(tf, p, -1, &tf->bin_list);
+	pl = new_pl(tf, p, -1, &tf->bin_list, orderid);
 	if(!pl)
 		return -1;
 

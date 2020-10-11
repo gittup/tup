@@ -2225,7 +2225,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	return 0;
 }
 
-struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_head *bl)
+struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_head *bl, int orderid)
 {
 	struct path_list *pl;
 	char *p;
@@ -2247,6 +2247,7 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 	pl->re = NULL;
 	memcpy(pl->mem, s, len);
 	pl->mem[len] = 0;
+	pl->orderid = orderid;
 
 	p = pl->mem;
 	if(p[0] == '{') {
@@ -2342,10 +2343,9 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 		if(x < 0)
 			return -1;
 
-		pl = new_pl(tf, dest, -1, bl);
+		pl = new_pl(tf, dest, -1, bl, orderid);
 		if(!pl)
 			return -1;
-		pl->orderid = orderid;
 		orderid++;
 		TAILQ_INSERT_TAIL(plist, pl, list);
 
@@ -2384,10 +2384,9 @@ static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int 
 				if(spc_index == 0)
 					goto skip_empty_space;
 
-				newpl = new_pl(tf, p, spc_index, NULL);
+				newpl = new_pl(tf, p, spc_index, NULL, pl->orderid);
 				if(!newpl)
 					return -1;
-				newpl->orderid = pl->orderid;
 
 				TAILQ_INSERT_BEFORE(pl, newpl, list);
 
@@ -2470,7 +2469,7 @@ static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struc
 	TAILQ_FOREACH(pl, src, list) {
 		struct path_list *newpl;
 
-		newpl = new_pl(tf, pl->mem, -1, NULL);
+		newpl = new_pl(tf, pl->mem, -1, NULL, pl->orderid);
 		if(!newpl)
 			return -1;
 		TAILQ_INSERT_TAIL(dest, newpl, list);
@@ -3172,10 +3171,9 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
 		if(!toutput)
 			return -1;
-		newpl = new_pl(tf, toutput, -1, NULL);
+		newpl = new_pl(tf, toutput, -1, NULL, pl->orderid);
 		if(!newpl)
 			return -1;
-		newpl->orderid = pl->orderid;
 		TAILQ_INSERT_TAIL(&tmplist, newpl, list);
 		free(toutput);
 	}
@@ -3195,10 +3193,9 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
 		if(!toutput)
 			return -1;
-		newpl = new_pl(tf, toutput, -1, NULL);
+		newpl = new_pl(tf, toutput, -1, NULL, pl->orderid);
 		if(!newpl)
 			return -1;
-		newpl->orderid = pl->orderid;
 		TAILQ_INSERT_TAIL(&tmplist2, newpl, list);
 		free(toutput);
 	}
