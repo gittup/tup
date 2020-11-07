@@ -18,7 +18,7 @@ if [ "$server" = "fuse" ]; then
 	plat_ldflags="`pkg-config fuse --libs`"
 	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
 elif [ "$server" = "fuse3" ]; then
-	plat_cflags="`pkg-config fuse3 --cflags` -DFUSE3"
+	plat_cflags="`pkg-config fuse3 --cflags` -DFUSE3 -D_FILE_OFFSET_BITS=64"
 	plat_ldflags="`pkg-config fuse3 --libs`"
 	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
 elif [ "$server" = "ldpreload" ]; then

@@ -95,6 +95,7 @@ ifeq ($(TUP_SERVER),fuse3)
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse3 --cflags`
 CFLAGS += -DFUSE3
+CFLAGS += -D_FILE_OFFSET_BITS=64
 endif
 
 ifeq ($(TUP_SERVER),ldpreload)
