@@ -3,5 +3,6 @@ include_rules
 ifeq ($(TARGET),win32)
 # Disable warnings - we don't care about the pointer conversion error.
 CFLAGS = -w
+CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 : foreach *.c |> !cc32 |>
 endif
