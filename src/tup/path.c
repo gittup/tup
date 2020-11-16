@@ -261,6 +261,11 @@ static int full_scan_dir(struct tent_list_head *head, int dfd, tupid_t dt)
 			 */
 			if(tup_db_modify_cmds_by_input(tent->tnode.tupid) < 0)
 				return -1;
+			/* If the file was included from a Tupfile (or through io.read() in a Tupfile.lua)
+			 * set dependent directory flags.
+			 */
+			if(tup_db_set_dependent_flags(tent->tnode.tupid) < 0)
+				return -1;
 			if(tup_db_set_mtime(tent, mtime) < 0)
 				return -1;
 		}
