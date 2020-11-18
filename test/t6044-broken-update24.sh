@@ -27,11 +27,6 @@ HERE
 tup touch Tupfile
 update
 
-update > tmp.txt
-if grep 'touch .foo' tmp.txt > /dev/null; then
-	cat tmp.txt
-	echo "Error: Expected second update not to run the command." 1>&2
-	exit 1
-fi
+update_null "Expected second update not to run the command."
 
 eotup

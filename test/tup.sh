@@ -323,6 +323,22 @@ update_fail_msg()
 	set_leak_check full
 }
 
+update_null()
+{
+	if ! __update > .tup/.tupoutput 2>&1; then
+		cat .tup/.tupoutput
+		echo "Error: Expected update_null() to exit successfully." 1>&1
+		exit 1
+	fi
+	for i in "Tupfiles" "files" "commands"; do
+		if ! grep "No $i" .tup/.tupoutput > /dev/null; then
+			cat .tup/.tupoutput
+			echo "Error: $1 (Expected \"No $i\" in tup output)" 1>&2
+			exit 1
+		fi
+	done
+}
+
 parse()
 {
 	if ! __update parse; then

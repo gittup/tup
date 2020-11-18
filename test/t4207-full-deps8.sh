@@ -44,12 +44,7 @@ update
 
 echo foo1 | diff - out.txt
 
-update > .tup/.tupoutput
-if ! grep 'No commands to execute' .tup/.tupoutput > /dev/null; then
-	cat .tup/.tupoutput
-	echo "Error: No files should have been recompiled when nothing was changed." 1>&2
-	exit 1
-fi
+update_null "No files should have been recompiled when nothing was changed."
 
 sleep 1
 echo foo2 > ../external/arch-x86/foo.h
