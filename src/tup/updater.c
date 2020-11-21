@@ -1444,7 +1444,14 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	tup_db_begin();
 	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
-	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
+	if(tup_db_select_node_by_flags(build_graph_non_transient_cb, &g, TUP_FLAGS_MODIFY) < 0)
+		return -1;
+
+	/* Commands in the transient list have to be processed, and we have to
+	 * add any files in the transient list to the DAG to make sure they can
+	 * be removed.
+	 */
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_TRANSIENT) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
@@ -1584,8 +1591,28 @@ static int check_update_todo(int argc, char **argv)
 	return rc;
 }
 
+static int unlink_node(struct node *n)
+{
+	int dfd = tup_entry_open(n->tent->parent);
+	if(dfd < 0)
+		return -1;
+	if(unlinkat(dfd, n->tent->name.s, 0) < 0) {
+		pthread_mutex_lock(&display_mutex);
+		perror("unlinkat");
+		fprintf(stderr, "tup error: Unable to unlink transient output file: %s\n", n->tent->name.s);
+		pthread_mutex_unlock(&display_mutex);
+		return -1;
+	}
+	if(close(dfd) < 0) {
+		perror("close(dfd)");
+		return -1;
+	}
+	return 0;
+}
+
 static int pop_node(struct graph *g, struct node *n)
 {
+	int has_edges = 0;
 	while(!LIST_EMPTY(&n->edges)) {
 		struct edge *e;
 		e = LIST_FIRST(&n->edges);
@@ -1600,9 +1627,36 @@ static int pop_node(struct graph *g, struct node *n)
 			e->dest->state = STATE_PROCESSING;
 		}
 
+		/* Flip the transient file's edges around, so all the commands
+		 * it points to now point to it. After those commands complete,
+		 * we'll revisit this node in the DAG to remove it.
+		 */
+		if(n->transient == TRANSIENT_PROCESSING) {
+			if(create_edge(e->dest, n, TUP_LINK_NORMAL) < 0)
+				return -1;
+		}
 		remove_edge(e);
+		has_edges = 1;
 	}
-	remove_node(g, n);
+	if(n->transient == TRANSIENT_PROCESSING) {
+		/* If we are waiting for other jobs to finish before removing
+		 * the transient node, put it back on node_list. Otherwise we
+		 * can remove it immediately (likely it was in the
+		 * transient_list from a previous build), and can put it into
+		 * plist.
+		 */
+		if(has_edges) {
+			if(node_insert_head(&g->node_list, n) < 0)
+				return -1;
+		} else {
+			if(node_insert_head(&g->plist, n) < 0)
+				return -1;
+		}
+		n->state = STATE_FINISHED;
+		n->transient = TRANSIENT_DELETE;
+	} else {
+		remove_node(g, n);
+	}
 	return 0;
 }
 
@@ -1921,6 +1975,9 @@ static int update_work(struct graph *g, struct node *n)
 			}
 			if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 				rc = -1;
+			if(is_transient_tent(n->tent))
+				if(tup_db_unflag_transient(n->tnode.tupid) < 0)
+					rc = -1;
 			pthread_mutex_unlock(&db_mutex);
 		}
 	} else {
@@ -1934,6 +1991,13 @@ static int update_work(struct graph *g, struct node *n)
 		}
 		if(tup_db_unflag_modify(n->tnode.tupid) < 0)
 			rc = -1;
+		if(n->transient == TRANSIENT_DELETE) {
+			if(unlink_node(n) < 0)
+				rc = -1;
+			if(rc == 0)
+				if(tup_db_unflag_transient(n->tnode.tupid) < 0)
+					rc = -1;
+		}
 
 		/* For environment variables, if there are no more
 		 * out-going edges, then this variable is no longer
@@ -2024,7 +2088,7 @@ static int move_outputs(struct node *n)
 
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(!skip_output(output->tent)) {
+		if(!skip_output(output->tent) && output->transient != TRANSIENT_DELETE) {
 			int output_dfd;
 			/* TODO: This is only required to create generated
 			 * directories. This should probably be moved
@@ -2267,7 +2331,7 @@ static int unlink_outputs(int dfd, struct node *n)
 	struct node *output;
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
-		if(!skip_output(output->tent)) {
+		if(!skip_output(output->tent) && output->transient != TRANSIENT_DELETE) {
 			int output_dfd = dfd;
 			output->skip = 0;
 			if(output->tent->dt != n->tent->dt) {
@@ -2295,6 +2359,25 @@ static int unlink_outputs(int dfd, struct node *n)
 					return -1;
 				}
 			}
+		}
+	}
+	return 0;
+}
+
+static int mark_transient_outputs(struct node *n)
+{
+	/* Put all outputs of a transient command into the transient_list. If
+	 * the build stops due to failure or partial update, we'll be able to
+	 * revisit them on future builds to ensure they are removed when
+	 * appropriate.
+	 */
+	struct edge *e;
+	struct node *output;
+	LIST_FOREACH(e, &n->edges, list) {
+		output = e->dest;
+		if(!skip_output(output->tent)) {
+			if(tup_db_add_transient_list(output->tent->tnode.tupid) < 0)
+				return -1;
 		}
 	}
 	return 0;
@@ -2660,6 +2743,7 @@ static int update(struct node *n)
 	int compare_outputs = 0;
 	int run_in_bash = 0;
 	int use_server = 0;
+	int remove_transients = 0;
 
 	timespan_start(&ts);
 	if(n->tent->flags) {
@@ -2674,6 +2758,9 @@ static int update(struct node *n)
 					break;
 				case 'b':
 					run_in_bash = 1;
+					break;
+				case 't':
+					remove_transients = 1;
 					break;
 				default:
 					pthread_mutex_lock(&display_mutex);
@@ -2741,6 +2828,10 @@ static int update(struct node *n)
 	pthread_mutex_lock(&db_mutex);
 	pthread_mutex_lock(&display_mutex);
 	rc = process_output(&s, n, &ts, expanded_name, compare_outputs);
+	if(rc == 0 && remove_transients) {
+		if(mark_transient_outputs(n) < 0)
+			rc = -1;
+	}
 	pthread_mutex_unlock(&display_mutex);
 	pthread_mutex_unlock(&db_mutex);
 	free(expanded_name);

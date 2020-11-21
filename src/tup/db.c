@@ -49,7 +49,7 @@
 #include <sys/stat.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 17
+#define DB_VERSION 18
 #define PARSER_VERSION 13
 
 enum {
@@ -61,6 +61,7 @@ enum {
 	DB_SELECT_NODE_BY_FLAGS_2,
 	DB_SELECT_NODE_BY_FLAGS_3,
 	DB_SELECT_NODE_BY_FLAGS_4,
+	DB_SELECT_NODE_BY_FLAGS_5,
 	DB_SELECT_NODE_DIR,
 	DB_SELECT_NODE_DIR_GLOB,
 	DB_DELETE_NODE,
@@ -80,12 +81,15 @@ enum {
 	DB_ADD_CREATE_LIST,
 	DB_ADD_MODIFY_LIST,
 	DB_ADD_VARIANT_LIST,
+	DB_ADD_TRANSIENT_LIST,
 	DB_IN_CREATE_LIST,
 	DB_IN_MODIFY_LIST,
+	DB_IN_TRANSIENT_LIST,
 	DB_UNFLAG_CONFIG,
 	DB_UNFLAG_CREATE,
 	DB_UNFLAG_MODIFY,
 	DB_UNFLAG_VARIANT,
+	DB_UNFLAG_TRANSIENT,
 	_DB_GET_DIR_ENTRIES,
 	_DB_GET_OUTPUT_GROUP,
 	DB_LINK_EXISTS1,
@@ -311,6 +315,7 @@ int tup_db_create(int db_sync, int memory_db)
 		"create table create_list (id integer primary key not null)",
 		"create table modify_list (id integer primary key not null)",
 		"create table variant_list (id integer primary key not null)",
+		"create table transient_list (id integer primary key not null)",
 		"create index normal_index2 on normal_link(to_id)",
 		"create index sticky_index2 on sticky_link(to_id)",
 		"create index group_index2 on group_link(cmdid)",
@@ -638,6 +643,13 @@ static int version_check(void)
 				"insert or replace into create_list select id from node where type=2",
 			}
 		},
+		{
+			/* Upgrade to version 18 */
+			"Added a transient list for outputs that are deleted after they are no longer used.",
+			{
+				"create table transient_list (id integer primary key not null)",
+			}
+		},
 	};
 
 	if(tup_db_config_get_int("db_version", -1, &version) < 0)
@@ -840,6 +852,7 @@ int tup_db_check_flags(int flags)
 	char s1[] = "select * from config_list";
 	char s2[] = "select * from create_list";
 	char s3[] = "select * from modify_list";
+	char s4[] = "select * from transient_list";
 
 	if(tup_db_begin() < 0)
 		return -1;
@@ -871,6 +884,17 @@ int tup_db_check_flags(int flags)
 		if(sqlite3_exec(tup_db, s3, check_flags_cb, &rc, &errmsg) != 0) {
 			fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
 				errmsg, s3);
+			sqlite3_free(errmsg);
+			return -1;
+		}
+		transaction_started = 0;
+	}
+	if(flags & TUP_FLAGS_TRANSIENT) {
+		transaction_check("%s", s4);
+		check_flags_name = "transient";
+		if(sqlite3_exec(tup_db, s4, check_flags_cb, &rc, &errmsg) != 0) {
+			fprintf(stderr, "SQL select error: %s\nQuery was: %s\n",
+				errmsg, s4);
 			sqlite3_free(errmsg);
 			return -1;
 		}
@@ -1070,15 +1094,20 @@ struct tup_entry *tup_db_create_node_part_display(struct tup_entry *dtent, const
 
 		/* Commands never go through here - if the tent already exists,
 		 * it is handled in the parser. So we don't need to check &
-		 * update the 'display' and 'flags' fields.
+		 * update the 'display' field.
 		 */
 		if(tent->displaylen != displaylen || (displaylen > 0 && strncmp(tent->display, display, displaylen) != 0)) {
 			fprintf(stderr, "tup internal error: 'display' field shouldn't be changing here: %.*s -> %.*s\n", tent->displaylen, tent->display, displaylen, display);
 			return NULL;
 		}
+
+		/* We do need to check the flags field, since files can have
+		 * the transient flag and may go from normal to transient or
+		 * vice versa.
+		 */
 		if(tent->flagslen != flagslen || (flagslen > 0 && strncmp(tent->flags, flags, flagslen) != 0)) {
-			fprintf(stderr, "tup internal error: 'flags' field shouldn't be changing here: %.*s -> %.*s\n", tent->flagslen, tent->flags, flagslen, flags);
-			return NULL;
+			if(tup_db_set_flags(tent, flags, flagslen) < 0)
+				return NULL;
 		}
 		return tent;
 	}
@@ -1183,6 +1212,7 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
 	static char s2[] = "select * from create_list";
 	static char s3[] = "select * from modify_list";
 	static char s4[] = "select * from variant_list";
+	static char s5[] = "select * from transient_list";
 	char *sql;
 	int sqlsize;
 	struct tupid_list *tl;
@@ -1206,6 +1236,10 @@ int tup_db_select_node_by_flags(int (*callback)(void *, struct tup_entry *),
 		stmt = &stmts[DB_SELECT_NODE_BY_FLAGS_4];
 		sql = s4;
 		sqlsize = sizeof(s4);
+	} else if(flags == TUP_FLAGS_TRANSIENT) {
+		stmt = &stmts[DB_SELECT_NODE_BY_FLAGS_5];
+		sql = s5;
+		sqlsize = sizeof(s5);
 	} else {
 		fprintf(stderr, "tup error: tup_db_select_node_by_flags() must specify exactly one of TUP_FLAGS_CONFIG/TUP_FLAGS_CREATE/TUP_FLAGS_MODIFY/TUP_FLAGS_VARIANT\n");
 		return -1;
@@ -2771,6 +2805,43 @@ int tup_db_add_variant_list(tupid_t tupid)
 	return 0;
 }
 
+int tup_db_add_transient_list(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_ADD_TRANSIENT_LIST];
+	static char s[] = "insert or ignore into transient_list values(?)";
+
+	transaction_check("%s [%lli]", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
 int tup_db_in_create_list(tupid_t tupid)
 {
 	int rc;
@@ -2823,6 +2894,52 @@ int tup_db_in_modify_list(tupid_t tupid)
 	int dbrc;
 	sqlite3_stmt **stmt = &stmts[DB_IN_MODIFY_LIST];
 	static char s[] = "select id from modify_list where id=?";
+
+	transaction_check("%s [%lli]", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_DONE) {
+		rc = 0;
+		goto out_reset;
+	}
+	if(dbrc != SQLITE_ROW) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		rc = -1;
+		goto out_reset;
+	}
+
+	rc = 1;
+
+out_reset:
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return rc;
+}
+
+int tup_db_in_transient_list(tupid_t tupid)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_IN_TRANSIENT_LIST];
+	static char s[] = "select id from transient_list where id=?";
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -2984,6 +3101,43 @@ int tup_db_unflag_variant(tupid_t tupid)
 	int rc;
 	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_VARIANT];
 	static char s[] = "delete from variant_list where id=?";
+
+	transaction_check("%s [%lli]", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	return 0;
+}
+
+int tup_db_unflag_transient(tupid_t tupid)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_UNFLAG_TRANSIENT];
+	static char s[] = "delete from transient_list where id=?";
 
 	transaction_check("%s [%lli]", s, tupid);
 	if(!*stmt) {
@@ -6076,7 +6230,8 @@ static int rm_output(struct tup_entry *tent, void *data)
 	return 0;
 }
 
-int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
+int tup_db_write_outputs(FILE *f, struct tup_entry *cmdtent,
+			 struct tent_entries *root,
 			 struct tent_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,
@@ -6084,6 +6239,7 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
 {
 	struct tent_entries output_root = {NULL};
 	struct tent_entries orig_exclusion_root = {NULL};
+	tupid_t cmdid = cmdtent->tnode.tupid;
 	struct parse_output_data pod = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6160,6 +6316,17 @@ int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
 			return -1;
 		if(tup_db_add_modify_list(cmdid) < 0)
 			return -1;
+
+		/* Commands with transient outputs are almost always in the
+		 * modify list, since their outputs are generally missing,
+		 * which causes the command to go in modify. However, when the
+		 * command is changed, we definitely need to re-run it, so we
+		 * also put it in the transient list to guarantee that it gets
+		 * executed.
+		 */
+		if(is_transient_tent(cmdtent))
+			if(tup_db_add_transient_list(cmdid) < 0)
+				return -1;
 		if(group) {
 			/* Explicitly add the group to the modify list in case
 			 * we are skipping outputs (t5079).

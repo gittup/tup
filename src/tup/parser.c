@@ -3153,15 +3153,27 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			   struct name_list *use_onl, struct name_list *onl, struct tup_entry **group,
 			   int *command_modified, struct tent_entries *output_root,
 			   struct tent_entries *exclusion_root,
-			   const char *ext, int extlen, int is_variant_copy)
+			   const char *ext, int extlen, int is_variant_copy,
+			   int transient_outputs)
 {
 	struct path_list *pl;
 	struct path_list_head tmplist;
 	struct path_list_head tmplist2;
+	char flags[1];
+	int flagslen;
 	int rc = 0;
 
 	TAILQ_INIT(&tmplist);
 	TAILQ_INIT(&tmplist2);
+
+	if(transient_outputs) {
+		flags[0] = 't';
+		flagslen = 1;
+	} else {
+		flags[0] = 0;
+		flagslen = 0;
+	}
+
 
 	/* first expand any %-flags before eval so things like $(flags_%f) work */
 	TAILQ_FOREACH(pl, oplist, list) {
@@ -3310,8 +3322,11 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		}
 		if(tupid_tree_add_dup(&tf->directory_root, pl->dt) < 0)
 			return -1;
-		onle->tent = tup_db_create_node_part(dest_tent, onle->base, -1,
-						     TUP_NODE_GENERATED, tf->tent->tnode.tupid, command_modified);
+		onle->tent = tup_db_create_node_part_display(dest_tent, onle->base, -1,
+							     NULL, 0,
+							     flags, flagslen,
+							     TUP_NODE_GENERATED, tf->tent->tnode.tupid,
+							     command_modified);
 		if(!onle->tent) {
 			free(onle->path);
 			free(onle);
@@ -3339,7 +3354,7 @@ struct command_split {
 
 static int split_command_string(const char *cmd, struct command_split *cs)
 {
-	cs->flags = NULL;
+	cs->flags = "";
 	cs->flagslen = 0;
 	cs->display = NULL;
 	cs->displaylen = 0;
@@ -3411,6 +3426,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	int command_modified = 0;
 	int is_variant_copy = 0;
 	int compare_display_flags = 0;
+	int transient_outputs = 0;
 	struct command_split cs;
 
 	/* t3017 - empty rules are just pass-through to get the input into the
@@ -3428,6 +3444,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	if(split_command_string(r->command, &cs) < 0)
 		return -1;
+	if(memchr(cs.flags, 't', cs.flagslen) != NULL)
+		transient_outputs = 1;
+	if(memchr(cs.flags, 'o', cs.flagslen) != NULL && transient_outputs) {
+		fprintf(tf->f, "tup error: Unable to use both 'o' and 't' flags at the same time. Outputs cannot be compared with 'o' if the files are deleted after they are used with 't'.\n");
+		return -1;
+	}
 
 	if(strcmp(cs.cmd, TUP_PRESERVE_CMD) == 0)
 		is_variant_copy = 1;
@@ -3435,7 +3457,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
 		return -1;
 	if(r->bin) {
 		TAILQ_FOREACH(onle, &onl.entries, list) {
@@ -3443,9 +3465,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 	}
-	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
 		return -1;
-	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy) < 0)
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
 		return -1;
 
 	if(is_variant_copy) {
@@ -3620,7 +3642,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 			return -1;
 		}
 	}
-	if(tup_db_write_outputs(tf->f, cmdtent->tnode.tupid, &output_root, &exclusion_root, group, &old_group, tf->refactoring, command_modified) < 0)
+	if(tup_db_write_outputs(tf->f, cmdtent, &output_root, &exclusion_root, group, &old_group, tf->refactoring, command_modified) < 0)
 		return -1;
 	if(tup_db_write_inputs(tf->f, cmdtent->tnode.tupid, &input_root, &tf->env_root, group, old_group, tf->refactoring) < 0)
 		return -1;

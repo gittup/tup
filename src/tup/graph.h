@@ -45,6 +45,12 @@ struct tup_entry;
 #define STATE_FINISHED 2
 #define STATE_REMOVING 3
 
+enum transient_type {
+	TRANSIENT_NONE,
+	TRANSIENT_PROCESSING,
+	TRANSIENT_DELETE,
+};
+
 enum graph_prune_type {
 	GRAPH_PRUNE_GENERATED,
 	GRAPH_PRUNE_ALL,
@@ -64,6 +70,7 @@ struct node {
 	unsigned char parsing;
 	unsigned char marked;
 	unsigned char skip;
+	unsigned char transient;
 };
 TAILQ_HEAD(node_head, node);
 
@@ -71,6 +78,7 @@ struct graph {
 	struct node_head node_list;
 	struct node_head plist;
 	struct node_head removing_list;
+	struct tent_entries transient_root;
 	struct node *root;
 	struct node *cur;
 	int num_nodes;
@@ -101,6 +109,7 @@ void remove_edge(struct edge *e);
 int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_TYPE count_flags2);
 int destroy_graph(struct graph *g);
 void save_graphs(struct graph *g);
+int build_graph_non_transient_cb(void *arg, struct tup_entry *tent);
 int build_graph_cb(void *arg, struct tup_entry *tent);
 int build_graph_group_cb(void *arg, struct tup_entry *tent);
 int build_graph(struct graph *g);

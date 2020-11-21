@@ -113,12 +113,15 @@ int tup_db_maybe_add_create_list(tupid_t tupid);
 int tup_db_add_create_list(tupid_t tupid);
 int tup_db_add_modify_list(tupid_t tupid);
 int tup_db_add_variant_list(tupid_t tupid);
+int tup_db_add_transient_list(tupid_t tupid);
 int tup_db_in_create_list(tupid_t tupid);
 int tup_db_in_modify_list(tupid_t tupid);
+int tup_db_in_transient_list(tupid_t tupid);
 int tup_db_unflag_config(tupid_t tupid);
 int tup_db_unflag_create(tupid_t tupid);
 int tup_db_unflag_modify(tupid_t tupid);
 int tup_db_unflag_variant(tupid_t tupid);
+int tup_db_unflag_transient(tupid_t tupid);
 
 /* Link operations */
 int tup_db_create_link(tupid_t a, tupid_t b, int style);
@@ -127,7 +130,8 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 		       int *exists);
 int tup_db_get_incoming_link(struct tup_entry *tent, struct tup_entry **incoming);
 int tup_db_delete_links(tupid_t tupid);
-int tup_db_write_outputs(FILE *f, tupid_t cmdid, struct tent_entries *root,
+int tup_db_write_outputs(FILE *f, struct tup_entry *cmdtent,
+			 struct tent_entries *root,
 			 struct tent_entries *exclusion_root,
 			 struct tup_entry *group,
 			 struct tup_entry **old_group,

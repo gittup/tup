@@ -71,6 +71,17 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	n->skip = 1;
 	if(node_insert_tail(&g->node_list, n) < 0)
 		return NULL;
+
+	/* The transient field in struct node is used for determining when to
+	 * remove a transient file from the filesystem. It doesn't correspond
+	 * to transient_list in the db.
+	 */
+	if(tent->type == TUP_NODE_GENERATED && is_transient_tent(tent)) {
+		n->transient = TRANSIENT_PROCESSING;
+	} else {
+		n->transient = TRANSIENT_NONE;
+	}
+
 	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
 		return NULL;
 	return n;
@@ -221,6 +232,7 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_
 	TAILQ_INIT(&g->node_list);
 	TAILQ_INIT(&g->plist);
 	TAILQ_INIT(&g->removing_list);
+	RB_INIT(&g->transient_root);
 	RB_INIT(&g->gen_delete_root);
 	RB_INIT(&g->save_root);
 	g->gen_delete_count = 0;
@@ -275,19 +287,9 @@ static int expand_node(struct graph *g, struct node *n)
 	return 0;
 }
 
-int build_graph_cb(void *arg, struct tup_entry *tent)
+static int make_edge(struct graph *g, struct node *n)
 {
-	struct graph *g = arg;
-	struct node *n;
-
-	n = find_node(g, tent->tnode.tupid);
-	if(n != NULL)
-		goto edge_create;
-	n = create_node(g, tent);
-	if(!n)
-		return -1;
-
-edge_create:
+	struct tup_entry *tent = n->tent;
 	if(n->state == STATE_PROCESSING) {
 		/* A circular dependency is not guaranteed to trigger this,
 		 * but it is easy to check before going through the graph.
@@ -318,6 +320,50 @@ edge_create:
 	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	return 0;
+}
+
+static int attach_transient_cb(void *arg, struct tup_entry *tent)
+{
+	/* Transient nodes that don't otherwise need to be built are only added
+	 * if they can attach to something else in the DAG.
+	 */
+	struct graph *g = arg;
+	struct node *n;
+	n = find_node(g, tent->tnode.tupid);
+	if(n) {
+		return make_edge(g, n);
+	}
+	return 0;
+}
+
+int build_graph_non_transient_cb(void *arg, struct tup_entry *tent)
+{
+	/* Only build out nodes that aren't transient. Any transient nodes get
+	 * saved in g->transient_root for later processing.
+	 */
+	struct graph *g = arg;
+	if(tent->type == TUP_NODE_CMD && is_transient_tent(tent)) {
+		if(tent_tree_add(&g->transient_root, tent) < 0)
+			return -1;
+		return 0;
+	}
+
+	return build_graph_cb(arg, tent);
+}
+
+int build_graph_cb(void *arg, struct tup_entry *tent)
+{
+	struct graph *g = arg;
+	struct node *n;
+
+	n = find_node(g, tent->tnode.tupid);
+	if(n == NULL) {
+		n = create_node(g, tent);
+		if(!n)
+			return -1;
+	}
+
+	return make_edge(g, n);
 }
 
 static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
@@ -395,10 +441,82 @@ static int build_group_cb(void *arg, struct tup_entry *tent,
 	return 0;
 }
 
+static int attach_transient_nodes(struct graph *g)
+{
+	struct tent_tree *tt;
+	struct tent_tree *tmp;
+	int rc = 0;
+	RB_FOREACH_SAFE(tt, tent_entries, &g->transient_root, tmp) {
+		struct tup_entry *tent;
+		struct node *cmdnode;
+		struct node *n;
+		struct edge *e;
+		int keep_cmd = 0;
+		tent = tt->tent;
+
+		if(find_node(g, tent->tnode.tupid)) {
+			continue;
+		}
+
+		/* Expand the command and its output files */
+		g->cur = create_node(g, tent);
+		cmdnode = g->cur;
+		if(tup_db_select_node_by_link(build_graph_cb, g, g->cur->tnode.tupid) < 0)
+			return -1;
+		LIST_FOREACH(e, &cmdnode->edges, list) {
+			g->cur = e->dest;
+			if(tup_db_select_node_by_link(attach_transient_cb, g, g->cur->tnode.tupid) < 0)
+				return -1;
+
+			/* We only need to keep the command if:
+			 *  1) The file doesn't already exist from a previous
+			 *     incomplete build (in the transient list)
+			 *   and
+			 *  2) We link to something in the DAG (!LIST_EMPTY)
+			 */
+			if(!tup_db_in_transient_list(g->cur->tent->tnode.tupid) && !LIST_EMPTY(&g->cur->edges)) {
+				keep_cmd = 1;
+				break;
+			}
+		}
+		if(keep_cmd) {
+			rc = 1;
+			LIST_FOREACH(e, &cmdnode->edges, list) {
+				n = e->dest;
+				if(node_remove_list(&g->plist, n) < 0)
+					return -1;
+				if(node_insert_tail(&g->node_list, n) < 0)
+					return -1;
+				n->state = STATE_FINISHED;
+			}
+			g->cur = g->root;
+			if(make_edge(g, cmdnode) < 0)
+				return -1;
+			if(node_remove_list(&g->plist, cmdnode) < 0)
+				return -1;
+			if(node_insert_tail(&g->node_list, cmdnode) < 0)
+				return -1;
+			tent_tree_rm(&g->transient_root, tt);
+		} else {
+			struct edge *tmpe;
+			LIST_FOREACH_SAFE(e, &cmdnode->edges, list, tmpe) {
+				if(!tup_db_in_transient_list(e->dest->tent->tnode.tupid)) {
+					remove_node_internal(g, e->dest);
+				}
+			}
+			remove_node_internal(g, cmdnode);
+		}
+	}
+	return rc;
+}
+
 int build_graph(struct graph *g)
 {
 	struct node *cur;
 
+	/* First fill out the graph with everything that we know needs to be
+	 * built.
+	 */
 	while(!TAILQ_EMPTY(&g->plist)) {
 		cur = TAILQ_FIRST(&g->plist);
 		if(cur->state == STATE_INITIALIZED) {
@@ -429,6 +547,23 @@ int build_graph(struct graph *g)
 			return -1;
 		}
 	}
+
+	/* Second, attach any commands that build transient files that are
+	 * currently missing. This has to be done recursively until no nodes
+	 * are added in case there are chains of transient nodes.
+	 */
+	while(1) {
+		int rc;
+		rc = attach_transient_nodes(g);
+		if(rc < 0)
+			return -1;
+		if(rc == 0)
+			break;
+	}
+	/* Anything remaining in transient_root are nodes that we don't need to
+	 * rebuild.
+	 */
+	free_tent_tree(&g->transient_root);
 
 	if(g->style != TUP_LINK_GROUP)
 		if(add_graph_stickies(g) < 0)
@@ -483,13 +618,12 @@ static int add_file_cb(void *arg, struct tup_entry *tent)
 	struct node *n;
 
 	n = find_node(g, tent->tnode.tupid);
-	if(n != NULL)
-		goto edge_create;
-	n = create_node(g, tent);
-	if(!n)
-		return -1;
+	if(n == NULL) {
+		n = create_node(g, tent);
+		if(!n)
+			return -1;
+	}
 
-edge_create:
 	if(n->state == STATE_PROCESSING) {
 		/* A circular dependency is not guaranteed to trigger this,
 		 * but it is easy to check before going through the graph.
@@ -610,6 +744,7 @@ static void mark_nodes(struct node *n)
 
 static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum graph_prune_type gpt, int verbose)
 {
+	struct edge *e;
 	if(n->tent->type == g->count_flags && n->expanded) {
 		if(n->tent->type != TUP_NODE_CMD) {
 			fprintf(stderr, "tup internal error: node of type %i trying to add to the modify list in prune_graph\n", n->tent->type);
@@ -633,6 +768,14 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum gra
 			print_tup_entry(stdout, n->tent);
 			printf("\n");
 		}
+	}
+	/* If a partial update prunes a node from the DAG, we want to still
+	 * keep any transient files we depend on around until they are actually
+	 * used.
+	 */
+	LIST_FOREACH(e, &n->incoming, destlist) {
+		if(e->src->transient)
+			e->src->transient = TRANSIENT_NONE;
 	}
 	/* Normal files are not pruned so we can make sure we update the mtime
 	 * in the tup database (t6079). Any dependent commands are flagged as

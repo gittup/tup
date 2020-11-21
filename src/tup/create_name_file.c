@@ -444,6 +444,13 @@ int tup_del_id_type(tupid_t tupid, enum TUP_NODE_TYPE type, int force, int *modi
 		if(tup_db_unflag_modify(tupid) < 0)
 			return -1;
 
+		/* Transient files don't need a warning, since tup likely was
+		 * the one who deleted them.
+		 */
+		if(is_transient_tent(tent)) {
+			return 0;
+		}
+
 		/* Only display a warning if the command isn't already in the
 		 * modify list. It's possible that the command hasn't actually
 		 * been executed yet.

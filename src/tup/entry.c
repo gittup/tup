@@ -754,6 +754,11 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	return 0;
 }
 
+int is_transient_tent(struct tup_entry *tent)
+{
+	return memchr(tent->flags, 't', tent->flagslen) != NULL;
+}
+
 int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match)
 {
 	struct tent_tree *tt;

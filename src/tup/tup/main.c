@@ -241,7 +241,7 @@ int main(int argc, char **argv)
 		if(rc == 1)
 			rc = 11;
 	} else if(strcmp(cmd, "flags_exists") == 0) {
-		rc = tup_db_check_flags(TUP_FLAGS_CONFIG | TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY);
+		rc = tup_db_check_flags(TUP_FLAGS_CONFIG | TUP_FLAGS_CREATE | TUP_FLAGS_MODIFY | TUP_FLAGS_TRANSIENT);
 	} else if(strcmp(cmd, "create_flags_exists") == 0) {
 		rc = tup_db_check_flags(TUP_FLAGS_CREATE);
 	} else if(strcmp(cmd, "touch") == 0) {

@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/04/01" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/04/19" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -432,7 +432,15 @@ The 'b' flag causes the command to be run via "/usr/bin/env bash -e -o pipefail 
 The 'c' flag causes the command to fail if tup does not support user namespaces (on Linux) or is not suid root. In these cases, tup runs in a degraded mode where the fake working directories are visible in the sub-processes, and some dependencies may be missed. If these degraded behaviors will break your a particular command in your build, add the 'c' flag so that users know they need to add the suid bit or upgrade their kernel. This flag is ignored on Windows.
 .TP
 .B o
-The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran.
+The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran. The 'o' flag is incompatible with the 't' flag.
+.TP
+.B t
+The 't' flag causes the command's outputs to be transient. The outputs may be used as inputs to other commands, but after all dependent commands are executed, the transient outputs will be deleted from the filesystem. This can be used to save space if there are many stages of processing that each produce large outputs, but only the final output needs to be kept. The 't' flag is incompatible with the 'o' flag.
+
+An example where the 't' flag can make sense in a build pipeline is if there are large assets that go through multiple stages of processing. For example, a large audio or video file that has stages of effects applied, each as a separate step in the Tupfile.
+
+In contrast, the 't' flag does *not* make sense for object files in a C program, even though those could theoretically be deleted after the final executable is linked. If the object files were marked transient in this case, a change to any of the input C files would require *all* object files to be rebuilt in order to produce the executable, instead of only the single file that was changed.
+
 .RE
 
 .TP
