@@ -349,7 +349,8 @@ int generate(int argc, char **argv)
 	 * Tupfiles have already been parsed.
 	 */
 	n = TAILQ_FIRST(&g.node_list);
-	TAILQ_REMOVE(&g.node_list, n, list);
+	if(node_remove_list(&g.node_list, n) < 0)
+		return -1;
 	while(!LIST_EMPTY(&n->edges)) {
 		remove_edge(LIST_FIRST(&n->edges));
 	}
@@ -359,7 +360,8 @@ int generate(int argc, char **argv)
 		if(!n->already_used)
 			if(parse(n, &g, NULL, 0, 0, full_deps) < 0)
 				return -1;
-		TAILQ_REMOVE(&g.plist, n, list);
+		if(node_remove_list(&g.plist, n) < 0)
+			return -1;
 		while(!LIST_EMPTY(&n->incoming)) {
 			remove_edge(LIST_FIRST(&n->incoming));
 		}
@@ -814,7 +816,8 @@ static int process_config_nodes(int environ_check)
 	while(!LIST_EMPTY(&g.root->edges)) {
 		remove_edge(LIST_FIRST(&g.root->edges));
 	}
-	TAILQ_REMOVE(&g.node_list, g.root, list);
+	if(node_remove_list(&g.node_list, g.root) < 0)
+		return -1;
 	remove_node(&g, g.root);
 
 	{
@@ -853,7 +856,8 @@ static int process_config_nodes(int environ_check)
 			struct parser_server ps;
 
 			n = TAILQ_FIRST(&g.plist);
-			TAILQ_REMOVE(&g.plist, n, list);
+			if(node_remove_list(&g.plist, n) < 0)
+				return -1;
 
 			variant = variant_search(n->tent->dt);
 
@@ -928,7 +932,8 @@ static int process_config_nodes(int environ_check)
 						goto err_rollback;
 					if(tup_db_add_variant_list(n->tent->tnode.tupid) < 0)
 						goto err_rollback;
-					TAILQ_INSERT_HEAD(&g.node_list, n, list);
+					if(node_insert_head(&g.node_list, n) < 0)
+						return -1;
 					rm_node = 0;
 					show_result(n->tent, 0, NULL, "new variant", 1);
 				} else {
@@ -941,7 +946,8 @@ static int process_config_nodes(int environ_check)
 						 * (t8055).
 						 */
 						new_variants = 1;
-						TAILQ_INSERT_HEAD(&g.node_list, n, list);
+						if(node_insert_head(&g.node_list, n) < 0)
+							return -1;
 						rm_node = 0;
 						if(variant_enable(variant) < 0)
 							return -1;
@@ -1088,9 +1094,11 @@ static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
 	n = find_node(g, tent->tnode.tupid);
 	if(n) {
 		if(n->state == STATE_REMOVING) {
-			TAILQ_REMOVE(&g->removing_list, n, list);
+			if(node_remove_list(&g->removing_list, n) < 0)
+				return -1;
 		} else {
-			TAILQ_REMOVE(&g->plist, n, list);
+			if(node_remove_list(&g->plist, n) < 0)
+				return -1;
 		}
 		while(!LIST_EMPTY(&n->incoming)) {
 			remove_edge(LIST_FIRST(&n->incoming));
@@ -1105,8 +1113,10 @@ static int mark_variant_dir_for_deletion(struct graph *g, struct node *n)
 {
 	if(tup_db_select_node_by_link(build_graph_cb, g, n->tent->tnode.tupid) < 0)
 		return -1;
-	TAILQ_REMOVE(&g->plist, n, list);
-	TAILQ_INSERT_TAIL(&g->removing_list, n, list);
+	if(node_remove_list(&g->plist, n) < 0)
+		return -1;
+	if(node_insert_tail(&g->removing_list, n) < 0)
+		return -1;
 	n->state = STATE_REMOVING;
 	return 0;
 }
@@ -1574,7 +1584,7 @@ static int check_update_todo(int argc, char **argv)
 	return rc;
 }
 
-static void pop_node(struct graph *g, struct node *n)
+static int pop_node(struct graph *g, struct node *n)
 {
 	while(!LIST_EMPTY(&n->edges)) {
 		struct edge *e;
@@ -1583,14 +1593,17 @@ static void pop_node(struct graph *g, struct node *n)
 			/* Put the node back on the plist, and mark it as such
 			 * by changing the state to STATE_PROCESSING.
 			 */
-			TAILQ_REMOVE(&g->node_list, e->dest, list);
-			TAILQ_INSERT_HEAD(&g->plist, e->dest, list);
+			if(node_remove_list(&g->node_list, e->dest) < 0)
+				return -1;
+			if(node_insert_head(&g->plist, e->dest) < 0)
+				return -1;
 			e->dest->state = STATE_PROCESSING;
 		}
 
 		remove_edge(e);
 	}
 	remove_node(g, n);
+	return 0;
 }
 
 /* Returns:
@@ -1652,8 +1665,10 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 
 	root = TAILQ_FIRST(&g->node_list);
 	DEBUGP("root node: %lli\n", root->tnode.tupid);
-	TAILQ_REMOVE(&g->node_list, root, list);
-	pop_node(g, root);
+	if(node_remove_list(&g->node_list, root) < 0)
+		return -2;
+	if(pop_node(g, root) < 0)
+		return -2;
 
 	start_progress(g->num_nodes, g->total_mtime, jobs);
 	/* Keep going as long as:
@@ -1670,19 +1685,24 @@ static int execute_graph(struct graph *g, int keep_going, int jobs,
 			/* Here STATE_FINISHED means we're on the node_list,
 			 * therefore not ready for processing.
 			 */
-			TAILQ_REMOVE(&g->plist, n, list);
-			TAILQ_INSERT_HEAD(&g->node_list, n, list);
+			if(node_remove_list(&g->plist, n) < 0)
+				return -2;
+			if(node_insert_head(&g->node_list, n) < 0)
+				return -2;
 			n->state = STATE_FINISHED;
 			goto check_empties;
 		}
 
 		if(!n->expanded) {
-			TAILQ_REMOVE(&g->plist, n, list);
-			pop_node(g, n);
+			if(node_remove_list(&g->plist, n) < 0)
+				return -2;
+			if(pop_node(g, n) < 0)
+				return -2;
 			goto check_empties;
 		}
 
-		TAILQ_REMOVE(&g->plist, n, list);
+		if(node_remove_list(&g->plist, n) < 0)
+			return -2;
 		active++;
 
 		wt = LIST_FIRST(&free_list);
@@ -1719,12 +1739,14 @@ check_empties:
 			active--;
 
 			if(wt->rc == 0) {
-				pop_node(g, n);
+				if(pop_node(g, n) < 0)
+					return -2;
 			} else {
 				/* Failed jobs sit on the node_list until the
 				 * graph is destroyed.
 				 */
-				TAILQ_INSERT_TAIL(&g->node_list, n, list);
+				if(node_insert_tail(&g->node_list, n) < 0)
+					return -2;
 				failed++;
 			}
 		}

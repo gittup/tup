@@ -441,8 +441,10 @@ static int graph_cb(void *arg, struct tup_entry *tent)
 edge_create:
 	if(n->expanded == 0) {
 		n->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, n, list);
-		TAILQ_INSERT_HEAD(&g->plist, n, list);
+		if(node_remove_list(&g->node_list, n) < 0)
+			return -1;
+		if(node_insert_head(&g->plist, n) < 0)
+			return -1;
 	}
 	if(g->cur)
 		if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
@@ -516,8 +518,10 @@ static int graph(int argc, char **argv)
 			if(!n)
 				return -1;
 			n->expanded = 1;
-			TAILQ_REMOVE(&g.node_list, n, list);
-			TAILQ_INSERT_HEAD(&g.plist, n, list);
+			if(node_remove_list(&g.node_list, n) < 0)
+				return -1;
+			if(node_insert_head(&g.plist, n) < 0)
+				return -1;
 		}
 		default_graph = 0;
 	}
@@ -536,8 +540,10 @@ static int graph(int argc, char **argv)
 			if(tup_db_select_node_by_distinct_group_link(build_graph_group_cb, &g, g.cur->tnode.tupid) < 0)
 				return -1;
 		}
-		TAILQ_REMOVE(&g.plist, g.cur, list);
-		TAILQ_INSERT_HEAD(&g.node_list, g.cur, list);
+		if(node_remove_list(&g.plist, g.cur) < 0)
+			return -1;
+		if(node_insert_head(&g.node_list, g.cur) < 0)
+			return -1;
 
 		if(strcmp(g.cur->tent->name.s, TUP_CONFIG) != 0) {
 			tupid = g.cur->tnode.tupid;

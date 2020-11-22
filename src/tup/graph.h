@@ -56,6 +56,7 @@ struct node {
 	struct edge_head incoming;
 	struct tupid_tree tnode;
 	struct tup_entry *tent;
+	struct node_head *active_list;
 
 	unsigned char state;
 	unsigned char already_used;
@@ -90,6 +91,9 @@ struct graph {
 struct node *find_node(struct graph *g, tupid_t tupid);
 struct node *create_node(struct graph *g, struct tup_entry *tent);
 void remove_node(struct graph *g, struct node *n);
+int node_insert_tail(struct node_head *head, struct node *n);
+int node_insert_head(struct node_head *head, struct node *n);
+int node_remove_list(struct node_head *head, struct node *n);
 
 int create_edge(struct node *n1, struct node *n2, int style);
 void remove_edge(struct edge *e);

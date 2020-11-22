@@ -62,22 +62,60 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	LIST_INIT(&n->incoming);
 	n->tnode.tupid = tent->tnode.tupid;
 	n->tent = tent;
+	n->active_list = NULL;
 	n->state = STATE_INITIALIZED;
 	n->already_used = 0;
 	n->expanded = 0;
 	n->parsing = 0;
 	n->marked = 0;
 	n->skip = 1;
-	TAILQ_INSERT_TAIL(&g->node_list, n, list);
-
+	if(node_insert_tail(&g->node_list, n) < 0)
+		return NULL;
 	if(tupid_tree_insert(&g->node_root, &n->tnode) < 0)
 		return NULL;
 	return n;
 }
 
+int node_insert_tail(struct node_head *head, struct node *n)
+{
+	if(n->active_list != NULL) {
+		fprintf(stderr, "tup internal error: Node %s is already in a list.\n", n->tent->name.s);
+		return -1;
+	}
+	TAILQ_INSERT_TAIL(head, n, list);
+	n->active_list = head;
+	return 0;
+}
+
+int node_insert_head(struct node_head *head, struct node *n)
+{
+	if(n->active_list != NULL) {
+		fprintf(stderr, "tup internal error: Node %s is already in a list.\n", n->tent->name.s);
+		return -1;
+	}
+	TAILQ_INSERT_HEAD(head, n, list);
+	n->active_list = head;
+	return 0;
+}
+
+int node_remove_list(struct node_head *head, struct node *n)
+{
+	if(!n->active_list) {
+		fprintf(stderr, "tup internal error: Node %s is not on a list.\n", n->tent->name.s);
+		return -1;
+	}
+	if(n->active_list != head) {
+		fprintf(stderr, "tup internal error: Node %s being removed from a different list.\n", n->tent->name.s);
+		return -1;
+	}
+	TAILQ_REMOVE(head, n, list);
+	n->active_list = NULL;
+	return 0;
+}
+
 static void remove_node_internal(struct graph *g, struct node *n)
 {
-	TAILQ_REMOVE(&g->node_list, n, list);
+	node_remove_list(n->active_list, n);
 	while(!LIST_EMPTY(&n->edges)) {
 		remove_edge(LIST_FIRST(&n->edges));
 	}
@@ -227,11 +265,14 @@ void save_graphs(struct graph *g)
 	save_graph(stderr, g, ".tup/tmp/graph-trimmed-%i.dot");
 }
 
-static void expand_node(struct graph *g, struct node *n)
+static int expand_node(struct graph *g, struct node *n)
 {
 	n->expanded = 1;
-	TAILQ_REMOVE(&g->node_list, n, list);
-	TAILQ_INSERT_HEAD(&g->plist, n, list);
+	if(node_remove_list(&g->node_list, n) < 0)
+		return -1;
+	if(node_insert_head(&g->plist, n) < 0)
+		return -1;
+	return 0;
 }
 
 int build_graph_cb(void *arg, struct tup_entry *tent)
@@ -309,7 +350,8 @@ int build_graph_group_cb(void *arg, struct tup_entry *tent)
 		return -1;
 
 	if(n->expanded == 0) {
-		expand_node(g, n);
+		if(expand_node(g, n) < 0)
+			return -1;
 	}
 
 	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
@@ -337,10 +379,12 @@ static int build_group_cb(void *arg, struct tup_entry *tent,
 		return -1;
 
 	if(n->expanded == 0) {
-		expand_node(g, n);
+		if(expand_node(g, n) < 0)
+			return -1;
 	}
 	if(cmdn->expanded == 0) {
-		expand_node(g, cmdn);
+		if(expand_node(g, cmdn) < 0)
+			return -1;
 	}
 
 	if(create_edge(g->cur, cmdn, TUP_LINK_NORMAL) < 0)
@@ -374,8 +418,10 @@ int build_graph(struct graph *g)
 			cur->state = STATE_PROCESSING;
 		} else if(cur->state == STATE_PROCESSING) {
 			DEBUGP("remove node from stack: %lli\n", cur->tnode.tupid);
-			TAILQ_REMOVE(&g->plist, cur, list);
-			TAILQ_INSERT_TAIL(&g->node_list, cur, list);
+			if(node_remove_list(&g->plist, cur) < 0)
+				return -1;
+			if(node_insert_tail(&g->node_list, cur) < 0)
+				return -1;
 			cur->state = STATE_FINISHED;
 		} else if(cur->state == STATE_FINISHED) {
 			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", cur->tnode.tupid);
@@ -449,8 +495,10 @@ edge_create:
 		if(n->tent->type == g->count_flags)
 			g->num_nodes++;
 		n->expanded = 1;
-		TAILQ_REMOVE(&g->node_list, n, list);
-		TAILQ_INSERT_HEAD(&g->plist, n, list);
+		if(node_remove_list(&g->node_list, n) < 0)
+			return -1;
+		if(node_insert_head(&g->plist, n) < 0)
+			return -1;
 	}
 
 	if(create_edge(g->cur, n, TUP_LINK_NORMAL) < 0)
@@ -472,8 +520,10 @@ int nodes_are_connected(struct tup_entry *src, struct tent_entries *valid_root,
 	if(create_edge(g.cur, n, TUP_LINK_NORMAL) < 0)
 		return -1;
 	n->expanded = 1;
-	TAILQ_REMOVE(&g.node_list, n, list);
-	TAILQ_INSERT_HEAD(&g.plist, n, list);
+	if(node_remove_list(&g.node_list, n) < 0)
+		return -1;
+	if(node_insert_head(&g.plist, n) < 0)
+		return -1;
 
 	*connected = 0;
 	while(!TAILQ_EMPTY(&g.plist)) {
@@ -493,8 +543,10 @@ int nodes_are_connected(struct tup_entry *src, struct tent_entries *valid_root,
 			n->state = STATE_PROCESSING;
 		} else if(n->state == STATE_PROCESSING) {
 			DEBUGP("remove node from stack: %lli\n", n->tnode.tupid);
-			TAILQ_REMOVE(&g.plist, n, list);
-			TAILQ_INSERT_TAIL(&g.node_list, n, list);
+			if(node_remove_list(&g.plist, n) < 0)
+				return -1;
+			if(node_insert_tail(&g.node_list, n) < 0)
+				return -1;
 			n->state = STATE_FINISHED;
 		} else if(n->state == STATE_FINISHED) {
 			fprintf(stderr, "tup internal error: STATE_FINISHED node %lli in plist\n", n->tnode.tupid);
@@ -1165,8 +1217,10 @@ int add_group_circ_check(struct tup_entry *tent)
 	if(!n) {
 		return -1;
 	}
-	TAILQ_REMOVE(&group_graph.node_list, n, list);
-	TAILQ_INSERT_HEAD(&group_graph.plist, n, list);
+	if(node_remove_list(&group_graph.node_list, n) < 0)
+		return -1;
+	if(node_insert_head(&group_graph.plist, n) < 0)
+		return -1;
 	n->expanded = 1;
 	return 0;
 }
