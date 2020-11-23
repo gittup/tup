@@ -109,6 +109,7 @@ void remove_edge(struct edge *e);
 int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_TYPE count_flags2);
 int destroy_graph(struct graph *g);
 void save_graphs(struct graph *g);
+int build_graph_transient_cb(void *arg, struct tup_entry *tent);
 int build_graph_non_transient_cb(void *arg, struct tup_entry *tent);
 int build_graph_cb(void *arg, struct tup_entry *tent);
 int build_graph_group_cb(void *arg, struct tup_entry *tent);

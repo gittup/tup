@@ -336,6 +336,31 @@ static int attach_transient_cb(void *arg, struct tup_entry *tent)
 	return 0;
 }
 
+int build_graph_transient_cb(void *arg, struct tup_entry *tent)
+{
+	struct graph *g = arg;
+
+	if(tent->type == TUP_NODE_CMD) {
+		return build_graph_cb(g, tent);
+	} else {
+		struct node *n;
+		n = find_node(g, tent->tnode.tupid);
+		if(n == NULL) {
+			n = create_node(g, tent);
+			if(!n)
+				return -1;
+			if(make_edge(g, n) < 0)
+				return -1;
+			if(node_remove_list(&g->plist, n) < 0)
+				return -1;
+			if(node_insert_tail(&g->node_list, n) < 0)
+				return -1;
+			n->state = STATE_FINISHED;
+		}
+	}
+	return 0;
+}
+
 int build_graph_non_transient_cb(void *arg, struct tup_entry *tent)
 {
 	/* Only build out nodes that aren't transient. Any transient nodes get

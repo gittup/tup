@@ -1451,7 +1451,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	 * add any files in the transient list to the DAG to make sure they can
 	 * be removed.
 	 */
-	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_TRANSIENT) < 0)
+	if(tup_db_select_node_by_flags(build_graph_transient_cb, &g, TUP_FLAGS_TRANSIENT) < 0)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
