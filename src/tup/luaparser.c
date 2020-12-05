@@ -732,10 +732,50 @@ static char *lua_vardb(void *arg, const char *var, int varlen)
 	return value;
 }
 
+static int initial_luadb(struct lua_State *ls, struct string_entries *root)
+{
+	lua_pushglobaltable(ls);
+	lua_pushnil(ls);
+	while(lua_next(ls, -2) != 0) {
+		const char *name = lua_tostring(ls, -2);
+		struct string_tree *st;
+		st = malloc(sizeof *st);
+		if(string_tree_add(root, st, name) < 0)
+			return -1;
+		lua_pop(ls, 1);
+	}
+	lua_pop(ls, 1);
+	return 0;
+}
+
+static int add_vardb(struct tupfile *tf, struct lua_State *ls, struct string_entries *root)
+{
+	lua_pushglobaltable(ls);
+	lua_pushnil(ls);
+	while(lua_next(ls, -2) != 0) {
+		const char *name = lua_tostring(ls, -2);
+		if(string_tree_search(root, name, strlen(name)) == NULL) {
+			char *value;
+			if(lua_istable(ls, -1)) {
+				value = tuplua_table_tostring(ls);
+			} else {
+				value = tuplua_strdup(ls, -1);
+			}
+			if(vardb_set(&tf->vdb, name, value, NULL) < 0)
+				return -1;
+			free(value);
+		}
+		lua_pop(ls, 1);
+	}
+	lua_pop(ls, 1);
+	return 0;
+}
+
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 {
 	struct tuplua_reader_data lrd;
 	struct lua_State *ls = NULL;
+	struct string_entries vars = {NULL};
 
 	lrd.read = 0;
 	lrd.b = b;
@@ -777,8 +817,6 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 
 		lua_setglobal(ls, "tup");
 
-		set_vardb(tf, ls);
-
 		/* Load some basic libraries.  Load the debug library so
 		 * tracebacks for errors can be formatted nicely
 		 */
@@ -814,6 +852,10 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		}
 		lua_pop(ls, 1);
 
+
+		if(initial_luadb(ls, &vars) < 0)
+			return -1;
+		set_vardb(tf, ls);
 		if(parser_include_rules(tf, "Tuprules.lua") < 0) {
 			if(tf->luaerror == TUPLUA_PENDINGERROR) {
 				assert(lua_gettop(ls) == 2);
@@ -847,6 +889,11 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	}
 
 	lua_pop(ls, 1);
+	if(add_vardb(tf, ls, &vars) < 0)
+		return -1;
+	tf->vdb.external_vardb = NULL;
+	tf->vdb.external_arg = NULL;
+	free_string_tree(&vars);
 	assert(lua_gettop(ls) == 0);
 	return 0;
 }
