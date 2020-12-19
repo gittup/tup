@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2010-2020  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2020  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,17 +16,28 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Make sure hidden files are still tracked internally during command
-# execution, even though they won't make it into the final DAG.
+# Make sure including a lua file still allows the Tupfile to change variables.
+
 . ./tup.sh
-check_no_windows shell
+
+cat > extra.lua << HERE
+CFLAGS += '-Dlua'
+v1 = 17
+v2 = {'hey', 'there'}
+HERE
 
 cat > Tupfile << HERE
-: |> touch .foo; mv .foo bar |> bar
+CFLAGS += -Dfoo
+include extra.lua
+CFLAGS += -Dbar
+: |> echo \$(CFLAGS) |>
+: |> echo \$(v1) |>
+: |> echo \$(v2) |>
 HERE
-tup touch Tupfile
-update
+parse
 
-update_null "Expected second update not to run the command."
+tup_object_exist . 'echo -Dfoo -Dlua -Dbar'
+tup_object_exist . 'echo 17'
+tup_object_exist . 'echo hey there'
 
 eotup

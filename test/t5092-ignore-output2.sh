@@ -40,14 +40,7 @@ check_exist ignoredir/file.txt
 
 # Make sure a subsequent update doesn't do anything, since all ignored files
 # should be in the database.
-update > .tup/.tupoutput
-for i in "Tupfiles" "files" "commands"; do
-	if ! grep "No $i" .tup/.tupoutput > /dev/null; then
-		cat .tup/.tupoutput
-		echo "Error: Expected \"No $i\" in tup output" 1>&2
-		exit 1
-	fi
-done
+update_null "All ignored files should be in the database"
 
 # Make sure running with ignored files already in the db still works.
 tup touch run.sh

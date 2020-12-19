@@ -54,11 +54,6 @@ tup_dep_no_exist $prefix/.. external . 'sh run.sh 2'
 
 sleep 1
 touch ../external/bar.txt
-update > .tup/.tupoutput
-if ! grep 'No commands to execute' .tup/.tupoutput > /dev/null; then
-	cat .tup/.tupoutput
-	echo "Error: No files should have been recompiled when nothing was changed." 1>&2
-	exit 1
-fi
+update_null "No files should have been recompiled when nothing was changed."
 
 eotup
