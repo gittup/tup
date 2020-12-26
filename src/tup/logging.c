@@ -173,7 +173,7 @@ void log_graph(struct graph *g, const char *name)
 {
 	if(enabled) {
 		char fullname[PATH_MAX];
-		if(snprintf(fullname, sizeof(fullname), ".tup/log/%s.dot.0", name) >= (signed)sizeof(fullname)) {
+		if(snprintf(fullname, sizeof(fullname), "%s/.tup/log/%s.dot.0", get_tup_top(), name) >= (signed)sizeof(fullname)) {
 			fprintf(stderr, "tup internal error: log graph name is sized incorrectly.\n");
 			return;
 		}

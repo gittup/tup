@@ -38,6 +38,7 @@
 #include "environ.h"
 #include "timespan.h"
 #include "variant.h"
+#include "logging.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -4965,9 +4966,11 @@ static int env_cb(int environ_check, struct tup_entry *tent, const char *var, co
 	}
 
 	if(!match) {
-		printf("Environment variable changed: %s\n", var);
 		/* Skip past the 'FOO=' part of the stored value if we have an old value to print */
-		printf(" - Old: '%s'\n", stored_value ? stored_value + varlen + 1: NULL);
+		const char *old = stored_value ? stored_value + varlen + 1: NULL;
+		log_debug_tent("Env update", tent, "\n - Old: %s\n - New: %s\n", old, env);
+		printf("Environment variable changed: %s\n", var);
+		printf(" - Old: '%s'\n", old);
 		printf(" - New: '%s'\n", env);
 		if(tup_db_add_create_list(tent->tnode.tupid) < 0)
 			return -1;
