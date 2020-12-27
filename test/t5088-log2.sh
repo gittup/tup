@@ -51,6 +51,11 @@ touch overfile
 update --debug-logging
 log_good "Create(overwrite).*overfile.*oldtype=2"
 
+PATH=$PATH:$PWD update --debug-logging
+log_good "Env update.*PATH"
+check_exist .tup/log/update.dot.0
+update
+
 update --debug-logging
 if ! wc -l .tup/log/debug.log.0  | grep '1 \.tup/log/debug.log.0' > /dev/null; then
 	echo "Error: Expected only one line in debug.log.0" 1>&2
