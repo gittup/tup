@@ -589,10 +589,27 @@ static int tuplua_function_run(lua_State *ls)
 	if(!cmdline)
 		return luaL_error(ls, "run() must be passed a string for the command-line to run");
 
-	if(exec_run_script(tf, cmdline, 0) < 0)
+	if(exec_run_script(tf, cmdline, 0, NULL) < 0)
 		return luaL_error(ls, "tup error: Failed to run external script.\n");
 
 	return 0;
+}
+
+static int tuplua_function_shell(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *cmdline = tuplua_tostring(ls, 1);
+	char *output = NULL;
+
+	if(!cmdline)
+		return luaL_error(ls, "shell() must be passed a string for command-line to execute");
+	if(exec_run_script(tf, cmdline, 0, &output) < 0 && output == NULL)
+		return luaL_error(ls, "tup error: Failed to run command");
+
+	lua_settop(ls, 0);
+	lua_pushstring(ls, output);
+	free(output);
+	return 1;
 }
 
 static int tuplua_function_nodevariable(lua_State *ls)
@@ -803,6 +820,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "handle_fileread", tuplua_function_handle_fileread, tf);
 		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);
 		tuplua_register_function(ls, "run", tuplua_function_run, tf);
+		tuplua_register_function(ls, "shell", tuplua_function_shell, tf);
 
 		lua_pushlightuserdata(ls, tf);
 		lua_newtable(ls);

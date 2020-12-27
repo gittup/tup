@@ -589,7 +589,7 @@ int server_unlink(void)
 }
 
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
-		      struct tent_entries *env_root, char **rules)
+		      struct tent_entries *env_root, char **outputp)
 {
 	struct tup_entry *tent;
 	struct server s;
@@ -607,42 +607,47 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
 	init_file_info(&s.finfo, tup_entry_variant(tent)->variant_dir, 0);
-	if(exec_internal(&s, cmdline, &te, tent, 0, 0, 0) < 0)
+	if(exec_internal(&s, cmdline, &te, tent, f == NULL ? 1 : 0, 0, 0) < 0)
 		return -1;
 	environ_free(&te);
 
-	if(display_output(s.error_fd, 1, cmdline, 1, f) < 0)
-		return -1;
-	if(close(s.error_fd) < 0) {
-		perror("close(s.error_fd)");
-		return -1;
+	if(f != NULL) {
+		if(display_output(s.error_fd, 1, cmdline, 1, f) < 0)
+			return -1;
+		if(close(s.error_fd) < 0) {
+			perror("close(s.error_fd)");
+			return -1;
+		}
 	}
 
-	if(s.exited) {
-		if(s.exit_status == 0) {
-			struct buf b;
-			if(fslurp_null(s.output_fd, &b) < 0)
-				return -1;
-			if(close(s.output_fd) < 0) {
-				perror("close(s.output_fd)");
-				return -1;
-			}
-			*rules = b.s;
-			return 0;
+	if((s.exited && s.exit_status == 0) || f == NULL) {
+		struct buf b;
+
+		if(fslurp_null(s.output_fd, &b) < 0)
+			return -1;
+		if(close(s.output_fd) < 0) {
+			perror("close(s.output_fd)");
+			return -1;
 		}
-		fprintf(f, "tup error: run-script exited with failure code: %i\n", s.exit_status);
-	} else {
-		if(s.signalled) {
-			fprintf(f, "tup error: run-script terminated with signal %i\n", s.exit_sig);
-		} else {
-			fprintf(f, "tup error: run-script terminated abnormally.\n");
-		}
+		*outputp = b.s;
 	}
+
+	if(s.exited && s.exit_status == 0)
+		return 0;
+	else if(f == NULL)
+		return -1;
+
+	if(s.exited)
+		fprintf(f, "tup error: `%s` exited with failure code: %i\n", cmdline, s.exit_status);
+	else if(s.signalled)
+		fprintf(f, "tup error: `%s` terminated with signal: %i\n", cmdline, s.exit_sig);
+	else
+		fprintf(f, "tup error: `%s` terminated abnormally\n", cmdline);
 	return -1;
 }
 
 int serverless_run_script(FILE *f, const char *cmdline,
-		          struct tent_entries *env_root, char **rules)
+		          struct tent_entries *env_root, char **outputp)
 {
 	struct tup_env te;
 
@@ -660,7 +665,7 @@ int serverless_run_script(FILE *f, const char *cmdline,
 		return -1;
 	}
 
-	efile = tmpfile();
+	efile = f == NULL ? ofile : tmpfile();
 	if(!efile) {
 		perror("tmpfile");
 		fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
@@ -688,7 +693,7 @@ int serverless_run_script(FILE *f, const char *cmdline,
 			perror("fclose(ofile)");
 			exit(-1);
 		}
-		if(fclose(efile) < 0) {
+		if(efile != ofile && fclose(efile) < 0) {
 			perror("fclose(efile)");
 			exit(-1);
 		}
@@ -734,14 +739,16 @@ int serverless_run_script(FILE *f, const char *cmdline,
 	}
 	environ_free(&te);
 
-	rewind(efile);
 	rewind(ofile);
 
-	if(display_output(fileno(efile), 1, cmdline, 1, f) < 0)
-		return -1;
-	if(fclose(efile) < 0) {
-		perror("close(efile)");
-		return -1;
+	if(efile != ofile) {
+		rewind(efile);
+		if(display_output(fileno(efile), 1, cmdline, 1, f) < 0)
+			return -1;
+		if(fclose(efile) < 0) {
+			perror("close(efile)");
+			return -1;
+		}
 	}
 
 	int exited = 0;
@@ -759,26 +766,29 @@ int serverless_run_script(FILE *f, const char *cmdline,
 		return -1;
 	}
 
-	if(exited) {
-		if(exit_status == 0) {
-			struct buf b;
-			if(fslurp_null(fileno(ofile), &b) < 0)
-				return -1;
-			if(fclose(ofile) < 0) {
-				perror("fclose(ofile)");
-				return -1;
-			}
-			*rules = b.s;
-			return 0;
+	if((exited && exit_status == 0) || f == NULL) {
+		struct buf b;
+
+		if(fslurp_null(fileno(ofile), &b) < 0)
+			return -1;
+		if(fclose(ofile) < 0) {
+			perror("fclose(ofile)");
+			return -1;
 		}
-		fprintf(f, "tup error: run-script exited with failure code: %i\n", exit_status);
-	} else {
-		if(signalled) {
-			fprintf(f, "tup error: run-script terminated with signal %i\n", exit_sig);
-		} else {
-			fprintf(f, "tup error: run-script terminated abnormally.\n");
-		}
+		*outputp = b.s;
 	}
+
+	if(exited && exit_status == 0)
+		return 0;
+	else if(f == NULL)
+		return -1;
+
+	if(exited)
+		fprintf(f, "tup error: `%s` exited with failure code: %i\n", cmdline, exit_status);
+	else if(signalled)
+		fprintf(f, "tup error: `%s` terminated with signal: %i\n", cmdline, exit_sig);
+	else
+		fprintf(f, "tup error: `%s` terminated abnormally\n", cmdline);
 	return -1;
 }
 

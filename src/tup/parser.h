@@ -153,7 +153,8 @@ struct rule {
 struct bin_head;
 
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
-int exec_run_script(struct tupfile *tf, const char *cmdline, int lno);
+int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
+		    char **outputp);
 int export(struct tupfile *tf, const char *cmdline);
 void free_path_list(struct path_list_head *plist);
 struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_head *bl, int orderid);

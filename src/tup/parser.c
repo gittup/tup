@@ -1000,13 +1000,16 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno)
 	if(!eval_cmdline) {
 		return -1;
 	}
-	rc = exec_run_script(tf, eval_cmdline, lno);
+	rc = exec_run_script(tf, eval_cmdline, lno, NULL);
 	free(eval_cmdline);
 	return rc;
 }
 
-int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
+int exec_run_script(struct tupfile *tf, const char *cmdline, int lno,
+		    char **outputp)
 {
+	int expect_rules = outputp == NULL;
+	FILE *f = expect_rules ? tf->f : NULL;
 	char *rules;
 	char *p;
 	int rslno = 0;
@@ -1029,12 +1032,17 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 		if(tent_tree_add_dup(&tf->input_root, tt->tent) < 0)
 			return -1;
 	}
+
+	if(expect_rules)
+		outputp = &rules;
 	if (tf->use_server)
-		rc = server_run_script(tf->f, tf->tent->tnode.tupid, cmdline, &tf->env_root, &rules);
+		rc = server_run_script(f, tf->tent->tnode.tupid, cmdline, &tf->env_root, outputp);
 	else
-		rc = serverless_run_script(tf->f, cmdline, &tf->env_root, &rules);
+		rc = serverless_run_script(f, cmdline, &tf->env_root, outputp);
 	if(rc < 0)
 		return -1;
+	if(!expect_rules)
+		return 0;
 
 	p = rules;
 	while(p[0]) {
