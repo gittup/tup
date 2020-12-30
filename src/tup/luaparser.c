@@ -558,8 +558,21 @@ static int tuplua_function_handle_fileread(lua_State *ls)
 	if(strcmp(mode, "r") != 0) {
 		return luaL_error(ls, "io.open in the parser can only open files read-only");
 	}
-	if(handle_file_dtent(ACCESS_READ, tf->curtent, filename, &tf->ps->s.finfo) < 0)
-		return luaL_error(ls, "unable to save file read access in the lua parser");
+	if(is_full_path(filename)) {
+		if(handle_file(ACCESS_READ, filename, "", &tf->ps->s.finfo) < 0)
+			return luaL_error(ls, "unable to save file read access in the lua parser");
+	} else {
+		char fullpath[PATH_MAX];
+		char curtentpath[PATH_MAX];
+		if(snprint_tup_entry(curtentpath, sizeof(curtentpath), tf->curtent) >= (int)sizeof(curtentpath)) {
+			return luaL_error(ls, "string size too small in handle_fileread()\n");
+		}
+		if(snprintf(fullpath, PATH_MAX, "%s/%s/%s", get_tup_top(), curtentpath, filename) >= PATH_MAX) {
+			return luaL_error(ls, "string size too small in handle_fileread()\n");
+		}
+		if(handle_file(ACCESS_READ, fullpath, "", &tf->ps->s.finfo) < 0)
+			return luaL_error(ls, "unable to save file read access in the lua parser");
+	}
 
 	/* builtin.lua will call unchdir after doing the actual file open,
 	 * which is expected to be relative to the current directory.
