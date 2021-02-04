@@ -1,24 +1,23 @@
-diff --git a/src/lua/lauxlib.c b/src/lua/lauxlib.c
-index f7a3836..7b26158 100644
---- a/src/lua/lauxlib.c
-+++ b/src/lua/lauxlib.c
-@@ -1030,6 +1030,11 @@ LUALIB_API lua_State *luaL_newstate (void) {
+diff --git a/lauxlib.c b/lauxlib.c
+index e8fc486e..1ee77eff 100644
+--- a/lauxlib.c
++++ b/lauxlib.c
+@@ -1071,6 +1071,10 @@ static void warnfon (void *ud, const char *message, int tocont) {
+   warnfcont(ud, message, tocont);  /* finish processing */
  }
- 
  
 +LUALIB_API void luaL_setoutput (lua_State *L, FILE *output) {
 +  lua_setoutput(L, output);
 +}
 +
-+
- LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
-   const lua_Number *v = lua_version(L);
-   if (sz != LUAL_NUMSIZES)  /* check numeric types */
-diff --git a/src/lua/lauxlib.h b/src/lua/lauxlib.h
-index 9a2e66a..190fa98 100644
---- a/src/lua/lauxlib.h
-+++ b/src/lua/lauxlib.h
-@@ -91,6 +91,8 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
+ 
+ LUALIB_API lua_State *luaL_newstate (void) {
+   lua_State *L = lua_newstate(l_alloc, NULL);
+diff --git a/lauxlib.h b/lauxlib.h
+index 65714911..ef6979fa 100644
+--- a/lauxlib.h
++++ b/lauxlib.h
+@@ -99,6 +99,8 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
  
  LUALIB_API lua_State *(luaL_newstate) (void);
  
@@ -26,8 +25,8 @@ index 9a2e66a..190fa98 100644
 +
  LUALIB_API lua_Integer (luaL_len) (lua_State *L, int idx);
  
- LUALIB_API const char *(luaL_gsub) (lua_State *L, const char *s, const char *p,
-@@ -234,6 +236,9 @@ LUALIB_API void (luaL_openlib) (lua_State *L, const char *libname,
+ LUALIB_API void luaL_addgsub (luaL_Buffer *b, const char *s,
+@@ -262,6 +264,9 @@ typedef struct luaL_Stream {
          (fprintf(stderr, (s), (p)), fflush(stderr))
  #endif
  
@@ -37,26 +36,28 @@ index 9a2e66a..190fa98 100644
  /* }================================================================== */
  
  
-diff --git a/src/lua/lbaselib.c b/src/lua/lbaselib.c
-index 08523e6..dd741b8 100644
---- a/src/lua/lbaselib.c
-+++ b/src/lua/lbaselib.c
-@@ -19,6 +19,7 @@
+diff --git a/lbaselib.c b/lbaselib.c
+index 747fd45a..95e45fdb 100644
+--- a/lbaselib.c
++++ b/lbaselib.c
+@@ -19,7 +19,7 @@
  
  #include "lauxlib.h"
  #include "lualib.h"
+-
 +#include "lstate.h"
  
- 
  static int luaB_print (lua_State *L) {
-@@ -34,11 +35,11 @@ static int luaB_print (lua_State *L) {
-     s = lua_tolstring(L, -1, &l);  /* get result */
-     if (s == NULL)
-       return luaL_error(L, "'tostring' must return a string to 'print'");
--    if (i>1) lua_writestring("\t", 1);
--    lua_writestring(s, l);
+   int n = lua_gettop(L);  /* number of arguments */
+@@ -27,12 +27,11 @@ static int luaB_print (lua_State *L) {
+   for (i = 1; i <= n; i++) {  /* for each argument */
+     size_t l;
+     const char *s = luaL_tolstring(L, i, &l);  /* convert it to string */
+-    if (i > 1)  /* not the first element? */
+-      lua_writestring("\t", 1);  /* add a tab before it */
+-    lua_writestring(s, l);  /* print it */
 +    if (i>1) lua_writestringout("\t", 1, L);
-+    lua_writestringout(s, l, L);
++    lua_writestringout(s, l, L);    
      lua_pop(L, 1);  /* pop result */
    }
 -  lua_writeline();
@@ -64,10 +65,10 @@ index 08523e6..dd741b8 100644
    return 0;
  }
  
-diff --git a/src/lua/llex.c b/src/lua/llex.c
-index 7032827..92de8e3 100644
---- a/src/lua/llex.c
-+++ b/src/lua/llex.c
+diff --git a/llex.c b/llex.c
+index e9915178..463261a7 100644
+--- a/llex.c
++++ b/llex.c
 @@ -44,7 +44,8 @@ static const char *const luaX_tokens [] = {
      "return", "then", "true", "until", "while",
      "//", "..", "...", "==", ">=", "<=", "~=",
@@ -78,8 +79,8 @@ index 7032827..92de8e3 100644
  };
  
  
-@@ -494,6 +495,11 @@ static int llex (LexState *ls, SemInfo *seminfo) {
-         if (check_next1(ls, '=')) return TK_NE;
+@@ -510,6 +511,11 @@ static int llex (LexState *ls, SemInfo *seminfo) {
+         if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
          else return '~';
        }
 +      case '!': {
@@ -89,12 +90,12 @@ index 7032827..92de8e3 100644
 +      }
        case ':': {
          next(ls);
-         if (check_next1(ls, ':')) return TK_DBCOLON;
-diff --git a/src/lua/llex.h b/src/lua/llex.h
-index 2363d87..443f2d9 100644
---- a/src/lua/llex.h
-+++ b/src/lua/llex.h
-@@ -33,7 +33,8 @@ enum RESERVED {
+         if (check_next1(ls, ':')) return TK_DBCOLON;  /* '::' */
+diff --git a/llex.h b/llex.h
+index 389d2f86..e352cd39 100644
+--- a/llex.h
++++ b/llex.h
+@@ -39,7 +39,8 @@ enum RESERVED {
    TK_IDIV, TK_CONCAT, TK_DOTS, TK_EQ, TK_GE, TK_LE, TK_NE,
    TK_SHL, TK_SHR,
    TK_DBCOLON, TK_EOS,
@@ -104,11 +105,11 @@ index 2363d87..443f2d9 100644
  };
  
  /* number of reserved words */
-diff --git a/src/lua/lparser.c b/src/lua/lparser.c
-index cd4512d..00d9a29 100644
---- a/src/lua/lparser.c
-+++ b/src/lua/lparser.c
-@@ -1010,6 +1010,7 @@ static BinOpr getbinopr (int op) {
+diff --git a/lparser.c b/lparser.c
+index 249ba9a4..3ee2214e 100644
+--- a/lparser.c
++++ b/lparser.c
+@@ -1207,6 +1207,7 @@ static BinOpr getbinopr (int op) {
      case TK_SHR: return OPR_SHR;
      case TK_CONCAT: return OPR_CONCAT;
      case TK_NE: return OPR_NE;
@@ -116,10 +117,13 @@ index cd4512d..00d9a29 100644
      case TK_EQ: return OPR_EQ;
      case '<': return OPR_LT;
      case TK_LE: return OPR_LE;
-@@ -1143,6 +1144,71 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
+@@ -1353,6 +1354,80 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
    }
  }
  
++#define BITRK               (1 << (SIZE_B - 1))
++#define ISK(x)              ((x) & BITRK)
++
 +static void append_assignment (LexState *ls, struct LHS_assign *lh) {
 +  FuncState * fs=ls->fs;
 +  TString *appendfunc_name;
@@ -144,7 +148,8 @@ index cd4512d..00d9a29 100644
 +    /* Locate _ENV and make it an upvalue if necessary */
 +    singlevaraux(fs, ls->envn, &appendfunc, 1);
 +    lua_assert(appendfunc.k == VLOCAL || appendfunc.k == VUPVAL);
-+    codestring(ls, &key, appendfunc_name);  /* Make func_name a constant */
++    codename(ls, &key);
++    codestring(&key, appendfunc_name);
 +    luaK_indexed(fs, &appendfunc, &key);  /* env[varname] */
 +  }
 +  luaK_exp2nextreg(fs, &appendfunc);
@@ -161,9 +166,9 @@ index cd4512d..00d9a29 100644
 +    if (!ISK(var.u.ind.idx) && var.u.ind.idx >= fs->nactvar) {
 +      fs->freereg += 1;
 +    }
-+    if (var.u.ind.vt == VLOCAL) {
++    if (var.u.ind.t == VLOCAL) {
 +      if (!ISK(var.u.ind.t) && var.u.ind.t >= fs->nactvar) {
-+	fs->freereg += 1;
++        fs->freereg += 1;
 +      }
 +    }
 +  }
@@ -178,21 +183,25 @@ index cd4512d..00d9a29 100644
 +  lua_assert(appendfunc.k == VNONRELOC);
 +  base = appendfunc.u.info;  /* base register for call */
 +  init_exp(&appendfunc, VCALL,
-+	   luaK_codeABC(fs, OP_CALL, base, fs->freereg - (base + 1) + 1, 2));
++      luaK_codeABC(fs, OP_CALL, base, fs->freereg - (base + 1) + 1, 2));
 +  fs->freereg = base + 1;  /* call removes function and arguments and leaves
-+			      (unless changed) one result */
++                          (unless changed) one result */
 +
 +  /* Store the call result */
 +  luaK_storevar(fs, &lh->v, &appendfunc);
 +}
- 
- static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
-   expdesc e;
-@@ -1159,6 +1225,13 @@ static void assignment (LexState *ls, struct LHS_assign *lh, int nvars) {
-   }
-   else {  /* assignment -> '=' explist */
-     int nexps;
 +
++#undef BITRK
++#undef ISK
++
++
+ /*
+ ** Parse and compile a multiple assignment. The first "variable"
+ ** (a 'suffixedexp') was already read by the caller.
+@@ -1376,6 +1451,12 @@ static void restassign (LexState *ls, struct LHS_assign *lh, int nvars) {
+   }
+   else {  /* restassign -> '=' explist */
+     int nexps;
 +    if(nvars==1) {
 +      if(ls->t.token == '+') {
 +        append_assignment(ls, lh);
@@ -202,20 +211,20 @@ index cd4512d..00d9a29 100644
      checknext(ls, '=');
      nexps = explist(ls, &e);
      if (nexps != nvars)
-@@ -1490,7 +1563,7 @@ static void exprstat (LexState *ls) {
+@@ -1786,7 +1867,7 @@ static void exprstat (LexState *ls) {
    FuncState *fs = ls->fs;
    struct LHS_assign v;
    suffixedexp(ls, &v.v);
 -  if (ls->t.token == '=' || ls->t.token == ',') { /* stat -> assignment ? */
 +  if (ls->t.token == '=' || ls->t.token == ',' || ls->t.token == '+') { /* stat -> assignment ? */
      v.prev = NULL;
-     assignment(ls, &v, 1);
+     restassign(ls, &v, 1);
    }
-diff --git a/src/lua/lstate.c b/src/lua/lstate.c
-index 9194ac3..a439055 100644
---- a/src/lua/lstate.c
-+++ b/src/lua/lstate.c
-@@ -334,10 +334,16 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
+diff --git a/lstate.c b/lstate.c
+index 92ccbf9b..11304668 100644
+--- a/lstate.c
++++ b/lstate.c
+@@ -401,10 +401,16 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
      close_state(L);
      L = NULL;
    }
@@ -230,12 +239,12 @@ index 9194ac3..a439055 100644
 +
 +
  LUA_API void lua_close (lua_State *L) {
-   L = G(L)->mainthread;  /* only the main thread can be closed */
    lua_lock(L);
-diff --git a/src/lua/lstate.h b/src/lua/lstate.h
-index a469466..7d56528 100644
---- a/src/lua/lstate.h
-+++ b/src/lua/lstate.h
+   L = G(L)->mainthread;  /* only the main thread can be closed */
+diff --git a/lstate.h b/lstate.h
+index 38a6c9b6..6c74b97a 100644
+--- a/lstate.h
++++ b/lstate.h
 @@ -12,6 +12,7 @@
  #include "lobject.h"
  #include "ltm.h"
@@ -244,18 +253,18 @@ index a469466..7d56528 100644
  
  
  /*
-@@ -181,6 +184,7 @@ struct lua_State {
-   unsigned short nCcalls;  /* number of nested C calls */
-   l_signalT hookmask;
+@@ -274,6 +275,7 @@ struct lua_State {
+   CommonHeader;
+   lu_byte status;
    lu_byte allowhook;
 +  FILE *output;
- };
- 
- 
-diff --git a/src/lua/lua.h b/src/lua/lua.h
-index 26c0e2d..c107621 100644
---- a/src/lua/lua.h
-+++ b/src/lua/lua.h
+   unsigned short nci;  /* number of items in 'ci' list */
+   StkId top;  /* first free slot in the stack */
+   global_State *l_G;
+diff --git a/lua.h b/lua.h
+index aec70dac..67943f46 100644
+--- a/lua.h
++++ b/lua.h
 @@ -9,6 +9,7 @@
  #ifndef lua_h
  #define lua_h
@@ -264,11 +273,11 @@ index 26c0e2d..c107621 100644
  #include <stdarg.h>
  #include <stddef.h>
  
-@@ -143,6 +144,7 @@ extern const char lua_ident[];
- ** state manipulation
+@@ -152,6 +153,7 @@ extern const char lua_ident[];
  */
  LUA_API lua_State *(lua_newstate) (lua_Alloc f, void *ud);
-+LUA_API void       (lua_setoutput) (lua_State *L, FILE *output);
  LUA_API void       (lua_close) (lua_State *L);
++LUA_API void       (lua_setoutput) (lua_State *L, FILE *output);
  LUA_API lua_State *(lua_newthread) (lua_State *L);
+ LUA_API int        (lua_resetthread) (lua_State *L);
  

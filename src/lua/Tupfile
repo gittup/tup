@@ -22,7 +22,6 @@ srcs += lvm.c
 srcs += lzio.c
 srcs += lauxlib.c
 srcs += lbaselib.c
-srcs += lbitlib.c
 srcs += lcorolib.c
 srcs += ldblib.c
 srcs += liolib.c
