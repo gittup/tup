@@ -18,6 +18,10 @@
 
 # Make sure we can play nicely with ccache.
 . ./tup.sh
+if ! ccache --version | grep 'ccache version 3' > /dev/null; then
+	echo "[33mSkipping test: Expected ccache version 3[0m"
+	eotup
+fi
 check_tup_suid
 
 set_full_deps
