@@ -46,6 +46,7 @@
 #include <pthread.h>
 
 int __xstat(int vers, const char *name, struct stat *buf);
+int stat(const char *filename, struct stat *buf);
 int stat64(const char *filename, struct stat64 *buf);
 int __xstat64(int __ver, __const char *__filename,
 	      struct stat64 *__stat_buf);
@@ -87,6 +88,7 @@ static int (*s_execvp)(const char *file, char *const argv[]);
 static int (*s_chdir)(const char *path);
 static int (*s_fchdir)(int fd);
 static int (*s_xstat)(int vers, const char *name, struct stat *buf);
+static int (*s_stat)(const char *name, struct stat *buf);
 static int (*s_stat64)(const char *name, struct stat64 *buf);
 static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
 static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
@@ -563,6 +565,15 @@ int __xstat(int vers, const char *name, struct stat *buf)
 	WRAP(s_xstat, "__xstat");
 	rc = s_xstat(vers, name, buf);
 	handle_file(name, "", ACCESS_READ);
+	return rc;
+}
+
+int stat(const char *filename, struct stat *buf)
+{
+	int rc;
+	WRAP(s_stat, "stat");
+	rc = s_stat(filename, buf);
+	handle_file(filename, "", ACCESS_READ);
 	return rc;
 }
 
