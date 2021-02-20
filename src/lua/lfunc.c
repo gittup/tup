@@ -120,11 +120,11 @@ static void callclosemethod (lua_State *L, TValue *obj, TValue *err, int yy) {
 
 
 /*
-** Check whether 'obj' has a close metamethod and raise an error
-** if not.
+** Check whether object at given level has a close metamethod and raise
+** an error if not.
 */
-static void checkclosemth (lua_State *L, StkId level, const TValue *obj) {
-  const TValue *tm = luaT_gettmbyobj(L, obj, TM_CLOSE);
+static void checkclosemth (lua_State *L, StkId level) {
+  const TValue *tm = luaT_gettmbyobj(L, s2v(level), TM_CLOSE);
   if (ttisnil(tm)) {  /* no metamethod? */
     int idx = cast_int(level - L->ci->func);  /* variable index */
     const char *vname = luaG_findlocal(L, L->ci, idx, NULL);
@@ -155,33 +155,21 @@ static void prepcallclosemth (lua_State *L, StkId level, int status, int yy) {
 
 
 /*
-** Try to create a to-be-closed upvalue
-** (can raise a memory-allocation error)
-*/
-static void trynewtbcupval (lua_State *L, void *ud) {
-  newupval(L, 1, cast(StkId, ud), &L->openupval);
-}
-
-
-/*
-** Create a to-be-closed upvalue. If there is a memory error
-** when creating the upvalue, the closing method must be called here,
-** as there is no upvalue to call it later.
+** Insert a variable in the list of to-be-closed variables.
 */
 void luaF_newtbcupval (lua_State *L, StkId level) {
-  TValue *obj = s2v(level);
-  lua_assert(L->openupval == NULL || uplevel(L->openupval) < level);
-  if (!l_isfalse(obj)) {  /* false doesn't need to be closed */
-    int status;
-    checkclosemth(L, level, obj);
-    status = luaD_rawrunprotected(L, trynewtbcupval, level);
-    if (unlikely(status != LUA_OK)) {  /* memory error creating upvalue? */
-      lua_assert(status == LUA_ERRMEM);
-      luaD_seterrorobj(L, LUA_ERRMEM, level + 1);  /* save error message */
-      callclosemethod(L, s2v(level), s2v(level + 1), 0);
-      luaD_throw(L, LUA_ERRMEM);  /* throw memory error */
-    }
+  lua_assert(level > L->tbclist);
+  if (l_isfalse(s2v(level)))
+    return;  /* false doesn't need to be closed */
+  checkclosemth(L, level);  /* value must have a close method */
+  while (level - L->tbclist > USHRT_MAX) {  /* is delta too large? */
+    L->tbclist += USHRT_MAX;  /* create a dummy node at maximum delta */
+    L->tbclist->tbclist.delta = USHRT_MAX;
+    L->tbclist->tbclist.isdummy = 1;
   }
+  level->tbclist.delta = level - L->tbclist;
+  level->tbclist.isdummy = 0;
+  L->tbclist = level;
 }
 
 
@@ -194,11 +182,9 @@ void luaF_unlinkupval (UpVal *uv) {
 
 
 /*
-** Close all upvalues up to the given stack level. A 'status' equal
-** to NOCLOSINGMETH closes upvalues without running any __close
-** metamethods.
+** Close all upvalues up to the given stack level.
 */
-void luaF_close (lua_State *L, StkId level, int status, int yy) {
+void luaF_closeupval (lua_State *L, StkId level) {
   UpVal *uv;
   StkId upl;  /* stack index pointed by 'uv' */
   while ((uv = L->openupval) != NULL && (upl = uplevel(uv)) >= level) {
@@ -211,9 +197,22 @@ void luaF_close (lua_State *L, StkId level, int status, int yy) {
       nw2black(uv);  /* closed upvalues cannot be gray */
       luaC_barrier(L, uv, slot);
     }
-    if (uv->tbc && status != NOCLOSINGMETH) {
-      ptrdiff_t levelrel = savestack(L, level);
-      prepcallclosemth(L, upl, status, yy);  /* may change the stack */
+  }
+}
+
+
+/*
+** Close all upvalues and to-be-closed variables up to the given stack
+** level.
+*/
+void luaF_close (lua_State *L, StkId level, int status, int yy) {
+  ptrdiff_t levelrel = savestack(L, level);
+  luaF_closeupval(L, level);  /* first, close the upvalues */
+  while (L->tbclist >= level) {  /* traverse tbc's down to that level */
+    StkId tbc = L->tbclist;  /* get variable index */
+    L->tbclist -= tbc->tbclist.delta;  /* remove it from list */
+    if (!tbc->tbclist.isdummy) {  /* not a dummy entry? */
+      prepcallclosemth(L, tbc, status, yy);  /* close variable */
       level = restorestack(L, levelrel);
     }
   }

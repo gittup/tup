@@ -314,15 +314,6 @@ void luaK_patchtohere (FuncState *fs, int list) {
 }
 
 
-/*
-** MAXimum number of successive Instructions WiTHout ABSolute line
-** information.
-*/
-#if !defined(MAXIWTHABS)
-#define MAXIWTHABS	120
-#endif
-
-
 /* limit for difference between lines in relative line info. */
 #define LIMLINEDIFF	0x80
 
@@ -337,13 +328,13 @@ void luaK_patchtohere (FuncState *fs, int list) {
 static void savelineinfo (FuncState *fs, Proto *f, int line) {
   int linedif = line - fs->previousline;
   int pc = fs->pc - 1;  /* last instruction coded */
-  if (abs(linedif) >= LIMLINEDIFF || fs->iwthabs++ > MAXIWTHABS) {
+  if (abs(linedif) >= LIMLINEDIFF || fs->iwthabs++ >= MAXIWTHABS) {
     luaM_growvector(fs->ls->L, f->abslineinfo, fs->nabslineinfo,
                     f->sizeabslineinfo, AbsLineInfo, MAX_INT, "lines");
     f->abslineinfo[fs->nabslineinfo].pc = pc;
     f->abslineinfo[fs->nabslineinfo++].line = line;
     linedif = ABSLINEINFO;  /* signal that there is absolute information */
-    fs->iwthabs = 0;  /* restart counter */
+    fs->iwthabs = 1;  /* restart counter */
   }
   luaM_growvector(fs->ls->L, f->lineinfo, pc, f->sizelineinfo, ls_byte,
                   MAX_INT, "opcodes");

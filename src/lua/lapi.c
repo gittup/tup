@@ -39,7 +39,7 @@ const char lua_ident[] =
 
 
 /*
-** Test for a valid index.
+** Test for a valid index (one that is not the 'nilvalue').
 ** '!ttisnil(o)' implies 'o != &G(L)->nilvalue', so it is not needed.
 ** However, it covers the most common cases in a faster way.
 */
@@ -74,7 +74,8 @@ static TValue *index2value (lua_State *L, int idx) {
       return &G(L)->nilvalue;  /* it has no upvalues */
     else {
       CClosure *func = clCvalue(s2v(ci->func));
-      return (idx <= func->nupvalues) ? &func->upvalue[idx-1] : &G(L)->nilvalue;
+      return (idx <= func->nupvalues) ? &func->upvalue[idx-1]
+                                      : &G(L)->nilvalue;
     }
   }
 }
@@ -191,9 +192,8 @@ LUA_API void lua_settop (lua_State *L, int idx) {
   if (diff < 0 && hastocloseCfunc(ci->nresults))
     luaF_close(L, L->top + diff, CLOSEKTOP, 0);
 #endif
+  api_check(L, L->tbclist < L->top + diff, "cannot pop an unclosed slot");
   L->top += diff;
-  api_check(L, L->openupval == NULL || uplevel(L->openupval) < L->top,
-               "cannot pop an unclosed slot");
   lua_unlock(L);
 }
 
@@ -202,10 +202,10 @@ LUA_API void lua_closeslot (lua_State *L, int idx) {
   StkId level;
   lua_lock(L);
   level = index2stack(L, idx);
-  api_check(L, hastocloseCfunc(L->ci->nresults) && L->openupval != NULL &&
-               uplevel(L->openupval) == level,
+  api_check(L, hastocloseCfunc(L->ci->nresults) && L->tbclist == level,
      "no variable to close at given level");
   luaF_close(L, level, CLOSEKTOP, 0);
+  level = index2stack(L, idx);  /* stack may be moved */
   setnilvalue(s2v(level));
   lua_unlock(L);
 }
@@ -1264,8 +1264,7 @@ LUA_API void lua_toclose (lua_State *L, int idx) {
   lua_lock(L);
   o = index2stack(L, idx);
   nresults = L->ci->nresults;
-  api_check(L, L->openupval == NULL || uplevel(L->openupval) <= o,
-               "marked index below or equal new one");
+  api_check(L, L->tbclist < o, "given index below or equal a marked one");
   luaF_newtbcupval(L, o);  /* create new to-be-closed upvalue */
   if (!hastocloseCfunc(nresults))  /* function not marked yet? */
     L->ci->nresults = codeNresults(nresults);  /* mark it */

@@ -181,6 +181,7 @@ static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
   L1->stack = luaM_newvector(L, BASIC_STACK_SIZE + EXTRA_STACK, StackValue);
+  L1->tbclist = L1->stack;
   for (i = 0; i < BASIC_STACK_SIZE + EXTRA_STACK; i++)
     setnilvalue(s2v(L1->stack + i));  /* erase new stack */
   L1->top = L1->stack;
@@ -226,8 +227,6 @@ static void init_registry (lua_State *L, global_State *g) {
 
 /*
 ** open parts of the state that may cause memory-allocation errors.
-** ('g->nilvalue' being a nil value flags that the state was completely
-** build.)
 */
 static void f_luaopen (lua_State *L, void *ud) {
   global_State *g = G(L);
@@ -238,7 +237,7 @@ static void f_luaopen (lua_State *L, void *ud) {
   luaT_init(L);
   luaX_init(L);
   g->gcrunning = 1;  /* allow gc */
-  setnilvalue(&g->nilvalue);
+  setnilvalue(&g->nilvalue);  /* now state is complete */
   luai_userstateopen(L);
 }
 
@@ -253,6 +252,7 @@ static void preinit_thread (lua_State *L, global_State *g) {
   L->ci = NULL;
   L->nci = 0;
   L->twups = L;  /* thread has no upvalues */
+  L->nCcalls = 0;
   L->errorJmp = NULL;
   L->hook = NULL;
   L->hookmask = 0;
@@ -268,10 +268,13 @@ static void preinit_thread (lua_State *L, global_State *g) {
 
 static void close_state (lua_State *L) {
   global_State *g = G(L);
-  luaD_closeprotected(L, 0, LUA_OK);  /* close all upvalues */
-  luaC_freeallobjects(L);  /* collect all objects */
-  if (ttisnil(&g->nilvalue))  /* closing a fully built state? */
+  if (!completestate(g))  /* closing a partially built state? */
+    luaC_freeallobjects(L);  /* jucst collect its objects */
+  else {  /* closing a fully built state */
+    luaD_closeprotected(L, 1, LUA_OK);  /* close all upvalues */
+    luaC_freeallobjects(L);  /* collect all objects */
     luai_userstateclose(L);
+  }
   luaM_freearray(L, G(L)->strt.hash, G(L)->strt.size);
   freestack(L);
   lua_assert(gettotalbytes(g) == sizeof(LG));
@@ -296,7 +299,6 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
   setthvalue2s(L, L->top, L1);
   api_incr_top(L);
   preinit_thread(L1, g);
-  L1->nCcalls = 0;
   L1->hookmask = L->hookmask;
   L1->basehookcount = L->basehookcount;
   L1->hook = L->hook;
@@ -313,7 +315,7 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
 
 void luaE_freethread (lua_State *L, lua_State *L1) {
   LX *l = fromstate(L1);
-  luaF_close(L1, L1->stack, NOCLOSINGMETH, 0);  /* close all upvalues */
+  luaF_closeupval(L1, L1->stack);  /* close all upvalues */
   lua_assert(L1->openupval == NULL);
   luai_userstatefree(L, L1);
   freestack(L1);
@@ -328,7 +330,7 @@ int luaE_resetthread (lua_State *L, int status) {
   ci->callstatus = CIST_C;
   if (status == LUA_YIELD)
     status = LUA_OK;
-  status = luaD_closeprotected(L, 0, status);
+  status = luaD_closeprotected(L, 1, status);
   if (status != LUA_OK)  /* errors? */
     luaD_seterrorobj(L, status, L->stack + 1);
   else
@@ -363,7 +365,6 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   preinit_thread(L, g);
   g->allgc = obj2gco(L);  /* by now, only object is the main thread */
   L->next = NULL;
-  L->nCcalls = 0;
   incnny(L);  /* main thread is always non yieldable */
   g->frealloc = f;
   g->ud = ud;
