@@ -222,26 +222,26 @@ static Vardesc *getlocalvardesc (FuncState *fs, int vidx) {
 
 
 /*
-** Convert 'nvar', a compiler index level, to its corresponding
-** register. For that, search for the highest variable below that level
-** that is in a register and uses its register index ('ridx') plus one.
+** Convert 'nvar', a compiler index level, to it corresponding
+** stack index level. For that, search for the highest variable
+** below that level that is in the stack and uses its stack
+** index ('sidx').
 */
-static int reglevel (FuncState *fs, int nvar) {
+static int stacklevel (FuncState *fs, int nvar) {
   while (nvar-- > 0) {
-    Vardesc *vd = getlocalvardesc(fs, nvar);  /* get previous variable */
-    if (vd->vd.kind != RDKCTC)  /* is in a register? */
-      return vd->vd.ridx + 1;
+    Vardesc *vd = getlocalvardesc(fs, nvar);  /* get variable */
+    if (vd->vd.kind != RDKCTC)  /* is in the stack? */
+      return vd->vd.sidx + 1;
   }
-  return 0;  /* no variables in registers */
+  return 0;  /* no variables in the stack */
 }
 
 
 /*
-** Return the number of variables in the register stack for the given
-** function.
+** Return the number of variables in the stack for function 'fs'
 */
 int luaY_nvarstack (FuncState *fs) {
-  return reglevel(fs, fs->nactvar);
+  return stacklevel(fs, fs->nactvar);
 }
 
 
@@ -267,7 +267,7 @@ static void init_var (FuncState *fs, expdesc *e, int vidx) {
   e->f = e->t = NO_JUMP;
   e->k = VLOCAL;
   e->u.var.vidx = vidx;
-  e->u.var.ridx = getlocalvardesc(fs, vidx)->vd.ridx;
+  e->u.var.sidx = getlocalvardesc(fs, vidx)->vd.sidx;
 }
 
 
@@ -310,12 +310,12 @@ static void check_readonly (LexState *ls, expdesc *e) {
 */
 static void adjustlocalvars (LexState *ls, int nvars) {
   FuncState *fs = ls->fs;
-  int reglevel = luaY_nvarstack(fs);
+  int stklevel = luaY_nvarstack(fs);
   int i;
   for (i = 0; i < nvars; i++) {
     int vidx = fs->nactvar++;
     Vardesc *var = getlocalvardesc(fs, vidx);
-    var->vd.ridx = reglevel++;
+    var->vd.sidx = stklevel++;
     var->vd.pidx = registerlocalvar(ls, fs, var->vd.name);
   }
 }
@@ -366,7 +366,7 @@ static int newupvalue (FuncState *fs, TString *name, expdesc *v) {
   FuncState *prev = fs->prev;
   if (v->k == VLOCAL) {
     up->instack = 1;
-    up->idx = v->u.var.ridx;
+    up->idx = v->u.var.sidx;
     up->kind = getlocalvardesc(prev, v->u.var.vidx)->vd.kind;
     lua_assert(eqstr(name, getlocalvardesc(prev, v->u.var.vidx)->vd.name));
   }
@@ -620,7 +620,7 @@ static void movegotosout (FuncState *fs, BlockCnt *bl) {
   for (i = bl->firstgoto; i < gl->n; i++) {  /* for each pending goto */
     Labeldesc *gt = &gl->arr[i];
     /* leaving a variable scope? */
-    if (reglevel(fs, gt->nactvar) > reglevel(fs, bl->nactvar))
+    if (stacklevel(fs, gt->nactvar) > stacklevel(fs, bl->nactvar))
       gt->close |= bl->upval;  /* jump may need a close */
     gt->nactvar = bl->nactvar;  /* update goto level */
   }
@@ -661,7 +661,7 @@ static void leaveblock (FuncState *fs) {
   BlockCnt *bl = fs->bl;
   LexState *ls = fs->ls;
   int hasclose = 0;
-  int stklevel = reglevel(fs, bl->nactvar);  /* level outside the block */
+  int stklevel = stacklevel(fs, bl->nactvar);  /* level outside the block */
   if (bl->isloop)  /* fix pending breaks? */
     hasclose = createlabel(ls, luaS_newliteral(ls->L, "break"), 0, 0);
   if (!hasclose && bl->previous && bl->upval)
@@ -1207,7 +1207,6 @@ static BinOpr getbinopr (int op) {
     case TK_SHR: return OPR_SHR;
     case TK_CONCAT: return OPR_CONCAT;
     case TK_NE: return OPR_NE;
-    case TK_NE2: return OPR_NE;
     case TK_EQ: return OPR_EQ;
     case '<': return OPR_LT;
     case TK_LE: return OPR_LE;
@@ -1331,13 +1330,13 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
         }
       }
       else {  /* table is a register */
-        if (v->k == VLOCAL && lh->v.u.ind.t == v->u.var.ridx) {
+        if (v->k == VLOCAL && lh->v.u.ind.t == v->u.var.sidx) {
           conflict = 1;  /* table is the local being assigned now */
           lh->v.u.ind.t = extra;  /* assignment will use safe copy */
         }
         /* is index the local being assigned? */
         if (lh->v.k == VINDEXED && v->k == VLOCAL &&
-            lh->v.u.ind.idx == v->u.var.ridx) {
+            lh->v.u.ind.idx == v->u.var.sidx) {
           conflict = 1;
           lh->v.u.ind.idx = extra;  /* previous assignment will use safe copy */
         }
@@ -1347,86 +1346,12 @@ static void check_conflict (LexState *ls, struct LHS_assign *lh, expdesc *v) {
   if (conflict) {
     /* copy upvalue/local value to a temporary (in position 'extra') */
     if (v->k == VLOCAL)
-      luaK_codeABC(fs, OP_MOVE, extra, v->u.var.ridx, 0);
+      luaK_codeABC(fs, OP_MOVE, extra, v->u.var.sidx, 0);
     else
       luaK_codeABC(fs, OP_GETUPVAL, extra, v->u.info, 0);
     luaK_reserveregs(fs, 1);
   }
 }
-
-#define BITRK               (1 << (SIZE_B - 1))
-#define ISK(x)              ((x) & BITRK)
-
-static void append_assignment (LexState *ls, struct LHS_assign *lh) {
-  FuncState * fs=ls->fs;
-  TString *appendfunc_name;
-  expdesc appendfunc;
-  expdesc var;
-  expdesc value;
-  int base;
-
-  luaX_next(ls);
-
-  checknext(ls, '=');
-
-  /* Push tup_append_assignment onto the stack */
-  /* Note: copied from function call suffixedexp -> primaryexp -> singlevar */
-  appendfunc_name = luaS_new(ls->L, "tup_append_assignment");
-  singlevaraux(fs, appendfunc_name, &appendfunc, 1);
-  if (appendfunc.k == VVOID) {
-    /* If tup_append_assignment isn't global, then check _ENV/locals
-     * Note: reuse appendfunc to reference _ENV temporarily
-     */
-    expdesc key;
-    /* Locate _ENV and make it an upvalue if necessary */
-    singlevaraux(fs, ls->envn, &appendfunc, 1);
-    lua_assert(appendfunc.k == VLOCAL || appendfunc.k == VUPVAL);
-    codename(ls, &key);
-    codestring(&key, appendfunc_name);
-    luaK_indexed(fs, &appendfunc, &key);  /* env[varname] */
-  }
-  luaK_exp2nextreg(fs, &appendfunc);
-
-  /* Push assignment lhs as first function argument */
-  var = lh->v; /* exp2nextreg disables the expr somehow, so copy it first */
-  if (var.k == VINDEXED) {
-    /* exp2nextreg if INDEXED will try to pop/reuse the source table and
-     * index stack positions.
-     * Increase freeregs to prevent that.
-     * The conditions need to match those in and around freereg in
-     * luaK_dischargevars exactly.
-     */
-    if (!ISK(var.u.ind.idx) && var.u.ind.idx >= fs->nactvar) {
-      fs->freereg += 1;
-    }
-    if (var.u.ind.t == VLOCAL) {
-      if (!ISK(var.u.ind.t) && var.u.ind.t >= fs->nactvar) {
-        fs->freereg += 1;
-      }
-    }
-  }
-  luaK_exp2nextreg(fs, &var);
-
-  /* Push original rhs as second function argument */
-  expr(ls, &value);
-  luaK_exp2nextreg(fs, &value);
-
-  /* Call the function */
-  /* Note: copied from funcargs */
-  lua_assert(appendfunc.k == VNONRELOC);
-  base = appendfunc.u.info;  /* base register for call */
-  init_exp(&appendfunc, VCALL,
-      luaK_codeABC(fs, OP_CALL, base, fs->freereg - (base + 1) + 1, 2));
-  fs->freereg = base + 1;  /* call removes function and arguments and leaves
-                          (unless changed) one result */
-
-  /* Store the call result */
-  luaK_storevar(fs, &lh->v, &appendfunc);
-}
-
-#undef BITRK
-#undef ISK
-
 
 /*
 ** Parse and compile a multiple assignment. The first "variable"
@@ -1451,12 +1376,6 @@ static void restassign (LexState *ls, struct LHS_assign *lh, int nvars) {
   }
   else {  /* restassign -> '=' explist */
     int nexps;
-    if(nvars==1) {
-      if(ls->t.token == '+') {
-        append_assignment(ls, lh);
-        return;
-      }
-    }
     checknext(ls, '=');
     nexps = explist(ls, &e);
     if (nexps != nvars)
@@ -1492,7 +1411,7 @@ static void gotostat (LexState *ls) {
     newgotoentry(ls, name, line, luaK_jump(fs));
   else {  /* found a label */
     /* backward jump; will be resolved here */
-    int lblevel = reglevel(fs, lb->nactvar);  /* label level */
+    int lblevel = stacklevel(fs, lb->nactvar);  /* label level */
     if (luaY_nvarstack(fs) > lblevel)  /* leaving the scope of a variable? */
       luaK_codeABC(fs, OP_CLOSE, lblevel, 0, 0);
     /* create jump and link it to the label */
@@ -1569,7 +1488,7 @@ static void repeatstat (LexState *ls, int line) {
   if (bl2.upval) {  /* upvalues? */
     int exit = luaK_jump(fs);  /* normal exit must jump over fix */
     luaK_patchtohere(fs, condexit);  /* repetition must close upvalues */
-    luaK_codeABC(fs, OP_CLOSE, reglevel(fs, bl2.nactvar), 0, 0);
+    luaK_codeABC(fs, OP_CLOSE, stacklevel(fs, bl2.nactvar), 0, 0);
     condexit = luaK_jump(fs);  /* repeat after closing upvalues */
     luaK_patchtohere(fs, exit);  /* normal exit comes to here */
   }
@@ -1789,7 +1708,7 @@ static void checktoclose (LexState *ls, int level) {
     FuncState *fs = ls->fs;
     markupval(fs, level + 1);
     fs->bl->insidetbc = 1;  /* in the scope of a to-be-closed variable */
-    luaK_codeABC(fs, OP_TBC, reglevel(fs, level), 0, 0);
+    luaK_codeABC(fs, OP_TBC, stacklevel(fs, level), 0, 0);
   }
 }
 
@@ -1867,7 +1786,7 @@ static void exprstat (LexState *ls) {
   FuncState *fs = ls->fs;
   struct LHS_assign v;
   suffixedexp(ls, &v.v);
-  if (ls->t.token == '=' || ls->t.token == ',' || ls->t.token == '+') { /* stat -> assignment ? */
+  if (ls->t.token == '=' || ls->t.token == ',') { /* stat -> assignment ? */
     v.prev = NULL;
     restassign(ls, &v, 1);
   }

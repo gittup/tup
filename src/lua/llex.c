@@ -44,8 +44,7 @@ static const char *const luaX_tokens [] = {
     "return", "then", "true", "until", "while",
     "//", "..", "...", "==", ">=", "<=", "~=",
     "<<", ">>", "::", "<eof>",
-    "<number>", "<integer>", "<name>", "<string>",
-    "!="
+    "<number>", "<integer>", "<name>", "<string>"
 };
 
 
@@ -123,29 +122,26 @@ l_noret luaX_syntaxerror (LexState *ls, const char *msg) {
 
 
 /*
-** Creates a new string and anchors it in scanner's table so that it
-** will not be collected until the end of the compilation; by that time
-** it should be anchored somewhere. It also internalizes long strings,
-** ensuring there is only one copy of each unique string.  The table
-** here is used as a set: the string enters as the key, while its value
-** is irrelevant. We use the string itself as the value only because it
-** is a TValue readly available. Later, the code generation can change
-** this value.
+** creates a new string and anchors it in scanner's table so that
+** it will not be collected until the end of the compilation
+** (by that time it should be anchored somewhere)
 */
 TString *luaX_newstring (LexState *ls, const char *str, size_t l) {
   lua_State *L = ls->L;
+  TValue *o;  /* entry for 'str' */
   TString *ts = luaS_newlstr(L, str, l);  /* create new string */
-  const TValue *o = luaH_getstr(ls->h, ts);
-  if (!ttisnil(o))  /* string already present? */
-    ts = keystrval(nodefromval(o));  /* get saved copy */
-  else {  /* not in use yet */
-    TValue *stv = s2v(L->top++);  /* reserve stack space for string */
-    setsvalue(L, stv, ts);  /* temporarily anchor the string */
-    luaH_finishset(L, ls->h, stv, o, stv);  /* t[string] = string */
-    /* table is not a metatable, so it does not need to invalidate cache */
+  setsvalue2s(L, L->top++, ts);  /* temporarily anchor it in stack */
+  o = luaH_set(L, ls->h, s2v(L->top - 1));
+  if (isempty(o)) {  /* not in use yet? */
+    /* boolean value does not need GC barrier;
+       table is not a metatable, so it does not need to invalidate cache */
+    setbtvalue(o);  /* t[string] = true */
     luaC_checkGC(L);
-    L->top--;  /* remove string from stack */
   }
+  else {  /* string already present */
+    ts = keystrval(nodefromval(o));  /* re-use value previously stored */
+  }
+  L->top--;  /* remove string from stack */
   return ts;
 }
 
@@ -510,11 +506,6 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         next(ls);
         if (check_next1(ls, '=')) return TK_NE;  /* '~=' */
         else return '~';
-      }
-      case '!': {
-        next(ls);
-        if (ls->current != '=') return '!';
-        else { next(ls); return TK_NE2; }
       }
       case ':': {
         next(ls);

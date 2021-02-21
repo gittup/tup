@@ -9,7 +9,6 @@
 #ifndef lua_h
 #define lua_h
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -153,7 +152,6 @@ extern const char lua_ident[];
 */
 LUA_API lua_State *(lua_newstate) (lua_Alloc f, void *ud);
 LUA_API void       (lua_close) (lua_State *L);
-LUA_API void       (lua_setoutput) (lua_State *L, FILE *output);
 LUA_API lua_State *(lua_newthread) (lua_State *L);
 LUA_API int        (lua_resetthread) (lua_State *L);
 
@@ -349,8 +347,7 @@ LUA_API size_t   (lua_stringtonumber) (lua_State *L, const char *s);
 LUA_API lua_Alloc (lua_getallocf) (lua_State *L, void **ud);
 LUA_API void      (lua_setallocf) (lua_State *L, lua_Alloc f, void *ud);
 
-LUA_API void (lua_toclose) (lua_State *L, int idx);
-LUA_API void (lua_closeslot) (lua_State *L, int idx);
+LUA_API void  (lua_toclose) (lua_State *L, int idx);
 
 
 /*

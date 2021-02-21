@@ -99,8 +99,6 @@ LUALIB_API int (luaL_loadstring) (lua_State *L, const char *s);
 
 LUALIB_API lua_State *(luaL_newstate) (void);
 
-LUALIB_API void (luaL_setoutput) (lua_State *L, FILE *output);
-
 LUALIB_API lua_Integer (luaL_len) (lua_State *L, int idx);
 
 LUALIB_API void luaL_addgsub (luaL_Buffer *b, const char *s,
@@ -157,22 +155,6 @@ LUALIB_API void (luaL_requiref) (lua_State *L, const char *modname,
 
 /* push the value used to represent failure/error */
 #define luaL_pushfail(L)	lua_pushnil(L)
-
-
-/*
-** Internal assertions for in-house debugging
-*/
-#if !defined(lua_assert)
-
-#if defined LUAI_ASSERT
-  #include <assert.h>
-  #define lua_assert(c)		assert(c)
-#else
-  #define lua_assert(c)		((void)0)
-#endif
-
-#endif
-
 
 
 /*
@@ -263,9 +245,6 @@ typedef struct luaL_Stream {
 #define lua_writestringerror(s,p) \
         (fprintf(stderr, (s), (p)), fflush(stderr))
 #endif
-
-#define lua_writestringout(s,l,ls)  fwrite((s), sizeof(char), (l), ls->output)
-#define lua_writelineout(ls)  (lua_writestringout("\n", 1, ls), fflush(ls->output))
 
 /* }================================================================== */
 
