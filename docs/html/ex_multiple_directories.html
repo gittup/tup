@@ -6,6 +6,8 @@
 <span class="prompt">$</span> mkdir newmath
 </pre>
 
+<p>Note that in this example, we created an empty <span class="filename">Tupfile.ini</span> file at the root of our project. This is an alternative to running <span class="cmd">tup init</span> to create the tup database. When tup can't find the <span class="filename">.tup</span> directory that is created by the init process, it will look for a <span class="filename">Tupfile.ini</span> anywhere up the tree and automatically run <span class="cmd">tup init</span> there for you if it finds one. This can be helpful when cloning your repository for different users or machines to reduce the steps needed to get a new developer setup. Note that <span class="filename">Tupfile.ini</span> is separate from the <span class="filename">Tupfile</span>s that contain the rules to build your program.</p>
+
 <p>We'll start out with the same program as in the <a href="ex_a_first_tupfile.html">first Tupfile</a> example, but this time we want to put the squaring function in a separate directory so it can be bundled into a library with other related files.</p>
 
 <span class="fileheader">hello.c</span>

@@ -1,8 +1,8 @@
-<p>In this example, we'll create a small C program using tup. The program itself will be completely useless, but hopefully you can use your imagination to see how you might use tup in a real project. Let's start with a typical "Hello, world!" in C. Since we're using tup, you'll want to create a <span class="filename">Tupfile.ini</span> file or run <span class="cmd">tup init</span> at the top of the project, which in this example will be the tup_test directory.</p>
+<p>In this example, we'll create a small C program using tup. The program itself will be completely useless, but hopefully you can use your imagination to see how you might use tup in a real project. Let's start with a typical "Hello, world!" in C. Since we're using tup, you'll want to run <span class="cmd">tup init</span> at the top of the project, which in this example will be the tup_test directory.</p>
 <pre>
 <span class="prompt">$</span> mkdir tup_test
 <span class="prompt">$</span> cd tup_test
-<span class="prompt">$</span> tup init    -OR-    touch Tupfile.ini
+<span class="prompt">$</span> tup init
 <span class="prompt">$</span> EDITOR hello.c
 </pre>
 
@@ -19,7 +19,7 @@ int main(void)
 <p>Here's what we have so far:</p>
 <pre>
 <span class="prompt">$</span> ls -a
-.  ..  .tup  Tupfile.ini  hello.c
+.  ..  .tup  hello.c
 </pre>
 <p>The <i>.tup</i> directory contains the dependency database, and some lock files. You shouldn't mess with files in this directory manually, unless you want to play around. If there was a warranty for tup, you would lose it by doing that.</p>
 

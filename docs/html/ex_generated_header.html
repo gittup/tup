@@ -3,9 +3,8 @@
 <p>Handling auto-generated header files in tup is actually fairly easy, though at first glance it may appear to be tricky. They are not completely automatic, however. You do still need to specify the generated header as an input to any compilation rules. Let's get a C program from the <a href="ex_a_first_tupfile.html">First Tupfile example</a> to start with. Later we will generate a new header file from a separate shell script and see how that affects our Tupfile.</p>
 
 <pre>
-<span class="prompt">$</span> mkdir tup_test3
+<span class="prompt">$</span> tup init tup_test3
 <span class="prompt">$</span> cd tup_test3
-<span class="prompt">$</span> touch Tupfile.ini
 </pre>
 
 <span class="fileheader">Tupfile</span>

@@ -1,4 +1,4 @@
-.TH "tup" "1" "2020/08/07" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/04/01" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -62,7 +62,9 @@ tup [--debug-sql] [--debug-fuse] SECONDARY_COMMAND [SECONDARY_COMMAND_ARGS]
 
 .TP
 .B init [directory]
-Creates a '.tup' directory in the specified directory and initializes the tup database. If a directory name is unspecified, it defaults to creating '.tup' in the current directory. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy". You should not need to run this command directly, tup will automatically run init the first time it is run in a new directory, using Tupfile.ini to locate the project root.
+Creates a '.tup' directory in the specified directory and initializes the tup database. If a directory name is unspecified, it defaults to creating '.tup' in the current directory. This defines the top of your project, as viewed by tup. Everything in the current directory and its subdirectories are known as the "tup hierarchy".
+
+If you want to avoid having to run 'tup init' every time you clone your repository to a new location, you can instead create an empty file called 'Tupfile.ini' in the project root. If 'tup' is run without the '.tup' directory present, it will automatically create one for you as a sibling of the Tupfile.ini file, as if you had run 'tup init' in that directory.. If there are multiple Tupfile.ini files in parent paths, the one highest up the tree will be chosen.
 .RS
 .TP
 .B --no-sync
@@ -231,7 +233,7 @@ You shouldn't ever need to run this, unless you want to make the database reflec
 .B upd
 Legacy secondary command. Calling 'tup upd' is equivalent to simply calling 'tup'.
 .SH INI FILE
-The tup command can be run from anywhere in the source tree. It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory located at the root of the project. The .tup directory can be created manually with the "tup init" command, but it is much more common to use a Tupfile.ini, which can be added to the project's version control repository. Tup uses Tupfile.ini to identify the root of a project to automatically set up a .tup directory in the project root the first time it is run.
+The tup command can be run from anywhere in the source tree. It uses the information from all Tupfiles (see the \fBTUPFILES\fR section) as well as it's own dynamic database, which is maintained in the .tup directory located at the root of the project. The .tup directory can be created manually with the 'tup init' command, or you can have it run automatically by adding an empty Tupfile.ini file at the root of the project's version control repository.
 
 The contents of the Tupfile.ini file are ignored.
 
