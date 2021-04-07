@@ -1,7 +1,7 @@
 #! /bin/sh -e
 # tup - A file-based build system
 #
-# Copyright (C) 2014-2021  Mike Shal <marfey@gmail.com>
+# Copyright (C) 2021  Mike Shal <marfey@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,30 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Try to generate a shell script with generated output directories.
+# Same as t3090, but in a subdir.
 
 . ./tup.sh
 
-# 'tup generate' runs without a tup directory
-rm -rf .tup
-
-mkdir sub1
-cat > sub1/Tupfile << HERE
-: |> touch %o |> out/dir/foo.txt
-: |> touch %o |> out/bar.txt
-: |> touch %o |> out/dir/baz.txt
+mkdir sub
+cat > sub/Tupfile << HERE
+: foo.txt |> tup varsed %f %o |> out.txt
 HERE
+echo "hey @FOO@ yo" > sub/foo.txt
+echo "This is an email@address.com" >> sub/foo.txt
+varsetall FOO=sup
 
+rm -rf .tup
 generate $generate_script_name
 ./$generate_script_name
 
-# Make sure running it again doesn't fail mkdirs
-./$generate_script_name
-check_exist sub1/out/dir/foo.txt sub1/out/bar.txt sub1/out/dir/baz.txt
-
-if ! grep '^mkdir' $generate_script_name | wc -l | grep 2 > /dev/null; then
-	echo "Error: Generated script should have 2 mkdirs" 1>&2
-	exit 1
-fi
+(echo "hey sup yo"; echo "This is an email@address.com") | diff sub/out.txt -
 
 eotup

@@ -256,6 +256,7 @@ int generate(int argc, char **argv)
 	int x;
 	int rc;
 	const char *file_open_flags = "w";
+	const char *generate_vardict_file = "tup-generate.vardict";
 #ifdef _WIN32
 	const char *example_script = "script_name.bat | script_name.sh";
 #else
@@ -334,7 +335,7 @@ int generate(int argc, char **argv)
 	} else {
 		varfiletent = vartent;
 	}
-	if(tup_db_read_vars(tup_top_fd(), varfiletent->parent, varfiletent->name.s, vartent, NULL) < 0)
+	if(tup_db_read_vars(tup_top_fd(), varfiletent->parent, varfiletent->name.s, vartent, generate_vardict_file) < 0)
 		return -1;
 
 	printf("Parsing...\n");
@@ -383,6 +384,11 @@ int generate(int argc, char **argv)
 	} else {
 		fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
 	}
+#ifdef _WIN32
+	fprintf(generate_f, "set %s=%s\\%s\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
+#else
+	fprintf(generate_f, "export %s=\"%s/%s\"\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
+#endif
 	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
