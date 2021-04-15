@@ -33,6 +33,14 @@ else
 AR = ar
 endif
 
+# Override AR settings if being built with busybox kconfig
+ifeq ($(AR),y)
+AR = ar
+endif
+ifeq ($(AR),n)
+AR = ar
+endif
+
 CFLAGS += -W
 CFLAGS += -Wall
 ifeq (@(TUP_WERROR),y)
