@@ -11,6 +11,7 @@ pages += make_vs_tup.html
 pages += tup_vs_mordor.html
 pages += license.html
 pages += support.html
+pages += donate.html
 
 examples += ex_a_first_tupfile.html
 examples += ex_dependencies.html
