@@ -45,6 +45,8 @@ DLLINJECT_API void tup_inject_setexecdir(const char *dir);
 DLLINJECT_API int tup_inject_dll(LPPROCESS_INFORMATION process, const char *depfilename,
 				 const char *vardict_file);
 
+DLLINJECT_API int conemu_injected(void);
+
 #ifdef __cplusplus
 }
 #endif

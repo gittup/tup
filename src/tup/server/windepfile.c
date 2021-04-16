@@ -48,6 +48,10 @@ static char wintmpdir[PATH_MAX];
 
 int server_pre_init(void)
 {
+	if(conemu_injected()) {
+		fprintf(stderr, "tup error: Tup is known to not work when the ConEmu DLL (ConEmuHk.dll) is injected. Please disable ConEmuHk.dll injection or run tup outside of ConEmu. See also: https://github.com/gittup/tup/issues/419\n");
+		return -1;
+	}
 	return 0;
 }
 

@@ -2410,3 +2410,36 @@ int tup_inject_dll(
 
 	return 0;
 }
+
+int conemu_injected(void)
+{
+	HMODULE hMods[1024];
+	HANDLE hProcess;
+	DWORD cbNeeded;
+	int rc = 0;
+
+	hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
+				PROCESS_VM_READ,
+				FALSE, GetCurrentProcessId());
+	if(hProcess == NULL)
+		return 1;
+
+	if(EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+		unsigned int i;
+		for(i=0; i<(cbNeeded / sizeof(HMODULE)); i++) {
+			TCHAR szModName[MAX_PATH];
+
+			if ( GetModuleFileNameEx( hProcess, hMods[i], szModName,
+						  sizeof(szModName) / sizeof(TCHAR))) {
+				if(wcscasestr(szModName, L"ConEmuHk64.dll") != NULL) {
+					DEBUG_HOOK("Found mod: %S\n", szModName);
+					rc = 1;
+					break;
+				}
+			}
+		}
+	}
+
+	CloseHandle(hProcess);
+	return rc;
+}
