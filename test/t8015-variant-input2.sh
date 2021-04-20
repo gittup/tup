@@ -31,7 +31,7 @@ update
 cat > Tupfile << HERE
 : |> touch %o |> foo
 ifeq (@(FOO),y)
-: |> cat ../build/foo > %o |> output
+: |> cat build/foo > %o |> output
 endif
 HERE
 tup touch Tupfile

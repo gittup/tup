@@ -29,6 +29,6 @@ tmkdir foo
 tup touch foo/input.txt
 update
 
-tup_dep_exist sub "!tup_ln `pwd -P`/foo/input.txt link.txt" sub link.txt
+tup_dep_exist sub "!tup_ln ../foo/input.txt link.txt" sub link.txt
 
 eotup

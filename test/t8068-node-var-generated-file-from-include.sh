@@ -48,6 +48,6 @@ HERE
 tup touch Tuprules.tup lib/lib.tup lib/foo.a lib/Tupfile sw/Tupfile build/tup.config
 update
 
-tup_dep_exist build/lib lib.a build/sw 'cp ../lib/lib.a lib.a.copy'
+tup_dep_exist build/lib lib.a build/sw 'cp ../build/lib/lib.a ../build/sw/lib.a.copy'
 
 eotup

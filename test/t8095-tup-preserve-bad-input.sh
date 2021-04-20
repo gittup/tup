@@ -41,7 +41,7 @@ tup touch sub/Tupfile
 # !tup_preserve can't use a generate file, since foo.txt is only a ghost file
 # because of how fuse accesses variants. This will probably need to be updated
 # with a better message if explicit variants are enabled.
-update_fail_msg 'Explicitly.*foo.txt.*is a ghost file'
+update_fail_msg "Explicitly named file 'foo.txt' not found in subdir 'build/sub'"
 
 cat > sub/Tupfile << HERE
 : |> touch %o |> foo.txt

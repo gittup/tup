@@ -70,7 +70,6 @@ struct file_info {
 	struct tent_entries used_groups_root;
 	struct tent_entries output_root;
 	struct tent_entries exclusion_root;
-	const char *variant_dir;
 	int server_fail;
 	int open_count;
 	int do_unlink;
@@ -82,7 +81,7 @@ enum check_type_t {
 	CHECK_SIGNALLED,
 };
 
-int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink);
+int init_file_info(struct file_info *info, int do_unlink);
 void cleanup_file_info(struct file_info *info);
 void finfo_lock(struct file_info *info);
 void finfo_unlock(struct file_info *info);

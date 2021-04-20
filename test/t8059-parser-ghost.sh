@@ -33,11 +33,10 @@ update
 
 echo 'nofile' | diff - build/output.txt
 tup_object_exist . ghost-dir
-tup_object_exist build ghost-dir
 
 cat > sub/Tupfile << HERE
 : ../ghost-dir/bar |> cat %f |>
 HERE
-parse_fail_msg "Explicitly named file 'bar' not found"
+parse_fail_msg "Failed to find directory ID for dir '../ghost-dir/bar' relative to 'build/sub'"
 
 eotup

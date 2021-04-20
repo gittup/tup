@@ -29,6 +29,6 @@ cat > Tupfile << HERE
 HERE
 
 tup touch Tupfile build/tup.config
-update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
+update_fail_msg "Unable to find tup entry for file 'a.txt' in node reference declaration."
 
 eotup

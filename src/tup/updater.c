@@ -671,7 +671,7 @@ static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
-	if(init_file_info(&s->finfo, tup_entry_variant(tent)->variant_dir, server_unlink()) < 0)
+	if(init_file_info(&s->finfo, server_unlink()) < 0)
 		return -1;
 
 	if(tent->type == TUP_NODE_CMD) {
@@ -2566,7 +2566,7 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 					if(e && !first)
 						if(estring_append(e, " ", 1) < 0)
 							return -1;
-					if(get_relative_dir(f, e, info->tent->parent->tnode.tupid, input_tent->tnode.tupid) < 0)
+					if(get_relative_dir(f, e, variant_tent_to_srctent(info->tent->parent)->tnode.tupid, input_tent->tnode.tupid) < 0)
 						return -1;
 					if(f)
 						fprintf(f, "\n");
@@ -2724,7 +2724,7 @@ static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *
 		strcpy(output, endp);
 	} else {
 		output[0] = '.';
-		snprint_tup_entry(output+1, PATH_MAX-1, dtent);
+		snprint_tup_entry(output+1, PATH_MAX-1, variant_tent_to_srctent(dtent));
 		strcat(output, "/");
 		strcat(output, endp);
 	}
@@ -2767,11 +2767,12 @@ static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char 
 
 static int update(struct node *n)
 {
-	int dfd = -1;
+	int dfd;
+	int srcdfd;
 	char *expanded_name = NULL;
 	const char *cmd;
 	struct server s;
-	int rc;
+	int rc = 0;
 	struct tup_env newenv;
 	struct timespan ts;
 	int need_namespacing = 0;
@@ -2779,6 +2780,7 @@ static int update(struct node *n)
 	int run_in_bash = 0;
 	int use_server = 0;
 	int remove_transients = 0;
+	int is_variant;
 
 	timespan_start(&ts);
 	if(n->tent->flags) {
@@ -2827,7 +2829,20 @@ static int update(struct node *n)
 	}
 
 	pthread_mutex_lock(&db_mutex);
-	rc = initialize_server_struct(&s, n->tent);
+	is_variant = !tup_entry_variant(n->tent->parent)->root_variant;
+	if(is_variant) {
+		srcdfd = tup_entry_open(variant_tent_to_srctent(n->tent->parent));
+		if(srcdfd < 0) {
+			pthread_mutex_lock(&display_mutex);
+			fprintf(stderr, "tup error: Unable to open srcdir directory for update work.\n");
+			pthread_mutex_unlock(&display_mutex);
+			rc = -1;
+		}
+	} else {
+		srcdfd = dfd;
+	}
+	if(rc == 0)
+		rc = initialize_server_struct(&s, n->tent);
 	if(rc == 0)
 		rc = tup_db_get_environ(&s.finfo.sticky_root, &s.finfo.normal_root, &newenv);
 	if(rc == 0) {
@@ -2838,13 +2853,13 @@ static int update(struct node *n)
 	}
 	pthread_mutex_unlock(&db_mutex);
 	if(rc < 0)
-		goto err_close_dfd;
+		goto err_close_srcdfd;
 	if(strncmp(cmd, "!tup_ln ", 8) == 0) {
-		rc = do_ln(&s, n->tent->parent, dfd, cmd + 8);
+		rc = do_ln(&s, n->tent->parent, srcdfd, cmd + 8);
 	} else if (strncmp(cmd, "!tup_preserve ", 14) == 0) {
-		rc = do_ln(&s, n->tent->parent, dfd, cmd + 14);
+		rc = do_ln(&s, n->tent->parent, srcdfd, cmd + 14);
 	} else {
-		rc = server_exec(&s, dfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);
+		rc = server_exec(&s, srcdfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);
 		use_server = 1;
 	}
 	if(rc < 0) {
@@ -2852,9 +2867,15 @@ static int update(struct node *n)
 		fprintf(stderr, " *** Command ID=%lli failed: %s\n", n->tnode.tupid, cmd);
 		pthread_mutex_unlock(&display_mutex);
 		free(expanded_name);
-		goto err_close_dfd;
+		goto err_close_srcdfd;
 	}
 	environ_free(&newenv);
+	if(is_variant) {
+		if(close(srcdfd) < 0) {
+			perror("close(srcdfd)");
+			return -1;
+		}
+	}
 	if(close(dfd) < 0) {
 		perror("close(dfd)");
 		return -1;
@@ -2876,6 +2897,12 @@ static int update(struct node *n)
 			return -1;
 	return rc;
 
+err_close_srcdfd:
+	if(is_variant) {
+		if(close(srcdfd) < 0) {
+			perror("close(srcdfd");
+		}
+	}
 err_close_dfd:
 	if(close(dfd) < 0) {
 		perror("close(dfd)");

@@ -35,14 +35,13 @@ update
 
 echo nofile | diff - build-default/output.txt
 tup_object_exist . bar
-tup_object_exist build-default bar
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
 : |> touch %o |> foo
 endif
 : |> echo foo > %o |> bar
-: bar |> if [ -f bar ]; then cat bar; else echo nofile; fi > %o |> output.txt
+: bar |> if [ -f %f ]; then cat %f; else echo nofile; fi > %o |> output.txt
 HERE
 tup touch Tupfile
 update

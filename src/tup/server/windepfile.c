@@ -274,7 +274,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int need_cmd = 0;
 	int append_quote = 0;
 
-	if(dtent) {}
 	if(need_namespacing) {}
 
 	if(initialize_depfile(s, depfile, &h) < 0) {

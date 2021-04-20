@@ -35,6 +35,6 @@ update
 tup touch Tupfile
 update
 
-tup_dep_exist . myLib.a build 'cp myLib.a myLib.a.copy'
+tup_dep_exist . myLib.a build 'cp myLib.a build/myLib.a.copy'
 
 eotup

@@ -58,11 +58,11 @@ echo "normal" | diff - build/foo2/output.txt
 echo "normal" | diff - build-debug/foo2/output.txt
 
 rm -rf sub
-update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to 'build-debug/foo'"
+update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to 'build.*/foo'"
 
 # Make sure that if we try to re-parse the Tupfile we still get the same error message.
 tup touch foo/Tupfile
-update_fail_msg "Explicitly named file 'gen' not found"
+update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to 'build.*/foo'"
 
 rm foo/Tupfile
 tup rm foo/Tupfile

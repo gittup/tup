@@ -73,8 +73,6 @@ TAILQ_HEAD(bang_list_head, bang_list);
 
 struct build_name_list_args {
 	struct name_list *nl;
-	const char *dir;
-	int dirlen;
 	const char *globstr;  /* Pointer to the basename of the filename in the tupfile */
 	int globstrlen;       /* Length of the basename */
 	int wildcard;
@@ -131,7 +129,6 @@ static int nl_add_external_path(struct path_list *pl, struct name_list *nl, int 
 static int nl_add_bin(struct bin *b, struct name_list *nl, int orderid);
 static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name_list *nl);
 static int build_name_list_cb(void *arg, struct tup_entry *tent);
-static char *set_path(const char *name, const char *dir, int dirlen);
 static void set_nle_base(struct name_list_entry *nle);
 static void add_name_list_entry(struct name_list *nl,
 				struct name_list_entry *nle);
@@ -196,7 +193,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			return -1;
 	}
 
-	init_file_info(&ps.s.finfo, tf.variant->variant_dir, 0);
+	init_file_info(&ps.s.finfo, 0);
 	ps.s.id = n->tnode.tupid;
 	pthread_mutex_init(&ps.lock, NULL);
 
@@ -217,16 +214,11 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 
 	tf.tent = n->tent;
 	tf.curtent = tf.tent;
+	tf.srctent = variant_tent_to_srctent(n->tent);
 	tf.root_fd = ps.root_fd;
 	tf.g = g;
 	tf.refactoring = refactoring;
 	tf.full_deps = full_deps;
-	if(tf.variant->root_variant) {
-		tf.srctent = NULL;
-	} else {
-		if(variant_get_srctent(tf.variant, tf.tent, &tf.srctent) < 0)
-			goto out_server_stop;
-	}
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
 	LIST_INIT(&tf.bin_list);
@@ -259,9 +251,11 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		goto out_close_vdb;
 	}
 
-	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
+	tf.cur_dfd = tup_entry_openat(ps.root_fd, tf.srctent);
 	if(tf.cur_dfd < 0) {
-		fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tent->tnode.tupid);
+		fprintf(tf.f, "tup error: Unable to open directory: ");
+		print_tup_entry(tf.f, tf.srctent);
+		fprintf(tf.f, "\n");
 		goto out_close_vdb;
 	}
 
@@ -474,6 +468,7 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 		*parser_lua = 1;
 		return 0;
 	}
+	tent = variant_tent_to_srctent(tent);
 	do {
 		int x;
 		strcpy(path + n*3, TUPDEFAULT);
@@ -807,8 +802,8 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 	const char dotdotstr[] = {'.', '.', path_sep(), 0};
 
 	num_dotdots = 0;
-	tent = tf->curtent;
-	while(tent->tnode.tupid != tf->variant->dtnode.tupid) {
+	tent = variant_tent_to_srctent(tf->curtent);
+	while(tent->tnode.tupid != DOT_DT) {
 		tent = tent->parent;
 		num_dotdots++;
 	}
@@ -902,7 +897,7 @@ static int gen_dir_list(struct tupfile *tf, tupid_t dt)
 
 	rpp.root = &pd->files;
 
-	if(snprint_tup_entry(path, sizeof(path), tent) >= (signed)sizeof(path)) {
+	if(snprint_tup_entry(path, sizeof(path), variant_tent_to_srctent(tent)) >= (signed)sizeof(path)) {
 		fprintf(tf->f, "tup internal error: ps.path is sized incorrectly in gen_dir_list()\n");
 		return -1;
 	}
@@ -1719,19 +1714,10 @@ static int set_variable(struct tupfile *tf, char *line)
 
 	if(var[0] == '&') {
 		struct tup_entry *tent;
-		tent = get_tent_dt(tf->curtent->tnode.tupid, value);
+		tent = get_tent_dt(variant_tent_to_srctent(tf->curtent)->tnode.tupid, value);
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			/* didn't find the given file; if using a variant, check the source dir */
-			struct tup_entry *srctent;
-			if(variant_get_srctent(tf->variant, tf->curtent, &srctent) < 0)
-				return -1;
-			if(srctent)
-				tent = get_tent_dt(srctent->tnode.tupid, value);
-
-			if(!tent) {
-				fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", value);
-				return -1;
-			}
+			fprintf(tf->f, "tup error: Unable to find tup entry for file '%s' in node reference declaration.\n", value);
+			return -1;
 		}
 
 		if(tent->type != TUP_NODE_FILE && tent->type != TUP_NODE_DIR) {
@@ -2499,9 +2485,15 @@ int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf)
 		if(!pl->bin && !pl->group && !pl->re && pl->dt != -1 && pl->dt != tf->tent->tnode.tupid) {
 			struct node *n;
 			struct tup_entry *dtent;
+			struct variant *variant;
 
 			if(tup_entry_add(pl->dt, &dtent) < 0)
 				return -1;
+			variant = tup_entry_variant(dtent);
+			if(variant != tf->variant && !variant->root_variant) {
+				fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
+				return -1;
+			}
 			if(dtent->type == TUP_NODE_GENERATED_DIR) {
 				if(tupid_tree_search(&tf->directory_root, pl->dt) == NULL) {
 					fprintf(tf->f, "tup error: Unable to use inputs from a generated directory (%lli) that isn't written to by this Tupfile.\n", pl->dt);
@@ -2585,13 +2577,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	struct tup_entry *dtent;
 	struct tup_entry *srctent = NULL;
 
-	if(pl->dir != NULL) {
-		args.dir = pl->dir;
-		args.dirlen = pl->dirlen;
-	} else {
-		args.dir = "";
-		args.dirlen = 0;
-	}
 	args.nl = nl;
 	/* Save the original string with globs to pass to the function that
 	 * determines the length, extension length, and basename length in order to
@@ -2607,7 +2592,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		return -1;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent = NULL;
-		struct variant *variant;
 
 		/* Only look for an input in the variant directory if it's not
 		 * a !tup_preserve command (!is_variant_copy), or if this is
@@ -2619,20 +2603,25 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				return -1;
 			}
 		}
+		/* If we didn't find an existing group, create one. We don't
+		 * look for these in the srcdir since they are unique to each
+		 * variant.
+		 */
+		if(!tent && pl->pel->path[0] == '<') {
+			tent = tup_db_create_node_part(dtent, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
+			if(!tent) {
+				fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
+				return -1;
+			}
+		}
+
+		/* If we still haven't found the tent or it's a ghost in the
+		 * variantdir, look for it in the srcdir for variant builds.
+		 */
 		if(!tent || tent->type == TUP_NODE_GHOST) {
-			if(pl->pel->path[0] == '<') {
-				tent = tup_db_create_node_part(dtent, pl->pel->path, pl->pel->len, TUP_NODE_GROUP, -1, NULL);
-				if(!tent) {
-					fprintf(tf->f, "tup error: Unable to create node for group: '%.*s'\n", pl->pel->len, pl->pel->path);
+			if(srctent) {
+				if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tent) < 0)
 					return -1;
-				}
-			} else {
-				/* If we're a variant build, also look for the
-				 * file in the srcdir.
-				 */
-				if(srctent)
-					if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tent) < 0)
-						return -1;
 			}
 		}
 
@@ -2654,11 +2643,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				fprintf(tf->f, "'\n");
 				return -1;
 			}
-		}
-		variant = tup_entry_variant(tent);
-		if(!variant->root_variant && variant != tf->variant) {
-			fprintf(tf->f, "tup error: Unable to use files from another variant (%s) in this variant (%s)\n", variant->variant_dir, tf->variant->variant_dir);
-			return -1;
 		}
 		if(tent->type == TUP_NODE_GHOST && tent->mtime == -1) {
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
@@ -2805,6 +2789,7 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 	int len;
 	struct name_list_entry *nle;
 	struct tupfile *tf = args->tf;
+	struct estring e;
 
 	/* If the file is generated from another directory, we can't use it in
 	 * a wildcard.
@@ -2828,13 +2813,10 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 
-	len = tent->name.len + args->dirlen;
-	extlesslen = tent->name.len - 1;
-	while(extlesslen > 0 && tent->name.s[extlesslen] != '.')
-		extlesslen--;
-	if(extlesslen == 0)
-		extlesslen = tent->name.len;
-	extlesslen += args->dirlen;
+	if(estring_init(&e) < 0)
+		return -1;
+	if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tent->tnode.tupid) < 0)
+		return -1;
 
 	nle = malloc(sizeof *nle);
 	if(!nle) {
@@ -2842,16 +2824,19 @@ static int build_name_list_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 
-	nle->path = set_path(tent->name.s, args->dir, args->dirlen);
-	if(!nle->path) {
-		free(nle);
-		return -1;
+	extlesslen = e.len;
+	len = tent->name.len;
+	while(len > 0 && tent->name.s[len] != '.') {
+		len--;
+		extlesslen--;
 	}
+	if(len == 0)
+		extlesslen = e.len;
 
-	nle->len = len;
+	nle->path = e.s;
+	nle->len = e.len;
 	nle->extlesslen = extlesslen;
 	nle->tent = tent;
-	nle->dirlen = args->dirlen;
 	set_nle_base(nle);
 	nle->orderid = args->orderid;
 
@@ -3004,34 +2989,6 @@ static int glob_parse(const char *pattern, int patlen, char *match, int *globidx
 	return glob_cnt;
 }
 
-static char *set_path(const char *name, const char *dir, int dirlen)
-{
-	char *path;
-
-	if(dirlen) {
-		int nlen;
-
-		nlen = strlen(name);
-		/* +1 for '/', +1 for nul */
-		path = malloc(nlen + dirlen + 1);
-		if(!path) {
-			perror("malloc");
-			return NULL;
-		}
-
-		memcpy(path, dir, dirlen-1);
-		path[dirlen-1] = '/';
-		strcpy(path + dirlen, name);
-	} else {
-		path = strdup(name);
-		if(!path) {
-			perror("strdup");
-			return NULL;
-		}
-	}
-	return path;
-}
-
 static int find_existing_command(const struct name_list *onl, struct tup_entry **cmd)
 {
 	struct name_list_entry *onle;
@@ -3133,7 +3090,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			   int *command_modified, struct tent_entries *output_root,
 			   struct tent_entries *exclusion_root,
 			   const char *ext, int extlen, int is_variant_copy,
-			   int transient_outputs)
+			   int transient_outputs, struct estring *variant_prefix)
 {
 	struct path_list *pl;
 	struct path_list_head tmplist;
@@ -3258,6 +3215,31 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 			strncpy(onle->path, pl->pel->path, pl->pel->len);
 			onle->path[pl->pel->len] = 0;
 		}
+		if(!tf->variant->root_variant) {
+			char *withvariant;
+			struct tup_entry *tent;
+			struct tup_entry *srctent;
+			if(variant_get_srctent(tf->variant, dest_tent, &srctent) < 0)
+				return -1;
+			if(srctent && !is_variant_copy) {
+				if(tup_db_select_tent(srctent, onle->path, &tent) < 0)
+					return -1;
+				if(tent && tent->type != TUP_NODE_GHOST) {
+					fprintf(tf->f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s) in the source directory. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", onle->path, tup_db_type(tent->type));
+					return -1;
+				}
+			}
+			withvariant = malloc(variant_prefix->len + 1 + strlen(onle->path) + 1);
+			if(!withvariant) {
+				perror("malloc");
+				return -1;
+			}
+			memcpy(withvariant, variant_prefix->s, variant_prefix->len);
+			withvariant[variant_prefix->len] = '/';
+			strcpy(withvariant+variant_prefix->len+1, onle->path);
+			free(onle->path);
+			onle->path = withvariant;
+		}
 		if(name_cmp(onle->path, "Tupfile") == 0 ||
 		   name_cmp(onle->path, "Tuprules.tup") == 0 ||
 		   name_cmp(onle->path, "Tupfile.lua") == 0 ||
@@ -3273,16 +3255,6 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		onle->extlesslen = onle->len - 1;
 		while(onle->extlesslen > 0 && onle->path[onle->extlesslen] != '.')
 			onle->extlesslen--;
-
-		if(tf->srctent && !is_variant_copy) {
-			struct tup_entry *tent;
-			if(tup_db_select_tent(tf->srctent, onle->path, &tent) < 0)
-				return -1;
-			if(tent && tent->type != TUP_NODE_GHOST) {
-				fprintf(tf->f, "tup error: Attempting to insert '%s' as a generated node when it already exists as a different type (%s) in the source directory. You can do one of two things to fix this:\n  1) If this file is really supposed to be created from the command, delete the file from the filesystem and try again.\n  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.\n", onle->path, tup_db_type(tent->type));
-				return -1;
-			}
-		}
 
 		/* Go up until we find a non-generated dir, so we can try to
 		 * gitignore there.
@@ -3402,6 +3374,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
+	struct estring variant_prefix;
 	int command_modified = 0;
 	int is_variant_copy = 0;
 	int compare_display_flags = 0;
@@ -3436,7 +3409,12 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	init_name_list(&onl);
 	init_name_list(&extra_onl);
 
-	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
+	estring_init(&variant_prefix);
+	if(tf->srctent != tf->tent) {
+		if(get_relative_dir(NULL, &variant_prefix, tf->srctent->tnode.tupid, tf->tent->tnode.tupid) < 0)
+			return -1;
+	}
+	if(do_rule_outputs(tf, &r->outputs, nl, NULL, &onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs, &variant_prefix) < 0)
 		return -1;
 	if(r->bin) {
 		TAILQ_FOREACH(onle, &onl.entries, list) {
@@ -3444,10 +3422,11 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 				return -1;
 		}
 	}
-	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
+	if(do_rule_outputs(tf, &r->extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs, &variant_prefix) < 0)
 		return -1;
-	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs) < 0)
+	if(do_rule_outputs(tf, &r->bang_extra_outputs, nl, &onl, &extra_onl, &group, &command_modified, &output_root, &exclusion_root, ext, extlen, is_variant_copy, transient_outputs, &variant_prefix) < 0)
 		return -1;
+	free(variant_prefix.s);
 
 	if(is_variant_copy) {
 		if(onl.num_entries != 1 || nl->num_entries != 1) {
@@ -3794,7 +3773,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 					struct name_list_entry *onle = TAILQ_FIRST(&onl->entries);
 					if(estring_init(&rel_path) < 0)
 						return NULL;
-					if(get_relative_dir(NULL, &rel_path, onle->tent->tnode.tupid, nle->tent->tnode.tupid) < 0)
+					if(get_relative_dir(NULL, &rel_path, onle->tent->parent->tnode.tupid, nle->tent->tnode.tupid) < 0)
 						return NULL;
 					estring_append(&e, rel_path.s, rel_path.len);
 					free(rel_path.s);
@@ -4099,6 +4078,14 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
 					}
+				} else if(rparen-var == 14 &&
+					  strncmp(var, "TUP_VARIANTDIR", 14) == 0) {
+					if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tf->curtent->tnode.tupid) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->srctent->tnode.tupid, tf->curtent->tnode.tupid);
+						tup_db_print(tf->f, tf->srctent->tnode.tupid);
+						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+						return NULL;
+					}
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;
@@ -4159,7 +4146,7 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 				var = s + 2;
 				if (nodedb_copy(&tf->node_db, var, rparen-var, &e,
-				                tf->curtent->tnode.tupid) < 0)
+				                variant_tent_to_srctent(tf->curtent)->tnode.tupid) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {

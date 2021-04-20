@@ -31,7 +31,7 @@ cat > sub2/Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B ../<foo-autoh>
 HERE
 cat > sub3/Tupfile << HERE
-: foreach *.c | ../<foo-autoh> |> gcc -c %f -o %o -I../sub -I../sub2 |> %B.o {objs}
+: foreach *.c | ../<foo-autoh> |> gcc -c %f -o %o -I\$(TUP_VARIANTDIR)/../sub -I\$(TUP_VARIANTDIR)/../sub2 |> %B.o {objs}
 HERE
 echo '#define FOO 3' > sub/foo.h.in
 echo '#define BAR 4' > sub2/bar.h.in
@@ -46,12 +46,12 @@ tup touch build/tup.config
 tup touch build2/tup.config
 update
 
-tup_dep_exist build/sub foo.h build/sub3 'gcc -c foo.c -o foo.o -I../sub -I../sub2'
-tup_dep_exist build/sub2 bar.h build/sub3 'gcc -c foo.c -o foo.o -I../sub -I../sub2'
-tup_dep_exist build/sub2 bar.h build/sub3 'gcc -c bar.c -o bar.o -I../sub -I../sub2'
+tup_dep_exist build/sub foo.h build/sub3 'gcc -c foo.c -o ../build/sub3/foo.o -I../build/sub3/../sub -I../build/sub3/../sub2'
+tup_dep_exist build/sub2 bar.h build/sub3 'gcc -c foo.c -o ../build/sub3/foo.o -I../build/sub3/../sub -I../build/sub3/../sub2'
+tup_dep_exist build/sub2 bar.h build/sub3 'gcc -c bar.c -o ../build/sub3/bar.o -I../build/sub3/../sub -I../build/sub3/../sub2'
 
-tup_dep_exist build2/sub foo.h build2/sub3 'gcc -c foo.c -o foo.o -I../sub -I../sub2'
-tup_dep_exist build2/sub2 bar.h build2/sub3 'gcc -c foo.c -o foo.o -I../sub -I../sub2'
-tup_dep_exist build2/sub2 bar.h build2/sub3 'gcc -c bar.c -o bar.o -I../sub -I../sub2'
+tup_dep_exist build2/sub foo.h build2/sub3 'gcc -c foo.c -o ../build2/sub3/foo.o -I../build2/sub3/../sub -I../build2/sub3/../sub2'
+tup_dep_exist build2/sub2 bar.h build2/sub3 'gcc -c foo.c -o ../build2/sub3/foo.o -I../build2/sub3/../sub -I../build2/sub3/../sub2'
+tup_dep_exist build2/sub2 bar.h build2/sub3 'gcc -c bar.c -o ../build2/sub3/bar.o -I../build2/sub3/../sub -I../build2/sub3/../sub2'
 
 eotup

@@ -50,6 +50,7 @@ struct variant *variant_search(tupid_t dt);
 struct variant_head *get_variant_list(void);
 int variant_list_empty(void);
 int variant_get_srctent(struct variant *variant, struct tup_entry *tent, struct tup_entry **srctent);
+struct tup_entry *variant_tent_to_srctent(struct tup_entry *tent);
 void variants_free(void);
 
 #endif

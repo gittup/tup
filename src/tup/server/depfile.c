@@ -226,7 +226,7 @@ static int run_subprocess(int ofd, int dfd, const char *cmd, const char *depfile
 		if(dup2(null_fd, STDIN_FILENO) < 0) {
 			perror("dup2");
 			fprintf(stderr, "tup error: Unable to dup stdin for child processes.\n");
-			return -1;
+			exit(1);
 		}
 
 		if(fchdir(dfd) < 0) {

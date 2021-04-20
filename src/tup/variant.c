@@ -162,6 +162,17 @@ int variant_get_srctent(struct variant *variant, struct tup_entry *tent, struct 
 	return 0;
 }
 
+struct tup_entry *variant_tent_to_srctent(struct tup_entry *tent)
+{
+	struct tup_entry *srctent;
+
+	if(variant_get_srctent(tup_entry_variant(tent), tent, &srctent) < 0)
+		return tent;
+	if(srctent)
+		return srctent;
+	return tent;
+}
+
 void variants_free(void)
 {
 	struct variant *variant;

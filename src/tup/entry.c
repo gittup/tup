@@ -646,29 +646,12 @@ void dump_tup_entry(void)
 	}
 }
 
-/* Note: when used with variants, this function will skip over the variant
- * root tent, meaning that the returned list of tents isn't a correct parent
- * list, but when converted to a path it will refer to the correct file.
- */
 static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 {
 	struct tup_entry *tent;
-	struct variant *variant;
 
 	tent = tup_entry_get(tupid);
-	variant = tup_entry_variant(tent);
 	while(tent) {
-		if(!variant->root_variant) {
-			/* Pretend the variant dir isn't there. The parser
-			 * handles whether or not the tent should be in the
-			 * variant dir or the src dir - we just get the path as
-			 * if the start and end tents are both in the src dir.
-			 */
-			if(tent->dt == DOT_DT) {
-				tent = tent->parent;
-				continue;
-			}
-		}
 		if(tent_list_add_head(head, tent) < 0)
 			return -1;
 

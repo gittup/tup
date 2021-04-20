@@ -48,7 +48,7 @@ static int add_parser_files_locked(struct file_info *finfo,
 
 static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct file_entry);
 
-int init_file_info(struct file_info *info, const char *variant_dir, int do_unlink)
+int init_file_info(struct file_info *info, int do_unlink)
 {
 	TAILQ_INIT(&info->read_list);
 	TAILQ_INIT(&info->write_list);
@@ -64,14 +64,6 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	tent_tree_init(&info->exclusion_root);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
-	/* Root variant gets a NULL variant_dir so we can skip trying to do the
-	 * same thing twice in the server (eg: we only need a single readdir()
-	 * on the src tree).
-	 */
-	if(variant_dir[0])
-		info->variant_dir = variant_dir;
-	else
-		info->variant_dir = NULL;
 	info->server_fail = 0;
 	info->open_count = 0;
 	info->do_unlink = do_unlink;
