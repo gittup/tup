@@ -646,13 +646,10 @@ check_no_windows()
 {
 	case `tup server` in
 	ldpreload)
-		# The LD_PRELOAD shim doesn't support run-scripts, variants, or the client library.
+		# The LD_PRELOAD shim doesn't support run-scripts or the client library.
 		for var in "$@"; do
 			if [ "$var" = "run-script" ]; then
 				echo "[33mSkipping run-script test for LD_PRELOAD shim[0m"
-				eotup
-			elif [ "$var" = "variant" ]; then
-				echo "[33mSkipping variant test for LD_PRELOAD shim[0m"
 				eotup
 			elif [ "$var" = "client" ]; then
 				echo "[33mSkipping client test for LD_PRELOAD shim[0m"
