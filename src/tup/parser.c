@@ -2592,6 +2592,8 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		       struct name_list *nl, int orderid, int is_variant_copy)
 {
 	struct build_name_list_args args;
+	struct tup_entry *dtent;
+	struct tup_entry *srctent = NULL;
 
 	if(pl->dir != NULL) {
 		args.dir = pl->dir;
@@ -2609,13 +2611,14 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	args.globstrlen = pl->pel->len;
 	args.tf = tf;
 	args.orderid = orderid;
+	if(tup_entry_add(pl->dt, &dtent) < 0)
+		return -1;
+	if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
+		return -1;
 	if(char_find(pl->pel->path, pl->pel->len, "*?[") == 0) {
 		struct tup_entry *tent = NULL;
-		struct tup_entry *dtent;
 		struct variant *variant;
 
-		if(tup_entry_add(pl->dt, &dtent) < 0)
-			return -1;
 		/* Only look for an input in the variant directory if it's not
 		 * a !tup_preserve command (!is_variant_copy), or if this is
 		 * not a variant build (tf->variant->root_variant). In the
@@ -2634,13 +2637,9 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 					return -1;
 				}
 			} else {
-				struct tup_entry *srctent = NULL;
-
 				/* If we're a variant build, also look for the
 				 * file in the srcdir.
 				 */
-				if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
-					return -1;
 				if(srctent)
 					if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tent) < 0)
 						return -1;
@@ -2676,7 +2675,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			return -1;
 		}
 		if(tent_tree_search(&tf->g->gen_delete_root, tent) != NULL) {
-			struct tup_entry *srctent = NULL;
 			int valid_input = 0;
 
 			/* If the file now exists in the srctree (ie: we
@@ -2684,8 +2682,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			 * created a regular file in the srctree), then we are
 			 * good (t8072).
 			 */
-			if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
-				return -1;
 			if(srctent) {
 				struct tup_entry *tmp;
 				if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tmp) < 0)
@@ -2707,11 +2703,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(build_name_list_cb(&args, tent) < 0)
 			return -1;
 	} else {
-		struct tup_entry *srctent = NULL;
-		struct tup_entry *dtent;
-
-		if(tup_entry_add(pl->dt, &dtent) < 0)
-			return -1;
 		if(dtent->type == TUP_NODE_GHOST) {
 			fprintf(tf->f, "tup error: Unable to generate wildcard for directory '%s' since it is a ghost.\n", pl->mem);
 			return -1;
@@ -2719,8 +2710,6 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 
 		args.wildcard = 1;
 		if(tup_db_select_node_dir_glob(build_name_list_cb, &args, dtent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
-			return -1;
-		if(variant_get_srctent(tf->variant, dtent, &srctent) < 0)
 			return -1;
 		if(srctent) {
 			if(tup_db_select_node_dir_glob(build_name_list_cb, &args, srctent, pl->pel->path, pl->pel->len, &tf->g->gen_delete_root, 0) < 0)
