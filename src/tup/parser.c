@@ -2576,6 +2576,8 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 	struct build_name_list_args args;
 	struct tup_entry *dtent;
 	struct tup_entry *srctent = NULL;
+	int checked_dtent = 0;
+	int checked_srctent = 0;
 
 	args.nl = nl;
 	/* Save the original string with globs to pass to the function that
@@ -2602,6 +2604,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			if(tup_db_select_tent_part(dtent, pl->pel->path, pl->pel->len, &tent) < 0) {
 				return -1;
 			}
+			checked_dtent = 1;
 		}
 		/* If we didn't find an existing group, create one. We don't
 		 * look for these in the srcdir since they are unique to each
@@ -2622,6 +2625,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 			if(srctent) {
 				if(tup_db_select_tent_part(srctent, pl->pel->path, pl->pel->len, &tent) < 0)
 					return -1;
+				checked_srctent = 1;
 			}
 		}
 
@@ -2639,7 +2643,15 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				}
 			} else {
 				fprintf(tf->f, "tup error: Explicitly named file '%.*s' not found in subdir '", pl->pel->len, pl->pel->path);
-				print_tupid(tf->f, pl->dt);
+				if(checked_dtent) {
+					print_tup_entry(tf->f, dtent);
+					if(checked_srctent) {
+						fprintf(tf->f, " or ");
+					}
+				}
+				if(checked_srctent) {
+					print_tup_entry(tf->f, srctent);
+				}
 				fprintf(tf->f, "'\n");
 				return -1;
 			}
