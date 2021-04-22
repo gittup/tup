@@ -118,17 +118,18 @@ static int get_symlink(const char *filename, char **ret)
 		int dirlen;
 		last_slash = strrchr(filename, '/');
 		if(!last_slash) {
-			fprintf(stderr, "tup error: Expected a '/' in the symlink filename: %s\n", filename);
-			return -1;
+			*ret = malloc(linklen + 1);
+			strcpy(*ret, linkbuf);
+		} else {
+			dirlen = last_slash - filename + 1;
+			*ret = malloc(dirlen + linklen + 1);
+			if(!*ret) {
+				perror("malloc");
+				return -1;
+			}
+			strncpy(*ret, filename, dirlen);
+			strcpy(*ret + dirlen, linkbuf);
 		}
-		dirlen = last_slash - filename + 1;
-		*ret = malloc(dirlen + linklen + 1);
-		if(!*ret) {
-			perror("malloc");
-			return -1;
-		}
-		strncpy(*ret, filename, dirlen);
-		strcpy(*ret + dirlen, linkbuf);
 	}
 	return 0;
 }
