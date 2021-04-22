@@ -71,8 +71,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 int server_postexec(struct server *s);
 int server_unlink(void);
 int server_is_dead(void);
-int server_config_start(struct server *s);
-int server_config_stop(struct server *s);
 int server_parser_start(struct parser_server *ps);
 int server_parser_stop(struct parser_server *ps);
 
