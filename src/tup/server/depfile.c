@@ -391,56 +391,6 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 	return 0;
 }
 
-static int get_symlink(const char *filename, char **ret)
-{
-	char linkbuf[PATH_MAX];
-	ssize_t linklen;
-	linklen = readlink(filename, linkbuf, sizeof(linkbuf));
-	if(linklen <= 0)
-		return 0;
-	linkbuf[linklen] = 0;
-	if(linkbuf[0] == '/') {
-		*ret = strdup(linkbuf);
-		if(!*ret) {
-			perror("strdup");
-			return -1;
-		}
-	} else {
-		char *last_slash;
-		int dirlen;
-		last_slash = strrchr(filename, '/');
-		if(!last_slash) {
-			fprintf(stderr, "tup error: Expected a '/' in the symlink filename: %s\n", filename);
-			return -1;
-		}
-		dirlen = last_slash - filename + 1;
-		*ret = malloc(dirlen + linklen + 1);
-		if(!*ret) {
-			perror("malloc");
-			return -1;
-		}
-		strncpy(*ret, filename, dirlen);
-		strcpy(*ret + dirlen, linkbuf);
-	}
-	return 0;
-}
-
-static int add_symlinks(const char *path, struct file_info *finfo)
-{
-	char *linkpath = NULL;
-
-	if(get_symlink(path, &linkpath) < 0)
-		return -1;
-	if(linkpath) {
-		if(handle_file(ACCESS_READ, linkpath, "", finfo) < 0) {
-			fprintf(stderr, "tup error: Failed to call handle_file on a symlink event '%s'\n", linkpath);
-			return -1;
-		}
-		free(linkpath);
-	}
-	return 0;
-}
-
 static int process_depfile(struct server *s, int fd)
 {
 	char event1[PATH_MAX];
@@ -511,10 +461,6 @@ static int process_depfile(struct server *s, int fd)
 		if(handle_file(event.at, event1, event2, &s->finfo) < 0) {
 			fprintf(stderr, "tup error: Failed to call handle_file on event '%s'\n", event1);
 			return -1;
-		}
-		if(event.at == ACCESS_READ) {
-			if(add_symlinks(event1, &s->finfo) < 0)
-				return -1;
 		}
 	}
 	return 0;

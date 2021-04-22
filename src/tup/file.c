@@ -98,6 +98,58 @@ void finfo_unlock(struct file_info *info)
 	pthread_mutex_unlock(&info->lock);
 }
 
+#ifndef _WIN32
+static int get_symlink(const char *filename, char **ret)
+{
+	char linkbuf[PATH_MAX];
+	ssize_t linklen;
+	linklen = readlinkat(tup_top_fd(), filename, linkbuf, sizeof(linkbuf));
+	if(linklen <= 0)
+		return 0;
+	linkbuf[linklen] = 0;
+	if(linkbuf[0] == '/') {
+		*ret = strdup(linkbuf);
+		if(!*ret) {
+			perror("strdup");
+			return -1;
+		}
+	} else {
+		char *last_slash;
+		int dirlen;
+		last_slash = strrchr(filename, '/');
+		if(!last_slash) {
+			fprintf(stderr, "tup error: Expected a '/' in the symlink filename: %s\n", filename);
+			return -1;
+		}
+		dirlen = last_slash - filename + 1;
+		*ret = malloc(dirlen + linklen + 1);
+		if(!*ret) {
+			perror("malloc");
+			return -1;
+		}
+		strncpy(*ret, filename, dirlen);
+		strcpy(*ret + dirlen, linkbuf);
+	}
+	return 0;
+}
+
+static int add_symlinks(const char *path, struct file_info *finfo)
+{
+	char *linkpath = NULL;
+
+	if(get_symlink(path, &linkpath) < 0)
+		return -1;
+	if(linkpath) {
+		if(handle_open_file(ACCESS_READ, linkpath, finfo) < 0) {
+			fprintf(stderr, "tup error: Failed to call handle_open_file on a symlink event '%s'\n", linkpath);
+			return -1;
+		}
+		free(linkpath);
+	}
+	return 0;
+}
+#endif
+
 int handle_file_dtent(enum access_type at, struct tup_entry *dtent,
 		      const char *filename, struct file_info *info)
 {
@@ -136,6 +188,12 @@ int handle_file(enum access_type at, const char *filename, const char *file2,
 		rc = handle_rename(filename, file2, info);
 	} else {
 		rc = handle_open_file(at, filename, info);
+#ifndef _WIN32
+		if(at == ACCESS_READ) {
+			if(add_symlinks(filename, info) < 0)
+				return -1;
+		}
+#endif
 	}
 	finfo_unlock(info);
 
