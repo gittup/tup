@@ -171,7 +171,7 @@ int tup_db_config_get_int(const char *lval, int def, int *result);
 /* Var operations */
 int tup_db_set_var(tupid_t tupid, const char *value);
 struct tup_entry *tup_db_get_var(struct variant *variant, const char *var, int varlen, struct estring *e);
-int tup_db_read_vars(int root_fd, struct tup_entry *dtent, const char *file,
+int tup_db_read_vars(struct tup_entry *dtent, const char *file,
 		     struct tup_entry *var_dtent, const char *vardict_file);
 int tup_db_delete_tup_config(struct tup_entry *tent);
 

@@ -335,7 +335,7 @@ int generate(int argc, char **argv)
 	} else {
 		varfiletent = vartent;
 	}
-	if(tup_db_read_vars(tup_top_fd(), varfiletent->parent, varfiletent->name.s, vartent, generate_vardict_file) < 0)
+	if(tup_db_read_vars(varfiletent->parent, varfiletent->name.s, vartent, generate_vardict_file) < 0)
 		return -1;
 
 	printf("Parsing...\n");
@@ -853,7 +853,7 @@ static int process_config_nodes(int environ_check)
 		while(!TAILQ_EMPTY(&g.plist)) {
 			struct variant *variant;
 			int rm_node = 1;
-			struct parser_server ps;
+			struct server s;
 
 			n = TAILQ_FIRST(&g.plist);
 			if(node_remove_list(&g.plist, n) < 0)
@@ -955,16 +955,14 @@ static int process_config_nodes(int environ_check)
 					show_result(n->tent, 0, NULL, "updated variant", 1);
 				}
 				compat_lock_disable();
-				if(initialize_server_struct(&ps.s, n->tent) < 0)
+				if(initialize_server_struct(&s, n->tent) < 0)
 					goto err_rollback;
-				if(server_parser_start(&ps) < 0)
-					goto err_rollback;
-				rc = tup_db_read_vars(ps.root_fd, n->tent->parent, TUP_CONFIG, n->tent, variant->vardict_file);
-				if(server_parser_stop(&ps) < 0)
+				rc = tup_db_read_vars(n->tent->parent, TUP_CONFIG, n->tent, variant->vardict_file);
+				if(handle_file_dtent(ACCESS_READ, n->tent->parent, TUP_CONFIG, &s.finfo) < 0)
 					goto err_rollback;
 				if(rc < 0)
 					goto err_rollback;
-				if(add_config_files(&ps.s.finfo, n->tent, full_deps) < 0)
+				if(add_config_files(&s.finfo, n->tent, full_deps) < 0)
 					goto err_rollback;
 				compat_lock_enable();
 

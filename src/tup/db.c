@@ -4959,7 +4959,7 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(int root_fd, struct tup_entry *dtent, const char *file,
+int tup_db_read_vars(struct tup_entry *dtent, const char *file,
 		     struct tup_entry *var_dtent, const char *vardict_file)
 {
 	struct vardb db_tree;
@@ -4972,7 +4972,7 @@ int tup_db_read_vars(int root_fd, struct tup_entry *dtent, const char *file,
 	vardb_init(&file_tree);
 	if(tup_db_get_vardb(var_dtent, &db_tree) < 0)
 		return -1;
-	dfd = tup_entry_openat(root_fd, dtent);
+	dfd = tup_entry_openat(tup_top_fd(), dtent);
 	if(dfd < 0) {
 		rc = 0;
 	} else {
