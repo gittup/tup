@@ -16,13 +16,13 @@ plat_files=""
 if [ "$server" = "fuse" ]; then
 	plat_cflags="`pkg-config fuse --cflags`"
 	plat_ldflags="`pkg-config fuse --libs`"
-	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
+	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/tup/server/symlink.c"
 elif [ "$server" = "fuse3" ]; then
 	plat_cflags="`pkg-config fuse3 --cflags` -DFUSE3 -D_FILE_OFFSET_BITS=64"
 	plat_ldflags="`pkg-config fuse3 --libs`"
-	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c"
+	plat_files="$plat_files ../src/tup/server/fuse*.c ../src/tup/server/master_fork.c ../src/tup/server/symlink.c"
 elif [ "$server" = "ldpreload" ]; then
-	plat_files="../src/tup/server/depfile.c ../src/tup/server/privs.c"
+	plat_files="../src/tup/server/depfile.c ../src/tup/server/privs.c ../src/tup/server/symlink.c"
 else
 	echo "Error: invalid TUP_SERVER \"$server\"" 1>&2
 	exit 1

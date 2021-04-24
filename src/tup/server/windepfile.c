@@ -470,14 +470,16 @@ int serverless_run_script(FILE *f, const char *cmdline,
 	return -1;
 }
 
-int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath)
+int server_symlink(struct server *s, struct tup_entry *dtent, const char *target, int dfd, const char *linkpath)
 {
 	char depfile[PATH_MAX];
 	char dest[PATH_MAX];
+	char dest_canon[PATH_MAX];
 	wchar_t wtarget[PATH_MAX];
 	wchar_t wdest[PATH_MAX];
 	int rc;
 
+	if(dtent) {/* unused */}
 	rc = dir_mutex_lock(dfd);
 	if(rc < 0)
 		return rc;
@@ -485,18 +487,24 @@ int server_symlink(struct server *s, const char *target, int dfd, const char *li
 		fprintf(stderr, "tup error: dest path sized too small in symlinkat compat function\n");
 		goto out_err;
 	}
+	/* Canonicalize the path name to remove ../'s and ./'s for
+	 * GetFileAttributesExW in file_set_mtime().
+	 */
+	GetFullPathNameA(dest, sizeof(dest_canon), dest_canon, NULL);
 	if(snprintf(depfile, sizeof(depfile), "%s/%s", win32_get_dirpath(dfd), target) >= PATH_MAX) {
 		fprintf(stderr, "tup error: depfile path sized too small in symlinkat compat function\n");
 		goto out_err;
 	}
 	MultiByteToWideChar(CP_UTF8, 0, target, -1, wtarget, PATH_MAX);
-	MultiByteToWideChar(CP_UTF8, 0, dest, -1, wdest, PATH_MAX);
+	MultiByteToWideChar(CP_UTF8, 0, dest_canon, -1, wdest, PATH_MAX);
 	if(CopyFile(wtarget, wdest, 1) == 0) {
 		perror("CopyFile");
 		goto out_err;
 	}
 	dir_mutex_unlock();
 	if(handle_file(ACCESS_READ, depfile, NULL, &s->finfo) < 0)
+		return -1;
+	if(handle_file(ACCESS_WRITE, dest_canon, NULL, &s->finfo) < 0)
 		return -1;
 	return 0;
 

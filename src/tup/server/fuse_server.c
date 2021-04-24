@@ -782,17 +782,6 @@ int serverless_run_script(FILE *f, const char *cmdline,
 	return -1;
 }
 
-int server_symlink(struct server *s, const char *target, int dfd, const char *linkpath)
-{
-	if(s) {/* unused */}
-	if(symlinkat(target, dfd, linkpath) < 0) {
-		perror("symlinkat");
-		fprintf(stderr, "tup error: unable to create symlink at '%s' pointing to target '%s'\n", linkpath, target);
-		return -1;
-	}
-	return 0;
-}
-
 int server_is_dead(void)
 {
 	return sig_quit;

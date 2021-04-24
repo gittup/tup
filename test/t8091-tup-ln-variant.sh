@@ -25,38 +25,47 @@ cat > Tupfile << HERE
 : foreach *.txt |> !tup_ln |> %B.lnk
 HERE
 tmkdir build
+echo foo > foo.txt
+echo bar > bar.txt
 tup touch foo.txt bar.txt build/tup.config
 
 tmkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.txt |> !tup_ln |> %B.lnk
 HERE
+echo baz > sub/baz.txt
+echo blah > sub/blah.txt
 tup touch sub/baz.txt sub/blah.txt
 update
 
-tup_dep_exist build "$(tup_ln_cmd ../foo.txt build/foo.lnk)" build foo.lnk
-tup_dep_exist build "$(tup_ln_cmd ../bar.txt build/bar.lnk)" build bar.lnk
+tup_dep_exist build "$(tup_ln_cmd foo.txt build/foo.lnk)" build foo.lnk
+tup_dep_exist build "$(tup_ln_cmd bar.txt build/bar.lnk)" build bar.lnk
 
-tup_dep_exist build/sub "$(tup_ln_cmd ../../sub/baz.txt ../build/sub/baz.lnk)" build/sub baz.lnk
-tup_dep_exist build/sub "$(tup_ln_cmd ../../sub/blah.txt ../build/sub/blah.lnk)" build/sub blah.lnk
+tup_dep_exist build/sub "$(tup_ln_cmd baz.txt ../build/sub/baz.lnk)" build/sub baz.lnk
+tup_dep_exist build/sub "$(tup_ln_cmd blah.txt ../build/sub/blah.lnk)" build/sub blah.lnk
 
 case $tupos in
 	CYGWIN*)
 		# Windows does a copy, so it should have input dependencies
-		tup_dep_exist . foo.txt build "$(tup_ln_cmd ../foo.txt build/foo.lnk)"
-		tup_dep_exist . bar.txt build "$(tup_ln_cmd ../bar.txt build/bar.lnk)"
+		tup_dep_exist . foo.txt build "$(tup_ln_cmd foo.txt build/foo.lnk)"
+		tup_dep_exist . bar.txt build "$(tup_ln_cmd bar.txt build/bar.lnk)"
 
-		tup_dep_exist sub baz.txt build/sub "$(tup_ln_cmd ../../sub/baz.txt ../build/sub/baz.lnk)"
-		tup_dep_exist sub blah.txt build/sub "$(tup_ln_cmd ../../sub/blah.txt ../build/sub/blah.lnk)"
+		tup_dep_exist sub baz.txt build/sub "$(tup_ln_cmd baz.txt ../build/sub/baz.lnk)"
+		tup_dep_exist sub blah.txt build/sub "$(tup_ln_cmd blah.txt ../build/sub/blah.lnk)"
 		;;
 	*)
 		# Other platforms use symlink, so no input dependencies
-		tup_dep_no_exist . foo.txt build "$(tup_ln_cmd ../foo.txt build/foo.lnk)"
-		tup_dep_no_exist . bar.txt build "$(tup_ln_cmd ../bar.txt build/bar.lnk)"
+		tup_dep_no_exist . foo.txt build "$(tup_ln_cmd foo.txt build/foo.lnk)"
+		tup_dep_no_exist . bar.txt build "$(tup_ln_cmd bar.txt build/bar.lnk)"
 
-		tup_dep_no_exist sub baz.txt build/sub "$(tup_ln_cmd ../../sub/baz.txt ../build/sub/baz.lnk)"
-		tup_dep_no_exist sub blah.txt build/sub "$(tup_ln_cmd ../../sub/blah.txt ../build/sub/blah.lnk)"
+		tup_dep_no_exist sub baz.txt build/sub "$(tup_ln_cmd baz.txt ../build/sub/baz.lnk)"
+		tup_dep_no_exist sub blah.txt build/sub "$(tup_ln_cmd blah.txt ../build/sub/blah.lnk)"
 		;;
 esac
+
+echo foo | diff - build/foo.lnk
+echo bar | diff - build/bar.lnk
+echo baz | diff - build/sub/baz.lnk
+echo blah | diff - build/sub/blah.lnk
 
 eotup

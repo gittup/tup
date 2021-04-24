@@ -3,18 +3,18 @@ include_rules
 ifeq ($(TUP_SERVER),fuse)
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse --cflags`
-: foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
+: foreach fuse_server.c fuse_fs.c master_fork.c symlink.c |> !cc |>
 endif
 
 ifeq ($(TUP_SERVER),fuse3)
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse3 --cflags`
 CFLAGS += -DFUSE3
-: foreach fuse_server.c fuse_fs.c master_fork.c |> !cc |>
+: foreach fuse_server.c fuse_fs.c master_fork.c symlink.c |> !cc |>
 endif
 
 ifeq ($(TUP_SERVER),ldpreload)
-: foreach depfile.c privs.c |> !cc |>
+: foreach depfile.c privs.c symlink.c |> !cc |>
 endif
 
 ifeq ($(TUP_SERVER),windepfile)

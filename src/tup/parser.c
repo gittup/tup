@@ -538,11 +538,6 @@ static int parse_internal_definitions(struct tupfile *tf)
 	return 0;
 }
 
-static int is_internal_command(const char *cmd) {
-	return !strcmp(cmd, TUP_PRESERVE_CMD) ||
-	       !strcmp(cmd, TUP_LN_CMD);
-}
-
 static char *get_newline(char *p)
 {
 	char *newline;
@@ -3780,18 +3775,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				if(!first) {
 					estring_append(&e, " ", 1);
 				}
-				if(!tf->variant->root_variant && is_internal_command(cmd)) {
-					struct estring rel_path;
-					struct name_list_entry *onle = TAILQ_FIRST(&onl->entries);
-					if(estring_init(&rel_path) < 0)
-						return NULL;
-					if(get_relative_dir(NULL, &rel_path, onle->tent->parent->tnode.tupid, nle->tent->tnode.tupid) < 0)
-						return NULL;
-					estring_append(&e, rel_path.s, rel_path.len);
-					free(rel_path.s);
-				} else {
-					estring_append(&e, nle->path, nle->len);
-				}
+				estring_append(&e, nle->path, nle->len);
 				first = 0;
 			}
 		} else if(*next == 'b') {

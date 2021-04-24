@@ -2704,7 +2704,7 @@ static int expand_command(char **res,
 	return 0;
 }
 
-static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *dtent, char *input, char *output)
+static const char *input_and_output_from_cmd(const char *cmd, char *input)
 {
 	const char *endp;
 	size_t input_len;
@@ -2720,49 +2720,20 @@ static const char *input_and_output_from_cmd(const char *cmd, struct tup_entry *
 	input[input_len] = 0;
 	while(isspace(*endp))
 		endp++;
-	if(is_full_path(endp)) {
-		strcpy(output, endp);
-	} else {
-		output[0] = '.';
-		snprint_tup_entry(output+1, PATH_MAX-1, variant_tent_to_srctent(dtent));
-		strcat(output, "/");
-		strcat(output, endp);
-	}
 	return endp;
-}
-
-static int specify_pseudo_exec_output(struct server *s, const char *output)
-{
-	struct mapping *map;
-	if(handle_file(ACCESS_WRITE, output, NULL, &s->finfo) < 0)
-		return -1;
-	map = malloc(sizeof *map);
-	if(!map) {
-		perror("malloc");
-		return -1;
-	}
-	map->realname = strdup(output);
-	map->tmpname = strdup(output);
-	map->tent = NULL;
-	finfo_lock(&s->finfo);
-	TAILQ_INSERT_TAIL(&s->finfo.mapping_list, map, list);
-	finfo_unlock(&s->finfo);
-
-	s->exited = 1;
-	s->exit_status = 0;
-	return 0;
 }
 
 static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char *cmd)
 {
 	char input_path[PATH_MAX];
-	char full_output_path[PATH_MAX];
-	const char* output_name = input_and_output_from_cmd(cmd, dtent, input_path, full_output_path);
+	const char* output_name = input_and_output_from_cmd(cmd, input_path);
 	if(!output_name)
 		return -1;
-	if(server_symlink(s, input_path, dfd, output_name) < 0)
+	if(server_symlink(s, dtent, input_path, dfd, output_name) < 0)
 		return -1;
-	return specify_pseudo_exec_output(s, full_output_path);
+	s->exited = 1;
+	s->exit_status = 0;
+	return 0;
 }
 
 static int update(struct node *n)

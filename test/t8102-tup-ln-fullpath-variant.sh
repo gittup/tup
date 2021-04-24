@@ -32,6 +32,6 @@ tmkdir build
 tup touch build/tup.config
 update
 
-tup_dep_exist build/sub "!tup_ln ../../foo/input.txt ../build/sub/link.txt" build/sub link.txt
+tup_dep_exist build/sub "!tup_ln ../foo/input.txt ../build/sub/link.txt" build/sub link.txt
 
 eotup
