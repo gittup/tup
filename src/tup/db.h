@@ -188,9 +188,9 @@ int is_virtual_tent(struct tup_entry *tent);
 tupid_t exclusion_dt(void);
 
 /* Tree operations */
-int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
-int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
-int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYPE type);
+int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, enum TUP_NODE_TYPE type);
+int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, enum TUP_NODE_TYPE type);
+int tup_db_type_to_tree(struct tent_entries *root, enum TUP_NODE_TYPE type);
 int tup_db_is_generated_dir(tupid_t dt);
 
 /* scanner operations */

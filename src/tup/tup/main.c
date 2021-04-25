@@ -383,7 +383,7 @@ static int inputs(int argc, char **argv)
 	if(tup_db_begin() < 0)
 		return -1;
 	for(x=1; x<argc; x++) {
-		struct tent_entries inputs = RB_INITIALIZER(&inputs);
+		struct tent_entries inputs = TENT_ENTRIES_INITIALIZER;
 		struct tent_tree *tt;
 		tupid_t cmdid;
 

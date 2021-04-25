@@ -489,7 +489,7 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 static int add_config_files_locked(struct file_info *finfo, struct tup_entry *tent, int full_deps)
 {
 	struct file_entry *r;
-	struct tent_entries root = {NULL};
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 
 	while(!TAILQ_EMPTY(&finfo->read_list)) {
 		r = TAILQ_FIRST(&finfo->read_list);
@@ -517,7 +517,7 @@ static int add_parser_files_locked(struct file_info *finfo,
 	struct file_entry *r;
 	struct mapping *map;
 	struct tup_entry *tent;
-	struct tent_entries tmproot = {NULL};
+	struct tent_entries tmproot = TENT_ENTRIES_INITIALIZER;
 	struct tent_tree *tt;
 	int map_bork = 0;
 
@@ -692,7 +692,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	struct file_entry *r;
 	struct file_entry *tmp;
 	struct tup_entry *tent;
-	struct tent_entries root = {NULL};
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 	int write_bork = 0;
 
 	while(!TAILQ_EMPTY(&info->write_list)) {
@@ -835,7 +835,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			    int *important_link_removed)
 {
 	struct file_entry *r;
-	struct tent_entries root = {NULL};
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 
 	while(!TAILQ_EMPTY(&info->read_list)) {
 		int match = 0;

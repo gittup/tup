@@ -248,15 +248,15 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	 * previously. We'll check these against the new ones in order to see
 	 * if any should be removed.
 	 */
-	if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &g->cmd_delete_root, &g->cmd_delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &g->cmd_delete_root, TUP_NODE_CMD) < 0)
 		goto out_close_vdb;
-	if(tup_db_srcid_to_tree(tf.tent->tnode.tupid, &g->gen_delete_root, &g->gen_delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_srcid_to_tree(tf.tent->tnode.tupid, &g->gen_delete_root, TUP_NODE_GENERATED) < 0)
 		goto out_close_vdb;
 	if(split_roots(&g->gen_delete_root, &g->save_root) < 0)
 		goto out_close_vdb;
 
 	if(refactoring) {
-		if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &tf.refactoring_cmd_delete_root, NULL, TUP_NODE_CMD) < 0)
+		if(tup_db_dirtype(tf.tent->tnode.tupid, NULL, &tf.refactoring_cmd_delete_root, TUP_NODE_CMD) < 0)
 			goto out_close_vdb;
 	}
 
@@ -1166,9 +1166,7 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
 			return -1;
-		tent_tree_remove_count(&tf->g->gen_delete_root,
-				       tent,
-				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->gen_delete_root, tent);
 	} else {
 		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
 			perror("unlinkat");
@@ -1202,9 +1200,7 @@ static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 		if(tup_db_node_insert_tent(dtent, ".gitignore", -1, TUP_NODE_GENERATED, -1, dtent->tnode.tupid, &tent) < 0)
 			return -1;
 	} else {
-		tent_tree_remove_count(&tf->g->gen_delete_root,
-				       tent,
-				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->gen_delete_root, tent);
 		/* It may be a ghost if we are going from a variant
 		 * to an in-tree build, or a normal file if we are appending
 		 * definitions to a user-created .gitignore file.
@@ -2042,7 +2038,7 @@ static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
 static int make_name_list_unique(struct name_list *nl)
 {
 	struct name_list_entry *tmp;
-	struct tent_entries root = {NULL};
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 	struct name_list_entry *nle;
 
 	/* We only care about dupes in the inputs namelist, since the others
@@ -3063,7 +3059,7 @@ static int add_input(struct tupfile *tf, struct tent_entries *input_root,
 		     struct tup_entry *tent)
 {
 	if(tent->type == TUP_NODE_GENERATED) {
-		struct tent_entries extra_group_root = {NULL};
+		struct tent_entries extra_group_root = TENT_ENTRIES_INITIALIZER;
 		struct tent_tree *tt;
 		struct tup_entry *cmd;
 
@@ -3406,9 +3402,9 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	struct tent_tree *tt;
 	struct tent_tree *ttree;
 	struct tup_entry *cmdtent = NULL;
-	struct tent_entries input_root = {NULL};
-	struct tent_entries output_root = {NULL};
-	struct tent_entries exclusion_root = {NULL};
+	struct tent_entries input_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries output_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries exclusion_root = TENT_ENTRIES_INITIALIZER;
 	struct tup_entry *tmptent = NULL;
 	struct tup_entry *group = NULL;
 	struct tup_entry *old_group = NULL;
@@ -3558,7 +3554,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		tup_db_print(tf->f, cmdtent->tnode.tupid);
 		return -1;
 	}
-	tent_tree_remove_count(&tf->g->cmd_delete_root, cmdtent, &tf->g->cmd_delete_count);
+	tent_tree_remove(&tf->g->cmd_delete_root, cmdtent);
 	if(tf->refactoring) {
 		tent_tree_remove(&tf->refactoring_cmd_delete_root, cmdtent);
 	}
@@ -3569,8 +3565,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tup_db_create_unique_link(cmdtent, onle->tent) < 0) {
 			return -1;
 		}
-		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
-				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->gen_delete_root, onle->tent);
 		tent_tree_remove(&tf->g->save_root, onle->tent);
 		if(output_nl) {
 			move_name_list_entry(output_nl, &onl, onle);
@@ -3584,8 +3579,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		if(tup_db_create_unique_link(cmdtent, onle->tent) < 0) {
 			return -1;
 		}
-		tent_tree_remove_count(&tf->g->gen_delete_root, onle->tent,
-				       &tf->g->gen_delete_count);
+		tent_tree_remove(&tf->g->gen_delete_root, onle->tent);
 		tent_tree_remove(&tf->g->save_root, onle->tent);
 		delete_name_list_entry(&extra_onl, onle);
 	}

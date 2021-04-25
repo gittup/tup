@@ -581,12 +581,12 @@ static int delete_files(struct graph *g)
 	struct tup_entry *tent;
 	int rc = -1;
 
-	if(g->cmd_delete_count) {
+	if(g->cmd_delete_root.count) {
 		char buf[64];
-		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_count, g->cmd_delete_count == 1 ? "" : "s");
+		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_root.count, g->cmd_delete_root.count == 1 ? "" : "s");
 		buf[sizeof(buf)-1] = 0;
 		tup_show_message(buf);
-		start_progress(g->cmd_delete_count, -1, -1);
+		start_progress(g->cmd_delete_root.count, -1, -1);
 	}
 	while((tt = RB_ROOT(&g->cmd_delete_root)) != NULL) {
 		tent = tt->tent;
@@ -602,7 +602,7 @@ static int delete_files(struct graph *g)
 		show_progress(-1, TUP_NODE_GENERATED);
 	}
 
-	start_progress(g->gen_delete_count, -1, -1);
+	start_progress(g->gen_delete_root.count, -1, -1);
 	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
 		tent = tt->tent;
 		tent_tree_rm(&g->gen_delete_root, tt);
@@ -616,9 +616,11 @@ static int delete_files(struct graph *g)
 		if(tup_del_id_force(tent->tnode.tupid, TUP_NODE_GENERATED) < 0)
 			goto out_err;
 	}
+
 	if(!RB_EMPTY(&g->save_root)) {
 		tup_show_message("Converting generated files to normal files...\n");
 	}
+	start_progress(g->save_root.count, -1, -1);
 	while((tt = RB_ROOT(&g->save_root)) != NULL) {
 		tent = tt->tent;
 		tent_tree_rm(&g->save_root, tt);
@@ -654,9 +656,9 @@ static int delete_in_tree(void)
 	struct graph g;
 	if(create_graph(&g, TUP_NODE_FILE, -1) < 0)
 		return -1;
-	if(tup_db_type_to_tree(&g.cmd_delete_root, &g.cmd_delete_count, TUP_NODE_CMD) < 0)
+	if(tup_db_type_to_tree(&g.cmd_delete_root, TUP_NODE_CMD) < 0)
 		return -1;
-	if(tup_db_type_to_tree(&g.gen_delete_root, &g.gen_delete_count, TUP_NODE_GENERATED) < 0)
+	if(tup_db_type_to_tree(&g.gen_delete_root, TUP_NODE_GENERATED) < 0)
 		return -1;
 	if(delete_files(&g) < 0)
 		return -1;
@@ -1357,7 +1359,7 @@ static int process_create_nodes(void)
 	compat_lock_enable();
 
 	if(rc == 0) {
-		if(g.gen_delete_count) {
+		if(g.gen_delete_root.count) {
 			tup_main_progress("Deleting files...\n");
 		} else {
 			tup_main_progress("No files to delete.\n");
@@ -2019,9 +2021,9 @@ static int generate_work(struct graph *g, struct node *n)
 {
 	int rc = 0;
 	char *expanded_name = NULL;
-	struct tent_entries sticky_root = {NULL};
-	struct tent_entries normal_root = {NULL};
-	struct tent_entries group_sticky_root = {NULL};
+	struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries normal_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries group_sticky_root = TENT_ENTRIES_INITIALIZER;
 	if(g) {/* unused */}
 
 	if(n->tent->type == TUP_NODE_CMD) {
@@ -2515,7 +2517,7 @@ static int expand_group(FILE *f, struct estring *e, struct expand_info *info)
 		struct tup_entry *group_tent = tt->tent;
 
 		if(memcmp(group_tent->name.s, info->groupname, info->grouplen) == 0) {
-			struct tent_entries inputs = {NULL};
+			struct tent_entries inputs = TENT_ENTRIES_INITIALIZER;
 			struct tent_tree *ttinput;
 
 			if(info->used_groups_root)

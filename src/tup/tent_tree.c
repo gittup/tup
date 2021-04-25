@@ -31,6 +31,12 @@ static int tent_tree_cmp(struct tent_tree *tt1, struct tent_tree *tt2)
 
 RB_GENERATE(tent_entries, tent_tree, linkage, tent_tree_cmp);
 
+void tent_tree_init(struct tent_entries *root)
+{
+	root->rbh_root = NULL;
+	root->count = 0;
+}
+
 int tent_tree_add(struct tent_entries *root, struct tup_entry *tent)
 {
 	struct tent_tree *tt;
@@ -48,6 +54,7 @@ int tent_tree_add(struct tent_entries *root, struct tup_entry *tent)
 		return -1;
 	}
 	tup_entry_add_ref(tent);
+	root->count++;
 	return 0;
 }
 
@@ -64,6 +71,7 @@ int tent_tree_add_dup(struct tent_entries *root, struct tup_entry *tent)
 		mempool_free(&pool, tt);
 	} else {
 		tup_entry_add_ref(tent);
+		root->count++;
 	}
 	return 0;
 }
@@ -104,19 +112,7 @@ void tent_tree_remove(struct tent_entries *root, struct tup_entry *tent)
 		return;
 	}
 	tent_tree_rm(root, tt);
-}
-
-void tent_tree_remove_count(struct tent_entries *root, struct tup_entry *tent, int *count)
-{
-	struct tent_tree *tt;
-
-	tt = tent_tree_search(root, tent);
-	if(!tt) {
-		return;
-	}
-	if(count)
-		(*count)--;
-	tent_tree_rm(root, tt);
+	root->count--;
 }
 
 void tent_tree_rm(struct tent_entries *root, struct tent_tree *tt)

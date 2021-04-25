@@ -88,9 +88,7 @@ struct graph {
 	time_t total_mtime;
 	struct tent_entries gen_delete_root;
 	struct tent_entries save_root;
-	int gen_delete_count;
 	struct tent_entries cmd_delete_root;
-	int cmd_delete_count;
 	struct tent_entries normal_dir_root;
 	struct tent_entries parse_gitignore_root;
 	int style;

@@ -150,7 +150,7 @@ LIST_HEAD(half_entry_head, half_entry);
 
 static sqlite3 *tup_db = NULL;
 static sqlite3_stmt *stmts[DB_NUM_STATEMENTS];
-static struct tent_entries ghost_root = {NULL};
+static struct tent_entries ghost_root = TENT_ENTRIES_INITIALIZER;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
@@ -1840,7 +1840,7 @@ static int duplicate_directory_structure(int fd, struct tup_entry *dest, struct 
 	struct tent_list_head subdir_list;
 
 	tent_list_init(&subdir_list);
-	if(tup_db_dirtype(src->tnode.tupid, &subdir_list, NULL, NULL, TUP_NODE_DIR) < 0)
+	if(tup_db_dirtype(src->tnode.tupid, &subdir_list, NULL, TUP_NODE_DIR) < 0)
 		return -1;
 	tent_list_foreach(tl, &subdir_list) {
 		struct tup_entry *subdest;
@@ -3418,7 +3418,7 @@ int tup_db_link_exists(tupid_t a, tupid_t b, int style,
 
 int tup_db_get_incoming_link(struct tup_entry *tent, struct tup_entry **incoming)
 {
-	struct tent_entries root = {NULL};
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 	struct tent_tree *tt;
 	struct tup_entry *incoming_tent = NULL;
 	int set = 0;
@@ -3689,7 +3689,7 @@ int tup_db_normal_dir_to_generated(struct tup_entry *tent)
 	return 0;
 }
 
-int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries *root, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -3739,8 +3739,6 @@ int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries 
 			rc = -1;
 			break;
 		}
-		if(count)
-			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {
@@ -3771,7 +3769,7 @@ int tup_db_dirtype(tupid_t dt, struct tent_list_head *head, struct tent_entries 
 	return rc;
 }
 
-int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -3821,8 +3819,6 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, e
 			rc = -1;
 			break;
 		}
-		if(count)
-			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {
@@ -3845,7 +3841,7 @@ int tup_db_srcid_to_tree(tupid_t srcid, struct tent_entries *root, int *count, e
 	return rc;
 }
 
-int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYPE type)
+int tup_db_type_to_tree(struct tent_entries *root, enum TUP_NODE_TYPE type)
 {
 	int rc = 0;
 	int dbrc;
@@ -3890,8 +3886,6 @@ int tup_db_type_to_tree(struct tent_entries *root, int *count, enum TUP_NODE_TYP
 			rc = -1;
 			break;
 		}
-		if(count)
-			(*count)++;
 	}
 
 	if(msqlite3_reset(*stmt) != 0) {
@@ -5771,13 +5765,13 @@ int tup_db_check_actual_outputs(FILE *f, tupid_t cmdid,
 				int *write_bork,
 				int do_unlink, int complain_missing)
 {
-	struct tent_entries output_copy = {NULL};
+	struct tent_entries output_copy = TENT_ENTRIES_INITIALIZER;
 	struct actual_output_data aod = {
 		.f = f,
 		.cmdid = cmdid,
 		.output_error = 0,
 		.mapping_list = mapping_list,
-		.exclusion_root = {NULL},
+		.exclusion_root = TENT_ENTRIES_INITIALIZER,
 		.do_unlink = do_unlink,
 	};
 	int (*missing)(struct tup_entry *, void*) = NULL;
@@ -5904,7 +5898,7 @@ int tup_db_write_inputs(FILE *f, tupid_t cmdid, struct tent_entries *input_root,
 			struct tup_entry *old_group,
 			int refactoring)
 {
-	struct tent_entries sticky_root = {NULL};
+	struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
 	struct write_input_data wid = {
 		.f = f,
 		.cmdid = cmdid,
@@ -6103,13 +6097,13 @@ int tup_db_check_actual_inputs(FILE *f, tupid_t cmdid,
 			       struct tent_entries *output_root,
 			       int *important_link_removed)
 {
-	struct tent_entries sticky_copy = {NULL};
+	struct tent_entries sticky_copy = TENT_ENTRIES_INITIALIZER;
 	struct actual_input_data aid = {
 		.f = f,
 		.cmdid = cmdid,
 		.sticky_root = sticky_root,
 		.output_root = output_root,
-		.missing_input_root = {NULL},
+		.missing_input_root = TENT_ENTRIES_INITIALIZER,
 		.important_link_removed = 0,
 	};
 	int rc;
@@ -6145,11 +6139,11 @@ int tup_db_check_config_inputs(struct tup_entry *tent,
 	struct actual_input_data aid = {
 		.f = stdout,
 		.cmdid = tent->tnode.tupid,
-		.missing_input_root = {NULL},
+		.missing_input_root = TENT_ENTRIES_INITIALIZER,
 	};
-	struct tent_entries output_root = {NULL};
-	struct tent_entries sticky_root = {NULL};
-	struct tent_entries normal_root = {NULL};
+	struct tent_entries output_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries normal_root = TENT_ENTRIES_INITIALIZER;
 
 	aid.sticky_root = &sticky_root;
 	aid.output_root = &output_root;
@@ -6237,8 +6231,8 @@ int tup_db_write_outputs(FILE *f, struct tup_entry *cmdtent,
 			 struct tup_entry **old_group,
 			 int refactoring, int command_modified)
 {
-	struct tent_entries output_root = {NULL};
-	struct tent_entries orig_exclusion_root = {NULL};
+	struct tent_entries output_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries orig_exclusion_root = TENT_ENTRIES_INITIALIZER;
 	tupid_t cmdid = cmdtent->tnode.tupid;
 	struct parse_output_data pod = {
 		.f = f,
@@ -6375,8 +6369,8 @@ static int rm_dir_link(struct tup_entry *tent, void *data)
 
 int tup_db_write_dir_inputs(FILE *f, tupid_t dt, struct tent_entries *root)
 {
-	struct tent_entries sticky_root = {NULL};
-	struct tent_entries normal_root = {NULL};
+	struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
+	struct tent_entries normal_root = TENT_ENTRIES_INITIALIZER;
 	struct write_dir_input_data wdid = {
 		.dt = dt,
 		.f = f,
@@ -6988,7 +6982,7 @@ static int reclaim_ghosts(void)
 	 * having a ghost subdir - the subdir would be removed in one pass,
 	 * then the other dir in the next pass.
 	 */
-	struct tent_entries tmp_root = {NULL};
+	struct tent_entries tmp_root = TENT_ENTRIES_INITIALIZER;
 
 	while(!RB_EMPTY(&ghost_root)) {
 		struct tup_entry *tent;

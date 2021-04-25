@@ -233,11 +233,9 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_
 	TAILQ_INIT(&g->plist);
 	TAILQ_INIT(&g->removing_list);
 	RB_INIT(&g->transient_root);
-	RB_INIT(&g->gen_delete_root);
-	RB_INIT(&g->save_root);
-	g->gen_delete_count = 0;
-	RB_INIT(&g->cmd_delete_root);
-	g->cmd_delete_count = 0;
+	tent_tree_init(&g->gen_delete_root);
+	tent_tree_init(&g->save_root);
+	tent_tree_init(&g->cmd_delete_root);
 
 	RB_INIT(&g->normal_dir_root);
 	RB_INIT(&g->parse_gitignore_root);
@@ -618,7 +616,7 @@ int add_graph_stickies(struct graph *g)
 
 	TAILQ_FOREACH(n, &g->node_list, list) {
 		if(n->tent->type == TUP_NODE_CMD) {
-			struct tent_entries sticky_root = {NULL};
+			struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
 			struct tent_tree *tt;
 			struct node *inputn;
 
