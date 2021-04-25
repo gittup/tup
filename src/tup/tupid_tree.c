@@ -91,20 +91,6 @@ void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid)
 	free(tt);
 }
 
-void tupid_tree_remove_count(struct tupid_entries *root, tupid_t tupid, int *count)
-{
-	struct tupid_tree *tt;
-
-	tt = tupid_tree_search(root, tupid);
-	if(!tt) {
-		return;
-	}
-	if(count)
-		(*count)--;
-	tupid_tree_rm(root, tt);
-	free(tt);
-}
-
 void free_tupid_tree(struct tupid_entries *root)
 {
 	struct tupid_tree *tt;

@@ -37,7 +37,6 @@ int tupid_tree_insert(struct tupid_entries *root, struct tupid_tree *data);
 int tupid_tree_add(struct tupid_entries *root, tupid_t tupid);
 int tupid_tree_add_dup(struct tupid_entries *root, tupid_t tupid);
 void tupid_tree_remove(struct tupid_entries *root, tupid_t tupid);
-void tupid_tree_remove_count(struct tupid_entries *root, tupid_t tupid, int *count);
 static inline void tupid_tree_rm(struct tupid_entries *root, struct tupid_tree *tt)
 {
 	RB_REMOVE(tupid_entries, root, tt);
