@@ -29,11 +29,6 @@ struct tupid_tree {
 	tupid_t tupid;
 };
 
-struct tree_entry {
-	struct tupid_tree tnode;
-	int type;
-};
-
 RB_HEAD(tupid_entries, tupid_tree);
 RB_PROTOTYPE(tupid_entries, tupid_tree, linkage, x);
 
