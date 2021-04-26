@@ -30,6 +30,7 @@ for i in $@; do
 done
 
 cat << HERE
+    <li class="menu-item"><iframe src="https://github.com/sponsors/gittup/button" title="Sponsor gittup" height="35" width="116" style="border: 0;"></iframe></li>
     <li class="menu-header">Additional Info</li>
     <li class="menu-item"><a href="build_system_rules_and_algorithms.pdf">Build System Rules<br>and Algorithms (PDF)</a></li>
     <li class="menu-item"><a href="http://groups.google.com/group/tup-users">tup-users mailing list</a></li>
