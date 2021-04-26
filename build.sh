@@ -10,7 +10,7 @@ case "$os" in
 esac
 
 server=${TUP_SERVER:-$default_server}
-plat_cflags=""
+plat_cflags="-Os"
 plat_ldflags=""
 plat_files=""
 if [ "$server" = "fuse" ]; then
