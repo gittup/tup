@@ -5623,7 +5623,7 @@ int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
 			tent->retrieved_stickies = 0;
 		}
 		if(!tent->retrieved_stickies) {
-			tent->retrieved_stickies = 1;
+			tent->retrieved_stickies = sticky_count;
 			if(get_sticky_inputs(cmdid, &tent->stickies, &tent->group_stickies) < 0)
 				return -1;
 		}
