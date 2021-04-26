@@ -7,6 +7,10 @@ CFLAGS += $(FPIC)
 CFLAGS += -Wno-redundant-decls
 CFLAGS += -pthread
 
+# Don't see _FILE_OFFSET_BITS since we're compiling both 32-bit and 64-bit
+# modules.
+CFLAGS += -U_FILE_OFFSET_BITS
+
 srcs += *.c
 srcs += ../tup/flock/fcntl.c
 srcs += ../tup/ccache.c
