@@ -575,7 +575,7 @@ int tup_entry_clear(void)
 	return 0;
 }
 
-int tup_entry_add_ghost_tree(struct tup_entry *tent, struct tent_entries *root)
+int tup_entry_add_ghost_tree(struct tent_entries *root, struct tup_entry *tent)
 {
 	if(tent->type == TUP_NODE_GHOST || tent->type == TUP_NODE_GROUP ||
 	   tent->type == TUP_NODE_GENERATED_DIR) {
@@ -593,7 +593,7 @@ int tup_entry_debug_add_all_ghosts(struct tent_entries *root)
 		struct tup_entry *tent;
 
 		tent = container_of(tt, struct tup_entry, tnode);
-		if(tup_entry_add_ghost_tree(tent, root) < 0)
+		if(tup_entry_add_ghost_tree(root, tent) < 0)
 			return -1;
 	}
 	return 0;

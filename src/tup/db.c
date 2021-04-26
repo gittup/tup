@@ -1520,7 +1520,7 @@ int tup_db_delete_node(tupid_t tupid)
 		 */
 		if(tup_entry_add(tent->srcid, &srctent) < 0)
 			return -1;
-		if(tup_entry_add_ghost_tree(srctent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, srctent) < 0)
 			return -1;
 	}
 
@@ -1551,7 +1551,7 @@ int tup_db_delete_node(tupid_t tupid)
 
 	if(delete_node(tupid) < 0)
 		return -1;
-	if(tup_entry_add_ghost_tree(parent, &ghost_root) < 0)
+	if(tup_entry_add_ghost_tree(&ghost_root, parent) < 0)
 		return -1;
 
 	return 0;
@@ -1656,7 +1656,7 @@ int tup_db_flag_generated_dir(tupid_t dt, int force)
 		 */
 		if(tup_db_set_type(tent, TUP_NODE_GHOST) < 0)
 			return -1;
-		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, tent) < 0)
 			return -1;
 	}
 
@@ -3324,7 +3324,7 @@ int tup_db_create_unique_link(struct tup_entry *a, struct tup_entry *b)
 			 */
 			if(link_remove(b->tnode.tupid, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
-			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
+			if(tup_entry_add_ghost_tree(&ghost_root, output_group) < 0)
 				return -1;
 		}
 		/* Delete any old links (t6029) */
@@ -3346,7 +3346,7 @@ int tup_db_create_unique_link(struct tup_entry *a, struct tup_entry *b)
 		if(output_group) {
 			if(link_remove(b->tnode.tupid, output_group->tnode.tupid, TUP_LINK_NORMAL) < 0)
 				return -1;
-			if(tup_entry_add_ghost_tree(output_group, &ghost_root) < 0)
+			if(tup_entry_add_ghost_tree(&ghost_root, output_group) < 0)
 				return -1;
 		}
 	}
@@ -5525,7 +5525,7 @@ static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost
 			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
 			if(ghost_check) {
-				if(tup_entry_add_ghost_tree(tent, root) < 0)
+				if(tup_entry_add_ghost_tree(root, tent) < 0)
 					return -1;
 			} else {
 				if(tent_tree_add(root, tent) < 0)
@@ -5872,7 +5872,7 @@ static int rm_sticky(struct tup_entry *tent, void *data)
 		/* Removing an input group means we need to check if the group
 		 * also needs to be removed from the database.
 		 */
-		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, tent) < 0)
 			return -1;
 
 		/* If this command also writes to a group, we need to remove
@@ -6034,7 +6034,7 @@ static int del_normal_link(struct tup_entry *tent, void *data)
 		return -1;
 	if(tent_tree_search(aid->sticky_root, tent) == NULL) {
 		/* Not a sticky link, so check if it was a ghost (t5054). */
-		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, tent) < 0)
 			return -1;
 	}
 	return 0;
@@ -6218,7 +6218,7 @@ static int rm_output(struct tup_entry *tent, void *data)
 		/* When an output exclusion is removed, we have to check that
 		 * it might now be unused.
 		 */
-		if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, tent) < 0)
 			return -1;
 	}
 	return 0;
@@ -6295,7 +6295,7 @@ int tup_db_write_outputs(FILE *f, struct tup_entry *cmdtent,
 			if(tup_db_add_modify_list((*old_group)->tnode.tupid) < 0)
 				return -1;
 			/* Possibly clean up this group if there are no more references. */
-			if(tup_entry_add_ghost_tree(*old_group, &ghost_root) < 0)
+			if(tup_entry_add_ghost_tree(&ghost_root, *old_group) < 0)
 				return -1;
 		}
 	}
@@ -6359,7 +6359,7 @@ static int rm_dir_link(struct tup_entry *tent, void *data)
 {
 	struct write_dir_input_data *wdid = data;
 
-	if(tup_entry_add_ghost_tree(tent, &ghost_root) < 0)
+	if(tup_entry_add_ghost_tree(&ghost_root, tent) < 0)
 		return -1;
 	if(link_remove(tent->tnode.tupid, wdid->dt, TUP_LINK_NORMAL) < 0)
 		return -1;
@@ -6952,7 +6952,7 @@ static int add_group_and_exclusion_checks(tupid_t tupid)
 		return -1;
 
 	tent_list_foreach(tl, &tent_list) {
-		if(tup_entry_add_ghost_tree(tl->tent, &ghost_root) < 0)
+		if(tup_entry_add_ghost_tree(&ghost_root, tl->tent) < 0)
 			return -1;
 	}
 	free_tent_list(&tent_list);
@@ -7013,7 +7013,7 @@ static int reclaim_ghosts(void)
 
 			/* Re-check the parent again later */
 			tent_tree_remove(&ghost_root, tent->parent);
-			if(tup_entry_add_ghost_tree(tent->parent, &tmp_root) < 0)
+			if(tup_entry_add_ghost_tree(&tmp_root, tent->parent) < 0)
 				return -1;
 
 			if(rm_generated_dir(tent) < 0)
