@@ -69,30 +69,35 @@ static const char *stdout_isatty(void);
 static const char *get_console_width(void);
 static int init_home_loc(void);
 
+static const char *is_number(const char *value);
+static const char *is_flag(const char *value);
+static const char *is_color(const char *value);
+
 static struct option {
 	const char *name;
 	const char *default_value;
 	/* function that generates default value dynamically */
 	const char *(*generator)(void);
+	const char *(*is_valid)(const char *value);
 } options[] = {
-	{"updater.num_jobs", NULL, cpu_number},
-	{"updater.keep_going", "0", NULL},
-	{"updater.full_deps", "0", NULL},
-	{"updater.warnings", "1", NULL},
-	{"display.color", "auto", NULL},
-	{"display.width", NULL, get_console_width},
-	{"display.progress", NULL, stdout_isatty},
-	{"display.job_numbers", "1", NULL},
-	{"display.job_time", "1", NULL},
-	{"display.quiet", "0", NULL},
-	{"monitor.autoupdate", "0", NULL},
-	{"monitor.autoparse", "0", NULL},
-	{"monitor.foreground", "0", NULL},
-	{"db.sync", "1", NULL},
-	{"graph.dirs", "0", NULL},
-	{"graph.ghosts", "0", NULL},
-	{"graph.environment", "0", NULL},
-	{"graph.combine", "0", NULL},
+	{"updater.num_jobs", NULL, cpu_number, is_number},
+	{"updater.keep_going", "0", NULL, is_flag},
+	{"updater.full_deps", "0", NULL, is_flag},
+	{"updater.warnings", "1", NULL, is_flag},
+	{"display.color", "auto", NULL, is_color},
+	{"display.width", NULL, get_console_width, is_number},
+	{"display.progress", NULL, stdout_isatty, is_flag},
+	{"display.job_numbers", "1", NULL, is_flag},
+	{"display.job_time", "1", NULL, is_flag},
+	{"display.quiet", "0", NULL, is_flag},
+	{"monitor.autoupdate", "0", NULL, is_flag},
+	{"monitor.autoparse", "0", NULL, is_flag},
+	{"monitor.foreground", "0", NULL, is_flag},
+	{"db.sync", "1", NULL, is_flag},
+	{"graph.dirs", "0", NULL, is_flag},
+	{"graph.ghosts", "0", NULL, is_flag},
+	{"graph.environment", "0", NULL, is_flag},
+	{"graph.combine", "0", NULL, is_flag},
 };
 #define NUM_OPTIONS (sizeof(options) / sizeof(options[0]))
 
@@ -252,10 +257,9 @@ static int parse_cmdline_options(struct vardb *vdb, int argc, char **argv)
 			}
 			opt = "display.color";
 			value = &argv[x][16];
-			if(strcmp(value, "never") != 0 &&
-			   strcmp(value, "always") != 0 &&
-			   strcmp(value, "auto") != 0) {
-				fprintf(stderr, "tup error: --display-color requires one of {never|always|auto}\n");
+			const char *failure = is_color(value);
+			if(failure) {
+				fprintf(stderr, "tup error: --display-color requires %s\n", failure);
 				return -1;
 			}
 		}
@@ -413,8 +417,14 @@ static int parse_callback(void *user, const char *section, const char *name,
 		return 0; /* inih error code */
 	}
 	for(x=0; x<NUM_OPTIONS; x++) {
-		if(strcmp(options[x].name, opt) == 0)
+		if(strcmp(options[x].name, opt) == 0) {
+			const char *failure = options[x].is_valid(value);
+			if(failure) {
+				fprintf(stderr, "tup error: Invalid value '%s' for option '%s.%s' - expected %s\n", value, section, name, failure);
+				return 0; /* inih error code */
+			}
 			goto set_var;
+		}
 	}
 
 	fprintf(stderr, "tup warning: Option '%s' in section '%s' is unknown to this version of tup. It will be ignored.", name, section);
@@ -448,6 +458,45 @@ static int parse_option_file(int x)
 		fprintf(stderr, "tup error: Failed to parse options file (%s) on line %i.\n", locations[x].file, rc);
 	}
 	return -1;
+}
+
+static const char *is_number(const char *value)
+{
+	int i = 0;
+	while(value[i]) {
+		if(value[i] < '0' || value[i] > '9') {
+			return "non-negative number (0, 1, 2, etc)";
+		}
+		i++;
+	}
+	return NULL;
+}
+
+static const char *is_flag(const char *value)
+{
+	if(strcmp(value, "true") == 0)
+		return NULL;
+	if(strcmp(value, "yes") == 0)
+		return NULL;
+	if(strcmp(value, "false") == 0)
+		return NULL;
+	if(strcmp(value, "no") == 0)
+		return NULL;
+	if(strcmp(value, "1") == 0)
+		return NULL;
+	if(strcmp(value, "0") == 0)
+		return NULL;
+	return "a boolean value {0|false|no|1|true|yes}";
+}
+
+static const char *is_color(const char *value)
+{
+	if(strcmp(value, "never") != 0 &&
+	   strcmp(value, "always") != 0 &&
+	   strcmp(value, "auto") != 0) {
+		return "one of {never|always|auto}";
+	}
+	return NULL;
 }
 
 static const char *cpu_number(void)
