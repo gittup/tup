@@ -581,6 +581,21 @@ static int delete_files(struct graph *g)
 	struct tup_entry *tent;
 	int rc = -1;
 
+	start_progress(g->gen_delete_root.count, -1, -1);
+	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
+		tent = tt->tent;
+		tent_tree_rm(&g->gen_delete_root, tt);
+		if(server_is_dead())
+			goto out_err;
+		show_result(tent, 0, NULL, "rm", 1);
+		show_progress(-1, TUP_NODE_GENERATED);
+
+		if(delete_file(tent) < 0)
+			goto out_err;
+		if(tup_del_id_force(tent->tnode.tupid, TUP_NODE_GENERATED) < 0)
+			goto out_err;
+	}
+
 	if(g->cmd_delete_root.count) {
 		char buf[64];
 		snprintf(buf, sizeof(buf), "Deleting %i command%s...\n", g->cmd_delete_root.count, g->cmd_delete_root.count == 1 ? "" : "s");
@@ -600,21 +615,6 @@ static int delete_files(struct graph *g)
 		 * we are deleting (not executing) commands.
 		 */
 		show_progress(-1, TUP_NODE_GENERATED);
-	}
-
-	start_progress(g->gen_delete_root.count, -1, -1);
-	while((tt = RB_ROOT(&g->gen_delete_root)) != NULL) {
-		tent = tt->tent;
-		tent_tree_rm(&g->gen_delete_root, tt);
-		if(server_is_dead())
-			goto out_err;
-		show_result(tent, 0, NULL, "rm", 1);
-		show_progress(-1, TUP_NODE_GENERATED);
-
-		if(delete_file(tent) < 0)
-			goto out_err;
-		if(tup_del_id_force(tent->tnode.tupid, TUP_NODE_GENERATED) < 0)
-			goto out_err;
 	}
 
 	if(!RB_EMPTY(&g->save_root)) {
