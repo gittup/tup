@@ -339,7 +339,7 @@ int generate(int argc, char **argv)
 		return -1;
 
 	printf("Parsing...\n");
-	if(create_graph(&g, TUP_NODE_DIR, -1) < 0)
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -391,7 +391,7 @@ int generate(int argc, char **argv)
 #else
 	fprintf(generate_f, "export %s=\"%s/%s\"\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
 #endif
-	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -654,7 +654,7 @@ out_err:
 static int delete_in_tree(void)
 {
 	struct graph g;
-	if(create_graph(&g, TUP_NODE_FILE, -1) < 0)
+	if(create_graph(&g, TUP_NODE_FILE) < 0)
 		return -1;
 	if(tup_db_type_to_tree(&g.cmd_delete_root, TUP_NODE_CMD) < 0)
 		return -1;
@@ -809,7 +809,7 @@ static int process_config_nodes(int environ_check)
 	if(tup_db_begin() < 0)
 		return -1;
 	/* Use TUP_NODE_ROOT to count everything */
-	if(create_graph(&g, TUP_NODE_ROOT, -1) < 0)
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1249,7 +1249,7 @@ static int process_create_nodes(void)
 		old_changes = tup_db_changes();
 
 	tup_db_begin();
-	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
 	/* Force total_mtime to -1 so we count directory nodes rather than use
 	 * their mtimes to determine progress. In some cases we may assign an
@@ -1262,6 +1262,21 @@ static int process_create_nodes(void)
 	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
 		struct variant *node_variant = tup_entry_variant(n->tent);
 
+		if(n->tent->type == TUP_NODE_GHOST) {
+			struct tent_entries root = TENT_ENTRIES_INITIALIZER;
+
+			if(tup_db_srcid_to_tree(n->tent->tnode.tupid, &root, TUP_NODE_GENERATED) < 0)
+				return -1;
+			while(!RB_EMPTY(&root)) {
+				tt = RB_MIN(tent_entries, &root);
+				tent_tree_rm(&root, tt);
+				if(tt->tent->dt != n->tent->tnode.tupid) {
+					if(tent_tree_add(&g.gen_delete_root, tt->tent) < 0)
+						return -1;
+				}
+			}
+			continue;
+		}
 		if(n->tent->type != TUP_NODE_DIR)
 			continue;
 		if(is_virtual_tent(n->tent))
@@ -1442,7 +1457,7 @@ static int process_update_nodes(int argc, char **argv, int *num_pruned)
 	int rc = 0;
 
 	tup_db_begin();
-	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_non_transient_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -1499,7 +1514,7 @@ static int check_config_todo(void)
 	int stuff_todo = 0;
 
 	/* Use TUP_NODE_ROOT to count everything */
-	if(create_graph(&g, TUP_NODE_ROOT, -1) < 0)
+	if(create_graph(&g, TUP_NODE_ROOT) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CONFIG) < 0)
 		return -1;
@@ -1531,7 +1546,7 @@ static int check_create_todo(void)
 	int rc;
 	int stuff_todo = 0;
 
-	if(create_graph(&g, TUP_NODE_DIR, TUP_NODE_GHOST) < 0)
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
 		return -1;
@@ -1562,7 +1577,7 @@ static int check_update_todo(int argc, char **argv)
 	int stuff_todo = 0;
 	int num_pruned = 0;
 
-	if(create_graph(&g, TUP_NODE_CMD, -1) < 0)
+	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
 		return -1;
@@ -1885,7 +1900,7 @@ static void *run_thread(void *arg)
 static int create_work(struct graph *g, struct node *n)
 {
 	int rc = 0;
-	if(n->tent->type == TUP_NODE_DIR || n->tent->type == TUP_NODE_GHOST) {
+	if(n->tent->type == TUP_NODE_DIR) {
 		if(tup_entry_variant(n->tent)->enabled) {
 			if(n->already_used) {
 				rc = 0;
@@ -1899,6 +1914,7 @@ static int create_work(struct graph *g, struct node *n)
 		  n->tent->type == TUP_NODE_GENERATED ||
 		  n->tent->type == TUP_NODE_GROUP ||
 		  n->tent->type == TUP_NODE_GENERATED_DIR ||
+		  n->tent->type == TUP_NODE_GHOST ||
 		  n->tent->type == TUP_NODE_CMD) {
 		rc = 0;
 	} else {

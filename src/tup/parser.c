@@ -186,11 +186,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	}
 	tf.ls = NULL;
 	tf.luaerror = TUPLUA_NOERROR;
-	if(n->tent->type == TUP_NODE_GHOST) {
-		tf.use_server = 0;
-	} else {
-		tf.use_server = use_server;
-	}
+	tf.use_server = use_server;
 
 	/* We may need to convert normal dirs back to generated dirs,
 	 * so add this one to check.
@@ -264,26 +260,22 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		goto out_close_vdb;
 	}
 
-	if(n->tent->type == TUP_NODE_GHOST) {
-		tf.cur_dfd = -1;
-	} else {
-		tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
-		if(tf.cur_dfd < 0) {
-			fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tent->tnode.tupid);
-			goto out_close_vdb;
-		}
+	tf.cur_dfd = tup_entry_openat(ps.root_fd, n->tent);
+	if(tf.cur_dfd < 0) {
+		fprintf(tf.f, "tup error: Unable to open directory ID %lli\n", tf.tent->tnode.tupid);
+		goto out_close_vdb;
+	}
 
-		if(open_tupfile(&tf, n->tent, path, &parser_lua, &fd) < 0)
-			goto out_close_dfd;
-		if(fd < 0) {
-			/* No Tupfile means we have nothing to do */
-			if(n->tent->tnode.tupid == DOT_DT) {
-				/* Check to see if the top-level rules file would .gitignore. We disable
-				 * tf.tent->tnode.tupid so no rules get created.
-				 */
-				if(check_toplevel_gitignore(&tf) < 0)
-					goto out_close_dfd;
-			}
+	if(open_tupfile(&tf, n->tent, path, &parser_lua, &fd) < 0)
+		goto out_close_dfd;
+	if(fd < 0) {
+		/* No Tupfile means we have nothing to do */
+		if(n->tent->tnode.tupid == DOT_DT) {
+			/* Check to see if the top-level rules file would .gitignore. We disable
+			 * tf.tent->tnode.tupid so no rules get created.
+			 */
+			if(check_toplevel_gitignore(&tf) < 0)
+				goto out_close_dfd;
 		}
 	}
 	if(fd >= 0) {

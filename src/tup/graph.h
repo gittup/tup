@@ -84,7 +84,6 @@ struct graph {
 	int num_nodes;
 	struct tupid_entries node_root;
 	enum TUP_NODE_TYPE count_flags;
-	enum TUP_NODE_TYPE count_flags2;
 	time_t total_mtime;
 	struct tent_entries gen_delete_root;
 	struct tent_entries save_root;
@@ -104,7 +103,7 @@ int node_remove_list(struct node_head *head, struct node *n);
 int create_edge(struct node *n1, struct node *n2, int style);
 void remove_edge(struct edge *e);
 
-int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags, enum TUP_NODE_TYPE count_flags2);
+int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags);
 int destroy_graph(struct graph *g);
 void save_graphs(struct graph *g);
 int build_graph_transient_cb(void *arg, struct tup_entry *tent);
