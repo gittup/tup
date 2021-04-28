@@ -20,6 +20,11 @@
 # files.
 
 . ./tup.sh
+cat > .tup/options << HERE
+[display]
+job_numbers = 1
+HERE
+
 cat > Tupfile << HERE
 : foreach in*.txt |> cp %f %o |> %B.out.txt
 HERE

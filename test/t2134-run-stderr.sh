@@ -20,6 +20,11 @@
 . ./tup.sh
 check_no_windows run-script
 
+cat > .tup/options << HERE
+[display]
+job_numbers = 1
+HERE
+
 cat > run.sh << HERE
 echo "Run script \$1" 1>&2
 HERE
