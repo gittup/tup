@@ -1299,9 +1299,6 @@ static int process_create_nodes(void)
 						return -1;
 				}
 			}
-			if(!node_variant->enabled) {
-				g.num_nodes--;
-			}
 		} else {
 			struct tup_entry *srctent;
 			int force_removal = 0;
@@ -1354,6 +1351,20 @@ static int process_create_nodes(void)
 
 	if(build_graph(&g) < 0)
 		return -1;
+	TAILQ_FOREACH(n, &g.node_list, list) {
+		if(n->tent->type != TUP_NODE_ROOT) {
+			struct variant *node_variant = tup_entry_variant(n->tent);
+			/* Directories in an inactive variant are skipped in
+			 * create_work, and virtual tents are skipped in
+			 * parse(). Make sure these don't count towards the
+			 * number of directories that we're parsing.
+			 */
+			if(!node_variant->enabled || is_virtual_tent(n->tent)) {
+				if(n->tent->type == g.count_flags)
+					g.num_nodes--;
+			}
+		}
+	}
 	log_graph(&g, "create");
 	if(g.num_nodes) {
 		tup_main_progress("Parsing Tupfiles...\n");

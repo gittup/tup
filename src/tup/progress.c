@@ -123,6 +123,12 @@ void clear_progress(void)
 
 void tup_main_progress(const char *s)
 {
+	if(sum != total) {
+		fprintf(stderr, "tup internal error: previous progress bar sized incorrectly: %i, %i\n", sum, total);
+		if(getenv("TUP_VALGRIND")) {
+			exit(1);
+		}
+	}
 	clear_active(stdout);
 	cur_phase++;
 	tup_show_message(s);
@@ -198,6 +204,9 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	sum++;
 	if(sum > total) {
 		fprintf(stderr, "tup internal error: progress bar is sized incorrectly.\n");
+		if(getenv("TUP_VALGRIND")) {
+			exit(1);
+		}
 	}
 
 	if(quiet && !always_display)
