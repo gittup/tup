@@ -1159,6 +1159,7 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 		if(tup_db_set_srcid(tent, -1) < 0)
 			return -1;
 		tent_tree_remove(&tf->g->gen_delete_root, tent);
+		tent_tree_remove(&tf->g->save_root, tent);
 	} else {
 		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
 			perror("unlinkat");
@@ -1193,6 +1194,7 @@ static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 			return -1;
 	} else {
 		tent_tree_remove(&tf->g->gen_delete_root, tent);
+		tent_tree_remove(&tf->g->save_root, tent);
 		/* It may be a ghost if we are going from a variant
 		 * to an in-tree build, or a normal file if we are appending
 		 * definitions to a user-created .gitignore file.

@@ -123,10 +123,6 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		log_debug_tent("Create", tent, ", mtime=%li\n", mtime);
 		new = 1;
 	} else {
-		/* Always ignore generated files when it's a .gitignore file, since that happens during parsing. */
-		if(strcmp(file, ".gitignore") == 0)
-			ignore_generated = 1;
-
 		/* If we are ignoring generated files (ie: from the monitor when it catches
 		 * an event from the updater creating output files), then disable force.
 		 * In this case we only want to mark the generated files again if the user
