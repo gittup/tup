@@ -459,8 +459,8 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	tent->mtime = mtime;
 	tent->srcid = srcid;
 	tent->variant = NULL;
-	RB_INIT(&tent->stickies);
-	RB_INIT(&tent->group_stickies);
+	tent_tree_init(&tent->stickies);
+	tent_tree_init(&tent->group_stickies);
 	tent->retrieved_stickies = 0;
 	tent->incoming = NULL;
 	tent->refcount = 0;

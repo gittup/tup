@@ -56,12 +56,12 @@ int init_file_info(struct file_info *info, const char *variant_dir, int do_unlin
 	TAILQ_INIT(&info->var_list);
 	TAILQ_INIT(&info->mapping_list);
 	TAILQ_INIT(&info->tmpdir_list);
-	RB_INIT(&info->sticky_root);
-	RB_INIT(&info->normal_root);
-	RB_INIT(&info->group_sticky_root);
-	RB_INIT(&info->used_groups_root);
-	RB_INIT(&info->output_root);
-	RB_INIT(&info->exclusion_root);
+	tent_tree_init(&info->sticky_root);
+	tent_tree_init(&info->normal_root);
+	tent_tree_init(&info->group_sticky_root);
+	tent_tree_init(&info->used_groups_root);
+	tent_tree_init(&info->output_root);
+	tent_tree_init(&info->exclusion_root);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
 	/* Root variant gets a NULL variant_dir so we can skip trying to do the

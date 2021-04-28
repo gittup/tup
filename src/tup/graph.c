@@ -232,13 +232,13 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 	TAILQ_INIT(&g->node_list);
 	TAILQ_INIT(&g->plist);
 	TAILQ_INIT(&g->removing_list);
-	RB_INIT(&g->transient_root);
+	tent_tree_init(&g->transient_root);
 	tent_tree_init(&g->gen_delete_root);
 	tent_tree_init(&g->save_root);
 	tent_tree_init(&g->cmd_delete_root);
 
-	RB_INIT(&g->normal_dir_root);
-	RB_INIT(&g->parse_gitignore_root);
+	tent_tree_init(&g->normal_dir_root);
+	tent_tree_init(&g->parse_gitignore_root);
 	RB_INIT(&g->node_root);
 
 	g->cur = g->root = create_node(g, &root_entry);

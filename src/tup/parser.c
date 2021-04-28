@@ -201,15 +201,12 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	pthread_mutex_init(&ps.lock, NULL);
 
 	RB_INIT(&tf.cmd_root);
-	RB_INIT(&tf.env_root);
+	tent_tree_init(&tf.env_root);
 	RB_INIT(&tf.bang_root);
-	RB_INIT(&tf.input_root);
+	tent_tree_init(&tf.input_root);
 	RB_INIT(&tf.directory_root);
 	RB_INIT(&ps.directories);
-
-	if(refactoring) {
-		RB_INIT(&tf.refactoring_cmd_delete_root);
-	}
+	tent_tree_init(&tf.refactoring_cmd_delete_root);
 
 	if(tf.use_server) {
 		if(server_parser_start(&ps) < 0)
