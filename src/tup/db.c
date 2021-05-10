@@ -183,7 +183,7 @@ static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
 static int delete_group_links(tupid_t cmdid);
 static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost_check);
 static int node_has_ghosts(tupid_t tupid);
-static int load_all_nodes(void);
+static int load_existing_nodes(void);
 static int add_ghost_checks(tupid_t tupid);
 static int add_group_and_exclusion_checks(tupid_t tupid);
 static int reclaim_ghosts(void);
@@ -912,11 +912,16 @@ void tup_db_enable_sql_debug(void)
 
 int tup_db_debug_add_all_ghosts(void)
 {
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 	reclaim_ghost_debug = 1;
 
-	/* First get all tup_entrys loaded */
-	if(load_all_nodes() < 0)
+	/* First get all ghosts loaded */
+	if(tup_db_type_to_tree(&root, TUP_NODE_GHOST) < 0)
 		return -1;
+	/* Free the tmp tree, since the ghost check actually is done by
+	 * ghost_root in tup_db_commit().
+	 */
+	free_tent_tree(&root);
 
 	if(tup_entry_debug_add_all_ghosts(&ghost_root) < 0)
 		return -1;
@@ -5321,7 +5326,7 @@ int tup_db_scan_begin(void)
 {
 	if(tup_db_begin() < 0)
 		return -1;
-	if(load_all_nodes() < 0)
+	if(load_existing_nodes() < 0)
 		return -1;
 	if(variant_load() < 0)
 		return -1;
@@ -5335,7 +5340,7 @@ int tup_db_scan_end(void)
 	return 0;
 }
 
-static int load_all_nodes(void)
+static int load_existing_nodes(void)
 {
 	int rc = -1;
 	int dbrc;
