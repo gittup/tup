@@ -1098,7 +1098,8 @@ static int rm_variant_dir_cb(void *arg, struct tup_entry *tent)
 			remove_edge(LIST_FIRST(&n->incoming));
 		}
 		remove_node(g, n);
-		g->num_nodes--;
+		if(n->counted)
+			g->num_nodes--;
 	}
 	return 0;
 }
@@ -1354,8 +1355,21 @@ static int process_create_nodes(void)
 			 * number of directories that we're parsing.
 			 */
 			if(!node_variant->enabled || is_virtual_tent(n->tent)) {
-				if(n->tent->type == g.count_flags)
+				if(n->counted)
 					g.num_nodes--;
+			}
+
+			/* Make sure we counted any nodes we were supposed to
+			 * count. For example, a variant directory that was
+			 * deleted could be a ghost that ends up in the graph,
+			 * but then is converted to a directory in
+			 * get_rel_tent() via tup_db_set_type(). So even though
+			 * we didn't match count_flags when the node was added,
+			 * we might now.
+			 */
+			if(!n->counted && n->tent->type == g.count_flags) {
+				n->counted = 1;
+				g.num_nodes++;
 			}
 		}
 	}

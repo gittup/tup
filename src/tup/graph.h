@@ -70,6 +70,7 @@ struct node {
 	unsigned char parsing;
 	unsigned char marked;
 	unsigned char skip;
+	unsigned char counted;
 	unsigned char transient;
 };
 TAILQ_HEAD(node_head, node);

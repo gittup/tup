@@ -69,6 +69,7 @@ struct node *create_node(struct graph *g, struct tup_entry *tent)
 	n->parsing = 0;
 	n->marked = 0;
 	n->skip = 1;
+	n->counted = 0;
 	if(node_insert_tail(&g->node_list, n) < 0)
 		return NULL;
 
@@ -300,6 +301,7 @@ static int make_edge(struct graph *g, struct node *n)
 	if(n->expanded == 0) {
 		/* TUP_NODE_ROOT means we count everything */
 		if(n->tent->type == g->count_flags || g->count_flags == TUP_NODE_ROOT) {
+			n->counted = 1;
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
 				if(n->tent->mtime == -1)
@@ -765,7 +767,7 @@ static void mark_nodes(struct node *n)
 static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum graph_prune_type gpt, int verbose)
 {
 	struct edge *e;
-	if(n->tent->type == g->count_flags && n->expanded) {
+	if(n->counted) {
 		if(n->tent->type != TUP_NODE_CMD) {
 			fprintf(stderr, "tup internal error: node of type %i trying to add to the modify list in prune_graph\n", n->tent->type);
 			return -1;
