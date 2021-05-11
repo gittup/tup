@@ -4257,9 +4257,12 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid)
 			goto out_reset;
 		}
 
-		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
-			rc = -1;
-			goto out_reset;
+		tupid_t newdt = sqlite3_column_int64(*stmt, 0);
+		if(newdt != tupid) {
+			if(tupid_list_add_tail(&tupid_list, newdt) < 0) {
+				rc = -1;
+				goto out_reset;
+			}
 		}
 	}
 
