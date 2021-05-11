@@ -16,13 +16,13 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Automatically print tables in lua.
+# Make sure tostring(table) expands into a useful string.
 
 . ./tup.sh
 cat > Tupfile.lua << HERE
 CFLAGS += '-DFOO'
 CFLAGS += '-DBAR'
-print("My cflags are: ", CFLAGS)
+print("My cflags are: ", tostring(CFLAGS))
 HERE
 tup touch Tupfile.lua
 tup parse > .output.txt

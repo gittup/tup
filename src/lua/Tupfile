@@ -1,38 +1,37 @@
 include_rules
 
 srcs += lapi.c
+srcs += lauxlib.c
+srcs += lbaselib.c
 srcs += lcode.c
+srcs += lcorolib.c
 srcs += lctype.c
+srcs += ldblib.c
 srcs += ldebug.c
 srcs += ldo.c
 srcs += ldump.c
 srcs += lfunc.c
 srcs += lgc.c
+srcs += linit.c
+srcs += liolib.c
 srcs += llex.c
+srcs += lmathlib.c
 srcs += lmem.c
+srcs += loadlib.c
 srcs += lobject.c
 srcs += lopcodes.c
+srcs += loslib.c
 srcs += lparser.c
 srcs += lstate.c
 srcs += lstring.c
+srcs += lstrlib.c
 srcs += ltable.c
+srcs += ltablib.c
 srcs += ltm.c
 srcs += lundump.c
+srcs += lutf8lib.c
 srcs += lvm.c
 srcs += lzio.c
-srcs += lauxlib.c
-srcs += lbaselib.c
-srcs += lbitlib.c
-srcs += lcorolib.c
-srcs += ldblib.c
-srcs += liolib.c
-srcs += lmathlib.c
-srcs += loslib.c
-srcs += lstrlib.c
-srcs += ltablib.c
-srcs += loadlib.c
-srcs += linit.c
-srcs += lutf8lib.c
 
 CFLAGS += -w
 
