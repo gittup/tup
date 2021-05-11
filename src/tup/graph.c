@@ -656,8 +656,6 @@ static int add_file_cb(void *arg, struct tup_entry *tent)
 		return -1;
 	}
 	if(n->expanded == 0) {
-		if(n->tent->type == g->count_flags)
-			g->num_nodes++;
 		n->expanded = 1;
 		if(node_remove_list(&g->node_list, n) < 0)
 			return -1;
