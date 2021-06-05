@@ -21,12 +21,17 @@
 . ./tup.sh
 cat > Tupfile << HERE
 : |> echo blah > %o |> foo.h
-: foreach *.c | foo.h |> echo gcc -c %f -o %o |> %B.o
+: foreach *.c | foo.h nongen.h |> echo gcc -c %f -o %o |> %B.o
 HERE
 
-tup touch Tupfile foo.c bar.c
+tup touch Tupfile foo.c bar.c nongen.h
 parse
 tup_sticky_exist . foo.h . "echo gcc -c foo.c -o foo.o"
 tup_sticky_exist . foo.h . "echo gcc -c bar.c -o bar.o"
+
+# We should have a sticky on the normal %f file, but not the normal order-only
+# input file.
+tup_sticky_exist . foo.c . "echo gcc -c foo.c -o foo.o"
+tup_sticky_no_exist . nongen.h . "echo gcc -c foo.c -o foo.o"
 
 eotup

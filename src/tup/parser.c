@@ -3070,7 +3070,7 @@ static int find_existing_command(const struct name_list *onl, struct tup_entry *
 }
 
 static int add_input(struct tupfile *tf, struct tent_entries *input_root,
-		     struct tup_entry *tent)
+		     struct tup_entry *tent, int force_normal_file)
 {
 	if(tent->type == TUP_NODE_GENERATED) {
 		struct tent_entries extra_group_root = TENT_ENTRIES_INITIALIZER;
@@ -3099,6 +3099,11 @@ static int add_input(struct tupfile *tf, struct tent_entries *input_root,
 	} else if(tent->type == TUP_NODE_VAR || tent->type == TUP_NODE_GROUP) {
 		if(tent_tree_add_dup(input_root, tent) < 0)
 			return -1;
+	} else if(tent->type == TUP_NODE_FILE) {
+		if(force_normal_file) {
+			if(tent_tree_add_dup(input_root, tent) < 0)
+				return -1;
+		}
 	}
 	return 0;
 }
@@ -3622,21 +3627,21 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 
 	TAILQ_FOREACH(nle, &nl->entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent) < 0)
+			if(add_input(tf, &input_root, nle->tent, 1) < 0)
 				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->order_only_inputs.entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent) < 0)
+			if(add_input(tf, &input_root, nle->tent, 0) < 0)
 				return -1;
 	}
 	TAILQ_FOREACH(nle, &r->bang_oo_inputs.entries, list) {
 		if(nle->tent)
-			if(add_input(tf, &input_root, nle->tent) < 0)
+			if(add_input(tf, &input_root, nle->tent, 0) < 0)
 				return -1;
 	}
 	RB_FOREACH(tt, tent_entries, &tf->env_root) {
-		if(add_input(tf, &input_root, tt->tent) < 0)
+		if(add_input(tf, &input_root, tt->tent, 0) < 0)
 			return -1;
 	}
 	if(group) {
