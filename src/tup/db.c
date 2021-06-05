@@ -119,6 +119,7 @@ enum {
 	DB_FILES_TO_TREE,
 	_DB_GET_LINKS1,
 	_DB_GET_LINKS2,
+	_DB_GET_STICKY_OUTPUTS,
 	DB_NODE_INSERT,
 	_DB_NODE_SELECT,
 	_DB_LINK_INSERT1,
@@ -5623,6 +5624,69 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 	return rc;
 }
 
+static int get_sticky_outputs(tupid_t tupid, struct tent_entries *root)
+{
+	int rc = 0;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[_DB_GET_STICKY_OUTPUTS];
+	static char s[] = "select to_id from sticky_link where from_id=?";
+	struct tupid_list *tl;
+	struct tupid_list_head tupid_list;
+
+	tupid_list_init(&tupid_list);
+
+	transaction_check("%s [%lli]", s, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	while(1) {
+		dbrc = sqlite3_step(*stmt);
+		if(dbrc == SQLITE_DONE) {
+			break;
+		}
+		if(dbrc != SQLITE_ROW) {
+			fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			rc = -1;
+			break;
+		}
+
+		if(tupid_list_add_tail(&tupid_list, sqlite3_column_int64(*stmt, 0)) < 0) {
+			rc = -1;
+			break;
+		}
+	}
+
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	if(rc == 0) {
+		tupid_list_foreach(tl, &tupid_list) {
+			struct tup_entry *tent;
+			if(tup_entry_add(tl->tupid, &tent) < 0)
+				return -1;
+			if(tent_tree_add_dup(root, tent) < 0)
+				return -1;
+		}
+	}
+	free_tupid_list(&tupid_list);
+	return rc;
+}
+
 int tup_db_get_inputs(tupid_t cmdid, struct tent_entries *sticky_root,
 		      struct tent_entries *normal_root,
 		      struct tent_entries *group_sticky_root)
@@ -7466,6 +7530,37 @@ int tup_db_create_compile_db(FILE *f, struct variant *variant)
 	if(empty) {
 		fprintf(stderr, "tup warning: No commands exported to compiledb. You may need to add the ^j flag to commands that should be exported.\n");
 	}
+	return 0;
+}
+
+int tup_db_print_commandline(struct tup_entry *tent)
+{
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
+	struct tent_tree *tt;
+	int found = 0;
+
+	if(get_sticky_outputs(tent->tnode.tupid, &root) < 0) {
+		return -1;
+	}
+
+	RB_FOREACH(tt, tent_entries, &root) {
+		/* Look through all possible commands that we are a sticky
+		 * input to for one that has our name in it. Usually there will
+		 * be only one command, but if there are multiple we'd want the
+		 * one that lists us on the command-line.
+		 */
+		if(strstr(tt->tent->name.s, tent->name.s) != NULL) {
+			print_compile_db(stdout, tt->tent, tent);
+			found = 1;
+			break;
+		}
+	}
+	if(!found && root.count > 0) {
+		tt = RB_MIN(tent_entries, &root);
+		print_compile_db(stdout, tt->tent, tent);
+	}
+
+	free_tent_tree(&root);
 	return 0;
 }
 

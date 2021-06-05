@@ -164,6 +164,7 @@ int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *,
 int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup_entry *),
 					      void *arg, tupid_t tupid);
 int tup_db_create_compile_db(FILE *f, struct variant *variant);
+int tup_db_print_commandline(struct tup_entry *tent);
 
 /* Config operations */
 int tup_db_show_config(void);

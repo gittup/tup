@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "tup/colors.h"
 #include "tup/config.h"
 #include "tup/lock.h"
 #include "tup/monitor.h"
@@ -81,6 +82,7 @@ static int inputs(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
 static int compiledb(int argc, char **argv);
+static int commandline(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
 static int variant(int argc, char **argv);
@@ -260,6 +262,8 @@ int main(int argc, char **argv)
 		rc = graph(argc, argv);
 	} else if(strcmp(cmd, "compiledb") == 0) {
 		rc = compiledb(argc, argv);
+	} else if(strcmp(cmd, "commandline") == 0) {
+		rc = commandline(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;
 		if(monitor_get_pid(0, &pid) < 0)
@@ -668,6 +672,36 @@ static int compiledb(int argc, char **argv)
 			close(dfd);
 		}
 	}
+	return 0;
+}
+
+static int commandline(int argc, char **argv)
+{
+	struct tup_entry *tent;
+	int x;
+
+	color_disable();
+	if(tup_db_begin() < 0)
+		return -1;
+	if(variant_load() < 0)
+		return -1;
+	printf("[\n");
+	for(x=0; x<argc; x++) {
+		if(gimme_tent(argv[x], &tent) < 0) {
+			fprintf(stderr, "No tent :(\n");
+			return -1;
+		}
+		if(tent) {
+			if(tup_db_print_commandline(tent) < 0)
+				return -1;
+		} else {
+			fprintf(stderr, "tup error: entry not found for '%s'\n", argv[x]);
+			return -1;
+		}
+	}
+	printf("\n]\n");
+	if(tup_db_commit() < 0)
+		return -1;
 	return 0;
 }
 

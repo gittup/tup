@@ -25,6 +25,7 @@
 #include "db_types.h"
 
 void color_init(void);
+void color_disable(void);
 void color_set(FILE *f);
 const char *color_type(enum TUP_NODE_TYPE type);
 const char *color_append_normal(void);

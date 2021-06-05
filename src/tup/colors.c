@@ -60,6 +60,12 @@ void color_init(void)
 	}
 }
 
+void color_disable(void)
+{
+	enabled[COLOR_STDOUT] = 0;
+	enabled[COLOR_STDERR] = 0;
+}
+
 void color_set(FILE *f)
 {
 	if(f == stdout)
