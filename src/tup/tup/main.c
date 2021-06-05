@@ -80,6 +80,7 @@ static int tupid(int argc, char **argv);
 static int inputs(int argc, char **argv);
 static int graph_cb(void *arg, struct tup_entry *tent);
 static int graph(int argc, char **argv);
+static int compiledb(int argc, char **argv);
 /* Testing commands */
 static int mlink(int argc, char **argv);
 static int variant(int argc, char **argv);
@@ -257,6 +258,8 @@ int main(int argc, char **argv)
 		rc = inputs(argc, argv);
 	} else if(strcmp(cmd, "graph") == 0) {
 		rc = graph(argc, argv);
+	} else if(strcmp(cmd, "compiledb") == 0) {
+		rc = compiledb(argc, argv);
 	} else if(strcmp(cmd, "scan") == 0) {
 		int pid;
 		if(monitor_get_pid(0, &pid) < 0)
@@ -635,6 +638,36 @@ static int graph(int argc, char **argv)
 	destroy_graph(&g);
 	if(tup_db_commit() < 0)
 		return -1;
+	return 0;
+}
+
+static int compiledb(int argc, char **argv)
+{
+	int rc;
+	struct variant *variant;
+	rc = updater(argc, argv, 2);
+	if(rc < 0)
+		return -1;
+
+	LIST_FOREACH(variant, get_variant_list(), list) {
+		if(variant->enabled) {
+			int fd;
+			int dfd;
+
+			dfd = tup_entry_open(variant->tent->parent);
+			fd = openat(dfd, "compile_commands.json", O_CREAT | O_WRONLY | O_TRUNC, 0666);
+			if(fd < 0) {
+				perror("compile_commands.json");
+				fprintf(stderr, "tup error: Unable to create compile_commands.json at the top of the tup hierarchy.\n");
+				return -1;
+			}
+			FILE *f = fdopen(fd, "w");
+			if(tup_db_create_compile_db(f, variant) < 0)
+				return -1;
+			fclose(f);
+			close(dfd);
+		}
+	}
 	return 0;
 }
 

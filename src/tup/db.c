@@ -5612,7 +5612,7 @@ static int get_sticky_inputs(tupid_t cmdid, struct tent_entries *root,
 			struct tup_entry *tent;
 			if(tup_entry_add(tl->tupid, &tent) < 0)
 				return -1;
-			if(tent->type == TUP_NODE_GROUP)
+			if(group_root && tent->type == TUP_NODE_GROUP)
 				if(tent_tree_add_dup(group_root, tent) < 0)
 					return -1;
 			if(tent_tree_add_dup(root, tent) < 0)
@@ -7371,6 +7371,100 @@ int tup_db_reparse_all(void)
 		fprintf(stderr, "SQL error: %s\nQuery was: %s\n",
 			errmsg, sql_parse_all);
 		return -1;
+	}
+	return 0;
+}
+
+static void print_command(FILE *f, struct tup_entry *cmdtent)
+{
+	/* Escape \ and " for json strings */
+	char *buf = malloc(cmdtent->name.len * 2);
+	char *s = cmdtent->name.s;
+	int x;
+	int offs = 0;
+
+	for(x=0; x<cmdtent->name.len; x++) {
+		if(s[x] == '\\' || s[x] == '"') {
+			buf[offs] = '\\';
+			offs++;
+		}
+		buf[offs] = s[x];
+		offs++;
+	}
+	buf[offs] = 0;
+	fprintf(f, "%s", buf);
+	free(buf);
+}
+
+static int print_compile_db(FILE *f, struct tup_entry *cmdtent, struct tup_entry *filetent)
+{
+	static int first_time = 1;
+	struct tup_entry *srctent = variant_tent_to_srctent(cmdtent->parent);
+
+	if(first_time) {
+		first_time = 0;
+	} else {
+		fprintf(f, ",\n");
+	}
+	fprintf(f, "{\n");
+	fprintf(f, "    \"directory\": \"%s/", get_tup_top());
+	if(srctent->tnode.tupid != DOT_DT) {
+		print_tup_entry(f, srctent);
+	}
+	fprintf(f, "\",\n");
+	fprintf(f, "    \"command\": \"");
+	print_command(f, cmdtent);
+	fprintf(f, "\",\n");
+	fprintf(f, "    \"file\": \"");
+	if(get_relative_dir(f, NULL, srctent->tnode.tupid, filetent->tnode.tupid) < 0)
+		return -1;
+	fprintf(f, "\"\n");
+	fprintf(f, "}");
+	/* Return 1 to indicate we successfully printed an entry */
+	return 1;
+}
+
+int tup_db_create_compile_db(FILE *f, struct variant *variant)
+{
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
+	struct tent_tree *tt;
+	int empty = 1;
+
+	if(tup_db_begin() < 0)
+		return -1;
+	if(tup_db_type_to_tree(&root, TUP_NODE_CMD) < 0)
+		return -1;
+
+	fprintf(f, "[\n");
+	RB_FOREACH(tt, tent_entries, &root) {
+		if(!is_compiledb_tent(tt->tent))
+			continue;
+		if(tup_entry_variant(tt->tent) != variant)
+			continue;
+
+		struct tup_entry *cmdtent = tt->tent;
+		struct tent_entries stickies = TENT_ENTRIES_INITIALIZER;
+		struct tent_tree *stt;
+
+		if(get_sticky_inputs(cmdtent->tnode.tupid, &stickies, NULL) < 0)
+			return -1;
+
+		RB_FOREACH(stt, tent_entries, &stickies) {
+			if(stt->tent->type == TUP_NODE_FILE ||
+			   stt->tent->type == TUP_NODE_GENERATED) {
+				print_compile_db(f, cmdtent, stt->tent);
+			}
+		}
+		free_tent_tree(&stickies);
+
+		empty = 0;
+	}
+	fprintf(f, "\n]\n");
+	if(tup_db_commit() < 0)
+		return -1;
+	free_tent_tree(&root);
+	if(empty) {
+		fprintf(stderr, "tup warning: No commands exported to compiledb. You may need to add the ^j flag to commands that should be exported.\n");
 	}
 	return 0;
 }

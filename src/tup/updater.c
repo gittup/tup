@@ -2779,6 +2779,9 @@ static int update(struct node *n)
 				case 'b':
 					run_in_bash = 1;
 					break;
+				case 'j':
+					/* Only used for compile_commands.json */
+					break;
 				case 't':
 					remove_transients = 1;
 					break;

@@ -747,9 +747,19 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 	return 0;
 }
 
+static int has_flag(struct tup_entry *tent, char c)
+{
+	return memchr(tent->flags, c, tent->flagslen) != NULL;
+}
+
 int is_transient_tent(struct tup_entry *tent)
 {
-	return memchr(tent->flags, 't', tent->flagslen) != NULL;
+	return has_flag(tent, 't');
+}
+
+int is_compiledb_tent(struct tup_entry *tent)
+{
+	return has_flag(tent, 'j');
 }
 
 int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match)

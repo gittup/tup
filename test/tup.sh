@@ -570,6 +570,18 @@ generate()
 	$cmd "$@"
 }
 
+compiledb()
+{
+	if [ -n "$TUP_VALGRIND" ]; then
+		cmd="valgrind -q --error-exitcode=11 --sim-hints=fuse-compatible --track-fds=yes --track-origins=yes --leak-check=full tup compiledb"
+	elif [ -n "$TUP_HELGRIND" ]; then
+		cmd="valgrind -q --error-exitcode=12 --sim-hints=fuse-compatible --tool=helgrind tup compiledb"
+	else
+		cmd="tup compiledb"
+	fi
+	$cmd "$@"
+}
+
 re_init()
 {
 	rm -rf .tup
