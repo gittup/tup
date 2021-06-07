@@ -151,10 +151,16 @@ int server_pre_init(void)
 		fprintf(stderr, "tup error: Unable to set process group for tup's subprocesses.\n");
 		return -1;
 	}
+	/* Temporarily open a file to make sure that our socketpair doesn't end
+	 * up using fd 0. We later dup /dev/null over stdin, so if the socket
+	 * ends up on 0, we'll dup /dev/null over the socket fd.
+	 */
+	int tmpfd = open("/dev/null", O_RDONLY);
 	if(socketpair(AF_LOCAL, SOCK_STREAM, 0, msd) < 0) {
 		perror("socketpair");
 		return -1;
 	}
+	close(tmpfd);
 	master_fork_pid = fork();
 	if(master_fork_pid < 0) {
 		perror("fork");
