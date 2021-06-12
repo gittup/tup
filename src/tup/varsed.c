@@ -39,12 +39,7 @@ int varsed(int argc, char **argv)
 	int input_found = 0;
 
 	for(x=0; x<argc; x++) {
-		if(strcmp(argv[x], "-h") == 0 ||
-		   strcmp(argv[x], "--help") == 0) {
-			fprintf(stderr, "Usage: %s [infile] [outfile]\n", argv[0]);
-			fprintf(stderr, "This will replace all variable references of the form @VARIABLE@ in [infile] with the corresponding value in the tup database, and write the output to [outfile]. If not specified, or specified as \"-\", then the input and output default to stdin and stdout, respectively.\n");
-			return 1;
-		} else if(strcmp(argv[x], "--binary") == 0) {
+		if(strcmp(argv[x], "--binary") == 0) {
 			binmode = 1;
 		} else {
 			if(!input_found) {

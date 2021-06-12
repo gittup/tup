@@ -50,7 +50,30 @@
 #include "tup/vardb.h"
 #include "tup/variant.h"
 #include "tup/container.h"
+#include "tup/array_size.h"
 
+static struct help {
+	const char *command;
+	const char *altcommand;
+	const char *args;
+	const char *desc;
+} helpers[] = {
+	{"init", NULL, "[directory]", "Creates a '.tup' directory in the specified directory and initializes the tup database. If a directory name is unspecified, it defaults to creating '.tup' in the current directory. This defines the top of your project, as viewed by tup."},
+	{"upd", NULL, "[<output_1> ... <output_n>]", "Legacy secondary command. Calling 'tup upd' is equivalent to simply calling 'tup'."},
+	{"refactor", "ref", "", "The refactor command can be used to help refactor Tupfiles. This will cause tup to run through the parsing phase, but not execute any commands. If any Tupfiles that are parsed result in changes to the database, these are reported as errors."},
+	{"monitor", NULL, "", "*LINUX ONLY* Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup' does not need to do the initial scan, and can start constructing the build graph immediately."},
+	{"stop", NULL, "", "Kills the monitor if it is running."},
+	{"variant", NULL, "foo.config [bar.config] [...]", "For each argument, this command creates a variant directory with tup.config symlinked to the specified config file."},
+	{"dbconfig", NULL, "", "Displays the current tup database configuration. These are internal values used by tup."},
+	{"options", NULL, "", "Displays all of the current tup options, as well as where they originated."},
+	{"graph", NULL, "[--dirs] [--ghosts] [--env] [--combine] [--stickies] [<output_1> ... <output_n>]", "Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph."},
+	{"todo", NULL, "[<output_1> ... <output_n>]", "Prints out the next steps in the tup process that will execute when updating the given outputs. If no outputs are specified then it prints the steps needed to update the whole project."},
+	{"generate", NULL, "[--config config-file] script.sh (or script.bat on Windows)", "The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). On Windows, if the script filename has a \".bat\" extension, then the output will be a batch script instead of a shell script."},
+	{"varsed", NULL, "", "The varsed command is used as a subprogram in a Tupfile; you would not run it manually at the command-line. It is used to read one file, and replace any variable references and write the output to a second file. Variable references are of the form @VARIABLE@, and are replaced with the corresponding value of the @-variable."},
+	{"scan", NULL, "", "You shouldn't ever need to run this, unless you want to make the database reflect the filesystem before running 'tup graph'. Scan is called automatically by 'upd' if the monitor isn't running."},
+};
+
+static void print_help(struct help *h, const char *argv0);
 static int entry(int argc, char **argv);
 static int type(int argc, char **argv);
 static int tupid(int argc, char **argv);
@@ -83,7 +106,9 @@ int main(int argc, char **argv)
 	int cmd_arg = 0;
 	const char *cmd = NULL;
 	int clear_autoupdate = 0;
+	int show_help = 0;
 	int orig_argc;
+	char *tupexe = argv[0];
 	char **orig_argv;
 
 	/* Skip 'tup' executable argument */
@@ -100,7 +125,32 @@ int main(int argc, char **argv)
 			tup_db_enable_sql_debug();
 		} else if(strcmp(argv[x], "--debug-fuse") == 0) {
 			server_enable_debug();
+		} else if(strcmp(argv[x], "-h") == 0 ||
+			  strcmp(argv[x], "--help") == 0) {
+			show_help = 1;
 		}
+	}
+
+	if(show_help) {
+		if(!cmd) {
+			fprintf(stderr, "%s [--debug-sql] [--debug-fuse] [SECONDARY_COMMAND] [ARGS]\n\n", tupexe);
+			fprintf(stderr, "tup [<output_1> ... <output_n>]\n");
+			fprintf(stderr, "\nUpdates the set of outputs based on the dependency graph and the current state of the filesystem. If no outputs are specified then the whole project is updated.\n");
+			fprintf(stderr, "\nSECONDARY COMMANDS\n\n");
+			for(x=0; x<ARRAY_SIZE(helpers); x++) {
+				fprintf(stderr, "%s %s\n", tupexe, helpers[x].command);
+			}
+		} else {
+			for(x=0; x<ARRAY_SIZE(helpers); x++) {
+				if(strcmp(cmd, helpers[x].command) == 0 ||
+				   (helpers[x].altcommand && strcmp(cmd, helpers[x].altcommand) == 0)) {
+					print_help(&helpers[x], tupexe);
+					return 0;
+				}
+			}
+			fprintf(stderr, "tup: No help found for secondary command: %s\n", cmd);
+		}
+		return 0;
 	}
 
 	if(NULL == cmd) {
@@ -298,6 +348,15 @@ int main(int argc, char **argv)
 	if(rc < 0)
 		return 1;
 	return rc;
+}
+
+static void print_help(struct help *h, const char *tupexe)
+{
+	fprintf(stderr, "%s %s %s\n", tupexe, h->command, h->args);
+	if(h->altcommand) {
+		fprintf(stderr, "%s %s %s\n", tupexe, h->altcommand, h->args);
+	}
+	fprintf(stderr, "\n%s\n", h->desc);
 }
 
 static int entry(int argc, char **argv)
