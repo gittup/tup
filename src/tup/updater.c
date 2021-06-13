@@ -1126,11 +1126,13 @@ static int gitignore(struct tup_entry *tent)
 		return -1;
 	if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
 		const char *tg_str = "##### TUP GITIGNORE #####\n";
+		int tg_str_len = 26;
 		int tg_idx = 0;
 		int copied_tg_str = 0;
 		char nextchar;
 		struct stat buf;
 		FILE *f;
+		int skip_self = 0;
 		dfd = tup_entry_open(tent);
 		if(dfd < 0)
 			return -1;
@@ -1150,6 +1152,7 @@ static int gitignore(struct tup_entry *tent)
 			goto err_close;
 		}
 		if(fd_old >= 0) {
+			int bytes_copied = 0;
 			while(1) {
 				int rc;
 
@@ -1171,14 +1174,23 @@ static int gitignore(struct tup_entry *tent)
 					perror("fprintf");
 					goto err_close_both;
 				}
-				if(tg_idx == 26) {
+				bytes_copied++;
+				if(tg_idx == tg_str_len) {
 					copied_tg_str = 1;
+					bytes_copied -= tg_str_len;
 					break;
 				}
 			}
 			if(close(fd_old) < 0) {
 				perror("close(fd_old)");
 				goto err_close;
+			}
+			if(bytes_copied > 0) {
+				/* If we have some amount of manual user data
+				 * in the file, don't ignore the .gitignore
+				 * file itself.
+				 */
+				skip_self = 1;
 			}
 		}
 		if(!copied_tg_str) {
@@ -1201,7 +1213,7 @@ static int gitignore(struct tup_entry *tent)
 				goto err_close;
 			}
 		}
-		if(tup_db_write_gitignore(f, tent->tnode.tupid) < 0)
+		if(tup_db_write_gitignore(f, tent->tnode.tupid, skip_self) < 0)
 			goto err_close;
 		fclose(f);
 		if(renameat(dfd, ".gitignore.new", dfd, ".gitignore") < 0) {

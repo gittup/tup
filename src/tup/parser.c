@@ -1116,7 +1116,7 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 			perror("write");
 			return -1;
 		}
-		bytes_copied += 1;
+		bytes_copied++;
 		if(tg_idx == tg_str_len) {
 			copied_tg_str = 1;
 			break;

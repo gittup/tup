@@ -37,6 +37,7 @@ update
 
 gitignore_good ok.txt .gitignore
 gitignore_bad foo .gitignore
+gitignore_bad .gitignore .gitignore
 
 cat > Tupfile << HERE
 .gitignore
@@ -47,6 +48,7 @@ update
 
 gitignore_good ok.txt .gitignore
 gitignore_good foo .gitignore
+gitignore_bad .gitignore .gitignore
 
 # Go back to the way things were, which should leave us with our original
 # .gitignore file.
@@ -58,6 +60,7 @@ update
 
 gitignore_good ok.txt .gitignore
 gitignore_bad foo .gitignore
+gitignore_bad .gitignore .gitignore
 
 diff backup .gitignore
 

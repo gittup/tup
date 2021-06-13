@@ -54,11 +54,13 @@ gitignore_bad bar.c .gitignore
 gitignore_bad Tupfile .gitignore
 gitignore_good foo.o .gitignore
 gitignore_good bar.o .gitignore
+gitignore_good .gitignore .gitignore
 gitignore_good prog.exe .gitignore
 gitignore_bad shazam.c sub/.gitignore
 gitignore_bad Tupfile sub/.gitignore
 gitignore_good shazam.o sub/.gitignore
 gitignore_good libsub.a sub/.gitignore
+gitignore_good .gitignore sub/.gitignore
 
 rm -f Tuprules.tup
 tup rm Tuprules.tup

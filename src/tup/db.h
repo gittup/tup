@@ -97,7 +97,7 @@ int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_normal_dir_to_generated(struct tup_entry *tent);
 int tup_db_print(FILE *stream, tupid_t tupid);
-int tup_db_write_gitignore(FILE *f, tupid_t dt);
+int tup_db_write_gitignore(FILE *f, tupid_t dt, int skip_self);
 int tup_db_rebuild_all(void);
 int tup_db_delete_slash(void);
 tupid_t slash_dt(void);

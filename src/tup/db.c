@@ -2349,7 +2349,7 @@ static int write_gitignore_line(FILE * f, const unsigned char *to_ignore)
 	return -1;
 }
 
-int tup_db_write_gitignore(FILE *f, tupid_t dt)
+int tup_db_write_gitignore(FILE *f, tupid_t dt, int skip_self)
 {
 	int rc;
 	int dbrc;
@@ -2393,10 +2393,14 @@ int tup_db_write_gitignore(FILE *f, tupid_t dt)
 			rc = -1;
 			goto out_reset;
 		}
-		if(write_gitignore_line(f, sqlite3_column_text(*stmt, 0)) < 0) {
-			fprintf(stderr, "tup error: Unable to write data to .gitignore file.\n");
-			rc = -1;
-			goto out_reset;
+
+		const char *filename = (const char *)sqlite3_column_text(*stmt, 0);
+		if(!skip_self || strcmp(filename, ".gitignore") != 0) {
+			if(write_gitignore_line(f, sqlite3_column_text(*stmt, 0)) < 0) {
+				fprintf(stderr, "tup error: Unable to write data to .gitignore file.\n");
+				rc = -1;
+				goto out_reset;
+			}
 		}
 	}
 
