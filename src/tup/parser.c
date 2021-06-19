@@ -1051,7 +1051,7 @@ out_err:
 
 int export(struct tupfile *tf, const char *cmdline)
 {
-	struct tup_entry *tent = NULL;
+	struct var_entry *ve = NULL;
 
 	if(!cmdline[0]) {
 		fprintf(tf->f, "tup error: Expected environment variable to export.\n");
@@ -1059,11 +1059,11 @@ int export(struct tupfile *tf, const char *cmdline)
 	}
 
 	/* Pull from tup's environment */
-	if(tup_db_findenv(cmdline, &tent) < 0) {
+	if(tup_db_findenv(cmdline, &ve) < 0) {
 		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
 		return -1;
 	}
-	if(tent_tree_add_dup(&tf->env_root, tent) < 0)
+	if(tent_tree_add_dup(&tf->env_root, ve->tent) < 0)
 		return -1;
 	return 0;
 }

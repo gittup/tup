@@ -5164,7 +5164,7 @@ int tup_db_check_env(int environ_check)
 	return 0;
 }
 
-int tup_db_findenv(const char *var, struct tup_entry **tent)
+int tup_db_findenv(const char *var, struct var_entry **ret)
 {
 	struct var_entry *ve;
 	int varlen = strlen(var);
@@ -5186,7 +5186,7 @@ int tup_db_findenv(const char *var, struct tup_entry **tent)
 			return -1;
 		expected_changes++;
 	}
-	*tent = ve->tent;
+	*ret = ve;
 	return 0;
 }
 

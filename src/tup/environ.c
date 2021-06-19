@@ -22,6 +22,7 @@
 #include "entry.h"
 #include "db.h"
 #include "tent_tree.h"
+#include "vardb.h"
 
 static const char *default_env[] = {
 /* NOTE: Please increment PARSER_VERSION if these are modified */
@@ -51,11 +52,11 @@ static const char *default_env[] = {
 int environ_add_defaults(struct tent_entries *root)
 {
 	unsigned int x;
-	struct tup_entry *tent;
+	struct var_entry *ve;
 	for(x=0; x<sizeof(default_env) / sizeof(default_env[0]); x++) {
-		if(tup_db_findenv(default_env[x], &tent) < 0)
+		if(tup_db_findenv(default_env[x], &ve) < 0)
 			return -1;
-		if(tent_tree_add_dup(root, tent) < 0)
+		if(tent_tree_add_dup(root, ve->tent) < 0)
 			return -1;
 	}
 	return 0;
