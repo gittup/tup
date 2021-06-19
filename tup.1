@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/04/19" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/06/18" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -357,7 +357,7 @@ Additionally, using "foreach" allows the use of the "%e" flag (see below).
 The input files for the command. An input file can be anywhere in the tup hierarchy, and is specified relative to the current directory. Input files affect the %-flags (see below). Wildcarding is supported within a directory by using the SQLite glob function. The special glob characters are '*', '?', and '[]'. For example, "*.c" would match any .c file, "fo?.c" would match any 3-character .c file that has 'f' and 'o' as the first two characters, and "fo[xyz].c" would match fox.c, foy.c, and foz.c. Globbing does not match directories, so "src/*.c" will work, but "*/*.c" will not.
 .TP
 .B order-only inputs
-These are also used as inputs for the command, but will not appear in any of the %-flags. They are separated from regular inputs by use of the '|' character. In effect, these can be used to specify additional inputs to a command that shouldn't appear on the command line. Globbing is supported as in the inputs section. For example, one use for them is to specify auto-generated header dependencies:
+These are also used as inputs for the command, but will not appear in any of the %-flags except %i. They are separated from regular inputs by use of the '|' character. In effect, these can be used to specify additional inputs to a command that shouldn't appear on the command line. Globbing is supported as in the inputs section. For example, one use for them is to specify auto-generated header dependencies:
 .nf
 
 : |> echo "#define FOO 3" > %o |> foo.h
@@ -445,26 +445,29 @@ In contrast, the 't' flag does *not* make sense for object files in a C program,
 
 .TP
 .B %-flags
-Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs.
+Within a command string or output string, the following %-flags may also be used to substitute values from the inputs or outputs. In general, %-flags expand to all filenames in a list. For example, %o expands to all output files. To refer to a single file, you can use %1o, %2o, etc to refer to the first or second (and so on) filename in the list.
 .RS
 .TP
 .B %%
 Expands to a single "%" character in the command string. This should be used when you want the percent character to be interpreted by the command itself rather than by tup's parser.
 .TP
 .B %f
-The filename from the "inputs" section. This includes the path and extension. This is most useful in a command, since it lists each input file name with the path relative to the current directory. For example, "src/foo.c" would be copied exactly as "src/foo.c"
+The filenames from the "inputs" section. This includes the path and extension. This is most useful in a command, since it lists each input file name with the path relative to the current directory. For example, "src/foo.c" would be copied exactly as "src/foo.c". Individual files can be referenced with %1f, %2f, etc.
+.TP
+.B %i
+The filenames from the "order-only inputs" section. This includes the path and extension. Usually order-only inputs are used for filenames that you don't want to appear in the command-line, but if you need to refer to them, you can use %i. Individual files can be referenced with %1i, %2i, etc.
 .TP
 .B %b
-Like %f, but is just the basename of the file. The directory part is stripped off. For example, "src/foo.c" would become "foo.c"
+Like %f, but is just the basename of the file. The directory part is stripped off. For example, "src/foo.c" would become "foo.c". Individual files can be referenced with %1b, %2b, etc.
 .TP
 .B %B
-Like %b, but strips the extension. This is most useful in converting an input file into an output file of the same name but with a different extension, since the output file needs to be in the same directory. For example, "src/foo.c" would become "foo"
+Like %b, but strips the extension. This is most useful in converting an input file into an output file of the same name but with a different extension, since the output file needs to be in the same directory. For example, "src/foo.c" would become "foo". Individual files can be referenced with %1B, %2B, etc.
 .TP
 .B %e
 The file extension of the current file when used in a foreach rule. This can be used for variables that can have different values based on the suffix of the file. For example, you could set certain flags for assembly (.S) files that are different from .c files, and then use a construct like $(CFLAGS_%e) to reference the CFLAGS_S or CFLAGS_c variable depending on what type of file is being compiled. For example, "src/foo.c" would become "c", while "src/foo.S" would become "S"
 .TP
 .B %o
-The name of the output file(s). It is useful in a command so that the filename passed to a command will always match what tup thinks the output is. This only works in the "command" section, not in the "outputs" section.
+The name of the output file(s). It is useful in a command so that the filename passed to a command will always match what tup thinks the output is. This only works in the "command" section, not in the "outputs" section. Individual files can be referenced with %1o, %2o, etc.
 .TP
 .B %O
 The name of the output file without the extension. This only works in the extra-outputs section if there is exactly one output file specified. A use-case for this is if you have a !-macro that generates files not specified on the command line, but are based off of the output that is named. For example, if a linker creates a map file by taking the specified output "foo.so", removing the ".so" and adding ".map", then you may want a !-macro like so:
