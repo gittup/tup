@@ -5164,10 +5164,13 @@ int tup_db_check_env(int environ_check)
 	return 0;
 }
 
-int tup_db_findenv(const char *var, struct var_entry **ret)
+int tup_db_findenv(const char *var, int varlen, struct var_entry **ret)
 {
 	struct var_entry *ve;
-	int varlen = strlen(var);
+
+	if(varlen < 0) {
+		varlen = strlen(var);
+	}
 
 	ve = vardb_get(&envdb, var, varlen);
 	if(!ve) {

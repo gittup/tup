@@ -54,7 +54,7 @@ int environ_add_defaults(struct tent_entries *root)
 	unsigned int x;
 	struct var_entry *ve;
 	for(x=0; x<sizeof(default_env) / sizeof(default_env[0]); x++) {
-		if(tup_db_findenv(default_env[x], &ve) < 0)
+		if(tup_db_findenv(default_env[x], -1, &ve) < 0)
 			return -1;
 		if(tent_tree_add_dup(root, ve->tent) < 0)
 			return -1;

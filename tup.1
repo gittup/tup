@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/06/18" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/06/19" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -720,6 +720,19 @@ If you wish to export a variable to a specific value rather than get the value f
 .fi
 
 This usage will not create a dependency on the environment variable FOO, since it is controlled through the Tupfile.
+
+.TP
+.B import VARIABLE[=default]
+The import directive sets a variable inside the Tupfile that has the value of the environment variable. If the environment variable is unset, the default value is used instead if provided. This introduces a dependency from the environment variable to the Tupfile, so that if the environment variable changes, the Tupfile is re-parsed. For example:
+.nf
+
+import CC=gcc
+: foreach *.c |> $(CC) -c %f -o %o |> %B.o
+
+.fi
+This will compile all .c files with the compiler defined in the CC environment variable. If CC is not set in the environment, it will use gcc as the default. On a subsequent build, running 'CC=clang tup' will re-parse this Tupfile and re-build all .c files with clang instead (since the commandlines have changed).
+
+Unlike 'export', the import command does not pass the variables to the sub-process's environment. In the previous example, the CC environment variable is therefore not set in the subprocess, unless 'export CC' was also in the Tupfile.
 
 .TP
 .B .gitignore

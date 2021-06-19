@@ -555,6 +555,28 @@ static int tuplua_function_export(lua_State *ls)
 	return 0;
 }
 
+static int tuplua_function_import(lua_State *ls)
+{
+	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	const char *name = NULL;
+	const char *var = NULL;
+	const char *val = NULL;
+
+	name = tuplua_tostring(ls, -1);
+	if(name == NULL)
+		return luaL_error(ls, "Must be passed an environment variable name as an argument.");
+
+	if(import(tf, name, &var, &val) < 0)
+		return luaL_error(ls, "Failed to import environment variable '%s'.", name);
+	if(val) {
+		lua_pushstring(ls, val);
+	} else {
+		lua_pushnil(ls);
+	}
+	lua_setglobal(ls, var);
+	return 0;
+}
+
 static int tuplua_function_creategitignore(lua_State *ls)
 {
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
@@ -833,6 +855,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
 		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
 		tuplua_register_function(ls, "export", tuplua_function_export, tf);
+		tuplua_register_function(ls, "import", tuplua_function_import, tf);
 		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
 		tuplua_register_function(ls, "handle_fileread", tuplua_function_handle_fileread, tf);
 		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);

@@ -178,7 +178,7 @@ int tup_db_delete_tup_config(struct tup_entry *tent);
 
 /* Environment operations */
 int tup_db_check_env(int environ_check);
-int tup_db_findenv(const char *var, struct var_entry **ret);
+int tup_db_findenv(const char *var, int varlen, struct var_entry **ret);
 int tup_db_get_environ(struct tent_entries *root,
 		       struct tent_entries *normal_root, struct tup_env *te);
 tupid_t env_dt(void);

@@ -667,6 +667,8 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			rc = run_script(tf, line+4, lno);
 		} else if(strncmp(line, "export ", 7) == 0) {
 			rc = export(tf, line+7);
+		} else if(strncmp(line, "import ", 7) == 0) {
+			rc = import(tf, line+7, NULL, NULL);
 		} else if(strcmp(line, ".gitignore") == 0) {
 			tf->ign = 1;
 		} else if(line[0] == ':') {
@@ -1059,12 +1061,66 @@ int export(struct tupfile *tf, const char *cmdline)
 	}
 
 	/* Pull from tup's environment */
-	if(tup_db_findenv(cmdline, &ve) < 0) {
+	if(tup_db_findenv(cmdline, -1, &ve) < 0) {
 		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%s'\n", cmdline);
 		return -1;
 	}
 	if(tent_tree_add_dup(&tf->env_root, ve->tent) < 0)
 		return -1;
+	return 0;
+}
+
+int import(struct tupfile *tf, const char *cmdline, const char **retvar, const char **retval)
+{
+	struct var_entry *ve = NULL;
+	const char *var;
+	const char *default_val = NULL;
+	int varlen = 0;
+
+	if(!cmdline[0]) {
+		fprintf(tf->f, "tup error: Expected environment variable to import.\n");
+		return SYNTAX_ERROR;
+	}
+
+	var = cmdline;
+	const char *p = cmdline;
+	while(*p) {
+		if(*p == '=') {
+			default_val = p + 1;
+			break;
+		}
+		varlen++;
+		p++;
+	}
+
+	/* Pull from tup's environment */
+	if(tup_db_findenv(var, varlen, &ve) < 0) {
+		fprintf(tf->f, "tup error: Unable to get tup entry for environment variable '%.*s'\n", varlen, var);
+		return -1;
+	}
+	if(tent_tree_add_dup(&tf->input_root, ve->tent) < 0)
+		return -1;
+	/* Values in envdb are stored as VAR=value */
+	const char *real_val = ve->value;
+	if(real_val) {
+		while(*real_val) {
+			real_val++;
+			if(*real_val == '=') {
+				real_val++;
+				break;
+			}
+		}
+	} else {
+		real_val = default_val;
+	}
+	if(vardb_set(&tf->vdb, ve->var.s, real_val, NULL) < 0)
+		return -1;
+	if(retvar) {
+		*retvar = ve->var.s;
+	}
+	if(retval) {
+		*retval = real_val;
+	}
 	return 0;
 }
 

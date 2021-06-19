@@ -154,6 +154,7 @@ struct bin_head;
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 int exec_run_script(struct tupfile *tf, const char *cmdline, int lno);
 int export(struct tupfile *tf, const char *cmdline);
+int import(struct tupfile *tf, const char *cmdline, const char **retvar, const char **retval);
 void free_path_list(struct path_list_head *plist);
 struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_head *bl, int orderid);
 void del_pl(struct path_list *pl, struct path_list_head *head);

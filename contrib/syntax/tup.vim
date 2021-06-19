@@ -31,7 +31,7 @@ syntax match variable /$([^)]*)/
 syntax match variable /{[^}]*}/
 syntax match atvar /@([^)]*)/
 syntax match atvar /$(CONFIG_[^)]*)/
-syntax match control "^\(ifeq\>\|ifneq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\|run\>\|export\>\)"
+syntax match control "^\(ifeq\>\|ifneq\>\|else\>\|endif\>\|include\>\|include_rules\>\|\.gitignore\>\|run\>\|export\>\|import\>\)"
 syntax match backslash /\\$/
 syntax keyword keys foreach
 syntax region ifdef matchgroup=control start=/^ifdef / start=/^ifndef / end=/$/
