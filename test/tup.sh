@@ -365,7 +365,7 @@ parse_fail_msg()
 
 refactor()
 {
-	if ! tup refactor; then
+	if ! tup refactor $@; then
 		exit 1
 	fi
 }

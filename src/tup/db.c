@@ -1023,14 +1023,17 @@ struct tup_entry *tup_db_create_node_part_display(struct tup_entry *dtent, const
 				if(tup_db_delete_links(tent->tnode.tupid) < 0)
 					return NULL;
 			}
-			if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
-				return NULL;
-			if(tup_db_set_type(tent, type) < 0)
-				return NULL;
-			if(tup_db_set_srcid(tent, srcid) < 0)
-				return NULL;
-			if(node_changed)
-				*node_changed = 1;
+
+			if(type != TUP_NODE_GHOST) {
+				if(tup_db_add_modify_list(tent->tnode.tupid) < 0)
+					return NULL;
+				if(tup_db_set_type(tent, type) < 0)
+					return NULL;
+				if(tup_db_set_srcid(tent, srcid) < 0)
+					return NULL;
+				if(node_changed)
+					*node_changed = 1;
+			}
 
 			{
 				struct variant *variant;
