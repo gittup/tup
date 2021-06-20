@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/06/19" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/06/20" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -355,6 +355,16 @@ Additionally, using "foreach" allows the use of the "%e" flag (see below).
 .TP
 .B inputs
 The input files for the command. An input file can be anywhere in the tup hierarchy, and is specified relative to the current directory. Input files affect the %-flags (see below). Wildcarding is supported within a directory by using the SQLite glob function. The special glob characters are '*', '?', and '[]'. For example, "*.c" would match any .c file, "fo?.c" would match any 3-character .c file that has 'f' and 'o' as the first two characters, and "fo[xyz].c" would match fox.c, foy.c, and foz.c. Globbing does not match directories, so "src/*.c" will work, but "*/*.c" will not.
+
+Any inputs starting with '^' are Perl-compatible regular expressions used to exclude files that were matched in a previous glob. For example, you could compile all *.c files except main.c with the following fragment:
+
+.nf
+
+: foreach *.c ^main.c |> ... |>
+
+.fi
+
+These input exclusions are handled at parser time, and are distinct from the dependency exclusions in the outputs section.
 .TP
 .B order-only inputs
 These are also used as inputs for the command, but will not appear in any of the %-flags except %i. They are separated from regular inputs by use of the '|' character. In effect, these can be used to specify additional inputs to a command that shouldn't appear on the command line. Globbing is supported as in the inputs section. For example, one use for them is to specify auto-generated header dependencies:
@@ -382,6 +392,18 @@ A command string can also begin with the special character '!', in which case th
 .TP
 .B outputs
 The outputs section specifies the files that will be written to by the command. Only one command can write to a specific file, but a single command can output multiple files (such as how a bison command will output both a .c and .h file). The output can use any %-flags except %o. Once a file is specified in an output section, it is put into the tup database. Any following rules can use that file as an input, even if it doesn't exist in the filesystem yet.
+
+Outputs starting with '^' are used to ignore dependencies on files. These are Perl-compatible regular expressions that are stored in the database. Any files that are read or written to when the sub-process executes that matches these patterns are ignored by tup. For example, if your compiler writes to a 'license_file.txt', you could instruct tup to ignore dependency errors on this file like so:
+
+.nf
+
+: foreach *.c |> ... |> %B.o ^license_file.txt
+
+.fi
+
+Note that this also instructs tup to ignore input dependencies on the file. If you wish to merely skip files in a glob, see the similar '^' syntax in the inputs section.
+
+You should only ignore dependencies with extreme caution. It is trivial to cause tup to fail to update when it should have because it's been instructed to ignore dependencies.
 .TP
 .B extra-outputs
 The extra-outputs section is similar to the order-only inputs section. It is separated from the regular outputs by the '|' character. The extra-outputs behave exactly as regular outputs, except they do not appear in the %o flag. These can be used if a command generates files whose names do not actually appear in the command line. If there is exactly one output specified by the rule, the extra-outputs section can use the %O flag to represent the basename of the output. This can be useful in extra-outputs for !-macros.
