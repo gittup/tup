@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/06/20" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/06/24" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -210,6 +210,31 @@ git clean -f -x -d
 
 .fi
 The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation. This does not support variants, however the top-level tup.config file is used to define the configuration variables. Optionally, a separate configuration file can be passed in with the --config argument.
+.RE
+.TP
+.B compiledb
+The compiledb command creates a compile_commands.json file for use with third-party tools that use that file as a reference to determine how files are compiled. The file is created at the top of the tup hierarchy, or if you are using variants, each variant gets has its own compile_commands.json created at the root of the variant. You must annotate files that you want to export with the ^j flag. For example, you could add the ^j flag to your compiler invocations:
+
+.nf
+
+: foreach *.c |> ^j^ gcc -c %f -o %o |> %B.o
+
+.fi
+
+Tup automatically parses any out-of-date Tupfiles (equivalent to 'tup parse') before generating the database.
+
+Due to the expense of updating compile_commands.json with large projects, the file is *not* automatically updated when Tupfiles change. You must re-run 'tup compiledb' manually when you want an updated version.
+
+To automatically pull the latest commandline directly from the database instead of using compile_commands.json as an intermediary, see the 'commandline' command.
+
+See also:
+https://clang.llvm.org/docs/JSONCompilationDatabase.html
+.RE
+.TP
+.B commandline <file_1> [<file_2> ... <file_n>]
+The commandline command will print out the information needed to compile the filename given as an argument. The information is printed to stdout in the same JSON format as the compile_commands.json file from 'tup compiledb'. Note that as compared to the compiledb command, 'tup commandline' does not automatically parse Tupfiles before attempting to find the command. This simply queries the database directly.
+
+For an example of how to use this, see the .ycm_extra_conf.py file located at the root of the tup git repository: https://github.com/gittup/tup/
 .RE
 .TP
 .B varsed
@@ -452,6 +477,9 @@ The 'b' flag causes the command to be run via "/usr/bin/env bash -e -o pipefail 
 .TP
 .B c
 The 'c' flag causes the command to fail if tup does not support user namespaces (on Linux) or is not suid root. In these cases, tup runs in a degraded mode where the fake working directories are visible in the sub-processes, and some dependencies may be missed. If these degraded behaviors will break your a particular command in your build, add the 'c' flag so that users know they need to add the suid bit or upgrade their kernel. This flag is ignored on Windows.
+.TP
+.B j
+The 'j' flag marks the command for export in the 'tup compiledb' command. If you are interested in using compile_commands.json, annotate the commands that you want to export with ^j and then run 'tup compiledb'. See the compiledb command for more details.
 .TP
 .B o
 The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran. The 'o' flag is incompatible with the 't' flag.
