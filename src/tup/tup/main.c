@@ -1174,14 +1174,9 @@ static int varshow(int argc, char **argv)
 
 static int dbconfig(int argc, char **argv)
 {
-	if(argv) {}
-	if(argc == 1) {
-		if(tup_db_show_config() < 0)
-			return -1;
-	} else {
-		fprintf(stderr, "tup error: 'dbconfig' doesn't take arguments.\n");
+	if(argv || argc) {/* unused */}
+	if(tup_db_show_config() < 0)
 		return -1;
-	}
 	return 0;
 }
 
