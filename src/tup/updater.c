@@ -466,7 +466,7 @@ int todo(int argc, char **argv)
 	if(rc < 0)
 		return -1;
 	if(rc == 1) {
-		printf("Run 'tup upd' to bring the system up-to-date.\n");
+		printf("Run 'tup' to bring the system up-to-date.\n");
 		goto out_ok;
 	}
 	printf("tup: Everything is up-to-date.\n");

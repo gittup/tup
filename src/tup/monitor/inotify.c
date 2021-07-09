@@ -23,17 +23,17 @@
  * scanning algorithm:
  *
  *        Step 1.  Start at initial directory foo.  Add watch.
- *        
+ *
  *        Step 2.  Setup handlers for watch created in Step 1.
  *                 Specifically, ensure that a directory created
  *                 in foo will result in a handled CREATE_SUBDIR
  *                 event.
- *        
+ *
  *        Step 3.  Read the contents of foo.
- *        
+ *
  *        Step 4.  For each subdirectory of foo read in step 3, repeat
  *                 step 1.
- *        
+ *
  *        Step 5.  For any CREATE_SUBDIR event on bar, if a watch is
  *                 not yet created on bar, repeat step 1 on bar.
  */
@@ -286,7 +286,7 @@ int monitor(int argc, char **argv)
 
 			/* Need to clear out all saved structures (the dircache
 			 * and tup_entries), then shut the monitor off before
-			 * turning it back on. If there is a waiting 'tup upd'
+			 * turning it back on. If there is a waiting 'tup'
 			 * it will get the lock and update in scan mode before
 			 * we return from tup_lock_init(). Then we should be
 			 * good to go.
