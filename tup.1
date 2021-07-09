@@ -604,8 +604,8 @@ No other special $-variables exist yet, but to be on the safe side you should as
 .PD 0
 .TP
 .B &var += file
-p.PD 1
-Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines, and they are later be referenced by using "&(var)".
+.PD 1
+Set the &-variable to refer to the given file or directory. The file must be a normal file, not a generated file (an output from a :-rule). &-variables are used to refer to files in a similar way as $(TUP_CWD), except that instead of storing the relative path to the file, &-variables store tup's internal ID of the file. This means that the relative path to the file is determined when the &-variable is used, rather than when the variable is assigned as is the case with $(TUP_CWD). &-variables can only be used in the following locations: :-rule inputs, :-rule order-only inputs, :-rule commands, include lines, and run-script lines, and they can later be referenced by using "&(var)".
 .nf
 
 # Tuprules.tup
@@ -886,7 +886,7 @@ When using in-tree builds, the resulting build outputs may rely on run-time file
 Either a symbolic link or a copy of the source file will be created, depending on the OS and file system being used.
 
 .SH "EXAMPLE"
-Parsing a :-rule may be a little confusing at first. You may find it easy to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
+Parsing a :-rule may be a little confusing at first. You may find it easier to think of the Tupfile as a shell script with additional input/output annotations for the commands. As an example, consider this Tupfile:
 .nf
 
 WARNINGS += -W
