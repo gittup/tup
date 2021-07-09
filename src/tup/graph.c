@@ -407,7 +407,7 @@ static struct node *find_or_create_node(struct graph *g, struct tup_entry *tent)
 }
 
 /* Callback for adding group dependencies to the regular update graph. This
- * just adds a link from <group1> -> <group2> so that if we 'tup upd
+ * just adds a link from <group1> -> <group2> so that if we 'tup
  * <group2>', we also build everything in group1. See t3088, t3089.
  */
 int build_graph_group_cb(void *arg, struct tup_entry *tent)

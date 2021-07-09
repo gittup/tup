@@ -85,7 +85,7 @@ CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	# Put -I. first so we find our new luabuiltin.h file, not one built
-	# by a previous 'tup upd'.
+	# by a previous invocation of 'tup'.
 	$CC $CFLAGS -c $i -I. -I../src -I../src/pcre $plat_cflags
 done
 
