@@ -30,10 +30,34 @@ check()
 . ./tup.sh
 check_no_windows HOME environment variable
 
-# Override HOME so we can control ~/.tupoptions
+# Override HOME and XDG_CONFIG_HOME so we can control
+# the location of the options files.
+
+# Test ${XDG_CONFIG_HOME:-$HOME/.config}/tup/options
 export HOME=`pwd`
+export XDG_CONFIG_HOME=
 check keep_going 0
 
+mkdir -p "$HOME/.config/tup"
+cat > .config/tup/options << HERE
+[updater]
+num_jobs = 4
+keep_going = 1
+HERE
+check num_jobs 4
+check keep_going 1
+
+export XDG_CONFIG_HOME="$HOME/.alt_config"
+check keep_going 0
+
+mkdir -p "$XDG_CONFIG_HOME/tup"
+cat > "$XDG_CONFIG_HOME/tup/options" << HERE
+[updater]
+num_jobs = 5
+HERE
+check num_jobs 5
+
+# Test ~/.tupoptions, which overrides the previous file.
 cat > .tupoptions << HERE
 [updater]
 num_jobs = 2
