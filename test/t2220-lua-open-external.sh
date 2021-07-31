@@ -44,7 +44,6 @@ update
 
 check_exist foo bar
 
-sleep 1
 cat > ../data.txt << HERE
 foo
 bar

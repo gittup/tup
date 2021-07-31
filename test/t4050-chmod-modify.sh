@@ -35,8 +35,6 @@ cat > Tupfile << HERE
 HERE
 update
 
-sleep 1
-
 chmod -x ok.sh
 update_fail_msg "ok.sh.*Permission denied"
 

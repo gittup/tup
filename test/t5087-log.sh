@@ -36,7 +36,6 @@ check_exist .tup/log/debug.log.0
 check_exist .tup/log/debug.log.1
 log_good "Create.*foo.txt"
 
-sleep 1
 touch foo.txt
 update --debug-logging
 log_good "Update.*foo.txt"

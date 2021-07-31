@@ -41,8 +41,6 @@ update
 echo 'this is A' | diff - a.out
 echo 'this is B' | diff - b.out
 
-sleep 1
-
 mv b.txt c.txt
 mv a.txt b.txt
 update

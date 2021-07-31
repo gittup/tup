@@ -27,7 +27,6 @@ cat > sub/Tupfile << HERE
 HERE
 update
 
-sleep 1
 touch out/sub/ok.o
 rm -rf sub/ok.c out
 update

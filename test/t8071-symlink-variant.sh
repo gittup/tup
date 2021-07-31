@@ -47,7 +47,6 @@ update
 
 check_exist build/dist/bar/sub
 tup_dep_exist dist/bar/sub foo.h build 'gcc -c foo.c -o build/foo.o -Idist'
-sleep 1
 
 rm -rf dist/bar/sub
 cd dist/bar

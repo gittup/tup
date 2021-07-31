@@ -26,7 +26,6 @@ cat > Tupfile << HERE
 HERE
 update
 
-sleep 1
 tup touch ok.o
 rm ok.c ok.o
 update

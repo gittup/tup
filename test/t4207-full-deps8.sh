@@ -45,7 +45,6 @@ echo foo1 | diff - out.txt
 
 update_null "No files should have been recompiled when nothing was changed."
 
-sleep 1
 echo foo2 > ../external/arch-x86/foo.h
 update
 

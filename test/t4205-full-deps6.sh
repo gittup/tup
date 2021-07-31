@@ -52,7 +52,6 @@ fi
 tup_dep_no_exist $prefix/.. external . 'sh run.sh 1'
 tup_dep_no_exist $prefix/.. external . 'sh run.sh 2'
 
-sleep 1
 touch ../external/bar.txt
 update_null "No files should have been recompiled when nothing was changed."
 

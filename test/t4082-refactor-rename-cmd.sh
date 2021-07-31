@@ -25,9 +25,6 @@ cat > Tupfile << HERE
 HERE
 update
 
-# Sleep 1 here so that we update the mtime in a transaction prior to
-# parsing.
-sleep 1
 cat > Tupfile << HERE
 string = foo
 : |> touch \$(string) |> foo
