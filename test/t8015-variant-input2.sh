@@ -20,11 +20,11 @@
 # straight from the other variant.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 cat > Tupfile << HERE
 : |> touch %o |> foo
 HERE
-tup touch Tupfile build/tup.config
+touch Tupfile build/tup.config
 update
 
 cat > Tupfile << HERE
@@ -33,12 +33,12 @@ ifeq (@(FOO),y)
 : |> cat build/foo > %o |> output
 endif
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
-tmkdir build2
+mkdir build2
 echo "CONFIG_FOO=y" > build2/tup.config
-tup touch build2/tup.config
+touch build2/tup.config
 update_fail_msg "Unable to use files from another variant.*in this variant"
 
 eotup

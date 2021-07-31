@@ -19,13 +19,13 @@
 # Make sure we don't get a spurious error message if the top-level Tuprules.tup file is a ghost.
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 include_rules
 HERE
 update
 
-tup touch bar.txt
+touch bar.txt
 update > output.txt
 if grep 'Tuprules.tup: No such file or directory' output.txt > /dev/null; then
 	cat output.txt

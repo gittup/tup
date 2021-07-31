@@ -26,7 +26,7 @@ echo "hey there" > foo.c
 cat > Tupfile << HERE
 : |> touch foo.c |>
 HERE
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update_fail_msg "\(tup error.*utimens\|Unspecified output files\)"
 
 check_exist foo.c

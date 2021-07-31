@@ -21,8 +21,8 @@
 
 . ./tup.sh
 
-tmkdir subdir
-tmkdir notupdated
+mkdir subdir
+mkdir notupdated
 
 cat > subdir/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

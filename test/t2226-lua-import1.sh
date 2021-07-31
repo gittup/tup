@@ -27,7 +27,7 @@ if CC then
 tup.rule('foo.c', '\$(CC) -c %f -o %o', '%B.o')
 end
 HERE
-tup touch Tupfile.lua foo.c
+touch Tupfile.lua foo.c
 update
 
 check_exist foo.o

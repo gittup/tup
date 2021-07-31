@@ -20,11 +20,11 @@
 
 . ./tup.sh
 
-tmkdir sub
-tmkdir sub/dir
+mkdir sub
+mkdir sub/dir
 cd sub/dir
 
-tmkdir tmp
+mkdir tmp
 cat > ok.sh << HERE
 #! /bin/sh
 cd tmp
@@ -39,7 +39,7 @@ HERE
 echo "yo" > tmp/bar
 echo "not this one" > bar
 
-tup touch bar tmp/bar Tupfile ok.sh
+touch bar tmp/bar Tupfile ok.sh
 update
 
 tup_dep_exist sub/dir/tmp bar sub/dir './ok.sh'

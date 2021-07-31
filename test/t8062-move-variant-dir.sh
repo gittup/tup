@@ -20,8 +20,8 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir sub
-tmkdir configs
+mkdir sub
+mkdir configs
 
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

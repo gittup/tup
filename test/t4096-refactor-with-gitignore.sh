@@ -24,12 +24,12 @@ cat > Tupfile << HERE
 .gitignore
 : |> touch %o |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 gitignore_good foo .gitignore
 
-tup touch Tupfile
+touch Tupfile
 refactor
 
 gitignore_good foo .gitignore

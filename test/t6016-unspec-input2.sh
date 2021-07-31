@@ -31,14 +31,14 @@ cat > foo.c << HERE
 #include "foo.h"
 int main(void) {return FOO;}
 HERE
-tup touch foo.c foo.h.in Tupfile
+touch foo.c foo.h.in Tupfile
 update
 
 cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Missing input dependency"
 
 eotup

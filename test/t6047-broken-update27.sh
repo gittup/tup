@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : |> cat foo 2>/dev/null || true; touch bar |> bar
 : bar |> cat bar 2>/dev/null; touch foo |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Unspecified output files"
 
 check_not_exist foo
@@ -36,7 +36,7 @@ cat > Tupfile << HERE
 : |> cat foo 2>/dev/null || true; touch bar |> bar
 : bar |> cat bar 2>/dev/null; touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Missing input dependency"
 
 eotup

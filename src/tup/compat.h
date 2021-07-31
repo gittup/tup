@@ -37,8 +37,9 @@ void compat_lock_disable(void);
 #define SQL_NAME_COLLATION " collate nocase"
 #define name_cmp stricmp
 #define name_cmp_n strnicmp
-/* Windows uses mtime, since ctime there is the creation time, not change time */
-#define MTIME(b) b.st_mtime
+#define MTIME(b) win_mtime(&b)
+#define FILETIME_TO_TICKS(ft) ((((long long)(ft)->dwHighDateTime) << 32) + (long long)(ft)->dwLowDateTime)
+struct timespec win_mtime(struct stat *buf);
 #else
 #define is_path_sep(ch) ((ch)[0] == '/')
 #define is_full_path is_path_sep
@@ -52,13 +53,13 @@ void compat_lock_disable(void);
  * saving a file using exchangedata() only affects mtime. Most other operations
  * affect both.
  */
-#define MTIME_MAX(x,y) ((x)>(y) ? (x) : (y))
-#define MTIME(b) MTIME_MAX(b.st_ctime, b.st_mtime)
+#define MTIME_MAX(x,y) ((x).tv_sec == (y).tv_sec) ? ((x).tv_nsec > (y).tv_nsec ? (x) : (y)) : (((x).tv_sec) > ((y).tv_sec) ? (x) : (y))
+#define MTIME(b) MTIME_MAX(b.st_ctimespec, b.st_mtimespec)
 #else
 /* Use ctime on other platforms, since chmod will affect ctime, but not mtime.
  * Also on Linux, ctime will be updated when a file is renamed (t6058).
  */
-#define MTIME(b) b.st_ctime
+#define MTIME(b) b.st_ctim
 #endif
 #endif
 

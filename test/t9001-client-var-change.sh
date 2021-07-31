@@ -26,7 +26,7 @@ make_tup_client
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-tup touch Tupfile empty.txt
+touch Tupfile empty.txt
 update
 
 diff empty.txt ok.txt

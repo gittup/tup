@@ -25,7 +25,7 @@ files.extra_inputs = tup.rule('echo blah > %o', {'foo.h'})
 tup.foreach_rule(files, 'gcc -c %f -o %o', '%B.o')
 HERE
 
-tup touch Tupfile.lua foo.c bar.c
+touch Tupfile.lua foo.c bar.c
 parse
 tup_sticky_exist . foo.h . "gcc -c foo.c -o foo.o"
 tup_sticky_exist . foo.h . "gcc -c bar.c -o bar.o"

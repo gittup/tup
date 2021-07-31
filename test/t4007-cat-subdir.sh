@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : foreach input/*.o |> cat %f > %o |> %b
 HERE
 
-tmkdir input
+mkdir input
 cat > input/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
@@ -33,7 +33,7 @@ HERE
 echo "void foo(void) {}" > input/foo.c
 echo "void bar(void) {}" > input/bar.c
 
-tup touch Tupfile input/Tupfile input/foo.c input/bar.c
+touch Tupfile input/Tupfile input/foo.c input/bar.c
 update
 
 eotup

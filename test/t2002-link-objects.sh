@@ -16,7 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Since *.o isn't 'tup touched', we have to get them from the output of the
+# Since *.o isn't 'touched', we have to get them from the output of the
 # first rule.
 
 . ./tup.sh
@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o prog %f |> prog
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 parse
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o"

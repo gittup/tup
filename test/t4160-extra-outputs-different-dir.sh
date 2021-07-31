@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 :|> echo first > %o && echo second > %o.2 |> out/file.txt | %O.txt.2
 :|> echo first > %o && echo second > %o.2 |> supermyoutout/file.txt | %O.txt.2
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

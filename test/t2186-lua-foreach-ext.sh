@@ -28,7 +28,7 @@ inputs = '*.c'
 inputs += '*.S'
 tup.foreach_rule(inputs, 'gcc -c %f \$(CFLAGS_%e) -o %o', '%B.o')
 HERE
-tup touch foo.c bar.S
+touch foo.c bar.S
 parse
 
 tup_object_exist . 'gcc -c foo.c -Dcfile -o foo.o'

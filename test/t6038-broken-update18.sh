@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cd sub
 ln -s . foo
 update

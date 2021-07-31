@@ -22,14 +22,14 @@
 cat > Tupfile << HERE
 : foreach	file.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile file.c
+touch Tupfile file.c
 update
 
 cat > Tupfile << HERE
 !cc = foreach	| blah.h |> gcc -c %f -o %o |> %B.o
 : foo.c |> !cc |>
 HERE
-tup touch Tupfile foo.c blah.h
+touch Tupfile foo.c blah.h
 update
 
 eotup

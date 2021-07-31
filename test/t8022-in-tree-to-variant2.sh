@@ -19,7 +19,7 @@
 # Start with an in-tree build, then create a variant, then create another variant.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -27,7 +27,7 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 touch build/tup.config
@@ -36,9 +36,9 @@ update
 check_exist build/bar
 check_not_exist build/foo
 
-tmkdir build-debug
+mkdir build-debug
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-tup touch build-debug/tup.config
+touch build-debug/tup.config
 
 update
 check_exist build-debug/bar

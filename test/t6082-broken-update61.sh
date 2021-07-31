@@ -27,8 +27,8 @@ cat > Tupfile << HERE
 : |> cat sub/foo 2>/dev/null || true; touch bar |> bar
 : bar |> cat bar 2>/dev/null; touch sub |>
 HERE
-tup touch sub
-tup touch Tupfile
+touch sub
+touch Tupfile
 update_fail_msg "Unspecified output files"
 
 cat > Tupfile << HERE
@@ -38,7 +38,7 @@ HERE
 rm -rf sub
 mkdir sub
 touch sub/unused
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Attempting to insert 'sub' as a generated node"
 
 eotup

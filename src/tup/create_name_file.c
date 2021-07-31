@@ -41,7 +41,7 @@ static int ghost_to_file(struct tup_entry *tent);
 
 static void (*rmdir_callback)(tupid_t tupid);
 
-int create_name_file(tupid_t dt, const char *file, time_t mtime,
+int create_name_file(tupid_t dt, const char *file, struct timespec mtime,
 		     struct tup_entry **entry)
 {
 	struct tup_entry *dtent;
@@ -104,7 +104,7 @@ tupid_t tup_file_mod(tupid_t dt, const char *file, int *modified)
 	return tup_file_mod_mtime(dt, file, MTIME(buf), 1, 1, modified);
 }
 
-tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
+tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, struct timespec mtime,
 			   int force, int ignore_generated, int *modified)
 {
 	struct tup_entry *tent;
@@ -120,7 +120,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 	if(!tent) {
 		if(create_name_file(dt, file, mtime, &tent) < 0)
 			return -1;
-		log_debug_tent("Create", tent, ", mtime=%li\n", mtime);
+		log_debug_tent("Create", tent, ", mtime=%li.%li\n", mtime.tv_sec, mtime.tv_nsec);
 		new = 1;
 	} else {
 		/* If we are ignoring generated files (ie: from the monitor when it catches
@@ -130,8 +130,8 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 		 */
 		if(ignore_generated && tent->type == TUP_NODE_GENERATED)
 			force = 0;
-		if(tent->mtime != mtime || force) {
-			log_debug_tent("Update", tent, ", oldmtime=%li, newmtime=%li, force=%i\n", tent->mtime, mtime, force);
+		if(!MTIME_EQ(tent->mtime, mtime) || force) {
+			log_debug_tent("Update", tent, ", oldmtime=%li.%li, newmtime=%li.%li, force=%i\n", tent->mtime.tv_sec, tent->mtime.tv_nsec, mtime.tv_sec, mtime.tv_nsec, force);
 			changed = 1;
 		}
 
@@ -179,7 +179,7 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, time_t mtime,
 			if(tup_db_set_dependent_flags(tent->tnode.tupid) < 0)
 				return -1;
 
-			if(tent->mtime != mtime)
+			if(!MTIME_EQ(tent->mtime, mtime))
 				if(tup_db_set_mtime(tent, mtime) < 0)
 					return -1;
 		}
@@ -629,7 +629,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				}
 			} else {
 				int type = TUP_NODE_GHOST;
-				time_t mtime = -1;
+				struct timespec mtime = {-1, 0};
 
 				/* Secret of the ghost valley! */
 				if(sotgv == 0) {
@@ -655,13 +655,13 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 	return tent->tnode.tupid;
 }
 
-int get_outside_tup_mtime(struct tup_entry *parent, struct path_element *pel, time_t *mtime)
+int get_outside_tup_mtime(struct tup_entry *parent, struct path_element *pel, struct timespec *mtime)
 {
 	int dfd;
 
 	dfd = tup_entry_open(parent);
 	if(dfd == -ENOENT || dfd == -ENOTDIR) {
-		*mtime = -1;
+		*mtime = INVALID_MTIME;
 	} else if(dfd < 0) {
 		perror("tup_entry_open");
 		fprintf(stderr, "tup error: Unable to open tup entry: ");
@@ -683,7 +683,7 @@ int get_outside_tup_mtime(struct tup_entry *parent, struct path_element *pel, ti
 				fprintf(stderr, "tup error: Unable to stat file: %.*s\n", pel->len, pel->path);
 				return -1;
 			}
-			*mtime = -1;
+			*mtime = INVALID_MTIME;
 		} else {
 			/* Ghost directories in the /-tree have mtimes set to
 			 * zero if they exist. This way we can distinguish

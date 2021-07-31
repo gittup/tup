@@ -19,8 +19,8 @@
 # Try a variant in lua.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile.lua << HERE
 objs = tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
@@ -32,13 +32,13 @@ tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-tup touch build/tup.config Tupfile.lua foo.c sub/bar.c
+touch build/tup.config Tupfile.lua foo.c sub/bar.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe
 check_not_exist foo.o sub/bar.o prog.exe
 
-tup touch baz.c
+touch baz.c
 update
 check_exist build/baz.o
 

@@ -30,8 +30,8 @@ echo "Run script \$1" 1>&2
 HERE
 chmod +x run.sh
 
-tmkdir sub1
-tmkdir sub2
+mkdir sub1
+mkdir sub2
 cat > sub1/Tupfile << HERE
 run ../run.sh part1A
 : ../sub2/foo.txt |> echo %f |>
@@ -42,7 +42,7 @@ cat > sub2/Tupfile << HERE
 run ../run.sh part2
 HERE
 
-tup touch sub1/Tupfile sub2/Tupfile sub2/foo.txt
+touch sub1/Tupfile sub2/Tupfile sub2/foo.txt
 update > .output.txt 2>&1
 
 if ! cat .output.txt | tr '\n' ' ' | grep '1).*sub2.*part2.*0).*sub1.*part1A.*part1B' > /dev/null; then

@@ -41,7 +41,7 @@ cat > run.sh << HERE
 cat ../external/foo.txt
 ls ../external > /dev/null
 HERE
-tup touch Tupfile foo.c bar.c
+touch Tupfile foo.c bar.c
 update
 
 if [ "$in_windows" = "1" ]; then

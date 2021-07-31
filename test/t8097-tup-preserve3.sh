@@ -19,7 +19,7 @@
 # Copy files from the srcdir to the variant dir.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
@@ -27,21 +27,21 @@ cat > Tupfile << HERE
 HERE
 echo file1 > file.html
 echo file2 > file2.html
-tup touch Tupfile build/tup.config
+touch Tupfile build/tup.config
 update
 
 check_exist build/file.html build/file2.html build/gen.txt
 echo file1 | diff - build/file.html
 echo file2 | diff - build/file2.html
 
-tmkdir sub
-tmkdir sub/bar
+mkdir sub
+mkdir sub/bar
 cat > sub/bar/Tupfile << HERE
 : file3.html |> !tup_preserve |>
 : |> touch %o |> gen2.txt
 HERE
 echo file3 > sub/bar/file3.html
-tup touch sub/bar/Tupfile
+touch sub/bar/Tupfile
 update
 
 check_exist build/sub/bar/file3.html build/sub/bar/gen2.txt

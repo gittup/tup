@@ -20,23 +20,24 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
 echo foo > foo/foo.txt
-echo bar > bar/bar.txt
 cat > foo/Tupfile << HERE
 : |> cp foo.txt %o |> ../bar/out.txt
 HERE
+# Add foo first so it gets parsed first
+tup scan
+
+mkdir bar
+echo bar > bar/bar.txt
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> out.txt
 HERE
-tup touch foo/Tupfile bar/Tupfile
 update_fail_msg "Unable to create output file 'out.txt'"
 
 # Correctly create foo.txt
 cat > bar/Tupfile << HERE
 HERE
-tup touch bar/Tupfile
 update
 
 echo foo | diff - bar/out.txt
@@ -47,7 +48,6 @@ HERE
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> out.txt
 HERE
-tup touch foo/Tupfile bar/Tupfile
 update
 
 echo bar | diff - bar/out.txt
@@ -58,7 +58,6 @@ cat > foo/Tupfile << HERE
 HERE
 cat > bar/Tupfile << HERE
 HERE
-tup touch foo/Tupfile bar/Tupfile
 update
 
 echo foo | diff - bar/out.txt
@@ -67,7 +66,6 @@ echo foo | diff - bar/out.txt
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> out.txt
 HERE
-tup touch bar/Tupfile
 update_fail_msg "Unable to create output file 'out.txt'"
 
 eotup

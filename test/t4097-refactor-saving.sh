@@ -21,8 +21,8 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : |> echo foo |>
 HERE
@@ -40,7 +40,7 @@ cat > bar/Tupfile << HERE
 str = bar
 : |> echo \$(str) |>
 HERE
-tup touch foo/Tupfile bar/Tupfile
+touch foo/Tupfile bar/Tupfile
 refactor
 
 # Now change just foo - only foo should be refactored, since bar
@@ -50,7 +50,7 @@ cmd = echo
 str = foo
 : |> \$(cmd) \$(str) |>
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 tup refactor > .out.txt
 
 if ! grep foo .out.txt > /dev/null; then

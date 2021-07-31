@@ -37,28 +37,26 @@ cat > Tupfile << HERE
 HERE
 
 echo "int main(void) {return 0;}" > foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 sym_check foo.o main
 sym_check built-in.o main
 
 re_init
-tup touch foo.c foo.o built-in.o Tupfile
+touch foo.c foo.o built-in.o Tupfile
 update_fail
 
 # First try: remove the offending files and update again
 rm foo.o built-in.o
-tup rm foo.o built-in.o
 update
 
 # Go back to our error scenario
 re_init
-tup touch foo.c foo.o built-in.o Tupfile
+touch foo.c foo.o built-in.o Tupfile
 update_fail
 
 # Second try: remove only foo.o for now, we'll just deal with built-in.o
 rm foo.o
-tup rm foo.o
 update_fail
 
 # Now we assume built-in.o is actually a user file, and then change our command
@@ -71,7 +69,7 @@ cat > Tupfile << HERE
 : *.o |> ld -r %f -o new-built-in.o |> new-built-in.o
 HERE
 echo "int foo(void) {return 0;}" > foo.c
-tup touch Tupfile foo.c
+touch Tupfile foo.c
 update
 
 check_exist foo.o built-in.o new-built-in.o

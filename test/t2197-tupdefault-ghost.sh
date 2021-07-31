@@ -20,12 +20,12 @@
 # first parsed.
 
 . ./tup.sh
-tmkdir sub
-tmkdir sub/a
-tmkdir sub/b
-tmkdir sub/b/b2
-tmkdir sub/c
-tmkdir sub/c/c2
+mkdir sub
+mkdir sub/a
+mkdir sub/b
+mkdir sub/b/b2
+mkdir sub/c
+mkdir sub/c/c2
 
 # Parse empty directories first
 parse

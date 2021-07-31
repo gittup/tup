@@ -22,10 +22,10 @@
 cat > Tupfile << HERE
 : |> cat input.txt > .hidden |> .hidden
 HERE
-tup touch Tupfile input.txt
+touch Tupfile input.txt
 update
 
-tup touch input.txt
+touch input.txt
 update
 
 eotup

@@ -31,7 +31,7 @@ for i in *.[co]; do
 	echo ": |> echo \$1 \$i |>"
 done
 HERE
-tup touch Tupfile ok.sh foo.c bar.c
+touch Tupfile ok.sh foo.c bar.c
 update
 
 tup_object_exist . 'echo good foo.c'
@@ -41,7 +41,7 @@ tup_object_exist . 'echo good bar.o'
 tup_object_no_exist . 'echo bad foo.o'
 tup_object_no_exist . 'echo bad bar.o'
 
-tup touch Tupfile
+touch Tupfile
 update
 tup_object_exist . 'echo good foo.c'
 tup_object_exist . 'echo good bar.c'

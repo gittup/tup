@@ -24,9 +24,9 @@ cat > Tupfile << HERE
 : foreach subdir/*.txt |> cp %f %o |> %b
 : foreach subdir/*.c |> gcc -c %f -o %o |> %B.o
 HERE
-tmkdir subdir
-tmkdir superlongtest
-tup touch subdir/foo.c subdir/readme.txt Tupfile superlongtest/ok
+mkdir subdir
+mkdir superlongtest
+touch subdir/foo.c subdir/readme.txt Tupfile superlongtest/ok
 parse
 tup_object_exist . foo.o readme.txt
 tup_object_exist . "cp subdir/readme.txt readme.txt"

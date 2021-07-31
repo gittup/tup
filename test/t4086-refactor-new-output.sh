@@ -23,13 +23,13 @@
 cat > Tupfile << HERE
 : |> touch bar |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> touch bar |> bar baz foo
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to add a new output to a command: baz"
 refactor_fail_msg "Attempting to add a new output to a command: foo"
 

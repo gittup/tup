@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 !foo = |> cat -v |>
 : foreach *.c |> !foo "%f" > "%o" |> bin/%B
 HERE
-tup touch foo.c
+touch foo.c
 update
 
 tup_object_exist . 'cat -v "foo.c" > "bin/foo"'

@@ -21,14 +21,14 @@
 
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 &lib = myLib.a
 : &(lib) |> cp %f %o |> %b.copy
 HERE
 
-tup touch Tupfile build/tup.config myLib.a
+touch Tupfile build/tup.config myLib.a
 update
 
 tup_dep_exist . myLib.a build 'cp myLib.a build/myLib.a.copy'

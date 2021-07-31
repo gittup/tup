@@ -19,22 +19,22 @@
 # Make sure we can't use a variant file as an input.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 cat > Tupfile << HERE
 : |> touch %o |> foo
 HERE
-tup touch Tupfile build/tup.config
+touch Tupfile build/tup.config
 update
 
 cat > Tupfile << HERE
 : |> touch %o |> foo
 : ../build/foo |> cat %f > %o |> output
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
-tmkdir build2
-tup touch build2/tup.config
+mkdir build2
+touch build2/tup.config
 update_fail_msg "Unable to use files from another variant.*in this variant"
 
 eotup

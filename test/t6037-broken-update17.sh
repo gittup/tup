@@ -26,7 +26,7 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 files-y = foo.c
 files-@(BAR) += bar.c
@@ -38,7 +38,7 @@ cat > Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > sub/foo.c
 echo "void bar(void) {}" > sub/bar.c
-tup touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
+touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
 varsetall BAR=y
 update
 

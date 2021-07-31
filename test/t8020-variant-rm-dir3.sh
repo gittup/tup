@@ -20,13 +20,13 @@
 # Tupfiles are gone.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
-tmkdir sub
-tmkdir sub/foo
+mkdir sub
+mkdir sub/foo
 echo ": |> touch %o |> hey" > sub/Tupfile
 echo ": |> touch %o |> yo" > sub/foo/Tupfile
-tup touch build/tup.config sub/Tupfile sub/foo/Tupfile
+touch build/tup.config sub/Tupfile sub/foo/Tupfile
 
 update
 

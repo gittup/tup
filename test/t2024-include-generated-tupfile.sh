@@ -26,19 +26,19 @@
 # that it should error on the fact that it was a generated file.
 
 . ./tup.sh
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : |> echo "var=foo" > %o |> inc
 HERE
 touch Tupfile
 
-tup touch Tupfile foo/Tupfile
+touch Tupfile foo/Tupfile
 update
 
 cat > Tupfile << HERE
 include foo/inc
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail
 
 eotup

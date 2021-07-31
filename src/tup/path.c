@@ -197,7 +197,7 @@ static int full_scan_dir(struct tent_list_head *head, int dfd, tupid_t dt)
 	tent_list_foreach(tl, head) {
 		struct tup_entry *tent = tl->tent;
 		int new_dfd = -1;
-		time_t mtime = -1;
+		struct timespec mtime = INVALID_MTIME;
 		int scan_subdir = 0;
 
 		if(tent->dt != dt)
@@ -252,7 +252,7 @@ static int full_scan_dir(struct tent_list_head *head, int dfd, tupid_t dt)
 			}
 		}
 
-		if(mtime != tent->mtime) {
+		if(!MTIME_EQ(tent->mtime, mtime)) {
 			log_debug_tent("Update external", tent, ", oldmtime=%li, newmtime=%li\n", tent->mtime, mtime);
 
 			scan_subdir = 1;

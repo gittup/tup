@@ -33,7 +33,7 @@ cat > ok.sh << HERE
 echo changed > out.txt
 echo bar > same.txt
 HERE
-tup touch ok.sh
+touch ok.sh
 update --debug-logging
 log_good "Skip file.*: same.txt"
 log_good "Skip cmd.*: cat same.txt"

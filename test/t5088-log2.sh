@@ -33,7 +33,7 @@ log_graph_good create "label=\"\."
 log_graph_good update "gcc -Ia -Ib -c bar.c -o bar.o"
 log_graph_good update "gcc -Ia -Ib -c foo.c -o foo.o"
 
-tup touch bar.c
+touch bar.c
 update --debug-logging
 
 log_graph_bad create "label=\"\."

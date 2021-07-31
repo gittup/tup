@@ -27,7 +27,7 @@ ifeq (1,2)
 endif #foo == 2
 : b.c |> !cc |> b.o
 HERE
-tup touch a.c b.c Tupfile
+touch a.c b.c Tupfile
 parse_fail_msg "missing endif before EOF"
 
 cat > Tupfile << HERE
@@ -37,7 +37,7 @@ ifeq (1,2)
 endif
 : b.c |> !cc |> b.o
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_object_exist . "gcc -c b.c -o b.o"
 

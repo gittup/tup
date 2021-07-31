@@ -27,7 +27,7 @@ single_threaded
 echo "void bar(void) {}" > bar.c
 echo "int main(void) {bork; return 0;}" > foo.c
 echo "void zap(void) {}" > zap.c
-tup touch bar.c foo.c zap.c
+touch bar.c foo.c zap.c
 update_fail
 
 check_exist bar.o

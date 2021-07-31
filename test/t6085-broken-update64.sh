@@ -24,14 +24,14 @@ cat > Tupfile << HERE
 : |> touch %o |> baz.c
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile foo.c bar.c
+touch Tupfile foo.c bar.c
 update
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 echo 'int x;' > baz.c
-tup touch Tupfile baz.c
+touch Tupfile baz.c
 update
 
 check_exist foo.o bar.o baz.o

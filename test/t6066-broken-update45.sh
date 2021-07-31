@@ -25,9 +25,6 @@ touch foo/foo.h
 
 update
 
-# Use a sleep here to force a scan, since calling 'tup rm' and 'tup touch' already
-# works.
-sleep 1
 rm -rf foo
 touch foo
 update

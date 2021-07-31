@@ -90,7 +90,6 @@ static int node_exists(int argc, char **argv);
 static int link_exists(const char *cmd, int argc, char **argv);
 static int touch(int argc, char **argv);
 static int node(int argc, char **argv);
-static int rm(int argc, char **argv);
 static int varshow(int argc, char **argv);
 static int dbconfig(int argc, char **argv);
 static int options(int argc, char **argv);
@@ -313,8 +312,6 @@ int main(int argc, char **argv)
 		rc = touch(argc, argv);
 	} else if(strcmp(cmd, "node") == 0) {
 		rc = node(argc, argv);
-	} else if(strcmp(cmd, "rm") == 0) {
-		rc = rm(argc, argv);
 	} else if(strcmp(cmd, "varshow") == 0) {
 		rc = varshow(argc, argv);
 	} else if(strcmp(cmd, "dbconfig") == 0) {
@@ -1054,48 +1051,18 @@ static int node(int argc, char **argv)
 	for(x=0; x<argc; x++) {
 		tupid_t dt;
 		struct path_element *pel = NULL;
+		struct timespec mtime = {-1, 0};
 
 		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0, 0);
 		if(dt <= 0) {
 			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
 			return -1;
 		}
-		if(create_name_file(dt, pel->path, -1, NULL) < 0) {
+		if(create_name_file(dt, pel->path, mtime, NULL) < 0) {
 			fprintf(stderr, "Unable to create node for '%s' in dir %lli\n", pel->path, dt);
 			return -1;
 		}
 		free_pel(pel);
-	}
-	if(tup_db_commit() < 0)
-		return -1;
-	return 0;
-}
-
-static int rm(int argc, char **argv)
-{
-	int x;
-	tupid_t sub_dir_dt;
-
-	if(tup_db_begin() < 0)
-		return -1;
-	sub_dir_dt = get_sub_dir_dt();
-	if(sub_dir_dt < 0)
-		return -1;
-
-	for(x=0; x<argc; x++) {
-		struct path_element *pel = NULL;
-		tupid_t dt;
-
-		dt = find_dir_tupid_dt(sub_dir_dt, argv[x], &pel, 0, 0);
-		if(dt < 0) {
-			fprintf(stderr, "Unable to find dir '%s' relative to %lli\n", argv[x], sub_dir_dt);
-			return -1;
-		}
-		if(pel) {
-			if(tup_file_del(dt, pel->path, pel->len, NULL) < 0)
-				return -1;
-			free_pel(pel);
-		}
 	}
 	if(tup_db_commit() < 0)
 		return -1;
@@ -1192,7 +1159,7 @@ static int fake_mtime(int argc, char **argv)
 {
 	struct tup_entry *tent;
 	struct tup_entry *dtent;
-	time_t mtime;
+	struct timespec mtime;
 	tupid_t dt;
 	tupid_t sub_dir_dt;
 	struct path_element *pel = NULL;
@@ -1219,7 +1186,7 @@ static int fake_mtime(int argc, char **argv)
 		fprintf(stderr, "Unable to find node '%.*s' in dir %lli\n", pel->len, pel->path, dt);
 		return -1;
 	}
-	mtime = strtol(argv[1], NULL, 0);
+	mtime.tv_sec = strtol(argv[1], NULL, 0);
 	if(tup_db_set_mtime(tent, mtime) < 0)
 		return -1;
 	free_pel(pel);

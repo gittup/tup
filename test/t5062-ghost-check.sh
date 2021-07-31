@@ -23,7 +23,8 @@
 # functionality to tup.
 
 . ./tup.sh
-tup touch foo
+touch foo
+tup scan
 tup_object_exist . foo
 
 tup ghost_check

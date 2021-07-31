@@ -22,14 +22,14 @@
 check_no_windows client
 
 make_tup_client
-tmkdir sub
+mkdir sub
 cd sub
 mv ../client .
 
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-tup touch Tupfile empty.txt
+touch Tupfile empty.txt
 update
 
 diff empty.txt ok.txt

@@ -50,7 +50,7 @@ cat > Tupfile << HERE
 : |> sh run.sh foo > %o |> out.txt
 : out.txt |> sh run.sh bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 config 3 1
 update_fail_msg "1 job failed" "Remaining nodes skipped due to errors in command execution"
 

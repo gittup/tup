@@ -19,9 +19,9 @@
 # Put a group in a different path.
 
 . ./tup.sh
-tmkdir sub
-tmkdir sub2
-tmkdir sub3
+mkdir sub
+mkdir sub2
+mkdir sub3
 cat > sub/Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B ../<foo-autoh>
 HERE

@@ -21,7 +21,7 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir build-default
+mkdir build-default
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -30,7 +30,7 @@ endif
 : |> if [ -f bar ]; then cat bar; else echo nofile; fi > %o |> output.txt
 HERE
 echo "" > build-default/tup.config
-tup touch Tupfile
+touch Tupfile
 update
 
 echo nofile | diff - build-default/output.txt
@@ -43,7 +43,7 @@ endif
 : |> echo foo > %o |> bar
 : bar |> if [ -f %f ]; then cat %f; else echo nofile; fi > %o |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 echo foo | diff - build-default/output.txt

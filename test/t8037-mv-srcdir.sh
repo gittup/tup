@@ -19,8 +19,8 @@
 # Try moving a src directory with a variant build.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

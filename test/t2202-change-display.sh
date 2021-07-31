@@ -29,7 +29,7 @@ update
 cat > Tupfile << HERE
 : |> false | echo foo > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update > .output.txt
 
 if ! grep 'false | echo foo > out.txt' .output.txt > /dev/null; then

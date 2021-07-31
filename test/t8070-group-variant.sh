@@ -20,9 +20,9 @@
 
 . ./tup.sh
 
-tmkdir sub
-tmkdir sub2
-tmkdir sub3
+mkdir sub
+mkdir sub2
+mkdir sub3
 cat > sub/Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B ../<foo-autoh>
 HERE
@@ -39,10 +39,10 @@ cat > sub3/foo.c << HERE
 #include "bar.h"
 HERE
 echo '#include "bar.h"' > sub3/bar.c
-tmkdir build
-tmkdir build2
-tup touch build/tup.config
-tup touch build2/tup.config
+mkdir build
+mkdir build2
+touch build/tup.config
+touch build2/tup.config
 update
 
 tup_dep_exist build/sub foo.h build/sub3 'gcc -c foo.c -o ../build/sub3/foo.o -I../build/sub3/../sub -I../build/sub3/../sub2'

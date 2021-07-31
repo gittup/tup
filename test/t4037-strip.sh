@@ -42,7 +42,7 @@ endif
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f && strip \$(stripflags) %o |> libfoo.a
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 update
 
 eotup

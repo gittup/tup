@@ -25,15 +25,15 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-tup touch foo.c
+touch foo.c
 update
 sym_check foo.o main
 
 echo "int main(void) {bork}" > foo.c
-tup touch foo.c
+touch foo.c
 update_fail
 
-tup touch Tupfile
+touch Tupfile
 if tup upd 2>&1 | grep 'gcc -c foo.c -o foo.o' > /dev/null; then
 	:
 else

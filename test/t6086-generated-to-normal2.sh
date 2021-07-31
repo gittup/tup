@@ -28,12 +28,12 @@ HERE
 cat > Tupfile << HERE
 : foreach in*.txt |> cp %f %o |> %B.out.txt
 HERE
-for i in `seq 1 8`; do tup touch in$i.txt; done
+for i in `seq 1 8`; do touch in$i.txt; done
 update
 
-for i in `seq 1 4`; do tup touch in$i.out.txt; done
+for i in `seq 1 4`; do touch in$i.out.txt; done
 echo "" > Tupfile
-tup touch Tupfile
+touch Tupfile
 update > .tup/output.txt
 
 if ! grep '0) rm: ' .tup/output.txt > /dev/null; then

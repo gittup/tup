@@ -44,7 +44,7 @@ cat > Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B
 : foreach *.c | <foo-autoh> |> gcc -c %f -o %o |> %B.o {objs}
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Missing input dependency"
 
 tup_dep_no_exist . 'foo.h' . '<foo-autoh>'
@@ -57,7 +57,7 @@ cat > Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B <foo-autoh>
 : foreach *.c | <foo-autoh> |> gcc -c %f -o %o |> %B.o {objs}
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_exist . 'foo.h' . '<foo-autoh>'

@@ -35,7 +35,7 @@ mkdir bar
 echo 'hey' > bar/ghost
 rm boo
 ln -s bar boo
-tup touch boo
+touch boo
 update
 echo 'hey' | diff - out.txt
 

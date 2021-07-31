@@ -30,7 +30,7 @@ include_rules
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 
-tup touch foo.c bar.c Tupfile Tuprules.tup
+touch foo.c bar.c Tupfile Tuprules.tup
 update
 
 if [ ! -f .gitignore ]; then
@@ -46,7 +46,6 @@ gitignore_good bar.o .gitignore
 gitignore_good prog.exe .gitignore
 
 rm -f bar.c
-tup rm bar.c
 update
 
 gitignore_bad foo.c .gitignore

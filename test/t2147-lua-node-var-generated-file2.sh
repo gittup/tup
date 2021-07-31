@@ -25,13 +25,13 @@ cat > Tupfile.lua << HERE
 tup.rule('touch a.txt', {'a.txt'})
 HERE
 
-tup touch Tupfile.lua
+touch Tupfile.lua
 update
 
 cat > Tupfile.lua <<HERE
 node_var = tup.nodevariable 'a.txt'
 HERE
-tup touch Tupfile.lua
+touch Tupfile.lua
 update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

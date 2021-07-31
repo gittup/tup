@@ -31,17 +31,16 @@
 
 . ./tup.sh
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile <<HERE
 files-@(ARCH) = foo.c
 HERE
 varsetall ARCH=y
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 rm -rf foo
-# Don't 'tup rm' foo so the scan will pick up the removal
-tup touch tup.config
+touch tup.config
 update
 
 eotup

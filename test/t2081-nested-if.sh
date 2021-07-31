@@ -31,7 +31,7 @@ else
 : |> foo n |>
 endif
 HERE
-tup touch Tupfile
+touch Tupfile
 varsetall FOO=y BAR=y
 parse
 tup_object_exist . 'foo y'

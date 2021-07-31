@@ -28,19 +28,19 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir build
-tmkdir build-debug
+mkdir build
+mkdir build-debug
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> echo "generated" > %o |> gen
 HERE
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : ../sub/gen |> cat %f > %o |> output.txt
 HERE
 
-tmkdir foo2
+mkdir foo2
 cat > foo2/Tupfile << HERE
 : |> if [ -f ../sub/normal ]; then cat ../sub/normal; else echo nofile; fi > %o |> output.txt
 HERE
@@ -48,7 +48,7 @@ HERE
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
 echo "normal" > sub/normal
-tup touch build/tup.config build-debug/tup.config sub/Tupfile foo/Tupfile foo2/Tupfile
+touch build/tup.config build-debug/tup.config sub/Tupfile foo/Tupfile foo2/Tupfile
 
 update
 
@@ -61,11 +61,10 @@ rm -rf sub
 update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to '\[build.*\] foo'"
 
 # Make sure that if we try to re-parse the Tupfile we still get the same error message.
-tup touch foo/Tupfile
+touch foo/Tupfile
 update_fail_msg "Failed to find directory ID for dir '../sub/gen' relative to '\[build.*\] foo'"
 
 rm foo/Tupfile
-tup rm foo/Tupfile
 update
 
 check_not_exist build/foo/output.txt

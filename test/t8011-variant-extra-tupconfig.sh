@@ -19,21 +19,21 @@
 # Make sure a tup.config not at a top-level doesn't create a new variant.
 . ./tup.sh
 
-tmkdir build
-tmkdir build2
-tmkdir build2/debug
+mkdir build
+mkdir build2
+mkdir build2/debug
 
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build2/debug/tup.config
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 ifeq (@(DEBUG),y)
 : foo.c |> cp %f %o |> foo
 endif
 : foo.c |> cp %f %o |> bar
 HERE
-tup touch build/tup.config build2/debug/tup.config sub/Tupfile sub/foo.c
+touch build/tup.config build2/debug/tup.config sub/Tupfile sub/foo.c
 update
 
 check_not_exist build2/debug/sub

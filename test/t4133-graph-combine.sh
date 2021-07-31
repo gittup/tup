@@ -26,12 +26,12 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |> out1.txt out2.txt out3.txt
 HERE
-tup touch in1.txt in2.txt Tupfile
+touch in1.txt in2.txt
 update
 
 tup graph . --combine > ok.dot
 # 3 in files is in1.txt, in2.txt, ok.sh
-gitignore_good 'node.*in.*3 files' ok.dot
+gitignore_good 'node.*\(in\|ok.sh\).*3 files' ok.dot
 gitignore_good 'node.*out.*3 files' ok.dot
 
 eotup

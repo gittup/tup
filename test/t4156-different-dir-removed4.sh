@@ -21,8 +21,8 @@
 
 . ./tup.sh
 
-tmkdir obj
-tmkdir obj/bar
+mkdir obj
+mkdir obj/bar
 cat > obj/bar/Tupfile << HERE
 : |> echo hey > %o |> ../aaa/baz.txt
 : |> echo yo > %o |> foo.txt

@@ -21,8 +21,8 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir build-debug
-tmkdir configs
+mkdir build-debug
+mkdir configs
 
 touch build-debug/foo
 

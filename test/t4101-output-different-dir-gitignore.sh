@@ -21,7 +21,7 @@
 
 . ./tup.sh
 
-tmkdir foo
+mkdir foo
 cat > Tupfile << HERE
 : |> echo hey > %o |> foo/bar.txt
 HERE
@@ -31,7 +31,7 @@ cat > foo/Tupfile << HERE
 .gitignore
 : |> echo foo > %o |> baz.txt
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 gitignore_good baz.txt foo/.gitignore

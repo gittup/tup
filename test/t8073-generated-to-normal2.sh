@@ -29,14 +29,14 @@ cat > Tupfile << HERE
 : |> echo generated > %o |> genfile.txt
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 
 cat > Tupfile << HERE
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
 echo 'manual' > genfile.txt
-tup touch genfile.txt Tupfile
+touch genfile.txt Tupfile
 update
 
 echo 'manual' | diff - build/output.txt

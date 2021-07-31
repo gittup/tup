@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 .gitignore
 : |> touch %o |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 gitignore_good foo .gitignore
@@ -33,7 +33,7 @@ gitignore_good foo .gitignore
 cat > Tupfile << HERE
 : |> touch %o |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 check_not_exist .gitignore

@@ -20,17 +20,15 @@
 
 . ./tup.sh
 check_no_windows symlink
-tmkdir sub
+mkdir sub
 ln -s ghost sub/foo
 cat > sub/Tupfile << HERE
 : |> cat foo 2> /dev/null || true |>
 HERE
-tup touch sub/foo sub/Tupfile
 update
 tup_object_exist sub ghost foo
 
 rm -f sub/foo sub/Tupfile
-tup rm sub/foo sub/Tupfile
 update
 tup_object_no_exist sub ghost foo
 

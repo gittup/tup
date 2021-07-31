@@ -19,12 +19,11 @@
 # Try to move a directory, then move it back to the original directory.
 
 . ./tup.sh
-tmkdir a
-tmkdir a/a2
+mkdir a
+mkdir a/a2
 cp ../testTupfile.tup a/a2/Tupfile
 
 echo "int main(void) {return 0;}" > a/a2/foo.c
-tup touch a/a2/foo.c a/a2/Tupfile
 update
 tup_object_exist . a
 tup_object_exist a a2
@@ -34,14 +33,13 @@ sym_check a/a2/prog.exe main
 
 # Move directory a to b
 mv a b
-tup rm a
-tup touch b b/a2 b/a2/foo.c b/a2/Tupfile
+tup scan
 # And back
 mv b a
-tup rm b
-tup touch a a/a2 a/a2/foo.c a/a2/Tupfile
 # TODO: Replace with --overwrite-outputs
-update --no-scan
+update_fail_msg "Attempting to insert 'foo.o'"
+rm a/a2/foo.o a/a2/prog.exe
+update
 tup_object_exist . a
 tup_object_exist a a2
 tup_object_exist a/a2 foo.c foo.o prog.exe 'gcc -c foo.c -o foo.o' 'gcc foo.o -o prog.exe'

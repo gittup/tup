@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc %f -o %o |> prog.exe
 HERE
-tup touch foo.c bar.c baz.c foo.h
+touch foo.c bar.c baz.c foo.h
 echo "int main(void) {return 0;}" > foo.c
 echo "#include \"foo.h\"" > bar.c
 echo "#include \"foo.h\"" > baz.c

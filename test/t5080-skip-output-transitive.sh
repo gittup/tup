@@ -41,7 +41,7 @@ update
 cat > ok1.sh << HERE
 echo blah
 HERE
-tup touch ok1.sh
+touch ok1.sh
 update_fail_msg "Missing input dependency"
 
 eotup

@@ -21,11 +21,11 @@
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/lib
-tmkdir sw/app
-tmkdir sw/app/core
-tmkdir sw/test
+mkdir sw
+mkdir sw/lib
+mkdir sw/app
+mkdir sw/app/core
+mkdir sw/test
 
 cat > sw/Tuprules.tup << HERE
 &lib_tupfile = lib/Tupfile
@@ -64,7 +64,7 @@ vars += test
 : |> !vars |> test.txt
 HERE
 
-tup touch sw/Tuprules.tup sw/lib/Tupfile sw/app/Tuprules.tup sw/app/core/Tupfile sw/test/Tupfile
+touch sw/Tuprules.tup sw/lib/Tupfile sw/app/Tuprules.tup sw/app/core/Tupfile sw/test/Tupfile
 update
 
 tup_dep_exist sw/lib 'echo sw lib > lib.txt' sw/lib lib.txt

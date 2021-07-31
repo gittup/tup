@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : |> sh ok1.sh |> output.txt
 : |> sh ok2.sh |> output2.txt | <bar>
 HERE
-tup touch ok1.sh ok2.sh Tupfile
+touch ok1.sh ok2.sh Tupfile
 update
 
 cat > ok1.sh << HERE
@@ -37,7 +37,7 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok1.sh |> output.txt output2.txt
 HERE
-tup touch ok1.sh Tupfile
+touch ok1.sh Tupfile
 update
 
 echo 'touch output.txt' > ok1.sh
@@ -46,7 +46,7 @@ cat > Tupfile << HERE
 : |> sh ok1.sh |> output.txt | <bar>
 : |> sh ok2.sh |> output2.txt | <bar>
 HERE
-tup touch ok1.sh ok2.sh Tupfile
+touch ok1.sh ok2.sh Tupfile
 update
 
 eotup

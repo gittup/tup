@@ -23,13 +23,13 @@
 cat > Tupfile << HERE
 : foreach *.txt |> !tup_ln |> %B.lnk
 HERE
-tup touch foo.txt bar.txt
+touch foo.txt bar.txt
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.txt |> !tup_ln |> %B.lnk
 HERE
-tup touch sub/baz.txt sub/blah.txt
+touch sub/baz.txt sub/blah.txt
 update
 
 tup_dep_exist . "$(tup_ln_cmd foo.txt foo.lnk)" . foo.lnk

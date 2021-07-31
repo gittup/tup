@@ -19,12 +19,12 @@
 # Make sure we can't use files from outside of the variant when parsing lua.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile.lua << HERE
 tup.include '../foo.lua'
 HERE
-tup touch Tupfile.lua foo.lua build/tup.config
+touch Tupfile.lua foo.lua build/tup.config
 update_fail_msg "Unable to include file '../foo.lua' since it is outside of the variant tree"
 
 eotup

@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> echo 'foo' > %o; echo yo > bar |> file1
 HERE
-tup touch bar Tupfile
+touch bar Tupfile
 # Windows fails with 'Unspecified output files'
 update_fail_msg "\(tup error: Unable to truncate\|Unspecified output files\)"
 

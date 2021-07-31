@@ -19,20 +19,20 @@
 # Try a variant with a ghost in the variant dir.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 : sub/input.h |> cp %f %o |> output.h
 HERE
 echo "CONFIG_FOO=y" > build/tup.config
-tup touch build/tup.config Tupfile sub/input.h
+touch build/tup.config Tupfile sub/input.h
 
 update
 check_exist build/output.h
 
 # Make sure we can still parse now that input.h is a ghost in build/sub/
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

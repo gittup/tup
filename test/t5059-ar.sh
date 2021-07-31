@@ -27,12 +27,11 @@ cat > Tupfile << HERE
 HERE
 echo "void foo(void) {}" > foo.c
 echo "void bar(void) {}" > bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 update
 sym_check lib.a foo bar
 
 rm foo.c
-tup rm foo.c
 update
 sym_check lib.a ^foo bar
 

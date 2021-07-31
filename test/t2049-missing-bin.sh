@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : {objs} |> gcc %f -o %o |> prog
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "Unable to find bin 'objs'"
 
 eotup

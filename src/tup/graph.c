@@ -225,7 +225,7 @@ int create_graph(struct graph *g, enum TUP_NODE_TYPE count_flags)
 	root_entry.dt = 0;
 	root_entry.parent = NULL;
 	root_entry.type = TUP_NODE_ROOT;
-	root_entry.mtime = -1;
+	root_entry.mtime = INVALID_MTIME;
 	root_entry.name.len = strlen(root_name);
 	root_entry.name.s = root_name;
 	RB_INIT(&root_entry.entries);
@@ -304,10 +304,10 @@ static int make_edge(struct graph *g, struct node *n)
 			n->counted = 1;
 			g->num_nodes++;
 			if(g->total_mtime != -1) {
-				if(n->tent->mtime == -1)
+				if(n->tent->mtime.tv_sec == -1)
 					g->total_mtime = -1;
 				else
-					g->total_mtime += n->tent->mtime;
+					g->total_mtime += n->tent->mtime.tv_sec;
 			}
 		}
 		expand_node(g, n);
@@ -781,8 +781,8 @@ static int prune_node(struct graph *g, struct node *n, int *num_pruned, enum gra
 
 		g->num_nodes--;
 		if(g->total_mtime != -1) {
-			if(n->tent->mtime != -1)
-				g->total_mtime -= n->tent->mtime;
+			if(n->tent->mtime.tv_sec != -1)
+				g->total_mtime -= n->tent->mtime.tv_sec;
 		}
 		(*num_pruned)++;
 		if(verbose) {

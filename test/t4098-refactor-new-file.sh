@@ -22,7 +22,7 @@
 
 update
 
-tup touch foo.txt
+touch foo.txt
 refactor
 
 eotup

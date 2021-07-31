@@ -21,20 +21,20 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir build
+mkdir build
 
 echo "" > build/tup.config
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> if [ -f ghost/foo ]; then cat ghost/foo; else echo nofile; fi > %o |> output.txt
 HERE
-tup touch build/tup.config sub/Tupfile
+touch build/tup.config sub/Tupfile
 update
 
 echo nofile | diff - build/sub/output.txt
 
-tmkdir sub/ghost
+mkdir sub/ghost
 echo hey > sub/ghost/foo
 update
 

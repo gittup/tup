@@ -32,7 +32,7 @@ cat > .gitignore << HERE
 ok.txt
 HERE
 cp .gitignore backup
-tup touch ok.txt
+touch ok.txt
 update
 
 gitignore_good ok.txt .gitignore
@@ -43,7 +43,7 @@ cat > Tupfile << HERE
 .gitignore
 : |> touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 gitignore_good ok.txt .gitignore
@@ -55,7 +55,7 @@ gitignore_bad .gitignore .gitignore
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 gitignore_good ok.txt .gitignore

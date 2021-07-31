@@ -27,9 +27,9 @@ mkdir tuptest
 cd tuptest
 re_init
 
-tmkdir build
+mkdir build
 
-tup touch Tupfile.lua build/tup.config
+touch Tupfile.lua build/tup.config
 update
 
 eotup

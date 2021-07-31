@@ -20,7 +20,7 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 sym_check foo.o foo
 sym_check prog.exe foo
@@ -30,7 +30,6 @@ tup_object_exist . foo.o
 tup_object_exist . prog.exe
 
 rm Tupfile
-tup rm Tupfile
 update
 
 check_not_exist foo.o prog.exe

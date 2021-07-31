@@ -20,16 +20,16 @@
 # variants.
 . ./tup.sh
 
-tmkdir build1
-tmkdir build2
+mkdir build1
+mkdir build2
 
-tup touch build1/tup.config
+touch build1/tup.config
 update
 
 check_exist build1/build2
 check_not_exist build2/build1
 
-tup touch build2/tup.config
+touch build2/tup.config
 update
 
 check_not_exist build1/build2

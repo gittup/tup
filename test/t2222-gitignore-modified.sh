@@ -29,8 +29,8 @@ update
 
 gitignore_good foo .gitignore
 
-tup touch .gitignore
-tup touch Tupfile
+touch .gitignore
+touch Tupfile
 parse > .tup/output.txt 2>&1
 
 if grep 'generated -> normal: .gitignore' .tup/output.txt > /dev/null; then

@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : |> echo blah > %o; touch bar |> foo.h | bar
 HERE
 
-tup touch Tupfile
+touch Tupfile
 parse
 tup_dep_exist . "echo blah > foo.h; touch bar" . foo.h
 tup_dep_exist . "echo blah > foo.h; touch bar" . bar
@@ -33,7 +33,7 @@ update
 cat > Tupfile << HERE
 : |> echo blah > %o; touch bar |> foo.h
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 
 tup_dep_exist . "echo blah > foo.h; touch bar" . foo.h
@@ -43,7 +43,7 @@ update_fail_msg "File '.*bar' was written to"
 cat > Tupfile << HERE
 : |> echo blah > %o; touch bar |> foo.h | bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_exist . "echo blah > foo.h; touch bar" . foo.h

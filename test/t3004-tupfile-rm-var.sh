@@ -20,7 +20,7 @@
 # dependency on the directory.
 
 . ./tup.sh
-tmkdir tmp
+mkdir tmp
 cat > tmp/Tupfile << HERE
 file-y = foo.c
 file-@(BAR) += bar.c
@@ -28,7 +28,7 @@ file-@(BAR) += bar.c
 HERE
 echo hey > tmp/foo.c
 echo yo > tmp/bar.c
-tup touch tmp/foo.c tmp/bar.c tmp/Tupfile
+touch tmp/foo.c tmp/bar.c tmp/Tupfile
 varsetall BAR=y
 update
 tup_object_exist tmp foo.c bar.c
@@ -40,7 +40,7 @@ cat > tmp/Tupfile << HERE
 file-y = foo.c
 : foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
-tup touch tmp/Tupfile
+touch tmp/Tupfile
 update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"

@@ -22,7 +22,7 @@ check_no_windows fuse
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile foo.c
+touch Tupfile foo.c
 cat > run.py << HERE
 import sh
 sh.tup('upd')

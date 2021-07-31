@@ -28,13 +28,13 @@ new-%: %
 	tup link "cp \$< \$@" -i\$< -o\$@
 HERE
 
-tup touch file1 file2 Makefile
+touch file1 file2 Makefile
 update
 check_exist new-file1 new-file2
 
 rm new-file1 new-file2
 
-tup touch file1
+touch file1
 
 update
 check_exist new-file1 new-file2

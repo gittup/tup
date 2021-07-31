@@ -19,13 +19,13 @@
 # Make sure removing the source file means the variant copy is deleted.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : |> touch %o |> gen.txt
 HERE
-tup touch Tupfile file.html file2.html build/tup.config
+touch Tupfile file.html file2.html build/tup.config
 update
 
 check_exist build/file.html build/file2.html build/gen.txt

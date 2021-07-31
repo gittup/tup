@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 : foreach foo.c |> gcc -c %f -o %o |> %o
 HERE
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update_fail_msg "%o can only be used in a command string"
 
 eotup

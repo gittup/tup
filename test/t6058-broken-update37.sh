@@ -36,7 +36,7 @@ echo 'this is B' > b.txt
 cat > Tupfile << HERE
 : foreach *.txt |> cp %f %o |> %B.out
 HERE
-tup touch Tupfile a.txt b.txt
+touch Tupfile a.txt b.txt
 update
 
 echo 'this is A' | diff - a.out

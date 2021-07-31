@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : foreach *.c |> echo gcc -c %f -o %o |> foo.o
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 update_fail
 
 eotup

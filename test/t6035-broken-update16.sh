@@ -37,7 +37,7 @@ obj-@(OK) += bar.c
 : foreach \$(obj-y) |> gcc -c %f -o %o |> %B.o
 HERE
 echo 'bork' > bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 varsetall OK=y
 update_fail -j2
 

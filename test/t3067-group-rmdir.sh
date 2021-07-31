@@ -19,8 +19,8 @@
 # Delete the directory that contains an active group
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : ../bar/<group> |> cp ../bar/file.txt %o |> copy.txt
 HERE
@@ -32,7 +32,7 @@ update
 rm -rf bar
 tup scan
 
-tmkdir bar
+mkdir bar
 cat > bar/Tupfile << HERE
 : |> echo hey > %o |> file.txt | <group>
 HERE

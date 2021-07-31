@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : |> touch baz |> baz
 : |> echo baz |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
@@ -33,7 +33,7 @@ cat > Tupfile << HERE
 : |> touch baz |> baz
 : bar baz |> echo baz |>
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to add a new input link: bar"
 refactor_fail_msg "Attempting to add a new input link: baz"
 

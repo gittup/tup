@@ -39,7 +39,7 @@ cat > ok.sh << HERE
 echo stringa > a/out.txt
 echo bstring > b/out.txt
 HERE
-tup touch ok.sh
+touch ok.sh
 update > .output.txt
 
 gitignore_bad stringa .output.txt
@@ -57,7 +57,7 @@ cat > Tupfile << HERE
 : b/out.txt |> cat b/out.txt |>
 : c/out.txt |> cat c/out.txt |>
 HERE
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update > .output.txt
 
 gitignore_bad stringa .output.txt

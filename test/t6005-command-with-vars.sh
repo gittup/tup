@@ -30,7 +30,7 @@ EXE = prog.exe
 HERE
 
 echo "int main(void) {} void foo(void) {}" > foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 sym_check foo.o foo
 sym_check prog.exe foo

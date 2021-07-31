@@ -22,13 +22,13 @@
 cat > Tupfile << HERE
 : |> touch %o |> bar bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "The output file 'bar' is listed multiple times in a command"
 
 cat > Tupfile << HERE
 : |> touch %o |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 
 update
 

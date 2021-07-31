@@ -30,7 +30,7 @@ cat > build.lua << HERE
 files += 'foo.c'
 tup.foreach_rule(files, '\$(CC) \$(CFLAGS) -c %f -o %o', '%B.o')
 HERE
-tup touch foo.c
+touch foo.c
 update
 
 tup_object_exist . 'gcc -DFOO -DBAR -DBAZ -c foo.c -o foo.o'

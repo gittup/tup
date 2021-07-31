@@ -35,7 +35,7 @@ cat > Tupfile << HERE
 export FOO
 : |> sh ok.sh > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 echo 'foo is hey' | diff - out.txt
 
@@ -47,7 +47,7 @@ cat > Tupfile << HERE
 export FOO
 : |> ^ run script > %o^ sh ok.sh > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 echo 'foo is yo' | diff - out.txt
 
@@ -58,7 +58,7 @@ tup_dep_exist $ FOO . 'sh ok.sh > out.txt'
 cat > Tupfile << HERE
 : |> ^ run script > %o^ sh ok.sh > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 echo 'foo is ' | diff - out.txt
 

@@ -21,18 +21,18 @@
 . ./tup.sh
 check_no_windows client
 
-tmkdir build
+mkdir build
 touch build/tup.config
 
 make_tup_client
-tmkdir sub
+mkdir sub
 cd sub
 mv ../client .
 
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-tup touch Tupfile empty.txt
+touch Tupfile empty.txt
 update
 
 diff empty.txt ../build/sub/ok.txt
@@ -41,7 +41,7 @@ tup_object_exist build/tup.config defg
 
 cd ..
 echo "CONFIG_defg=hey" > build/tup.config
-tup touch build/tup.config
+touch build/tup.config
 update
 
 cd sub

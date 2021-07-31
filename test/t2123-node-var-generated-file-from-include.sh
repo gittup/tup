@@ -22,7 +22,7 @@
 . ./tup.sh
 check_no_windows slashes
 
-tmkdir lib
+mkdir lib
 
 cat > lib/Tupfile << HERE
 : |> touch %o |> lib.a
@@ -38,7 +38,7 @@ include &(lib)
 : foreach \$(static_libs) |> cp %f %o |> %b.copy
 HERE
 
-tup touch Tupfile lib/Tupfile lib/lib.tup
+touch Tupfile lib/Tupfile lib/lib.tup
 update
 
 tup_dep_exist lib lib.a . 'cp lib/lib.a lib.a.copy'

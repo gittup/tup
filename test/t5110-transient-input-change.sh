@@ -37,7 +37,7 @@ echo 'foo' | diff - bar.txt
 cat > run.sh << HERE
 echo bar > in.txt
 HERE
-tup touch run.sh
+touch run.sh
 update
 
 check_not_exist tmp.txt

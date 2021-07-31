@@ -19,8 +19,8 @@
 # Make sure we can create a new variant.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > sub/Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -29,7 +29,7 @@ endif
 : |> touch %o |> bar
 HERE
 echo "" > build/tup.config
-tup touch build/tup.config sub/Tupfile
+touch build/tup.config sub/Tupfile
 
 update
 check_exist build/sub/bar
@@ -38,9 +38,9 @@ check_not_exist build-debug
 
 update
 
-tmkdir build-debug
+mkdir build-debug
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-tup touch build-debug/tup.config
+touch build-debug/tup.config
 update
 check_exist build-debug/sub/bar
 check_exist build-debug/sub/foo

@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : |> echo "lib list:"&(libs) > %o |> out.txt
 HERE
 
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_exist . 'echo "lib list:" > out.txt'

@@ -47,7 +47,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len,
 				   const char *display, int displaylen, const char *flags, int flagslen,
 				   enum TUP_NODE_TYPE type,
-				   time_t mtime, tupid_t srcid);
+				   struct timespec mtime, tupid_t srcid);
 static int rm_entry(tupid_t tupid, int safe);
 static int resolve_parent(struct tup_entry *tent);
 static int change_name(struct tup_entry *tent, const char *new_name);
@@ -266,7 +266,7 @@ int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 
 int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
-			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
+			 enum TUP_NODE_TYPE type, struct timespec mtime, tupid_t srcid,
 			 struct tup_entry **dest)
 {
 	struct tup_entry *tent;
@@ -282,7 +282,7 @@ int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *nam
 }
 
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
+		      struct timespec mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
 		      struct tup_entry **dest)
 {
 	struct tup_entry *tent;
@@ -438,7 +438,7 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 				   const char *name, int len,
 				   const char *display, int displaylen, const char *flags, int flagslen,
 				   enum TUP_NODE_TYPE type,
-				   time_t mtime, tupid_t srcid)
+				   struct timespec mtime, tupid_t srcid)
 {
 	struct tup_entry *tent;
 

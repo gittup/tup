@@ -20,11 +20,11 @@
 # all sub-directories.
 
 . ./tup.sh
-tmkdir sub
-tmkdir sub/a
-tmkdir sub/b
-tmkdir sub/b/b2
-tmkdir sub/c
+mkdir sub
+mkdir sub/a
+mkdir sub/b
+mkdir sub/b/b2
+mkdir sub/c
 
 cat > Tupdefault.lua << HERE
 tup.rule('echo top')

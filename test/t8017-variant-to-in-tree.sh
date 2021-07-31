@@ -19,8 +19,8 @@
 # Make sure we can go from a variant to in-tree build with a tup.config
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 .gitignore
@@ -35,7 +35,7 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo 'CONFIG_FOO=y' > build/tup.config
-tup touch Tupfile foo.c sub/bar.c build/tup.config
+touch Tupfile foo.c sub/bar.c build/tup.config
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe

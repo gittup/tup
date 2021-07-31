@@ -33,7 +33,7 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> tmp.txt
 : tmp.txt |> cp %f %o |> bar.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist tmp.txt
@@ -42,7 +42,7 @@ cat > Tupfile << HERE
 : |> ^t^ echo foo > %o |> tmp.txt
 : tmp.txt |> cp %f %o |> bar.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 check_not_exist tmp.txt

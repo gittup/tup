@@ -21,9 +21,9 @@
 . ./tup.sh
 check_no_windows slashes
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
+mkdir sw
+mkdir sw/toolkit
+mkdir sw/app
 
 cat > sw/Tuprules.tup << HERE
 &toolkit_lib = toolkit/toolkit.a
@@ -34,9 +34,9 @@ include_rules
 : &(toolkit_lib) |> cp %f %o |> %B.copy
 HERE
 
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile
+touch sw/Tuprules.tup
+touch sw/toolkit/toolkit.a
+touch sw/app/Tupfile
 update
 
 tup_dep_exist sw/toolkit toolkit.a sw/app 'cp ../toolkit/toolkit.a toolkit.copy'

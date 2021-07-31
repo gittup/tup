@@ -49,7 +49,7 @@ HERE
 echo 'int main(void) {return 0;}' > foo.c
 echo 'void bar1(void) {}' > bar1.c
 echo 'void bar2(void) {}' > bar2.c
-tup touch foo.c bar1.c bar2.c Tupfile.lua
+touch foo.c bar1.c bar2.c Tupfile.lua
 update
 
 tup_dep_exist . foo.c . 'gcc -c foo.c -o foo.o'

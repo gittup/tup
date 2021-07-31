@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 }
 HERE
 
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update_fail_msg "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged."
 
 eotup

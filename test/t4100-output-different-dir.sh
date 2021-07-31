@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmkdir foo
+mkdir foo
 cat > Tupfile << HERE
 : |> echo hey > %o |> foo/bar.txt
 HERE
@@ -28,7 +28,7 @@ update
 
 cat > foo/Tupfile << HERE
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 check_exist foo/bar.txt

@@ -20,9 +20,9 @@
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
+mkdir sw
+mkdir sw/toolkit
+mkdir sw/app
 
 cat > sw/Tuprules.tup << HERE
 &toolkit_lib = toolkit/toolkit.a
@@ -34,9 +34,9 @@ include_rules
 : &(toolkit_lib) |> cp %f %o |> %B.copy
 HERE
 
-tup touch sw/Tuprules.tup
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile sw/app/app.a
+touch sw/Tuprules.tup
+touch sw/toolkit/toolkit.a
+touch sw/app/Tupfile sw/app/app.a
 update
 
 tup_dep_exist sw/app app.a sw/app 'cp app.a app.copy'

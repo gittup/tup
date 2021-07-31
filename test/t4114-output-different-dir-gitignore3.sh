@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : foreach *.c |> gcc -c %f -o %o |> sub/%B.o
 HERE
-tup touch foo.c bar.c
+touch foo.c bar.c
 update
 
 gitignore_good foo.o .gitignore

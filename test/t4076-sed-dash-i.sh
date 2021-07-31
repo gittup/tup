@@ -38,7 +38,7 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |> foo.txt foo.txt.tmp
 HERE
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 
 eotup

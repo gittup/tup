@@ -34,7 +34,7 @@ int main(void)
 	return 0;
 }
 HERE
-tup touch segfault.c Tupfile
+touch segfault.c Tupfile
 update_fail_msg "Segmentation fault"
 tup_dep_exist . segfault.c . 'gcc segfault.c -o tup_t5014_segfault'
 tup_dep_exist . 'gcc segfault.c -o tup_t5014_segfault' . tup_t5014_segfault

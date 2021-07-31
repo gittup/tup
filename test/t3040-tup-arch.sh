@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> echo @(TUP_ARCH) |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 
 # Could validate other cpu architectures here if desired - not really necessary.

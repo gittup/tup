@@ -21,9 +21,9 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir sub
-tmkdir sub/foo
-tmkdir sub/foo/configs
+mkdir sub
+mkdir sub/foo
+mkdir sub/foo/configs
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -36,7 +36,7 @@ echo "" > sub/foo/configs/default
 cd sub/foo
 tup variant configs/*
 cd ../..
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist build-default/bar
@@ -49,7 +49,7 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > sub/foo/configs/debug
-tup touch sub/foo/configs/debug
+touch sub/foo/configs/debug
 update
 
 check_exist build-default/bar

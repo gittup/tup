@@ -20,7 +20,7 @@
 . ./tup.sh
 check_no_windows run-script
 
-tmkdir sub
+mkdir sub
 cat > sub/gen.sh << HERE
 #! /bin/sh
 for i in *.c; do
@@ -35,7 +35,7 @@ HERE
 cat > Tupfile << HERE
 include sub/inc.tup
 HERE
-tup touch Tupfile sub/inc.tup sub/gen.sh foo.c bar.c
+touch Tupfile sub/inc.tup sub/gen.sh foo.c bar.c
 update
 
 check_exist foo.o bar.o

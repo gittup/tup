@@ -19,7 +19,7 @@
 # Make sure gitignore files work properly in variants.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 touch build/tup.config
 
 cat > Tupfile << HERE
@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : |> touch %o |> foo.txt
 HERE
 
-tmkdir bar
+mkdir bar
 cat > bar/Tupfile << HERE
 .gitignore
 : |> touch %o |> bar.txt

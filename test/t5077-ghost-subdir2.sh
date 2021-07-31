@@ -20,20 +20,20 @@
 # initial compilation.
 . ./tup.sh
 
-tmkdir b
+mkdir b
 echo 'int x;' > b/foo.h
 echo '#include "foo.h"' > ok.c
 
 cat > Tupfile << HERE
 : ok.c |> gcc -c %f -o %o -Ia -Ib |> ok.o
 HERE
-tup touch b/foo.h ok.c Tupfile
+touch b/foo.h ok.c Tupfile
 update
 
 tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'
 sym_check ok.o x
 
-tmkdir a
+mkdir a
 echo 'int y;' > a/foo.h
 update
 

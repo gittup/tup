@@ -30,7 +30,7 @@
 # real error is that libfoo.a is not specified as an input.
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o {objs}
 : {objs} |> ar crs %o %f |> libfoo.a
@@ -39,7 +39,7 @@ cat > sub/lib.c << HERE
 int foo(void) {return 3;}
 HERE
 
-tup touch sub/Tupfile sub/lib.c
+touch sub/Tupfile sub/lib.c
 update
 
 cat > Tupfile << HERE
@@ -57,7 +57,7 @@ int main(void)
 }
 HERE
 
-tup touch Tupfile main.c
+touch Tupfile main.c
 
 case $tupos in
 	Darwin*)
@@ -78,7 +78,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : main.o | sub/libfoo.a |> gcc %f -o %o sub/libfoo.a |> prog.exe
 HERE
-tup touch sub/lib2.c Tupfile
+touch sub/lib2.c Tupfile
 update
 
 eotup

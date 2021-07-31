@@ -21,8 +21,8 @@
 . ./tup.sh
 check_windows
 
-tmkdir sub1
-tmkdir sub2
+mkdir sub1
+mkdir sub2
 cat > Tuprules.tup << HERE
 : foreach *.c |> ^ CC %f^ gcc -c %f -o %o |> %B.o
 HERE

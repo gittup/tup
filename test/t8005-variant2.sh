@@ -19,14 +19,14 @@
 # Try a variant with git.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : |> git describe > %o |> output.txt
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-tup touch build/tup.config Tupfile foo.c
+touch build/tup.config Tupfile foo.c
 
 git init
 git config user.email test@example.com

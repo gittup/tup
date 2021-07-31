@@ -20,8 +20,8 @@
 # aren't reading file entries from it.
 
 . ./tup.sh
-tmkdir sub
-tmkdir bar
+mkdir sub
+mkdir bar
 cat > sub/Tupfile << HERE
 : ../bar/<group> |> echo foo |>
 HERE
@@ -33,7 +33,7 @@ tup_dep_no_exist . bar . sub
 cat > sub/Tupfile << HERE
 : ../bar/<group> ../bar/*.c |> echo foo |>
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 update
 
 tup_dep_exist . bar . sub

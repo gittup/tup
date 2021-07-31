@@ -37,7 +37,7 @@ check_exist tmp.txt
 cat > run.sh << HERE
 cp tmp.txt bar.txt
 HERE
-tup touch run.sh
+touch run.sh
 update > .tup/tupoutput
 check_not_exist tmp.txt
 

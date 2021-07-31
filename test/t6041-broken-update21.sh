@@ -37,7 +37,7 @@ check_no_windows shell
 cat > Tupfile <<HERE
 : |> if [ -f output ]; then cat output; fi |> output
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Expected to write to file 'output'"
 
 tup_dep_no_exist . output . 'if [ -f output ]; then cat output; fi'

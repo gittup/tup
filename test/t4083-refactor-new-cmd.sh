@@ -23,14 +23,14 @@
 cat > Tupfile << HERE
 : |> echo foo |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> echo foo |>
 : |> echo bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to create a new command: echo bar"
 
 eotup

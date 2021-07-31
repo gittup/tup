@@ -24,8 +24,8 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> bar.txt
 HERE
 
-tmkdir sub
-tmkdir sub/dir
+mkdir sub
+mkdir sub/dir
 
 cat > sub/dir/Tupfile << HERE
 preload ../..

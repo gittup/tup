@@ -25,7 +25,6 @@ HERE
 (echo "#include \"foo.h\""; echo "int main(void) {}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
 echo "int marfx;" > foo.h
-tup touch foo.c bar.c foo.h
 update
 sym_check foo.o main marfx
 sym_check bar.o bar1 marfx
@@ -34,7 +33,6 @@ sym_check prog.exe main bar1
 # If we re-compile bar.c without the header, foo.h will have a dangling ref
 # to bar.o
 echo "void bar1(void) {}" > bar.c
-tup touch bar.c
 update
 sym_check bar.o bar1 ^marfx
 
@@ -51,7 +49,6 @@ tup_dep_no_exist . foo.h . "gcc -fcommon -c bar.c -o bar.o"
 
 # Make sure the foo.h->foo.o link still exists and wasn't marked obsolete for
 # some reason.
-tup touch foo.h
 update
 tup_dep_exist . foo.h . "gcc -fcommon -c foo.c -o foo.o"
 tup_dep_exist . "gcc -fcommon -c foo.c -o foo.o" . foo.o

@@ -30,7 +30,7 @@ endif
 
 : foreach \$(objs-y) |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 parse
 tup_object_exist . 'gcc -c foo.c -o foo.o'
 tup_object_exist . 'gcc -c bar.c -o bar.o'
@@ -58,7 +58,7 @@ tup_object_no_exist . 'gcc -c bar.c -o bar.o'
 cat > Tupfile << HERE
 : foreach \$(objs-y) |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_object_no_exist . 'gcc -c foo.c -o foo.o'
 tup_object_no_exist . 'gcc -c bar.c -o bar.o'

@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : {objs} foo.o |> gcc %f -o %o |> prog.exe
 HERE
 echo 'int main(void) {return 0;}' > foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 
 tup_object_exist . 'gcc foo.o -o prog.exe'

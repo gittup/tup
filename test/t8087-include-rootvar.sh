@@ -19,20 +19,20 @@
 # Try to use a _ROOT variable to include a file
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tuprules.tup << HERE
 GITTUP_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 include_rules
 include \$(GITTUP_ROOT)/lib/lib.tup
 : |> echo \$(CFLAGS) |>
 HERE
 
-tmkdir lib
+mkdir lib
 cat > lib/lib.tup << HERE
 CFLAGS += -I\$(TUP_CWD)
 CFLAGS += -I\$(TUP_VARIANTDIR)

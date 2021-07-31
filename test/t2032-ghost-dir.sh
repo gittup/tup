@@ -27,13 +27,13 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
 
-tmkdir secret
+mkdir secret
 echo 'alive' > secret/ghost
-tup touch secret/ghost
+touch secret/ghost
 update
 echo alive | diff output.txt -
 

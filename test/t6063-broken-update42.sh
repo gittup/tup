@@ -25,14 +25,14 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> gcc -c foo.c |> foo.o
 HERE
-tup touch Tupfile foo.c
+touch Tupfile foo.c
 update
 
 cat > Tupfile << HERE
 : |> if [ -f 'gcc -c foo.c' ]; then true; fi; touch out.txt |> out.txt
 : |> gcc -c foo.c |> foo.o
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "tup error: Attempted to read from a file with the same name.*gcc -c foo.c"
 
 eotup

@@ -20,8 +20,8 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir foo/sub
+mkdir foo
+mkdir foo/sub
 cat > Tupfile << HERE
 : |> touch %o |> foo/bar.txt
 HERE

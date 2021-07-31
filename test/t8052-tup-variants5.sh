@@ -20,7 +20,7 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir configs
+mkdir configs
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -31,7 +31,7 @@ HERE
 echo "CONFIG_DEBUG=y" > configs/debug
 echo "" > configs/default
 tup variant configs/*
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist build-default/bar
@@ -44,7 +44,7 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > configs/debug
-tup touch configs/debug
+touch configs/debug
 update
 
 check_exist build-default/bar

@@ -25,7 +25,7 @@ tup.definerule{command = 'touch a.txt', outputs = {'a.txt'}}
 node_var = tup.nodevariable 'a.txt'
 HERE
 
-tup touch Tupfile.lua
+touch Tupfile.lua
 update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

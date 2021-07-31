@@ -21,16 +21,16 @@
 
 . ./tup.sh
 
-tmkdir a
-tmkdir a/b
+mkdir a
+mkdir a/b
 cp ../testTupfile.tup a/b/Tupfile
 
 echo "int main(void) {}" > a/b/foo.c
-tup touch a/b/foo.c a/b/Tupfile
+touch a/b/foo.c a/b/Tupfile
 update
 sym_check a/b/prog.exe main
 
-tup touch a/b/foo.c
+touch a/b/foo.c
 cd a
 update
 

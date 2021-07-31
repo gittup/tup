@@ -23,9 +23,9 @@ check_no_windows run-script
 check_bash
 
 # Use a variant to make sure we don't get double directories
-tmkdir build
+mkdir build
 touch build/tup.config
-tmkdir sub
+mkdir sub
 touch sub/foo.txt
 touch bar.txt baz.txt
 

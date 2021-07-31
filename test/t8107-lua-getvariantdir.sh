@@ -19,8 +19,8 @@
 # Try tup.getvariantdir()
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile.lua << HERE
 headers = tup.rule('touch %o', {'foo.h'})
@@ -34,7 +34,7 @@ cat > foo.c << HERE
 #include "foo.h"
 #include "bar.h"
 HERE
-tup touch build/tup.config Tupfile.lua bar.h
+touch build/tup.config Tupfile.lua bar.h
 update
 
 eotup

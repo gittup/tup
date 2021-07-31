@@ -25,7 +25,7 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup graph . > ok.dot

@@ -25,15 +25,6 @@
 #include <errno.h>
 #include "tup/compat.h"
 
-#define WINDOWS_TICK 10000000
-#define SEC_TO_UNIX_EPOCH 11644473600LL
-
-static time_t filetime_to_epoch(FILETIME *ft)
-{
-	long long ticks = (((long long)ft->dwHighDateTime) << 32) + (long long)ft->dwLowDateTime;
-	return (time_t)(ticks / WINDOWS_TICK - SEC_TO_UNIX_EPOCH);
-}
-
 static dev_t stat_dev_for(const wchar_t *wpathname)
 {
 	DWORD len;
@@ -78,9 +69,9 @@ int win_lstat(const char *pathname, struct stat *buf)
 	buf->st_uid = 0;
 	buf->st_gid = 0;
 	buf->st_ino = 0;
-	buf->st_ctime = filetime_to_epoch(&data.ftCreationTime);
-	buf->st_mtime = filetime_to_epoch(&data.ftLastWriteTime);
-	buf->st_atime = filetime_to_epoch(&data.ftLastAccessTime);
+	buf->st_ctime = FILETIME_TO_TICKS(&data.ftCreationTime);
+	buf->st_mtime = FILETIME_TO_TICKS(&data.ftLastWriteTime);
+	buf->st_atime = FILETIME_TO_TICKS(&data.ftLastAccessTime);
 	buf->st_size = (((__int64)data.nFileSizeHigh) << 32) + (__int64)data.nFileSizeLow;
 
 	buf->st_mode = 0;

@@ -28,10 +28,10 @@ cat > Tupfile << HERE
 : foo.o |> gcc %f -o %o && touch blah |> foo.exe | blah
 HERE
 echo 'int main(void) {return 0;}' > foo.c
-tup touch Tupfile foo.c
+touch Tupfile foo.c
 update
 
-tup touch foo.c
+touch foo.c
 update foo.exe
 
 # Try again with an output that we don't specify (we update 'foo', so
@@ -41,10 +41,10 @@ cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o && touch blah |> foo.o | blah
 : foo.o |> gcc %f -o %o |> foo.exe
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
-tup touch foo.c
+touch foo.c
 update foo.exe
 
 eotup

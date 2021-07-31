@@ -25,7 +25,7 @@ EXT_txt = out
 EXT_src = obj
 : foreach *.src *.txt |> cp %f %o |> %B.\$(EXT_%e)
 HERE
-tup touch foo.txt bar.txt baz.src
+touch foo.txt bar.txt baz.src
 update
 tup_object_exist . foo.out
 tup_object_exist . bar.out

@@ -24,8 +24,8 @@
 # TUP_NODE_DIR check from create_work().
 . ./tup.sh
 
-tmkdir dir1
-tmkdir dir2
+mkdir dir1
+mkdir dir2
 touch dir1/ok.in
 cat > Tupfile << HERE
 : dir2/ok.in |> cp %f %o |> %B.out

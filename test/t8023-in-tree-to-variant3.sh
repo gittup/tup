@@ -19,7 +19,7 @@
 # Go from in-tree to variant to in-tree to variant.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 .gitignore
@@ -28,7 +28,7 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 touch build/tup.config

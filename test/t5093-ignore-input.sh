@@ -29,7 +29,7 @@ cat ignoreghost 2>/dev/null
 cat real
 touch \$1
 HERE
-tup touch ignore real
+touch ignore real
 update
 
 tup_dep_exist . real . 'sh run.sh output.txt'

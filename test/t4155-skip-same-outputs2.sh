@@ -20,8 +20,8 @@
 
 . ./tup.sh
 
-tmkdir sub
-tmkdir sub/dir
+mkdir sub
+mkdir sub/dir
 cat > sub/dir/ok.sh << HERE
 echo stringa > a
 echo stringb > b
@@ -45,7 +45,7 @@ echo stringa > a
 echo stringb > b
 echo cstring > c
 HERE
-tup touch sub/dir/ok.sh
+touch sub/dir/ok.sh
 update > .output.txt
 
 gitignore_bad stringa .output.txt

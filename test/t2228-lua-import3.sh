@@ -29,7 +29,7 @@ else
 tup.rule('good')
 end
 HERE
-tup touch Tupfile.lua
+touch Tupfile.lua
 parse
 
 tup_object_exist . 'good'

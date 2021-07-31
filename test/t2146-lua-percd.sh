@@ -24,13 +24,13 @@ cat > Tupfile.lua << HERE
 tup.rule('echo %d')
 HERE
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile.lua << HERE
 tup.rule('echo %d')
 HERE
 
-tmkdir bar
-tmkdir bar/baz
+mkdir bar
+mkdir bar/baz
 cat > bar/Tupfile.lua << HERE
 tup.rule('echo %d')
 HERE

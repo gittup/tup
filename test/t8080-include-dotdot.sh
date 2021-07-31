@@ -19,12 +19,12 @@
 # Make sure we can't use files from outside of the variant when parsing.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 include ../foo.tup
 HERE
-tup touch Tupfile foo.tup build/tup.config
+touch Tupfile foo.tup build/tup.config
 update_fail_msg "Unable to include file '../foo.tup' since it is outside of the variant tree"
 
 eotup

@@ -26,7 +26,7 @@ for k, v in pairs(binaries) do
 	tup.rule('busybox', 'ln -s %f %o', v)
 end
 HERE
-tup touch busybox Tupfile.lua
+touch busybox Tupfile.lua
 update
 
 tup_dep_exist . 'ln -s busybox ar' . ar

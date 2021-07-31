@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 HERE
 echo "foo" > foo.txt
 echo "bar" > bar.txt
-tup touch Tupfile foo.txt bar.txt
+touch Tupfile foo.txt bar.txt
 update
 
 eotup

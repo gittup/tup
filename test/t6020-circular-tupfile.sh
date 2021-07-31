@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : foo/*.o |> gcc %f -o %o |> prog
 HERE
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : foreach ../*.c |> gcc -c %f -o %o |> %B.o
 HERE
@@ -34,7 +34,7 @@ cat > foo/ok.c << HERE
 int main(void) {return 0;}
 HERE
 
-tup touch Tupfile foo/Tupfile foo/ok.c
+touch Tupfile foo/Tupfile foo/ok.c
 update_fail
 
 eotup

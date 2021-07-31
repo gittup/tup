@@ -25,9 +25,9 @@ inputs = {'file1.ext', 'file2.ext', 'foo/file3.ext', 'file4.ext', 'foo/file5.ext
 outputs = {'out1', 'out2'}
 tup.rule(inputs, 'cmd %1f %3f %2o %1o %4B %5b', outputs)
 HERE
-tmkdir foo
-tup touch file1.ext file2.ext file4.ext
-tup touch foo/file3.ext foo/file5.ext
+mkdir foo
+touch file1.ext file2.ext file4.ext
+touch foo/file3.ext foo/file5.ext
 parse
 
 tup_object_exist . 'cmd file1.ext foo/file3.ext out2 out1 file4 file5.ext'

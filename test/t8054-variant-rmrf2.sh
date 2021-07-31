@@ -20,15 +20,15 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir sub
-tmkdir configs
-tmkdir build-default
-tmkdir build-debug
+mkdir sub
+mkdir configs
+mkdir build-default
+mkdir build-debug
 
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch build-default/tup.config build-debug/tup.config sub/Tupfile sub/foo.c sub/bar.c
+touch build-default/tup.config build-debug/tup.config sub/Tupfile sub/foo.c sub/bar.c
 
 update
 

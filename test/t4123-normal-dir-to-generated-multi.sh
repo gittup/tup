@@ -20,14 +20,14 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir foo/bar
-tmkdir foo/bar/baz
+mkdir foo
+mkdir foo/bar
+mkdir foo/bar/baz
 cat > Tupfile << HERE
 .gitignore
 : |> touch %o |> foo/bar/baz/gen.txt
 HERE
-tup touch foo/bar/baz/ok.txt
+touch foo/bar/baz/ok.txt
 update
 
 gitignore_bad foo .gitignore

@@ -30,7 +30,7 @@ cat > Tupfile << HERE
 : |> touch %o |> out.txt ^/ignore <group>
 : |> echo foo |> ^/ignore
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_no_exist ^ /ignore . '<group>'
@@ -38,7 +38,7 @@ tup_dep_no_exist ^ /ignore . '<group>'
 cat > Tupfile << HERE
 : |> echo foo |> ^/ignore
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_no_exist . '<group>'

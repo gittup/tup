@@ -23,8 +23,8 @@ cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 include_rules
 : foreach *.c |> gcc -c %f -o %o |> %B.o | \$(MY_ROOT)/<objs>
@@ -50,7 +50,7 @@ cat > Tupfile << HERE
 HERE
 
 # Same, but now we need the ../ path to get to the objs.
-tmkdir linked
+mkdir linked
 cat > linked/Tupfile << HERE
 include_rules
 : \$(MY_ROOT)/<objs> |> gcc %<objs> -o %o |> myprog.exe
@@ -60,8 +60,8 @@ update
 # Make sure if we add a new file to the group, the things using the group
 # are re-executed.
 echo 'int marfx;' > foo/newfoo.c
-tmkdir build
-tup touch foo/newfoo.c build/tup.config
+mkdir build
+touch foo/newfoo.c build/tup.config
 update
 
 sym_check build/myprog.exe marfx

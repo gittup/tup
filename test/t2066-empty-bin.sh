@@ -27,7 +27,7 @@ obj-@(FOO) += foo.c
 !ld.EMPTY = |> ar crs %o |>
 : {objs} |> !ld |> built-in.o
 HERE
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 varsetall FOO=y
 parse
 tup_object_exist . 'gcc -c foo.c -o foo.o'

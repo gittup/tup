@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : |> echo "\@hey" |>
 : |> echo "\@(hey" |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_exist . 'echo "\@hey"'

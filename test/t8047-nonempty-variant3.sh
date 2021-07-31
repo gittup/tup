@@ -19,13 +19,13 @@
 # Try to move the tup.config to a srcdir accidentally.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch build/tup.config sub/foo.c sub/bar.c
+touch build/tup.config sub/foo.c sub/bar.c
 update
 
 check_exist build/sub/foo.o build/sub/bar.o

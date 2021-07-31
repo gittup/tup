@@ -23,7 +23,7 @@
 
 . ./tup.sh
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : |> touch %o |> ok.txt
 HERE

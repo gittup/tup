@@ -19,10 +19,11 @@
 # Make sure ../.. doesn't get condensed to nothing.
 
 . ./tup.sh
-tmkdir foo
+mkdir foo
 cd foo
-tmkdir baz
+mkdir baz
 cd baz
+tup scan
 tup touch ../../bar.c
 tup touch ../baz/../../foo.c
 cd ../..

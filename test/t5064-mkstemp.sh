@@ -46,7 +46,7 @@ cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> prog
 : prog |> ./prog |> output
 HERE
-tup touch ok.c Tupfile
+touch ok.c Tupfile
 update
 
 tup_dep_exist . './prog' . output

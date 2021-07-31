@@ -26,7 +26,7 @@ file-@(BAR) += bar.c
 HERE
 echo hey > foo.c
 echo yo > bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"
@@ -36,7 +36,7 @@ cat > Tupfile << HERE
 file-y = foo.c
 : foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_exist . "cat foo.c > foo.o"

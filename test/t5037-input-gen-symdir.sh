@@ -24,18 +24,18 @@
 . ./tup.sh
 check_no_windows symlink
 
-tmkdir arch-x86
+mkdir arch-x86
 cat > Tupfile << HERE
 : |> ln -s arch-x86 %o |> arch
 HERE
-tup touch Tupfile arch-x86/foo.c
+touch Tupfile arch-x86/foo.c
 update
 
 cat > Tupfile << HERE
 : |> ln -s arch-x86 %o |> arch
 : arch/*.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "Unable to read from generated file.*arch"
 
 eotup

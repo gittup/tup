@@ -34,7 +34,7 @@ fi
 cat > Tupfile << HERE
 : |> echo text > %o |> OUTput.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 if ls | grep 'output.txt' > /dev/null; then

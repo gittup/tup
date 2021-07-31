@@ -24,14 +24,14 @@ cat > Tupfile << HERE
 HERE
 
 echo 'foo' > .hidden
-tmkdir yo
+mkdir yo
 mkdir yo/.hidden_dir
-tup touch yo/.hidden_dir
+touch yo/.hidden_dir
 echo 'bar' > yo/.hidden_dir/foo
 
-tup touch .hidden
-tup touch yo/.hidden_dir/foo
-tup touch Tupfile
+touch .hidden
+touch yo/.hidden_dir/foo
+touch Tupfile
 update
 tup_object_exist . .hidden
 tup_object_exist . 'cat .hidden'

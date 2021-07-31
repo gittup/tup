@@ -33,7 +33,7 @@ cat > foo.c << HERE
 int foo(void);
 int main(void) {return foo();}
 HERE
-tup touch foo.c lib.c Tupfile
+touch foo.c lib.c Tupfile
 update
 
 eotup

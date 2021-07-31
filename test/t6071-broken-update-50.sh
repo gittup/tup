@@ -24,7 +24,7 @@
 # should detect that it has an old group and prevent the double insertion.
 . ./tup.sh
 
-tmkdir a
+mkdir a
 cat > Tuprules.tup << HERE
 TOP = \$(TUP_CWD)
 !cc = |> gcc -c %f -o %o |> \$(TOP)/%B.o \$(TOP)/<group>
@@ -34,7 +34,7 @@ include_rules
 
 : foreach *.c |> !cc |>
 HERE
-tup touch a/foo.c
+touch a/foo.c
 update
 
 mv a b

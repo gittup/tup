@@ -360,7 +360,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 	if(tup_db_select_tent_part(new_dtent, pel->path, pel->len, &tent) < 0)
 		return -1;
 	if(!tent) {
-		time_t mtime = -1;
+		struct timespec mtime = INVALID_MTIME;
 		int type = TUP_NODE_GHOST;
 		if(full_deps && (pg.pg_flags & PG_OUTSIDE_TUP)) {
 			if(get_outside_tup_mtime(new_dtent, pel, &mtime) < 0)
@@ -378,7 +378,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 	free_pel(pel);
 	del_pel_group(&pg);
 
-	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR || tent->mtime == 0) {
+	if(tent->type == TUP_NODE_DIR || tent->type == TUP_NODE_GENERATED_DIR || tent->mtime.tv_sec == 0) {
 		/* We don't track dependencies on directory nodes for commands. Note that
 		 * some directory accesses may create ghost nodes as placeholders for the
 		 * directory until a real directory is created there (eg: t5077). In this
@@ -397,13 +397,16 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 
 #ifdef _WIN32
 #include <windows.h>
+
 #define WINDOWS_TICK 10000000
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 
-static unsigned filetime_to_epoch(FILETIME *ft)
+static struct timespec ticks_to_timespec(long long ticks)
 {
-        long long ticks = (((long long)ft->dwHighDateTime) << 32) + (long long)ft->dwLowDateTime;
-        return (unsigned)(ticks / WINDOWS_TICK - SEC_TO_UNIX_EPOCH);
+	struct timespec ts;
+	ts.tv_sec = ticks / WINDOWS_TICK - SEC_TO_UNIX_EPOCH;
+	ts.tv_nsec = ticks % WINDOWS_TICK * 100;
+	return ts;
 }
 
 static int file_set_mtime(struct tup_entry *tent, const char *file)
@@ -435,10 +438,16 @@ static int file_set_mtime(struct tup_entry *tent, const char *file)
 		fprintf(stderr, "tup error: GetFileAttributesExW(\"%ls\") failed: 0x%08lx\n", widefile, GetLastError());
 		return -1;
 	}
-	if(tup_db_set_mtime(tent, filetime_to_epoch(&data.ftLastWriteTime)) < 0)
+	if(tup_db_set_mtime(tent, ticks_to_timespec(FILETIME_TO_TICKS(&data.ftLastWriteTime))) < 0)
 		return -1;
 	return 0;
 }
+
+struct timespec win_mtime(struct stat *buf)
+{
+	return ticks_to_timespec(buf->st_mtime);
+}
+
 #else
 static int file_set_mtime(struct tup_entry *tent, const char *file)
 {

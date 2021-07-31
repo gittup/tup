@@ -21,7 +21,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > Tupfile << HERE
 : sub/foo.c |> echo %f |>
 : bork
@@ -30,13 +30,13 @@ cat > sub/Tupfile << HERE
 .gitignore
 : |> touch %o |> hey
 HERE
-tup touch Tupfile sub/Tupfile sub/foo.c
+touch Tupfile sub/Tupfile sub/foo.c
 update_fail_msg 'Error parsing Tupfile'
 
 cat > Tupfile << HERE
 : sub/foo.c |> echo %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

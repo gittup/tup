@@ -43,12 +43,12 @@ cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> tup_t5067_segfault2
 : tup_t5067_segfault2 |> ./%f |> tmp.txt
 HERE
-tup touch ok.c Tupfile
+touch ok.c Tupfile
 update_fail_msg "Segmentation fault"
 
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 check_not_exist tmp.txt tup_t5067_segfault2
 

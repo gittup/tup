@@ -27,14 +27,14 @@ cat > Tupfile << HERE
 : foo.txt |> cp %f %o |> bar.txt
 HERE
 echo 'orig' > foo.txt
-tup touch foo.txt Tupfile
+touch foo.txt Tupfile
 update
 
 check_exist foo.txt bar.txt
 
 # Just try to overwrite bar.txt - should be regenerated with the original text.
 echo 'new file' > bar.txt
-tup touch bar.txt
+touch bar.txt
 update
 
 echo orig | diff - bar.txt
@@ -43,7 +43,7 @@ echo orig | diff - bar.txt
 # with the new text.
 echo 'new file' > bar.txt
 echo "" > Tupfile
-tup touch bar.txt Tupfile
+touch bar.txt Tupfile
 update
 
 check_exist foo.txt bar.txt

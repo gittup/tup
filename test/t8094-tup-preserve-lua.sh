@@ -24,8 +24,8 @@ cat > Tupfile.lua << HERE
 tup.rule({'file.txt'}, '!tup_preserve')
 tup.rule('file.txt', 'bash gen.sh %f %o', 'out.txt')
 HERE
-tmkdir sub
-tmkdir sub/bar
+mkdir sub
+mkdir sub/bar
 cp Tupfile.lua sub/bar/Tupfile.lua
 cat > gen.sh << HERE
 (echo -n "generated "; cat \$1) > \$2
@@ -53,7 +53,7 @@ echo 'generated subdir content' | diff - build/sub/bar/out.txt
 
 # Make sure we can re-parse the Tupfile now that we have file.txt in the srcdir
 # and the build dir.
-tup touch Tupfile.lua sub/bar/Tupfile.lua
+touch Tupfile.lua sub/bar/Tupfile.lua
 update > .tup/.tupoutput
 if grep 'preserve file.txt' .tup/.tupoutput > /dev/null; then
 	cat .tup/.tupoutput

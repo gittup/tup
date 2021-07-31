@@ -19,18 +19,18 @@
 # Try to use a _ROOT variable from TUP_CWD with a generated file.
 . ./tup.sh
 
-tmkdir build-default
+mkdir build-default
 
 cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir init
+mkdir init
 cat > init/Tupfile << HERE
 : |> touch %o |> foo
 HERE
 
-tmkdir proj
+mkdir proj
 cat > proj/Tupfile << HERE
 include_rules
 : \$(MY_ROOT)/init/foo |> cat %f > %o |> out.txt

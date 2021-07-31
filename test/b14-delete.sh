@@ -2,7 +2,7 @@
 
 cp ../testTupfile.tup ./Tupfile
 for i in `seq 1 $1`; do echo "void foo$i(void) {}" > $i.c; done
-seq 1 $1 | sed 's/$/.c/' | xargs tup touch
+seq 1 $1 | sed 's/$/.c/' | xargs touch
 echo "int main(void) {}" >> 1.c
 tup upd
 if nm prog.exe | grep main > /dev/null; then
@@ -12,7 +12,6 @@ else
 	exit 1
 fi
 seq 1 $1 | sed 's/$/.c/' | xargs rm -f
-seq 1 $1 | sed 's/$/.c/' | xargs tup rm
 tup upd
 if [ -f prog.exe ]; then
 	echo "Main program not deleted!" 1>&2

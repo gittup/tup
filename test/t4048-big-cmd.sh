@@ -24,8 +24,8 @@ cat > Tupfile << HERE
 : *.txt |> ^ Misty cat^ cat %f > %o |> output.txt
 HERE
 filelist=`seq 1 2000 | awk '{print "hey"$1".txt"}'`
-tup touch $filelist
-tup touch Tupfile
+touch $filelist
+touch Tupfile
 update
 
 eotup

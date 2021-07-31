@@ -40,7 +40,7 @@ foo
 bar
 baz
 HERE
-tup touch data.txt
+touch data.txt
 update
 
 check_exist foo bar baz

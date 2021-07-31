@@ -29,7 +29,7 @@ cat bar
 cat baz
 touch output.txt
 HERE
-tup touch foo bar baz
+touch foo bar baz
 update
 
 tup_dep_exist . foo . 'sh run.sh'
@@ -39,7 +39,7 @@ tup_dep_exist . baz . 'sh run.sh'
 cat > Tupfile << HERE
 : |> sh run.sh |> output.txt ^/foo$
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_no_exist . foo . 'sh run.sh'
@@ -49,7 +49,7 @@ tup_dep_exist . baz . 'sh run.sh'
 cat > Tupfile << HERE
 : |> sh run.sh |> output.txt ^/foo$ ^/ba
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_no_exist . foo . 'sh run.sh'
@@ -59,7 +59,7 @@ tup_dep_no_exist . baz . 'sh run.sh'
 cat > Tupfile << HERE
 : |> sh run.sh |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_exist . foo . 'sh run.sh'

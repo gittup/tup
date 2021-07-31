@@ -20,7 +20,7 @@
 . ./tup.sh
 check_no_windows run-script variant
 
-tmkdir build
+mkdir build
 
 cat > gen.sh << HERE
 #! /bin/sh
@@ -35,7 +35,7 @@ cat > Tupfile << HERE
 : |> echo "" > %o |> gen.c
 run ./gen.sh
 HERE
-tup touch Tupfile gen.sh foo.c bar.c build/tup.config
+touch Tupfile gen.sh foo.c bar.c build/tup.config
 update
 
 check_exist build/foo.o build/bar.o build/gen.o
@@ -44,7 +44,7 @@ check_exist build/foo.o build/bar.o build/gen.o
 cat > gen.sh << HERE
 #! /bin/sh
 HERE
-tup touch gen.sh
+touch gen.sh
 update
 
 check_not_exist build/foo.o build/bar.o build/gen.o
@@ -53,7 +53,7 @@ tup_dep_exist . gen.sh . build
 # Now don't call gen.sh and make sure the dependency on the directory is gone.
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_no_exist . gen.sh . build

@@ -25,7 +25,7 @@
 cat > Tupfile << HERE
 : |> (ls .tup/mnt 2>/dev/null || true) > %o |> files.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

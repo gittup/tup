@@ -52,7 +52,7 @@ int main(void)
 	return 0;
 }
 HERE
-tup touch tmp.txt
+touch tmp.txt
 update
 
 tup_dep_exist . tmp.txt . ./stat.exe

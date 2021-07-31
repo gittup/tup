@@ -22,11 +22,11 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir foo/bar
+mkdir foo
+mkdir foo/bar
 touch foo/bar/Tupfile
-tmkdir build-debug
-tmkdir build-debug2
+mkdir build-debug
+mkdir build-debug2
 touch build-debug/tup.config
 touch build-debug2/tup.config
 update

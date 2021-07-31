@@ -20,20 +20,20 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 HERE
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch sub/Tupfile sub/foo.h Tupfile bar.c
+touch sub/Tupfile sub/foo.h Tupfile bar.c
 update
 
 cat > Tupfile << HERE
 : foreach *.c | sub/foo.h |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor
 
 eotup

@@ -26,7 +26,7 @@ files_foo.in += foo2.out
 files_bar.in += bar1.out
 : foreach *.in |> echo %f > %o |> \$(files_%f)
 HERE
-tup touch foo.in bar.in
+touch foo.in bar.in
 parse
 
 tup_dep_exist . 'echo foo.in > foo1.out foo2.out' . foo1.out

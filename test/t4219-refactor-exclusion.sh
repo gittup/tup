@@ -23,10 +23,10 @@
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o && touch license |> %B.o ^license
 HERE
-tup touch foo.c bar.c
+touch foo.c bar.c
 update
 
-tup touch Tupfile
+touch Tupfile
 refactor
 
 eotup

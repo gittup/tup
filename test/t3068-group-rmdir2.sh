@@ -20,8 +20,8 @@
 # from another directory.
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : <group> |> cp ../bar/file.txt %o |> copy.txt
 HERE
@@ -33,7 +33,7 @@ update
 rm -rf foo
 tup scan
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : <group> |> cp ../bar/file.txt %o |> copy.txt
 HERE

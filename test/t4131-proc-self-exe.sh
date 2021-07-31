@@ -30,7 +30,7 @@ set_full_deps
 cat > Tupfile << HERE
 : |> readlink -e /proc/self/exe > %o |> file.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 rlink=`which readlink`

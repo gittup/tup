@@ -23,14 +23,14 @@ cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
-tup touch foo.c bar.c
+touch foo.c bar.c
 update
 
-tup touch Tupfile
+touch Tupfile
 tup todo | grep 'Tup phase 2'
 parse
 
-tup touch foo.c
+touch foo.c
 tup todo | grep 'Tup phase 3.* 2 commands'
 tup upd
 

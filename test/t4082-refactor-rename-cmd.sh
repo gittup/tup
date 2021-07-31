@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 # Sleep 1 here so that we update the mtime in a transaction prior to
@@ -39,7 +39,7 @@ cat > Tupfile << HERE
 string = foo
 : |> touch  \$(string) |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to modify a command string:"
 refactor_fail_msg "Old: 'touch foo'"
 refactor_fail_msg "New: 'touch  foo'"

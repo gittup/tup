@@ -19,17 +19,17 @@
 # Make sure errors appear under the parser banner.
 
 . ./tup.sh
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile.lua << HERE
 print "FOO"
 HERE
-tmkdir bar
+mkdir bar
 cat > bar/Tupfile.lua << HERE
 -- Make sure foo is parsed first
 tup.rule({'../foo/foo.txt'}, 'echo hey')
 print "BAR"
 HERE
-tup touch foo/foo.txt
+touch foo/foo.txt
 tup parse > .output.txt 2>&1 || true
 if ! cat .output.txt | tr '\n' ' ' | grep 'foo.*FOO.*bar.*BAR' > /dev/null; then
 	cat .output.txt

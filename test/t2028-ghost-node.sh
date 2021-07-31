@@ -27,12 +27,12 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
 
 echo 'alive' > ghost
-tup touch ghost
+touch ghost
 update
 echo alive | diff output.txt -
 

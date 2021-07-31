@@ -28,8 +28,8 @@ update
 cat > Tupfile << HERE
 : |> touch %o |> foo.txt <output-group>
 HERE
-tup touch output.txt
-tup touch Tupfile
+touch output.txt
+touch Tupfile
 update --debug-logging
 
 tup_dep_no_exist . 'output.txt' . '<output-group>'

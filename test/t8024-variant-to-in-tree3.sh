@@ -22,7 +22,7 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir build
+mkdir build
 
 for i in `seq 1 100`; do
 	text="$text $i"
@@ -32,7 +32,7 @@ cat > Tupfile << HERE
 .gitignore
 : |> ^ echo^ echo $text > /dev/null |>
 HERE
-tup touch Tupfile build/tup.config
+touch Tupfile build/tup.config
 update
 
 rm build/tup.config

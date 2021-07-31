@@ -35,8 +35,8 @@ export CCACHE_DIR
 : foo.o |> gcc %f -o %o |> foo.exe
 HERE
 
-tmkdir a
-tmkdir b
+mkdir a
+mkdir b
 
 echo '#define FOO 3' > b/foo.h
 
@@ -61,13 +61,13 @@ update
 sleep 1
 
 # Now rebuild foo.c so we use the ccache
-tup touch foo.c
+touch foo.c
 update
 
 ./foo.exe 3
 
 echo '#define FOO 4' > a/foo.h
-tup touch a/foo.h
+touch a/foo.h
 update
 ./foo.exe 4
 

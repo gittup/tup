@@ -20,8 +20,8 @@
 # it would get tup internal error: STATE_FINISHED node 81474 in plist
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : ../<A> |> touch %o |> foo.txt ../<B>
 HERE

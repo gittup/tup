@@ -19,9 +19,9 @@
 # Try some failure cases in %1f
 
 . ./tup.sh
-tup touch file1 file2
-tmkdir foo
-tup touch foo/file3
+touch file1 file2
+mkdir foo
+touch foo/file3
 
 cat > Tupfile << HERE
 : file1 file2 foo/file3 |> cmd %0o |> out1 out2

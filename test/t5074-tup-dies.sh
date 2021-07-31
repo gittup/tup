@@ -35,7 +35,7 @@ cat > Tupfile << HERE
 HERE
 
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 tup upd &
 pid=$!
 echo $pid > pid.txt
@@ -50,7 +50,7 @@ fi
 cat > ok.sh << HERE
 echo "All good." > \$1
 HERE
-tup touch ok.sh
+touch ok.sh
 update
 
 eotup

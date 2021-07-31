@@ -19,8 +19,8 @@
 # Test the include_rules directive.
 
 . ./tup.sh
-tmkdir fs
-tmkdir fs/sub
+mkdir fs
+mkdir fs/sub
 cat > fs/Tupfile << HERE
 include_rules
 : foreach *.c |> gcc \$(CFLAGS) -c %f -o %o |> %B.o
@@ -39,9 +39,9 @@ cat > fs/sub/Tuprules.tup << HERE
 CFLAGS = -O0
 HERE
 
-tup touch fs/Tupfile fs/sub/Tupfile Tuprules.tup fs/Tuprules.tup fs/sub/Tuprules.tup
-tup touch fs/ext1.c fs/ext2.c
-tup touch fs/sub/helper.c
+touch fs/Tupfile fs/sub/Tupfile Tuprules.tup fs/Tuprules.tup fs/sub/Tuprules.tup
+touch fs/ext1.c fs/ext2.c
+touch fs/sub/helper.c
 parse
 
 tup_object_exist fs 'gcc -Wall -DFS=1 -c ext1.c -o ext1.o'

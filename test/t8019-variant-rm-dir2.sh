@@ -20,10 +20,10 @@
 # dirs going away.
 . ./tup.sh
 
-tmkdir build
-tmkdir build-debug
+mkdir build
+mkdir build-debug
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 ifeq (@(DEBUG),y)
 : |> touch %o |> foo
@@ -33,7 +33,7 @@ HERE
 
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-tup touch build/tup.config build-debug/tup.config sub/Tupfile
+touch build/tup.config build-debug/tup.config sub/Tupfile
 
 update
 
@@ -45,7 +45,7 @@ ifeq (@(DEBUG),y)
 : |> touch %o |> foo
 endif
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 update
 
 check_exist build/sub
@@ -61,7 +61,7 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 
 update
 

@@ -25,13 +25,13 @@ check_no_ldpreload mozilla-unneeded
 cat > Tupfile << HERE
 : |> touch %o; chmod 664 %o |> test1
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> chmod 664 test2 |>
 HERE
-tup touch Tupfile test2
+touch Tupfile test2
 update_fail_msg "tup error.*chmod"
 
 eotup

@@ -21,9 +21,9 @@
 . ./tup.sh
 check_no_windows slashes
 
-tmkdir sw
-tmkdir sw/toolkit
-tmkdir sw/app
+mkdir sw
+mkdir sw/toolkit
+mkdir sw/app
 
 cat > sw/Tuprules.lua << HERE
 toolkit_lib = tup.nodevariable('toolkit/toolkit.a')
@@ -33,9 +33,9 @@ cat > sw/app/Tupfile.lua << HERE
 tup.rule(toolkit_lib, 'cp %f %o', 'toolkit.copy')
 HERE
 
-tup touch sw/Tuprules.lua
-tup touch sw/toolkit/toolkit.a
-tup touch sw/app/Tupfile.lua
+touch sw/Tuprules.lua
+touch sw/toolkit/toolkit.a
+touch sw/app/Tupfile.lua
 update
 
 tup_dep_exist sw/toolkit toolkit.a sw/app 'cp ../toolkit/toolkit.a toolkit.copy'

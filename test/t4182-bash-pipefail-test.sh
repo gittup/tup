@@ -24,14 +24,14 @@ check_bash
 cat > Tupfile << HERE
 : |> false | true |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 # Test that if fails in a bash rule
 cat > Tupfile << HERE
 : |> ^b^ false | true |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg 'Command ID=[0-9]* failed with return value 1'
 
 eotup

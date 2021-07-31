@@ -19,12 +19,12 @@
 # Try tup graph . both with and without --dirs
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 .gitignore
 : in.txt |> cp %f %o |> out.txt
 HERE
-tup touch sub/Tupfile sub/in.txt
+touch sub/Tupfile sub/in.txt
 update
 
 tup graph . > ok.dot

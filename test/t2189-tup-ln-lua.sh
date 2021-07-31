@@ -23,7 +23,7 @@
 cat > Tupfile.lua << HERE
 tup.foreach_rule('*.txt', '!tup_ln', '%B.lnk')
 HERE
-tup touch foo.txt bar.txt
+touch foo.txt bar.txt
 update
 
 tup_dep_exist . "$(tup_ln_cmd foo.txt foo.lnk)" . foo.lnk

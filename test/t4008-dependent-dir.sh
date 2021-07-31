@@ -22,12 +22,12 @@ cat > Tupfile << HERE
 : fs/*.o |> ld -r %f -o built-in.o |> built-in.o
 HERE
 
-tmkdir fs
+mkdir fs
 cat > fs/Tupfile << HERE
 : foreach input/*.o |> cp %f %o |> %b
 HERE
 
-tmkdir fs/input
+mkdir fs/input
 cat > fs/input/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
@@ -35,13 +35,13 @@ HERE
 echo "void ext3fs(void) {}" > fs/input/ext3.c
 echo "void ext4fs(void) {}" > fs/input/ext4.c
 
-tup touch Tupfile fs/Tupfile fs/input/Tupfile fs/input/ext3.c fs/input/ext4.c
+touch Tupfile fs/Tupfile fs/input/Tupfile fs/input/ext3.c fs/input/ext4.c
 update
 
 sym_check built-in.o ext3fs ext4fs
 
 echo "void ext5fs(void) {}" > fs/input/ext5.c
-tup touch fs/input/ext5.c
+touch fs/input/ext5.c
 update
 sym_check built-in.o ext3fs ext4fs ext5fs
 

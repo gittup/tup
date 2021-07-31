@@ -22,11 +22,11 @@
 # MinGW throws off the paths here, so doing 'cat /home/marf/tup/...' becomes
 # 'cat C:\MinGW\msys\1.0\home\marf\tup\...' which doesn't exist
 check_no_windows mingw
-tmkdir atmp
+mkdir atmp
 cat > atmp/Tupfile << HERE
 : |> cat $PWD/atmp/foo.txt |>
 HERE
-tup touch atmp/foo.txt atmp/Tupfile
+touch atmp/foo.txt atmp/Tupfile
 update
 
 eotup

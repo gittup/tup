@@ -23,11 +23,11 @@
 cat > build.tup << HERE
 : |> touch %o |> %d.lib
 HERE
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 include ../build.tup
 HERE
-tmkdir bar
+mkdir bar
 cat > bar/Tupfile << HERE
 include ../build.tup
 HERE

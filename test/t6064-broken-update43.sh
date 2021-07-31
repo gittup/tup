@@ -28,7 +28,7 @@ re_init
 cat > Tupfile << HERE
 : |> gcc -c foo.c |> foo.o
 HERE
-tup touch Tupfile foo.c
+touch Tupfile foo.c
 update
 
 check_exist foo.o

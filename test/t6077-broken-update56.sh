@@ -38,13 +38,13 @@ cat > Tupfile << HERE
 HERE
 update_partial normal.txt
 
-tup touch Tupfile
+touch Tupfile
 update_partial gen/output.txt
 
 cat > Tupfile << HERE
 : |> touch %o |> normal.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

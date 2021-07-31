@@ -21,8 +21,8 @@
 . ./tup.sh
 check_no_windows run-script
 
-tmkdir sw
-tmkdir tools
+mkdir sw
+mkdir tools
 
 cat > Tuprules.tup << HERE
 &script = tools/script.sh
@@ -40,9 +40,9 @@ HERE
 
 chmod u+x tools/script.sh
 
-tup touch Tuprules.tup
-tup touch sw/Tupfile
-tup touch tools/script.sh
+touch Tuprules.tup
+touch sw/Tupfile
+touch tools/script.sh
 update
 
 tup_dep_exist tools script.sh . sw

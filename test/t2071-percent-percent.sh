@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> printf "hey %%i yo\n" 3  |>
 HERE
-tup touch Tupfile
+touch Tupfile
 if tup upd | grep 'hey 3 yo' > /dev/null; then
 	:
 else

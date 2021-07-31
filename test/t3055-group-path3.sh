@@ -19,10 +19,10 @@
 # Reference a group in a !-macro.
 
 . ./tup.sh
-tmkdir sub
-tmkdir sub2
-tmkdir sub2/blah
-tmkdir sub3
+mkdir sub
+mkdir sub2
+mkdir sub2/blah
+mkdir sub3
 cat > Tuprules.tup << HERE
 PROJ_ROOT = \$(TUP_CWD)
 CFLAGS += -I\$(TUP_CWD)

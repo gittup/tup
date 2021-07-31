@@ -25,13 +25,13 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> echo 1 > %o |> foooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Unable to unlink previous output file"
 
 cat > Tupfile << HERE
 : |> echo 1 > %o |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 check_exist foo
 

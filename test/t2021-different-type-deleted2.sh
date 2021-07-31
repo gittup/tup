@@ -21,15 +21,15 @@
 
 . ./tup.sh
 
-tmkdir foo
+mkdir foo
 touch foo/a
-tup touch foo/a
+tup scan
+
 rm foo/a
-tup rm foo/a
 rmdir foo
-tup rm foo
+tup scan
 
 touch foo
-tup touch foo
+update
 
 eotup

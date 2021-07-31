@@ -48,12 +48,6 @@ esac
 GREP_OPTIONS=""
 export GREP_OPTIONS
 
-tmkdir()
-{
-	mkdir $1
-	tup touch $1
-}
-
 symeotup()
 {
 	echo "[33m'touch -h' is not supported - skipping test.[0m" 1>&2
@@ -491,7 +485,7 @@ varsetall()
 		fi
 		shift
 	done
-	tup touch tup.config
+	touch tup.config
 }
 
 monitor()
@@ -618,7 +612,6 @@ HERE
 		plat_ldflags="$plat_ldflags -lasan -lubsan"
 	fi
 	gcc client.c ../../libtup_client.a -o client $plat_ldflags -ldl
-	tup touch client
 }
 
 check_monitor_supported()

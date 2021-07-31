@@ -19,18 +19,18 @@
 # Make sure touching the Tupfile doesn't delete the tup_preserve files.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : |> touch %o |> gen.txt
 HERE
-tup touch Tupfile file.html file2.html build/tup.config
+touch Tupfile file.html file2.html build/tup.config
 update
 
 check_exist build/file.html build/file2.html build/gen.txt
 
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist build/file.html build/file2.html build/gen.txt

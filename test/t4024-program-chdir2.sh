@@ -24,7 +24,7 @@ mkdir tmp
 cd tmp
 re_init
 
-tmkdir sub
+mkdir sub
 cd sub
 cat > ok.sh << HERE
 #! /bin/sh
@@ -42,7 +42,7 @@ HERE
 
 echo "yo" > bar
 
-tup touch bar Tupfile ok.sh
+touch bar Tupfile ok.sh
 update
 
 tup_dep_exist sub bar sub './ok.sh'

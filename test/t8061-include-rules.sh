@@ -20,9 +20,9 @@
 . ./tup.sh
 check_no_windows tup variant
 
-tmkdir sub
-tmkdir sub/sub2
-tmkdir configs
+mkdir sub
+mkdir sub/sub2
+mkdir configs
 
 cat > Tuprules.tup << HERE
 var += y
@@ -45,7 +45,7 @@ HERE
 echo "CONFIG_DEBUG=y" > configs/debug.config
 echo "" > configs/default.config
 tup variant configs/*.config
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist build-default/sub/sub2/bar
@@ -58,7 +58,7 @@ check_not_exist build-debug/sub/sub2/baz
 cat > Tuprules.tup << HERE
 var += n
 HERE
-tup touch Tuprules.tup
+touch Tuprules.tup
 update
 
 check_not_exist build-default/sub/sub2/bar

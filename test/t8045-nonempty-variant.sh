@@ -20,9 +20,9 @@
 # tup.config)
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
-tup touch build/tup.config build/Tupfile build/foo.c
+touch build/tup.config build/Tupfile build/foo.c
 update_fail_msg "Variant directory must only contain a tup.config file"
 
 eotup

@@ -27,7 +27,7 @@ normal_var = some value
 : |> echo \$(normal_var) is &(normal_var) |>
 HERE
 
-tup touch lib.a Tupfile
+touch lib.a Tupfile
 update
 
 tup_object_exist . 'echo some value is lib.a'

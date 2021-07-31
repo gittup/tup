@@ -22,18 +22,18 @@
 
 # Case 1: we create the generated file before trying to use it (foo is parsed
 # before bar).
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : |> echo hey > %o |> ../out/gen.txt
 : ../out/gen.txt |> cat %f |>
 HERE
+tup scan
 
-tmkdir bar
+mkdir bar
 cat > bar/Tupfile << HERE
 : |> touch %o |> ../out/tmp.txt
 : ../out/gen.txt |> cat %f |>
 HERE
-tup touch foo/Tupfile bar/Tupfile
 update_fail_msg "Explicitly named file 'out.*gen.txt' can't be listed as an input because it was generated from external directory 'foo'"
 
 # case 2: The generated directory is not present when we try to use it as an
@@ -46,11 +46,10 @@ HERE
 cat > foo/Tupfile << HERE
 : ../out/gen.txt |> cat %f |>
 HERE
-tup touch foo/Tupfile bar/Tupfile
 update_fail_msg "Failed to find directory ID for dir '../out/gen.txt' relative to 'foo'"
 
 # case 3: The generated file is not present when we try to use it as an input
-tmkdir out
+mkdir out
 update_fail_msg "Explicitly named file 'gen.txt' not found in subdir 'out'"
 
 eotup

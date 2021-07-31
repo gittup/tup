@@ -39,7 +39,7 @@ set_full_deps
 cat > Tupfile << HERE
 : |> readlink ../external/arch; cat ../external/arch/foo.h > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 echo foo1 | diff - out.txt

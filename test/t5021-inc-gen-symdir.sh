@@ -23,19 +23,19 @@
 . ./tup.sh
 check_no_windows symlink
 
-tmkdir foo
-tmkdir foo/arch-x86
+mkdir foo
+mkdir foo/arch-x86
 echo 'var = 3' > foo/arch-x86/rules.tup
 cat > foo/Tupfile << HERE
 : arch-x86 |> ln -s %f %o |> arch
 HERE
-tup touch foo/arch-x86/rules.tup foo/Tupfile
+touch foo/arch-x86/rules.tup foo/Tupfile
 update
 
 cat > Tupfile << HERE
 include foo/arch/rules.tup
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail
 
 eotup

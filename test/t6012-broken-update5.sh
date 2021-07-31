@@ -36,11 +36,11 @@ cat > Tupfile << HERE
 : *.o |> gcc %f -o %o |> prog.exe
 HERE
 
-tmkdir include
+mkdir include
 touch include/foo.h
 (echo "#include \"foo.h\""; echo "void foo(void) {bork}") > foo.c
 echo "int main(void) {}" > bar.c
-tup touch include/foo.h foo.c bar.c Tupfile
+touch include/foo.h foo.c bar.c Tupfile
 update_fail
 check_not_exist foo.o prog.exe
 check_exist bar.o
@@ -52,12 +52,12 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o -Iinclude |> %B.o
 : *.o |> gcc %f -o %o |> prog.exe
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail
 check_not_exist foo.o prog.exe
 
 (echo "#include \"foo.h\""; echo "void foo(void) {}") > foo.c
-tup touch foo.c
+touch foo.c
 update
 sym_check foo.o foo
 sym_check bar.o main

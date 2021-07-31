@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cd sub
 cat > ok.sh << HERE
 mkdir tmpsub
@@ -67,7 +67,7 @@ rm tmpsub/level2/baz.txt
 rmdir tmpsub/level2
 rmdir tmpsub
 HERE
-tup touch ok.sh
+touch ok.sh
 update
 
 for i in foo.txt bar.txt tmpsub/level2/baz.txt; do

@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : foo.c |> echo gcc -c %f |>
 HERE
 # Note: Not touching foo.c
-tup touch Tupfile
+touch Tupfile
 update_fail
 
 eotup

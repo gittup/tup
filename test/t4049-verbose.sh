@@ -24,7 +24,7 @@ tmp=".tmp.txt"
 cat > Tupfile << HERE
 : ok.c |> ^ short^ gcc -c %f -o %o |> %B.o
 HERE
-tup touch ok.c Tupfile
+touch ok.c Tupfile
 update > $tmp
 
 if ! grep short $tmp > /dev/null; then
@@ -36,7 +36,7 @@ if grep 'gcc -c ok.c -o ok.o' $tmp > /dev/null; then
 	exit 1
 fi
 
-tup touch ok.c
+touch ok.c
 update --verbose > $tmp
 if grep short $tmp > /dev/null; then
 	echo "Error: Expected 'short' not to be in the output text." 1>&2

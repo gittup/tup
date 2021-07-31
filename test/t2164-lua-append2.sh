@@ -34,7 +34,7 @@ objlist = {'foo.c'}
 obj = 'output.txt'
 ld_linux(objlist, obj)
 HERE
-tup touch foo.c
+touch foo.c
 update
 
 eotup

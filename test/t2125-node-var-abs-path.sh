@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 &node_var = /tmp
 HERE
 
-tup touch Tupfile
+touch Tupfile
 
 update_fail_msg "Unable to find tup entry for file '/tmp' in node reference declaration"
 

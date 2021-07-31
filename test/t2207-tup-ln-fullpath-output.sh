@@ -21,11 +21,11 @@
 . ./tup.sh
 check_no_windows paths
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : input.txt |> !tup_ln |> `pwd -P`/sub/link.txt
 HERE
-tup touch sub/input.txt
+touch sub/input.txt
 update
 
 tup_dep_exist sub "!tup_ln input.txt `pwd -P`/sub/link.txt" sub link.txt

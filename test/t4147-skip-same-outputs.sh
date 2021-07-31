@@ -45,7 +45,7 @@ echo stringa > a
 echo stringb > b
 echo cstring > c
 HERE
-tup touch ok.sh
+touch ok.sh
 update > .output.txt
 
 gitignore_bad stringa .output.txt

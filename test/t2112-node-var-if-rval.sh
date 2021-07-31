@@ -26,7 +26,7 @@ ifeq (,&(node_var))
 endif
 HERE
 
-tup touch lib.a Tupfile
+touch lib.a Tupfile
 
 update_fail_msg "&-variables not allowed here"
 

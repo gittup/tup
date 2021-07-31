@@ -26,7 +26,7 @@ file-@(BAR) += bar.c
 HERE
 echo hey > foo.c
 echo yo > bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 varsetall BAR=n
 update
 tup_object_exist . foo.c bar.c

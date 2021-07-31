@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/foo.c << HERE
 int main(void)
 {
@@ -38,7 +38,7 @@ endif
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f && strip \$(stripflags) %o |> libfoo.a
 HERE
-tup touch sub/foo.c sub/bar.c sub/Tupfile
+touch sub/foo.c sub/bar.c sub/Tupfile
 update
 
 eotup

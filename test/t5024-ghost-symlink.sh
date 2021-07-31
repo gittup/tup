@@ -26,7 +26,6 @@ ln -s foo-x86.h foo.h
 cat > Tupfile << HERE
 : foo.h |> (cat %f 2>/dev/null || echo 'nofile') > %o |> output.txt
 HERE
-tup touch foo-x86.h foo.h
 update
 echo '#define FOO 3' | diff - output.txt
 check_updates foo.h output.txt
@@ -36,7 +35,6 @@ check_updates foo-x86.h output.txt
 # that the update will still succeed without the symlink working, so output.txt
 # should be 'nofile' now.
 ln -sf foo-ppc.h foo.h
-tup touch foo.h
 update
 echo 'nofile' | diff - output.txt
 
@@ -44,7 +42,6 @@ echo 'nofile' | diff - output.txt
 # already have a dependency on foo-ppc.h, so the update should end up copying
 # the contents of foo-ppc.h into output.txt.
 echo "#define FOO 4" > foo-ppc.h
-tup touch foo-ppc.h
 update
 echo '#define FOO 4' | diff - output.txt
 check_updates foo.h output.txt

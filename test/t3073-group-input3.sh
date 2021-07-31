@@ -24,9 +24,9 @@ cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir foo
-tmkdir bar
-tmkdir sub
+mkdir foo
+mkdir bar
+mkdir sub
 cat > foo/Tupfile << HERE
 include_rules
 : foreach *.c |> !cc |>

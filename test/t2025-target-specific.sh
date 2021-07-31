@@ -28,7 +28,7 @@ srcs = *.c
 var_bar = BREAK
 HERE
 
-tup touch Tupfile foo.c bar.c
+touch Tupfile foo.c bar.c
 parse
 tup_object_exist . "gcc -DBLAH=hey -c foo.c -o foo.o"
 tup_object_exist . "gcc -DBLAH=yo -c bar.c -o bar.o"

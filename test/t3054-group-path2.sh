@@ -19,9 +19,9 @@
 # Use $(TUP_CWD) to specify the location of a group.
 
 . ./tup.sh
-tmkdir sub
-tmkdir sub2
-tmkdir sub3
+mkdir sub
+mkdir sub2
+mkdir sub3
 cat > Tuprules.tup << HERE
 PROJ_ROOT = \$(TUP_CWD)
 group = \$(TUP_CWD)/<foo-autoh>

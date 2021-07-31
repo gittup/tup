@@ -171,7 +171,7 @@ void skip_result(struct tup_entry *tent)
 {
 	sum++;
 	if(tent) {
-		total_time -= tent->mtime;
+		total_time -= tent->mtime.tv_sec;
 	}
 }
 
@@ -195,7 +195,7 @@ void show_result(struct tup_entry *tent, int is_error, struct timespan *ts, cons
 	FILE *f;
 	float tdiff = 0.0;
 
-	job_time += tent->mtime;
+	job_time += tent->mtime.tv_sec;
 
 	if(ts) {
 		tdiff = timespan_seconds(ts);

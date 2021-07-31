@@ -25,13 +25,13 @@ cat > Tupfile << HERE
 HERE
 
 echo hey > foo.txt
-tup touch Tupfile foo.txt
+touch Tupfile foo.txt
 update
 
 cat > Tupfile << HERE
 : bar.txt |> cat %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail
 
 eotup

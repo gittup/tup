@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "int spacetest;" > space\ bar.c
-tup touch *.c
+touch *.c
 update
 
 sym_check prog.exe spacetest

@@ -21,7 +21,7 @@
 
 . ./tup.sh
 
-tmkdir atmp
+mkdir atmp
 update
 
 rmdir atmp

@@ -26,7 +26,7 @@ HERE
 update
 
 rm -rf foo/bar
-tup touch foo/bar
+touch foo/bar
 # foo.bar.baz uses the . as a wildcard for matching Windows & Unix paths
 update_fail_msg "Unable to output to a different directory because 'foo.bar' is a normal file"
 

@@ -31,6 +31,11 @@
 
 #define TUP_CONFIG "tup.config"
 
+#define MTIME_EQ(a, b) ((a).tv_sec == (b).tv_sec && (a).tv_nsec == (b).tv_nsec)
+
+extern struct timespec INVALID_MTIME;
+extern struct timespec EXTERNAL_DIRECTORY_MTIME;
+
 struct tup_entry;
 struct tup_entry_head;
 struct tup_env;
@@ -66,10 +71,10 @@ struct tup_entry *tup_db_create_node_part_display(struct tup_entry *dtent, const
 						  const char *display, int displaylen, const char *flags, int flagslen,
 						  enum TUP_NODE_TYPE type, tupid_t srcid, int *node_changed);
 int tup_db_node_insert_tent(struct tup_entry *dtent, const char *name, int namelen,
-			    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
+			    enum TUP_NODE_TYPE type, struct timespec mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_node_insert_tent_display(struct tup_entry *dtent, const char *name, int namelen,
 				    const char *display, int displaylen, const char *flags, int flagslen,
-				    enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid, struct tup_entry **entry);
+				    enum TUP_NODE_TYPE type, struct timespec mtime, tupid_t srcid, struct tup_entry **entry);
 int tup_db_fill_tup_entry(tupid_t tupid, struct tup_entry **dest);
 int tup_db_select_tent(struct tup_entry *dtent, const char *name, struct tup_entry **entry);
 int tup_db_select_tent_part(struct tup_entry *dtent, const char *name, int len,
@@ -94,7 +99,7 @@ int tup_db_set_name(tupid_t tupid, const char *new_name, tupid_t new_dt);
 int tup_db_set_display(struct tup_entry *tent, const char *display, int displaylen);
 int tup_db_set_flags(struct tup_entry *tent, const char *flags, int flagslen);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
-int tup_db_set_mtime(struct tup_entry *tent, time_t mtime);
+int tup_db_set_mtime(struct tup_entry *tent, struct timespec mtime);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_normal_dir_to_generated(struct tup_entry *tent);
 int tup_db_print(FILE *stream, tupid_t tupid);

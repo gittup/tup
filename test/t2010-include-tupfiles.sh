@@ -25,17 +25,17 @@ include bar/Install.tup
 : foreach \$(input) |> cp %f %o |> %B.o
 HERE
 
-tmkdir foo
+mkdir foo
 cat > foo/Install.tup << HERE
 input += foo/sball
 HERE
 
-tmkdir bar
+mkdir bar
 cat > bar/Install.tup << HERE
 input += bar/tab
 HERE
 
-tup touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
+touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
 parse
 tup_object_exist . sball.o tab.o
 

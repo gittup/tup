@@ -28,7 +28,7 @@ echo '#include "foo.h"' > foo.c
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c foo-x86.h foo-ppc.h foo.h
+touch foo.c foo-x86.h foo-ppc.h foo.h
 update
 check_exist foo.o
 
@@ -37,7 +37,7 @@ check_updates foo-x86.h foo.o
 check_no_updates foo-ppc.h foo.o
 
 ln -sf foo-ppc.h foo.h
-tup touch foo.h
+touch foo.h
 update
 check_updates foo.h foo.o
 check_no_updates foo-x86.h foo.o

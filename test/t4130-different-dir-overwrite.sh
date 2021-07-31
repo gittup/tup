@@ -21,7 +21,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 touch sub/foo.c
 cat > Tupfile << HERE
 : |> touch %o |> sub/foo.c

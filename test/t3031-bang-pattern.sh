@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : |> echo '#define FOO 3' > %o |> foo.h
 : foo.c |> !cc |>
 HERE
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 
 tup_sticky_exist . foo.h . 'gcc -c foo.c -o foo.o'

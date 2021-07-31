@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : |> ln -s ghost %o |> foo
 : foo |> cat %f 2>/dev/null || true |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 tup_object_exist . foo ghost
 

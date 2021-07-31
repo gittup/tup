@@ -31,9 +31,9 @@ cat > Tupfile << HERE
 include_rules
 HERE
 
-tmkdir build
+mkdir build
 
-tup touch build/tup.config
+touch build/tup.config
 update
 
 eotup

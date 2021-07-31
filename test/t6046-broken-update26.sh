@@ -25,13 +25,13 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> cat foo 2> /dev/null || true; touch foo |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "File.*foo.*was written to"
 
 cat > Tupfile << HERE
 : |> cat foo 2> /dev/null || true; touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

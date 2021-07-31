@@ -22,7 +22,7 @@
 
 . ./tup.sh
 
-tmkdir tmp
+mkdir tmp
 cat > ok.sh << HERE
 #! /bin/sh
 cd tmp
@@ -37,7 +37,7 @@ HERE
 echo "yo" > tmp/bar
 echo "not this one" > bar
 
-tup touch bar tmp/bar Tupfile ok.sh
+touch bar tmp/bar Tupfile ok.sh
 update
 
 tup_dep_exist tmp bar . './ok.sh'

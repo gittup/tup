@@ -21,9 +21,9 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
-tmkdir baz
+mkdir foo
+mkdir bar
+mkdir baz
 echo foo > foo/foo.txt
 echo bar > bar/bar.txt
 echo baz > baz/baz.txt
@@ -35,7 +35,7 @@ HERE
 cat > baz/Tupfile << HERE
 : |> cp baz.txt %o |> bazout.txt
 HERE
-tup touch foo/Tupfile bar/Tupfile baz/Tupfile
+touch foo/Tupfile bar/Tupfile baz/Tupfile
 update
 
 echo bar | diff - bar/barout.txt
@@ -49,7 +49,7 @@ HERE
 cat > foo/Tupfile << HERE
 : |> sh ok.sh |> ../bar/barout.txt ../baz/bazout.txt
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 rm bar/Tupfile baz/Tupfile
 update
 

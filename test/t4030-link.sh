@@ -27,7 +27,7 @@ check_no_ldpreload mozilla-unneeded
 cat > Tupfile << HERE
 : tmp |> link %f %o |> outlink
 HERE
-tup touch tmp Tupfile
+touch tmp Tupfile
 update_fail_msg "tup error.*hard links"
 
 eotup

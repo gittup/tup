@@ -22,7 +22,7 @@
 # being in the create graph.
 . ./tup.sh
 
-tmkdir outdir
+mkdir outdir
 touch outdir/foo.txt
 cat > Tupfile << HERE
 : |> touch %o |> outdir/sub/bar.txt

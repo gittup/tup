@@ -19,7 +19,7 @@
 # Read from a data file with lua in a subdir.
 
 . ./tup.sh
-tmkdir sub
+mkdir sub
 cat > sub/data.txt << HERE
 foo
 bar
@@ -43,7 +43,7 @@ foo
 bar
 baz
 HERE
-tup touch sub/data.txt
+touch sub/data.txt
 update
 
 check_exist sub/foo sub/bar sub/baz

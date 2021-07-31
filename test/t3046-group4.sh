@@ -39,7 +39,7 @@ cat > Tupfile << HERE
 : |> sh ok.sh |> foo <group>
 : |> touch bar |> bar
 HERE
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 
 tup_dep_exist . 'foo' . '<group>'

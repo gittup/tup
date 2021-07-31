@@ -33,13 +33,13 @@ HERE
 cat > ok.sh << HERE
 touch output.txt
 HERE
-tup touch foo.txt ok.sh
+touch foo.txt ok.sh
 update
 
 cat > ok.sh << HERE
 cat foo.txt && touch output.txt
 HERE
-tup touch foo.txt ok.sh
+touch foo.txt ok.sh
 update_partial output.txt
 
 update_partial output.txt > .tup/.output.txt

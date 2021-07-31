@@ -20,8 +20,8 @@
 . ./tup.sh
 check_no_windows run-script
 
-tmkdir sub
-tmkdir sub/sub2
+mkdir sub
+mkdir sub/sub2
 touch sub/foo
 
 cat > Tupfile << HERE

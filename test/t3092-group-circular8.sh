@@ -30,7 +30,7 @@ cat > Tupfile << HERE
 : <groupB> |> touch foo |> foo <groupA>
 : <groupA> |> touch bar |> bar <groupB>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "tup error.*Circular dependency found among the following groups"
 
 eotup

@@ -19,7 +19,7 @@
 # Multiple levels of generated directories that need to be reparsed
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> touch %o |> ../out/out2/foo.txt
 HERE

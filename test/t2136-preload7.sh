@@ -20,7 +20,7 @@
 . ./tup.sh
 check_no_windows run-script
 
-tmkdir sub
+mkdir sub
 
 cat > sub/Tupfile << HERE
 preload ../..

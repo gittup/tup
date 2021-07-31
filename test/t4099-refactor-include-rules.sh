@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 include_rules
 : |> echo hey |>
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor
 
 eotup

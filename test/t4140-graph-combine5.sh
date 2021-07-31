@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 : foo.h |> sh ok.sh foo.h foo.h %o |> out1.txt
 : bar.h baz.h |> sh ok.sh bar.h baz.h %o |> out2.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup graph . --combine > ok.dot

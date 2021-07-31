@@ -62,7 +62,7 @@ cat > Tupfile << HERE
 HERE
 echo "A" > A.java
 echo "B" > B.java
-tup touch A.java B.java Tupfile
+touch A.java B.java Tupfile
 update
 check_exist A.class B.class
 echo 'B' | diff - B.class
@@ -72,7 +72,7 @@ cat > Tupfile << HERE
 : B.java |> cat %f > %o |> B.o
 : A.java |> sleep 0.5; (if ./mls | grep B.class > /dev/null; then echo "Using B.class"; cat B.class; else echo "Using B.java"; cat B.java; fi; cat %f) > %o |> A.o
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 check_not_exist A.class B.class
 check_exist A.o B.o

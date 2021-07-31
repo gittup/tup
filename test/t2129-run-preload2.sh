@@ -20,12 +20,12 @@
 . ./tup.sh
 check_no_windows run-script
 
-tmkdir sub
+mkdir sub
 cat > sub/include.tup << HERE
 preload foo
 HERE
 
-tmkdir sub/foo
+mkdir sub/foo
 touch sub/foo/bar.c
 
 cat > Tupfile << HERE

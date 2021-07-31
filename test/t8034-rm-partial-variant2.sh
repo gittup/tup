@@ -19,8 +19,8 @@
 # Like t8033, but with another level of subdirectory.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -31,18 +31,18 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-tup touch build/tup.config Tupfile foo.c sub/bar.c
+touch build/tup.config Tupfile foo.c sub/bar.c
 update
 
-tmkdir sub/dir2
-tmkdir sub/dir2/dir3
+mkdir sub/dir2
+mkdir sub/dir2/dir3
 cat > sub/dir2/Tupfile << HERE
 : foreach bar2.c |> gcc -c %f -o %o |> %B.o
 HERE
 cat > sub/dir2/dir3/Tupfile << HERE
 : foreach bar3.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch sub/dir2/bar2.c sub/dir2/dir3/bar3.c
+touch sub/dir2/bar2.c sub/dir2/dir3/bar3.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/sub/dir2/bar2.o build/sub/dir2/dir3/bar3.o build/prog.exe

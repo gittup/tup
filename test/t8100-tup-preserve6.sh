@@ -19,13 +19,13 @@
 # Try to read from a !tup_preserve file
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : file2.html |> cat file2.html > %o |> out.html
 HERE
-tup touch Tupfile file.html file2.html build/tup.config
+touch Tupfile file.html file2.html build/tup.config
 update
 
 eotup

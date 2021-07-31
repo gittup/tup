@@ -31,10 +31,10 @@ cat > Tupfile << HERE
 include_rules
 HERE
 varsetall ARCH=y
-tup touch Tuprules.tup Tupfile
+touch Tuprules.tup Tupfile
 update
 
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

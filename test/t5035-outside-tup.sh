@@ -20,12 +20,12 @@
 
 . ./tup.sh
 check_no_windows shell
-tmkdir foo
-tmkdir include
+mkdir foo
+mkdir include
 cat > foo/Tupfile << HERE
 : |> if [ -f ../include/../../../../../../../bar/lg.h ]; then echo yay; else echo no; fi |>
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 eotup

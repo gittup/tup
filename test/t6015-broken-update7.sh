@@ -26,10 +26,9 @@ HERE
 
 touch foo.c
 touch bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 parse
 rm foo.c
-tup rm foo.c
 update
 tup_object_exist . bar.c bar.o
 tup_object_no_exist . foo.c foo.o

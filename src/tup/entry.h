@@ -39,7 +39,7 @@ struct tup_entry {
 	tupid_t dt;
 	struct tup_entry *parent;
 	enum TUP_NODE_TYPE type;
-	time_t mtime;
+	struct timespec mtime;
 	tupid_t srcid;
 	struct variant *variant;
 	struct string_tree name;
@@ -69,10 +69,10 @@ int tup_entry_find_name_in_dir_dt(struct tup_entry *dtent, const char *name, int
 				  struct tup_entry **dest);
 int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
-			 enum TUP_NODE_TYPE type, time_t mtime, tupid_t srcid,
+			 enum TUP_NODE_TYPE type, struct timespec mtime, tupid_t srcid,
 			 struct tup_entry **dest);
 int tup_entry_add_all(tupid_t tupid, tupid_t dt, enum TUP_NODE_TYPE type,
-		      time_t mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
+		      struct timespec mtime, tupid_t srcid, const char *name, const char *display, const char *flags,
 		      struct tup_entry **dest);
 int tup_entry_resolve_dirs(void);
 int tup_entry_change_name_dt(tupid_t tupid, const char *new_name, tupid_t dt);

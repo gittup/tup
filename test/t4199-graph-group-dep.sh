@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : <newgroup> |> touch %o |> out3.txt <final>
 : <newgroup> |> touch %o |> out4.txt <final>
 HERE
-tup touch input.txt
+touch input.txt
 update --debug-logging
 
 tup graph input.txt > ok.dot

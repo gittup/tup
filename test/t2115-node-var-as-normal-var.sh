@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : |> echo \$(node_var) > %o |> out.txt
 HERE
 
-tup touch lib.a Tupfile
+touch lib.a Tupfile
 update
 
 tup_dep_exist . 'echo  > out.txt' . out.txt

@@ -45,7 +45,7 @@ cat > Tupfile << HERE
 : gen.exe |> ./gen.exe |> out.cpp <more>
 #: <more> |> gcc -c out.cpp -o out.o |> out.o <generated>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
@@ -53,7 +53,7 @@ cat > Tupfile << HERE
 : gen.exe |> ./gen.exe |> out.cpp <more>
 : <more> |> gcc -c out.cpp -o out.o |> out.o <generated>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "tup error.*Circular dependency found among the following groups:"
 
 eotup

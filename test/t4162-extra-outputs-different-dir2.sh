@@ -28,7 +28,7 @@ update
 cat > Tupfile << HERE
 : |> echo first > %o && echo second > %o.2 |> out/file.txt | sub/%O.txt.2
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Expected to write to file 'sub/out/file.txt.2'"
 
 eotup

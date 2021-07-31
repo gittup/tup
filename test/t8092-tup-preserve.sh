@@ -42,7 +42,7 @@ cmp file.txt build-2/file.txt
 
 # Make sure we can re-parse the Tupfile now that we have file.txt in the srcdir
 # and the build dir.
-tup touch Tupfile
+touch Tupfile
 update > .tup/.tupoutput
 if grep 'preserve file.txt' .tup/.tupoutput > /dev/null; then
 	cat .tup/.tupoutput

@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> echo @(BAR) |>
 HERE
-tup touch Tupfile
+touch Tupfile
 varsetall BAR='"string"'
 update
 tup_object_exist . 'echo string'

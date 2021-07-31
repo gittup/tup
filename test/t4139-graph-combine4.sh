@@ -28,11 +28,11 @@ cat > Tupfile << HERE
 : foo.h |> cp %f %o |> outdir/%b | <generated-headers>
 : bar.h |> cp %f %o |> outdir/%b | <generated-headers>
 HERE
-tup touch foo.idl bar.idl Tupfile
+touch foo.idl bar.idl Tupfile
 update
 
 tup graph . --combine > ok.dot
-gitignore_good 'node.*\.idl.*3 files' ok.dot
+gitignore_good 'node.*\(\.idl\|ok.sh\).*3 files' ok.dot
 gitignore_good 'node.*sh ok.sh.*idl.*2 commands' ok.dot
 gitignore_good 'node.*\.h.*2 files' ok.dot
 gitignore_good 'node.*cp.*\.h.*2 commands' ok.dot

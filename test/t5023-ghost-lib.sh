@@ -23,8 +23,8 @@
 
 . ./tup.sh
 
-tmkdir a
-tmkdir b
+mkdir a
+mkdir b
 
 # Verify both files are compiled
 echo "void foo(void); int main(void) {foo(); return 0;}" > main.c
@@ -42,7 +42,7 @@ cat > b/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libfoo.a
 HERE
-tup touch main.c b/foo.c Tupfile b/Tupfile
+touch main.c b/foo.c Tupfile b/Tupfile
 update
 echo libB | diff - output.txt
 
@@ -61,7 +61,7 @@ cat > a/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libfoo.a
 HERE
-tup touch a/foo.c a/Tupfile
+touch a/foo.c a/Tupfile
 update_fail
 
 # Add the pre-requisite, and the update should succeed - the program should now
@@ -71,7 +71,7 @@ cat > Tupfile << HERE
 : *.o | a/libfoo.a b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog.exe
 : prog.exe |> ./%f > %o |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 echo libA | diff - output.txt
 

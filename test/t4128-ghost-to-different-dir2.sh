@@ -27,9 +27,9 @@ cat > Tupfile << HERE
 HERE
 echo '#include "sub/foo.h"' > ok.c
 
-tmkdir bar
-tmkdir bar/sub
-tup touch bar/sub/foo.h
+mkdir bar
+mkdir bar/sub
+touch bar/sub/foo.h
 update
 
 tup_dep_exist bar/sub foo.h . 'gcc -c ok.c -o ok.o -Ifoo -Ibar'
@@ -37,7 +37,7 @@ tup_dep_exist bar/sub foo.h . 'gcc -c ok.c -o ok.o -Ifoo -Ibar'
 cat > bar/Tupfile << HERE
 : |> touch %o |> ../foo/sub/foo.h | ../<headers>
 HERE
-tup touch bar/Tupfile
+touch bar/Tupfile
 parse
 
 rm bar/Tupfile

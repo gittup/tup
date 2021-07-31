@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o {objs} {blah}
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 parse_fail_msg "bin must be at the end of the output list"
 
 eotup

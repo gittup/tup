@@ -20,8 +20,8 @@
 # so the group_link table is used.
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : ../bar/<group> |> cp ../bar/file.txt %o |> copy.txt | ../bar/<output>
 HERE
@@ -35,7 +35,7 @@ for i in a b c; do
 	rm -rf bar
 	tup scan
 
-	tmkdir bar
+	mkdir bar
 	cat > bar/Tupfile << HERE
 : |> echo hey > %o |> file.txt | <group>
 HERE

@@ -30,14 +30,14 @@ include_rules
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libsub.a
 include_rules
 HERE
 
-tup touch foo.c bar.c Tupfile Tuprules.tup sub/Tupfile sub/shazam.c
+touch foo.c bar.c Tupfile Tuprules.tup sub/Tupfile sub/shazam.c
 update
 
 if [ ! -f .gitignore ]; then
@@ -63,7 +63,6 @@ gitignore_good libsub.a sub/.gitignore
 gitignore_good .gitignore sub/.gitignore
 
 rm -f Tuprules.tup
-tup rm Tuprules.tup
 update
 for f in .gitignore sub/.gitignore .gitignore.new sub/.gitignore.new; do
 	if [ -f $f ]; then

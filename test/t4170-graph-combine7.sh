@@ -25,17 +25,17 @@ cat > Tupfile << HERE
 : foo.o |> cat foo.o > out.txt |> out.txt
 : |> cat bar.h foo.h > blah.h |> blah.h
 HERE
-tup touch foo.h bar.h Tupfile
+touch foo.h bar.h
 update
 
 tup graph . --combine > ok.dot
 gitignore_good 'cat.*bar.h.*2 commands' ok.dot
-gitignore_good 'foo*\.h.*2 files' ok.dot
+gitignore_good 'bar*\.h.*2 files' ok.dot
 
 tup graph --combine . --prune out.txt > ok.dot
 gitignore_bad 'cat.*bar.h.*2 commands' ok.dot
 gitignore_bad 'bar.o' ok.dot
-gitignore_good 'foo*\.h.*2 files' ok.dot
+gitignore_good 'bar*\.h.*2 files' ok.dot
 gitignore_good 'out.txt' ok.dot
 
 eotup

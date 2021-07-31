@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : foreach *.c | foo.h nongen.h |> echo gcc -c %f -o %o |> %B.o
 HERE
 
-tup touch Tupfile foo.c bar.c nongen.h
+touch Tupfile foo.c bar.c nongen.h
 parse
 tup_sticky_exist . foo.h . "echo gcc -c foo.c -o foo.o"
 tup_sticky_exist . foo.h . "echo gcc -c bar.c -o bar.o"

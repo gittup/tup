@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 else
 : |> echo bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "else statement outside of an if block"
 
 cat > Tupfile << HERE
@@ -32,7 +32,7 @@ cat > Tupfile << HERE
 endif
 : |> echo bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "endif statement outside of an if block"
 
 eotup

@@ -20,12 +20,12 @@
 # another directory, we end up re-creating the file.
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> touch %o |> ../out/foo.txt
 HERE
-tmkdir out
-tup touch out/bar.txt
+mkdir out
+touch out/bar.txt
 update
 
 rm -rf out
@@ -37,7 +37,7 @@ check_exist out/foo.txt
 # rule is removed.
 cat > sub/Tupfile << HERE
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 update
 
 check_not_exist out

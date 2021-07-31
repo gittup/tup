@@ -21,7 +21,7 @@
 . ./tup.sh
 
 varsetall FOO=y
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 ifeq (@(FOO),1)
 : |> echo foo |>
@@ -29,7 +29,8 @@ endif
 HERE
 update
 
-tup touch tup.config
+touch tup.config
+tup scan
 
 tup graph --dirs > ok.dot
 gitignore_good tup.config ok.dot

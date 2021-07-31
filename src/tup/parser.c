@@ -400,7 +400,7 @@ static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char
 	if(tup_db_select_tent(dtent, path, &tupfile_tent) < 0)
 		return -1;
 	if(!tupfile_tent) {
-		if(tup_db_node_insert_tent(dtent, path, strlen(path), TUP_NODE_GHOST, -1, -1, &tupfile_tent) < 0) {
+		if(tup_db_node_insert_tent(dtent, path, strlen(path), TUP_NODE_GHOST, INVALID_MTIME, -1, &tupfile_tent) < 0) {
 			fprintf(tf->f, "tup error: Node '%s' doesn't exist and we couldn't create a ghost in directory: ", path);
 			print_tup_entry(tf->f, dtent);
 			fprintf(tf->f, "\n");
@@ -1236,7 +1236,7 @@ static int gitignore(struct tupfile *tf, struct tup_entry *dtent)
 			fprintf(tf->f, "tup refactoring error: Attempting to create a new .gitignore file.\n");
 			return -1;
 		}
-		if(tup_db_node_insert_tent(dtent, ".gitignore", -1, TUP_NODE_GENERATED, -1, dtent->tnode.tupid, &tent) < 0)
+		if(tup_db_node_insert_tent(dtent, ".gitignore", -1, TUP_NODE_GENERATED, INVALID_MTIME, dtent->tnode.tupid, &tent) < 0)
 			return -1;
 	} else {
 		tent_tree_remove(&tf->g->gen_delete_root, tent);
@@ -2683,7 +2683,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 		if(!tent) {
 			if(tf->full_deps) {
 				struct stat buf;
-				time_t mtime = -1;
+				struct timespec mtime = INVALID_MTIME;
 
 				if(lstat(pl->mem, &buf) == 0) {
 					mtime = MTIME(buf);
@@ -2707,7 +2707,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 				return -1;
 			}
 		}
-		if(tent->type == TUP_NODE_GHOST && tent->mtime == -1) {
+		if(tent->type == TUP_NODE_GHOST && tent->mtime.tv_sec == -1) {
 			fprintf(tf->f, "tup error: Explicitly named file '%.*s' is a ghost file, so it can't be used as an input.\n", pl->pel->len, pl->pel->path);
 			return -1;
 		}

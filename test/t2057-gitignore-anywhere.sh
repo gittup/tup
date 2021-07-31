@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 update
 
 if [ ! -f .gitignore ]; then

@@ -44,7 +44,7 @@ export FOO
 : |> cat input.txt > %o |> bar.txt | <group>
 : |> sh ok.sh |> output.txt env.txt
 HERE
-tup touch Tupfile input.txt ok.sh
+touch Tupfile input.txt ok.sh
 update
 
 echo bar | diff - env.txt

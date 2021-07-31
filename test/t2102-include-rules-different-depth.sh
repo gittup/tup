@@ -21,10 +21,10 @@
 
 . ./tup.sh
 
-tmkdir sw
-tmkdir sw/lib
-tmkdir sw/app
-tmkdir sw/app/core
+mkdir sw
+mkdir sw/lib
+mkdir sw/app
+mkdir sw/app/core
 
 cat > sw/lib/Tupfile << HERE
 include_rules
@@ -54,7 +54,7 @@ cat > sw/app/Tuprules.tup << HERE
 vars += app
 HERE
 
-tup touch sw/lib/Tupfile sw/app/core/Tupfile sw/Tuprules.tup sw/app/Tuprules.tup
+touch sw/lib/Tupfile sw/app/core/Tupfile sw/Tuprules.tup sw/app/Tuprules.tup
 update
 
 tup_dep_exist sw/lib 'echo sw lib > out.txt' sw/lib out.txt

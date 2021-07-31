@@ -19,11 +19,11 @@
 # Simple test to write to a file in another directory.
 
 . ./tup.sh
-tmkdir bar
+mkdir bar
 cat > Tupfile << HERE
 : |> echo hey > %o |> bar/foo.o
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

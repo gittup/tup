@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : <group> |> touch bar |> bar
 : bar |> cat foo bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_sticky_exist . '<group>' . 'touch bar'
@@ -36,7 +36,7 @@ cat > Tupfile << HERE
 : |> touch foo bar |> foo bar
 : bar |> cat foo bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg 'Missing input dependency'
 
 tup_object_no_exist . '<group>'

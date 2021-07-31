@@ -30,7 +30,7 @@ int main(void)
 }
 HERE
 cp foo.c bar.c
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

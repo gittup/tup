@@ -24,9 +24,9 @@ cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o |> %B.o
 HERE
 
-tmkdir sub
+mkdir sub
 
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 
 check_exist foo.o

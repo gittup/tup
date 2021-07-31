@@ -26,7 +26,7 @@ HERE
 
 echo "int main(void) {}" > foo.c
 echo '#include "bar.h"' > bar.c
-tup touch foo.c bar.c bar.h
+touch foo.c bar.c bar.h
 update
 
 tup_dep_exist . bar.h . 'clang -c bar.c -o bar.o'

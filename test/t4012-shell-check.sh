@@ -33,7 +33,7 @@ cat tmp > \$1
 rm tmp
 HERE
 chmod +x foo.sh
-tup touch Tupfile foo.sh
+touch Tupfile foo.sh
 update
 
 eotup

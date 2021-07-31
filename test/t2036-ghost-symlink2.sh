@@ -20,13 +20,14 @@
 # just because the symlink was.
 
 . ./tup.sh
-tup touch real
+touch real
 ln -s real foo
-tup touch foo
+touch foo
+tup scan
 tup_object_exist . real foo
 
 rm -f foo
-tup rm foo
+tup scan
 tup_object_no_exist . foo
 tup_object_exist . real
 

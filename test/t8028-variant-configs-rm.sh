@@ -22,10 +22,10 @@
 . ./tup.sh
 check_no_windows symlink
 
-tmkdir build-default
-tmkdir build-debug
+mkdir build-default
+mkdir build-debug
 
-tmkdir configs
+mkdir configs
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -37,7 +37,7 @@ echo "CONFIG_DEBUG=y" > configs/debug.config
 echo "" > configs/default.config
 ln -s ../configs/debug.config build-debug/tup.config
 ln -s ../configs/default.config build-default/tup.config
-tup touch Tupfile
+touch Tupfile
 
 update
 

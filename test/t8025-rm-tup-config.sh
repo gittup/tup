@@ -20,8 +20,8 @@
 # uses an @-variable, just those that would be affected by the change.
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 ifeq (@(FOO),y)
 : |> touch %o |> foo
@@ -33,7 +33,7 @@ ifeq (@(BAR),y)
 endif
 HERE
 echo "CONFIG_FOO=y" > tup.config
-tup touch foo/Tupfile bar/Tupfile
+touch foo/Tupfile bar/Tupfile
 update
 
 rm tup.config

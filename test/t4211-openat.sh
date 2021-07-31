@@ -44,8 +44,8 @@ cat > Tupfile << HERE
 : |> gcc prog.c -o %o |> prog.exe
 : prog.exe |> ./prog.exe |> output.txt sub/subout.txt
 HERE
-tmkdir sub
-tup touch input.txt sub/subin.txt Tupfile
+mkdir sub
+touch input.txt sub/subin.txt Tupfile
 update
 
 tup_dep_exist . input.txt . './prog.exe'

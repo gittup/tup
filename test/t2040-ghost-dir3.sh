@@ -27,12 +27,11 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 tup_object_exist . secret
 
 rm -f Tupfile
-tup rm Tupfile
 update
 
 tup_object_no_exist . secret

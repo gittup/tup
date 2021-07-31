@@ -23,16 +23,16 @@
 cat > Tupfile << HERE
 : |> touch bar |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
-tup touch Tupfile
+touch Tupfile
 refactor
 
 cat > Tupfile << HERE
 : |> touch bar |>
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to remove an output from a command: bar"
 
 eotup

@@ -44,22 +44,21 @@ int main(void)
 	return 0;
 }
 HERE
-tup touch target.txt
+touch target.txt
 ln -s target.txt slink.txt
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ./foo |>
 HERE
-tup touch slink.txt Tupfile
+touch slink.txt Tupfile
 update
 
 rm slink.txt
-tup rm slink.txt
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ln -s target.txt slink.txt && ./foo |> slink.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

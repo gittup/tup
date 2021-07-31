@@ -24,7 +24,7 @@ CFLAGS += '-DFOO'
 CFLAGS += '-DBAR'
 print("My cflags are: ", tostring(CFLAGS))
 HERE
-tup touch Tupfile.lua
+touch Tupfile.lua
 tup parse > .output.txt
 if ! grep 'My cflags are:.*-DFOO -DBAR' .output.txt > /dev/null; then
 	cat .output.txt

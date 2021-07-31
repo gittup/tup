@@ -26,7 +26,7 @@ file-@(GHOST) += bar.c
 HERE
 echo hey > foo.c
 echo yo > bar.c
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 varsetall FOO=3
 update
 tup_object_exist . "cat foo.c > foo.o"

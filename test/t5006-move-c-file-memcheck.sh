@@ -31,7 +31,6 @@ HERE
 # Verify both files are compiled
 echo "int foo(void) {return 0;}" > foo.c
 echo "void bar1(void) {}" > bar.c
-tup touch foo.c bar.c
 update
 sym_check foo.o foo
 sym_check bar.o bar1
@@ -39,8 +38,6 @@ sym_check libfoo.a foo bar1
 
 # Rename bar.c to realbar.c.
 mv bar.c realbar.c
-tup rm bar.c
-tup touch realbar.c
 MALLOC_TRACE=mout tup upd
 
 # Still seem to be some leaks in sqlite, even though I'm finalizing the

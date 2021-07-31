@@ -24,7 +24,7 @@
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c bar.c
+touch foo.c bar.c
 tup parse
 
 tup commandline foo.c > .tup/output.txt

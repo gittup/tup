@@ -34,7 +34,7 @@ cat > foo.c << HERE
 #include "foo.h"
 HERE
 
-tup touch Tupfile foo.c zap.c
+touch Tupfile foo.c zap.c
 update_fail -k
 
 if tup upd -k 2>&1 | grep gcc | wc -l | grep 1 > /dev/null; then

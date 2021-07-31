@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : foreach *.c |> ^ GCC %f^ gcc -c %f -o %o |> %B.o
 : *.o |> ^ GCC %f^ gcc %f -o %o |> prog.exe
 HERE
-tup touch foo.c bar.c baz.c
+touch foo.c bar.c baz.c
 echo "int main(void) {return 0;}" > foo.c
 update
 

@@ -31,7 +31,7 @@ cat > bar.tup << HERE
 : |> echo bar > %o |> file
 HERE
 
-tup touch Tupfile foo.tup bar.tup
+touch Tupfile foo.tup bar.tup
 parse
 tup_object_exist . 'echo foo > file'
 tup_dep_exist . foo.tup 0 .
@@ -42,7 +42,7 @@ var = bar
 include \$(var).tup
 HERE
 
-tup touch Tupfile
+touch Tupfile
 parse
 tup_object_exist . 'echo bar > file'
 tup_dep_no_exist . foo.tup 0 .

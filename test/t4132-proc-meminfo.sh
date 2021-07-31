@@ -29,7 +29,7 @@ set_full_deps
 cat > Tupfile << HERE
 : |> cat /proc/meminfo > %o |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 if echo -n "" | diff - output.txt > /dev/null; then

@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : |> touch baz |> baz
 : bar baz |> cat bar baz |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
@@ -33,7 +33,7 @@ cat > Tupfile << HERE
 : |> touch baz |> baz
 : |> cat bar baz |>
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to remove an input link: bar"
 refactor_fail_msg "Attempting to remove an input link: baz"
 

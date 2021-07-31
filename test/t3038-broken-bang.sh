@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 !cc | foo.h |> gcc -c %f -o %o |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Expecting '=' to set the bang rule"
 
 eotup

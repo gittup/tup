@@ -19,8 +19,8 @@
 # Try removing part of a variant directory.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
@@ -31,7 +31,7 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-tup touch build/tup.config Tupfile foo.c sub/bar.c
+touch build/tup.config Tupfile foo.c sub/bar.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe

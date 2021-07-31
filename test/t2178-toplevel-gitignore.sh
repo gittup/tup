@@ -27,12 +27,12 @@ cat > Tuprules.tup << HERE
 .gitignore
 : |> echo hey |>
 HERE
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 include_rules
 : |> touch foo |> foo
 HERE
-tmkdir sub2
+mkdir sub2
 cat > sub2/Tupfile << HERE
 : |> touch bar |> bar
 HERE
@@ -48,7 +48,7 @@ tup_dep_exist . 'Tuprules.tup' 0 .
 # include_rules
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 tup_dep_no_exist . 'Tuprules.tup' 0 .
 

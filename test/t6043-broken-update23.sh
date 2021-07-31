@@ -27,12 +27,12 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> echo hey > ok.txt; exit 1 |> ok.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "failed with return value 1"
 
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 check_not_exist ok.txt
 

@@ -22,13 +22,13 @@
 check_no_windows shell
 
 # First make a ghost
-tmkdir src
+mkdir src
 cat > src/Tupfile << HERE
 : |> if [ -f ../ghost ]; then echo yes; else echo no; fi |>
 HERE
 update
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : ../ghost/*.c |> echo %f |>
 HERE

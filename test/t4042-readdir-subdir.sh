@@ -20,7 +20,7 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cd sub
 cat > ok.sh << HERE
 echo hey > foo.txt

@@ -27,7 +27,7 @@ CC = echo \$(CC)
 : foreach *.c |> \$(CC) -c %f -o %o \$(CCARGS) |> %B.o
 : *.o |> \$(CC) -o prog %f |> prog
 HERE
-tup touch foo.c bar.c Tupfile
+touch foo.c bar.c Tupfile
 parse
 tup_object_exist . foo.c bar.c
 tup_object_exist . "echo gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"

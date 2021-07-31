@@ -31,7 +31,7 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |> log.txt foo.txt
 HERE
-tup touch Tupfile ok.sh
+touch Tupfile ok.sh
 update_fail_msg "failed with return value 2"
 
 check_exist log.txt

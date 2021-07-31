@@ -46,8 +46,8 @@ include_rules
 include \$(GITTUP_ROOT)/root.lua
 HERE
 
-tmkdir build
-tup touch foo.c build/tup.config
+mkdir build
+touch foo.c build/tup.config
 update
 
 eotup

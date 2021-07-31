@@ -35,7 +35,7 @@ HERE
 cat > run.sh << HERE
 if [ -f ../external/foo/bar/baz.txt ]; then cat ../external/foo/bar/baz.txt; else echo nofile; fi > out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 echo "nofile" | diff - out.txt

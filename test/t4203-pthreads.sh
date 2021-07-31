@@ -76,7 +76,7 @@ int main(void)
 	return 0;
 }
 HERE
-tup touch foo.txt bar.txt
+touch foo.txt bar.txt
 update
 
 eotup

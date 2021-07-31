@@ -31,7 +31,7 @@ chmod +x ok.sh
 cat > Tupfile << HERE
 : foreach *.in |> ./ok.sh %f %o |> %B.out
 HERE
-tup touch ok.sh Tupfile 0.in 1.in 2.in 3.in 4.in 5.in 6.in 7.in 8.in 9.in
+touch ok.sh Tupfile 0.in 1.in 2.in 3.in 4.in 5.in 6.in 7.in 8.in 9.in
 update -j10
 
 for i in `seq 0 9`; do

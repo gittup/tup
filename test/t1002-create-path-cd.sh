@@ -17,8 +17,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 . ./tup.sh
-tmkdir foo
+mkdir foo
 cd foo
+tup scan
 tup touch bar.c
 cd ..
 tup_object_exist foo bar.c

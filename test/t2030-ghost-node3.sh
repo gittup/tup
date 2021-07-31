@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 tup_object_exist . ghost
 echo nofile | diff output.txt -
@@ -37,7 +37,7 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 : foreach g* |> cat %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_object_no_exist . 'cat ghost'
 update
@@ -47,7 +47,7 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 : ghost |> cat %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse_fail_msg "Explicitly named file 'ghost' is a ghost file, so it can't be used as an input"
 
 eotup

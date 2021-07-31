@@ -23,7 +23,7 @@ cat > Tupfile << HERE
 : |> echo foo |>
 
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

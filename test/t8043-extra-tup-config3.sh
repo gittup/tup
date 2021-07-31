@@ -20,8 +20,8 @@
 # Make sure it gets used after the variant is deleted.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > Tupfile << HERE
 .gitignore
@@ -36,7 +36,7 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > tup.config
-tup touch Tupfile foo.c sub/bar.c
+touch Tupfile foo.c sub/bar.c
 update
 
 check_not_exist build/prog.exe

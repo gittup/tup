@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 : |> touch %o |> foo/out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 check_exist foo/out.txt
@@ -38,7 +38,7 @@ check_exist foo/out.txt
 rm -rf foo
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 check_not_exist foo

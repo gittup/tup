@@ -33,8 +33,8 @@ cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 include_rules
 : |> touch %o |> foo.txt | \$(MY_ROOT)/<txt>
@@ -56,7 +56,7 @@ cat > foo/Tupfile << HERE
 include_rules
 : |> touch %o |> foo.txt newfoo.txt | \$(MY_ROOT)/<txt>
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 check_list foo/foo.txt mylist.txt
@@ -67,7 +67,7 @@ cat > foo/Tupfile << HERE
 include_rules
 : |> touch %o |> foo.txt | \$(MY_ROOT)/<txt>
 HERE
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 check_list foo/foo.txt mylist.txt

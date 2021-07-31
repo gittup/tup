@@ -23,14 +23,14 @@
 cat > Tupfile << HERE
 : |> echo hey > %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> out.txt
 : |> echo hey > %o |> out2.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 touch .tup/tmp/0
 update
 

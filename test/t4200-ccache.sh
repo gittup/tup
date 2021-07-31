@@ -29,11 +29,11 @@ set_full_deps
 cat > Tupfile << HERE
 : foreach *.c |> ccache gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c bar.c
+touch foo.c bar.c
 update
 
 echo 'int x;' > foo.c
-tup touch foo.c bar.c
+touch foo.c bar.c
 update
 
 eotup

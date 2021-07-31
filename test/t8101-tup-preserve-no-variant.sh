@@ -19,24 +19,24 @@
 # Use !tup_preserve without any variants.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : |> touch %o |> gen.txt
 HERE
-tup touch Tupfile file.html file2.html
+touch Tupfile file.html file2.html
 update
 
 check_exist file.html file2.html gen.txt
 
-tmkdir sub
-tmkdir sub/bar
+mkdir sub
+mkdir sub/bar
 cat > sub/bar/Tupfile << HERE
 : file2.html |> !tup_preserve |>
 : |> touch %o |> gen2.txt
 HERE
-tup touch sub/bar/Tupfile sub/bar/file2.html
+touch sub/bar/Tupfile sub/bar/file2.html
 update
 
 check_exist sub/bar/file2.html sub/bar/gen2.txt

@@ -37,13 +37,13 @@ cat > Tupfile << HERE
 : foo.c |> sh ok.sh |> foo.o
 HERE
 touch foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update_fail_msg "\(File '.*sub.dir.bar' was written to\|Directory.*sub/dir.*Only temporary directories can be created\)"
 
 cat > Tupfile << HERE
 : foo.c |> sh ok.sh |> foo.o sub/dir/bar
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

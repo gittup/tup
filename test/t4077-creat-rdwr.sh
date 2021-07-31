@@ -51,7 +51,7 @@ cat > Tupfile << HERE
 : |> gcc ok.c -o %o |> ok.exe
 : ok.exe |> ./%f |> out.txt
 HERE
-tup touch ok.c Tupfile
+touch ok.c Tupfile
 update
 
 eotup

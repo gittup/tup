@@ -2438,7 +2438,7 @@ static int process_output(struct server *s, struct node *n,
 	FILE *f;
 	int is_err = 1;
 	struct timespan *show_ts = NULL;
-	time_t ms = -1;
+	struct timespec ms = {-1, 0};
 	struct tup_entry *tent = n->tent;
 	int *warning_dest;
 	int important_link_removed = 0;
@@ -2461,7 +2461,7 @@ static int process_output(struct server *s, struct node *n,
 			if(write_files(f, tent->tnode.tupid, &s->finfo, warning_dest, CHECK_SUCCESS, full_deps, tup_entry_vardt(tent), &important_link_removed) == 0) {
 				timespan_end(ts);
 				show_ts = ts;
-				ms = timespan_milliseconds(ts);
+				ms.tv_sec = timespan_milliseconds(ts);
 
 				/* Hooray! */
 				is_err = 0;
@@ -2538,7 +2538,7 @@ static int process_output(struct server *s, struct node *n,
 
 	if(is_err)
 		return -1;
-	if(tent->mtime != ms)
+	if(tent->mtime.tv_sec != ms.tv_sec)
 		if(tup_db_set_mtime(tent, ms) < 0)
 			return -1;
 	return 0;

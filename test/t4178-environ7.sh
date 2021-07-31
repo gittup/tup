@@ -31,14 +31,14 @@ tup_dep_exist $ FOO . 'touch out.txt'
 cat > Tupfile << HERE
 : |> touch %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 
 cat > Tupfile << HERE
 export FOO
 : |> touch %o |> out.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_exist $ FOO . 'touch out.txt'

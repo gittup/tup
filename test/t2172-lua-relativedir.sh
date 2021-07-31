@@ -22,8 +22,8 @@
 cat > Tuprules.lua << HERE
 myroot = tup.getcwd()
 HERE
-tmkdir foo
-tmkdir foo/bar
+mkdir foo
+mkdir foo/bar
 cat > Tupdefault.lua << HERE
 tup.rule("echo " .. tup.getrelativedir(myroot))
 HERE

@@ -30,7 +30,7 @@ parse_fail_msg "Unable to output to a different directory because 'foo.bar.baz' 
 cat > Tupfile << HERE
 : |> echo foo > %o |> foo/bar/baz
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

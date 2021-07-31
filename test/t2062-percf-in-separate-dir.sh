@@ -19,12 +19,12 @@
 # Try to write a file in a different directory using %f.
 
 . ./tup.sh
-tmkdir sub
+mkdir sub
 touch sub/foo.c
 cat > Tupfile << HERE
 : sub/foo.c |> gcc -c %f -o %o |> %f.o
 HERE
-tup touch sub/foo.c Tupfile
+touch sub/foo.c Tupfile
 update
 
 check_exist sub/foo.c.o

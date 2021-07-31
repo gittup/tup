@@ -25,10 +25,10 @@ cat > Tupfile << HERE
 HERE
 echo '#include "foo.h"' > foo.c
 echo '#include "foo.h"' > bar.c
-tup touch foo.c bar.c foo.h
+touch foo.c bar.c foo.h
 update
 
-tup touch foo.h
+touch foo.h
 update_partial foo.o > .output.txt
 
 if grep bar.o .output.txt > /dev/null; then

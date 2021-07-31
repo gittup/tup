@@ -22,8 +22,8 @@
 # after all files are parsed and old commands are deleted.
 . ./tup.sh
 
-tmkdir sub1
-tmkdir sub2
+mkdir sub1
+mkdir sub2
 
 cat > sub1/Tupfile << HERE
 : <foo> |> echo blah > %o |> output.txt | <bar>
@@ -35,7 +35,7 @@ HERE
 cat > sub2/Tupfile << HERE
 : <bar> |> echo blah > %o |> output.txt | <foo>
 HERE
-tup touch sub1/Tupfile sub2/Tupfile
+touch sub1/Tupfile sub2/Tupfile
 update
 
 eotup

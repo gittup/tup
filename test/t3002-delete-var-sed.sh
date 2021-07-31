@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 HERE
 echo "hey @FOO@ yo" > foo.txt
 echo "This is an email@address.com" >> foo.txt
-tup touch foo.txt Tupfile
+touch foo.txt Tupfile
 varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt
@@ -34,7 +34,7 @@ tup_object_exist . "tup varsed foo.txt out.txt"
 
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_no_exist . out.txt

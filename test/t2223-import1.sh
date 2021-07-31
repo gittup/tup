@@ -21,8 +21,8 @@
 . ./tup.sh
 
 export CC=gcc
-tmkdir sub1
-tmkdir sub2
+mkdir sub1
+mkdir sub2
 cat > sub1/Tupfile << HERE
 import CC
 : foreach *.c |> \$(CC) -c %f -o %o |> %B.o
@@ -50,7 +50,7 @@ echo 'marf was here' | diff - sub1/foo.o
 cat > sub1/Tupfile << HERE
 : foreach *.c |> sh marfcc -c %f -o %o |> %B.o
 HERE
-tup touch sub1/Tupfile
+touch sub1/Tupfile
 update
 
 tup_dep_no_exist $ CC . sub1

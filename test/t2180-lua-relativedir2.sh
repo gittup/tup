@@ -19,8 +19,8 @@
 # Check tup.getrelativedir() with a bad directory.
 
 . ./tup.sh
-tmkdir foo
-tmkdir foo/bar
+mkdir foo
+mkdir foo/bar
 cat > Tupdefault.lua << HERE
 tup.rule("echo " .. tup.getrelativedir(nil))
 HERE

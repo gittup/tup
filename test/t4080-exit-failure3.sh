@@ -34,7 +34,7 @@ echo goodtext > badfile.txt
 cat > Tupfile << HERE
 : |> sh ok.sh |> log.txt foo.txt
 HERE
-tup touch Tupfile ok.sh badfile.txt
+touch Tupfile ok.sh badfile.txt
 update_fail_msg 'Unspecified output: badfile.txt'
 
 check_exist log.txt

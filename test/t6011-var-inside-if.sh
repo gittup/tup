@@ -27,7 +27,7 @@ CC = gcc
 endif
 HERE
 
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update
 
 eotup

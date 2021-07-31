@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 .gitignore
 : |> touch %o |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 gitignore_good foo .gitignore
@@ -34,7 +34,7 @@ cat > Tupfile << HERE
 : |> touch %o |> foo
 borkbork
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "Syntax error parsing Tupfile line 3"
 
 gitignore_good foo .gitignore

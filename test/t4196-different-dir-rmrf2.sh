@@ -19,12 +19,12 @@
 # Similar to t4195, but this time we create a new file in place of the target directory.
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> touch %o |> ../out/foo.txt
 HERE
-tmkdir out
-tup touch out/bar.txt
+mkdir out
+touch out/bar.txt
 update
 
 rm -rf out

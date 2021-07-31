@@ -23,7 +23,7 @@
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c bar.c
+touch foo.c bar.c
 compiledb 2> .tup/output.txt
 
 if ! grep 'tup warning: No commands exported' .tup/output.txt > /dev/null; then
@@ -34,7 +34,7 @@ fi
 cat > Tupfile << HERE
 : foreach *.c |> ^j^ gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile
+touch Tupfile
 compiledb
 
 for i in foo.c bar.c; do

@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-tup touch ok.sh Tupfile
+touch ok.sh Tupfile
 update
 echo nofile | diff output.txt -
 
@@ -35,7 +35,7 @@ cat > Tupfile << HERE
 : ghost |> ./ok.sh > %o |> output.txt
 HERE
 
-tup touch Tupfile
+touch Tupfile
 update
 echo alive | diff output.txt -
 

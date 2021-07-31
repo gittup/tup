@@ -26,7 +26,7 @@ cat > data.txt << HERE
 foo
 bar
 HERE
-tmkdir sub
+mkdir sub
 cd sub
 re_init
 set_full_deps

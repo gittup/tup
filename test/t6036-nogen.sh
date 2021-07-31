@@ -33,7 +33,7 @@ check_empty_create()
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c
+touch foo.c
 parse
 check_empty_create
 

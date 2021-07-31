@@ -20,14 +20,14 @@
 
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 include_rules
 HERE
 update
 
 # Touch a file in the top-level directory to trigger parsing there.
-tup touch foo
+touch foo
 update
 
 eotup

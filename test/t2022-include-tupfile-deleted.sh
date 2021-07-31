@@ -24,25 +24,23 @@ include yo/Install.tup
 : |> echo foo |>
 HERE
 
-tmkdir yo
+mkdir yo
 cat > yo/Install.tup << HERE
 : |> echo bar |>
 HERE
 
-tup touch yo/Install.tup Tupfile
+touch yo/Install.tup Tupfile
 update
 tup_object_exist . 'echo foo'
 tup_object_exist . 'echo bar'
 
 rm yo/Install.tup
-tup rm yo/Install.tup
 rmdir yo
-tup rm yo
 
 cat > Tupfile << HERE
 : |> echo foo |>
 HERE
-# Note: Do not 'tup touch Tupfile' - want to see if rming Install.tup causes it
+# Note: Do not 'touch Tupfile' - want to see if rming Install.tup causes it
 # to be re-parsed. But I also want to parse it successfully so I can see the
 # command gets removed.
 

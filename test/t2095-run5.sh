@@ -29,11 +29,11 @@ for i in sub/*.[co]; do
 done
 HERE
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch Tupfile ok.sh sub/foo.c sub/bar.c
+touch Tupfile ok.sh sub/foo.c sub/bar.c
 update_fail_msg 'Fuse server reported an access violation'
 
 # TODO: Allow readdir() to parse subdirs automatically? Would cause a loop

@@ -21,8 +21,8 @@
 # it should get rebuilt.
 . ./tup.sh
 
-tmkdir build-foo
-tmkdir sub
+mkdir build-foo
+mkdir sub
 
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

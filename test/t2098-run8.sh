@@ -22,7 +22,7 @@ check_no_windows run-script
 
 export PATH=$PWD/a:$PATH
 
-tmkdir a
+mkdir a
 cat > a/gen.sh << HERE
 #! /bin/sh
 for i in *.c; do
@@ -30,7 +30,7 @@ for i in *.c; do
 done
 HERE
 
-tmkdir b
+mkdir b
 cat > b/gen.sh << HERE
 #! /bin/sh
 for i in *.c; do
@@ -40,7 +40,7 @@ HERE
 chmod +x a/gen.sh b/gen.sh
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile a/gen.sh b/gen.sh foo.c bar.c
+touch Tupfile a/gen.sh b/gen.sh foo.c bar.c
 update
 
 # We should only get the directory-level dependency on PATH when we actually
@@ -50,7 +50,7 @@ tup_dep_no_exist $ PATH 0 .
 cat > Tupfile << HERE
 run gen.sh
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_dep_exist $ PATH 0 .

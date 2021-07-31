@@ -36,7 +36,7 @@ ln -s realvars.lua vars.lua
 
 echo "int main(void) {return 0;}" > foo.c
 touch bar.c
-tup touch foo.c bar.c Tupfile.lua vars.lua
+touch foo.c bar.c Tupfile.lua vars.lua
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
@@ -50,7 +50,7 @@ CC = 'gcc -W'
 CCARGS = '-DFOO=1'
 CCARGS += '-DBAR=1'
 HERE
-tup touch realvars.lua
+touch realvars.lua
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_no_exist . "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"

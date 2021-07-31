@@ -21,7 +21,7 @@
 check_no_windows symlink
 
 ln -s ../t5055-sym-outside-tup.sh foo
-tup touch foo
+touch foo
 update
 
 eotup

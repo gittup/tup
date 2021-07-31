@@ -19,8 +19,8 @@
 # Try rm -rf'ing a variant directory.
 . ./tup.sh
 
-tmkdir build
-tmkdir build-debug
+mkdir build
+mkdir build-debug
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -30,7 +30,7 @@ endif
 HERE
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
 echo "" > build/tup.config
-tup touch build/tup.config build-debug/tup.config Tupfile
+touch build/tup.config build-debug/tup.config Tupfile
 
 update
 check_exist build/bar

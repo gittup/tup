@@ -22,8 +22,8 @@
 
 . ./tup.sh
 
-tmkdir foo
-tmkdir bar
+mkdir foo
+mkdir bar
 cat > foo/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libfoo.a
@@ -34,12 +34,12 @@ HERE
 echo "int marfx;" > foo/x.c
 echo "int marfy;" > foo/y.c
 echo "int marfz;" > bar/z.c
-tup touch foo/Tupfile bar/Tupfile
+touch foo/Tupfile bar/Tupfile
 update
 
 sym_check foo/libfoo.a marfx marfy ^marfz
 
-tup touch foo/Tupfile
+touch foo/Tupfile
 update
 
 sym_check foo/libfoo.a marfx marfy ^marfz

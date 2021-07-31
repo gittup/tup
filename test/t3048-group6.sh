@@ -29,7 +29,7 @@ tup_sticky_exist . '<group>' . 'touch foo'
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_no_exist . '<group>'

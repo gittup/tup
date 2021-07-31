@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> touch foo |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_dep_exist . 'touch foo' . bar
 
@@ -30,7 +30,7 @@ cat > Tupfile << HERE
 : |> touch foo |> foo
 : |> touch bar |> bar
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_dep_exist . 'touch foo' . foo
 tup_dep_exist . 'touch bar' . bar

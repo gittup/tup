@@ -19,7 +19,7 @@
 # Try to use a %-flag in a variable name.
 . ./tup.sh
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 NAME = %d
 : |> touch %o |> \$(NAME).out

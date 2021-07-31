@@ -23,12 +23,12 @@
 cat > Tupfile << HERE
 : |> echo foo |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 cat > Tupfile << HERE
 HERE
-tup touch Tupfile
+touch Tupfile
 refactor_fail_msg "Attempting to delete a command: echo foo"
 
 eotup

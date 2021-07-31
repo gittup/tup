@@ -20,17 +20,17 @@
 # Tupfile to try to include it.
 
 . ./tup.sh
-tmkdir fs
-tmkdir fs/sub
+mkdir fs
+mkdir fs/sub
 cat > fs/Tupfile << HERE
 include_rules
 : foreach *.c |> gcc \$(CFLAGS) -c %f -o %o |> %B.o
 : *.o |> gcc \$(LDFLAGS) %f -o %o |> prog
 HERE
 
-tup touch fs/Tupfile
-tup touch fs/ok.c
-tup touch fs/sub/helper.c
+touch fs/Tupfile
+touch fs/ok.c
+touch fs/sub/helper.c
 parse
 
 tup_object_exist fs 'gcc  -c ok.c -o ok.o'
@@ -38,7 +38,7 @@ tup_object_exist fs 'gcc  -c ok.c -o ok.o'
 tup_dep_exist . Tuprules.tup . fs
 
 cp fs/Tupfile fs/sub/Tupfile
-tup touch fs/sub/Tupfile
+touch fs/sub/Tupfile
 parse
 
 tup_object_exist fs/sub 'gcc  -c helper.c -o helper.o'

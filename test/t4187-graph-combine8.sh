@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : |> ^ TEST1^ cat input2.txt |>
 : |> ^ TEST2^ cat input3.txt |>
 HERE
-tup touch input1.txt input2.txt input3.txt
+touch input1.txt input2.txt input3.txt
 update
 
 tup graph . --combine > ok.dot

@@ -26,12 +26,12 @@
 . ./tup.sh
 check_no_windows shell
 
-tmkdir secret
+mkdir secret
 
 cat > Tupfile << HERE
 : |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 echo 'nofile' | diff - output.txt
 
@@ -39,7 +39,7 @@ rmdir secret
 update
 echo 'nofile' | diff - output.txt
 
-tmkdir secret
+mkdir secret
 echo 'foo' > secret/ghost
 update
 echo 'foo' | diff - output.txt

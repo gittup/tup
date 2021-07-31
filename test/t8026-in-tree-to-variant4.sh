@@ -20,7 +20,7 @@
 # the in-tree build.
 . ./tup.sh
 
-tmkdir build
+mkdir build
 
 cat > Tupfile << HERE
 .gitignore
@@ -30,7 +30,7 @@ endif
 : |> touch %o |> bar
 HERE
 echo 'CONFIG_DEBUG=y' > tup.config
-tup touch Tupfile tup.config
+touch Tupfile tup.config
 update
 
 check_exist foo bar

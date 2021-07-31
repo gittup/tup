@@ -19,23 +19,23 @@
 # Make sure a new src directory gets propagated to all variants.
 . ./tup.sh
 
-tmkdir build
-tmkdir build-debug
+mkdir build
+mkdir build-debug
 
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-tup touch build/tup.config build-debug/tup.config
+touch build/tup.config build-debug/tup.config
 
 update
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 ifeq (@(DEBUG),y)
 : |> touch %o |> foo
 endif
 : |> touch %o |> bar
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 update
 
 check_exist build/sub/bar

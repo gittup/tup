@@ -33,7 +33,7 @@ mkfifo foofifo
 cat > Tupfile << HERE
 : |> echo hi |>
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

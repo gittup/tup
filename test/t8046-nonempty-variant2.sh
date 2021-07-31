@@ -19,13 +19,13 @@
 # Create a normal file inside a variant directory after the variant is used.
 . ./tup.sh
 
-tmkdir build
-tmkdir sub
+mkdir build
+mkdir sub
 
 cat > sub/Tupfile << HERE
 : |> touch %o |> generated
 HERE
-tup touch build/tup.config
+touch build/tup.config
 update
 
 touch build/sub/normal

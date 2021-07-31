@@ -46,7 +46,7 @@ cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> ok
 : ok |> ./%f |>
 HERE
-tup touch ok.c foo.txt Tupfile
+touch ok.c foo.txt Tupfile
 update
 
 tup_dep_exist . foo.txt . ./ok

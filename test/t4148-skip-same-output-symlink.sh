@@ -44,7 +44,7 @@ ln -s linka a
 ln -s linkb b
 ln -s clink c
 HERE
-tup touch ok.sh
+touch ok.sh
 update > .output.txt
 
 gitignore_bad linka .output.txt

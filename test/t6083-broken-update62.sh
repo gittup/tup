@@ -105,7 +105,7 @@ int main(void)
 	return 0;
 }
 HERE
-tup touch ok.txt
+touch ok.txt
 update
 
 eotup

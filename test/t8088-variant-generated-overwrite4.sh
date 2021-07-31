@@ -19,20 +19,20 @@
 # Similar to t8029, but now we generate rules from an included file.
 . ./tup.sh
 
-tmkdir build-default
+mkdir build-default
 
 cat > Tuprules.tup << HERE
 MY_ROOT = \$(TUP_CWD)
 HERE
 
-tmkdir init
+mkdir init
 cat > init/Tupfile << HERE
 include_rules
 include \$(MY_ROOT)/proj/install.tup
 HERE
 
-tmkdir proj
-tmkdir proj/gen
+mkdir proj
+mkdir proj/gen
 cat > proj/install.tup << HERE
 : |> touch %o |> gen
 HERE

@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 !cc = |> gcc -c %f -o %o |> %B.o
 : foreach *.c |> !cc |> | <objs>
 HERE
-tup touch Tupfile foo.c bar.c
+touch Tupfile foo.c bar.c
 update
 
 eotup

@@ -23,14 +23,13 @@
 mkdir real
 cd real
 re_init
-tmkdir sub
+mkdir sub
 echo ': |> echo blah |>' > sub/Test.tup
 echo 'include sub/Test.tup' > Tupfile
-tup touch Tupfile sub/Test.tup
+touch Tupfile sub/Test.tup
 update
 
 mv sub ..
-tup rm sub
 update_fail
 
 eotup

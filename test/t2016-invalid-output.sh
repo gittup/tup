@@ -23,10 +23,10 @@
 cat > Tupfile << HERE
 : foo.c |> gcc -c foo.c -o foo.o |> bar/foo.o
 HERE
-tmkdir bar
-tup touch bar/hey
+mkdir bar
+touch bar/hey
 touch foo.c
-tup touch foo.c Tupfile
+touch foo.c Tupfile
 update_fail
 
 eotup

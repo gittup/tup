@@ -20,8 +20,8 @@
 
 . ./tup.sh
 
-tmkdir sub
-tmkdir sub/dir2
+mkdir sub
+mkdir sub/dir2
 touch sub/dir2/a1.txt
 touch sub/dir2/a2.txt
 cd sub

@@ -29,7 +29,7 @@ update_fail_msg "Failed to find directory ID for dir 'foo/baz/\*.txt' relative t
 
 rm Tupfile
 
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : |> touch %o |> ../foo/baz/out.txt
 HERE

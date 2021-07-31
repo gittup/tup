@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : out.txt |> cat %f > %o |> new.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
-tup touch foo.txt Tupfile
+touch foo.txt Tupfile
 varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt new.txt

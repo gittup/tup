@@ -31,7 +31,7 @@ for i in *.c; do
 	echo ": \$i|> gcc -c %f -o %o |> %B.o"
 done
 HERE
-tup touch Tupfile ok.sh bar.c
+touch Tupfile ok.sh bar.c
 update
 
 check_exist bar.o

@@ -24,7 +24,7 @@
 
 . ./tup.sh
 
-tmkdir include
+mkdir include
 cat > ok.sh << HERE
 if [ -f include/ghost ]; then cat include/ghost; else echo nofile; fi
 HERE
@@ -34,13 +34,13 @@ cat > Tupfile << HERE
 HERE
 chmod +x ok.sh
 cp ok.sh foo.sh
-tup touch ok.sh foo.sh Tupfile
+touch ok.sh foo.sh Tupfile
 update
 echo nofile | diff output.txt -
 echo nofile | diff foo-output.txt -
 
 echo 'alive' > include/ghost
-tup touch include/ghost
+touch include/ghost
 update
 echo alive | diff output.txt -
 echo alive | diff foo-output.txt -

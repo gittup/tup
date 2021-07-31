@@ -30,16 +30,13 @@ cat > Tupfile << HERE
 HERE
 chmod +x ok.sh
 ln -s ghost foo
-tup touch foo ok.sh Tupfile
 update
 echo nofile | diff output.txt -
 
 rm -f foo
-tup rm foo
 tup_object_exist . ghost
 
 echo 'alive' > ghost
-tup touch ghost
 update
 echo alive | diff output.txt -
 

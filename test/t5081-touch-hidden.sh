@@ -27,10 +27,10 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |>
 HERE
-tup touch Tupfile input.txt
+touch Tupfile input.txt
 update
 
-tup touch input.txt
+touch input.txt
 update
 
 eotup

@@ -22,19 +22,19 @@
 cat > Tupfile << HERE
 : |> echo foo > %o |> .git
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "You specified a path '.git'"
 
 cat > Tupfile << HERE
 : |> echo foo > %o |> foo/.git
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "You specified a path 'foo/.git'"
 
 cat > Tupfile << HERE
 : |> echo foo > %o |> foo/.git/baz
 HERE
-tup touch Tupfile
+touch Tupfile
 update_fail_msg "You specified a path 'foo/.git/baz'"
 
 eotup

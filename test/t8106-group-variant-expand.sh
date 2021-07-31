@@ -20,9 +20,9 @@
 
 . ./tup.sh
 
-tmkdir sub
-tmkdir sub2
-tmkdir sub3
+mkdir sub
+mkdir sub2
+mkdir sub3
 cat > sub/Tupfile << HERE
 : foreach *.h.in |> cp %f %o |> %B ../<foo-autoh>
 HERE
@@ -35,10 +35,10 @@ HERE
 echo '#define FOO 3' > sub/foo.h.in
 echo '#define BAR 4' > sub2/bar.h.in
 echo '#define BAZ 5' > sub2/baz.h.in
-tmkdir build
-tmkdir build2
-tup touch build/tup.config
-tup touch build2/tup.config
+mkdir build
+mkdir build2
+touch build/tup.config
+touch build2/tup.config
 update
 
 # Windows has an extra space and \r at the end, so ignore trailing whitespace (\s*)

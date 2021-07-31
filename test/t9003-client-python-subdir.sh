@@ -22,7 +22,7 @@
 check_no_windows client
 check_python
 
-tmkdir sub
+mkdir sub
 
 cat > sub/foo.py << HERE
 import tup_client
@@ -36,7 +36,7 @@ HERE
 cat > sub/Tupfile << HERE
 : |> PYTHONPATH=../../.. python -B foo.py |>
 HERE
-tup touch sub/Tupfile
+touch sub/Tupfile
 update
 
 tup_object_exist tup.config BAZ
@@ -53,7 +53,7 @@ if tup_client.config_var('BAR') != "hey":
 if tup_client.config_var('BAZ') is not None:
 	raise Exception("No: BAZ")
 HERE
-tup touch sub/foo.py
+touch sub/foo.py
 update
 
 tup_object_exist tup.config BAZ
@@ -65,7 +65,7 @@ if tup_client.config_var('FOO') != "y":
 if tup_client.config_var('BAR') != "hey":
 	raise Exception("No: BAR")
 HERE
-tup touch sub/foo.py
+touch sub/foo.py
 update
 
 tup_object_no_exist tup.config BAZ

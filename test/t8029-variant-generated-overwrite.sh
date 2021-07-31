@@ -22,7 +22,7 @@
 # normal files are.
 . ./tup.sh
 
-tmkdir build-default
+mkdir build-default
 
 cat > Tupfile << HERE
 ifeq (@(DEBUG),y)
@@ -31,7 +31,7 @@ endif
 : |> touch %o |> bar
 HERE
 echo "" > build-default/tup.config
-tup touch bar Tupfile
+touch bar Tupfile
 
 update_fail_msg "Attempting to insert 'bar' as a generated node.*in the source directory"
 

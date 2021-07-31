@@ -27,7 +27,7 @@ flags_foo += '-y'
 tup.foreach_rule(pages, 'echo %f \$(flags) \$(flags_%B)')
 HERE
 
-tup touch Tupfile.lua foo.html bar.html
+touch Tupfile.lua foo.html bar.html
 parse
 
 tup_object_exist . 'echo foo.html -x -y'

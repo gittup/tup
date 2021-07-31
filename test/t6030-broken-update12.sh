@@ -26,18 +26,17 @@
 # This test just mimics how it was discovered.
 
 . ./tup.sh
-tmkdir sub
+mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
 cat > Tupfile << HERE
 : sub/*.o |> ar rcs %o %f |> libfoo.a
 HERE
-tup touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
+touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
 update
 
 rm sub/bar.c
-tup rm sub/bar.c
 update
 
 eotup

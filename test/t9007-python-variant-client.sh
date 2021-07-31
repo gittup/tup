@@ -22,7 +22,7 @@
 check_no_windows client
 check_python
 
-tmkdir build
+mkdir build
 touch build/tup.config
 cat > foo.py << HERE
 import tup_client
@@ -36,14 +36,14 @@ HERE
 cat > Tupfile << HERE
 run PYTHONPATH=../.. python -B \$(TUP_CWD)/foo.py
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 tup_object_exist build/tup.config BAZ
 
 varsetall FOO=y BAR=hey
 mv tup.config build
-tup touch build/tup.config
+touch build/tup.config
 update_fail_msg 'Exception: No: FOO'
 
 eotup

@@ -25,7 +25,7 @@ set_full_deps
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-tup touch foo.c
+touch foo.c
 update
 sym_check foo.o main
 
@@ -45,7 +45,6 @@ esac
 tup_object_exist $path $filename
 
 rm Tupfile
-tup rm Tupfile
 update
 tup_object_no_exist $path $filename
 

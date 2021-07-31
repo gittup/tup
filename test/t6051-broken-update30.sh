@@ -40,7 +40,7 @@ cat > Tupfile << HERE
 : a |> ./ok.sh |> b
 : |> touch %o |> cwin
 HERE
-tup touch a ok.sh Tupfile
+touch a ok.sh Tupfile
 update
 
 cat > ok.sh << HERE
@@ -50,7 +50,7 @@ HERE
 cat > Tupfile << HERE
 : a |> ./ok.sh |> cwin
 HERE
-tup touch Tupfile
+touch Tupfile
 update
 
 eotup

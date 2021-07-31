@@ -32,7 +32,7 @@ entry()
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-tup touch foo.c bar.c 1
+touch foo.c bar.c 1
 update
 
 entry foo.c foo.c

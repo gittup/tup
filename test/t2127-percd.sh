@@ -24,13 +24,13 @@ cat > Tupfile << HERE
 : |> echo %d |>
 HERE
 
-tmkdir foo
+mkdir foo
 cat > foo/Tupfile << HERE
 : |> echo %o |> %d
 HERE
 
-tmkdir bar
-tmkdir bar/baz
+mkdir bar
+mkdir bar/baz
 cat > bar/Tupfile << HERE
 : |> echo %o |> %d
 HERE

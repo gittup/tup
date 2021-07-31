@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : |> touch %o |> bar.h
 : foo.c | bar.h |> cat %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 
 tup_sticky_exist . foo.c . 'cat foo.c'
@@ -35,7 +35,7 @@ cat > Tupfile << HERE
 : |> touch %o |> bar.h
 : foo.c |> cat %f |>
 HERE
-tup touch Tupfile
+touch Tupfile
 parse
 tup_sticky_exist . foo.c . 'cat foo.c'
 tup_sticky_no_exist . bar.h . 'cat foo.c'

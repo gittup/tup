@@ -22,8 +22,8 @@
 cat > Tupfile << HERE
 : foreach *.c [123].d ?.e |> cat %f |>
 HERE
-tup touch foo.c bar.c 1.d 2.d 3.d 5.e Tupfile
-tup touch boo.cc 4.d 52.e
+touch foo.c bar.c 1.d 2.d 3.d 5.e Tupfile
+touch boo.cc 4.d 52.e
 update
 for i in foo.c bar.c 1.d 2.d 3.d 5.e; do
 	check_exist $i

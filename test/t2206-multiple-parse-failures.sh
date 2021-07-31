@@ -20,7 +20,7 @@
 # output list.
 
 . ./tup.sh
-tup touch foo bar
+touch foo bar
 cat > Tupfile << HERE
 : |> touch %o |> foo bar
 HERE
