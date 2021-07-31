@@ -489,7 +489,7 @@ static int attach_transient_nodes(struct graph *g)
 			return -1;
 		LIST_FOREACH(e, &cmdnode->edges, list) {
 			g->cur = e->dest;
-			if(tup_db_select_node_by_link(attach_transient_cb, g, g->cur->tnode.tupid) < 0)
+			if(tup_db_select_node_by_sticky_link(attach_transient_cb, g, g->cur->tnode.tupid) < 0)
 				return -1;
 
 			/* We only need to keep the command if:

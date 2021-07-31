@@ -159,6 +159,8 @@ int tup_db_set_srcid_dir_flags(tupid_t tupid);
 int tup_db_set_dependent_config_flags(tupid_t tupid);
 int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			       void *arg, tupid_t tupid);
+int tup_db_select_node_by_sticky_link(int (*callback)(void *, struct tup_entry *),
+				      void *arg, tupid_t tupid);
 int tup_db_select_node_by_group_link(int (*callback)(void *, struct tup_entry *, struct tup_entry *),
 				     void *arg, tupid_t tupid);
 int tup_db_select_node_by_distinct_group_link(int (*callback)(void *, struct tup_entry *),

@@ -181,6 +181,7 @@ static int link_insert(tupid_t a, tupid_t b, int style);
 static int link_remove(tupid_t a, tupid_t b, int style);
 static int group_link_insert(tupid_t a, tupid_t b, tupid_t cmdid);
 static int group_link_remove(tupid_t a, tupid_t b, tupid_t cmdid);
+static int get_sticky_outputs(tupid_t tupid, struct tent_entries *root);
 static int delete_group_links(tupid_t cmdid);
 static int get_normal_inputs(tupid_t cmdid, struct tent_entries *root, int ghost_check);
 static int node_has_ghosts(tupid_t tupid);
@@ -4423,6 +4424,24 @@ int tup_db_select_node_by_link(int (*callback)(void *, struct tup_entry *),
 			return -1;
 	}
 	free_tent_list(&tent_list);
+
+	return 0;
+}
+
+int tup_db_select_node_by_sticky_link(int (*callback)(void *, struct tup_entry *),
+				      void *arg, tupid_t tupid)
+{
+	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
+	struct tent_tree *tt;
+
+	if(get_sticky_outputs(tupid, &root) < 0)
+		return -1;
+
+	RB_FOREACH(tt, tent_entries, &root) {
+		if(callback(arg, tt->tent) < 0)
+			return -1;
+	}
+	free_tent_tree(&root);
 
 	return 0;
 }
