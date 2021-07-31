@@ -38,7 +38,6 @@ cat > Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > sub/foo.c
 echo "void bar(void) {}" > sub/bar.c
-touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
 varsetall BAR=y
 update
 

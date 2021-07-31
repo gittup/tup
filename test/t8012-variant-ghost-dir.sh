@@ -29,7 +29,6 @@ mkdir sub
 cat > sub/Tupfile << HERE
 : |> if [ -f ghost/foo ]; then cat ghost/foo; else echo nofile; fi > %o |> output.txt
 HERE
-touch build/tup.config sub/Tupfile
 update
 
 echo nofile | diff - build/sub/output.txt

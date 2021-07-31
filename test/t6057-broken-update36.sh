@@ -41,7 +41,6 @@ find . -type f | xargs cat > /dev/null
 touch \$1
 HERE
 chmod +x do_stuff.sh
-touch Tupfile do_stuff.sh
 update_fail_msg "Missing input dependency"
 
 tup_dep_no_exist . a.out . './do_stuff.sh b.out'

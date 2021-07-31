@@ -26,7 +26,7 @@ HERE
 mkdir build
 echo foo > foo.txt
 echo bar > bar.txt
-touch foo.txt bar.txt build/tup.config
+touch build/tup.config
 
 mkdir sub
 cat > sub/Tupfile << HERE
@@ -34,7 +34,6 @@ cat > sub/Tupfile << HERE
 HERE
 echo baz > sub/baz.txt
 echo blah > sub/blah.txt
-touch sub/baz.txt sub/blah.txt
 update
 
 tup_dep_exist build "$(tup_ln_cmd foo.txt build/foo.lnk)" build foo.lnk

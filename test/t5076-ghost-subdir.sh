@@ -27,7 +27,6 @@ echo '#include "foo.h"' > ok.c
 cat > Tupfile << HERE
 : ok.c |> gcc -c %f -o %o -Ia -Ib |> ok.o
 HERE
-touch b/foo.h ok.c Tupfile
 update
 
 tup_dep_exist b foo.h . 'gcc -c ok.c -o ok.o -Ia -Ib'

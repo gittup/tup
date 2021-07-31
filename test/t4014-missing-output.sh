@@ -27,7 +27,6 @@ cat > Tupfile << HERE
 HERE
 
 echo "int main(void) {}" > foo.c
-touch foo.c Tupfile
 update
 check_exist foo.o
 
@@ -35,7 +34,6 @@ cat > Tupfile << HERE
 : foreach *.c |> echo gcc -c %f -o %o |> %B.o
 HERE
 
-touch Tupfile
 update_fail_msg "Expected to write to file 'foo.o'"
 
 eotup

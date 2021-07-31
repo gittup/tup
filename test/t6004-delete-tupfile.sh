@@ -20,7 +20,6 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
-touch foo.c Tupfile
 update
 sym_check foo.o foo
 sym_check prog.exe foo

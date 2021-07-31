@@ -38,7 +38,6 @@ generated_headers = foo.h
 : errors.o |> gcc %f -o %o |> errors2
 HERE
 echo 'int main(void) {return 0;}' > errors.c
-touch errors.c Tupfile
 update_fail_msg "Unable to create output file 'errors.o'"
 
 eotup

@@ -33,7 +33,6 @@ HERE
 cat > bar.c << HERE
 int bar(void) {return 7;}
 HERE
-touch bar.c foo.c foo.h.in Tupfile
 update
 
 tup_object_exist . foo.o bar.o

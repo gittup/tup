@@ -25,12 +25,10 @@
 cat > Tupfile << HERE
 : |> echo generated > %o |> sub/genfile.txt
 HERE
-touch Tupfile
 update
 
 rm Tupfile
 echo 'manual' > sub/genfile.txt
-touch sub/genfile.txt
 update
 
 if ! tup type sub | grep '^directory'; then

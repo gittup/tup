@@ -28,7 +28,7 @@ cat > Tupfile << HERE
 : foo.h |> cp %f %o |> outdir/%b | <generated-headers>
 : bar.h |> cp %f %o |> outdir/%b | <generated-headers>
 HERE
-touch foo.idl bar.idl Tupfile
+touch foo.idl bar.idl
 update
 
 tup graph . --combine > ok.dot

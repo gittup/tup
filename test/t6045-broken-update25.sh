@@ -53,7 +53,6 @@ cat > Tupfile << HERE
 : bar |> ./ok1.sh > %o |> foo
 HERE
 
-touch Tupfile
 update
 
 eotup

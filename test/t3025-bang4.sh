@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : foo.c |> !cc |>
 : bar.c |> !cc |> %B.newo
 HERE
-touch foo.c bar.c Tupfile
+touch foo.c bar.c
 update
 
 check_exist foo.o bar.newo

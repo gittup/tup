@@ -30,13 +30,12 @@ fi
 cat > Tupfile << HERE
 : |> touch %o; chown marf %o |> test1
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> chown marf test2 |>
 HERE
-touch Tupfile test2
+touch test2
 update_fail_msg "tup error.*chown"
 
 eotup

@@ -31,7 +31,6 @@ cat > Tupfile << HERE
 include_rules
 HERE
 varsetall ARCH=y
-touch Tuprules.tup Tupfile
 update
 
 touch Tupfile

@@ -31,7 +31,6 @@ touch -h foo || eotup
 cat > Tupfile << HERE
 : |> ln -s foo sym; touch -h sym |> sym
 HERE
-touch foo Tupfile
 update
 
 eotup

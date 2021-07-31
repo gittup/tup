@@ -58,7 +58,6 @@ cat > Tuprules.tup << HERE
 !cc = |> gcc -c %f -o %o |> %B.o
 MY_ROOT = \$(TUP_CWD)
 HERE
-touch Tupfile Tuprules.tup
 update
 
 eotup

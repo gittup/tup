@@ -39,9 +39,6 @@ include &(LIB)
 : |> echo \$(STATIC_LIBS) > %o |> libs.txt
 HERE
 
-touch sw/Tuprules.tup
-touch sw/toolkit/lib.tup
-touch sw/app/Tupfile
 update
 
 tup_dep_exist sw/app "echo app.a ../toolkit/toolkit.a > libs.txt" sw/app libs.txt

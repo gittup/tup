@@ -26,7 +26,6 @@ cat > Tupfile << HERE
 : out.txt |> cat %f > %o |> new.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
-touch foo.txt Tupfile
 varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt new.txt
@@ -34,7 +33,6 @@ tup_object_exist . foo.txt out.txt new.txt
 (echo "hey sup yo") | diff new.txt -
 
 echo "a @FOO@ b" > foo.txt
-touch foo.txt
 update
 (echo "a sup b") | diff out.txt -
 (echo "a sup b") | diff new.txt -

@@ -26,7 +26,6 @@ re_init
 mkdir sub
 echo ': |> echo blah |>' > sub/Test.tup
 echo 'include sub/Test.tup' > Tupfile
-touch Tupfile sub/Test.tup
 update
 
 mv sub ..

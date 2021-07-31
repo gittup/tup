@@ -33,7 +33,6 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |> log.txt foo.txt
 HERE
-touch Tupfile ok.sh
 update_fail_msg "File.*badfile.txt.*was written to"
 
 check_exist log.txt

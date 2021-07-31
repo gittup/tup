@@ -29,7 +29,6 @@ else
 tup.rule('good')
 end
 HERE
-touch Tupfile.lua
 parse
 
 tup_object_exist . 'good'

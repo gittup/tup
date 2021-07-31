@@ -51,7 +51,7 @@ HERE
 cat > foo.h << HERE
 #include "longer2.h"
 HERE
-touch Tupfile bar.h
+touch bar.h
 update
 
 tup_dep_exist include longer.h . "$mcmd"

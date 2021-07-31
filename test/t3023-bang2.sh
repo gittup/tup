@@ -29,7 +29,7 @@ files += foo.c
 files += bar.asm
 : foreach \$(files) |> !mplayer |> %B.o
 HERE
-touch foo.c bar.asm Tupfile
+touch foo.c bar.asm
 update
 
 check_exist foo.o bar.o

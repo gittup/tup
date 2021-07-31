@@ -48,7 +48,6 @@ tup_dep_exist . 'Tuprules.tup' 0 .
 # include_rules
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 tup_dep_no_exist . 'Tuprules.tup' 0 .
 

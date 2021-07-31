@@ -40,7 +40,6 @@ update_partial gen/sub/output.txt
 cat > Tupfile << HERE
 : |> touch %o |> normal.txt
 HERE
-touch Tupfile
 update
 
 eotup

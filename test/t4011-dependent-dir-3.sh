@@ -28,7 +28,6 @@
 mkdir C
 cat > C/Tupfile << HERE
 HERE
-touch C/Tupfile
 
 mkdir A
 cat > A/Tupfile << HERE
@@ -40,7 +39,6 @@ cat > B/Tupfile << HERE
 : foreach ../A/*.txt |> cp %f %o |> %b
 HERE
 
-touch A/Tupfile B/Tupfile
 update
 check_exist A/foo.txt B/foo.txt
 
@@ -51,8 +49,6 @@ cat > A/Tupfile << HERE
 : |> echo hey > %o |> foo.txt
 : |> echo yo > %o |> bar.txt
 HERE
-touch C/Tupfile
-touch A/Tupfile
 update
 check_exist A/foo.txt A/bar.txt B/foo.txt B/bar.txt C/foo.txt C/bar.txt
 

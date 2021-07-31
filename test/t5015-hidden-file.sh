@@ -29,9 +29,6 @@ mkdir yo/.hidden_dir
 touch yo/.hidden_dir
 echo 'bar' > yo/.hidden_dir/foo
 
-touch .hidden
-touch yo/.hidden_dir/foo
-touch Tupfile
 update
 tup_object_exist . .hidden
 tup_object_exist . 'cat .hidden'

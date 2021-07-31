@@ -25,8 +25,6 @@ cat > Tupfile << HERE
 .gitignore
 : |> echo foo > %o |> foo
 HERE
-
-touch Tupfile
 update
 
 gitignore_good foo .gitignore

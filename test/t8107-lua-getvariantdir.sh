@@ -34,7 +34,7 @@ cat > foo.c << HERE
 #include "foo.h"
 #include "bar.h"
 HERE
-touch build/tup.config Tupfile.lua bar.h
+touch build/tup.config bar.h
 update
 
 eotup

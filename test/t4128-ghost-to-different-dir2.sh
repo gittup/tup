@@ -37,7 +37,6 @@ tup_dep_exist bar/sub foo.h . 'gcc -c ok.c -o ok.o -Ifoo -Ibar'
 cat > bar/Tupfile << HERE
 : |> touch %o |> ../foo/sub/foo.h | ../<headers>
 HERE
-touch bar/Tupfile
 parse
 
 rm bar/Tupfile

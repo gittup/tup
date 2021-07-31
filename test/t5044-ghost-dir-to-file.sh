@@ -32,13 +32,11 @@ update
 echo nofile | diff - output.txt
 
 touch secret
-touch secret
 update
 
 rm secret
 mkdir secret
 echo boo > secret/ghost
-touch secret/ghost
 update
 
 echo boo | diff - output.txt

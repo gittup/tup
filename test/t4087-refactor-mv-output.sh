@@ -24,14 +24,12 @@ cat > Tupfile << HERE
 : |> touch bar |> bar
 : |> echo foo |>
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> touch bar |>
 : |> echo foo |> bar
 HERE
-touch Tupfile
 refactor_fail_msg "Attempting to remove an output from a command: bar"
 
 eotup

@@ -32,12 +32,10 @@ cat > Tupfile << HERE
 HERE
 tup parse
 echo ohai > output.txt
-touch output.txt
 
 cat > Tupfile << HERE
 : output.txt |> touch %o |> output.txt
 HERE
-touch Tupfile
 update_fail_msg "tup error.*lists this file as both an input and an output: output.txt"
 
 eotup

@@ -24,7 +24,6 @@ check_no_windows mknod
 cat > Tupfile << HERE
 : |> mknod %o c 1 3 |> nulltest
 HERE
-touch Tupfile
 update_fail_msg "nulltest.*Operation not permitted"
 
 eotup

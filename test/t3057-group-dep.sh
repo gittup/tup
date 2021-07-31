@@ -33,7 +33,6 @@ tup_dep_no_exist . bar . sub
 cat > sub/Tupfile << HERE
 : ../bar/<group> ../bar/*.c |> echo foo |>
 HERE
-touch sub/Tupfile
 update
 
 tup_dep_exist . bar . sub

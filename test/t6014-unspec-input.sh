@@ -28,7 +28,6 @@ cat > Tupfile << HERE
 HERE
 
 echo "#define FOO 3" > foo.h.in
-touch foo.h.in Tupfile
 update
 
 cat > foo.c << HERE
@@ -39,7 +38,6 @@ cat > Tupfile << HERE
 : foo.h.in |> cp %f %o |> %B
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch foo.c Tupfile
 update_fail
 
 eotup

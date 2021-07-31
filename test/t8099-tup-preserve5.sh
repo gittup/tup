@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : |> touch %o |> gen.txt
 HERE
-touch Tupfile file.html file2.html build/tup.config
+touch file.html file2.html build/tup.config
 update
 
 check_exist build/file.html build/file2.html build/gen.txt

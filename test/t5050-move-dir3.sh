@@ -25,15 +25,12 @@ mkdir a/a2
 echo 'x = 5' > a/a2/Test.tup
 echo 'include a/a2/Test.tup' > Tupfile
 
-touch a/a2/Test.tup Tupfile
 update
 
 mv a b
-touch b b/a2 b/a2/Test.tup
 update_fail
 
 echo 'include b/a2/Test.tup' > Tupfile
-touch Tupfile
 update
 
 eotup

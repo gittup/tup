@@ -52,7 +52,6 @@ cat > Tupfile << HERE
 : |> sh run.sh output2.txt |> output2.txt ^/ignore
 : output.txt output2.txt |> cat output.txt output2.txt |>
 HERE
-touch Tupfile
 update
 
 tup_object_exist ^ '/ignore'
@@ -62,7 +61,6 @@ tup_object_no_exist . '<group>'
 cat > Tupfile << HERE
 : |> sh run.sh output.txt |> output.txt ^/ignore
 HERE
-touch Tupfile
 update
 
 tup_object_exist ^ '/ignore'
@@ -72,7 +70,6 @@ tup_dep_exist . 'sh run.sh output.txt' ^ '/ignore'
 # removed.
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist ^ '/ignore'

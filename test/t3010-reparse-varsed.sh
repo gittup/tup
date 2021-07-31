@@ -24,13 +24,11 @@ cat > Tupfile << HERE
 : foo.txt |> tup varsed %f %o |> out.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
-touch foo.txt Tupfile
 varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt
 echo "hey sup yo" | diff out.txt -
 
-touch Tupfile
 update
 
 eotup

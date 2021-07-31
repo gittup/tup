@@ -35,7 +35,7 @@ cat > bar/Install.tup << HERE
 input += bar/tab
 HERE
 
-touch foo/Install.tup bar/Install.tup Tupfile foo/sball bar/tab
+touch foo/sball bar/tab
 parse
 tup_object_exist . sball.o tab.o
 

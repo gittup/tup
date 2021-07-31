@@ -32,7 +32,7 @@ cat > Tupfile << HERE
 run ./gen.sh
 HERE
 mkdir src
-touch Tupfile gen.sh foo.c src/bar.c
+touch foo.c src/bar.c
 update
 
 check_exist foo.o bar.o

@@ -33,7 +33,6 @@ echo "int main(void) {return 0;}" > fs/main.c
 echo "void ext3fs(void) {}" > ext3.c
 echo "void ext4fs(void) {}" > ext4.c
 
-touch Tupfile ext3.c ext4.c fs/main.c fs/Tupfile
 update
 
 sym_check fs/prog.exe main ext3fs ext4fs

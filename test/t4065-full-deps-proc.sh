@@ -26,7 +26,6 @@ set_full_deps
 cat > Tupfile << HERE
 : |> if [ -f /proc/meminfo ]; then cat /proc/meminfo; fi > %o |> out.txt
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist /proc meminfo

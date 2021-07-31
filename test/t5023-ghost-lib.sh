@@ -42,7 +42,6 @@ cat > b/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libfoo.a
 HERE
-touch main.c b/foo.c Tupfile b/Tupfile
 update
 echo libB | diff - output.txt
 
@@ -61,7 +60,6 @@ cat > a/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> ar cr %o %f |> libfoo.a
 HERE
-touch a/foo.c a/Tupfile
 update_fail
 
 # Add the pre-requisite, and the update should succeed - the program should now
@@ -71,7 +69,6 @@ cat > Tupfile << HERE
 : *.o | a/libfoo.a b/libfoo.a |> gcc %f -La -Lb -lfoo -o %o |> prog.exe
 : prog.exe |> ./%f > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo libA | diff - output.txt
 

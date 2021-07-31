@@ -28,7 +28,6 @@ include_rules
 : *.o |> gcc \$(LDFLAGS) %f -o %o |> prog
 HERE
 
-touch fs/Tupfile
 touch fs/ok.c
 touch fs/sub/helper.c
 parse
@@ -38,7 +37,6 @@ tup_object_exist fs 'gcc  -c ok.c -o ok.o'
 tup_dep_exist . Tuprules.tup . fs
 
 cp fs/Tupfile fs/sub/Tupfile
-touch fs/sub/Tupfile
 parse
 
 tup_object_exist fs/sub 'gcc  -c helper.c -o helper.o'

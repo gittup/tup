@@ -24,12 +24,10 @@ touch ok.c
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch ok.c Tupfile
 update
 
 sleep 1
-touch ok.o
-touch ok.o
+tup touch ok.o
 rm ok.c ok.o
 update
 check_not_exist ok.o

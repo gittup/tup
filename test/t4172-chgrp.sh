@@ -34,7 +34,6 @@ group = marf
 endif
 : |> touch %o; chgrp \$(group) %o |> test1
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
@@ -45,7 +44,7 @@ group = marf
 endif
 : |> chgrp \$(group) test2 |>
 HERE
-touch Tupfile test2
+touch test2
 update_fail_msg "tup error.*chown"
 
 eotup

@@ -23,7 +23,6 @@ mkdir sub
 cat > sub/Tupfile << HERE
 : |> echo foo > %o |> file1
 HERE
-touch sub/Tupfile
 update
 echo foo | diff - sub/file1
 
@@ -31,13 +30,11 @@ echo foo | diff - sub/file1
 cat > Tupfile << HERE
 : |> echo bar > sub/file1 ; touch file2 |> file2
 HERE
-touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
 : |> echo bar > %o |> file2
 HERE
-touch Tupfile
 update
 echo foo | diff - sub/file1
 echo bar | diff - file2

@@ -24,7 +24,7 @@ mkdir build
 cat > Tupfile << HERE
 include ../foo.tup
 HERE
-touch Tupfile foo.tup build/tup.config
+touch foo.tup build/tup.config
 update_fail_msg "Unable to include file '../foo.tup' since it is outside of the variant tree"
 
 eotup

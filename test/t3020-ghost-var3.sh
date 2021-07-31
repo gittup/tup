@@ -27,7 +27,6 @@ file-@(BAR) += bar.c
 HERE
 echo hey > foo.c
 echo yo > bar.c
-touch foo.c bar.c Tupfile
 update
 tup_object_exist . "cat foo.c > foo.o"
 tup_object_no_exist . "cat bar.c > bar.o"

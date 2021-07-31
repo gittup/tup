@@ -26,13 +26,11 @@ cat > foo/Tupfile << HERE
 .gitignore
 : |> echo foo > %o |> baz.txt
 HERE
-touch foo/Tupfile
 update
 
 cat > Tupfile << HERE
 : |> echo hey > %o |> foo/bar.txt
 HERE
-touch Tupfile
 update
 
 gitignore_good baz.txt foo/.gitignore

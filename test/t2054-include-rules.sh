@@ -39,7 +39,6 @@ cat > fs/sub/Tuprules.tup << HERE
 CFLAGS = -O0
 HERE
 
-touch fs/Tupfile fs/sub/Tupfile Tuprules.tup fs/Tuprules.tup fs/sub/Tuprules.tup
 touch fs/ext1.c fs/ext2.c
 touch fs/sub/helper.c
 parse

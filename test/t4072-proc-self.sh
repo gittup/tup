@@ -30,7 +30,6 @@ set_full_deps
 cat > Tupfile << HERE
 : |> ls -l /proc/self/ > /dev/null |>
 HERE
-touch Tupfile
 update
 
 eotup

@@ -32,7 +32,7 @@ cat > Tupfile << HERE
 .gitignore
 : |> ^ echo^ echo $text > /dev/null |>
 HERE
-touch Tupfile build/tup.config
+touch build/tup.config
 update
 
 rm build/tup.config

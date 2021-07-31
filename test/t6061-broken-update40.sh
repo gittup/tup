@@ -31,7 +31,6 @@ mkdir secret
 cat > Tupfile << HERE
 : |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo 'nofile' | diff - output.txt
 

@@ -27,13 +27,12 @@ HERE
 cat > Tupfile << HERE
 : foreach *.c | sub/foo.h |> gcc -c %f -o %o |> %B.o
 HERE
-touch sub/Tupfile sub/foo.h Tupfile bar.c
+touch sub/foo.h bar.c
 update
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile
 refactor
 
 eotup

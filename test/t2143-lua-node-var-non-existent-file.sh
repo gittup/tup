@@ -24,8 +24,6 @@ cat > Tupfile.lua << HERE
 node_var = tup.nodevariable 'lib.a'
 HERE
 
-touch Tupfile.lua
-
 update_fail_msg "Unable to find tup entry for file 'lib.a' in node reference declaration"
 
 eotup

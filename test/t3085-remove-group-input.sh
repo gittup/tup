@@ -25,7 +25,6 @@ cat > Tupfile << HERE
 : |> touch %o |> bar | <group>
 : <group> |> echo %<group> > %o |> test.txt
 HERE
-touch Tupfile
 update
 
 echo 'foo bar' | diff - test.txt
@@ -34,7 +33,6 @@ cat > Tupfile << HERE
 : |> touch %o |> foo | <group>
 : <group> |> echo %<group> > %o |> test.txt
 HERE
-touch Tupfile
 update
 
 echo 'foo' | diff - test.txt

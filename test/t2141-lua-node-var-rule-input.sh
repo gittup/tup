@@ -33,9 +33,7 @@ cat > sw/app/Tupfile.lua << HERE
 tup.rule(toolkit_lib, 'cp %f %o', 'toolkit.copy')
 HERE
 
-touch sw/Tuprules.lua
 touch sw/toolkit/toolkit.a
-touch sw/app/Tupfile.lua
 update
 
 tup_dep_exist sw/toolkit toolkit.a sw/app 'cp ../toolkit/toolkit.a toolkit.copy'

@@ -26,7 +26,7 @@ var=
 include foo
 include \$(var)
 HERE
-touch Tupfile foo
+touch foo
 parse_fail_msg 'Invalid include filename'
 
 eotup

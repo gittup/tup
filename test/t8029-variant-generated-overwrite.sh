@@ -31,7 +31,7 @@ endif
 : |> touch %o |> bar
 HERE
 echo "" > build-default/tup.config
-touch bar Tupfile
+touch bar
 
 update_fail_msg "Attempting to insert 'bar' as a generated node.*in the source directory"
 

@@ -42,7 +42,6 @@ HERE
 
 echo "int main(void) {return 0;}" > tmp/foo.c
 touch tmp/bar.c
-touch tmp/foo.c tmp/bar.c tmp/Tupfile tmp/Tupfile.vars
 update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "gcc -c foo.c -o foo.o"
@@ -54,7 +53,6 @@ cat > tmp/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o %o %f |> prog.exe
 HERE
-touch tmp/Tupfile
 update
 tup_dep_no_exist tmp Tupfile.vars . tmp
 

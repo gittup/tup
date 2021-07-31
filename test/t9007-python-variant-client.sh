@@ -36,14 +36,12 @@ HERE
 cat > Tupfile << HERE
 run PYTHONPATH=../.. python -B \$(TUP_CWD)/foo.py
 HERE
-touch Tupfile
 update
 
 tup_object_exist build/tup.config BAZ
 
 varsetall FOO=y BAR=hey
 mv tup.config build
-touch build/tup.config
 update_fail_msg 'Exception: No: FOO'
 
 eotup

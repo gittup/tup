@@ -485,7 +485,6 @@ varsetall()
 		fi
 		shift
 	done
-	touch tup.config
 }
 
 monitor()

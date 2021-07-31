@@ -28,7 +28,6 @@ file-@(BAR) += bar.c
 HERE
 echo hey > tmp/foo.c
 echo yo > tmp/bar.c
-touch tmp/foo.c tmp/bar.c tmp/Tupfile
 varsetall BAR=y
 update
 tup_object_exist tmp foo.c bar.c
@@ -40,7 +39,6 @@ cat > tmp/Tupfile << HERE
 file-y = foo.c
 : foreach \$(file-y) |> cat %f > %o |> %B.o
 HERE
-touch tmp/Tupfile
 update
 tup_object_exist tmp foo.c bar.c
 tup_object_exist tmp "cat foo.c > foo.o"

@@ -38,7 +38,6 @@ include &(lib)
 : foreach \$(static_libs) |> cp %f %o |> %b.copy
 HERE
 
-touch Tupfile lib/Tupfile lib/lib.tup
 update
 
 tup_dep_exist lib lib.a . 'cp lib/lib.a lib.a.copy'

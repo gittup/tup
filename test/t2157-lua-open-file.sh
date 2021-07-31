@@ -42,7 +42,6 @@ foo
 bar
 baz
 HERE
-touch data.txt
 update
 
 check_exist foo bar baz

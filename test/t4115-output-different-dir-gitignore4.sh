@@ -40,7 +40,6 @@ cat > foo/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : foreach *.c |> gcc -c %f -o %o |> ../sub/%B.o
 HERE
-touch foo/Tupfile
 update
 
 gitignore_good foo.o foo/.gitignore

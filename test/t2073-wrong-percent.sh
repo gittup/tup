@@ -22,7 +22,6 @@
 cat > Tupfile << HERE
 : |> echo %Q |>
 HERE
-touch Tupfile
 update_fail_msg "Unknown %-flag: 'Q'"
 
 eotup

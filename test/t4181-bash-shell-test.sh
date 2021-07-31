@@ -23,7 +23,6 @@ check_bash
 cat > Tupfile << HERE
 : |> ^b^ echo \$BASH > %o |> bash.txt
 HERE
-touch Tupfile
 update
 
 check_exist bash.txt

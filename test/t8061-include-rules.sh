@@ -45,7 +45,6 @@ HERE
 echo "CONFIG_DEBUG=y" > configs/debug.config
 echo "" > configs/default.config
 tup variant configs/*.config
-touch Tupfile
 update
 
 check_exist build-default/sub/sub2/bar
@@ -58,7 +57,6 @@ check_not_exist build-debug/sub/sub2/baz
 cat > Tuprules.tup << HERE
 var += n
 HERE
-touch Tuprules.tup
 update
 
 check_not_exist build-default/sub/sub2/bar

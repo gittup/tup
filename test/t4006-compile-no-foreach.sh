@@ -29,7 +29,6 @@ cat > Tupfile << HERE
 HERE
 
 echo "int main(void) {}" > foo.c
-touch foo.c Tupfile
 update
 sym_check foo.o main
 tup_object_exist . foo.o prog.exe

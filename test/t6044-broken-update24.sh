@@ -24,7 +24,6 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> touch .foo; mv .foo bar |> bar
 HERE
-touch Tupfile
 update
 
 update_null "Expected second update not to run the command."

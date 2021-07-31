@@ -25,14 +25,13 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> if [ -f 'gcc -c foo.c' ]; then true; fi |>
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> if [ -f 'gcc -c foo.c' ]; then true; fi |>
 : |> gcc -c foo.c |> foo.o
 HERE
-touch foo.c Tupfile
+touch foo.c
 update_fail_msg "Unable to create command.*database as type 'ghost'"
 
 eotup

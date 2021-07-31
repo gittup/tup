@@ -23,13 +23,11 @@
 cat > Tupfile << HERE
 : |> touch foo |> foo <group>
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-touch Tupfile
 refactor_fail_msg "Attempting to remove the output group from command.*group"
 
 eotup

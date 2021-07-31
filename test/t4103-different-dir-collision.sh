@@ -32,13 +32,11 @@ HERE
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> ../baz/baz.txt
 HERE
-touch foo/Tupfile bar/Tupfile
 update_fail_msg "Unable to create output file '../baz.baz.txt'"
 
 # Correctly create foo.txt
 cat > bar/Tupfile << HERE
 HERE
-touch bar/Tupfile
 update
 
 echo foo | diff - baz/baz.txt
@@ -49,7 +47,6 @@ HERE
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> ../baz/baz.txt
 HERE
-touch foo/Tupfile bar/Tupfile
 update
 
 echo bar | diff - baz/baz.txt
@@ -60,7 +57,6 @@ cat > foo/Tupfile << HERE
 HERE
 cat > bar/Tupfile << HERE
 HERE
-touch foo/Tupfile bar/Tupfile
 update
 
 echo foo | diff - baz/baz.txt
@@ -69,7 +65,6 @@ echo foo | diff - baz/baz.txt
 cat > bar/Tupfile << HERE
 : |> cp bar.txt %o |> ../baz/baz.txt
 HERE
-touch bar/Tupfile
 update_fail_msg "Unable to create output file '../baz.baz.txt'"
 
 eotup

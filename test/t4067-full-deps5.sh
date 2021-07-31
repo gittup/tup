@@ -38,7 +38,7 @@ esac
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile foo.c bar.c
+touch foo.c bar.c
 update
 
 tup_object_no_exist $path $filename

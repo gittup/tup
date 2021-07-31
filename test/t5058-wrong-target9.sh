@@ -23,7 +23,7 @@ mkdir sub
 cat > Tupfile << HERE
 : |> touch foo; touch sub/bar |> foo
 HERE
-touch bar Tupfile
+touch bar
 update_fail
 
 check_exist bar
@@ -32,7 +32,6 @@ check_not_exist sub/bar
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-touch Tupfile
 update
 
 check_exist foo bar

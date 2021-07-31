@@ -33,7 +33,6 @@ check_exist foo/baz.txt
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 check_not_exist foo

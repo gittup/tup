@@ -29,7 +29,6 @@ chmod +x ok.sh
 cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo nofile | diff - output.txt
 
@@ -37,14 +36,12 @@ cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
 : |> ./ok.sh > %o |> output.txt
 HERE
-touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> ghost
 : ghost |> ./ok.sh > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo yo | diff - output.txt
 

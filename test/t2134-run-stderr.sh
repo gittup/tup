@@ -42,7 +42,7 @@ cat > sub2/Tupfile << HERE
 run ../run.sh part2
 HERE
 
-touch sub1/Tupfile sub2/Tupfile sub2/foo.txt
+touch sub2/foo.txt
 update > .output.txt 2>&1
 
 if ! cat .output.txt | tr '\n' ' ' | grep '1).*sub2.*part2.*0).*sub1.*part1A.*part1B' > /dev/null; then

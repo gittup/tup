@@ -22,7 +22,6 @@
 cat > Tupfile << HERE
 : |> echo % |>
 HERE
-touch Tupfile
 update_fail_msg "Unfinished %-flag"
 
 eotup

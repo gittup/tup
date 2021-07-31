@@ -23,14 +23,12 @@ cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
-touch foo.c bar.c
 update
 sym_check foo.o main
 sym_check bar.o bar1
 
 echo "int main2(void) {}" > foo.c
 echo "void bar2(void) {}" > bar.c
-touch bar.c foo.c
 update_partial foo.o
 
 # Only bar.o should have the new symbol

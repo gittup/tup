@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 HERE
 mkdir subdir
 mkdir superlongtest
-touch subdir/foo.c subdir/readme.txt Tupfile superlongtest/ok
+touch subdir/foo.c subdir/readme.txt superlongtest/ok
 parse
 tup_object_exist . foo.o readme.txt
 tup_object_exist . "cp subdir/readme.txt readme.txt"

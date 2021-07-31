@@ -22,14 +22,12 @@
 cat > Tupfile << HERE
 : |> (cat secret/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo nofile | diff - output.txt
 
 cat > Tupfile << HERE
 : |> echo yo > %o |> secret
 HERE
-touch Tupfile
 update
 
 eotup

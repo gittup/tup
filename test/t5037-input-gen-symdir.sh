@@ -28,14 +28,13 @@ mkdir arch-x86
 cat > Tupfile << HERE
 : |> ln -s arch-x86 %o |> arch
 HERE
-touch Tupfile arch-x86/foo.c
+touch arch-x86/foo.c
 update
 
 cat > Tupfile << HERE
 : |> ln -s arch-x86 %o |> arch
 : arch/*.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile
 parse_fail_msg "Unable to read from generated file.*arch"
 
 eotup

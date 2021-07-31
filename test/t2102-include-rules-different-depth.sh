@@ -54,7 +54,6 @@ cat > sw/app/Tuprules.tup << HERE
 vars += app
 HERE
 
-touch sw/lib/Tupfile sw/app/core/Tupfile sw/Tuprules.tup sw/app/Tuprules.tup
 update
 
 tup_dep_exist sw/lib 'echo sw lib > out.txt' sw/lib out.txt

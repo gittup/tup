@@ -34,7 +34,6 @@ cat > Tupfile << HERE
 : foreach *.h.in |> ^o^ cp %f %o |> %B
 : foreach *.c | <headers> |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile
 update_fail_msg 'Missing input dependency'
 
 eotup

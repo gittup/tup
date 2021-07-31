@@ -26,7 +26,6 @@ fi
 cat > Tupfile << HERE
 : |> ls -l /proc/\$\$/fd > %o |> fds.txt
 HERE
-touch Tupfile
 update
 
 # On Gentoo, stdout points to output-0, while on Ubuntu, it points to the

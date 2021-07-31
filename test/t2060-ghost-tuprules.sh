@@ -35,7 +35,6 @@ cat > fs/sub/Tuprules.tup << HERE
 CFLAGS += -O0
 HERE
 
-touch fs/sub/Tupfile Tuprules.tup fs/sub/Tuprules.tup
 touch fs/sub/helper.c
 parse
 
@@ -50,7 +49,6 @@ cat > fs/Tuprules.tup << HERE
 CFLAGS += -DFS=1
 LDFLAGS += -lfoo
 HERE
-touch fs/Tuprules.tup
 parse
 
 tup_object_exist fs/sub 'gcc -Wall -DFS=1 -O0 -c helper.c -o helper.o'

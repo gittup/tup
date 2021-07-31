@@ -38,7 +38,7 @@ CCARGS := -DFOO=1
 CCARGS += -DBAR=1
 HERE
 
-touch a/foo.c a/bar.c a/Tupfile Tupfile.vars Tupfile.ccargs
+touch a/foo.c a/bar.c
 parse
 tup_object_exist a foo.c bar.c
 tup_object_exist a "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"

@@ -33,13 +33,12 @@ set_full_deps
 cat > Tupfile << HERE
 : $root/external/foo.txt |> cat blah.txt > %o |> out.txt
 HERE
-touch Tupfile blah.txt
+touch blah.txt
 update
 
 cat > Tupfile << HERE
 : |> cat blah.txt > %o |> out.txt
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist $root/external foo.txt

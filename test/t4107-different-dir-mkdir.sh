@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 : |> touch %o |> foo/out.txt
 HERE
-touch Tupfile
 update
 
 check_exist foo/out.txt
@@ -33,7 +32,6 @@ check_not_exist bar
 cat > Tupfile << HERE
 : |> touch %o |> bar/out.txt
 HERE
-touch Tupfile
 update
 
 check_exist bar/out.txt

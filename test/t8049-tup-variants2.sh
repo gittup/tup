@@ -45,7 +45,6 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > configs/debug.config
-touch configs/debug.config
 update
 
 check_exist build-default/bar

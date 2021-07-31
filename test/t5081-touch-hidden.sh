@@ -27,7 +27,7 @@ HERE
 cat > Tupfile << HERE
 : |> sh ok.sh |>
 HERE
-touch Tupfile input.txt
+touch input.txt
 update
 
 touch input.txt

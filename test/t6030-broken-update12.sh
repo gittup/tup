@@ -33,7 +33,7 @@ HERE
 cat > Tupfile << HERE
 : sub/*.o |> ar rcs %o %f |> libfoo.a
 HERE
-touch sub/foo.c sub/bar.c sub/Tupfile Tupfile
+touch sub/foo.c sub/bar.c
 update
 
 rm sub/bar.c

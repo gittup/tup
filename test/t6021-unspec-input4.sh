@@ -33,7 +33,6 @@ cat > foo.c << HERE
 #include "foo.h"
 int main(void) {return FOO;}
 HERE
-touch foo.c foo.h.in Tupfile
 update
 
 cat > Tupfile << HERE
@@ -42,7 +41,6 @@ HERE
 cat > foo.c << HERE
 int main(void) {return 7;}
 HERE
-touch Tupfile foo.c
 update
 
 eotup

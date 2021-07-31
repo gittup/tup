@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : |> cat input.txt > .hidden |> .hidden
 HERE
-touch Tupfile input.txt
+touch input.txt
 update
 
 touch input.txt

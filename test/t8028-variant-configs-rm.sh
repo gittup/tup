@@ -37,7 +37,6 @@ echo "CONFIG_DEBUG=y" > configs/debug.config
 echo "" > configs/default.config
 ln -s ../configs/debug.config build-debug/tup.config
 ln -s ../configs/default.config build-default/tup.config
-touch Tupfile
 
 update
 

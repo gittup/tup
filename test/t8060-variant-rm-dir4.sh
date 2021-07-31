@@ -48,7 +48,6 @@ HERE
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
 echo "normal" > sub/normal
-touch build/tup.config build-debug/tup.config sub/Tupfile foo/Tupfile foo2/Tupfile
 
 update
 

@@ -24,7 +24,7 @@ cat > sub/Tupfile << HERE
 .gitignore
 : in.txt |> cp %f %o |> out.txt
 HERE
-touch sub/Tupfile sub/in.txt
+touch sub/in.txt
 update
 
 tup graph . > ok.dot

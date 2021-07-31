@@ -25,7 +25,6 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> false && touch foo.o |> foo.o
 HERE
-touch Tupfile
 if __update 2> .tup/.tupoutput; then
 	echo "*** Expected update to fail, but didn't" 1>&2
 	exit 1
@@ -41,7 +40,6 @@ cat > Tupfile << HERE
 : |> touch %o |> out.txt
 : |> if [ -f out.txt ]; then cat out.txt; fi; false |> out2.txt
 HERE
-touch Tupfile
 update_fail_msg "failed with return value" "Additionally, the command failed to process input dependencies"
 
 # Check that we get the input dependencies message if they failed and the command succeeded
@@ -49,14 +47,12 @@ cat > Tupfile << HERE
 : |> touch %o |> out.txt
 : |> if [ -f out.txt ]; then cat out.txt; fi; touch %o |> out2.txt
 HERE
-touch Tupfile
 update_fail_msg "Command ran successfully, but failed due to errors processing input dependencies."
 
 # Check that we get the output dependencies message if everything worked except outputs
 cat > Tupfile << HERE
 : |> touch out |> out.txt
 HERE
-touch Tupfile
 update_fail_msg "Command failed due to errors processing the output dependencies."
 
 # Check when both inputs & outputs fail
@@ -64,7 +60,6 @@ cat > Tupfile << HERE
 : |> touch %o |> out.txt
 : |> if [ -f out.txt ]; then cat out.txt; fi; touch out2.txt |> out3.txt
 HERE
-touch Tupfile
 update_fail_msg "Command ran successfully, but failed due to errors processing both the input and output dependencies"
 
 eotup

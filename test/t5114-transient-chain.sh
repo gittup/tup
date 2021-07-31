@@ -36,14 +36,12 @@ check_not_exist tmp1.txt tmp2.txt tmp3.txt tmp4.txt tmp5.txt
 (echo 'foo'; echo bar) | diff - out.txt
 
 echo 'baz' > in1.txt
-touch in1.txt
 update
 
 check_not_exist tmp1.txt tmp2.txt tmp3.txt tmp4.txt tmp5.txt
 (echo 'baz'; echo bar) | diff - out.txt
 
 echo 'ok' > in3.txt
-touch in3.txt
 update
 
 check_not_exist tmp1.txt tmp2.txt tmp3.txt tmp4.txt tmp5.txt

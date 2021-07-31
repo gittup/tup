@@ -22,7 +22,6 @@
 . ./tup.sh
 touch real
 ln -s real foo
-touch foo
 tup scan
 tup_object_exist . real foo
 

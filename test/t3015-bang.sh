@@ -27,7 +27,7 @@ headers = foo.h
 HERE
 echo '#define FOO 3' > foo.h.in
 echo '#include "foo.h"' > foo.c
-touch foo.h.in foo.c bar.c Tupfile
+touch bar.c
 update
 
 check_exist foo.o bar.o

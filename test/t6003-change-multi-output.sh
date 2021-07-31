@@ -26,7 +26,6 @@ touch a
 touch b
 HERE
 
-touch ok.sh Tupfile
 update
 check_exist a b
 check_not_exist c
@@ -40,7 +39,6 @@ cat > Tupfile << HERE
 : |> sh ok.sh |> a c
 HERE
 
-touch ok.sh Tupfile
 update
 
 check_exist a c

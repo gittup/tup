@@ -25,13 +25,12 @@ cat > Tupfile << HERE
 : |> touch %o |> a.txt
 HERE
 
-touch Tupfile
 update
 
 cat > Tupfile <<HERE
 &node_var = a.txt
 HERE
-touch Tupfile
+
 update_fail_msg "Node-variables can only refer to normal files and directories, not a 'generated file'."
 
 eotup

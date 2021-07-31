@@ -24,8 +24,6 @@
 cat > Tupfile << HERE
 .gitignore
 HERE
-
-touch Tupfile
 update
 
 if [ ! -f .gitignore ]; then

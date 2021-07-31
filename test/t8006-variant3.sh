@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : sub/input.h |> cp %f %o |> output.h
 HERE
 echo "CONFIG_FOO=y" > build/tup.config
-touch build/tup.config Tupfile sub/input.h
+touch sub/input.h
 
 update
 check_exist build/output.h

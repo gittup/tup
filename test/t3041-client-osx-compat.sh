@@ -41,7 +41,6 @@ cat > Tupfile << HERE
 : ok.c |> gcc %f -o %o |> ok
 : ok |> ./ok |>
 HERE
-touch ok.c Tupfile
 update
 
 eotup

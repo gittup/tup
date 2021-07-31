@@ -26,7 +26,7 @@ files += foo.c
 files += bar.c
 : \$(files) |> !cc |> %B.o
 HERE
-touch foo.c bar.c Tupfile
+touch foo.c bar.c
 update
 
 check_exist foo.o bar.o

@@ -33,7 +33,6 @@ update
 
 for i in `seq 1 4`; do touch in$i.out.txt; done
 echo "" > Tupfile
-touch Tupfile
 update > .tup/output.txt
 
 if ! grep '0) rm: ' .tup/output.txt > /dev/null; then

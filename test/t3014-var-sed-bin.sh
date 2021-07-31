@@ -25,7 +25,6 @@ cat > Tupfile << HERE
 : foreach {txt} |> cp %f %o |> %B.copied
 HERE
 echo "hey @FOO@ yo" > foo.txt
-touch foo.txt Tupfile
 varsetall FOO=sup
 update
 

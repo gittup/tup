@@ -36,7 +36,7 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo.exe
 : foo.exe |> ./%f |>
 HERE
-touch foo.c Tupfile access.txt
+touch access.txt
 update
 
 tup_dep_exist . access.txt . "./foo.exe"

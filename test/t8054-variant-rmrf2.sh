@@ -28,7 +28,7 @@ mkdir build-debug
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch build-default/tup.config build-debug/tup.config sub/Tupfile sub/foo.c sub/bar.c
+touch build-default/tup.config build-debug/tup.config sub/foo.c sub/bar.c
 
 update
 

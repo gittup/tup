@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : foo.ml | pre_sexp.cmi |> cat %f; cat pre_sexp.cmi; touch %o |> foo.cmi
 : conv.ml | pre_sexp.cmi foo.cmi |> cat conv.ml; cat pre_sexp.cmi; cat foo.cmi; touch %o |> conv.cmo
 HERE
-touch Tupfile pre_sexp.ml conv.ml foo.ml
+touch pre_sexp.ml conv.ml foo.ml
 update
 
 cat > Tupfile << HERE
@@ -35,7 +35,6 @@ cat > Tupfile << HERE
 : pre_sexp.ml | conv.cmo |> cat %f; touch %o |> pre_sexp.cmi
 : foo.ml | pre_sexp.cmi |> cat %f; cat pre_sexp.cmi; touch %o |> foo.cmi
 HERE
-touch Tupfile
 update_fail_msg 'tup error: Missing input dependency'
 
 touch pre_sexp.ml

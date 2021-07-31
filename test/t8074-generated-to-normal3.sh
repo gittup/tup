@@ -27,7 +27,6 @@ cat > Tupfile << HERE
 : |> echo generated > %o |> genfile.txt
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
-touch Tupfile
 update
 
 echo 'generated' | diff - build/output.txt
@@ -35,11 +34,9 @@ echo 'generated' | diff - build/output.txt
 cat > Tupfile << HERE
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
-touch Tupfile
 update_fail_msg "Explicitly named file.*genfile.txt.*scheduled to be deleted"
 
 echo 'manual' > genfile.txt
-touch genfile.txt
 update
 
 echo 'manual' | diff - build/output.txt

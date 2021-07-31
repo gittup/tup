@@ -45,9 +45,6 @@ HERE
 
 chmod u+x tools/script.sh
 
-touch Tuprules.tup
-touch sw/Tupfile
-touch tools/script.sh tools/data.csv
 update
 
 tup_dep_exist tools script.sh . sw

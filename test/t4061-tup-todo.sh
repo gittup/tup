@@ -23,7 +23,6 @@ cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
-touch foo.c bar.c
 update
 
 touch Tupfile

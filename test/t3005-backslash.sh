@@ -26,7 +26,6 @@ file-y = foo.c \\
 HERE
 echo hey > foo.c
 echo yo > bar.c
-touch foo.c bar.c Tupfile
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "cat foo.c > foo.o"

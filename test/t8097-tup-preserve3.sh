@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 HERE
 echo file1 > file.html
 echo file2 > file2.html
-touch Tupfile build/tup.config
+touch build/tup.config
 update
 
 check_exist build/file.html build/file2.html build/gen.txt
@@ -41,7 +41,6 @@ cat > sub/bar/Tupfile << HERE
 : |> touch %o |> gen2.txt
 HERE
 echo file3 > sub/bar/file3.html
-touch sub/bar/Tupfile
 update
 
 check_exist build/sub/bar/file3.html build/sub/bar/gen2.txt

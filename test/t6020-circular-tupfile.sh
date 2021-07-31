@@ -34,7 +34,6 @@ cat > foo/ok.c << HERE
 int main(void) {return 0;}
 HERE
 
-touch Tupfile foo/Tupfile foo/ok.c
 update_fail
 
 eotup

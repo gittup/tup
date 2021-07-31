@@ -22,13 +22,11 @@
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 .gitignore
 HERE
-touch Tupfile
 refactor_fail_msg "Attempting to create a new .gitignore file"
 
 eotup

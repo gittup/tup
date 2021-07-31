@@ -24,7 +24,7 @@ mkdir build
 cat > Tupfile.lua << HERE
 tup.include '../foo.lua'
 HERE
-touch Tupfile.lua foo.lua build/tup.config
+touch foo.lua build/tup.config
 update_fail_msg "Unable to include file '../foo.lua' since it is outside of the variant tree"
 
 eotup

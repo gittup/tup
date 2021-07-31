@@ -33,7 +33,7 @@ touch foo.c bar.c
 update
 
 echo 'int x;' > foo.c
-touch foo.c bar.c
+touch bar.c
 update
 
 eotup

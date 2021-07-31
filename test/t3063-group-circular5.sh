@@ -27,7 +27,6 @@ update
 cat > Tupfile << HERE
 : <bar> |> echo moreinfo > %o |> newoutput.txt | <foo>
 HERE
-touch Tupfile
 update
 
 eotup

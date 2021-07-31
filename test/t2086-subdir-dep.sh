@@ -24,7 +24,7 @@ mkdir subdir
 cat > Tupfile << HERE
 : subdir/*.c |> echo %f |>
 HERE
-touch Tupfile subdir/a.c
+touch subdir/a.c
 update
 tup_dep_exist . subdir 0 .
 

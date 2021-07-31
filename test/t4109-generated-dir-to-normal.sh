@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 : |> touch %o |> foo/bar/baz/out.txt
 HERE
-touch Tupfile
 update
 
 check_exist foo/bar/baz/out.txt

@@ -24,7 +24,6 @@ mkdir build-debug
 
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-touch build/tup.config build-debug/tup.config
 
 update
 
@@ -35,7 +34,6 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-touch sub/Tupfile
 update
 
 check_exist build/sub/bar

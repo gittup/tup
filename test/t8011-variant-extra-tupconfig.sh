@@ -33,7 +33,7 @@ ifeq (@(DEBUG),y)
 endif
 : foo.c |> cp %f %o |> bar
 HERE
-touch build/tup.config build2/debug/tup.config sub/Tupfile sub/foo.c
+touch sub/foo.c
 update
 
 check_not_exist build2/debug/sub

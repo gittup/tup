@@ -36,8 +36,6 @@ run ./gen.sh
 : foreach *.cc | {cc} |> !cp |> {copies}
 : foreach {copies} |> !cp |> {copies2}
 HERE
-
-touch Tupfile gen.sh
 update
 
 check_exist a.txt.copy.copy

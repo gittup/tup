@@ -22,7 +22,7 @@
 cat > Tupfile << HERE
 : foo.c |> sh -c "gcc -c %f -o %o" |> %B.o
 HERE
-touch foo.c Tupfile
+touch foo.c
 parse
 tup_object_exist . foo.c
 tup_object_exist . "sh -c \"gcc -c foo.c -o foo.o\""

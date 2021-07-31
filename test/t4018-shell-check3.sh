@@ -27,7 +27,6 @@ cat > Tupfile << HERE
 : |> echo foo; false; echo bar |>
 HERE
 
-touch Tupfile
 update_fail
 
 eotup

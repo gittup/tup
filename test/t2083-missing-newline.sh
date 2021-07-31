@@ -32,7 +32,6 @@ HERE
 gcc ok.c -o ok.exe
 ./ok.exe > Tupfile
 
-touch Tupfile ok.c ok.exe
 update
 check_exist foo
 
@@ -52,7 +51,6 @@ HERE
 gcc ok.c -o ok.exe
 ./ok.exe > Tupfile
 
-touch Tupfile
 update
 check_exist bar
 

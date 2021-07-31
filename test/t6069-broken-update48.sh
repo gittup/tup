@@ -44,14 +44,12 @@ cat > Tupfile << HERE
 : gen.c | <generated> |> gcc %f -o %o |> gen.exe
 : gen.exe |> ./gen.exe |> out.cpp <generated>
 HERE
-touch Tupfile
 update_fail_msg 'both reads from and writes to this group.*generated'
 
 cat > Tupfile << HERE
 : gen.c | <generated> |> gcc %f -o %o |> gen.exe
 : gen.exe |> ./gen.exe |> out.cpp
 HERE
-touch Tupfile
 update
 
 eotup

@@ -44,7 +44,6 @@ update
 cat > ok1.sh << HERE
 echo blah
 HERE
-touch ok1.sh
 update_fail_msg "Missing input dependency"
 
 eotup

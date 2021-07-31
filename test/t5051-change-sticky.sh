@@ -33,7 +33,6 @@ cat > Tupfile << HERE
 : foreach *.c | headers/*.h |> gcc -c %f -o %o |> %B.o
 HERE
 echo '#include "headers/foo.h"' > foo.c
-touch foo.c Tupfile headers/Tupfile
 update
 
 check_exist foo.o

@@ -24,13 +24,11 @@ mkdir foo
 cat > Tupfile << HERE
 : |> (cat foo/ghost 2>/dev/null || echo nofile) > %o |> output.txt
 HERE
-touch Tupfile
 update
 echo nofile | diff - output.txt
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 tup_object_exist . foo

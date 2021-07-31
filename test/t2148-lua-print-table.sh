@@ -24,8 +24,7 @@ CFLAGS += '-DFOO'
 CFLAGS += '-DBAR'
 print("My cflags are: ", tostring(CFLAGS))
 HERE
-touch Tupfile.lua
-tup parse > .output.txt
+parse > .output.txt
 if ! grep 'My cflags are:.*-DFOO -DBAR' .output.txt > /dev/null; then
 	cat .output.txt
 	echo "Error: Expecting CFLAGS to be expanded"

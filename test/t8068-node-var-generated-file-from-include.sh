@@ -44,7 +44,7 @@ include &(lib_tupfile)
 : foreach \$(static_libs) |> cp %f %o |> %b.copy
 HERE
 
-touch Tuprules.tup lib/lib.tup lib/foo.a lib/Tupfile sw/Tupfile build/tup.config
+touch lib/foo.a build/tup.config
 update
 
 tup_dep_exist build/lib lib.a build/sw 'cp ../build/lib/lib.a ../build/sw/lib.a.copy'

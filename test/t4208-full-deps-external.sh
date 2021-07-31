@@ -36,7 +36,6 @@ HERE
 cat > Tupfile << HERE
 : $root/external/foo.txt |> sh run.sh %f %o |> out.txt
 HERE
-touch Tupfile
 update
 
 # An external missing file can also work.
@@ -44,7 +43,6 @@ cat > Tupfile << HERE
 : $root/external/foo.txt |> sh run.sh %f %o |> out.txt
 : $root/external/missing.txt |> sh run.sh %f %o |> out2.txt
 HERE
-touch Tupfile
 update
 
 echo nofile | diff - out2.txt
@@ -54,7 +52,6 @@ echo nofile | diff - out2.txt
 cat > Tupfile << HERE
 : $root/external/foo.txt |> sh run.sh %f %o |> out.txt
 HERE
-touch Tupfile
 update
 
 if [ "$in_windows" = "1" ]; then
@@ -67,7 +64,6 @@ tup_object_exist $prefix/external foo.txt
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 parse
 
 tup_object_no_exist $prefix$root/external foo.txt

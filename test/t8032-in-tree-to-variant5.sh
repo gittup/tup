@@ -33,7 +33,7 @@ cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
 HERE
 echo "int main(void) {return 0;}" > foo.c
-touch Tupfile foo.c sub/bar.c
+touch sub/bar.c
 update
 
 check_not_exist build/foo.o build/sub/bar.o build/prog.exe

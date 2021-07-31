@@ -50,7 +50,6 @@ echo 'marf was here' | diff - sub1/foo.o
 cat > sub1/Tupfile << HERE
 : foreach *.c |> sh marfcc -c %f -o %o |> %B.o
 HERE
-touch sub1/Tupfile
 update
 
 tup_dep_no_exist $ CC . sub1

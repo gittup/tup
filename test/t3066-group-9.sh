@@ -30,7 +30,6 @@ cat > Tupfile << HERE
 : foo.txt |> false |> bar.txt
 : bar.txt |> echo bar > %o |> baz.txt | <group>
 HERE
-touch Tupfile
 update_fail_msg 'failed with return value 1'
 
 cat > Tupfile << HERE
@@ -38,7 +37,6 @@ cat > Tupfile << HERE
 : foo.txt |> true; touch %o |> bar.txt
 : bar.txt |> echo bar > %o |> baz.txt
 HERE
-touch Tupfile
 update
 
 eotup

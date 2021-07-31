@@ -20,14 +20,12 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {} void foo(void) {}" > foo.c
-touch foo.c Tupfile
 update
 sym_check foo.o foo
 sym_check prog.exe foo
 
 cat Tupfile | sed 's/prog/newprog/g' > tmpTupfile
 mv tmpTupfile Tupfile
-touch Tupfile
 update
 
 sym_check newprog.exe foo

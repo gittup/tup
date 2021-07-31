@@ -26,7 +26,6 @@ cat > Tupfile << HERE
 : |> !echo foo |>
 : |> !echo bar baz |>
 HERE
-touch Tupfile
 update
 
 tup_object_exist . 'echo text'

@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 : foreach *.html |> !tup_preserve |>
 : file2.html |> cat file2.html > %o |> out.html
 HERE
-touch Tupfile file.html file2.html build/tup.config
+touch file.html file2.html build/tup.config
 update
 
 eotup

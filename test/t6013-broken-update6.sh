@@ -33,17 +33,14 @@ HERE
 echo '#include "foo.h"' > afoo.c
 echo '#include "foo.h"' > bar.c
 touch foo.h
-touch afoo.c bar.c foo.h
 update
 check_exist afoo.o bar.o
 rm -f bar.o
 echo 'bork' >> afoo.c
-touch foo.h
 update_fail
 check_not_exist bar.o
 
 echo '#include "foo.h"' > afoo.c
-touch afoo.c
 update
 check_exist afoo.o bar.o
 

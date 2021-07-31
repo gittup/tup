@@ -32,13 +32,11 @@ cat > foo/Tupfile << HERE
 HERE
 touch Tupfile
 
-touch Tupfile foo/Tupfile
 update
 
 cat > Tupfile << HERE
 include foo/inc
 HERE
-touch Tupfile
 update_fail
 
 eotup

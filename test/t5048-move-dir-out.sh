@@ -27,7 +27,6 @@ mkdir sub
 echo "#define FOO 3" > sub/foo.h
 echo '#include "foo.h"' > foo.c
 echo ': foreach *.c |> gcc -c %f -o %o -Isub |> %B.o' > Tupfile
-touch Tupfile foo.c sub/foo.h
 update
 
 mv sub ..

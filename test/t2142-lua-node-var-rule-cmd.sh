@@ -32,9 +32,7 @@ cat > sw/app/Tupfile.lua << HERE
 tup.definerule{command = 'cp ' .. toolkit_lib .. ' lib_copy.a', outputs = {'lib_copy.a'}}
 HERE
 
-touch sw/Tuprules.lua
 touch sw/toolkit/toolkit.a
-touch sw/app/Tupfile.lua
 update
 
 tup_dep_exist sw/toolkit toolkit.a sw/app "cp ../toolkit/toolkit.a lib_copy.a"

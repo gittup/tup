@@ -40,7 +40,7 @@ HERE
 chmod +x a/gen.sh b/gen.sh
 cat > Tupfile << HERE
 HERE
-touch Tupfile a/gen.sh b/gen.sh foo.c bar.c
+touch foo.c bar.c
 update
 
 # We should only get the directory-level dependency on PATH when we actually
@@ -50,7 +50,6 @@ tup_dep_no_exist $ PATH 0 .
 cat > Tupfile << HERE
 run gen.sh
 HERE
-touch Tupfile
 update
 
 tup_dep_exist $ PATH 0 .

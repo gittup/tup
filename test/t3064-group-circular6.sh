@@ -35,7 +35,6 @@ HERE
 cat > sub2/Tupfile << HERE
 : <bar> |> echo blah > %o |> output.txt | <foo>
 HERE
-touch sub1/Tupfile sub2/Tupfile
 update
 
 eotup

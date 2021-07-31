@@ -43,7 +43,6 @@ foo
 bar
 baz
 HERE
-touch sub/data.txt
 update
 
 check_exist sub/foo sub/bar sub/baz

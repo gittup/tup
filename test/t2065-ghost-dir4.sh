@@ -26,7 +26,6 @@ cat > Tupfile << HERE
 : |> ./ok.sh > %o |> output.txt
 HERE
 chmod +x ok.sh
-touch ok.sh Tupfile
 update
 tup_object_exist . super
 

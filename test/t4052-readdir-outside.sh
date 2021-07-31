@@ -37,7 +37,6 @@ for i in ../*.txt; do
 	echo ": |> echo \$i |>"
 done
 HERE
-touch foo.sh Tupfile
 update
 
 tup_object_exist . 'echo ../foo.txt'

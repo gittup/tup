@@ -37,7 +37,6 @@ HERE
 echo "yo" > tmp/bar
 echo "not this one" > bar
 
-touch bar tmp/bar Tupfile ok.sh
 update
 
 tup_dep_exist tmp bar . './ok.sh'

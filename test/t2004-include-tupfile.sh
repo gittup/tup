@@ -34,7 +34,6 @@ HERE
 
 echo "int main(void) {return 0;}" > foo.c
 touch bar.c
-touch foo.c bar.c Tupfile Tupfile.vars
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
@@ -49,7 +48,6 @@ CCARGS := -DFOO=1
 CCARGS += -DBAR=1
 CC = \$(CC)
 HERE
-touch Tupfile.vars
 update
 tup_object_no_exist . "gcc -c foo.c -o foo.o -DFOO=1 -DBAR=1"
 tup_object_no_exist . "gcc -c bar.c -o bar.o -DFOO=1 -DBAR=1"

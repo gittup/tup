@@ -27,7 +27,7 @@ mkdir configs
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch sub/Tupfile sub/foo.c sub/bar.c configs/foo.config
+touch sub/foo.c sub/bar.c configs/foo.config
 tup variant configs/*.config
 update
 

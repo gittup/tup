@@ -31,7 +31,6 @@ HERE
 echo "CONFIG_DEBUG=y" > configs/debug
 echo "" > configs/default
 tup variant configs/*
-touch Tupfile
 update
 
 check_exist build-default/bar
@@ -44,7 +43,6 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > configs/debug
-touch configs/debug
 update
 
 check_exist build-default/bar

@@ -31,7 +31,6 @@ cat > foo/Tupfile << HERE
 .gitignore
 : |> echo foo > %o |> baz.txt
 HERE
-touch foo/Tupfile
 update
 
 gitignore_good baz.txt foo/.gitignore

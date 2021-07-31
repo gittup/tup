@@ -50,7 +50,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ./foo |>
 HERE
-touch slink.txt Tupfile
 update
 
 rm slink.txt
@@ -58,7 +57,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ln -s target.txt slink.txt && ./foo |> slink.txt
 HERE
-touch Tupfile
 update
 
 eotup

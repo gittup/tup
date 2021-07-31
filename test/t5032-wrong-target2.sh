@@ -25,7 +25,6 @@ check_no_windows shell
 cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
 HERE
-touch Tupfile
 update
 echo 'foo' | diff - file1
 
@@ -34,7 +33,6 @@ cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
 : |> touch file2; ln -sf file2 file1 |> file2
 HERE
-touch Tupfile
 update_fail
 
 # The echo 'foo' > file1 command should run again. Note that file1 was a
@@ -43,7 +41,6 @@ cat > Tupfile << HERE
 : |> echo 'foo' > %o |> file1
 : file1 |> ln -s file1 %o |> file2
 HERE
-touch Tupfile
 update
 echo 'foo' | diff - file1
 

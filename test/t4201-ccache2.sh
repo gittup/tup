@@ -67,7 +67,6 @@ update
 ./foo.exe 3
 
 echo '#define FOO 4' > a/foo.h
-touch a/foo.h
 update
 ./foo.exe 4
 

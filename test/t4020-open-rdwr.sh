@@ -36,7 +36,6 @@ gcc prog.c -o prog.exe
 cat > Tupfile << HERE
 : |> ./prog.exe |> output
 HERE
-touch prog.exe Tupfile
 update
 
 tup_dep_exist . './prog.exe' . output

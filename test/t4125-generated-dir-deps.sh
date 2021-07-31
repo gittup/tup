@@ -28,7 +28,6 @@ update
 cat > Tupfile << HERE
 : |> touch %o |> out.txt new/2/3.txt
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist . foo

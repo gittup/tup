@@ -22,14 +22,12 @@ cp ../testTupfile.tup Tupfile
 # Verify both files are compiled
 echo "int main(void) {}" > foo.c
 echo "void bar1(void) {}" > bar.c
-touch foo.c bar.c
 update
 sym_check foo.o main
 sym_check bar.o bar1
 
 # Verify only foo is compiled if foo.c is touched
 echo "void foo2(void) {}" >> foo.c
-touch foo.c
 if tup upd | grep 'gcc -c' | wc -l | grep 1 > /dev/null; then
 	:
 else

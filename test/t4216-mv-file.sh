@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 : |> touch a && mv a b |> b
 HERE
-touch Tupfile
 update
 
 eotup

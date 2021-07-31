@@ -26,7 +26,6 @@ HERE
 mkdir bar
 touch bar/hey
 touch foo.c
-touch foo.c Tupfile
 update_fail
 
 eotup

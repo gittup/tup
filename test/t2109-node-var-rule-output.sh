@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : lib.a |> cp lib.a %o |> &(toolkit_lib)
 HERE
 
-touch lib.a tklib.a Tupfile
+touch lib.a tklib.a
 
 update_fail_msg "&-variables not allowed here"
 

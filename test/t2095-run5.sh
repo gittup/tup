@@ -33,7 +33,7 @@ mkdir sub
 cat > sub/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile ok.sh sub/foo.c sub/bar.c
+touch sub/foo.c sub/bar.c
 update_fail_msg 'Fuse server reported an access violation'
 
 # TODO: Allow readdir() to parse subdirs automatically? Would cause a loop

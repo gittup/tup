@@ -33,9 +33,7 @@ include_rules
 : |> cp &(toolkit_lib) %o |> lib_copy.a
 HERE
 
-touch sw/Tuprules.tup
 touch sw/toolkit/toolkit.a
-touch sw/app/Tupfile
 update
 
 tup_dep_exist sw/toolkit toolkit.a sw/app "cp ../toolkit/toolkit.a lib_copy.a"

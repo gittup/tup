@@ -26,7 +26,7 @@ HERE
 
 mkdir sub
 
-touch foo.c Tupfile
+touch foo.c
 update
 
 check_exist foo.o

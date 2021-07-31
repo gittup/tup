@@ -25,7 +25,6 @@ mkdir foo
 cat > Tupfile << HERE
 : |> touch %o |> foo/ok.txt
 HERE
-touch Tupfile
 update
 
 tup_object_exist foo ok.txt
@@ -33,7 +32,6 @@ check_exist foo/ok.txt
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist foo ok.txt

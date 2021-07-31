@@ -22,7 +22,6 @@ mkdir a/a2
 cp ../testTupfile.tup a/a2/Tupfile
 
 echo "int main(void) {return 0;}" > a/a2/foo.c
-touch a/a2/foo.c a/a2/Tupfile
 update
 tup_object_exist . a
 tup_object_exist a a2

@@ -35,7 +35,7 @@ chmod +x gen.sh
 cat > Tupfile << HERE
 run ./gen.sh
 HERE
-touch a.in b.in c.in Tupfile
+touch a.in b.in c.in
 parse_fail_msg "Missing newline from :-rule in run script"
 
 eotup

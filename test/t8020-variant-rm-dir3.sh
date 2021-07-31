@@ -26,7 +26,7 @@ mkdir sub
 mkdir sub/foo
 echo ": |> touch %o |> hey" > sub/Tupfile
 echo ": |> touch %o |> yo" > sub/foo/Tupfile
-touch build/tup.config sub/Tupfile sub/foo/Tupfile
+touch build/tup.config
 
 update
 

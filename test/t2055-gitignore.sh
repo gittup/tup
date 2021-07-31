@@ -37,7 +37,7 @@ cat > sub/Tupfile << HERE
 include_rules
 HERE
 
-touch foo.c bar.c Tupfile Tuprules.tup sub/Tupfile sub/shazam.c
+touch bar.c sub/shazam.c
 update
 
 if [ ! -f .gitignore ]; then

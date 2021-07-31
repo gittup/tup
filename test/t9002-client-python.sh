@@ -34,7 +34,6 @@ HERE
 cat > Tupfile << HERE
 : |> PYTHONPATH=../.. python -B foo.py |>
 HERE
-touch Tupfile
 update
 
 tup_object_exist tup.config BAZ
@@ -51,7 +50,6 @@ if tup_client.config_var('BAR') != "hey":
 if tup_client.config_var('BAZ') is not None:
 	raise Exception("No: BAZ")
 HERE
-touch foo.py
 update
 
 tup_object_exist tup.config BAZ
@@ -63,7 +61,6 @@ if tup_client.config_var('FOO') != "y":
 if tup_client.config_var('BAR') != "hey":
 	raise Exception("No: BAR")
 HERE
-touch foo.py
 update
 
 tup_object_no_exist tup.config BAZ

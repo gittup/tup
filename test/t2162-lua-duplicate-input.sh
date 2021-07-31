@@ -25,7 +25,6 @@ objs += 'foo.o'
 tup.rule(objs, 'gcc %f -o %o', 'prog.exe')
 HERE
 echo 'int main(void) {return 0;}' > foo.c
-touch foo.c Tupfile.lua
 update
 
 tup_object_exist . 'gcc foo.o -o prog.exe'

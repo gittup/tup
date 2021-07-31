@@ -34,7 +34,6 @@ fi
 cat > Tupfile << HERE
 : foreach *.c |> ^j^ gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile
 compiledb
 
 for i in foo.c bar.c; do

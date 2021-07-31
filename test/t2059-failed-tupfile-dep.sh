@@ -28,7 +28,7 @@ cat > bar/Tupfile << HERE
 : ../foo/*.txt |> cp %f %o |> output
 : ../foo/*.c |> cp %f %o |> output
 HERE
-touch foo/Tupfile bar/Tupfile foo/ok.txt
+touch foo/ok.txt
 update
 
 # Change yo.h to yo.c so the second rule in bar/Tupfile is triggered to also
@@ -36,7 +36,6 @@ update
 cat > foo/Tupfile << HERE
 : |> echo yo > %o |> yo.c
 HERE
-touch foo/Tupfile
 update_fail
 
 # An update should again try to parse bar and fail again.

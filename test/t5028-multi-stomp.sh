@@ -23,7 +23,6 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> file1
 : |> echo foo2 > %o |> file2
 HERE
-touch Tupfile
 update
 echo foo | diff - file1
 echo foo2 | diff - file2
@@ -34,7 +33,6 @@ cat > Tupfile << HERE
 : |> echo foo2 > %o |> file2
 : |> echo bar > file1 ; echo bar2 > file2; touch file3 |> file3
 HERE
-touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
@@ -42,7 +40,6 @@ cat > Tupfile << HERE
 : |> echo foo2 > %o |> file2
 : |> echo bar > %o |> file3
 HERE
-touch Tupfile
 update
 echo foo | diff - file1
 echo foo2 | diff - file2

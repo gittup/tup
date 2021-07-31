@@ -21,7 +21,6 @@ cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {return 0;}" > foo.c
 echo "void bar1(void) {}" > bar.c
-touch foo.c bar.c
 update
 sym_check foo.o main
 sym_check bar.o bar1

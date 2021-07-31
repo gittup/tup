@@ -34,20 +34,17 @@ check_exist out.txt final.txt
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : <group> |> touch %o |> final.txt <final>
 HERE
-touch Tupfile
 update_partial '<final>'
 
 cat > Tupfile << HERE
 : |> touch %o |> out.txt <group>
 : <group> |> touch %o |> final.txt <final>
 HERE
-touch Tupfile
 update_partial '<final>'
 
 check_exist out.txt final.txt

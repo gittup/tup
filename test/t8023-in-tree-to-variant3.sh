@@ -28,7 +28,6 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-touch Tupfile
 update
 
 touch build/tup.config

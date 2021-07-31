@@ -30,7 +30,6 @@ endif
 : |> touch %o |> bar
 HERE
 echo 'CONFIG_DEBUG=y' > tup.config
-touch Tupfile tup.config
 update
 
 check_exist foo bar

@@ -34,7 +34,6 @@ update
 cat > a/b/c/Tupfile << HERE
 : |> false |>
 HERE
-touch a/b/c/Tupfile
 update_fail_msg 'failed with return value 1'
 
 check_not_exist build-tup/a/b/c/results/extra.txt
@@ -43,7 +42,6 @@ check_not_exist build-tup/a/b/c/results
 cat > a/b/c/Tupfile << HERE
 : |> ^ Running test^ echo test > %o |> results/extra.txt
 HERE
-touch a/b/c/Tupfile
 update
 
 check_exist build-tup/a/b/c/results/extra.txt

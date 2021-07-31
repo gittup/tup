@@ -50,7 +50,6 @@ HERE
 
 cp ../testTupfile.tup Tupfile
 echo "int main(void) {}" > foo.c
-touch foo.c
 update
 sym_check foo.o main
 

@@ -47,7 +47,6 @@ HERE
 cat > prog.c << HERE
 int main(void) {return 0;}
 HERE
-touch Tupfile exec_test.c prog.c
 update
 
 check_updates prog.c test_passed

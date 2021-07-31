@@ -62,7 +62,6 @@ mkdir tmpsub/level2/sublevel1.1
 ls tmpsub/level1
 rm -r tmpsub
 HERE
-touch ok.sh
 update
 
 for i in sublevel1.1 sublevel1.2; do

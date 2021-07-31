@@ -28,7 +28,7 @@ cat > Tupfile << HERE
 : &(lib) |> cp %f %o |> %b.copy
 HERE
 
-touch Tupfile build/tup.config myLib.a
+touch build/tup.config myLib.a
 update
 
 tup_dep_exist . myLib.a build 'cp myLib.a build/myLib.a.copy'

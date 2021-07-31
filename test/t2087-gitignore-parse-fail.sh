@@ -30,13 +30,12 @@ cat > sub/Tupfile << HERE
 .gitignore
 : |> touch %o |> hey
 HERE
-touch Tupfile sub/Tupfile sub/foo.c
+touch sub/foo.c
 update_fail_msg 'Error parsing Tupfile'
 
 cat > Tupfile << HERE
 : sub/foo.c |> echo %f |>
 HERE
-touch Tupfile
 update
 
 eotup

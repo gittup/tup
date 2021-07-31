@@ -22,7 +22,7 @@
 cat > Tupfile.lua << HERE
 tup.foreach_rule({'*.c'}, 'echo gcc -c %f -o %B.o')
 HERE
-touch foo.c bar.c Tupfile.lua
+touch foo.c bar.c
 update
 tup_object_exist . foo.c bar.c
 tup_object_exist . "echo gcc -c foo.c -o foo.o"

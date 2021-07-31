@@ -43,7 +43,6 @@ cat > Tupfile << HERE
 .gitignore
 : |> touch foo |> foo
 HERE
-touch Tupfile
 update
 
 gitignore_good ok.txt .gitignore
@@ -55,7 +54,6 @@ gitignore_bad .gitignore .gitignore
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-touch Tupfile
 update
 
 gitignore_good ok.txt .gitignore

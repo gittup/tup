@@ -67,7 +67,6 @@ rm tmpsub/level2/baz.txt
 rmdir tmpsub/level2
 rmdir tmpsub
 HERE
-touch ok.sh
 update
 
 for i in foo.txt bar.txt tmpsub/level2/baz.txt; do

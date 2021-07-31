@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : bar.c foo.c bar.c |> echo blah2 %f |>
 HERE
 (echo '#include "foo.h"'; echo 'int main(void) {return 0;}') > foo.c
-touch foo.c foo.h bar.c Tupfile
+touch foo.h bar.c
 update
 
 tup_object_exist . 'gcc -c foo.c -o foo.o'

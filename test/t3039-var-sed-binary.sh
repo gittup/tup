@@ -24,7 +24,6 @@ cat > Tupfile << HERE
 : foo.txt |> tup varsed --binary %f %o |> out.txt
 HERE
 echo "hey @FOO@ yo" > foo.txt
-touch foo.txt Tupfile
 varsetall FOO=sup
 update
 tup_object_exist . foo.txt out.txt

@@ -64,7 +64,6 @@ vars += test
 : |> !vars |> test.txt
 HERE
 
-touch sw/Tuprules.tup sw/lib/Tupfile sw/app/Tuprules.tup sw/app/core/Tupfile sw/test/Tupfile
 update
 
 tup_dep_exist sw/lib 'echo sw lib > lib.txt' sw/lib lib.txt

@@ -27,7 +27,6 @@ make_tup_client
 cat > Tupfile << HERE
 : |> ./client abcd |>
 HERE
-touch Tupfile
 update
 
 tup_object_exist tup.config abcd
@@ -35,7 +34,6 @@ tup_object_exist tup.config abcd
 cat > Tupfile << HERE
 : |> ./client defg |>
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist tup.config abcd

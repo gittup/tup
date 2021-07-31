@@ -36,7 +36,6 @@ echo "" > sub/foo/configs/default
 cd sub/foo
 tup variant configs/*
 cd ../..
-touch Tupfile
 update
 
 check_exist build-default/bar
@@ -49,7 +48,6 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > sub/foo/configs/debug
-touch sub/foo/configs/debug
 update
 
 check_exist build-default/bar

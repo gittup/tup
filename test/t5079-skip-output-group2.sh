@@ -55,7 +55,6 @@ cat > foo/Tupfile << HERE
 include_rules
 : |> ^o^ touch %o |> foo.txt newfoo.txt | \$(MY_ROOT)/<txt>
 HERE
-touch foo/Tupfile
 update
 
 check_list foo/foo.txt mylist.txt
@@ -66,7 +65,6 @@ cat > foo/Tupfile << HERE
 include_rules
 : |> ^o^ touch %o |> foo.txt | \$(MY_ROOT)/<txt>
 HERE
-touch foo/Tupfile
 update
 
 check_list foo/foo.txt mylist.txt

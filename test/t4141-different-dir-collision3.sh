@@ -35,7 +35,6 @@ HERE
 cat > baz/Tupfile << HERE
 : |> cp baz.txt %o |> bazout.txt
 HERE
-touch foo/Tupfile bar/Tupfile baz/Tupfile
 update
 
 echo bar | diff - bar/barout.txt
@@ -49,7 +48,6 @@ HERE
 cat > foo/Tupfile << HERE
 : |> sh ok.sh |> ../bar/barout.txt ../baz/bazout.txt
 HERE
-touch foo/Tupfile
 rm bar/Tupfile baz/Tupfile
 update
 

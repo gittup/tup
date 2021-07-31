@@ -29,7 +29,6 @@ endif
 : |> touch %o |> bar
 HERE
 echo "" > build/tup.config
-touch build/tup.config sub/Tupfile
 
 update
 check_exist build/sub/bar
@@ -40,7 +39,6 @@ update
 
 mkdir build-debug
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-touch build-debug/tup.config
 update
 check_exist build-debug/sub/bar
 check_exist build-debug/sub/foo

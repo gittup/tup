@@ -27,7 +27,6 @@ mkdir sub
 cat > sub/Tupfile << HERE
 : |> touch %o |> bar
 HERE
-touch Tupfile sub/Tupfile
 update
 
 check_exist foo sub/bar

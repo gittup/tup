@@ -28,7 +28,6 @@ update
 
 cat > foo/Tupfile << HERE
 HERE
-touch foo/Tupfile
 update
 
 check_exist foo/bar.txt

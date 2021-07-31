@@ -38,7 +38,6 @@ endif
 endif
 endif
 HERE
-touch Tupfile
 parse
 
 cat > Tupfile << HERE
@@ -61,7 +60,6 @@ endif
 endif
 endif
 HERE
-touch Tupfile
 parse_fail_msg "too many nested if statements"
 
 eotup

@@ -26,7 +26,6 @@ cat > sub/Tupfile << HERE
 HERE
 echo "hey @FOO@ yo" > sub/foo.txt
 echo "This is an email@address.com" >> sub/foo.txt
-touch sub/foo.txt sub/Tupfile
 varsetall FOO=sup
 update
 tup_object_exist sub foo.txt out.txt

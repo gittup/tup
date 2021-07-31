@@ -26,14 +26,13 @@ cat > Tupfile << HERE
 : |> ln -s foo bar |> bar
 : bar |> cat %f > %o |> output
 HERE
-touch foo Tupfile
+touch foo
 update
 
 cat > Tupfile << HERE
 : |> touch bar |> bar
 : bar |> cat %f > %o |> output
 HERE
-touch Tupfile
 update
 
 # Make sure the sym field in bar no longer points to foo

@@ -30,20 +30,20 @@ for i in *.c sub2/*.[co] ../foo/bar/*.[co]; do
 	echo ": |> echo \$i |>"
 done
 HERE
-touch sub/Tupfile sub/ok.sh sub/sub.c
+touch sub/sub.c
 
 mkdir sub/sub2
 cat > sub/sub2/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch sub/sub2/Tupfile sub/sub2/foo.c sub/sub2/bar.c
+touch sub/sub2/foo.c sub/sub2/bar.c
 
 mkdir foo
 mkdir foo/bar
 cat > foo/bar/Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 HERE
-touch foo/bar/Tupfile foo/bar/ok.c
+touch foo/bar/ok.c
 update
 
 tup_object_exist sub 'echo sub.c'

@@ -25,7 +25,6 @@ cat > Tupfile << HERE
 HERE
 filelist=`seq 1 2000 | awk '{print "hey"$1".txt"}'`
 touch $filelist
-touch Tupfile
 update
 
 eotup

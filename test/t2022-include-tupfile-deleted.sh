@@ -29,7 +29,6 @@ cat > yo/Install.tup << HERE
 : |> echo bar |>
 HERE
 
-touch yo/Install.tup Tupfile
 update
 tup_object_exist . 'echo foo'
 tup_object_exist . 'echo bar'

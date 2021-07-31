@@ -31,7 +31,7 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-touch build/tup.config Tupfile foo.c sub/bar.c
+touch sub/bar.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe

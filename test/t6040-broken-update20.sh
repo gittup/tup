@@ -36,7 +36,6 @@ cat > foo/Tupfile <<HERE
 files-@(ARCH) = foo.c
 HERE
 varsetall ARCH=y
-touch foo/Tupfile
 update
 
 rm -rf foo

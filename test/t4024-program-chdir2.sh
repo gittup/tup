@@ -42,7 +42,6 @@ HERE
 
 echo "yo" > bar
 
-touch bar Tupfile ok.sh
 update
 
 tup_dep_exist sub bar sub './ok.sh'

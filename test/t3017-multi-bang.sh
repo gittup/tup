@@ -28,7 +28,7 @@ cat > Tupfile << HERE
 : foreach foo.c sub/built-in.o bar.c |> !cc_linux |> {objs}
 : {objs} |> echo %f |>
 HERE
-touch foo.c bar.c sub/built-in.o Tupfile
+touch foo.c bar.c sub/built-in.o
 update
 
 check_exist foo.o bar.o

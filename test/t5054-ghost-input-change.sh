@@ -28,7 +28,6 @@ cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; else echo nofile; fi
 HERE
 echo 'heyo' > foo.txt
-touch foo.txt Tupfile ok.sh
 update
 
 tup_dep_exist . ghost . 'sh ok.sh > output'
@@ -37,7 +36,6 @@ echo 'nofile' | diff - output
 cat > ok.sh << HERE
 cat foo.txt
 HERE
-touch ok.sh
 update
 
 echo 'heyo' | diff - output

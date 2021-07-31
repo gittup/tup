@@ -24,14 +24,12 @@
 cat > Tupfile << HERE
 : |> echo foo > %o |> output
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> echo bar > %o |> output
 : |> echo foo > %o |> output
 HERE
-touch Tupfile
 update_fail_msg "Unable to create output file 'output'"
 
 eotup

@@ -35,7 +35,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o |> %B.o
 HERE
 echo 'int foo(void) {return 7;}' > foo.c
-touch foo.c Tupfile sub/gcc
 update
 sym_check foo.o foo
 

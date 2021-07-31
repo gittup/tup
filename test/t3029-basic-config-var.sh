@@ -26,7 +26,6 @@ file-\$(CONFIG_BAR) += bar.c
 HERE
 echo hey > foo.c
 echo yo > bar.c
-touch foo.c bar.c Tupfile
 varsetall BAR=n
 update
 tup_object_exist . foo.c bar.c

@@ -23,7 +23,6 @@ cp ../testTupfile.tup Tupfile
 echo "int main(void) {return 0;}" > foo.c
 echo "void bar1(void) {}" > bar.c
 echo "void baz1(void) {}" > baz.c
-touch foo.c bar.c baz.c
 update
 sym_check foo.o main
 sym_check bar.o bar1

@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o {objs}
 : {objs} lib |> ls %f |>
 HERE
-touch Tupfile foo.c bar.c lib
+touch foo.c bar.c lib
 update
 
 eotup

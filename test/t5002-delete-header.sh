@@ -22,7 +22,6 @@ cp ../testTupfile.tup Tupfile
 (echo "#include \"foo.h\""; echo "int main(void) {return 0;}") > foo.c
 (echo "#include \"foo.h\""; echo "void bar1(void) {}") > bar.c
 echo "" > foo.h
-touch foo.c bar.c foo.h
 update
 sym_check foo.o main
 sym_check bar.o bar1

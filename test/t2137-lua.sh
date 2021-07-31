@@ -22,21 +22,19 @@
 cat > Tupfile.lua << HERE
 tup.rule('echo hey')
 HERE
-touch Tupfile.lua
 update
 tup_object_exist . "echo hey"
 
 cat > Tupfile.lua << HERE
 tup.rule({'foo.c'}, 'echo hey')
 HERE
-touch foo.c Tupfile.lua
+touch foo.c
 update
 tup_object_exist . "echo hey"
 
 cat > Tupfile.lua << HERE
 tup.rule('touch output', {'output'})
 HERE
-touch foo.c Tupfile.lua
 update
 tup_object_exist . "touch output"
 check_exist output
@@ -44,7 +42,6 @@ check_exist output
 cat > Tupfile.lua << HERE
 tup.rule('foo.c', 'touch output', 'output')
 HERE
-touch Tupfile.lua
 update
 tup_object_exist . "touch output"
 check_exist output

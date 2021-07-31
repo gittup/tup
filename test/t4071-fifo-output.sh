@@ -25,7 +25,6 @@ check_no_ldpreload mozilla-unneeded
 cat > Tupfile << HERE
 : |> mkfifo %o |> tmpfifo
 HERE
-touch Tupfile
 update_fail_msg "Unable to create a FIFO as an output file"
 
 eotup

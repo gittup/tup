@@ -34,7 +34,6 @@ HERE
 echo "int marfx;" > foo/x.c
 echo "int marfy;" > foo/y.c
 echo "int marfz;" > bar/z.c
-touch foo/Tupfile bar/Tupfile
 update
 
 sym_check foo/libfoo.a marfx marfy ^marfz

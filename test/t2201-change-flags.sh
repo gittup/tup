@@ -29,7 +29,6 @@ update_fail_msg 'failed with return value 1'
 cat > Tupfile << HERE
 : |> false | echo foo > %o |> out.txt
 HERE
-touch Tupfile
 update
 
 eotup

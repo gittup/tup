@@ -25,7 +25,6 @@ check_no_ldpreload mozilla-unneeded
 cat > Tupfile << HERE
 : |> mkdir %o |> outdir
 HERE
-touch Tupfile
 update_fail_msg "tup error.*outdir"
 
 mkdir outdir
@@ -33,7 +32,6 @@ mkdir outdir
 cat > Tupfile << HERE
 : |> rmdir outdir |>
 HERE
-touch Tupfile
 update_fail_msg "tup error.*rmdir"
 
 eotup

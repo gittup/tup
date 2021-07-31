@@ -24,12 +24,10 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-touch foo.c
 update
 sym_check foo.o main
 
 echo "int main(void) {bork}" > foo.c
-touch foo.c
 update_fail
 
 # Update again should fail again

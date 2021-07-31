@@ -22,7 +22,6 @@
 cat > Tupfile << HERE
 : |> echo @(TUP_PLATFORM) |>
 HERE
-touch Tupfile
 parse
 
 # Could validate other platforms here if desired - not really necessary.

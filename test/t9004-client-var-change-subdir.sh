@@ -29,7 +29,7 @@ mv ../client .
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-touch Tupfile empty.txt
+touch empty.txt
 update
 
 diff empty.txt ok.txt

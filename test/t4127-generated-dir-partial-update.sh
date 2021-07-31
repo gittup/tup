@@ -35,7 +35,6 @@ update
 
 # Try to partial update the directory containing the output
 echo 'hey' > input.txt
-touch input.txt
 update_partial foo
 
 echo 'hey' | diff - foo/out.txt
@@ -43,7 +42,6 @@ echo 'orig' | diff - bar/out.txt
 
 # Try to partial update the directory containing the command
 echo 'yo' > input.txt
-touch input.txt
 update_partial out1
 
 echo 'yo' | diff - foo/out.txt
@@ -51,7 +49,6 @@ echo 'orig' | diff - bar/out.txt
 
 # Try to partial update the generated file
 echo 'new' > input.txt
-touch input.txt
 update_partial foo/out.txt
 
 echo 'new' | diff - foo/out.txt

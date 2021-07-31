@@ -29,7 +29,7 @@
 cat > Tupfile << HERE
 : foreach foo.c | foo.h |> gcc -c %f -o %o |> foo.o
 HERE
-touch Tupfile foo.c foo.h
+touch foo.c foo.h
 update
 
 touch foo.h foo.c

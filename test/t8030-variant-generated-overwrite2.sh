@@ -28,7 +28,6 @@ endif
 : |> touch %o |> bar
 HERE
 echo "" > build-default/tup.config
-touch Tupfile
 update
 
 touch bar

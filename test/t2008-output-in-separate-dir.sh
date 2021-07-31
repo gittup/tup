@@ -23,7 +23,6 @@ mkdir bar
 cat > Tupfile << HERE
 : |> echo hey > %o |> bar/foo.o
 HERE
-touch Tupfile
 update
 
 eotup

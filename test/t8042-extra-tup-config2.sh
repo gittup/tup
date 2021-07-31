@@ -33,7 +33,7 @@ cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
 HERE
 echo "int main(void) {return 0;}" > foo.c
-touch Tupfile foo.c build-default/tup.config build-debug/tup.config sub/bar.c
+touch build-default/tup.config build-debug/tup.config sub/bar.c
 update
 
 for i in foo.o sub/bar.o prog.exe sub/.gitignore; do

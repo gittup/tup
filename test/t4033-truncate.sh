@@ -40,14 +40,12 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> (echo hey; echo there) > %o; ./foo |> tmp.txt
 HERE
-touch Tupfile foo.c
 update
 
 echo 'hey' | diff - tmp.txt
 cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 HERE
-touch Tupfile
 update
 check_not_exist tmp.txt
 
@@ -55,7 +53,7 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ./foo |>
 HERE
-touch Tupfile tmp.txt
+touch tmp.txt
 update_fail_msg "tup error.*truncate"
 
 eotup

@@ -25,14 +25,12 @@ include_rules
 CFLAGS += foo
 : |> echo \$(CFLAGS) |>
 HERE
-touch sub/Tupfile
 update
 tup_object_exist sub 'echo foo'
 
 cat > Tupfile << HERE
 : |> echo 'CFLAGS += bar' > %o |> Tuprules.tup
 HERE
-touch Tupfile
 update_fail
 
 eotup

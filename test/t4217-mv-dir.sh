@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 : |> mkdir a && mv a b && rmdir b && touch c |> c
 HERE
-touch Tupfile
 update
 
 eotup

@@ -49,7 +49,6 @@ int main(int argc, char **argv)
 HERE
 
 cp foo.c bar.c
-touch foo.c bar.c Tupfile
 update
 
 if strings foo.exe | grep '\.tup/mnt' > /dev/null; then

@@ -33,7 +33,6 @@ chmod +x ok.sh
 cat > Tupfile << HERE
 : |> ./ok.sh > %o |> bar
 HERE
-touch Tupfile ok.sh
 update
 
 sleep 1

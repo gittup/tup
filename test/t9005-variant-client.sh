@@ -32,7 +32,7 @@ mv ../client .
 cat > Tupfile << HERE
 : |> ./client defg > %o |> ok.txt
 HERE
-touch Tupfile empty.txt
+touch empty.txt
 update
 
 diff empty.txt ../build/sub/ok.txt
@@ -41,7 +41,6 @@ tup_object_exist build/tup.config defg
 
 cd ..
 echo "CONFIG_defg=hey" > build/tup.config
-touch build/tup.config
 update
 
 cd sub

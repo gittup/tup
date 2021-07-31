@@ -35,7 +35,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> touch %o && ./foo |> access.txt
 HERE
-touch foo.c Tupfile
 update
 
 eotup

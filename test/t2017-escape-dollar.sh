@@ -24,7 +24,6 @@ cat > Tupfile << HERE
 : |> FOO="hey"; export FOO; echo \$FOO |>
 : |> echo \\\$(ls) |>
 HERE
-touch Tupfile
 update
 tup_object_exist . 'FOO="hey"; export FOO; echo $FOO'
 tup_object_exist . 'echo $(ls)'

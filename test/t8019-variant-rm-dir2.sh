@@ -33,7 +33,6 @@ HERE
 
 echo "" > build/tup.config
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-touch build/tup.config build-debug/tup.config sub/Tupfile
 
 update
 
@@ -45,7 +44,6 @@ ifeq (@(DEBUG),y)
 : |> touch %o |> foo
 endif
 HERE
-touch sub/Tupfile
 update
 
 check_exist build/sub
@@ -61,7 +59,6 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-touch sub/Tupfile
 
 update
 

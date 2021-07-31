@@ -24,7 +24,6 @@ cat > Tupfile.lua << HERE
 tup.import('CC=blah')
 tup.rule('echo \$(CC)')
 HERE
-touch Tupfile.lua
 update
 
 tup_object_exist . 'echo blah'

@@ -22,11 +22,9 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-touch foo.c
 update
 
 echo "int foo; int main(void) {}" > foo.c
-touch foo.c
 update_partial foo.c
 update_partial foo.o
 

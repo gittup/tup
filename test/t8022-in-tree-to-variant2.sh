@@ -27,7 +27,6 @@ ifeq (@(DEBUG),y)
 endif
 : |> touch %o |> bar
 HERE
-touch Tupfile
 update
 
 touch build/tup.config
@@ -38,7 +37,6 @@ check_not_exist build/foo
 
 mkdir build-debug
 echo "CONFIG_DEBUG=y" > build-debug/tup.config
-touch build-debug/tup.config
 
 update
 check_exist build-debug/bar

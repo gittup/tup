@@ -35,7 +35,7 @@ HERE
 cat > Tupfile << HERE
 include sub/inc.tup
 HERE
-touch Tupfile sub/inc.tup sub/gen.sh foo.c bar.c
+touch foo.c bar.c
 update
 
 check_exist foo.o bar.o

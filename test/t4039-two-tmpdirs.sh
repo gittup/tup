@@ -37,7 +37,6 @@ chmod +x ok.sh
 cat > Tupfile << HERE
 : ok.sh |> ./%f |> output.txt
 HERE
-touch ok.sh Tupfile
 update
 
 (echo foo; echo bar) | diff - output.txt

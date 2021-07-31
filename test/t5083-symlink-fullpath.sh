@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 : $cwd/foo.h |> !tup_ln |> bar.h <headers>
 : foreach *.c | <headers> |> ^c^ gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile foo.h
+touch foo.h
 update
 
 tup_dep_exist . bar.h . 'gcc -c foo.c -o foo.o'

@@ -29,7 +29,6 @@ cat > Tupfile << HERE
 : |> touch %o |> foo.txt <output-group>
 HERE
 touch output.txt
-touch Tupfile
 update --debug-logging
 
 tup_dep_no_exist . 'output.txt' . '<output-group>'

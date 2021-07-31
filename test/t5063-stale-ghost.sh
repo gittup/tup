@@ -31,14 +31,12 @@ cat > ok.sh << HERE
 if [ -f ghost ]; then cat ghost; fi
 cat foo.h
 HERE
-touch Tupfile ok.sh
 
 update_fail
 
 cat > ok.sh << HERE
 echo yo
 HERE
-touch ok.sh
 
 update
 tup_object_no_exist . ghost

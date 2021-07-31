@@ -27,7 +27,7 @@ node_var += new value
 : |> echo &(node_var) is \$(node_var) |>
 HERE
 
-touch lib.a Tupfile
+touch lib.a
 update
 
 tup_object_exist . 'echo lib.a is new value'

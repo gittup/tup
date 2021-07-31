@@ -32,7 +32,6 @@ tup_dep_exist . bar . '<group>'
 cat > Tupfile << HERE
 : |> touch bar |> bar <group>
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist . foo
@@ -41,7 +40,6 @@ tup_dep_exist . bar . '<group>'
 # Remove 'touch bar'. Now the group should be gone.
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 tup_object_no_exist . '<group>'

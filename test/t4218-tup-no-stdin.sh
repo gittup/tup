@@ -21,7 +21,6 @@
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-touch foo.c
 # Run update with stdin closed.
 update <&-
 sym_check foo.o main

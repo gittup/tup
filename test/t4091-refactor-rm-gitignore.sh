@@ -23,12 +23,10 @@
 cat > Tupfile << HERE
 .gitignore
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 refactor_fail_msg "Attempting to remove the .gitignore file"
 
 eotup

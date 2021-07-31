@@ -29,7 +29,7 @@ cat > Tupfile << HERE
 : &(lib) |> cp %f %o |> %b.copy
 HERE
 
-touch Tupfile build/tup.config myLib.a
+touch build/tup.config myLib.a
 update
 touch Tupfile
 update

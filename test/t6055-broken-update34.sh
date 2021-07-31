@@ -28,7 +28,6 @@ cat > Tupfile << HERE
 : foo.o |> gcc %f -o %o && touch blah |> foo.exe | blah
 HERE
 echo 'int main(void) {return 0;}' > foo.c
-touch Tupfile foo.c
 update
 
 touch foo.c
@@ -41,7 +40,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc -c %f -o %o && touch blah |> foo.o | blah
 : foo.o |> gcc %f -o %o |> foo.exe
 HERE
-touch Tupfile
 update
 
 touch foo.c

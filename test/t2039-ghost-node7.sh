@@ -34,13 +34,11 @@ cat > Tupfile << HERE
 HERE
 chmod +x ok.sh
 cp ok.sh foo.sh
-touch ok.sh foo.sh Tupfile
 update
 echo nofile | diff output.txt -
 echo nofile | diff foo-output.txt -
 
 echo 'alive' > include/ghost
-touch include/ghost
 update
 echo alive | diff output.txt -
 echo alive | diff foo-output.txt -

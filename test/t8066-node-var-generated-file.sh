@@ -27,7 +27,7 @@ cat > Tupfile << HERE
 &node_var = a.txt
 HERE
 
-touch Tupfile build/tup.config
+touch build/tup.config
 update_fail_msg "Unable to find tup entry for file 'a.txt' in node reference declaration."
 
 eotup

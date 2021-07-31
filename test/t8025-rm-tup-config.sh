@@ -33,7 +33,6 @@ ifeq (@(BAR),y)
 endif
 HERE
 echo "CONFIG_FOO=y" > tup.config
-touch foo/Tupfile bar/Tupfile
 update
 
 rm tup.config

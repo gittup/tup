@@ -25,7 +25,7 @@ cat > Tupfile << HERE
 HERE
 echo '#include "foo.h"' > foo.c
 echo '#include "foo.h"' > bar.c
-touch foo.c bar.c foo.h
+touch foo.h
 update
 
 touch foo.h

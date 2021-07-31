@@ -42,7 +42,6 @@ cat > Tupfile << HERE
 : foo.c |> gcc %f -o %o |> foo
 : foo |> ^c^ ./foo > %o |> output.txt
 HERE
-touch foo.c Tupfile
 update
 
 if ! grep "Cwd: $PWD$" output.txt > /dev/null; then

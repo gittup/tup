@@ -34,7 +34,6 @@ HERE
 cat > Tupfile << HERE
 run PYTHONPATH=../.. python -B foo.py
 HERE
-touch Tupfile foo.py
 update
 
 tup_object_exist . 'echo None'

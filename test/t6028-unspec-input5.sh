@@ -26,28 +26,24 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> output
 : output |> cat output |>
 HERE
-touch Tupfile
 update
 
 cat > Tupfile << HERE
 : |> cat output |>
 : |> echo foo > %o |> output
 HERE
-touch Tupfile
 update_fail_msg "Missing input dependency"
 
 cat > Tupfile << HERE
 : output |> cat output |>
 : |> echo foo > %o |> output
 HERE
-touch Tupfile
 update_fail_msg "Explicitly named file 'output' in subdir '.' is scheduled to be deleted"
 
 cat > Tupfile << HERE
 : |> echo foo > %o |> output
 : output |> cat output |>
 HERE
-touch Tupfile
 update
 
 eotup

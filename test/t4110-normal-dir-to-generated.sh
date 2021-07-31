@@ -24,7 +24,6 @@ mkdir foo
 cat > foo/Tupfile << HERE
 : |> touch %o |> ok.txt
 HERE
-touch Tupfile
 update
 
 # Remove the dir and also try to make it generated
@@ -32,7 +31,6 @@ rm -rf foo
 cat > Tupfile << HERE
 : |> touch %o |> foo/bar.txt
 HERE
-touch Tupfile
 update
 
 check_exist foo/bar.txt
@@ -42,7 +40,6 @@ tup_object_exist . foo
 # goes away.
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 
 check_not_exist foo

@@ -26,14 +26,12 @@ set_full_deps
 cp ../testTupfile.tup Tupfile
 
 echo "int main(void) {}" > foo.c
-touch foo.c
 tup parse > .output.txt 2>&1
 gitignore_bad / .output.txt
 update
 sym_check foo.o main
 
 echo "void foo2(void) {}" >> foo.c
-touch foo.c
 update
 sym_check foo.o main foo2
 

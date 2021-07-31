@@ -25,7 +25,6 @@ cat > Tupfile << HERE
 : |> echo "var=foo" > %o |> inc {includes}
 include {includes}
 HERE
-touch Tupfile
 parse_fail_msg "Failed to parse included file '{includes}'"
 
 eotup

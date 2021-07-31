@@ -60,7 +60,6 @@ update
 # Make sure if we add a new file to the group, the things using the group
 # are re-executed.
 echo 'int marfx;' > foo/newfoo.c
-touch foo/newfoo.c
 update
 
 sym_check myprog.exe marfx

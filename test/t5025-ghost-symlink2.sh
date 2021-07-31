@@ -26,7 +26,6 @@ ln -s foo-x86.h foo.h
 cat > Tupfile << HERE
 : foo.h |> (cat %f 2>/dev/null || echo 'nofile') > %o |> output.txt
 HERE
-touch foo-x86.h foo.h
 update
 echo '#define FOO 3' | diff - output.txt
 check_updates foo.h output.txt
@@ -39,7 +38,6 @@ echo 'nofile' | diff - output.txt
 # up changing the sym field of foo.h
 
 echo "#define FOO new" > foo-x86.h
-touch foo-x86.h
 update
 echo '#define FOO new' | diff - output.txt
 check_updates foo.h output.txt

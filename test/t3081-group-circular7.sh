@@ -30,7 +30,6 @@ cat > Tupfile << HERE
 : |> cat bar.txt > %o |> output.txt
 : output.txt |> cat input.txt output.txt > %o |> bar.txt | <group>
 HERE
-touch Tupfile input.txt
 update_fail_msg 'Missing input dependency'
 
 eotup

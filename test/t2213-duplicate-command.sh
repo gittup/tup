@@ -23,13 +23,11 @@ cat > Tupfile << HERE
 : |> echo foo |>
 : |> echo foo |>
 HERE
-touch Tupfile
 update_fail_msg "Attempted to add duplicate command"
 
 cat > Tupfile << HERE
 : |> echo foo |>
 HERE
-touch Tupfile
 update
 
 eotup

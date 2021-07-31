@@ -33,7 +33,6 @@ cat > Tupfile << HERE
 : |> echo yo |>
 HERE
 sleep 1
-touch Tupfile
 monitor
 update
 stop_monitor

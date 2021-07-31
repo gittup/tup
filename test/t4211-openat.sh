@@ -45,7 +45,7 @@ cat > Tupfile << HERE
 : prog.exe |> ./prog.exe |> output.txt sub/subout.txt
 HERE
 mkdir sub
-touch input.txt sub/subin.txt Tupfile
+touch input.txt sub/subin.txt
 update
 
 tup_dep_exist . input.txt . './prog.exe'

@@ -28,7 +28,6 @@ ARCH = x86
 : foo-\$(ARCH).h |> ln -s %f %o |> foo.h
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
-touch foo.c foo-x86.h foo-ppc.h
 update
 check_exist foo.o
 
@@ -41,7 +40,6 @@ ARCH = ppc
 : foo-\$(ARCH).h |> ln -s %f %o |> foo.h
 : foreach *.c | foo.h |> gcc -c %f -o %o |> %B.o
 HERE
-touch Tupfile
 update
 check_updates foo-ppc.h foo.o
 check_updates foo.h foo.o

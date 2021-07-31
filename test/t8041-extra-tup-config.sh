@@ -32,7 +32,7 @@ cat > sub/Tupfile << HERE
 : foreach bar.c |> gcc -c %f -o %o |> %B.o
 HERE
 echo "int main(void) {return 0;}" > foo.c
-touch Tupfile foo.c build/tup.config sub/bar.c
+touch build/tup.config sub/bar.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe build/.gitignore build/sub/.gitignore

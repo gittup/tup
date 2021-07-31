@@ -36,7 +36,6 @@ cat > Tupfile << HERE
 : |> ^t^ cp in2.txt %o |> tmp.txt
 : tmp.txt |> cp %f %o |> bar.txt
 HERE
-touch Tupfile
 update
 
 check_not_exist tmp.txt

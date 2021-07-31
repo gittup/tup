@@ -35,13 +35,11 @@ HERE
 echo "void ext3fs(void) {}" > fs/input/ext3.c
 echo "void ext4fs(void) {}" > fs/input/ext4.c
 
-touch Tupfile fs/Tupfile fs/input/Tupfile fs/input/ext3.c fs/input/ext4.c
 update
 
 sym_check built-in.o ext3fs ext4fs
 
 echo "void ext5fs(void) {}" > fs/input/ext5.c
-touch fs/input/ext5.c
 update
 sym_check built-in.o ext3fs ext4fs ext5fs
 

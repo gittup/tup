@@ -35,7 +35,6 @@ HERE
 echo "void ext3fs(void) {}" > fs/ext3.c
 echo "void ext4fs(void) {}" > fs/ext4.c
 
-touch bar/Tupfile fs/Tupfile fs/ext3.c fs/ext4.c
 update
 
 tup_dep_exist . fs . bar
@@ -44,7 +43,6 @@ cat > bar/Tupfile << HERE
 bork
 : ../fs/*.o |> ld -r %f -o built-in.o |> built-in.o
 HERE
-touch bar/Tupfile
 update_fail
 tup_dep_exist . fs . bar
 

@@ -24,7 +24,7 @@ mkdir build
 cat > Tupfile << HERE
 : |> touch %o |> foo
 HERE
-touch Tupfile build/tup.config
+touch build/tup.config
 update
 
 cat > Tupfile << HERE
@@ -33,12 +33,10 @@ ifeq (@(FOO),y)
 : |> cat build/foo > %o |> output
 endif
 HERE
-touch Tupfile
 update
 
 mkdir build2
 echo "CONFIG_FOO=y" > build2/tup.config
-touch build2/tup.config
 update_fail_msg "Unable to use files from another variant.*in this variant"
 
 eotup

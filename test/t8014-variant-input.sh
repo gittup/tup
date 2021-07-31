@@ -23,14 +23,13 @@ mkdir build
 cat > Tupfile << HERE
 : |> touch %o |> foo
 HERE
-touch Tupfile build/tup.config
+touch build/tup.config
 update
 
 cat > Tupfile << HERE
 : |> touch %o |> foo
 : ../build/foo |> cat %f > %o |> output
 HERE
-touch Tupfile
 update
 
 mkdir build2

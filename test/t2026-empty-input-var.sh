@@ -28,7 +28,7 @@ cat > Tupfile << HERE
 : |> echo foo > %o |> bar
 HERE
 
-touch Tupfile order.h
+touch order.h
 parse
 tup_object_no_exist . "nope"
 tup_object_no_exist . "not gonna work"

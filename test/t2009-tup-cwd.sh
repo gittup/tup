@@ -38,7 +38,6 @@ HERE
 touch bar/foo.so
 touch tab/blah.so
 
-touch fs/Tupfile bar/Install.tup tab/Install.tup bar/foo.so tab/blah.so
 update
 tup_object_exist fs foo.so blah.so
 check_exist fs/foo.so fs/blah.so

@@ -42,7 +42,7 @@ cat > sub/Tupfile << HERE
 : ok.c |> gcc %f -o %o |> ok.exe
 : ok.exe |> ./ok.exe > %o |> files.txt
 HERE
-touch sub/foo.c sub/bar.c sub/Tupfile
+touch sub/foo.c sub/bar.c
 update
 
 if ! grep foo.c sub/files.txt | wc -l | grep 1 > /dev/null; then

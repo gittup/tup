@@ -38,7 +38,6 @@ HERE
 cat > prog.c << HERE
 int main(void) {return 0;}
 HERE
-touch Tupfile foo.txt lib.c prog.c
 update
 
 eotup

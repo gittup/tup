@@ -33,7 +33,6 @@ update
 check_not_exist tmp.txt
 
 echo 'blah' > input.txt
-touch input.txt
 update -j1
 (echo foo; echo blah) | diff - final.txt
 check_not_exist tmp.txt

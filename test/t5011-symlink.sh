@@ -22,13 +22,11 @@ echo 'this is a file' > file1
 cat > Tupfile << HERE
 : file1 |> ln -s %f %o |> file1.sym
 HERE
-touch file1 Tupfile
 update
 
 check_exist file1.sym
 cat > Tupfile << HERE
 HERE
-touch Tupfile
 update
 check_not_exist file1.sym
 

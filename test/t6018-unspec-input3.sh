@@ -32,14 +32,12 @@ cat > foo.c << HERE
 #define FOO 4
 int main(void) {return FOO;}
 HERE
-touch foo.c foo.h.in Tupfile
 update
 
 cat > foo.c << HERE
 #include "foo.h"
 int main(void) {return FOO;}
 HERE
-touch foo.c
 update
 
 eotup

@@ -31,7 +31,6 @@ HERE
 
 echo "int main(void) {} void bar(void) {}" > bar.c
 echo "void foo(void) {}" > foo.c
-touch foo.c bar.c Tupfile
 update
 sym_check foo.o foo
 sym_check bar.o bar main
@@ -39,7 +38,6 @@ sym_check prog.exe foo bar main
 
 cat Tupfile | sed 's/FOO := 1/FOO := 0/' > tmpTupfile
 mv tmpTupfile Tupfile
-touch Tupfile
 update
 
 sym_check bar.o bar main

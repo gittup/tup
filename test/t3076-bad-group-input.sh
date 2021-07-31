@@ -30,7 +30,6 @@ cat > Tupfile << HERE
 : |> touch %o |> foo <group>
 : <group> |> cat %<group>.res > %o |> files.txt
 HERE
-touch Tupfile
 update
 
 if ! grep 'foo' files.txt > /dev/null; then

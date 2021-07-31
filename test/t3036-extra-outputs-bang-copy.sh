@@ -31,7 +31,7 @@ cat > Tupfile << HERE
 : foreach *.c |> !cc |> {objs}
 : {objs} |> !ld2 |> out.dll
 HERE
-touch Tupfile foo.c bar.c ok.sh
+touch foo.c bar.c
 update
 
 eotup

@@ -35,7 +35,6 @@ gitignore_good d lines.txt
 
 echo ': *.file ^e.file |> cat %f > %o |> lines.txt' > Tupfile
 
-touch Tupfile
 update
 
 gitignore_good a lines.txt
@@ -45,7 +44,6 @@ gitignore_good d lines.txt
 
 echo ': *.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
 
-touch Tupfile
 update
 
 gitignore_good a lines.txt
@@ -55,7 +53,6 @@ gitignore_good d lines.txt
 
 echo ': *.file ^c.file ^[bc].file |> cat %f > %o |> lines.txt' > Tupfile
 
-touch Tupfile
 update
 
 gitignore_good a lines.txt
@@ -68,7 +65,6 @@ echo ': sub/*.file ^sub/c.file |> cat %f > %o |> lines.txt' > Tupfile
 mkdir sub
 mv *.file sub/
 
-touch Tupfile
 update
 
 gitignore_good a lines.txt

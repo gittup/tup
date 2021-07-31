@@ -44,7 +44,6 @@ echo 'hey' > $tmpdir/tmpfile
 cat > Tupfile << HERE
 : |> ^ Read tmpfile^ if [ -f $tmpdir/tmpfile ]; then cat $tmpdir/tmpfile; else echo nofile; fi > %o |> out.txt
 HERE
-touch Tupfile
 update
 echo 'hey' | diff - out.txt
 

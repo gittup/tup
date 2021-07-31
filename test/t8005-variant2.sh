@@ -26,7 +26,6 @@ cat > Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-touch build/tup.config Tupfile foo.c
 
 git init
 git config user.email test@example.com

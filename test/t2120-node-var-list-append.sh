@@ -26,7 +26,7 @@ cat > Tupfile << HERE
 : |> echo &(libs) > %o |> out.txt
 HERE
 
-touch Tupfile foo.a bar.a
+touch foo.a bar.a
 update
 
 tup_object_exist . 'echo foo.a bar.a > out.txt'

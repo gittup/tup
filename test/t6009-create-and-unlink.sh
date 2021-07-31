@@ -37,7 +37,6 @@ cat foo.tmp > foo.h
 HERE
 chmod +x foo.sh
 
-touch Tupfile foo.sh
 update
 check_exist foo.h
 check_not_exist foo.tmp

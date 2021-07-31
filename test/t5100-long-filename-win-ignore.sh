@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 : |> touch fooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo |> ^/foo*
 HERE
-touch Tupfile
 update
 
 eotup

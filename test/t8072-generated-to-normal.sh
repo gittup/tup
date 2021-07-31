@@ -27,7 +27,6 @@ cat > Tupfile << HERE
 : |> echo generated > %o |> genfile.txt
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
-touch Tupfile
 update
 
 echo 'generated' | diff - build/output.txt
@@ -36,7 +35,6 @@ cat > Tupfile << HERE
 : genfile.txt |> cat %f > %o |> output.txt
 HERE
 echo 'manual' > genfile.txt
-touch genfile.txt Tupfile
 update
 
 echo 'manual' | diff - build/output.txt

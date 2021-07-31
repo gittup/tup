@@ -23,7 +23,6 @@
 cat > Tupfile << HERE
 var = @(FOO)
 HERE
-touch Tupfile
 varsetall FOO=n
 update
 tup_object_exist tup.config FOO

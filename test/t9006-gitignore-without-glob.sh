@@ -30,7 +30,7 @@ include_rules
 HERE
 echo 'int main(void) {return 0;}' > foo.c
 
-touch foo.c bar.c Tupfile Tuprules.tup
+touch bar.c
 update
 
 gitignore_good '/\\\[asd\\\].exe' .gitignore

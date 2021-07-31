@@ -40,7 +40,6 @@ cat > bar/Tupfile << HERE
 str = bar
 : |> echo \$(str) |>
 HERE
-touch foo/Tupfile bar/Tupfile
 refactor
 
 # Now change just foo - only foo should be refactored, since bar
@@ -50,7 +49,6 @@ cmd = echo
 str = foo
 : |> \$(cmd) \$(str) |>
 HERE
-touch foo/Tupfile
 tup refactor > .out.txt
 
 if ! grep foo .out.txt > /dev/null; then

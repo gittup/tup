@@ -30,13 +30,11 @@ echo 'var = 3' > foo/x86.tup
 cat > foo/Tupfile << HERE
 : x86.tup |> ln -s %f %o |> arch.tup
 HERE
-touch foo/x86.tup foo/Tupfile
 update
 
 cat > Tupfile << HERE
 include foo/arch.tup
 HERE
-touch Tupfile
 update_fail_msg "Unable to read from generated file"
 
 eotup

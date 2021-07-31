@@ -61,7 +61,7 @@ update
 # are re-executed.
 echo 'int marfx;' > foo/newfoo.c
 mkdir build
-touch foo/newfoo.c build/tup.config
+touch build/tup.config
 update
 
 sym_check build/myprog.exe marfx

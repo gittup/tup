@@ -28,7 +28,6 @@ cat > Tupfile << HERE
 : |> if [ -f ghost-dir/foo ]; then cat ghost-dir/foo; else echo nofile; fi > %o |> output.txt
 HERE
 echo "CONFIG_FOO=y" > build/tup.config
-touch build/tup.config Tupfile
 update
 
 echo 'nofile' | diff - build/output.txt

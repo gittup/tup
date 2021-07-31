@@ -34,9 +34,8 @@ include_rules
 : &(toolkit_lib) |> cp %f %o |> %B.copy
 HERE
 
-touch sw/Tuprules.tup
 touch sw/toolkit/toolkit.a
-touch sw/app/Tupfile sw/app/app.a
+touch sw/app/app.a
 update
 
 tup_dep_exist sw/app app.a sw/app 'cp app.a app.copy'

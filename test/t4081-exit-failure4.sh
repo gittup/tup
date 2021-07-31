@@ -36,7 +36,6 @@ cat > Tupfile << HERE
 : |> ./gen-output.sh > %o |> output.txt
 : output.txt |> sh ok.sh |> log.txt foo.txt
 HERE
-touch Tupfile ok.sh
 update_fail_msg 'Unspecified output'
 
 check_exist log.txt

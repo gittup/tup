@@ -22,13 +22,11 @@
 cat > Tupfile << HERE
 : |> touch foo; touch bar; touch baz |> foo
 HERE
-touch Tupfile
 update_fail
 
 cat > Tupfile << HERE
 : |> touch foo |> foo
 HERE
-touch Tupfile
 update
 
 check_exist foo

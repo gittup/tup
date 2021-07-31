@@ -24,7 +24,6 @@ cp ../testTupfile.tup blah/Tupfile
 echo "int main(void) {return 0;}" > blah/foo.c
 echo "void bar1(void) {}" > blah/bar.c
 echo "void baz1(void) {}" > blah/baz.c
-touch blah/foo.c blah/bar.c blah/baz.c blah/Tupfile
 update
 sym_check blah/foo.o main
 sym_check blah/bar.o bar1

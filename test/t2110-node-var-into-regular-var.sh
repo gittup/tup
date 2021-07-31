@@ -30,7 +30,7 @@ cat > Tupfile << HERE
 var = &(node_var)
 HERE
 
-touch lib.a Tupfile
+touch lib.a
 
 update_fail_msg "&-variables not allowed here"
 

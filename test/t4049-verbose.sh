@@ -24,7 +24,7 @@ tmp=".tmp.txt"
 cat > Tupfile << HERE
 : ok.c |> ^ short^ gcc -c %f -o %o |> %B.o
 HERE
-touch ok.c Tupfile
+touch ok.c
 update > $tmp
 
 if ! grep short $tmp > /dev/null; then

@@ -36,7 +36,7 @@ cat > sub/Tupfile << HERE
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > tup.config
-touch Tupfile foo.c sub/bar.c
+touch sub/bar.c
 update
 
 check_not_exist build/prog.exe

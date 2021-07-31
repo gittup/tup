@@ -26,7 +26,7 @@ mkdir atmp
 cat > atmp/Tupfile << HERE
 : |> cat $PWD/atmp/foo.txt |>
 HERE
-touch atmp/foo.txt atmp/Tupfile
+touch atmp/foo.txt
 update
 
 eotup

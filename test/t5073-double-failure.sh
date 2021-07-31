@@ -39,7 +39,6 @@ cat > sub/lib.c << HERE
 int foo(void) {return 3;}
 HERE
 
-touch sub/Tupfile sub/lib.c
 update
 
 cat > Tupfile << HERE
@@ -56,8 +55,6 @@ int main(void)
 	return -1;
 }
 HERE
-
-touch Tupfile main.c
 
 case $tupos in
 	Darwin*)
@@ -78,7 +75,6 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : main.o | sub/libfoo.a |> gcc %f -o %o sub/libfoo.a |> prog.exe
 HERE
-touch sub/lib2.c Tupfile
 update
 
 eotup

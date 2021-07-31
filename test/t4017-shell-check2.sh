@@ -32,7 +32,6 @@ chmod +x bar.sh
 rm bar.sh
 HERE
 chmod +x foo.sh
-touch Tupfile foo.sh
 update
 
 eotup

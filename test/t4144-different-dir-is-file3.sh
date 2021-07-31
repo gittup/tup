@@ -29,7 +29,6 @@ parse_fail_msg "Attempting to insert 'foo/bar/baz' as a generated node when it a
 cat > Tupfile << HERE
 : |> echo foo > %o |> foo/bar/baz
 HERE
-touch Tupfile
 update
 
 eotup

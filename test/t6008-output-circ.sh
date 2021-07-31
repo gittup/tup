@@ -37,13 +37,11 @@ cat > Tupfile << HERE
 HERE
 
 echo "int main(void) {return 0;}" > foo.c
-touch foo.c Tupfile
 update
 sym_check foo.o main
 sym_check built-in.o main
 
 re_init
-touch foo.c foo.o built-in.o Tupfile
 update_fail
 
 # First try: remove the offending files and update again
@@ -52,7 +50,6 @@ update
 
 # Go back to our error scenario
 re_init
-touch foo.c foo.o built-in.o Tupfile
 update_fail
 
 # Second try: remove only foo.o for now, we'll just deal with built-in.o
@@ -69,7 +66,6 @@ cat > Tupfile << HERE
 : *.o |> ld -r %f -o new-built-in.o |> new-built-in.o
 HERE
 echo "int foo(void) {return 0;}" > foo.c
-touch Tupfile foo.c
 update
 
 check_exist foo.o built-in.o new-built-in.o

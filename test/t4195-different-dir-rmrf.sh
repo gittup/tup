@@ -37,7 +37,6 @@ check_exist out/foo.txt
 # rule is removed.
 cat > sub/Tupfile << HERE
 HERE
-touch sub/Tupfile
 update
 
 check_not_exist out

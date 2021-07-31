@@ -24,7 +24,7 @@ cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 : *.o |> gcc -o prog %f |> prog
 HERE
-touch foo.c bar.c Tupfile
+touch foo.c bar.c
 parse
 tup_object_exist . foo.c bar.c
 tup_object_exist . "gcc -c foo.c -o foo.o"

@@ -32,7 +32,7 @@ tup.foreach_rule('*.c', 'gcc -c %f -o %o', '%B.o')
 HERE
 echo "int main(void) {return 0;}" > foo.c
 echo "CONFIG_FOO=y" > build/tup.config
-touch build/tup.config Tupfile.lua foo.c sub/bar.c
+touch sub/bar.c
 update
 
 check_exist build/foo.o build/sub/bar.o build/prog.exe

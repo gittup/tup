@@ -27,7 +27,6 @@ HERE
 update
 
 echo ': msg.txt |> cat %f > %o |> msg_copy.txt' >> Tupfile
-touch Tupfile
 update
 
 check_exist msg_copy.txt

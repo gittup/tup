@@ -33,7 +33,6 @@ HERE
 echo "void foo(void) {}" > input/foo.c
 echo "void bar(void) {}" > input/bar.c
 
-touch Tupfile input/Tupfile input/foo.c input/bar.c
 update
 
 eotup
