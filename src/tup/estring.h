@@ -29,5 +29,6 @@ struct estring {
 
 int estring_init(struct estring *e);
 int estring_append(struct estring *e, const char *src, int len);
+int estring_append_escape(struct estring *e, const char *src, int len, char escape);
 
 #endif

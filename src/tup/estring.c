@@ -55,3 +55,27 @@ int estring_append(struct estring *e, const char *src, int len)
 	e->s[e->len] = 0;
 	return 0;
 }
+
+int estring_append_escape(struct estring *e, const char *src, int len, char escape)
+{
+	const char *p = src;
+	const char *endp = src + len;
+	while(p < endp) {
+		const char *next;
+		next = memchr(p, escape, endp - p);
+		if(!next) {
+			return estring_append(e, p, endp - p);
+		}
+		if(estring_append(e, p, next - p) < 0)
+			return -1;
+		if(escape == '\'') {
+			if(estring_append(e, "'\"'\"'", 5) < 0)
+				return -1;
+		} else {
+			if(estring_append(e, "\\\"", 2) < 0)
+				return -1;
+		}
+		p = next + 1;
+	}
+	return 0;
+}

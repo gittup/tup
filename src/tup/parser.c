@@ -3933,7 +3933,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 						estring_append(&e, " ", 1);
 					}
 					estring_append(&e, next, 1);
-					estring_append(&e, nle->path, nle->len);
+					estring_append_escape(&e, nle->path, nle->len, *next);
 					estring_append(&e, next, 1);
 					first = 0;
 				}
@@ -3952,7 +3952,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 						estring_append(&e, " ", 1);
 					}
 					estring_append(&e, next, 1);
-					estring_append(&e, nle->path, nle->len);
+					estring_append_escape(&e, nle->path, nle->len, *next);
 					estring_append(&e, next, 1);
 					first = 0;
 				}
