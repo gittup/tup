@@ -36,8 +36,8 @@ cat > Tupfile << HERE
 HERE
 compiledb
 
-for i in foo.c bar.c; do
-	if ! grep "gcc -c $i -o $o" compile_commands.json > /dev/null; then
+for i in foo bar; do
+	if ! grep "gcc -c $i\\.c -o $i\\.o" compile_commands.json > /dev/null; then
 		echo "Error: Expected gcc command in compile_commands.json" 1>&2
 		exit 1
 	fi
