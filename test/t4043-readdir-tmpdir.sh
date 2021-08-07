@@ -44,8 +44,8 @@ cd ..
 update
 
 for i in foo.txt bar.txt tmpsub/baz.txt dir2/a1.txt dir2/a2.txt; do
-	if ! grep "$1" sub/output.dat > /dev/null; then
-		echo "Error: '$1' should be in the output file" 1>&2
+	if ! grep "$i" sub/output.dat > /dev/null; then
+		echo "Error: '$i' should be in the output file" 1>&2
 		exit 1
 	fi
 done

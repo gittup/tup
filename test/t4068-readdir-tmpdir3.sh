@@ -42,8 +42,8 @@ cd ..
 update
 
 for i in level1 level2; do
-	if ! grep "$1" sub/output.dat > /dev/null; then
-		echo "Error: '$1' should be in the output file" 1>&2
+	if ! grep "$i" sub/output.dat > /dev/null; then
+		echo "Error: '$i' should be in the output file" 1>&2
 		exit 1
 	fi
 done
@@ -52,7 +52,7 @@ if grep sublevel sub/output.dat > /dev/null; then
 	exit 1
 fi
 
-cat > ok.sh << HERE
+cat > sub/ok.sh << HERE
 mkdir tmpsub
 mkdir tmpsub/level1
 mkdir tmpsub/level2
@@ -65,8 +65,9 @@ HERE
 update
 
 for i in sublevel1.1 sublevel1.2; do
-	if ! grep "$1" sub/output.dat > /dev/null; then
-		echo "Error: '$1' should be in the output file" 1>&2
+	if ! grep "$i" sub/output.dat > /dev/null; then
+		echo "Error: '$i' should be in the output file but isn't:" 1>&2
+		cat sub/output.dat 1>&2
 		exit 1
 	fi
 done
