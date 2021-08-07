@@ -44,8 +44,8 @@ cd ..
 update
 
 for i in foo.txt bar.txt; do
-	if ! grep "$1" sub/output.dat > /dev/null; then
-		echo "Error: '$1' should be in the output file" 1>&2
+	if ! grep "$i" sub/output.dat > /dev/null; then
+		echo "Error: '$i' should be in the output file" 1>&2
 		exit 1
 	fi
 done
@@ -70,8 +70,9 @@ HERE
 update
 
 for i in foo.txt bar.txt tmpsub/level2/baz.txt; do
-	if ! grep "$1" sub/output.dat > /dev/null; then
-		echo "Error: '$1' should be in the output file" 1>&2
+	if ! grep "$i" sub/output.dat > /dev/null; then
+		echo "Error: '$i' should be in the output file but isn't:" 1>&2
+		cat sub/output.dat
 		exit 1
 	fi
 done
