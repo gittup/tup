@@ -28,9 +28,7 @@ sym_check bar.o bar1
 
 # Verify only foo is compiled if foo.c is touched
 echo "void foo2(void) {}" >> foo.c
-if tup upd | grep 'gcc -c' | wc -l | grep 1 > /dev/null; then
-	:
-else
+if [ "$(tup | grep -c 'gcc -c')" != 1 ]; then
 	echo "Only foo.c should have been compiled." 1>&2
 	exit 1
 fi
@@ -39,9 +37,7 @@ sym_check foo.o main foo2
 # Verify both are compiled if both are touched, but only linked once
 rm foo.o
 touch foo.c bar.c
-if tup upd | grep 'gcc .* -o prog' | wc -l | grep 1 > /dev/null; then
-	:
-else
+if [ "$(tup | grep -c 'gcc .* -o prog')" != 1 ]; then
 	echo "Program should have only been linked once." 1>&2
 	exit 1
 fi

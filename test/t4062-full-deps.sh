@@ -51,14 +51,12 @@ esac
 tup_dep_exist $path $filename . 'gcc -c foo.c -o foo.o'
 
 tup fake_mtime $path$filename 5
-if tup upd | grep 'gcc -c' | wc -l | grep 1 > /dev/null; then
-	:
-else
+if [ "$(tup | grep -c 'gcc -c')" != 1 ]; then
 	echo "Changing timestamp on /usr/bin/gcc should have caused foo.c to re-compile." 1>&2
 	exit 1
 fi
 
-if [ "`tup entry $path$filename`" = "" ]; then
+if [ -z "$(tup entry $path$filename)" ]; then
 	echo "Error: tup entry failed on $path$filename" 1>&2
 	exit 1
 fi

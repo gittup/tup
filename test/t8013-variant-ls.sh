@@ -45,7 +45,7 @@ HERE
 touch sub/foo.c sub/bar.c
 update
 
-if ! grep foo.c sub/files.txt | wc -l | grep 1 > /dev/null; then
+if [ "$(grep -c 'foo\.c' sub/files.txt)" != 1 ]; then
 	echo "Error: files.txt should only contain one foo.c" 1>&2
 	cat sub/files.txt
 	exit 1

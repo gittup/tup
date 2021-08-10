@@ -37,9 +37,7 @@ HERE
 touch zap.c
 update_fail -k
 
-if tup upd -k 2>&1 | grep gcc | wc -l | grep 1 > /dev/null; then
-	:
-else
+if [ "$(tup -k 2>&1 | grep -c gcc)" != 1 ]; then
 	echo "Error: Only one file should have been compiled." 1>&2
 	exit 1
 fi

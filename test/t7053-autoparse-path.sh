@@ -29,32 +29,38 @@ mkdir a
 mkdir b
 
 cat > a/run.sh << HERE
-echo arun
+echo arun >> .tup/.run.out
 HERE
 
 cat > b/run.sh << HERE
-echo brun
-echo '1' >> .tup/.run.count
+echo 'brun' >> .tup/.run.out
 HERE
 chmod +x a/run.sh b/run.sh
 
 cat > Tupfile << HERE
 : |> run.sh > %o |> output
 HERE
-tup upd
+tup
 
-# By now we've autoparsed with the monitor environ, and then run upd which
-# builds with the new environ. If we change the Tupfile to trigger an
-# autoparse, we shouldn't get the new environ. Running 'tup upd' again
-# should just quit without doing anything, which we check by looking at
-# the run count.
+# By now we've autoparsed with the monitor environ, and then run tup which
+# builds with the new environ. If we touch the Tupfile to trigger an
+# autoparse, we shouldn't get the new environ. Running 'tup' again should just
+# quit without doing anything, which we check by looking at the combined output
+# of the runs.
 
 touch Tupfile
-tup upd
+tup
 
-if ! cat .tup/.run.count | wc -l | grep 1 > /dev/null; then
-	echo "Error: Expected b/run.sh to only run once." 1>&2
-	exit 1
+if [ "$(grep -c arun .tup/.run.out)" != 0 ]; then
+    echo "Error: Expected a/run.sh to never run." 1>&2
+    cat .tup/.run.out 1>&2
+    exit 1
+fi
+
+if [ "$(grep -c brun .tup/.run.out)" != 1 ]; then
+    echo "Error: Expected b/run.sh to run once." 1>&2
+    cat .tup/.run.out 1>&2
+    exit 1
 fi
 
 eotup

@@ -27,9 +27,7 @@ echo "int main(void) {bork}" > foo.c
 update_fail
 
 echo "int main(void) {}" > foo.c
-if tup upd  | grep 'gcc.*foo.o' | wc -l | grep 2 > /dev/null; then
-	:
-else
+if [ "$(tup | grep -c 'gcc.*foo.o')" != 2 ]; then
 	echo "foo.c should have been compiled and linked again." 1>&2
 	exit 1
 fi

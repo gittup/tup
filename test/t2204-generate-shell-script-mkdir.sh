@@ -37,7 +37,7 @@ generate $generate_script_name
 ./$generate_script_name
 check_exist sub1/out/dir/foo.txt sub1/out/bar.txt sub1/out/dir/baz.txt
 
-if ! grep '^mkdir' $generate_script_name | wc -l | grep 2 > /dev/null; then
+if [ "$(grep -c '^mkdir' $generate_script_name)" != 2 ]; then
 	echo "Error: Generated script should have 2 mkdirs" 1>&2
 	exit 1
 fi

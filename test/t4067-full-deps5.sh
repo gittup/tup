@@ -44,14 +44,14 @@ update
 tup_object_no_exist $path $filename
 
 set_full_deps
-if ! tup upd | grep 'gcc -c' | wc -l | grep 2 > /dev/null; then
+if [ "$(tup | grep -c 'gcc -c')" != 2 ]; then
 	echo "Error: All files should have been recompiled when updater.full_deps was set." 1>&2
 	exit 1
 fi
 tup_object_exist $path $filename
 
 clear_full_deps
-if ! tup upd | grep 'gcc -c' | wc -l | grep 0 > /dev/null; then
+if [ "$(tup | grep -c 'gcc -c')" != 0 ]; then
 	echo "Error: No files should have been recompiled when updater.full_deps was cleared." 1>&2
 	exit 1
 fi
