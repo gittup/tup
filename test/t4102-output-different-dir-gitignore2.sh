@@ -36,7 +36,7 @@ update
 gitignore_good baz.txt foo/.gitignore
 gitignore_good bar.txt foo/.gitignore
 
-if ! cat foo/.gitignore | grep '\.gitignore' | wc -l | grep 1 > /dev/null; then
+if [ "$(grep -c '\.gitignore' foo/.gitignore)" != 1 ]; then
 	echo "Error: Expected only one .gitignore line in the .gitignore file." 1>&2
 	exit 1
 fi

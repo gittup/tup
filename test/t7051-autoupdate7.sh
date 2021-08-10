@@ -39,8 +39,8 @@ HERE
 tup flush
 check_exist foo
 
-if ! cat .tup/.run.txt | wc -l | grep 1 > /dev/null; then
-	echo "Error: tup should update only once" 1>&2
+if [ "$(grep -c executed .tup/.run.txt)" != 1 ]; then
+	echo "Error: ok.sh should have run once" 1>&2
 	exit 1
 fi
 
@@ -49,8 +49,8 @@ cat > Tupfile << HERE
 HERE
 tup flush
 
-if ! cat .tup/.run.txt | wc -l | grep 2 > /dev/null; then
-	echo "Error: tup should update only once" 1>&2
+if [ "$(grep -c executed .tup/.run.txt)" != 2 ]; then
+	echo "Error: ok.sh should have run twice altogether" 1>&2
 	exit 1
 fi
 

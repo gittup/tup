@@ -33,13 +33,13 @@ touch bar.c
 update
 
 touch foo.h.in
-if ! tup upd | grep 'gcc -c' | wc -l | grep 1 > /dev/null; then
+if [ "$(tup | grep -c 'gcc -c')" != 1 ]; then
 	echo "Error: Expected only one file to compile" 1>&2
 	exit 1
 fi
 
 touch bar.h.in
-if ! tup upd | grep 'gcc -c' | wc -l | grep 0 > /dev/null; then
+if [ "$(tup | grep -c 'gcc -c')" != 0 ]; then
 	echo "Error: Expected no files to compile" 1>&2
 	exit 1
 fi
