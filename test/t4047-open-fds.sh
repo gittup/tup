@@ -24,17 +24,22 @@ if [ ! "$tupos" = "Linux" ]; then
 	eotup
 fi
 cat > Tupfile << HERE
-: |> ls -l /proc/\$\$/fd > %o |> fds.txt
+: |> ls -l /proc/\$\$/fd > %o |> fds-while.txt
 HERE
-update
 
-# On Gentoo, stdout points to output-0, while on Ubuntu, it points to the
-# redirected file (fds.txt). This might be a bash vs dash thing.
-# On Fedora, something keeps /var/lib/sss/mc/passwd open (maybe https://bugzilla.redhat.com/show_bug.cgi?id=1356542)
-text=`cat fds.txt | grep -v ' 0 .*/dev/null' | grep -v ' 1 .*output-' | grep -v ' 1 .*fds.txt' | grep -v ' 2 .*errors' | grep -v ' 3 .*deps-' | grep -v '/var/lib/sss/mc/passwd'`
-if [ "$text" != "total 0" ]; then
-	echo "Error: These fds shouldn't be open: $text" 1>&2
-	exit 1
+ls -l /proc/self/fd > .tup/fds-before.txt
+update
+ls -l /proc/self/fd > .tup/fds-after.txt
+
+if [ "$(diff .tup/fds-before.txt .tup/fds-after.txt | grep -v ' 1 -> ' | grep -v ' 3 -> ' | grep -c '^>')" != 0 ]; then
+  echo "tup has left open file descriptors"
+  echo "File descriptors of parent process before running tup:"
+  cat .tup/fds-before.txt
+  echo "File descriptors of parent process while running tup:"
+  cat fds-while.txt
+  echo "File descriptors of parent process after running tup:"
+  cat .tup/fds-after.txt
+  exit 1
 fi
 
 eotup
