@@ -246,6 +246,7 @@ int generate(int argc, char **argv)
 	struct tup_entry *vartent;
 	struct tup_entry *varfiletent;
 	struct tupid_entries generated_dir_root;
+	struct variant *variant;
 	char *script_name = NULL;
 	char *config_file = NULL;
 	int verbose_script = 0;
@@ -316,7 +317,7 @@ int generate(int argc, char **argv)
 	printf("Reading tup.config...\n");
 	if(tup_db_get_tup_config_tent(&vartent) < 0)
 		return -1;
-	if(variant_add(vartent, 1, NULL) < 0)
+	if(variant_add(vartent, 1, &variant) < 0)
 		return -1;
 	if(config_file) {
 		tupid_t sub_dir_dt;
@@ -332,7 +333,7 @@ int generate(int argc, char **argv)
 	} else {
 		varfiletent = vartent;
 	}
-	if(tup_db_read_vars(varfiletent->parent, varfiletent->name.s, vartent, generate_vardict_file) < 0)
+	if(tup_db_read_vars(varfiletent, vartent, generate_vardict_file) < 0)
 		return -1;
 
 	printf("Parsing...\n");
@@ -953,7 +954,7 @@ static int process_config_nodes(int environ_check)
 				compat_lock_disable();
 				if(initialize_server_struct(&s, n->tent) < 0)
 					goto err_rollback;
-				rc = tup_db_read_vars(n->tent->parent, TUP_CONFIG, n->tent, variant->vardict_file);
+				rc = tup_db_read_vars(n->tent, n->tent, variant->vardict_file);
 				if(handle_file_dtent(ACCESS_READ, n->tent->parent, TUP_CONFIG, &s.finfo) < 0)
 					goto err_rollback;
 				if(rc < 0)

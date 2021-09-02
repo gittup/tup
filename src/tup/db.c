@@ -5005,8 +5005,7 @@ static int compare_vars(struct var_entry *vea, struct var_entry *veb)
 	return tup_db_set_var(vea->tent->tnode.tupid, veb->value);
 }
 
-int tup_db_read_vars(struct tup_entry *dtent, const char *file,
-		     struct tup_entry *var_dtent, const char *vardict_file)
+int tup_db_read_vars(struct tup_entry *tent, struct tup_entry *vartent, const char *vardict_file)
 {
 	struct vardb db_tree;
 	struct vardb file_tree;
@@ -5016,16 +5015,16 @@ int tup_db_read_vars(struct tup_entry *dtent, const char *file,
 
 	vardb_init(&db_tree);
 	vardb_init(&file_tree);
-	if(tup_db_get_vardb(var_dtent, &db_tree) < 0)
+	if(tup_db_get_vardb(vartent, &db_tree) < 0)
 		return -1;
-	dfd = tup_entry_openat(tup_top_fd(), dtent);
+	dfd = tup_entry_openat(tup_top_fd(), tent->parent);
 	if(dfd < 0) {
 		rc = 0;
 	} else {
-		fd = openat(dfd, file, O_RDONLY);
+		fd = openat(dfd, tent->name.s, O_RDONLY);
 		if(fd < 0) {
 			if(errno != ENOENT) {
-				perror(file);
+				perror(tent->name.s);
 				return -1;
 			}
 			/* No tup.config == empty file_tree */
@@ -5046,7 +5045,7 @@ int tup_db_read_vars(struct tup_entry *dtent, const char *file,
 		return -1;
 
 	if(vardb_compare(&db_tree, &file_tree, remove_var, add_var,
-			 compare_vars, var_dtent) < 0)
+			 compare_vars, vartent) < 0)
 		return -1;
 
 	if(vardict_file)
