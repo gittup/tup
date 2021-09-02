@@ -93,6 +93,7 @@ void tup_entry_set_verbose(int verbose);
 void print_tup_entry(FILE *f, struct tup_entry *tent);
 void print_tupid(FILE *f, tupid_t tupid);
 int snprint_tup_entry(char *dest, int len, struct tup_entry *tent);
+int write_tup_entry(FILE *f, struct tup_entry *tent);
 int tup_entry_clear(void);
 int tup_entry_add_ghost_tree(struct tent_entries *root, struct tup_entry *tent);
 int tup_entry_debug_add_all_ghosts(struct tent_entries *root);

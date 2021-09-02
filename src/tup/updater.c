@@ -55,6 +55,7 @@ typedef int(*worker_function)(struct graph *g, struct node *n);
 
 static int check_full_deps_rebuild(void);
 static int run_scan(int do_scan);
+static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *tent, int do_mkdirs);
 static int process_config_nodes(int environ_check);
 static int process_create_nodes(void);
 static int process_update_nodes(int argc, char **argv, int *num_pruned);
@@ -245,10 +246,12 @@ int generate(int argc, char **argv)
 	struct node *tmp;
 	struct tup_entry *vartent;
 	struct tup_entry *varfiletent;
+	struct tup_entry *orig_vartent;
 	struct tupid_entries generated_dir_root;
 	struct variant *variant;
 	char *script_name = NULL;
 	char *config_file = NULL;
+	char *build_dir = NULL;
 	int verbose_script = 0;
 	int is_batch_script = 0;
 	int x;
@@ -270,18 +273,26 @@ int generate(int argc, char **argv)
 			x++;
 			config_file = argv[x];
 			continue;
+		} else if(strcmp(argv[x], "--builddir") == 0) {
+			if(x+1 >= argc) {
+				fprintf(stderr, "--builddir requires a directory");
+				return -1;
+			}
+			x++;
+			build_dir = argv[x];
+			continue;
 		} else if(strcmp(argv[x], "--verbose") == 0) {
 			verbose_script = 1;
 			continue;
 		}
 		if(script_name) {
-			fprintf(stderr, "Usage: tup generate [--config config_file] %s\n", example_script);
+			fprintf(stderr, "Usage: tup generate [--config config_file] [--builddir directory] %s\n", example_script);
 			return -1;
 		}
 		script_name = argv[x];
 	}
 	if(!script_name) {
-		fprintf(stderr, "Usage: tup generate [--config config_file] %s\n", example_script);
+		fprintf(stderr, "Usage: tup generate [--config config_file] [--builddir directory] %s\n", example_script);
 		return -1;
 	}
 #ifdef _WIN32
@@ -309,66 +320,6 @@ int generate(int argc, char **argv)
 		return -1;
 	if(open_tup_top() < 0)
 		return -1;
-	printf("Scanning...\n");
-	if(tup_scan() < 0)
-		return -1;
-
-	tup_db_begin();
-	printf("Reading tup.config...\n");
-	if(tup_db_get_tup_config_tent(&vartent) < 0)
-		return -1;
-	if(variant_add(vartent, 1, &variant) < 0)
-		return -1;
-	if(config_file) {
-		tupid_t sub_dir_dt;
-
-		sub_dir_dt = get_sub_dir_dt();
-		if(sub_dir_dt < 0)
-			return -1;
-		varfiletent = get_tent_dt(sub_dir_dt, config_file);
-		if(!varfiletent) {
-			fprintf(stderr, "Unable to find tupid for: '%s'\n", config_file);
-				return -1;
-		}
-	} else {
-		varfiletent = vartent;
-	}
-	if(tup_db_read_vars(varfiletent, vartent, generate_vardict_file) < 0)
-		return -1;
-
-	printf("Parsing...\n");
-	if(create_graph(&g, TUP_NODE_DIR) < 0)
-		return -1;
-	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
-		return -1;
-	start_progress(g.num_nodes, g.total_mtime, 1);
-
-	/* The parsing nodes have to be removed so that we know if dependent
-	 * Tupfiles have already been parsed.
-	 */
-	n = TAILQ_FIRST(&g.node_list);
-	if(node_remove_list(&g.node_list, n) < 0)
-		return -1;
-	while(!LIST_EMPTY(&n->edges)) {
-		remove_edge(LIST_FIRST(&n->edges));
-	}
-	remove_node(&g, n);
-
-	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
-		if(!n->already_used)
-			if(parse(n, &g, NULL, 0, 0, full_deps) < 0)
-				return -1;
-		if(node_remove_list(&g.plist, n) < 0)
-			return -1;
-		while(!LIST_EMPTY(&n->incoming)) {
-			remove_edge(LIST_FIRST(&n->incoming));
-		}
-		remove_node(&g, n);
-	}
-	if(destroy_graph(&g) < 0)
-		return -1;
-
-	printf("Generate: %s\n", script_name);
 	if(chdir(get_tup_top()) < 0) {
 		perror("chdir(get_tup_top())\n");
 		return -1;
@@ -389,6 +340,143 @@ int generate(int argc, char **argv)
 #else
 	fprintf(generate_f, "export %s=\"%s/%s\"\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
 #endif
+	printf("Scanning...\n");
+	if(tup_scan() < 0)
+		return -1;
+
+	tup_db_begin();
+	printf("Reading tup.config...\n");
+	if(tup_db_get_tup_config_tent(&vartent) < 0)
+		return -1;
+	orig_vartent = vartent;
+
+	if(config_file) {
+		/* If we pass in a config file, point varfiletent to that file.
+		 * We'll read config variables from it.
+		 */
+		tupid_t sub_dir_dt;
+
+		sub_dir_dt = get_sub_dir_dt();
+		if(sub_dir_dt < 0)
+			return -1;
+		varfiletent = get_tent_dt(sub_dir_dt, config_file);
+		if(!varfiletent) {
+			fprintf(stderr, "Unable to find tupid for: '%s'\n", config_file);
+				return -1;
+		}
+	} else {
+		/* No config file passed in, just use the top-level tup.config if any. */
+		varfiletent = vartent;
+	}
+
+	if(build_dir) {
+		/* If we pass in a build dir, create a fake directory there so
+		 * we can generate rules as if it's a variant directory.
+		 * Otherwise we'll build in-tree.
+		 */
+		struct tup_entry *root;
+		struct tup_entry *var_dtent;
+		int changed = 0;
+		int i;
+		for(i=0; i<(signed)strlen(build_dir); i++) {
+			/* The build_dir can actually be multiple path parts
+			 * (like build/sub/dir/), and we don't bother to create
+			 * tup_entry's for each part here since the script
+			 * works fine without doing that. However, we do need
+			 * to convert / to \ for Windows.
+			 */
+			if(build_dir[i] == '/')
+				build_dir[i] = path_sep();
+		}
+		if(tup_entry_add(DOT_DT, &root) < 0)
+			return -1;
+		var_dtent = tup_db_create_node_srcid(root, build_dir, TUP_NODE_DIR, root->tnode.tupid, &changed);
+		if(!var_dtent) {
+			fprintf(stderr, "tup error: Unable to create variant directory entry for build_dir: %s\n", build_dir);
+			return -1;
+		}
+		if(!changed) {
+			fprintf(stderr, "tup error: --builddir directory must be a non-existent directory, but '%s' already exists.\n", build_dir);
+			return -1;
+		}
+		vartent = tup_db_create_node(var_dtent, TUP_CONFIG, TUP_NODE_FILE);
+		if(!vartent) {
+			fprintf(stderr, "tup error: Unable to create tup.config node for build_dir: %s\n", build_dir);
+			return -1;
+		}
+	}
+
+	if(variant_add(vartent, 1, &variant) < 0)
+		return -1;
+	if(!variant->root_variant) {
+		/* Make sure we have a root variant added so the regular
+		 * tup_entrys have somewhere to point.
+		 */
+		if(variant_add(orig_vartent, 0, NULL) < 0)
+			return -1;
+	}
+	if(tup_db_read_vars(varfiletent, vartent, generate_vardict_file) < 0)
+		return -1;
+
+	printf("Parsing...\n");
+	if(create_graph(&g, TUP_NODE_DIR) < 0)
+		return -1;
+	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_CREATE) < 0)
+		return -1;
+
+	if(!variant->root_variant) {
+		TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
+			struct variant *node_variant = tup_entry_variant(n->tent);
+			if(node_variant->root_variant) {
+				struct tup_entry *new_tent;
+				new_tent = get_rel_tent(variant->tent->parent, n->tent, 0);
+				if(!new_tent) {
+					fprintf(stderr, "tup internal error: Unable to find directory for variant '%s' for subdirectory: ", variant->variant_dir);
+					print_tup_entry(stderr, n->tent);
+					fprintf(stderr, "\n");
+					return -1;
+				}
+				if(build_graph_cb(&g, new_tent) < 0)
+					return -1;
+				fprintf(generate_f, "mkdir %s", is_batch_script ? "" : "-p ");
+				if(write_tup_entry(generate_f, new_tent) < 0)
+					return -1;
+				fprintf(generate_f, "\n");
+				/* Adjust num_nodes so the progress gets to 100% since we don't parse the root variant. */
+				g.num_nodes--;
+			}
+		}
+	}
+
+	start_progress(g.num_nodes, g.total_mtime, 1);
+
+	/* The parsing nodes have to be removed so that we know if dependent
+	 * Tupfiles have already been parsed.
+	 */
+	n = TAILQ_FIRST(&g.node_list);
+	if(node_remove_list(&g.node_list, n) < 0)
+		return -1;
+	while(!LIST_EMPTY(&n->edges)) {
+		remove_edge(LIST_FIRST(&n->edges));
+	}
+	remove_node(&g, n);
+
+	TAILQ_FOREACH_SAFE(n, &g.plist, list, tmp) {
+		struct variant *node_variant = tup_entry_variant(n->tent);
+		if(!n->already_used && node_variant->enabled)
+			if(parse(n, &g, NULL, 0, 0, full_deps) < 0)
+				return -1;
+		if(node_remove_list(&g.plist, n) < 0)
+			return -1;
+		while(!LIST_EMPTY(&n->incoming)) {
+			remove_edge(LIST_FIRST(&n->incoming));
+		}
+		remove_node(&g, n);
+	}
+	if(destroy_graph(&g) < 0)
+		return -1;
+
+	printf("Generate: %s\n", script_name);
 	if(create_graph(&g, TUP_NODE_CMD) < 0)
 		return -1;
 	if(tup_db_select_node_by_flags(build_graph_cb, &g, TUP_FLAGS_MODIFY) < 0)
@@ -1042,7 +1130,7 @@ err_rollback:
 	return -1;
 }
 
-static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *tent)
+static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *tent, int do_mkdirs)
 {
 	struct tup_entry *new;
 	struct tup_entry *sub;
@@ -1051,7 +1139,7 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 	if(!tent->parent)
 		return base;
 
-	new = get_rel_tent(base, tent->parent);
+	new = get_rel_tent(base, tent->parent, do_mkdirs);
 	if(!new)
 		return NULL;
 
@@ -1062,7 +1150,7 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 		fprintf(stderr, "\n");
 		return NULL;
 	}
-	if(do_mkdir) {
+	if(do_mkdir && do_mkdirs) {
 		int fd;
 		fd = tup_entry_open(new);
 		if(fd < 0)
@@ -1296,7 +1384,7 @@ static int process_create_nodes(void)
 				/* Add in all other variants to parse */
 				if(!variant->root_variant) {
 					struct tup_entry *new_tent;
-					new_tent = get_rel_tent(variant->tent->parent, n->tent);
+					new_tent = get_rel_tent(variant->tent->parent, n->tent, 1);
 					if(!new_tent) {
 						fprintf(stderr, "tup internal error: Unable to find directory for variant '%s' for subdirectory: ", variant->variant_dir);
 						print_tup_entry(stderr, n->tent);
@@ -2076,13 +2164,14 @@ static int generate_work(struct graph *g, struct node *n)
 
 	if(n->tent->type == TUP_NODE_CMD) {
 		const char *cmd;
-		if(generate_cwd != n->tent->parent) {
+		struct tup_entry *srctent = variant_tent_to_srctent(n->tent->parent);
+		if(generate_cwd != srctent) {
 			fprintf(generate_f, "cd \"");
-			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, n->tent->dt) < 0) {
+			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, srctent->tnode.tupid) < 0) {
 				rc = -1;
 			} else {
 				fprintf(generate_f, "\"\n");
-				generate_cwd = n->tent->parent;
+				generate_cwd = srctent;
 			}
 		}
 		cmd = n->tent->name.s;

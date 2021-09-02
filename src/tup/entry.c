@@ -264,6 +264,27 @@ int snprint_tup_entry(char *dest, int len, struct tup_entry *tent)
 	return rc;
 }
 
+int write_tup_entry(FILE *f, struct tup_entry *tent)
+{
+	/* Write out the tup entry unformatted, with OS-specific separators
+	 * (unlike print_tup_entry, which is a pretty-print)
+	 */
+	if(!tent)
+		return 0;
+	if(tent->tnode.tupid == DOT_DT) {
+		fprintf(f, ".");
+		return 0;
+	}
+	if(tent->parent->tnode.tupid != DOT_DT) {
+		if(write_tup_entry(f, tent->parent) < 0)
+			return -1;
+	}
+	fprintf(f, "%s", tent->name.s);
+	if(tent->type == TUP_NODE_DIR)
+		fprintf(f, "%c", path_sep());
+	return 0;
+}
+
 int tup_entry_add_to_dir(struct tup_entry *dtent, tupid_t tupid, const char *name, int len,
 			 const char *display, int displaylen, const char *flags, int flagslen,
 			 enum TUP_NODE_TYPE type, struct timespec mtime, tupid_t srcid,

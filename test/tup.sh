@@ -563,6 +563,26 @@ generate()
 	$cmd "$@"
 }
 
+generate_fail_msg()
+{
+	msg=$1
+	shift
+	if tup generate "$@" 2>.tupoutput; then
+		echo "*** Expected generate to fail, but didn't" 1>&2
+		exit 1
+	else
+		if grep "$msg" .tupoutput > /dev/null; then
+			echo "Generate expected to fail, and failed for the right reason."
+		else
+			echo "*** Generate expected to fail because of: $msg" 1>&2
+			echo "*** But failed because of:" 1>&2
+			cat .tupoutput 1>&2
+			exit 1
+		fi
+	fi
+	rm .tupoutput
+}
+
 compiledb()
 {
 	if [ -n "$TUP_VALGRIND" ]; then
