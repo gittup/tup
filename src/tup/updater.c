@@ -336,9 +336,9 @@ int generate(int argc, char **argv)
 		fprintf(generate_f, "#! /bin/sh -e%s\n", verbose_script ? "x" : "");
 	}
 #ifdef _WIN32
-	fprintf(generate_f, "set %s=%s\\%s\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
+	fprintf(generate_f, "set %s=%%cd%%\\%s\n", TUP_VARDICT_NAME, generate_vardict_file);
 #else
-	fprintf(generate_f, "export %s=\"%s/%s\"\n", TUP_VARDICT_NAME, get_tup_top(), generate_vardict_file);
+	fprintf(generate_f, "export %s=\"$(cd $(dirname $0) && pwd)/%s\"\n", TUP_VARDICT_NAME, generate_vardict_file);
 #endif
 	printf("Scanning...\n");
 	if(tup_scan() < 0)
