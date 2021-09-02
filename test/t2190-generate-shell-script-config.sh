@@ -23,8 +23,6 @@
 # 'tup generate' runs without a tup directory
 rm -rf .tup
 
-mkdir sub1
-mkdir sub2
 cat > Tupfile << HERE
 ifeq (@(FOO),1)
 : |> echo foo |>
