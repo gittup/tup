@@ -3,9 +3,11 @@
 label=${TUP_LABEL:-bootstrap}
 os=`uname -s`
 default_server=fuse
+monitor=null.c
 case "$os" in
 	Linux)
 		default_server=fuse3
+		monitor=inotify.c
 	;;
 esac
 
@@ -82,7 +84,7 @@ mkdir luabuiltin
 CFLAGS="$CFLAGS -DTUP_SERVER=\"$server\""
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
-for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/null.c ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do
+for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/$monitor ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do
 	echo "  bootstrap CC $CFLAGS $i"
 	# Put -I. first so we find our new luabuiltin.h file, not one built
 	# by a previous invocation of 'tup'.
