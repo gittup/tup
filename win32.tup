@@ -1,9 +1,5 @@
 ifdef CC32
 CC32 = @(CC32)
-else
-CC32 = $(CC)
-CFLAGS32 += -m32
-LDFLAGS32 += -m32
 endif
 
 # Compatibility function prototypes and include path for wrapper functions

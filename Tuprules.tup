@@ -9,7 +9,12 @@ endif
 ifdef CC
 CC = @(CC)
 else
+ifeq ($(TARGET),win32)
+CC = x86_64-w64-mingw32-gcc
+CC32 = i686-w64-mingw32-gcc
+else
 CC = gcc
+endif
 endif
 
 ifeq (@(TUP_DEBUG),y)
@@ -30,7 +35,11 @@ endif
 ifdef AR
 AR = @(AR)
 else
+ifeq ($(TARGET),win32)
+AR = x86_64-w64-mingw32-ar
+else
 AR = ar
+endif
 endif
 
 # Override AR settings if being built with busybox kconfig
