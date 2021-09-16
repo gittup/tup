@@ -1506,7 +1506,6 @@ static int process_create_nodes(void)
 		}
 		rc = delete_files(&g);
 		if(rc == 0 && group_need_circ_check()) {
-			/* TODO: Extra space */
 			tup_show_message("Checking circular dependencies among groups...\n");
 			if(group_circ_check() < 0)
 				rc = -1;

@@ -84,7 +84,7 @@ void tup_show_message(const char *s)
 	const char *tup = " tup ";
 	if(quiet)
 		return;
-	clear_progress();
+	clear_active(stdout);
 	color_set(stdout);
 	/* If we get to the end, show a green bar instead of grey. */
 	if(cur_phase == 5)
