@@ -589,7 +589,12 @@ int build_graph(struct graph *g)
 	 */
 	free_tent_tree(&g->transient_root);
 
-	if(g->style != TUP_LINK_GROUP)
+	/* Don't add graph stickies for groups, or for the create graph
+	 * (count_flags == TUP_NODE_DIR). The latter is because we don't want
+	 * to populate tup_entry->stickies before potentially deleting nodes
+	 * (t6807).
+	 */
+	if(g->style != TUP_LINK_GROUP && g->count_flags != TUP_NODE_DIR)
 		if(add_graph_stickies(g) < 0)
 			return -1;
 
