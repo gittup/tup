@@ -2285,9 +2285,6 @@ int tup_inject_dll(
 
 		process = lpProcessInformation->hProcess;
 
-		if (!WaitForInputIdle(process, INFINITE))
-			return -1;
-
 		remote_data = (char*) VirtualAllocEx(
 			process,
 			NULL,
@@ -2361,9 +2358,6 @@ int tup_inject_dll(
 			remote.vardict_file);
 
 		process = lpProcessInformation->hProcess;
-
-		if (!WaitForInputIdle(process, INFINITE))
-			return -1;
 
 		remote_data = (char*) VirtualAllocEx(
 			process,
