@@ -1271,22 +1271,39 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 		}
 	}
 
-	/* Then keep only the first node of each hash value */
+	/* Then keep only the first node (alphabetically) of each hash value */
 	RB_FOREACH_SAFE(tt, tupid_entries, &tmproot, tmp) {
 		struct tupid_tree *hashtt;
 		nd = container_of(tt, struct node_details, nodetnode);
 		n = nd->n;
 
+		tupid_tree_rm(&tmproot, &nd->nodetnode);
+
 		hashtt = tupid_tree_search(hash_root, nd->hashtnode.tupid);
 		if(hashtt == NULL) {
-			tupid_tree_rm(&tmproot, &nd->nodetnode);
 			tupid_tree_insert(hash_root, &nd->hashtnode);
 			tupid_tree_insert(node_root, &nd->nodetnode);
 		} else {
+			struct node_details *orig_nd;
 			struct node_details *count_nd;
+			struct node_details *child_nd;
 
-			count_nd = container_of(hashtt, struct node_details, hashtnode);
-			count_nd->count++;
+			orig_nd = container_of(hashtt, struct node_details, hashtnode);
+			if(strcmp(orig_nd->n->tent->name.s, nd->n->tent->name.s) < 0) {
+				count_nd = orig_nd;
+				child_nd = nd;
+			} else {
+				/* If the current node is first alphabetically,
+				 * remove the old one and replace it with us.
+				 */
+				count_nd = nd;
+				child_nd = orig_nd;
+				tupid_tree_rm(hash_root, &orig_nd->hashtnode);
+				tupid_tree_rm(node_root, &orig_nd->nodetnode);
+				tupid_tree_insert(hash_root, &nd->hashtnode);
+				tupid_tree_insert(node_root, &nd->nodetnode);
+			}
+			count_nd->count += child_nd->count;
 
 			if(n->tent->type == TUP_NODE_CMD) {
 				struct edge *e;
@@ -1295,22 +1312,21 @@ static int combine_nodes(struct graph *g, enum TUP_NODE_TYPE type, tupid_t (*has
 				 * command in the same hash bin so we
 				 * can count them properly.
 				 */
-				LIST_FOREACH(e, &n->edges, list) {
+				LIST_FOREACH(e, &child_nd->n->edges, list) {
 					if(!find_edge(&count_nd->n->edges, e->dest, e->style)) {
 						if(create_edge_sorted(count_nd->n, e->dest, e->style) < 0)
 							return -1;
 					}
 				}
-				LIST_FOREACH(e, &n->incoming, destlist) {
+				LIST_FOREACH(e, &child_nd->n->incoming, destlist) {
 					if(!find_incoming_edge(&count_nd->n->incoming, e->src, e->style)) {
 						if(create_edge_sorted(e->src, count_nd->n, e->style) < 0)
 							return -1;
 					}
 				}
 			}
-			tupid_tree_rm(&tmproot, &nd->nodetnode);
-			remove_node_internal(g, n);
-			free(nd);
+			remove_node_internal(g, child_nd->n);
+			free(child_nd);
 		}
 	}
 	return 0;
