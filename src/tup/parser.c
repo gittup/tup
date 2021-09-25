@@ -1775,6 +1775,8 @@ static int set_variable(struct tupfile *tf, char *line)
 			fprintf(tf->f, "tup error: Node-variables can only refer to normal files and directories, not a '%s'.\n", tup_db_type(tent->type));
 			return -1;
 		}
+		if(tent_tree_add_dup(&tf->input_root, tent) < 0)
+			return -1;
 
 		/* var+1 to skip the leading '&' */
 		if(append)
