@@ -53,8 +53,8 @@ struct tupfile {
 	int refactoring;
 	struct graph *g;
 	struct vardb vdb;
+	struct vardb node_db;
 	struct bin_head bin_list;
-	struct node_vardb node_db;
 	struct tupid_entries cmd_root;
 	struct tent_entries env_root;
 	struct string_entries bang_root;

@@ -59,27 +59,4 @@ int vardb_compare(struct vardb *vdba, struct vardb *vdbb,
 		  struct tup_entry *var_dtent);
 void vardb_dump(struct vardb *v);
 
-/* Node variables */
-
-struct node_vardb {
-   struct string_entries root;
-   int count;
-};
-
-struct node_var_entry {
-   struct string_tree var;
-   struct tent_list_head nodes;
-};
-
-int nodedb_init(struct node_vardb *v);
-int nodedb_close(struct node_vardb *v);
-int nodedb_set(struct node_vardb *v, const char *var,
-               struct tup_entry *tent);
-int nodedb_append(struct node_vardb *v, const char *var,
-                  struct tup_entry *tent);
-int nodedb_copy(struct node_vardb *v, const char *var, int varlen,
-                struct estring *e, tupid_t relative_to);
-struct node_var_entry *nodedb_get(struct node_vardb *v,
-                                  const char *var, int varlen);
-
 #endif

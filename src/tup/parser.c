@@ -222,7 +222,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
 	LIST_INIT(&tf.bin_list);
-	if(nodedb_init(&tf.node_db) < 0)
+	if(vardb_init(&tf.node_db) < 0)
 		goto out_server_stop;
 	if(vardb_init(&tf.vdb) < 0)
 		goto out_close_node_db;
@@ -327,10 +327,10 @@ out_close_vdb:
 	if(vardb_close(&tf.vdb) < 0)
 		rc = -1;
 out_close_node_db:
-	if(nodedb_close(&tf.node_db) < 0)
+	if(vardb_close(&tf.node_db) < 0)
 		rc = -1;
-	bin_list_del(&tf.bin_list);
 out_server_stop:
+	bin_list_del(&tf.bin_list);
 	if(tf.use_server)
 		if(server_parser_stop(&ps) < 0)
 			rc = -1;
@@ -1778,11 +1778,20 @@ static int set_variable(struct tupfile *tf, char *line)
 		if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 			return -1;
 
+		free(value);
+		value = malloc(32);
+		if(!value) {
+			perror("malloc");
+			return -1;
+		}
+		snprintf(value, 31, "%%%llit", tent->tnode.tupid);
+		value[31] = 0;
+
 		/* var+1 to skip the leading '&' */
 		if(append)
-			rc = nodedb_append(&tf->node_db, var+1, tent);
+			rc = vardb_append(&tf->node_db, var+1, value);
 		else
-			rc = nodedb_set(&tf->node_db, var+1, tent);
+			rc = vardb_set(&tf->node_db, var+1, value, NULL);
 	} else {
 		if(append)
 			rc = vardb_append(&tf->vdb, var, value);
@@ -4095,6 +4104,41 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	return e.s;
 }
 
+static char *expand_nodes(struct tupfile *tf, const char *string)
+{
+	struct estring e;
+	const char *s;
+
+	if(estring_init(&e) < 0)
+		return NULL;
+	s = string;
+	while(*s) {
+		if(*s == '%' && isdigit(s[1])) {
+			char *endp;
+			tupid_t tupid;
+			errno = 0;
+			tupid = strtoll(s+1, &endp, 10);
+			if(!errno && *endp == 't') {
+				/* Internal-only node reference */
+				if(get_relative_dir(NULL, &e, variant_tent_to_srctent(tf->curtent)->tnode.tupid, tupid) < 0)
+					return NULL;
+				s = endp + 1;
+			} else {
+				if(estring_append(&e, s, 1) < 0)
+					return NULL;
+				s++;
+			}
+		} else {
+			if(estring_append(&e, s, 1) < 0)
+				return NULL;
+			s++;
+		}
+	}
+	if(estring_append(&e, s, strlen(s)) < 0)
+		return NULL;
+	return e.s;
+}
+
 char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 {
 	const char *s;
@@ -4212,8 +4256,7 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 				}
 
 				var = s + 2;
-				if (nodedb_copy(&tf->node_db, var, rparen-var, &e,
-				                variant_tent_to_srctent(tf->curtent)->tnode.tupid) < 0)
+				if(vardb_copy(&tf->node_db, var, rparen-var, &e) < 0)
 					return NULL;
 				s = rparen + 1;
 			} else {
@@ -4230,7 +4273,13 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 	if(estring_append(&e, s, strlen(s)) < 0)
 		return NULL;
 
-	return e.s;
+
+	char *rc = e.s;
+	if(allow_nodes == ALLOW_NODES) {
+		rc = expand_nodes(tf, e.s);
+		free(e.s);
+	}
+	return rc;
 
 syntax_error:
 	fprintf(tf->f, "Syntax error: %s\n", syntax_msg);
