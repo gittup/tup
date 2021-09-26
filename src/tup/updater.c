@@ -1026,6 +1026,15 @@ static int process_config_nodes(int environ_check)
 						return -1;
 					rm_node = 0;
 					show_result(n->tent, 0, NULL, "new variant", 1);
+
+					/* Clear out any cached variant fields
+					 * in the tup_entry for us and our
+					 * parent. If the parent directory used
+					 * to be something else, we could fail
+					 * to parse otherwise (t8109).
+					 */
+					n->tent->variant = NULL;
+					n->tent->parent->variant = NULL;
 				} else {
 					if(!variant->enabled) {
 						/* If the variant is disabled

@@ -2253,7 +2253,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	TAILQ_INIT(&plist);
 	if(get_path_list(tf, p, &plist, bl) < 0)
 		return -1;
-	if(eval_path_list(tf, &plist, EXPAND_NODES) < 0)
+	if(eval_path_list(tf, &plist, EXPAND_NODES_SRC) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -3206,7 +3206,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	}
 
 	/* Then eval the list so all $-variables are expanded */
-	if(eval_path_list(tf, &tmplist, EXPAND_NODES) < 0)
+	if(eval_path_list(tf, &tmplist, EXPAND_NODES_SRC) < 0)
 		return -1;
 
 	/* Use tup_printf again in case $-variables reference %-flags.
@@ -4104,7 +4104,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	return e.s;
 }
 
-static char *expand_node_strings(struct tupfile *tf, const char *string)
+static char *expand_node_strings(struct tupfile *tf, const char *string, int expand_nodes)
 {
 	struct estring e;
 	const char *s;
@@ -4120,7 +4120,19 @@ static char *expand_node_strings(struct tupfile *tf, const char *string)
 			tupid = strtoll(s+1, &endp, 10);
 			if(!errno && *endp == 't') {
 				/* Internal-only node reference */
-				if(get_relative_dir(NULL, &e, variant_tent_to_srctent(tf->curtent)->tnode.tupid, tupid) < 0)
+				struct tup_entry *tent;
+				if(tup_entry_add(tupid, &tent) < 0)
+					return NULL;
+
+				/* Inputs & outputs are always given as if
+				 * they're in the srcdir, even if the node
+				 * variable points inside the variantdir due to
+				 * $(TUP_VARIANTDIR).
+				 */
+				if(expand_nodes == EXPAND_NODES_SRC)
+					tent = variant_tent_to_srctent(tent);
+
+				if(get_relative_dir(NULL, &e, variant_tent_to_srctent(tf->curtent)->tnode.tupid, tent->tnode.tupid) < 0)
 					return NULL;
 				s = endp + 1;
 			} else {
@@ -4183,12 +4195,11 @@ char *eval(struct tupfile *tf, const char *string, int expand_nodes)
 					}
 				} else if(rparen-var == 14 &&
 					  strncmp(var, "TUP_VARIANTDIR", 14) == 0) {
-					if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tf->curtent->tnode.tupid) < 0) {
-						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->srctent->tnode.tupid, tf->curtent->tnode.tupid);
-						tup_db_print(tf->f, tf->srctent->tnode.tupid);
-						tup_db_print(tf->f, tf->curtent->tnode.tupid);
+					char value[32];
+					snprintf(value, 31, "%%%llit", tf->curtent->tnode.tupid);
+					value[31] = 0;
+					if(estring_append(&e, value, strlen(value)) < 0)
 						return NULL;
-					}
 				} else if(rparen-var == 21 &&
 					  strncmp(var, "TUP_VARIANT_OUTPUTDIR", 21) == 0) {
 					if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tf->tent->tnode.tupid) < 0) {
@@ -4271,8 +4282,8 @@ char *eval(struct tupfile *tf, const char *string, int expand_nodes)
 
 
 	char *rc = e.s;
-	if(expand_nodes == EXPAND_NODES) {
-		rc = expand_node_strings(tf, e.s);
+	if(expand_nodes != KEEP_NODES) {
+		rc = expand_node_strings(tf, e.s, expand_nodes);
 		free(e.s);
 	}
 	return rc;

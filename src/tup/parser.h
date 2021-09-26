@@ -34,6 +34,7 @@
 
 #define KEEP_NODES 0
 #define EXPAND_NODES 1
+#define EXPAND_NODES_SRC 2
 
 #define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
 
