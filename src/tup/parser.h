@@ -32,8 +32,8 @@
 #define TUPLUA_PENDINGERROR 1
 #define TUPLUA_ERRORSHOWN 2
 
-#define DISALLOW_NODES 0
-#define ALLOW_NODES 1
+#define KEEP_NODES 0
+#define EXPAND_NODES 1
 
 #define parser_error(tf, err_string) fprintf((tf)->f, "%s: %s\n", (err_string), strerror(errno));
 

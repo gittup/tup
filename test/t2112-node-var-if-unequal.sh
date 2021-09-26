@@ -16,18 +16,22 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as the rval in an if statement doesn't work.
+# Test that two different node variables compare unequally.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
 &node_var = lib.a
+&other_var = foo.a
 ifeq (,&(node_var))
+: |> touch %o |> foo.txt
+else
+: |> touch %o |> bar.txt
 endif
 HERE
+touch lib.a foo.a
+update
 
-touch lib.a
-
-update_fail_msg "&-variables not allowed here"
+check_exist bar.txt
 
 eotup

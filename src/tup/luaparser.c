@@ -234,13 +234,13 @@ static int tuplua_function_definerule(lua_State *ls)
 
 	TAILQ_INIT(&input_path_list);
 	TAILQ_INIT(&extra_input_path_list);
-	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, DISALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, EXPAND_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
-	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, DISALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, EXPAND_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_inputs'.");
-	if(tuplua_table_to_path_list(ls, "outputs", tf, &r.outputs, ALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "outputs", tf, &r.outputs, EXPAND_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
-	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &r.extra_outputs, ALLOW_NODES) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_outputs", tf, &r.extra_outputs, EXPAND_NODES) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_outputs'.");
 
 	lua_getfield(ls, 1, "bin");

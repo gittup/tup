@@ -119,7 +119,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 			       struct name_list *nl, struct bin_head *bl,
 			       int is_variant_copy);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl);
-static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes);
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int expand_nodes);
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
@@ -652,7 +652,7 @@ static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename
 			char *file;
 
 			file = line + 8;
-			file = eval(tf, file, ALLOW_NODES);
+			file = eval(tf, file, EXPAND_NODES);
 			if(!file) {
 				rc = -1;
 			} else {
@@ -728,10 +728,10 @@ found_paren:
 	*comma = 0;
 	*paren = 0;
 
-	lval = eval(tf, lval, DISALLOW_NODES);
+	lval = eval(tf, lval, KEEP_NODES);
 	if(!lval)
 		return -1;
-	rval = eval(tf, rval, DISALLOW_NODES);
+	rval = eval(tf, rval, KEEP_NODES);
 	if(!rval) {
 		free(lval);
 		return -1;
@@ -770,7 +770,7 @@ static int var_ifdef(struct tupfile *tf, const char *var)
 static int error_directive(struct tupfile *tf, char *cmdline)
 {
 	char *eval_cmdline;
-	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
+	eval_cmdline = eval(tf, cmdline, EXPAND_NODES);
 	if(eval_cmdline) {
 		fprintf(tf->f, "Error:\n  ");
 		if(strlen(cmdline)==0) {
@@ -928,7 +928,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	TAILQ_INIT(&plist);
 	if(get_path_list(tf, cmdline, &plist, NULL) < 0)
 		return -1;
-	if(eval_path_list(tf, &plist, ALLOW_NODES) < 0)
+	if(eval_path_list(tf, &plist, EXPAND_NODES) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -980,7 +980,7 @@ static int run_script(struct tupfile *tf, char *cmdline, int lno)
 	int rc;
 	char *eval_cmdline;
 
-	eval_cmdline = eval(tf, cmdline, ALLOW_NODES);
+	eval_cmdline = eval(tf, cmdline, EXPAND_NODES);
 	if(!eval_cmdline) {
 		return -1;
 	}
@@ -1751,10 +1751,10 @@ static int set_variable(struct tupfile *tf, char *line)
 		eq--;
 	}
 
-	var = eval(tf, line, DISALLOW_NODES);
+	var = eval(tf, line, KEEP_NODES);
 	if(!var)
 		return -1;
-	value = eval(tf, value, DISALLOW_NODES);
+	value = eval(tf, value, KEEP_NODES);
 	if(!value)
 		return -1;
 
@@ -2253,7 +2253,7 @@ static int input_pattern_to_nl(struct tupfile *tf, char *p,
 	TAILQ_INIT(&plist);
 	if(get_path_list(tf, p, &plist, bl) < 0)
 		return -1;
-	if(eval_path_list(tf, &plist, ALLOW_NODES) < 0)
+	if(eval_path_list(tf, &plist, EXPAND_NODES) < 0)
 		return -1;
 	if(parse_dependent_tupfiles(&plist, tf) < 0)
 		return -1;
@@ -2396,7 +2396,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 	return 0;
 }
 
-static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int allow_nodes)
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int expand_nodes)
 {
 	struct path_list *pl;
 	struct path_list *tmp;
@@ -2407,7 +2407,7 @@ static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int 
 		int last_entry = 0;
 		char *p;
 
-		eval_p = eval(tf, pl->mem, allow_nodes);
+		eval_p = eval(tf, pl->mem, expand_nodes);
 		if(!eval_p)
 			return -1;
 
@@ -3206,7 +3206,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	}
 
 	/* Then eval the list so all $-variables are expanded */
-	if(eval_path_list(tf, &tmplist, DISALLOW_NODES) < 0)
+	if(eval_path_list(tf, &tmplist, EXPAND_NODES) < 0)
 		return -1;
 
 	/* Use tup_printf again in case $-variables reference %-flags.
@@ -3517,7 +3517,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	tcmd = tup_printf(tf, cs.cmd, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
 	if(!tcmd)
 		return -1;
-	cmd = eval(tf, tcmd, ALLOW_NODES);
+	cmd = eval(tf, tcmd, EXPAND_NODES);
 	if(!cmd)
 		return -1;
 	free(tcmd);
@@ -4104,7 +4104,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	return e.s;
 }
 
-static char *expand_nodes(struct tupfile *tf, const char *string)
+static char *expand_node_strings(struct tupfile *tf, const char *string)
 {
 	struct estring e;
 	const char *s;
@@ -4139,7 +4139,7 @@ static char *expand_nodes(struct tupfile *tf, const char *string)
 	return e.s;
 }
 
-char *eval(struct tupfile *tf, const char *string, int allow_nodes)
+char *eval(struct tupfile *tf, const char *string, int expand_nodes)
 {
 	const char *s;
 	const char *var;
@@ -4250,10 +4250,6 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 					syntax_msg = "expected ending variable paren ')'";
 					goto syntax_error;
 				}
-				if(allow_nodes != ALLOW_NODES) {
-					syntax_msg = "&-variables not allowed here";
-					goto syntax_error;
-				}
 
 				var = s + 2;
 				if(vardb_copy(&tf->node_db, var, rparen-var, &e) < 0)
@@ -4275,8 +4271,8 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 
 
 	char *rc = e.s;
-	if(allow_nodes == ALLOW_NODES) {
-		rc = expand_nodes(tf, e.s);
+	if(expand_nodes == EXPAND_NODES) {
+		rc = expand_node_strings(tf, e.s);
 		free(e.s);
 	}
 	return rc;

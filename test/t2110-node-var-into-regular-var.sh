@@ -16,22 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as the value of a regular variable doesn't
-# work - converting a node-variable to a string only makes sense in places
-# where the string will be consumed immediately. Putting the string into a
-# variable is not one of these places (the variable could be used as an output
-# file, or it could be used in another Tupfile where the relative path is no
-# longer valid).
+# Test that using a node-variable as the value of a regular variable works.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
 &node_var = lib.a
 var = &(node_var)
+: |> Var is \$(var) |>
 HERE
-
 touch lib.a
+parse
 
-update_fail_msg "&-variables not allowed here"
+tup_object_exist . 'Var is lib.a'
 
 eotup

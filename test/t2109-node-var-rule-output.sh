@@ -16,18 +16,18 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Test that using a node-variable as a rule output fails - this doesn't
-# make any sense, since node-variables can only refer to existing files.
+# Test that we can use a node variable based path in an output section.
 
 . ./tup.sh
 
 cat > Tupfile << HERE
-&toolkit_lib = tklib.a
-: lib.a |> cp lib.a %o |> &(toolkit_lib)
+&subdir = sub
+: lib.a |> cp lib.a %o |> &(subdir)/out.a
 HERE
-
 touch lib.a tklib.a
+mkdir sub
 
-update_fail_msg "&-variables not allowed here"
+update
+check_exist sub/out.a
 
 eotup
