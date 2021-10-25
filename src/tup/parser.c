@@ -4145,6 +4145,14 @@ char *eval(struct tupfile *tf, const char *string, int allow_nodes)
 						tup_db_print(tf->f, tf->curtent->tnode.tupid);
 						return NULL;
 					}
+				} else if(rparen-var == 21 &&
+					  strncmp(var, "TUP_VARIANT_OUTPUTDIR", 21) == 0) {
+					if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tf->tent->tnode.tupid) < 0) {
+						fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->srctent->tnode.tupid, tf->tent->tnode.tupid);
+						tup_db_print(tf->f, tf->srctent->tnode.tupid);
+						tup_db_print(tf->f, tf->tent->tnode.tupid);
+						return NULL;
+					}
 				} else if(rparen - var > 7 &&
 					  strncmp(var, "CONFIG_", 7) == 0) {
 					const char *atvar;

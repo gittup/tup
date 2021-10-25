@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/09/21" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2021/10/25" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -599,6 +599,9 @@ The special $-variable TUP_CWD is always set to the path relative to the Tupfile
 .TP
 .B $(TUP_VARIANTDIR)
 Similar to $(TUP_CWD), $(TUP_VARIANTDIR) is set to be the path relative to the Tupfile currently parsed, but points to the corresponding directory in the variant. As an example where this might be useful, suppose your build generates common headers into a directory called "include/". A Tuprules.tup file at the level of that directory could add -I$(TUP_VARIANTDIR) to a compiler flags variable. If a variant is used, this will evaluate to a path like "../build/path/to/include", where "build" is the name of the variant directory. If variants aren't used, TUP_VARIANTDIR is equivalent to TUP_CWD.
+.TP
+.B $(TUP_VARIANT_OUTPUTDIR)
+$(TUP_VARIANT_OUTPUTDIR) always points to the output directory corresponding to the variant currently being parsed. Unlike $(TUP_VARIANTDIR), it does not change when including another file like Tuprules.tup or other partial *.tup files. Without variants, this always evaluates to the string "." to point to the current directory.
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
 .TP
