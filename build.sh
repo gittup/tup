@@ -53,6 +53,7 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/dummy.c"
 	plat_files="$plat_files ../src/compat/utimensat_linux.c"
 	plat_files="$plat_files ../src/compat/clearenv.c"
+	CC=clang
 	;;
 	NetBSD)
 	plat_files="$plat_files ../src/compat/dummy.c"
