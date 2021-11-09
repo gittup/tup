@@ -18,6 +18,7 @@
 
 . ./tup.sh
 check_no_windows fuse
+check_python
 
 cat > Tupfile << HERE
 : foreach *.c |> gcc -c %f -o %o |> %B.o

@@ -19,6 +19,7 @@
 # Make sure !tup_preserve works from lua
 
 . ./tup.sh
+check_bash
 
 cat > Tupfile.lua << HERE
 tup.rule({'file.txt'}, '!tup_preserve')
