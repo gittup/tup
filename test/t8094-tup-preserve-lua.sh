@@ -22,7 +22,7 @@
 
 cat > Tupfile.lua << HERE
 tup.rule({'file.txt'}, '!tup_preserve')
-tup.rule('file.txt', 'bash gen.sh %f %o', 'out.txt')
+tup.rule('file.txt', 'sh gen.sh %f %o', 'out.txt')
 HERE
 mkdir sub
 mkdir sub/bar

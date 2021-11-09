@@ -22,7 +22,7 @@
 
 cat > Tupfile << HERE
 : file.txt |> !tup_preserve |>
-: file.txt |> bash gen.sh %f %o |> out.txt
+: file.txt |> sh gen.sh %f %o |> out.txt
 HERE
 mkdir sub
 mkdir sub/bar
