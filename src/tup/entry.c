@@ -693,10 +693,19 @@ static int get_full_path_tents(tupid_t tupid, struct tent_list_head *head)
 
 int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 {
+	/* For resource files, always use '/' as the separator.  Both cl and
+	 * cygwin can handle '/', but cygwin can't handle '\'.
+	 */
+	return get_relative_dir_sep(f, e, start, end, '/');
+}
+
+int get_relative_dir_sep(FILE *f, struct estring *e, tupid_t start, tupid_t end, char sep)
+{
 	struct tent_list_head startlist;
 	struct tent_list_head endlist;
 	struct tent_list *startentry;
 	struct tent_list *endentry;
+	char sep_str[2] = {sep, 0};
 	int first = 0;
 
 	tent_list_init(&startlist);
@@ -722,14 +731,10 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 		if(!first) {
 			first = 1;
 		} else {
-			/* For resource files, always use '/' as the separator.
-			 * Both cl and cygwin can handle '/', but cygwin can't
-			 * handle '\'.
-			 */
 			if(f)
-				fprintf(f, "/");
+				fprintf(f, "%s", sep_str);
 			if(e)
-				if(estring_append(e, "/", 1) < 0)
+				if(estring_append(e, sep_str, 1) < 0)
 					return -1;
 		}
 		if(f)
@@ -742,11 +747,10 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end)
 		if(!first) {
 			first = 1;
 		} else {
-			/* Resource files always use '/' - see above */
 			if(f)
-				fprintf(f, "/");
+				fprintf(f, "%s", sep_str);
 			if(e)
-				if(estring_append(e, "/", 1) < 0)
+				if(estring_append(e, sep_str, 1) < 0)
 					return -1;
 		}
 		if(f)

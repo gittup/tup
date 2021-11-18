@@ -7481,15 +7481,15 @@ int tup_db_reparse_all(void)
 	return 0;
 }
 
-static void print_command(FILE *f, struct tup_entry *cmdtent)
+static void print_json(FILE *f, const char *str, int len)
 {
 	/* Escape \ and " for json strings */
-	char *buf = malloc(cmdtent->name.len * 2);
-	char *s = cmdtent->name.s;
+	char *buf = malloc(len * 2);
+	const char *s = str;
 	int x;
 	int offs = 0;
 
-	for(x=0; x<cmdtent->name.len; x++) {
+	for(x=0; x<len; x++) {
 		if(s[x] == '\\' || s[x] == '"') {
 			buf[offs] = '\\';
 			offs++;
@@ -7506,6 +7506,7 @@ static int print_compile_db(FILE *f, struct tup_entry *cmdtent, struct tup_entry
 {
 	static int first_time = 1;
 	struct tup_entry *srctent = variant_tent_to_srctent(cmdtent->parent);
+	struct estring e;
 
 	if(first_time) {
 		first_time = 0;
@@ -7513,13 +7514,20 @@ static int print_compile_db(FILE *f, struct tup_entry *cmdtent, struct tup_entry
 		fprintf(f, ",\n");
 	}
 	fprintf(f, "{\n");
-	fprintf(f, "    \"directory\": \"%s/", get_tup_top());
+	fprintf(f, "    \"directory\": \"");
+	estring_init(&e);
+	estring_append(&e, get_tup_top(), get_tup_top_len());
+	char sep[1] = {path_sep()};
+	estring_append(&e, sep, 1);
 	if(srctent->tnode.tupid != DOT_DT) {
-		print_tup_entry(f, srctent);
+		if(get_relative_dir_sep(NULL, &e, DOT_DT, srctent->tnode.tupid, path_sep()) < 0)
+			return -1;
 	}
+	print_json(f, e.s, e.len);
+	free(e.s);
 	fprintf(f, "\",\n");
 	fprintf(f, "    \"command\": \"");
-	print_command(f, cmdtent);
+	print_json(f, cmdtent->name.s, cmdtent->name.len);
 	fprintf(f, "\",\n");
 	fprintf(f, "    \"file\": \"");
 	if(get_relative_dir(f, NULL, srctent->tnode.tupid, filetent->tnode.tupid) < 0)

@@ -43,4 +43,12 @@ for i in foo bar; do
 	fi
 done
 
+if [ "$in_windows" = "1" ]; then
+	# Make sure backslashes in the directory paths are escaped. (The 8
+	# become 4 on the commandline, which become 2 for the grep)
+	gitignore_good "directory.*test\\\\\\\\tuptesttmp" compile_commands.json
+else
+	gitignore_good "directory.*test/tuptesttmp" compile_commands.json
+fi
+
 eotup
