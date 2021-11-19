@@ -120,6 +120,12 @@ static int os_unmount(void)
 static int os_unmount(void)
 {
 	if(unmount(TUP_MNT, MNT_FORCE) < 0) {
+		if(errno == EBUSY) {
+			fprintf(stderr, "tup warning: FUSE filesystem busy on unmount, trying again...\n");
+			usleep(500000);
+			if(unmount(TUP_MNT, MNT_FORCE) == 0)
+				return 0;
+		}
 		perror("unmount");
 		return -1;
 	}
