@@ -468,7 +468,6 @@ static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 		*parser_lua = 1;
 		return 0;
 	}
-	tent = variant_tent_to_srctent(tent);
 	do {
 		int x;
 		strcpy(path + n*3, TUPDEFAULT);
@@ -1265,7 +1264,7 @@ static int check_toplevel_gitignore(struct tupfile *tf)
 	char *p;
 	char *e;
 	char *line;
-	int rc;
+	int rc = -1;
 
 	/* This mimics pieces of include_tuprules and parse_tupfile(), but all
 	 * we're looking for is a .gitignore directive. We don't want to
@@ -1349,7 +1348,6 @@ out_free:
 out_close:
 	if(close(fd) < 0) {
 		parser_error(tf, "close(fd)");
-		rc = -1;
 	}
 	return rc;
 }

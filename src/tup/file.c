@@ -135,6 +135,7 @@ static int add_symlinks(const char *path, struct file_info *finfo)
 	if(linkpath) {
 		if(handle_open_file(ACCESS_READ, linkpath, finfo) < 0) {
 			fprintf(stderr, "tup error: Failed to call handle_open_file on a symlink event '%s'\n", linkpath);
+			free(linkpath);
 			return -1;
 		}
 		free(linkpath);

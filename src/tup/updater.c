@@ -2168,7 +2168,6 @@ static int update_work(struct graph *g, struct node *n)
 
 static int generate_work(struct graph *g, struct node *n)
 {
-	int rc = 0;
 	char *expanded_name = NULL;
 	struct tent_entries sticky_root = TENT_ENTRIES_INITIALIZER;
 	struct tent_entries normal_root = TENT_ENTRIES_INITIALIZER;
@@ -2181,33 +2180,30 @@ static int generate_work(struct graph *g, struct node *n)
 		if(generate_cwd != srctent) {
 			fprintf(generate_f, "cd \"");
 			if(get_relative_dir(generate_f, NULL, generate_cwd->tnode.tupid, srctent->tnode.tupid) < 0) {
-				rc = -1;
-			} else {
-				fprintf(generate_f, "\"\n");
-				generate_cwd = srctent;
+				return -1;
 			}
+			fprintf(generate_f, "\"\n");
+			generate_cwd = srctent;
 		}
 		cmd = n->tent->name.s;
-		rc = tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root);
-		if (rc == 0) {
-			if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, NULL) < 0) {
-				fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
-				rc = -1;
-			}
-			if(expanded_name)
-				cmd = expanded_name;
+		if(tup_db_get_inputs(n->tent->tnode.tupid, &sticky_root, &normal_root, &group_sticky_root) < 0) {
+			return -1;
 		}
+		if(expand_command(&expanded_name, n->tent, cmd, &group_sticky_root, NULL) < 0) {
+			fprintf(stderr, "tup error: Failed to expand command '%s' for generate script.\n", n->tent->name.s);
+			return -1;
+		}
+		if(expanded_name)
+			cmd = expanded_name;
 		free_tent_tree(&sticky_root);
 		free_tent_tree(&normal_root);
 		free_tent_tree(&group_sticky_root);
 		if(cmd)
 			fprintf(generate_f, "(%s)\n", cmd);
 		free(expanded_name);
-	} else {
-		rc = 0;
 	}
 
-	return rc;
+	return 0;
 }
 
 static int todo_work(struct graph *g, struct node *n)
