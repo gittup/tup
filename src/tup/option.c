@@ -90,6 +90,7 @@ static struct option {
 	{"display.job_numbers", "1", NULL, is_flag},
 	{"display.job_time", "1", NULL, is_flag},
 	{"display.quiet", "0", NULL, is_flag},
+	{"display.unspecified_output_warnings", "1", NULL, is_flag},
 	{"monitor.autoupdate", "0", NULL, is_flag},
 	{"monitor.autoparse", "0", NULL, is_flag},
 	{"monitor.foreground", "0", NULL, is_flag},
