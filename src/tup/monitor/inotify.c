@@ -963,6 +963,13 @@ static void *wait_thread(void *arg)
 
 static int skip_event(struct inotify_event *e)
 {
+	/* While pel_ignored doesn't skip hidden files, we do here for
+	 * ease-of-use with editors (eg: vim) that create .blah.swp files in
+	 * the monitored directory.
+	 */
+	if(e->len > 0 && e->name[0] == '.' && strstr(e->name, ".swp") != NULL)
+		return 1;
+
 	/* Skip hidden files */
 	return pel_ignored(e->name, e->len);
 }
