@@ -1224,7 +1224,23 @@ static int handle_event(struct monitor_event *m, int *modified)
 	}
 	if(!(m->e.mask & IN_ISDIR) &&
 	   (m->e.mask & IN_MODIFY || m->e.mask & IN_ATTRIB)) {
-		if(tup_file_mod(dc->dt_node.tupid, m->e.name, modified) < 0)
+		int *tmp_modified = modified;
+		struct tup_entry *tent;
+		struct tup_entry *dtent;
+		if(tup_entry_add(dc->dt_node.tupid, &dtent) < 0) {
+			return -1;
+		}
+		if(tup_db_select_tent(dtent, m->e.name, &tent) < 0)
+			return -1;
+		if(tent && tent->type == TUP_NODE_GENERATED) {
+			/* t7061 - generated files that are restored when an ^o
+			 * rule fails can get set to IN_MODIFY by the
+			 * ephemeral_event() logic. We don't want to set that
+			 * as modified here and trigger an autoupdate.
+			 */
+			tmp_modified = NULL;
+		}
+		if(tup_file_mod(dc->dt_node.tupid, m->e.name, tmp_modified) < 0)
 			return -1;
 	}
 	if(m->e.mask & IN_DELETE) {
