@@ -2286,6 +2286,8 @@ static int restore_outputs(struct node *n)
 	LIST_FOREACH(e, &n->edges, list) {
 		output = e->dest;
 		if(!skip_output(output->tent)) {
+			struct stat buf;
+
 			curpath[0] = '.';
 			if(snprint_tup_entry(curpath+1, sizeof(curpath)-1, output->tent) >= (int)sizeof(curpath)-1) {
 				fprintf(stderr, "tup error: curpath sized incorrectly in move_outputs()\n");
@@ -2306,6 +2308,13 @@ static int restore_outputs(struct node *n)
 					return -1;
 				}
 			}
+
+			if(lstat(curpath, &buf) != 0) {
+				fprintf(stderr, "tup error: Unable to lstat() output '%s' after restoring it.\n", curpath);
+				return -1;
+			}
+			if(tup_db_set_mtime(output->tent, MTIME(buf)) < 0)
+				return -1;
 		}
 	}
 	return 0;
