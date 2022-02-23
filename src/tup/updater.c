@@ -2309,12 +2309,16 @@ static int restore_outputs(struct node *n)
 				}
 			}
 
-			if(lstat(curpath, &buf) != 0) {
-				fprintf(stderr, "tup error: Unable to lstat() output '%s' after restoring it.\n", curpath);
-				return -1;
+			if(lstat(curpath, &buf) == 0) {
+				if(tup_db_set_mtime(output->tent, MTIME(buf)) < 0)
+					return -1;
+			} else {
+				/* ENOENT is ok, similar to above. */
+				if(errno != ENOENT) {
+					fprintf(stderr, "tup error: Unable to lstat() output '%s' after restoring it.\n", curpath);
+					return -1;
+				}
 			}
-			if(tup_db_set_mtime(output->tent, MTIME(buf)) < 0)
-				return -1;
 		}
 	}
 	return 0;
