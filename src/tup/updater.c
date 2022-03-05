@@ -2851,9 +2851,20 @@ static int do_ln(struct server *s, struct tup_entry *dtent, int dfd, const char 
 {
 	char input_path[PATH_MAX];
 	const char* output_name = input_and_output_from_cmd(cmd, input_path);
+	struct tup_entry *output_tent = NULL;
+	struct tent_tree *tt;
+	RB_FOREACH(tt, tent_entries, &s->finfo.output_root) {
+		if(output_tent) {
+			fprintf(stderr, "tup internal error: tup symlink command has multiple output files. Command: ");
+			print_tup_entry(stderr, dtent);
+			fprintf(stderr, "\n");
+			return -1;
+		}
+		output_tent = tt->tent;
+	}
 	if(!output_name)
 		return -1;
-	if(server_symlink(s, dtent, input_path, dfd, output_name) < 0)
+	if(server_symlink(s, dtent, input_path, dfd, output_name, output_tent) < 0)
 		return -1;
 	s->exited = 1;
 	s->exit_status = 0;

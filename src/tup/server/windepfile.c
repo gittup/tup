@@ -470,7 +470,7 @@ int serverless_run_script(FILE *f, const char *cmdline,
 	return -1;
 }
 
-int server_symlink(struct server *s, struct tup_entry *dtent, const char *target, int dfd, const char *linkpath)
+int server_symlink(struct server *s, struct tup_entry *dtent, const char *target, int dfd, const char *linkpath, struct tup_entry *output_tent)
 {
 	char depfile[PATH_MAX];
 	char dest[PATH_MAX];
@@ -479,7 +479,7 @@ int server_symlink(struct server *s, struct tup_entry *dtent, const char *target
 	wchar_t wdest[PATH_MAX];
 	int rc;
 
-	if(dtent) {/* unused */}
+	if(dtent || output_tent) {/* unused */}
 	rc = dir_mutex_lock(dfd);
 	if(rc < 0)
 		return rc;
