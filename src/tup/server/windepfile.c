@@ -24,6 +24,7 @@
 #include "tup/flist.h"
 #include "tup/environ.h"
 #include "tup/entry.h"
+#include "tup/estring.h"
 #include "tup/variant.h"
 #include "tup/ccache.h"
 #include "dllinject/dllinject.h"
@@ -254,9 +255,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int rc = -1;
 	DWORD return_code = 1;
 	PROCESS_INFORMATION pi;
-	size_t namesz = strlen(cmd);
-	size_t cmdsz = sizeof(CMDSTR) - 1;
-	char* cmdline = (char*) __builtin_alloca(namesz + cmdsz + 1 + 1);
+	struct estring cmdline;
 	char buf[64];
 	char depfile[PATH_MAX];
 	char vardict_file[PATH_MAX];
@@ -297,7 +296,8 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	}
 	vardict_file[get_tup_top_len() + 1 + strlen(variant->vardict_file)] = 0;
 
-	cmdline[0] = '\0';
+	if(estring_init(&cmdline) < 0)
+		return -1;
 	/* Only pull in cmd/sh if really necessary */
 	if(!have_shell) {
 		need_sh = strncmp(cmd, "./", 2) == 0 ||
@@ -307,22 +307,27 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 			strchr(cmd, '>') != NULL ||
 			strchr(cmd, '<') != NULL;
 		if(run_in_bash) {
-			strcat(cmdline, BASHSTR);
+			if(estring_append(&cmdline, BASHSTR, strlen(BASHSTR)) < 0)
+				return -1;
 			append_quote = 1;
 		} else if(need_sh) {
-			strcat(cmdline, SHSTR);
+			if(estring_append(&cmdline, SHSTR, strlen(SHSTR)) < 0)
+				return -1;
 			append_quote = 1;
 		} else if(need_cmd) {
-			strcat(cmdline, CMDSTR);
+			if(estring_append(&cmdline, CMDSTR, strlen(CMDSTR)) < 0)
+				return -1;
 		}
 	}
-	strcat(cmdline, cmd);
+	if(estring_append(&cmdline, cmd, strlen(cmd)) < 0)
+		return -1;
 	if(append_quote) {
-		strcat(cmdline, "'");
+		if(estring_append(&cmdline, "'", 1) < 0)
+			return -1;
 	}
 
 	pthread_mutex_lock(&dir_mutex);
-	if(create_process(s, dfd, cmdline, newenv, &pi) < 0) {
+	if(create_process(s, dfd, cmdline.s, newenv, &pi) < 0) {
 		pthread_mutex_lock(s->error_mutex);
 		fprintf(stderr, "tup error: failed to create child process: %s\n", strerror(errno));
 		if(errno == ERANGE) {
@@ -333,6 +338,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		pthread_mutex_unlock(&dir_mutex);
 		goto end;
 	}
+	free(cmdline.s);
 	pthread_mutex_unlock(&dir_mutex);
 
 	if(tup_inject_dll(&pi, depfile, vardict_file)) {
