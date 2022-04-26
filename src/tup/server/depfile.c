@@ -269,7 +269,7 @@ static void server_unlock(struct server *s)
 }
 
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing, int run_in_bash)
+		struct tup_entry *dtent)
 {
 	int fd;
 	char depfile[PATH_MAX];
@@ -277,7 +277,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int status;
 
 	if(dtent) {}
-	if(need_namespacing) {}
 
 	snprintf(depfile, PATH_MAX, "%s/%s/deps-%i", get_tup_top(), TUP_TMP, s->id);
 	depfile[PATH_MAX-1] = 0;
@@ -293,7 +292,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		perror(buf);
 		return -1;
 	}
-	if(run_subprocess(s->output_fd, dfd, cmd, depfile, newenv, run_in_bash, &status) < 0) {
+	if(run_subprocess(s->output_fd, dfd, cmd, depfile, newenv, s->run_in_bash, &status) < 0) {
 		close(fd);
 		return -1;
 	}

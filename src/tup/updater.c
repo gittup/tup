@@ -765,6 +765,8 @@ static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->output_fd = -1;
 	s->error_fd = -1;
 	s->error_mutex = &display_mutex;
+	s->need_namespacing = 0;
+	s->run_in_bash = 0;
 	if(init_file_info(&s->finfo, server_unlink()) < 0)
 		return -1;
 
@@ -2950,8 +2952,11 @@ static int update(struct node *n)
 	} else {
 		srcdfd = dfd;
 	}
-	if(rc == 0)
+	if(rc == 0) {
 		rc = initialize_server_struct(&s, n->tent);
+		s.need_namespacing = need_namespacing;
+		s.run_in_bash = run_in_bash;
+	}
 	if(rc == 0)
 		rc = tup_db_get_environ(&s.finfo.sticky_root, &s.finfo.normal_root, &newenv);
 	if(rc == 0) {
@@ -2968,7 +2973,7 @@ static int update(struct node *n)
 	} else if (strncmp(cmd, "!tup_preserve ", 14) == 0) {
 		rc = do_ln(&s, n->tent->parent, srcdfd, cmd + 14);
 	} else {
-		rc = server_exec(&s, srcdfd, cmd, &newenv, n->tent->parent, need_namespacing, run_in_bash);
+		rc = server_exec(&s, srcdfd, cmd, &newenv, n->tent->parent);
 		use_server = 1;
 	}
 	if(rc < 0) {

@@ -3187,7 +3187,6 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		flagslen = 0;
 	}
 
-
 	/* first expand any %-flags before eval so things like $(flags_%f) work */
 	TAILQ_FOREACH(pl, oplist, list) {
 		struct path_list *newpl;

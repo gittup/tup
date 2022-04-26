@@ -462,8 +462,7 @@ static int finfo_wait_open_count(struct server *s)
 }
 
 static int exec_internal(struct server *s, const char *cmd, struct tup_env *newenv,
-			 struct tup_entry *dtent, int single_output, int need_namespacing,
-			 int run_in_bash)
+			 struct tup_entry *dtent, int single_output)
 {
 	int status;
 	char buf[64];
@@ -475,8 +474,8 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	memset(&em, 0, sizeof(em));
 	em.sid = s->id;
 	em.single_output = single_output;
-	em.need_namespacing = need_namespacing;
-	em.run_in_bash = run_in_bash;
+	em.need_namespacing = s->need_namespacing;
+	em.run_in_bash = s->run_in_bash;
 	em.envlen = newenv->block_size;
 	em.num_env_entries = newenv->num_entries;
 	em.joblen = snprintf(job, sizeof(job), TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
@@ -563,7 +562,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 }
 
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing, int run_in_bash)
+		struct tup_entry *dtent)
 {
 	int rc;
 
@@ -572,7 +571,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	if(tup_fuse_add_group(s->id, &s->finfo) < 0)
 		return -1;
 
-	rc = exec_internal(s, cmd, newenv, dtent, 1, need_namespacing, run_in_bash);
+	rc = exec_internal(s, cmd, newenv, dtent, 1);
 
 	if(tup_fuse_rm_group(&s->finfo) < 0)
 		return -1;
@@ -610,10 +609,12 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.exited = 0;
 	s.exit_status = 0;
 	s.signalled = 0;
+	s.need_namespacing = 0;
+	s.run_in_bash = 0;
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
 	init_file_info(&s.finfo, 0);
-	if(exec_internal(&s, cmdline, &te, tent, 0, 0, 0) < 0)
+	if(exec_internal(&s, cmdline, &te, tent, 0) < 0)
 		return -1;
 	environ_free(&te);
 

@@ -250,7 +250,7 @@ static int create_process(struct server *s, int dfd, char *cmdline,
 #define BASHSTR "bash -e -o pipefail -c '"
 #define CMDSTR "CMD.EXE /Q /C "
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing, int run_in_bash)
+		struct tup_entry *dtent)
 {
 	int rc = -1;
 	DWORD return_code = 1;
@@ -272,8 +272,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 	int need_sh = 0;
 	int need_cmd = 0;
 	int append_quote = 0;
-
-	if(need_namespacing) {}
 
 	if(initialize_depfile(s, depfile, &h) < 0) {
 		fprintf(stderr, "Error starting update server.\n");
@@ -306,7 +304,7 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 			strchr(cmd, '|') != NULL ||
 			strchr(cmd, '>') != NULL ||
 			strchr(cmd, '<') != NULL;
-		if(run_in_bash) {
+		if(s->run_in_bash) {
 			if(estring_append(&cmdline, BASHSTR, strlen(BASHSTR)) < 0)
 				return -1;
 			append_quote = 1;

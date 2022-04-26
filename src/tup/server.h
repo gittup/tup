@@ -39,6 +39,8 @@ struct server {
 	int exit_sig;
 	int output_fd;
 	int error_fd;
+	int need_namespacing;
+	int run_in_bash;
 	pthread_mutex_t *error_mutex;
 };
 
@@ -67,7 +69,7 @@ int server_post_exit(void);
 int server_init(enum server_mode mode);
 int server_quit(void);
 int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newenv,
-		struct tup_entry *dtent, int need_namespacing, int run_in_bash);
+		struct tup_entry *dtent);
 int server_postexec(struct server *s);
 int server_unlink(void);
 int server_is_dead(void);
