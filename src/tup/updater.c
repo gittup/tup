@@ -767,6 +767,7 @@ static int initialize_server_struct(struct server *s, struct tup_entry *tent)
 	s->error_mutex = &display_mutex;
 	s->need_namespacing = 0;
 	s->run_in_bash = 0;
+	s->streaming_mode = 0;
 	if(init_file_info(&s->finfo, server_unlink()) < 0)
 		return -1;
 
@@ -2888,6 +2889,7 @@ static int update(struct node *n)
 	int run_in_bash = 0;
 	int use_server = 0;
 	int remove_transients = 0;
+	int streaming_mode = 0;
 	int is_variant;
 
 	timespan_start(&ts);
@@ -2909,6 +2911,9 @@ static int update(struct node *n)
 					break;
 				case 't':
 					remove_transients = 1;
+					break;
+				case 's':
+					streaming_mode = 1;
 					break;
 				default:
 					pthread_mutex_lock(&display_mutex);
@@ -2956,6 +2961,7 @@ static int update(struct node *n)
 		rc = initialize_server_struct(&s, n->tent);
 		s.need_namespacing = need_namespacing;
 		s.run_in_bash = run_in_bash;
+		s.streaming_mode = streaming_mode;
 	}
 	if(rc == 0)
 		rc = tup_db_get_environ(&s.finfo.sticky_root, &s.finfo.normal_root, &newenv);

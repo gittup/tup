@@ -1,4 +1,4 @@
-.TH "tup" "1" "2021/10/25" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2022/04/26" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -485,6 +485,11 @@ The 'j' flag marks the command for export in the 'tup compiledb' command. If you
 .TP
 .B o
 The 'o' flag causes the command to compare the new outputs against the outputs from the previous run. Any outputs that are the same will not cause dependent commands in the DAG to be executed. For example, adding this flag to a compilation command will skip the linking step if the object file is the same from the last time it ran. The 'o' flag is incompatible with the 't' flag.
+.TP
+.B s
+The 's' flag disables buffering of stdout/stderr for the subprocesses and enables "streaming mode". When streaming, stdout/stderr are inherited from the tup process, so messages would typically be displayed on the terminal while the subprocess is running in whatever order they are generated. Note that processes with 's' enabled may display messages interleaved with each other, as well as with tup's progress bar or other tup messages. This flag may be useful for long-running processes where you wish to see the output as it occurs, though it can make for confusing logs if it is used for many noisy commands that may run in parallel.
+
+By default, tup will buffer a command's messages (for example, compiler warning messages) and display them under the banner for the command after it completes. Messages from separate commands are therefore always distinct and associated with the command that created them.
 .TP
 .B t
 The 't' flag causes the command's outputs to be transient. The outputs may be used as inputs to other commands, but after all dependent commands are executed, the transient outputs will be deleted from the filesystem. This can be used to save space if there are many stages of processing that each produce large outputs, but only the final output needs to be kept. The 't' flag is incompatible with the 'o' flag.

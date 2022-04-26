@@ -273,7 +273,6 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 {
 	int fd;
 	char depfile[PATH_MAX];
-	char buf[64];
 	int status;
 
 	if(dtent) {}
@@ -286,13 +285,20 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 		fprintf(stderr, "tup error: Unable to create dependency file for the sub-process.\n");
 		return -1;
 	}
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
-	s->output_fd = open(buf, O_CREAT | O_RDWR | O_CLOEXEC | O_TRUNC, 0600);
-	if(s->output_fd < 0) {
-		perror(buf);
-		return -1;
+	int output_fd;
+	if(!s->streaming_mode) {
+		char buf[64];
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+		s->output_fd = open(buf, O_CREAT | O_RDWR | O_CLOEXEC | O_TRUNC, 0600);
+		if(s->output_fd < 0) {
+			perror(buf);
+			return -1;
+		}
+		output_fd = s->output_fd;
+	} else {
+		output_fd = STDOUT_FILENO;
 	}
-	if(run_subprocess(s->output_fd, dfd, cmd, depfile, newenv, s->run_in_bash, &status) < 0) {
+	if(run_subprocess(output_fd, dfd, cmd, depfile, newenv, s->run_in_bash, &status) < 0) {
 		close(fd);
 		return -1;
 	}
@@ -325,15 +331,17 @@ int server_exec(struct server *s, int dfd, const char *cmd, struct tup_env *newe
 
 int server_postexec(struct server *s)
 {
-	char buf[64];
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
-	buf[sizeof(buf)-1] = 0;
-	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
-		server_lock(s);
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
-		server_unlock(s);
-		return -1;
+	if(!s->streaming_mode) {
+		char buf[64];
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
+		buf[sizeof(buf)-1] = 0;
+		if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+			server_lock(s);
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
+			server_unlock(s);
+			return -1;
+		}
 	}
 	return 0;
 }

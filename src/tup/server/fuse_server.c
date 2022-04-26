@@ -465,7 +465,6 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 			 struct tup_entry *dtent, int single_output)
 {
 	int status;
-	char buf[64];
 	char job[JOB_MAX];
 	char dir[PATH_MAX];
 	struct execmsg em;
@@ -476,6 +475,7 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	em.single_output = single_output;
 	em.need_namespacing = s->need_namespacing;
 	em.run_in_bash = s->run_in_bash;
+	em.streaming_mode = s->streaming_mode;
 	em.envlen = newenv->block_size;
 	em.num_env_entries = newenv->num_entries;
 	em.joblen = snprintf(job, sizeof(job), TUP_MNT "/" TUP_JOB "%i", s->id) + 1;
@@ -508,41 +508,44 @@ static int exec_internal(struct server *s, const char *cmd, struct tup_env *newe
 	if(finfo_wait_open_count(s) < 0)
 		return -1;
 
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
-	buf[sizeof(buf)-1] = 0;
-	s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
-	if(s->output_fd < 0) {
-		server_lock(s);
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
-		server_unlock(s);
-		return -1;
-	}
-	if(unlinkat(tup_top_fd(), buf, 0) < 0) {
-		server_lock(s);
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
-		server_unlock(s);
-		return -1;
-	}
-
-	if(!single_output) {
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
+	if(!s->streaming_mode) {
+		char buf[64];
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", s->id);
 		buf[sizeof(buf)-1] = 0;
-		s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
-		if(s->error_fd < 0) {
+		s->output_fd = openat(tup_top_fd(), buf, O_RDONLY);
+		if(s->output_fd < 0) {
 			server_lock(s);
 			perror(buf);
-			fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+			fprintf(stderr, "tup error: Unable to open sub-process output file.\n");
 			server_unlock(s);
 			return -1;
 		}
 		if(unlinkat(tup_top_fd(), buf, 0) < 0) {
 			server_lock(s);
 			perror(buf);
-			fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
+			fprintf(stderr, "tup error: Unable to unlink sub-process output file.\n");
 			server_unlock(s);
 			return -1;
+		}
+
+		if(!single_output) {
+			snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", s->id);
+			buf[sizeof(buf)-1] = 0;
+			s->error_fd = openat(tup_top_fd(), buf, O_RDWR);
+			if(s->error_fd < 0) {
+				server_lock(s);
+				perror(buf);
+				fprintf(stderr, "tup error: Unable to open sub-process errors file.\n");
+				server_unlock(s);
+				return -1;
+			}
+			if(unlinkat(tup_top_fd(), buf, 0) < 0) {
+				server_lock(s);
+				perror(buf);
+				fprintf(stderr, "tup error: Unable to unlink sub-process errors file.\n");
+				server_unlock(s);
+				return -1;
+			}
 		}
 	}
 
@@ -611,6 +614,7 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.signalled = 0;
 	s.need_namespacing = 0;
 	s.run_in_bash = 0;
+	s.streaming_mode = 0;
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
 	init_file_info(&s.finfo, 0);

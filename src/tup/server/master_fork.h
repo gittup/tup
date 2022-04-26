@@ -35,6 +35,7 @@ struct execmsg {
 	int single_output;
 	int need_namespacing;
 	int run_in_bash;
+	int streaming_mode;
 };
 
 #define JOB_MAX 64

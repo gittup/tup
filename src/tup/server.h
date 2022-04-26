@@ -41,6 +41,7 @@ struct server {
 	int error_fd;
 	int need_namespacing;
 	int run_in_bash;
+	int streaming_mode;
 	pthread_mutex_t *error_mutex;
 };
 

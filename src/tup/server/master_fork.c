@@ -228,7 +228,7 @@ read_rc_again:
 int server_post_exit(void)
 {
 	int status;
-	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct execmsg em = {-1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	if(!inited)
 		return 0;
@@ -337,65 +337,67 @@ static int read_all_internal(int sd, void *dest, int size, int line)
 	return 0;
 }
 
-static int setup_subprocess(int sid, const char *job, const char *dir,
-			    const char *dev, const char *proc, int single_output,
-			    int need_namespacing)
+static int setup_subprocess(struct execmsg *em, const char *job, const char *dir,
+			    const char *dev, const char *proc)
 {
-	int ofd, efd;
-	char buf[64];
 	int do_chroot;
 
-	snprintf(buf, sizeof(buf), ".tup/tmp/output-%i", sid);
-	buf[sizeof(buf)-1] = 0;
-	ofd = creat(buf, 0600);
-	if(ofd < 0) {
-		perror(buf);
-		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-		return -1;
-	}
-	if(fchown(ofd, getuid(), getgid()) < 0) {
-		perror("fchown");
-		fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
-		return -1;
+	if(!em->streaming_mode) {
+		int ofd, efd;
+		char buf[64];
+		snprintf(buf, sizeof(buf), ".tup/tmp/output-%lli", em->sid);
+		buf[sizeof(buf)-1] = 0;
+		ofd = creat(buf, 0600);
+		if(ofd < 0) {
+			perror(buf);
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+			return -1;
+		}
+		if(fchown(ofd, getuid(), getgid()) < 0) {
+			perror("fchown");
+			fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+			return -1;
+		}
+
+		if(em->single_output) {
+			efd = ofd;
+		} else {
+			snprintf(buf, sizeof(buf), ".tup/tmp/errors-%lli", em->sid);
+			buf[sizeof(buf)-1] = 0;
+			efd = creat(buf, 0600);
+			if(efd < 0) {
+				perror(buf);
+				fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+				return -1;
+			}
+			if(fchown(efd, getuid(), getgid()) < 0) {
+				perror("fchown");
+				fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+				return -1;
+			}
+		}
+		if(dup2(ofd, STDOUT_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+			return -1;
+		}
+		if(dup2(efd, STDERR_FILENO) < 0) {
+			perror("dup2");
+			fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
+			return -1;
+		}
+		if(close(ofd) < 0) {
+			perror("close(ofd)");
+			return -1;
+		}
+		if(!em->single_output) {
+			if(close(efd) < 0) {
+				perror("close(efd)");
+				return -1;
+			}
+		}
 	}
 
-	if(single_output) {
-		efd = ofd;
-	} else {
-		snprintf(buf, sizeof(buf), ".tup/tmp/errors-%i", sid);
-		buf[sizeof(buf)-1] = 0;
-		efd = creat(buf, 0600);
-		if(efd < 0) {
-			perror(buf);
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			return -1;
-		}
-		if(fchown(efd, getuid(), getgid()) < 0) {
-			perror("fchown");
-			fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
-			return -1;
-		}
-	}
-	if(dup2(ofd, STDOUT_FILENO) < 0) {
-		perror("dup2");
-		fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
-		return -1;
-	}
-	if(dup2(efd, STDERR_FILENO) < 0) {
-		perror("dup2");
-		fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
-		return -1;
-	}
-	if(close(ofd) < 0) {
-		perror("close(ofd)");
-		return -1;
-	}
-	if(!single_output) {
-		if(close(efd) < 0) {
-			perror("close(efd)");
-			return -1;
-		}
-	}
 #ifdef __linux__
 	if(use_namespacing) {
 		if(unshare(CLONE_NEWNS) < 0) {
@@ -414,7 +416,7 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	}
 #endif
 
-	if(need_namespacing && !use_namespacing && !privileged) {
+	if(em->need_namespacing && !use_namespacing && !privileged) {
 		fprintf(stderr, "tup error: This process requires namespacing, but this kernel does not support namespacing and tup is not privileged. You'll need to upgrade your kernel, or compile tup with CONFIG_TUP_SUDO_SUID=y in order to support the ^c flag.\n");
 		return -1;
 	}
@@ -422,7 +424,7 @@ static int setup_subprocess(int sid, const char *job, const char *dir,
 	do_chroot = 0;
 	if(full_deps) {
 		do_chroot = 1;
-	} else if(need_namespacing && privileged && !use_namespacing) {
+	} else if(em->need_namespacing && privileged && !use_namespacing) {
 		do_chroot = 1;
 	}
 
@@ -683,7 +685,7 @@ static int master_fork_loop(void)
 			curp++;
 			*curp = NULL;
 
-			if(setup_subprocess(em.sid, job, dir, waiter->dev, waiter->proc, em.single_output, em.need_namespacing) < 0)
+			if(setup_subprocess(&em, job, dir, waiter->dev, waiter->proc) < 0)
 				exit(1);
 
 			if(em.run_in_bash) {
