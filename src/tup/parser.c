@@ -2038,7 +2038,7 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			return -1;
 	} else {
 		if(input_pattern[0]) {
-			fprintf(tf->f, "tup error: bang rules can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
+			fprintf(tf->f, "tup error: !-macros can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
 			return -1;
 		}
 	}
