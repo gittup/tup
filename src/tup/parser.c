@@ -107,7 +107,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 			       char **o_bin);
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
-			       struct name_list *order_only_inputs,
+			       struct path_list_head *order_only_input_paths,
 			       struct bin_head *bl,
 			       int is_variant_copy);
 static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
@@ -115,11 +115,11 @@ static int parse_output_pattern(struct tupfile *tf, char *output_pattern,
 				struct path_list_head *extra_outputs);
 static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		   const char *ext, int extlen, struct name_list *output_nl);
-static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl,
-			       int is_variant_copy);
+static int path_list_to_nl(struct tupfile *tf, struct path_list_head *plist,
+			   struct name_list *nl, struct name_list *input_nl,
+			   int is_variant_copy);
 static int get_path_list(struct tupfile *tf, const char *p, struct path_list_head *plist, struct bin_head *bl);
-static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int expand_nodes);
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, struct name_list *input_nl, int expand_nodes);
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs);
 static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struct path_list_head *src);
 static int nl_add_path(struct tupfile *tf, struct path_list *pl,
@@ -927,7 +927,7 @@ static int preload(struct tupfile *tf, char *cmdline)
 	TAILQ_INIT(&plist);
 	if(get_path_list(tf, cmdline, &plist, NULL) < 0)
 		return -1;
-	if(eval_path_list(tf, &plist, EXPAND_NODES) < 0)
+	if(eval_path_list(tf, &plist, NULL, EXPAND_NODES) < 0)
 		return -1;
 
 	/* get_path_list() leaves us with the last path uncompleted (since it
@@ -1461,6 +1461,7 @@ void init_rule(struct rule *r)
 	init_name_list(&r->inputs);
 	init_name_list(&r->order_only_inputs);
 	init_name_list(&r->bang_oo_inputs);
+	TAILQ_INIT(&r->order_only_input_paths);
 	TAILQ_INIT(&r->outputs);
 	TAILQ_INIT(&r->extra_outputs);
 	TAILQ_INIT(&r->bang_extra_outputs);
@@ -1507,7 +1508,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno)
 	}
 	if(strcmp(cmd, "!tup_preserve") == 0)
 		is_variant_copy = 1;
-	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_inputs, &tf->bin_list, is_variant_copy) < 0)
+	if(parse_input_pattern(tf, input, &r.inputs, &r.order_only_input_paths, &tf->bin_list, is_variant_copy) < 0)
 		return -1;
 
 	r.command = cmd;
@@ -1530,6 +1531,7 @@ static int parse_rule(struct tupfile *tf, char *p, int lno)
 	init_name_list(&output_nl);
 	rc = execute_rule(tf, &r, &output_nl);
 	delete_name_list(&output_nl);
+	free_path_list(&r.order_only_input_paths);
 	free_path_list(&r.outputs);
 	free_path_list(&r.extra_outputs);
 	free_path_list(&r.bang_extra_outputs);
@@ -1659,6 +1661,14 @@ static int parse_bang_definition(struct tupfile *tf, char *p, int lno)
 		if(strncmp(input, "foreach", 7) == 0) {
 			foreach = 1;
 			input += 7;
+			while(isspace(*input)) input++;
+		}
+		if(input[0]) {
+			if(input[0] != '|') {
+				fprintf(tf->f, "tup error: !-macros can't have normal inputs, only order-only inputs. Pattern was: %s\n", input);
+				return -1;
+			}
+			input++;
 			while(isspace(*input)) input++;
 		}
 	}
@@ -1813,21 +1823,13 @@ static int parse_bang_rule_internal(struct tupfile *tf, struct rule *r,
 
 	/* Add any order only inputs to the list */
 	if(br->input) {
-		char *tinput;
-		if(nl) {
-			tinput = tup_printf(tf, br->input, -1, nl, NULL, NULL, NULL, 0, NULL);
-			if(!tinput)
-				return -1;
-		} else {
-			tinput = strdup(br->input);
-			if(!tinput) {
-				perror("strdup");
-				return -1;
-			}
-		}
-		if(parse_input_pattern(tf, tinput, NULL, &r->bang_oo_inputs, NULL, 0) < 0)
+		struct path_list_head head;
+		TAILQ_INIT(&head);
+		if(get_path_list(tf, br->input, &head, NULL) < 0)
 			return -1;
-		free(tinput);
+		if(path_list_to_nl(tf, &head, &r->bang_oo_inputs, nl, 0) < 0)
+			return -1;
+		free_path_list(&head);
 	}
 
 	/* The command gets replaced whole-sale */
@@ -2008,7 +2010,7 @@ static int split_input_pattern(struct tupfile *tf, char *p, char **o_input,
 
 static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			       struct name_list *inputs,
-			       struct name_list *order_only_inputs,
+			       struct path_list_head *order_only_input_paths,
 			       struct bin_head *bl,
 			       int is_variant_copy)
 {
@@ -2030,17 +2032,20 @@ static int parse_input_pattern(struct tupfile *tf, char *input_pattern,
 			*oosep = 0;
 			oosep++;
 		}
-		if(input_pattern_to_nl(tf, oosep, order_only_inputs, bl, is_variant_copy) < 0)
-			return -1;
+		if(order_only_input_paths) {
+			if(get_path_list(tf, oosep, order_only_input_paths, bl) < 0)
+				return -1;
+		}
 	}
 	if(inputs) {
-		if(input_pattern_to_nl(tf, input_pattern, inputs, bl, is_variant_copy) < 0)
+		struct path_list_head plist;
+
+		TAILQ_INIT(&plist);
+		if(get_path_list(tf, input_pattern, &plist, bl) < 0)
 			return -1;
-	} else {
-		if(input_pattern[0]) {
-			fprintf(tf->f, "tup error: !-macros can't have normal inputs, only order-only inputs. Pattern was: %s\n", input_pattern);
+		if(path_list_to_nl(tf, &plist, inputs, NULL, is_variant_copy) < 0)
 			return -1;
-		}
+		free_path_list(&plist);
 	}
 	return 0;
 }
@@ -2173,6 +2178,14 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 				if(parse_bang_rule(tf, r, &tmp_nl, ext, ext ? strlen(ext) : 0) < 0)
 					return -1;
 			}
+			struct path_list_head tmp_oo_inputs;
+			TAILQ_INIT(&tmp_oo_inputs);
+			if(copy_path_list(tf, &tmp_oo_inputs, &r->order_only_input_paths) < 0)
+				return -1;
+			if(path_list_to_nl(tf, &tmp_oo_inputs, &r->order_only_inputs, &tmp_nl, 0) < 0)
+				return -1;
+			free_path_list(&tmp_oo_inputs);
+
 			if(do_rule(tf, r, &tmp_nl, ext, extlen, output_nl) < 0)
 				return -1;
 
@@ -2188,6 +2201,7 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 				delete_name_list(&r->bang_oo_inputs);
 			}
 
+			delete_name_list(&r->order_only_inputs);
 			delete_name_list_entry(&r->inputs, nle);
 		}
 	} else {
@@ -2205,6 +2219,8 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 		 * empty, we won't try to execute do_rule(). But an empty user
 		 * string implies that no input is required.
 		 */
+		if(path_list_to_nl(tf, &r->order_only_input_paths, &r->order_only_inputs, &r->inputs, 0) < 0)
+			return -1;
 		if((r->inputs.num_entries > 0 || r->empty_input)) {
 			if(is_bang) {
 				if(parse_bang_rule(tf, r, NULL, NULL, 0) < 0)
@@ -2234,30 +2250,24 @@ int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl
 				}
 			}
 		}
+		delete_name_list(&r->order_only_inputs);
 	}
 
-	delete_name_list(&r->order_only_inputs);
 	delete_name_list(&r->bang_oo_inputs);
 
 	return 0;
 }
 
-static int input_pattern_to_nl(struct tupfile *tf, char *p,
-			       struct name_list *nl, struct bin_head *bl,
-			       int is_variant_copy)
+static int path_list_to_nl(struct tupfile *tf, struct path_list_head *plist,
+			   struct name_list *nl, struct name_list *input_nl,
+			   int is_variant_copy)
 {
-	struct path_list_head plist;
-
-	TAILQ_INIT(&plist);
-	if(get_path_list(tf, p, &plist, bl) < 0)
+	if(eval_path_list(tf, plist, input_nl, EXPAND_NODES_SRC) < 0)
 		return -1;
-	if(eval_path_list(tf, &plist, EXPAND_NODES_SRC) < 0)
+	if(parse_dependent_tupfiles(plist, tf) < 0)
 		return -1;
-	if(parse_dependent_tupfiles(&plist, tf) < 0)
+	if(get_name_list(tf, plist, nl, is_variant_copy) < 0)
 		return -1;
-	if(get_name_list(tf, &plist, nl, is_variant_copy) < 0)
-		return -1;
-	free_path_list(&plist);
 	return 0;
 }
 
@@ -2306,6 +2316,7 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 			fprintf(tf->f, "tup error: Unable to find bin '%s'\n", p+1);
 			return NULL;
 		}
+		*endb = '}';
 	} else if(p[0] == '^') {
 		/* Exclusion */
 		const char *error;
@@ -2394,7 +2405,7 @@ static int get_path_list(struct tupfile *tf, const char *p, struct path_list_hea
 	return 0;
 }
 
-static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int expand_nodes)
+static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, struct name_list *input_nl, int expand_nodes)
 {
 	struct path_list *pl;
 	struct path_list *tmp;
@@ -2404,10 +2415,20 @@ static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, int 
 		int spc_index;
 		int last_entry = 0;
 		char *p;
+		char *tinput;
 
-		eval_p = eval(tf, pl->mem, expand_nodes);
+		if(input_nl) {
+			tinput = tup_printf(tf, pl->mem, -1, input_nl, NULL, NULL, NULL, 0, NULL);
+			if(!tinput)
+				return -1;
+		} else {
+			tinput = pl->mem;
+		}
+		eval_p = eval(tf, tinput, expand_nodes);
 		if(!eval_p)
 			return -1;
+		if(input_nl)
+			free(tinput);
 
 		if(strcmp(eval_p, pl->mem) != 0) {
 			p = eval_p;
@@ -2505,7 +2526,7 @@ static int copy_path_list(struct tupfile *tf, struct path_list_head *dest, struc
 	TAILQ_FOREACH(pl, src, list) {
 		struct path_list *newpl;
 
-		newpl = new_pl(tf, pl->mem, -1, NULL, pl->orderid);
+		newpl = new_pl(tf, pl->mem, -1, &tf->bin_list, pl->orderid);
 		if(!newpl)
 			return -1;
 		TAILQ_INSERT_TAIL(dest, newpl, list);
@@ -3203,7 +3224,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 	}
 
 	/* Then eval the list so all $-variables are expanded */
-	if(eval_path_list(tf, &tmplist, EXPAND_NODES_SRC) < 0)
+	if(eval_path_list(tf, &tmplist, NULL, EXPAND_NODES_SRC) < 0)
 		return -1;
 
 	/* Use tup_printf again in case $-variables reference %-flags.

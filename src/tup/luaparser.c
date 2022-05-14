@@ -218,7 +218,6 @@ static int tuplua_function_definerule(lua_State *ls)
 	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
 	struct rule r;
 	struct path_list_head input_path_list;
-	struct path_list_head extra_input_path_list;
 	struct name_list return_nl;
 	struct name_list_entry *nle;
 	size_t command_len = 0;
@@ -233,10 +232,9 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "This function must be passed a table containing parameters");
 
 	TAILQ_INIT(&input_path_list);
-	TAILQ_INIT(&extra_input_path_list);
 	if(tuplua_table_to_path_list(ls, "inputs", tf, &input_path_list, EXPAND_NODES_SRC) < 0)
 		return luaL_error(ls, "Error while parsing 'inputs'.");
-	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &extra_input_path_list, EXPAND_NODES_SRC) < 0)
+	if(tuplua_table_to_path_list(ls, "extra_inputs", tf, &r.order_only_input_paths, EXPAND_NODES_SRC) < 0)
 		return luaL_error(ls, "Error while parsing 'extra_inputs'.");
 	if(tuplua_table_to_path_list(ls, "outputs", tf, &r.outputs, EXPAND_NODES_SRC) < 0)
 		return luaL_error(ls, "Error while parsing 'outputs'.");
@@ -262,10 +260,6 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "Error while parsing dependent Tupfiles");
 	if(get_name_list(tf, &input_path_list, &r.inputs, is_variant_copy) < 0)
 		return luaL_error(ls, "Error parsing input list");
-	if(parse_dependent_tupfiles(&extra_input_path_list, tf) < 0)
-		return luaL_error(ls, "Error while parsing dependent Tupfiles");
-	if(get_name_list(tf, &extra_input_path_list, &r.order_only_inputs, 0) < 0)
-		return luaL_error(ls, "Error parsing extra input list");
 
 	if(TAILQ_EMPTY(&input_path_list))
 		r.empty_input = 1;
@@ -277,7 +271,6 @@ static int tuplua_function_definerule(lua_State *ls)
 		return luaL_error(ls, "Failed to execute rule.");
 
 	free_path_list(&input_path_list);
-	free_path_list(&extra_input_path_list);
 
 	lua_newtable(ls);
 	TAILQ_FOREACH(nle, &return_nl.entries, list) {
@@ -291,10 +284,10 @@ static int tuplua_function_definerule(lua_State *ls)
 		count++;
 		free(e.s);
 	}
+	free_path_list(&r.order_only_input_paths);
 	free_path_list(&r.outputs);
 	free_path_list(&r.extra_outputs);
 	delete_name_list(&return_nl);
-	delete_name_list(&r.order_only_inputs);
 
 	return 1;
 }

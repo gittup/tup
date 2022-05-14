@@ -143,6 +143,7 @@ struct rule {
 	struct name_list inputs;
 	struct name_list order_only_inputs;
 	struct name_list bang_oo_inputs;
+	struct path_list_head order_only_input_paths;
 	struct path_list_head outputs;
 	struct path_list_head extra_outputs;
 	struct path_list_head bang_extra_outputs;
