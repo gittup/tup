@@ -21,7 +21,7 @@ int main(void)
 </pre>
 
 <span class="fileheader">Tupfile.lua</span>
-<pre class="code">tup.definerule{ inputs = {'hello.c'}, command = 'gcc hello.c -o hello', outputs = {'hello'} }</pre>
+<pre class="code">tup.definerule{ inputs = {'hello.c'}, command = 'gcc %f -o %o', outputs = {'hello'} }</pre>
 
 <p>Now, everything is prepared to compile.  The current directory structure looks like this:</p>
 
@@ -69,7 +69,7 @@ int main(void)
 <p>Replace the rules file with this new one:</p>
 <span class="fileheader">Tupfile.lua</span>
 <pre class="code">function compile(source, output)
-	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+	tup.definerule{ inputs = {source}, command = 'gcc %f -o %o', outputs = {output} }
 end
 
 compile('hello.c', 'hello')
@@ -124,7 +124,7 @@ Goodbye, world!
 
 <span class="fileheader">Tuprules.lua</span>
 <pre class="code">function compile(source, output)
-	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+	tup.definerule{ inputs = {source}, command = 'gcc %f -o %o', outputs = {output} }
 end
 </pre>
 
@@ -151,7 +151,7 @@ compile('goodbye.c', 'goodbye')
 
 <p><span class="filename">Tupfile.lua</span> automatically includes <span class="filename">Tuprules.lua</span> in its current directory and parent directories, so we can access compile in <span class="filename">hello/Tupfile.lua</span> and <span class="filename">goodbye/Tupfile.lua</span>.</p>
 
-<p>Build and test the programs.  You can run <span class="cmd">tup</span> from any location under the root of your project (where the <span class="filename">Tupfile.ini</span/ lives, or where you ran <span class="cmd">tup init</span>), but for the following listing we run everything in the top directory.</p>
+<p>Build and test the programs.  You can run <span class="cmd">tup</span> from any location under the root of your project (where the <span class="filename">Tupfile.ini</span> lives, or where you ran <span class="cmd">tup init</span>), but for the following listing we run everything in the top directory.</p>
 <pre>
 <span class="prompt">$</span> tup
 [ tup ] [0.000s] Scanning filesystem...
@@ -223,7 +223,7 @@ int main(void)
 <span class="fileheader">Tupfile.lua</span>
 <pre class="code">
 function compile(source, output)
-	tup.definerule{ inputs = {source}, command = 'gcc ' .. source .. ' -o ' .. output, outputs = {output} }
+	tup.definerule{ inputs = {source}, command = 'gcc %f -o %o', outputs = {output} }
 end
 
 if tup.getconfig('MODULE1') == 'y' then
@@ -281,7 +281,7 @@ out = tup.frule{inputs = {'hello.c'}, command = 'gcc %f -o %o', outputs = {'%B'}
 out = tup.frule{input = 'hello.c', command = 'gcc %f -o %o', output = '%B'}
 out = tup.rule('hello.c', 'gcc %f -o %o', '%B')
 </pre>
-<p>All of these are equivalent to <span class="cmd">tup.definerule{inputs = {'hello.c'}, command = 'gcc hello.c -o hello', outputs = {'hello'}}</span>.  <span class="cmd">out</span> is <span class="cmd">{'hello'}</span>.</p>
+<p>All of these are equivalent to <span class="cmd">tup.definerule{inputs = {'hello.c'}, command = 'gcc hello.c -o hello', outputs = {'hello'}}</span>.  <span class="cmd">out</span> is <span class="cmd">{'hello'}</span>. Note that using %f/%o is preferred if you intend to use variants.</p>
 
 <hr />
 
@@ -332,7 +332,7 @@ tup.rule(tup.glob('*.c'), 'gcc %f -o %o -L$SDK_PREFIX/lib -lsdklib', {'app'})
 </pre>
 <p>In a directory with the files <span class="filename">file1.c</span> and <span class="filename">file2.c</span>, this is equivalent to:</p>
 <pre class="code">
-tup.definerule{inputs = {'file1.c', 'file2.c'}, command = 'gcc file1.c file2.c -o app -L$SDK_PREFIX -lsdklib', outputs = {'app'}}
+tup.definerule{inputs = {'file1.c', 'file2.c'}, command = 'gcc %f -o %o -L$SDK_PREFIX -lsdklib', outputs = {'app'}}
 </pre>
 <p>Note that <span class="cmd">$SDK_PREFIX</span> is expanded by the shell and is treated the same as any other command substring by Tup.  <span class="cmd">tup.export</span> simply passes the value in the shell that invokes Tup to the shell that Tup invokes.</p>
 
