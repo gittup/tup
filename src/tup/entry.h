@@ -103,6 +103,6 @@ int get_relative_dir(FILE *f, struct estring *e, tupid_t start, tupid_t end);
 int get_relative_dir_sep(FILE *f, struct estring *e, tupid_t start, tupid_t end, char sep);
 int is_transient_tent(struct tup_entry *tent);
 int is_compiledb_tent(struct tup_entry *tent);
-int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match);
+int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, struct tup_entry **match);
 
 #endif

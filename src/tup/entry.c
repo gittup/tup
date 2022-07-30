@@ -787,17 +787,17 @@ int is_compiledb_tent(struct tup_entry *tent)
 	return has_flag(tent, 'j');
 }
 
-int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, int *match)
+int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s, struct tup_entry **match)
 {
 	struct tent_tree *tt;
 	int len = strlen(s);
 
-	*match = 0;
+	*match = NULL;
 	RB_FOREACH(tt, tent_entries, exclusion_root) {
 		int rc;
 		rc = pcre_exec(tt->tent->re, NULL, s, len, 0, 0, NULL, 0);
 		if(rc == 0) {
-			*match = 1;
+			*match = tt->tent;
 			if(do_verbose) {
 				fprintf(f, "tup info: Ignoring file '%s' because it matched the regex '%s'\n", s, tt->tent->name.s);
 			}

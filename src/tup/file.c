@@ -243,7 +243,7 @@ int write_files(FILE *f, tupid_t cmdid, struct file_info *info, int *warnings,
 
 	if(check_only == CHECK_SUCCESS) {
 		while(!TAILQ_EMPTY(&info->tmpdir_list)) {
-			int match = 0;
+			struct tup_entry *match = NULL;
 
 			tmpdir = TAILQ_FIRST(&info->tmpdir_list);
 			if(exclusion_match(f, &info->exclusion_root, tmpdir->dirname, &match) < 0)
@@ -658,11 +658,26 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 		fprintf(f, "tup internal error: create_ignored_file() didn't get a final pel pointer for file: %s\n", w->filename);
 		return -1;
 	}
-	if(tup_entry_add(dt, &dtent) < 0)
+	if(tup_entry_add(dt, &dtent) < 0) {
+		fprintf(f, "tup internal error: Unable to add entry for tupid %lli\n", dt);
 		return -1;
+	}
+	if(tup_db_select_tent_part(dtent, pel->path, pel->len, &tent) < 0) {
+		return -1;
+	}
+	if(tent && tent->type == TUP_NODE_GENERATED) {
+		fprintf(f, "tup error: Unable to exclude a generated file: ");
+		print_tup_entry(f, tent);
+		fprintf(f, "\n");
+		return -1;
+	}
 	tent = tup_db_create_node_part(dtent, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
-	if(!tent)
+	if(!tent) {
+		fprintf(f, "tup internal error: Unable to create node for file '%.*s' relative to directory: ", pel->len, pel->path);
+		print_tup_entry(f, dtent);
+		fprintf(f, "\n");
 		return -1;
+	}
 	free_pel(pel);
 	return 0;
 }
@@ -681,15 +696,19 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		tupid_t newdt;
 		struct path_element *pel = NULL;
 		struct pel_group pg;
-		int match = 0;
+		struct tup_entry *match = NULL;
 
 		w = TAILQ_FIRST(&info->write_list);
 
 		if(exclusion_match(f, &info->exclusion_root, w->filename, &match) < 0)
 			return -1;
 		if(match) {
-			if(create_ignored_file(f, w) < 0)
+			if(create_ignored_file(f, w) < 0) {
+				fprintf(f, "tup error: Failed to create ignored file. The filename '%s' matched an exclusion pattern: ", w->filename);
+				print_tup_entry(f, match);
+				fprintf(f, "\n");
 				return -1;
+			}
 			goto out_skip;
 		}
 
@@ -820,7 +839,7 @@ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
 	struct tent_entries root = TENT_ENTRIES_INITIALIZER;
 
 	while(!TAILQ_EMPTY(&info->read_list)) {
-		int match = 0;
+		struct tup_entry *match = NULL;
 		r = TAILQ_FIRST(&info->read_list);
 
 		if(exclusion_match(f, &info->exclusion_root, r->filename, &match) < 0)

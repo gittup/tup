@@ -1088,7 +1088,7 @@ static int tup_fs_truncate(const char *path, off_t size)
 	struct mapping *map;
 	struct file_info *finfo;
 	const char *peeled;
-	int match = 0;
+	struct tup_entry *match = NULL;
 
 #ifdef FUSE3
 	(void) fi;
@@ -1143,7 +1143,7 @@ static int tup_fs_utimens(const char *path, const struct timespec ts[2])
 	const char *peeled;
 	struct mapping *map;
 	struct file_info *finfo;
-	int match = 0;
+	struct tup_entry *match = NULL;
 
 #ifdef FUSE3
 	(void) fi;
@@ -1236,7 +1236,7 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 			openfile = map->tmpname;
 		} else {
 #ifdef FUSE3
-			int match = 0;
+			struct tup_entry *match = NULL;
 			if(exclusion_match(stderr, &finfo->exclusion_root, path, &match) < 0) {
 				put_finfo(finfo);
 				return -ENOSYS;
