@@ -19,6 +19,11 @@
 # Make sure a sub-process only has the minimum necessary fds open.
 . ./tup.sh
 
+# Later versions of valgrind have a pipe open that this test picks up and
+# erroneously fails.
+unset TUP_HELGRIND
+unset TUP_VALGRIND
+
 if [ ! "$tupos" = "Linux" ]; then
 	echo "Sub-process fds only checked under linux. Skipping test."
 	eotup
