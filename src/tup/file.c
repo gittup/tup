@@ -700,6 +700,17 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 
 		w = TAILQ_FIRST(&info->write_list);
 
+		if(get_path_elements(w->filename, &pg) < 0)
+			return -1;
+		if(pg.pg_flags & PG_HIDDEN) {
+			if(warnings) {
+				fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
+				(*warnings)++;
+			}
+			del_pel_group(&pg);
+			goto out_skip;
+		}
+
 		if(exclusion_match(f, &info->exclusion_root, w->filename, &match) < 0)
 			return -1;
 		if(match) {
@@ -717,17 +728,6 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 			if(r != w && (name_cmp(w->filename, r->filename) == 0)) {
 				del_file_entry(&info->write_list, r);
 			}
-		}
-
-		if(get_path_elements(w->filename, &pg) < 0)
-			return -1;
-		if(pg.pg_flags & PG_HIDDEN) {
-			if(warnings) {
-				fprintf(f, "tup warning: Writing to hidden file '%s'\n", w->filename);
-				(*warnings)++;
-			}
-			del_pel_group(&pg);
-			goto out_skip;
 		}
 
 		tent = NULL;
