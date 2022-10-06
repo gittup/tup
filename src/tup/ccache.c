@@ -26,6 +26,8 @@ int is_ccache_path(const char *path)
 	/* ccache paths */
 	if(strstr(path, "/.ccache") != NULL)
 		return 1;
+	if(strstr(path, "/ccache-tmp/") != NULL)
+		return 1;
 #ifdef _WIN32
 	if(strstr(path, "\\.ccache") != NULL)
 		return 1;
