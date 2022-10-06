@@ -446,7 +446,8 @@ static int ignore_exe(const char *exec)
 	 * Ignore mspdbsrv.exe, since it continues to run in the background.
 	 */
 	if(strcasestr(exec, "tup32detect.exe") != NULL ||
-	   strcasestr(exec, "mspdbsrv.exe") != NULL) {
+	   strcasestr(exec, "mspdbsrv.exe") != NULL ||
+	   strcasestr(exec, "vctip.exe") != NULL) {
 		return 1;
 	}
 	return 0;
@@ -457,7 +458,8 @@ static int ignore_wexe(LPCWSTR exec)
 	if(!exec)
 		return 1;
 	if(wcscasestr(exec, L"tup32detect.exe") != NULL ||
-	   wcscasestr(exec, L"mspdbsrv.exe") != NULL) {
+	   wcscasestr(exec, L"mspdbsrv.exe") != NULL ||
+	   wcscasestr(exec, L"vctip.exe") != NULL) {
 		return 1;
 	   }
 	return 0;
