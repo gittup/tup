@@ -90,7 +90,7 @@ tup.frule = function(arguments)
 		end
 		arguments.outputs = tableize(arguments.outputs)
 	end
-	rc = tup.definerule(arguments)
+	local rc = tup.definerule(arguments)
 	return rc
 end
 
