@@ -60,8 +60,6 @@ struct tup_entry {
 	int displaylen;
 };
 
-LIST_HEAD(tup_entry_head, tup_entry);
-
 int tup_entry_add(tupid_t tupid, struct tup_entry **dest);
 int tup_entry_find_name_in_dir(struct tup_entry *tent, const char *name, int len,
 			       struct tup_entry **dest);

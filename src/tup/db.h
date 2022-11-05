@@ -37,14 +37,12 @@ extern struct timespec INVALID_MTIME;
 extern struct timespec EXTERNAL_DIRECTORY_MTIME;
 
 struct tup_entry;
-struct tup_entry_head;
 struct tup_env;
 struct variant;
 struct mapping_head;
 struct vardb;
 struct var_entry;
 struct tent_entries;
-struct tupid_list_head;
 struct tent_list_head;
 
 /* General operations */

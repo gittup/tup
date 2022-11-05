@@ -27,7 +27,6 @@
 #include <time.h>
 
 struct tup_entry;
-struct tup_entry_head;
 struct path_element;
 struct pel_group;
 
