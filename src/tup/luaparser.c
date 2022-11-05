@@ -823,6 +823,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	struct tuplua_reader_data lrd;
 	struct lua_State *ls = NULL;
 	struct string_entries vars = {NULL};
+	int vars_set = 0;
 
 	lrd.read = 0;
 	lrd.b = b;
@@ -901,9 +902,9 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 		}
 		lua_pop(ls, 1);
 
-
 		if(initial_luadb(ls, &vars) < 0)
 			return -1;
+		vars_set = 1;
 		set_vardb(tf, ls);
 		if(parser_include_rules(tf, "Tuprules.lua") < 0) {
 			if(tf->luaerror == TUPLUA_PENDINGERROR) {
@@ -938,10 +939,12 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	}
 
 	lua_pop(ls, 1);
-	if(add_vardb(tf, ls, &vars) < 0)
-		return -1;
-	tf->vdb.external_vardb = NULL;
-	tf->vdb.external_arg = NULL;
+	if(vars_set) {
+		if(add_vardb(tf, ls, &vars) < 0)
+			return -1;
+		tf->vdb.external_vardb = NULL;
+		tf->vdb.external_arg = NULL;
+	}
 	free_string_tree(&vars);
 	assert(lua_gettop(ls) == 0);
 	return 0;
