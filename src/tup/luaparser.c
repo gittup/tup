@@ -140,7 +140,6 @@ static int tuplua_function_include(lua_State *ls)
 	if(file == NULL)
 		return luaL_error(ls, "Must be passed a filename as an argument.");
 
-	tf->ls = ls;
 	if(parser_include_file(tf, file) < 0) {
 		if (tf->luaerror == TUPLUA_NOERROR) {
 			luaL_where(ls, 1);
