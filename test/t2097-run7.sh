@@ -32,7 +32,7 @@ else:
 	print(" ".join([": |> echo foo", var, "|>"]))
 HERE
 cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B foo.py
+run PYTHONPATH=../.. python3 -B foo.py
 HERE
 update
 

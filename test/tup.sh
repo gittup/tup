@@ -732,22 +732,10 @@ check_tup_suid()
 
 check_python()
 {
-	if ! which python > /dev/null 2>&1; then
-		echo "[33mNo python found - skipping test.[0m"
+	if ! which python3 > /dev/null 2>&1; then
+		echo "[33mNo python3 found - skipping test.[0m"
 		eotup
 	fi
-	# Need 2.6 for the -B flag
-	cat > tmpversioncheck.py << HERE
-import sys
-if sys.version_info < (2, 6):
-    sys.exit(1)
-sys.exit(0)
-HERE
-	if ! python tmpversioncheck.py; then
-		echo "[33mPython < version 2.6 found - skipping test.[0m"
-		eotup
-	fi
-	rm tmpversioncheck.py
 }
 
 check_bash()

@@ -34,7 +34,7 @@ if tup_client.config_var('BAZ') is not None:
 	raise Exception("No: BAZ")
 HERE
 cat > Tupfile << HERE
-run PYTHONPATH=../.. python -B \$(TUP_CWD)/foo.py
+run PYTHONPATH=../.. python3 -B \$(TUP_CWD)/foo.py
 HERE
 update
 
