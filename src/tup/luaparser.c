@@ -122,16 +122,15 @@ static const char *tuplua_reader(struct lua_State *ls, void *data, size_t *size)
 	return lrd->b->s;
 }
 
-static void tuplua_register_function(struct lua_State *ls, const char *name, lua_CFunction function, void *data)
+static void tuplua_register_function(struct lua_State *ls, const char *name, lua_CFunction function)
 {
-	lua_pushlightuserdata(ls, data);
-	lua_pushcclosure(ls, function, 1);
+	lua_pushcfunction(ls, function);
 	lua_setfield(ls, 1, name);
 }
 
 static int tuplua_function_include(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	char *file = NULL;
 
 	file = tuplua_strdup(ls, -1);
@@ -214,7 +213,7 @@ static char *tuplua_table_tostring(lua_State *ls)
 
 static int tuplua_function_definerule(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	struct rule r;
 	struct path_list_head input_path_list;
 	struct name_list return_nl;
@@ -309,7 +308,7 @@ static int tuplua_function_append_table(lua_State *ls)
 
 static int tuplua_function_getcwd(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	struct estring e;
 
 	lua_settop(ls, 0);
@@ -331,7 +330,7 @@ static int tuplua_function_getcwd(lua_State *ls)
 
 static int tuplua_function_getvariantdir(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	struct estring e;
 
 	lua_settop(ls, 0);
@@ -351,7 +350,8 @@ static int tuplua_function_getvariantdir(lua_State *ls)
 
 static int tuplua_function_getdirectory(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
+	fprintf(tf->f, "OHAI: Getcwd: %s\n", tf->curtent->name.s);
 
 	if(tf->tent->tnode.tupid == DOT_DT) {
 		/* At the top of the tup-hierarchy, we get the
@@ -381,7 +381,7 @@ static int tuplua_function_getdirectory(lua_State *ls)
 
 static int tuplua_function_getrelativedir(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *dirname;
 	tupid_t dest;
 	struct estring e;
@@ -404,7 +404,7 @@ static int tuplua_function_getrelativedir(lua_State *ls)
 
 static int tuplua_function_getconfig(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *name = NULL;
 	size_t name_size = 0;
 	struct tup_entry *tent = NULL;
@@ -458,7 +458,7 @@ static int tuplua_glob_callback(void *arg, struct tup_entry *tent)
 
 static int tuplua_function_glob(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *pattern = NULL;
 	struct path_list_head plist;
 	struct path_list *pl;
@@ -534,7 +534,7 @@ static int tuplua_function_glob(lua_State *ls)
 
 static int tuplua_function_export(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *name = NULL;
 
 	name = tuplua_tostring(ls, -1);
@@ -549,7 +549,7 @@ static int tuplua_function_export(lua_State *ls)
 
 static int tuplua_function_import(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *name = NULL;
 	const char *var = NULL;
 	const char *val = NULL;
@@ -571,14 +571,15 @@ static int tuplua_function_import(lua_State *ls)
 
 static int tuplua_function_creategitignore(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	if(ls) {/* unused */}
+	struct tupfile *tf = top_tupfile();
 	tf->ign = 1;
 	return 0;
 }
 
 static int tuplua_function_handle_fileread(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *filename;
 	const char *mode;
 
@@ -629,7 +630,7 @@ static int tuplua_function_unchdir(lua_State *ls)
 
 static int tuplua_function_run(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	const char *cmdline;
 
 	cmdline = tuplua_tostring(ls, 1);
@@ -644,7 +645,7 @@ static int tuplua_function_run(lua_State *ls)
 
 static int tuplua_function_nodevariable(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 
 	lua_settop(ls, 1);
 
@@ -675,7 +676,7 @@ static int tuplua_function_nodevariable(lua_State *ls)
 	// TODO To guard from users confusing userdata items, allocate extra space and add a type identifier at the beginning (plus a magic number?).
 	void *stackid = lua_newuserdata(ls, sizeof(tent->tnode.tupid));
 	memcpy(stackid, &tent->tnode.tupid, sizeof(tent->tnode.tupid));
-	lua_pushvalue(ls, lua_upvalueindex(2));
+	lua_pushvalue(ls, lua_upvalueindex(1));
 	lua_setmetatable(ls, 1);
 
 	return 1;
@@ -683,7 +684,7 @@ static int tuplua_function_nodevariable(lua_State *ls)
 
 static int tuplua_function_nodevariable_tostring(lua_State *ls)
 {
-	struct tupfile *tf = lua_touserdata(ls, lua_upvalueindex(1));
+	struct tupfile *tf = top_tupfile();
 	int rc = -1;
 	void *stackid;
 	tupid_t tid;
@@ -838,31 +839,28 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 
 		/* Register tup interaction functions in the "tup" table in Lua */
 		lua_newtable(ls);
-		tuplua_register_function(ls, "include", tuplua_function_include, tf);
-		tuplua_register_function(ls, "definerule", tuplua_function_definerule, tf);
-		tuplua_register_function(ls, "append_table", tuplua_function_append_table, tf);
-		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd, tf);
-		tuplua_register_function(ls, "getvariantdir", tuplua_function_getvariantdir, tf);
-		tuplua_register_function(ls, "getdirectory", tuplua_function_getdirectory, tf);
-		tuplua_register_function(ls, "getrelativedir", tuplua_function_getrelativedir, tf);
-		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig, tf);
-		tuplua_register_function(ls, "glob", tuplua_function_glob, tf);
-		tuplua_register_function(ls, "export", tuplua_function_export, tf);
-		tuplua_register_function(ls, "import", tuplua_function_import, tf);
-		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore, tf);
-		tuplua_register_function(ls, "handle_fileread", tuplua_function_handle_fileread, tf);
-		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir, tf);
-		tuplua_register_function(ls, "run", tuplua_function_run, tf);
+		tuplua_register_function(ls, "include", tuplua_function_include);
+		tuplua_register_function(ls, "definerule", tuplua_function_definerule);
+		tuplua_register_function(ls, "append_table", tuplua_function_append_table);
+		tuplua_register_function(ls, "getcwd", tuplua_function_getcwd);
+		tuplua_register_function(ls, "getvariantdir", tuplua_function_getvariantdir);
+		tuplua_register_function(ls, "getdirectory", tuplua_function_getdirectory);
+		tuplua_register_function(ls, "getrelativedir", tuplua_function_getrelativedir);
+		tuplua_register_function(ls, "getconfig", tuplua_function_getconfig);
+		tuplua_register_function(ls, "glob", tuplua_function_glob);
+		tuplua_register_function(ls, "export", tuplua_function_export);
+		tuplua_register_function(ls, "import", tuplua_function_import);
+		tuplua_register_function(ls, "creategitignore", tuplua_function_creategitignore);
+		tuplua_register_function(ls, "handle_fileread", tuplua_function_handle_fileread);
+		tuplua_register_function(ls, "unchdir", tuplua_function_unchdir);
+		tuplua_register_function(ls, "run", tuplua_function_run);
 
-		lua_pushlightuserdata(ls, tf);
 		lua_newtable(ls);
-		lua_pushlightuserdata(ls, tf);
-		lua_pushcclosure(ls, tuplua_function_nodevariable_tostring, 1);
+		lua_pushcfunction(ls, tuplua_function_nodevariable_tostring);
 		lua_setfield(ls, -2, "__tostring");
-		lua_pushlightuserdata(ls, tf);
-		lua_pushcclosure(ls, tuplua_function_concat, 1);
+		lua_pushcfunction(ls, tuplua_function_concat);
 		lua_setfield(ls, -2, "__concat");
-		lua_pushcclosure(ls, tuplua_function_nodevariable, 2);
+		lua_pushcclosure(ls, tuplua_function_nodevariable, 1);
 		lua_setfield(ls, 1, "nodevariable");
 
 		lua_setglobal(ls, "tup");

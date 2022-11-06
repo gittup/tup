@@ -71,7 +71,11 @@ struct tupfile {
 	int luaerror;
 	int use_server;
 	int full_deps;
+
+	SLIST_ENTRY(tupfile) list;
 };
+
+SLIST_HEAD(tupfile_head, tupfile);
 
 #define MAX_GLOBS 10
 
@@ -153,6 +157,7 @@ struct rule {
 
 struct bin_head;
 
+struct tupfile *top_tupfile(void);
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 int exec_run_script(struct tupfile *tf, const char *cmdline, int lno);
 int export(struct tupfile *tf, const char *cmdline);

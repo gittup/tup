@@ -80,6 +80,8 @@ struct build_name_list_args {
 	int orderid;
 };
 
+static void push_tupfile(struct tupfile *tf);
+static void pop_tupfile(void);
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 			char *path, int *parser_lua, int *fd);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
@@ -143,6 +145,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
 
 static int debug_run = 0;
+static struct tupfile_head tupfile_list = SLIST_HEAD_INITIALIZER(tupfile_list);
 
 void parser_debug_run(void)
 {
@@ -271,6 +274,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 				goto out_close_dfd;
 		}
 	}
+	push_tupfile(&tf);
 	if(fd >= 0) {
 		int tmprc;
 		tmprc = fslurp_null(fd, &b);
@@ -288,6 +292,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 				goto out_free_bs;
 		}
 	}
+	pop_tupfile();
 	if(tf.ign) {
 		if(!tf.variant->root_variant) {
 			if(n->tent->srcid == DOT_DT) {
@@ -390,6 +395,21 @@ out_server_stop:
 		rc = CIRCULAR_DEPENDENCY_ERROR;
 
 	return rc;
+}
+
+static void push_tupfile(struct tupfile *tf)
+{
+	SLIST_INSERT_HEAD(&tupfile_list, tf, list);
+}
+
+static void pop_tupfile(void)
+{
+	SLIST_REMOVE_HEAD(&tupfile_list, list);
+}
+
+struct tupfile *top_tupfile(void)
+{
+	return SLIST_FIRST(&tupfile_list);
 }
 
 static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char *fullpath, const char *path, int *fd)
