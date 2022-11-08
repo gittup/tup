@@ -24,10 +24,12 @@ cat > Tupfile << HERE
 include ok.lua
 : |> echo "Vars are: \$(_G) \$(rawget) \$(tup) \$(CFLAGS)" |>
 HERE
-cat > Tuprules.lua << HERE
+cat > rules.lua << HERE
 CFLAGS += '-DBAZ'
 HERE
-touch ok.lua
+cat > ok.lua << HERE
+tup.include('rules.lua')
+HERE
 update
 
 tup_object_exist . 'echo "Vars are:    -DBAZ"'

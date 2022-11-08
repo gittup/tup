@@ -50,7 +50,7 @@
 #include "sqlite3/sqlite3.h"
 
 #define DB_VERSION 19
-#define PARSER_VERSION 15
+#define PARSER_VERSION 16
 
 enum {
 	DB_BEGIN,
@@ -158,7 +158,7 @@ static struct tent_entries ghost_root = TENT_ENTRIES_INITIALIZER;
 static int tup_db_var_changed = 0;
 static int sql_debug = 0;
 static int reclaim_ghost_debug = 0;
-static struct vardb envdb = { {NULL}, 0, NULL, NULL};
+static struct vardb envdb = { {NULL}, 0};
 static int transaction = 0;
 static tupid_t local_env_dt = -1;
 static tupid_t local_exclusion_dt = -1;

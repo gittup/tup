@@ -181,3 +181,51 @@ tup_append_assignment = function(a, b)
 	end
 	return result
 end
+
+-- "Global" variables from parsing a Tupfile are put into tupvars instead of _G
+-- to avoid cross-Tupfile pollution. Since we might stop parsing a Tupfile
+-- partway through in order to parse a dependent Tupfile, there is a stack of
+-- active Tupfiles in tupvars.
+
+local tupvars = {}
+local top
+tup_push_state = function()
+	local state = {}
+	table.insert(tupvars, state)
+	top = state
+end
+
+tup_pop_state = function()
+	table.remove(tupvars)
+	top = tupvars[#tupvars]
+end
+
+tup_get_var = function(var)
+	return top[var]
+end
+
+tup_set_var = function(var, value)
+	top[var] = value
+end
+
+-- The tup_environ overrides _ENV when parsing a lua Tupfile. This is used to
+-- cause global variable access to go into tupvars instead of _G. We can still
+-- read from _G of course, for things like the 'tup' functions or other
+-- standard lua functions (eg: string, math, etc).
+
+tup_environ = {}
+setmetatable(tup_environ, {
+	__newindex = function(t, k, v)
+		top[k] = v
+	end,
+	__index = function(t, k)
+		if k == '_G' then
+			return tup_environ
+		end
+		local v = top[k]
+		if v ~= nil then
+			return v
+		end
+		return rawget(_G, k)
+	end
+})

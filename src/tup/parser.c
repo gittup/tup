@@ -80,8 +80,6 @@ struct build_name_list_args {
 	int orderid;
 };
 
-static void push_tupfile(struct tupfile *tf);
-static void pop_tupfile(void);
 static int open_tupfile(struct tupfile *tf, struct tup_entry *tent,
 			char *path, int *parser_lua, int *fd);
 static int parse_tupfile(struct tupfile *tf, struct buf *b, const char *filename);
@@ -145,7 +143,6 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
 
 static int debug_run = 0;
-static struct tupfile_head tupfile_list = SLIST_HEAD_INITIALIZER(tupfile_list);
 
 void parser_debug_run(void)
 {
@@ -184,7 +181,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 		perror("tmpfile");
 		return -1;
 	}
-	tf.ls = NULL;
 	tf.luaerror = TUPLUA_NOERROR;
 	tf.use_server = use_server;
 
@@ -227,8 +223,6 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	LIST_INIT(&tf.bin_list);
 	if(vardb_init(&tf.node_db) < 0)
 		goto out_server_stop;
-	if(vardb_init(&tf.vdb) < 0)
-		goto out_close_node_db;
 	if(environ_add_defaults(&tf.env_root) < 0)
 		goto out_close_vdb;
 
@@ -288,6 +282,8 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 			if(parse_tupfile(&tf, &b, "Tupfile") < 0)
 				goto out_free_bs;
 		} else {
+			if(parse_lua_include_rules(&tf) < 0)
+				goto out_free_bs;
 			if(parse_lua_tupfile(&tf, &b, path) < 0)
 				goto out_free_bs;
 		}
@@ -329,9 +325,6 @@ out_close_dfd:
 		rc = -1;
 	}
 out_close_vdb:
-	if(vardb_close(&tf.vdb) < 0)
-		rc = -1;
-out_close_node_db:
 	if(vardb_close(&tf.node_db) < 0)
 		rc = -1;
 out_server_stop:
@@ -361,7 +354,6 @@ out_server_stop:
 	free_dir_lists(&ps.directories);
 	pthread_mutex_unlock(&ps.lock);
 
-	lua_parser_cleanup(&tf);
 	free_tent_tree(&tf.env_root);
 	free_tupid_tree(&tf.cmd_root);
 	free_tupid_tree(&tf.directory_root);
@@ -395,21 +387,6 @@ out_server_stop:
 		rc = CIRCULAR_DEPENDENCY_ERROR;
 
 	return rc;
-}
-
-static void push_tupfile(struct tupfile *tf)
-{
-	SLIST_INSERT_HEAD(&tupfile_list, tf, list);
-}
-
-static void pop_tupfile(void)
-{
-	SLIST_REMOVE_HEAD(&tupfile_list, list);
-}
-
-struct tupfile *top_tupfile(void)
-{
-	return SLIST_FIRST(&tupfile_list);
 }
 
 static int open_if_entry(struct tupfile *tf, struct tup_entry *dtent, const char *fullpath, const char *path, int *fd)
@@ -1132,7 +1109,7 @@ int import(struct tupfile *tf, const char *cmdline, const char **retvar, const c
 	} else {
 		real_val = default_val;
 	}
-	if(vardb_set(&tf->vdb, ve->var.s, real_val, NULL) < 0)
+	if(luadb_set(ve->var.s, real_val) < 0)
 		return -1;
 	if(retvar) {
 		*retvar = ve->var.s;
@@ -1822,9 +1799,9 @@ static int set_variable(struct tupfile *tf, char *line)
 			rc = vardb_set(&tf->node_db, var+1, value, NULL);
 	} else {
 		if(append)
-			rc = vardb_append(&tf->vdb, var, value);
+			rc = luadb_append(var, value);
 		else
-			rc = vardb_set(&tf->vdb, var, value, NULL);
+			rc = luadb_set(var, value);
 	}
 	if(rc < 0) {
 		fprintf(tf->f, "tup internal error: Error setting variable '%s'\n", var);
@@ -4258,7 +4235,7 @@ char *eval(struct tupfile *tf, const char *string, int expand_nodes)
 					if(tent_tree_add_dup(&tf->input_root, tent) < 0)
 						return NULL;
 				} else {
-					if(vardb_copy(&tf->vdb, var, rparen-var, &e) < 0)
+					if(luadb_copy(var, rparen-var, &e) < 0)
 						return NULL;
 				}
 				s = rparen + 1;

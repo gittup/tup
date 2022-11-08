@@ -53,7 +53,6 @@ struct tupfile {
 	int root_fd;
 	int refactoring;
 	struct graph *g;
-	struct vardb vdb;
 	struct vardb node_db;
 	struct bin_head bin_list;
 	struct tupid_entries cmd_root;
@@ -157,7 +156,6 @@ struct rule {
 
 struct bin_head;
 
-struct tupfile *top_tupfile(void);
 int parse_dependent_tupfiles(struct path_list_head *plist, struct tupfile *tf);
 int exec_run_script(struct tupfile *tf, const char *cmdline, int lno);
 int export(struct tupfile *tf, const char *cmdline);

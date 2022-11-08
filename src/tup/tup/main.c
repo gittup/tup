@@ -52,6 +52,7 @@
 #include "tup/variant.h"
 #include "tup/container.h"
 #include "tup/array_size.h"
+#include "tup/luaparser.h"
 
 static struct help {
 	const char *command;

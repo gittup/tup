@@ -40,6 +40,7 @@
 #include "flist.h"
 #include "estring.h"
 #include "logging.h"
+#include "luaparser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -324,6 +325,8 @@ int generate(int argc, char **argv)
 		perror("chdir(get_tup_top())\n");
 		return -1;
 	}
+	if(tup_lua_parser_new_state() < 0)
+		return -1;
 	generate_f = fopen(script_name, file_open_flags);
 	if(!generate_f) {
 		perror(script_name);
