@@ -1,4 +1,4 @@
-.TH "tup" "1" "2022/07/30" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2022/11/08" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -197,7 +197,7 @@ Do not scan the project for changed files. This is for internal tup testing only
 Causes tup to display the full command string instead of just the pretty-printed string for commands that use the ^ TEXT^ prefix.
 .RE
 .TP
-.B generate [--config config-file] [--builddir directory] script.sh (or script.bat on Windows)
+.B generate [--config config-file] [--builddir directory] script.sh (or script.bat on Windows) [<output_1> ... <output_n>]
 The generate command will parse all Tupfiles and create a shell script that can build the program without running in a tup environment. The expected usage is in continuous integration environments that aren't compatible with tup's dependency checking (eg: if FUSE is not supported). On Windows, if the script filename has a ".bat" extension, then the output will be a batch script instead of a shell script. For example:
 .nf
 
@@ -212,6 +212,8 @@ git clean -f -x -d
 The shell script does not work incrementally, so it is effectively a one-time use. You will need to clean up the tree before the next 'tup generate' and script invocation. By default, the top-level tup.config file is used to define the configuration variables. Optionally, a separate configuration file can be passed in with the --config argument.
 
 If a --builddir argument is specified, the shell script is generated as if it were a variant build. All build artifacts are placed in the directory specified. Otherwise, the default behavior is to place all build artifacts in-tree. The build directory must not already exist in the tree.
+
+After the script name, individual output files can be listed in order to limit the scope of the shell script to only build those outputs. If no outputs are listed, the shell script will build all outputs.
 .RE
 .TP
 .B compiledb

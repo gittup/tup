@@ -257,6 +257,7 @@ int generate(int argc, char **argv)
 	int is_batch_script = 0;
 	int x;
 	int rc;
+	int prune_start = -1;
 	const char *file_open_flags = "w";
 	const char *generate_vardict_file = "tup-generate.vardict";
 #ifdef _WIN32
@@ -286,11 +287,13 @@ int generate(int argc, char **argv)
 			verbose_script = 1;
 			continue;
 		}
-		if(script_name) {
-			fprintf(stderr, "Usage: tup generate [--config config_file] [--builddir directory] %s\n", example_script);
-			return -1;
-		}
 		script_name = argv[x];
+
+		/* After the script name, any remaining arguments are desired
+		 * outputs that are passed into prune_graph.
+		 */
+		prune_start = x + 1;
+		break;
 	}
 	if(!script_name) {
 		fprintf(stderr, "Usage: tup generate [--config config_file] [--builddir directory] %s\n", example_script);
@@ -491,6 +494,11 @@ int generate(int argc, char **argv)
 		return -1;
 	if(build_graph(&g) < 0)
 		return -1;
+	if(prune_start != -1) {
+		int num_pruned = 0;
+		if(prune_graph(&g, argc-prune_start, &argv[prune_start], &num_pruned, GRAPH_PRUNE_GENERATED, 0) < 0)
+			return -1;
+	}
 
 	/* Loop through all the nodes and pull out any generated directories.
 	 * The script will 'mkdir' all of these at the top of the script.

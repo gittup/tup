@@ -41,7 +41,7 @@ gitignore_good 'echo bar' $generate_script_name
 gitignore_bad 'echo foo' $generate_script_name
 gitignore_bad 'echo baz' $generate_script_name
 
-generate $generate_script_name --config configs/foo.config
+generate --config configs/foo.config $generate_script_name
 gitignore_bad 'echo bar' $generate_script_name
 gitignore_good 'echo foo' $generate_script_name
 gitignore_bad 'echo baz' $generate_script_name
