@@ -354,7 +354,6 @@ static int tuplua_function_getvariantdir(lua_State *ls)
 static int tuplua_function_getdirectory(lua_State *ls)
 {
 	struct tupfile *tf = top_tupfile();
-	fprintf(tf->f, "OHAI: Getcwd: %s\n", tf->curtent->name.s);
 
 	if(tf->tent->tnode.tupid == DOT_DT) {
 		/* At the top of the tup-hierarchy, we get the
