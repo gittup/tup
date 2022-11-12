@@ -27,10 +27,10 @@ struct buf;
 struct estring;
 
 int tup_lua_parser_new_state(void);
+void tup_lua_parser_cleanup(void);
 void lua_parser_debug_run(void);
 int parse_lua_include_rules(struct tupfile *tf);
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name);
-void lua_parser_cleanup(void);
 void push_tupfile(struct tupfile *tf);
 void pop_tupfile(void);
 int luadb_set(const char *var, const char *value);

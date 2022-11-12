@@ -843,7 +843,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 	return 0;
 }
 
-void lua_parser_cleanup(void)
+void tup_lua_parser_cleanup(void)
 {
 	if(gls)
 		lua_close(gls);

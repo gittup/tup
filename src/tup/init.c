@@ -27,7 +27,6 @@
 #include "server.h"
 #include "option.h"
 #include "colors.h"
-#include "luaparser.h"
 #include "mempool.h"
 #include "privs.h"
 #include "variant.h"
@@ -60,9 +59,6 @@ int tup_init(int argc, char **argv)
 		goto out_err;
 	}
 	if(tup_lock_init() < 0) {
-		goto out_err;
-	}
-	if(tup_lua_parser_new_state() < 0) {
 		goto out_err;
 	}
 	color_init();
@@ -104,7 +100,6 @@ void tup_valgrind_cleanup(void)
 		tup_entry_clear();
 		variants_free();
 		mempool_clear();
-		lua_parser_cleanup();
 
 		/* Also close out the standard file descriptors, so valgrind
 		 * doesn't complain about those as well. The outputs need to be
