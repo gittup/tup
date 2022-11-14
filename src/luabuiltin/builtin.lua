@@ -154,6 +154,15 @@ tup.foreach_rule = function(a, b, c)
 	return tup.frule{ inputs = inputs, command = command, outputs = outputs, foreach = 1}
 end
 
+tup_table_meta = {
+	__tostring = function(t)
+		return table.concat(t, ' ')
+	end,
+	__concat = function(a, b)
+		return tostring(a) .. tostring(b)
+	end,
+}
+
 -- This function is called when we do 'a += b' in a Tupfile.lua. It works
 -- if a and b are strings, tables, or nils, and always makes a result that
 -- is an array of strings.
@@ -179,6 +188,7 @@ tup_append_assignment = function(a, b)
 	else
 		error '+= operator only works when the value is a table or string'
 	end
+	setmetatable(result, tup_table_meta)
 	return result
 end
 

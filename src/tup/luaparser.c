@@ -893,6 +893,8 @@ static void tup_string_to_lua(const char *value)
 		return;
 	}
 	lua_newtable(gls);
+	lua_getglobal(gls, "tup_table_meta");
+	lua_setmetatable(gls, -2);
 	do {
 		space = strchr(value, ' ');
 		if(space) {
