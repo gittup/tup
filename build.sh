@@ -83,6 +83,7 @@ mkdir luabuiltin
 ./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
 
 CFLAGS="$CFLAGS -DTUP_SERVER=\"$server\""
+CFLAGS="$CFLAGS -DPCRE2_CODE_UNIT_WIDTH=8"
 CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
 
 for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/$monitor ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do

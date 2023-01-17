@@ -99,7 +99,7 @@ else
 use_system_pcre = $(TUP_USE_SYSTEM_PCRE)
 endif
 ifeq ($(use_system_pcre),y)
-CFLAGS += `pcre-config --cflags`
+CFLAGS += `pcre2-config --cflags`
 else
 CFLAGS += -I$(TUP_CWD)/src/pcre
 CFLAGS += -DPCRE_STATIC

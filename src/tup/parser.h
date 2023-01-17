@@ -26,7 +26,7 @@
 #include "timespan.h"
 #include "bin.h"
 #include "vardb.h"
-#include <pcre.h>
+#include "tup_pcre.h"
 
 #define TUPLUA_NOERROR 0
 #define TUPLUA_PENDINGERROR 1
@@ -130,7 +130,8 @@ struct path_list {
 	struct bin *bin;
 
 	/* For exclusions: */
-	pcre *re;
+	pcre2_code *re;
+	pcre2_match_data *re_match;
 
 	/* Copy of the full string */
 	char mem[0];

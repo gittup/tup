@@ -2288,6 +2288,7 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 	pl->pel = NULL;
 	pl->bin = NULL;
 	pl->re = NULL;
+	pl->re_match = NULL;
 	memcpy(pl->mem, s, len);
 	pl->mem[len] = 0;
 	pl->orderid = orderid;
@@ -2316,14 +2317,17 @@ struct path_list *new_pl(struct tupfile *tf, const char *s, int len, struct bin_
 		*endb = '}';
 	} else if(p[0] == '^') {
 		/* Exclusion */
-		const char *error;
-		int erroffset;
-		pl->re = pcre_compile(&pl->mem[1], 0, &error, &erroffset, NULL);
+		int error;
+		size_t erroffset;
+		pl->re = pcre2_compile((PCRE2_SPTR)&pl->mem[1], PCRE2_ZERO_TERMINATED, 0, &error, &erroffset, NULL);
 		pl->dt = exclusion_dt();
 		if(!pl->re) {
-			fprintf(tf->f, "tup error: Unable to compile regular expression '%s' at offset %i: %s\n", &pl->mem[1], erroffset, error);
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message(error, buffer, sizeof(buffer));
+			fprintf(tf->f, "tup error: Unable to compile regular expression '%s' at offset %zi: %s\n", &pl->mem[1], erroffset, buffer);
 			return NULL;
 		}
+		pl->re_match = pcre2_match_data_create_from_pattern(pl->re, NULL);
 	} else {
 		/* Path */
 		if(strchr(p, '<') != NULL) {
@@ -2544,7 +2548,8 @@ void del_pl(struct path_list *pl, struct path_list_head *head)
 {
 	TAILQ_REMOVE(head, pl, list);
 	if(pl->re) {
-		pcre_free(pl->re);
+		pcre2_match_data_free(pl->re_match);
+		pcre2_code_free(pl->re);
 	}
 	free_pel(pl->pel);
 	free(pl);
@@ -2861,10 +2866,10 @@ static int nl_rm_exclusion(struct tupfile *tf, struct path_list *pl, struct name
 	TAILQ_FOREACH_SAFE(nle, &nl->entries, list, tmp) {
 		int rc;
 
-		rc = pcre_exec(pl->re, NULL, nle->path, nle->len, 0, 0, NULL, 0);
-		if(rc == 0) {
+		rc = pcre2_match(pl->re, (PCRE2_SPTR)nle->path, nle->len, 0, 0, pl->re_match, NULL);
+		if(rc >= 0) {
 			delete_name_list_entry(nl, nle);
-		} else if(rc != PCRE_ERROR_NOMATCH) {
+		} else if(rc != PCRE2_ERROR_NOMATCH) {
 			fprintf(tf->f, "tup error: Regex failed to execute: %s\n", &pl->mem[1]);
 			return -1;
 		}

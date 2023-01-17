@@ -151,7 +151,7 @@ static int rm_entry(tupid_t tupid, int safe)
 		string_tree_rm(&tent->parent->entries, &tent->name);
 	}
 	if(tent->re) {
-		pcre_free(tent->re);
+		pcre2_code_free(tent->re);
 	}
 	free_tent_tree(&tent->stickies);
 	free_tent_tree(&tent->group_stickies);
@@ -504,11 +504,13 @@ static struct tup_entry *new_entry(tupid_t tupid, tupid_t dt,
 	RB_INIT(&tent->entries);
 
 	if(tent->dt == exclusion_dt()) {
-		const char *error;
-		int erroffset;
-		tent->re = pcre_compile(tent->name.s, 0, &error, &erroffset, NULL);
+		int error;
+		size_t erroffset;
+		tent->re = pcre2_compile((PCRE2_SPTR)tent->name.s, PCRE2_ZERO_TERMINATED, 0, &error, &erroffset, NULL);
 		if(!tent->re) {
-			fprintf(stderr, "tup error: Unable to compile regular expression '%s' at offset %i: %s\n", tent->name.s, erroffset, error);
+			PCRE2_UCHAR buffer[256];
+			pcre2_get_error_message(error, buffer, sizeof(buffer));
+			fprintf(stderr, "tup error: Unable to compile regular expression '%s' at offset %zi: %s\n", tent->name.s, erroffset, buffer);
 			return NULL;
 		}
 	} else {
@@ -795,14 +797,16 @@ int exclusion_match(FILE *f, struct tent_entries *exclusion_root, const char *s,
 	*match = NULL;
 	RB_FOREACH(tt, tent_entries, exclusion_root) {
 		int rc;
-		rc = pcre_exec(tt->tent->re, NULL, s, len, 0, 0, NULL, 0);
-		if(rc == 0) {
+		pcre2_match_data *re_match = pcre2_match_data_create_from_pattern(tt->tent->re, NULL);
+		rc = pcre2_match(tt->tent->re, (PCRE2_SPTR)s, len, 0, 0, re_match, NULL);
+		pcre2_match_data_free(re_match);
+		if(rc >= 0) {
 			*match = tt->tent;
 			if(do_verbose) {
 				fprintf(f, "tup info: Ignoring file '%s' because it matched the regex '%s'\n", s, tt->tent->name.s);
 			}
 			break;
-		} else if(rc != PCRE_ERROR_NOMATCH) {
+		} else if(rc != PCRE2_ERROR_NOMATCH) {
 			fprintf(f, "tup error: Regex failed to execute: %s\n", tt->tent->name.s);
 			return -1;
 		}

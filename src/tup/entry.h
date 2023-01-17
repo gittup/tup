@@ -26,9 +26,9 @@
 #include "string_tree.h"
 #include "db_types.h"
 #include "bsd/queue.h"
+#include "tup_pcre.h"
 #include <stdio.h>
 #include <time.h>
-#include <pcre.h>
 
 struct variant;
 struct estring;
@@ -51,7 +51,7 @@ struct tup_entry {
 	_Atomic int refcount;
 
 	/* For exclusions */
-	pcre *re;
+	pcre2_code *re;
 
 	/* For command strings */
 	char *flags;

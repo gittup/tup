@@ -1,6 +1,8 @@
 include_rules
 ifeq ($(use_system_pcre),n)
 CFLAGS += -DHAVE_CONFIG_H
+CFLAGS += -DPCRE2_CODE_UNIT_WIDTH=8
+CFLAGS += -DPCRE2_STATIC
 CFLAGS += -w
 : foreach *.c |> !cc |>
 endif
