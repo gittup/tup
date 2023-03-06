@@ -21,7 +21,11 @@ srcs += src/tup/tup/*.o
 srcs += src/tup/monitor/*.o
 srcs += src/tup/flock/*.o
 srcs += src/tup/server/*.o
+ifeq (@(TUP_USE_SYSTEM_INIH),y)
+LDFLAGS += -linih
+else
 srcs += src/inih/*.o
+endif
 srcs += src/compat/*.o
 ifeq (@(TUP_USE_SYSTEM_SQLITE),y)
 LDFLAGS += -lsqlite3
