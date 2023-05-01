@@ -38,6 +38,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <sys/resource.h>
 
@@ -729,6 +730,27 @@ static int mknod_internal(const char *path, mode_t mode, int flags, int close_fd
 	if(context_check() < 0)
 		return -EPERM;
 
+	/* t5119 - Make sure we could write to the actual underlying directory,
+	 * since that can affect program behavior. For example, inkscape uses
+	 * fontconfig, which tries to write .uuid files in /usr/. If we report
+	 * that the write succeeds, we'll have issues with unspecified outputs.
+	 */
+	char *dir;
+	char *dirtmp = strdup(path);
+	if(!dirtmp) {
+		return -ENOMEM;
+	}
+	dir = dirname(dirtmp);
+
+	/* Use tup_fs_access in case it's a directory we mkdir'd during program
+	 * execution.
+	 */
+	rc = tup_fs_access(dir, W_OK);
+	free(dirtmp);
+	if(rc < 0) {
+		return -errno;
+	}
+
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
 	if (S_ISREG(mode)) {
@@ -1220,7 +1242,7 @@ static int tup_fs_create(const char *path, mode_t mode, struct fuse_file_info *f
 	struct file_info *finfo;
 	rc = mknod_internal(path, mode, fi->flags, 0);
 	if(rc < 0)
-		return -errno;
+		return rc;
 	finfo = get_finfo(path);
 	if(finfo) {
 		if(finfo->open_count >= max_open_files) {
