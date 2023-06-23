@@ -647,9 +647,17 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 	struct path_element *pel = NULL;
 	struct tup_entry *tent;
 	struct tup_entry *dtent;
+	struct pel_group pg;
+	int type = TUP_NODE_FILE;
 	tupid_t dt;
 
-	dt = find_dir_tupid_dt(DOT_DT, w->filename, &pel, SOTGV_IGNORE_DIRS, 1);
+	if(get_path_elements(w->filename, &pg) < 0)
+		return -1;
+	if(pg.pg_flags & PG_OUTSIDE_TUP) {
+		type = TUP_NODE_GHOST;
+	}
+
+	dt = find_dir_tupid_dt_pg(DOT_DT, &pg, &pel, SOTGV_IGNORE_DIRS, 1);
 	if(dt < 0) {
 		fprintf(f, "tup error: Unable to create directory tree for ignored file: %s\n", w->filename);
 		return -1;
@@ -671,7 +679,7 @@ static int create_ignored_file(FILE *f, struct file_entry *w)
 		fprintf(f, "\n");
 		return -1;
 	}
-	tent = tup_db_create_node_part(dtent, pel->path, pel->len, TUP_NODE_FILE, -1, NULL);
+	tent = tup_db_create_node_part(dtent, pel->path, pel->len, type, -1, NULL);
 	if(!tent) {
 		fprintf(f, "tup internal error: Unable to create node for file '%.*s' relative to directory: ", pel->len, pel->path);
 		print_tup_entry(f, dtent);

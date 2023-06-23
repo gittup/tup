@@ -637,7 +637,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				}
 				if(sotgv == SOTGV_CREATE_DIRS)
 					type = TUP_NODE_GENERATED_DIR;
-				else if(sotgv == SOTGV_IGNORE_DIRS)
+				else if(sotgv == SOTGV_IGNORE_DIRS && !(pg->pg_flags & PG_OUTSIDE_TUP))
 					type = TUP_NODE_DIR;
 
 				if(full_deps && (pg->pg_flags & PG_OUTSIDE_TUP)) {
