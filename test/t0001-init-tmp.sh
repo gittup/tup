@@ -28,17 +28,14 @@ cleanup()
 	rm -rf $tmpdir
 }
 
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 cleanup
 mkdir $tmpdir
 cd $tmpdir
 tup init
 if [ ! -f ".tup/db" ]; then
 	echo ".tup/db not created!" 1>&2
-	cleanup
 	exit 1
 fi
-cleanup
 
-cd $tupcurdir
 eotup

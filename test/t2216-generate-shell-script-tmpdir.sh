@@ -29,7 +29,7 @@ cleanup()
 	rm -rf $tmpdir
 }
 
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 cleanup
 mkdir $tmpdir
 cd $tmpdir
@@ -66,8 +66,5 @@ if ! grep "$expected" $generate_script_name > /dev/null; then
 	echo "Error: Expected $expected in generated script" 1>&2
 	exit 1
 fi
-
-cleanup
-cd $tupcurdir
 
 eotup

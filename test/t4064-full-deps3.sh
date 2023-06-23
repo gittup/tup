@@ -35,7 +35,7 @@ cleanup()
 	cd - > /dev/null
 }
 
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 cleanup
 mkdir $tmpdir
 
@@ -55,7 +55,5 @@ mkdir $tmpdir
 echo 'yo' > $tmpdir/tmpfile
 update
 echo 'yo' | diff - out.txt
-
-cleanup
 
 eotup

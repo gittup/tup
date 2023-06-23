@@ -27,7 +27,7 @@ cleanup()
 	rm -rf $tmpdir
 }
 
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 cleanup
 mkdir $tmpdir
 cd $tmpdir
@@ -37,17 +37,12 @@ tup > $output
 
 if ! grep 'Initializing .tup in.*tup-t4159' $output > /dev/null; then
 	echo "Error: Expecting tup to initialize" 1>&2
-	cleanup
 	exit 1
 fi
 
 if ! grep 'Updated.' $output > /dev/null; then
 	echo "Error: Expecting tup to update" 1>&2
-	cleanup
 	exit 1
 fi
 
-cleanup
-
-cd $tupcurdir
 eotup

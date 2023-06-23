@@ -25,7 +25,7 @@ cleanup()
 	cd /tmp
 	rm -rf $tmpdir
 }
-trap cleanup INT TERM
+trap cleanup EXIT INT TERM
 cleanup
 mkdir $tmpdir
 cd $tmpdir
@@ -33,17 +33,13 @@ cd $tmpdir
 tup init -h 2>/dev/null
 if [ -d "-h" ]; then
 	echo "Error: -h directory created." 1>&2
-	cleanup
 	exit 1
 fi
 
 tup init --help 2>/dev/null
 if [ -d "--help" ]; then
 	echo "Error: --help directory created." 1>&2
-	cleanup
 	exit 1
 fi
 
-cleanup
-cd $tupcurdir
 eotup
