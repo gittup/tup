@@ -218,6 +218,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 	tf.g = g;
 	tf.refactoring = refactoring;
 	tf.full_deps = full_deps;
+	tf.including_rules = 0;
 	tf.ign = 0;
 	tf.circular_dep_error = 0;
 	LIST_INIT(&tf.bin_list);
@@ -794,6 +795,11 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 	int x;
 	const char dotdotstr[] = {'.', '.', path_sep(), 0};
 
+	if(tf->including_rules) {
+		fprintf(tf->f, "tup error: Unable to call include_rules from within a Tuprules.tup context.\n");
+		return SYNTAX_ERROR;
+	}
+	tf->including_rules = 1;
 	num_dotdots = 0;
 	tent = variant_tent_to_srctent(tf->curtent);
 	while(tent->tnode.tupid != DOT_DT) {
@@ -827,6 +833,7 @@ int parser_include_rules(struct tupfile *tf, const char *tuprules)
 out_free:
 	free(path);
 
+	tf->including_rules = 0;
 	return rc;
 }
 

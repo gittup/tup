@@ -70,6 +70,7 @@ struct tupfile {
 	int luaerror;
 	int use_server;
 	int full_deps;
+	int including_rules;
 
 	SLIST_ENTRY(tupfile) list;
 };
