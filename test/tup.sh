@@ -42,6 +42,18 @@ CYGWIN*)
 	in_windows=1
 	generate_script_name="build.bat"
 ;;
+Linux)
+	# Workaround for Linux using low-resolution filesystem timestamps based
+	# on CONFIG_HZ.
+	TUP_TESTING_HZ=$(zcat /proc/config.gz | grep '^CONFIG_HZ=' | sed 's/.*=//')
+	if [ "$TUP_TESTING_HZ" = "" ]; then
+		TUP_TESTING_HZ=$(cat /boot/config-$(uname -r) | grep '^CONFIG_HZ=' | sed 's/.*=//')
+		if [ "$TUP_TESTING_HZ" = "" ]; then
+			TUP_TESTING_HZ=100
+		fi
+	fi
+	export TUP_TESTING_HZ
+;;
 esac
 
 # override any user settings for grep

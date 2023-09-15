@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/stat.h>
 
 int tup_init(int argc, char **argv)
@@ -84,6 +85,29 @@ int tup_cleanup(void)
 	if(server_post_exit() < 0)
 		return -1;
 	logging_shutdown();
+
+#ifdef __linux__
+	/* Linux has nanosecond resolution file timestamps in the filesystem,
+	 * but are based on the timesteps from the CONFIG_HZ kernel
+	 * compile-time option. On my default VM installs, these are set to
+	 * 1000 (Fedora), 300 (Arch), and 250 (Ubuntu), which result in 1ms,
+	 * 3ms, and 4ms granularity. On faster machines, the lower HZ values
+	 * can cause problems in test cases where tup runs and the test case
+	 * changes a file inside a single tick. The file is then changed but
+	 * has the same timestamp.
+	 *
+	 * This is a workaround to sleep at least tick.
+	 */
+	char *testing_hz;
+	testing_hz = getenv("TUP_TESTING_HZ");
+	if(testing_hz != NULL) {
+		int hz = strtol(testing_hz, NULL, 10);
+		struct timespec ts;
+		ts.tv_sec = 0;
+		ts.tv_nsec = 1000000000L / hz;
+		nanosleep(&ts, NULL);
+	}
+#endif
 	return 0;
 }
 
