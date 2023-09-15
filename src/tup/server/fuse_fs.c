@@ -851,6 +851,18 @@ static int tup_fs_unlink(const char *path)
 		}
 		put_finfo(finfo);
 	}
+	if(strstr(path, ".fuse_hidden") != NULL) {
+		/* Similar to the rename check for .fuse_hidden, this shows up
+		 * in Arch sometimes.
+		 */
+		const char *peeled = peel(path);
+		int res;
+
+		res = unlink(peeled);
+		if(res < 0)
+			return -errno;
+		return 0;
+	}
 	fprintf(stderr, "tup error: Unable to unlink files not created during this job: %s\n", peel(path));
 	return -EPERM;
 }
@@ -976,16 +988,29 @@ static int tup_fs_rename(const char *from, const char *to)
 			return -ENOENT;
 		}
 
-		free(map->realname);
-		map->realname = strdup(peelto);
-		if(!map->realname) {
-			perror("strdup");
+		if(strstr(peelto, ".fuse_hidden") != NULL) {
+			/* If we're renaming to a .fuse_hidden file, treat it
+			 * as if the source was unlinked. This happens
+			 * sometimes in an Arch VM where a deleted file shows
+			 * up in FUSE as a rename to a .fuse_hidden file,
+			 * especially in t4017 for some reason.
+			 */
+			unlinkat(tup_top_fd(), map->tmpname, 0);
+			del_map(&finfo->mapping_list, map);
 			put_finfo(finfo);
-			return -ENOMEM;
-		}
+			tup_fuse_handle_file(from, NULL, ACCESS_UNLINK);
+		} else {
+			free(map->realname);
+			map->realname = strdup(peelto);
+			if(!map->realname) {
+				perror("strdup");
+				put_finfo(finfo);
+				return -ENOMEM;
+			}
 
-		handle_rename(peelfrom, peelto, finfo);
-		put_finfo(finfo);
+			handle_rename(peelfrom, peelto, finfo);
+			put_finfo(finfo);
+		}
 	}
 
 	return 0;
