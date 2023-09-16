@@ -55,7 +55,7 @@ HERE
 update
 
 if [ "$in_windows" = "1" ]; then
-	prefix="`echo $root | sed 's,/cygdrive/c,c:,'`"
+	prefix="`echo $root | sed 's,/c,c:,'`"
 else
 	prefix="$root"
 fi

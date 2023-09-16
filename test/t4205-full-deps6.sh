@@ -45,7 +45,7 @@ touch foo.c bar.c
 update
 
 if [ "$in_windows" = "1" ]; then
-	prefix="`echo $PWD | sed 's,/cygdrive/c,c:,'`"
+	prefix="`echo $PWD | sed 's,/c,c:,'`"
 else
 	prefix="$PWD"
 fi
