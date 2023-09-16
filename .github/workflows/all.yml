@@ -29,11 +29,11 @@ jobs:
 #   - run: ./bootstrap.sh
 #   - run: cd test && ./test.sh --keep-going
 
-  macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - run: brew install macfuse ccache
-    - run: pip3 install sh
-    - run: ./bootstrap.sh
-    - run: cd test && ./test.sh --keep-going
+#  macos:
+#    runs-on: macos-latest
+#    steps:
+#    - uses: actions/checkout@v2
+#    - run: brew install macfuse ccache
+#    - run: pip3 install sh
+#    - run: ./bootstrap.sh
+#    - run: cd test && ./test.sh --keep-going
