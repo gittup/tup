@@ -253,7 +253,7 @@ static int full_scan_dir(struct tent_list_head *head, int dfd, tupid_t dt)
 		}
 
 		if(!MTIME_EQ(tent->mtime, mtime)) {
-			log_debug_tent("Update external", tent, ", oldmtime=%li, newmtime=%li\n", tent->mtime, mtime);
+			log_debug_tent("Update external", tent, ", oldmtime=%li.%li, newmtime=%li.%li\n", tent->mtime.tv_sec, tent->mtime.tv_nsec, mtime.tv_sec, mtime.tv_nsec);
 
 			scan_subdir = 1;
 			/* Mark the commands as modify rather than the ghost node, since we don't
