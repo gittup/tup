@@ -4062,7 +4062,10 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 				fprintf(tf->f, "tup error: Failed to run strtol on %%-flag with a number.\n");
 				return NULL;
 			}
-			if(num <= 0 || num >= 99) {
+			/* Bounds-check the %-flag number, except for node
+			 * references (%Nt) which use an internal tup id.
+			 */
+			if((num <= 0 || num >= 99) && *endp != 't') {
 				fprintf(tf->f, "tup error: Expected number from 1-99 (base 10) for %%-flag, but got %i\n", num);
 				return NULL;
 			}
@@ -4079,27 +4082,36 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 					return NULL;
 				}
 				tmpnl = ooinput_nl;
+			} else if(*endp == 't') {
+				/* Skip node references here, they are
+				 * resolved in eval(). Just store the %Nt
+				 * string back in the output.
+				 */
+				estring_append(&e, "%%", 1);
+				estring_append(&e, next, endp-next + 1);
 			} else {
 				fprintf(tf->f, "tup error: Expected 'f', 'b', 'B', 'o', or 'i' after number in %%%i-flag, but got '%c'\n", num, *endp);
 				return NULL;
 			}
-			TAILQ_FOREACH(nle, &tmpnl->entries, list) {
-				if(nle->orderid == num) {
-					if(!first && estring_append(&e, " ", 1) < 0)
-						return NULL;
-					int err;
-					if(*endp == 'B') {
-						err = estring_append(&e, nle->base, nle->extlessbaselen);
-					} else if(*endp == 'b') {
-						err = estring_append(&e, nle->base, nle->baselen);
-					} else {
-						err = estring_append(&e, nle->path, nle->len);
+			if(tmpnl) {
+				TAILQ_FOREACH(nle, &tmpnl->entries, list) {
+					if(nle->orderid == num) {
+						if(!first && estring_append(&e, " ", 1) < 0)
+							return NULL;
+						int err;
+						if(*endp == 'B') {
+							err = estring_append(&e, nle->base, nle->extlessbaselen);
+						} else if(*endp == 'b') {
+							err = estring_append(&e, nle->base, nle->baselen);
+						} else {
+							err = estring_append(&e, nle->path, nle->len);
+						}
+						if(err < 0)
+							return NULL;
+						first = 0;
+					} else if(nle->orderid > num) {
+						break;
 					}
-					if(err < 0)
-						return NULL;
-					first = 0;
-				} else if(nle->orderid > num) {
-					break;
 				}
 			}
 

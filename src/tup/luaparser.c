@@ -334,20 +334,13 @@ static int tuplua_function_getcwd(lua_State *ls)
 static int tuplua_function_getvariantdir(lua_State *ls)
 {
 	struct tupfile *tf = top_tupfile();
-	struct estring e;
 
 	lua_settop(ls, 0);
 
-	estring_init(&e);
-	if(get_relative_dir(NULL, &e, tf->srctent->tnode.tupid, tf->curtent->tnode.tupid) < 0) {
-		fprintf(tf->f, "tup internal error: Unable to find relative directory from ID %lli -> %lli\n", tf->srctent->tnode.tupid, tf->curtent->tnode.tupid);
-		tup_db_print(tf->f, tf->srctent->tnode.tupid);
-		tup_db_print(tf->f, tf->curtent->tnode.tupid);
-		return luaL_error(ls, "Failed to get directory path length in getcwd.");
-	}
-
-	lua_pushlstring(ls, e.s, e.len);
-	free(e.s);
+	char value[32];
+	snprintf(value, 31, "%%%llit", tf->curtent->tnode.tupid);
+	value[31] = 0;
+	lua_pushlstring(ls, value, strlen(value));
 	return 1;
 }
 
