@@ -1,4 +1,4 @@
-.TH "tup" "1" "2022/11/08" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2023/10/14" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -604,12 +604,21 @@ Tup does not do any special processing for back-ticks, so the pkg-config command
 Append "value" to the end of the current value of "var". If "var" has not been set, this is equivalent to a regular '=' statement. If "var" already has a value, a space is appended to the $-variable before the new value is appended.
 .TP
 .B $(TUP_CWD)
+.PD 0
+.TP
+.B [lua] tup.getcwd()
 The special $-variable TUP_CWD is always set to the path relative to the Tupfile currently parsed. It can change value when including a file in a different directory. For example, if you "include ../foo.tup", then TUP_CWD will be set to ".." when parsing foo.tup. This lets foo.tup specify flags like "CFLAGS += -I$(TUP_CWD)", and CFLAGS will always have the -I directory where foo.tup is located, no matter if it was included as "../foo.tup" or "../../foo.tup" or "subdir/foo.tup". For an alternative to $(TUP_CWD) when referring to files, see the section on &-variables below.
 .TP
 .B $(TUP_VARIANTDIR)
+.PD 0
+.TP
+.B [lua] tup.getvariantdir()
 Similar to $(TUP_CWD), $(TUP_VARIANTDIR) is set to be the path relative to the Tupfile currently parsed, but points to the corresponding directory in the variant. As an example where this might be useful, suppose your build generates common headers into a directory called "include/". A Tuprules.tup file at the level of that directory could add -I$(TUP_VARIANTDIR) to a compiler flags variable. If a variant is used, this will evaluate to a path like "../build/path/to/include", where "build" is the name of the variant directory. If variants aren't used, TUP_VARIANTDIR is equivalent to TUP_CWD.
 .TP
 .B $(TUP_VARIANT_OUTPUTDIR)
+.PD 0
+.TP
+.B [lua] tup.getvariantoutputdir()
 $(TUP_VARIANT_OUTPUTDIR) always points to the output directory corresponding to the variant currently being parsed. Unlike $(TUP_VARIANTDIR), it does not change when including another file like Tuprules.tup or other partial *.tup files. Without variants, this always evaluates to the string "." to point to the current directory.
 .P
 No other special $-variables exist yet, but to be on the safe side you should assume that all variables named TUP_* are reserved.
