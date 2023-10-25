@@ -45,7 +45,7 @@ CYGWIN*)
 Linux)
 	# Workaround for Linux using low-resolution filesystem timestamps based
 	# on CONFIG_HZ.
-	TUP_TESTING_HZ=$(zcat /proc/config.gz | grep '^CONFIG_HZ=' | sed 's/.*=//')
+	TUP_TESTING_HZ=$(zcat /proc/config.gz 2>/dev/null | grep '^CONFIG_HZ=' | sed 's/.*=//')
 	if [ "$TUP_TESTING_HZ" = "" ]; then
 		TUP_TESTING_HZ=$(cat /boot/config-$(uname -r) | grep '^CONFIG_HZ=' | sed 's/.*=//')
 		if [ "$TUP_TESTING_HZ" = "" ]; then
