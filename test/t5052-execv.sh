@@ -19,6 +19,12 @@
 # Like t5013, but now with execv (at least gcc uses execv).
 
 . ./tup.sh
+
+# After updating cygwin, apparently the execl causes the WaitForSingleObject()
+# call to return immediately, even though prog.exe is still running and
+# has the .tup/tmp/output-%i file open.
+check_no_windows execl
+
 cat > Tupfile << HERE
 : foreach exec_test.c prog.c |> gcc %f -o %o |> %B.exe
 : exec_test.exe prog.exe |> ./exec_test.exe && touch %o |> test_passed
