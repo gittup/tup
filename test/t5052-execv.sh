@@ -23,17 +23,13 @@ cat > Tupfile << HERE
 : foreach exec_test.c prog.c |> gcc %f -o %o |> %B.exe
 : exec_test.exe prog.exe |> ./exec_test.exe && touch %o |> test_passed
 HERE
-const=""
-if [ "$in_windows" = "1" ]; then
-	const="const"
-fi
 cat > exec_test.c << HERE
 #include <stdio.h>
 #include <unistd.h>
 
 int main(void)
 {
-	$const char * const args[] = {"prog.exe", NULL};
+	char * const args[] = {"prog.exe", NULL};
 	execv("./prog.exe", args);
 	return 1;
 }
