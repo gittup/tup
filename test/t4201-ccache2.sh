@@ -27,7 +27,7 @@
 . ./tup.sh
 
 # Don't kill the user's ccache
-export CCACHE_DIR=$PWD/.ccache
+export CCACHE_DIR=.ccache
 
 cat > Tupfile << HERE
 export CCACHE_DIR
