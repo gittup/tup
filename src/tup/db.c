@@ -5220,7 +5220,11 @@ int tup_db_findenv(const char *var, int varlen, struct var_entry **ret)
 		newtent = node_insert(env_dtent(), var, varlen, NULL, 0, NULL, 0, TUP_NODE_VAR, INVALID_MTIME, -1);
 		if(!newtent)
 			return -1;
-		newenv = getenv(var);
+		char* varname = strndup(var, varlen);
+		if(varname == NULL)
+			return -1;
+		newenv = getenv(varname);
+		free(varname);
 		if(newenv)
 			newenvlen = strlen(newenv);
 		ve = envdb_set(var, varlen, newenv, newenvlen, newtent, 1);
