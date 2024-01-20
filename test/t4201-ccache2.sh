@@ -26,6 +26,8 @@
 
 . ./tup.sh
 
+check_ccache_version
+
 # Don't kill the user's ccache
 export CCACHE_DIR=.ccache
 

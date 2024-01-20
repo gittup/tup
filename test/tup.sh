@@ -761,6 +761,16 @@ check_bash()
     fi
 }
 
+check_ccache_version()
+{
+	min_version="4.7"
+	version=$( (echo $min_version; ccache --version | grep 'ccache version' | sed 's/ccache version //') | sort -V | head -1)
+	if [ "$version" != "$min_version" ]; then
+		echo "[33mSkipping test: Expected ccache version >= $min_version[0m"
+		eotup
+	fi
+}
+
 single_threaded()
 {
 	(echo "[updater]"; echo "num_jobs=1") >> .tup/options
