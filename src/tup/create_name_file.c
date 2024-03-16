@@ -80,6 +80,17 @@ int make_dirs_normal(struct tup_entry *dtent)
 		tup_db_del_ghost_tree(dtent);
 		dtent = dtent->parent;
 	}
+	if(dtent) {
+		/* Mark normal parent as needing update
+		 * to regenerate gitignore (t2244)
+		 */
+		struct tup_entry *gitignore_tent;
+		if(tup_db_select_tent(dtent, ".gitignore", &gitignore_tent) < 0)
+			return -1;
+		if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
+			tup_db_add_create_list(gitignore_tent->dt);
+		}
+	}
 	return 0;
 }
 

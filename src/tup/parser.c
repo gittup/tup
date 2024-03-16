@@ -90,7 +90,6 @@ static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno);
-static int remove_tup_gitignore(FILE *err, struct graph *g, struct tup_entry *tent);
 static int gitignore(struct tupfile *tf, struct tup_entry *dtent);
 static int check_toplevel_gitignore(struct tupfile *tf);
 static int parse_rule(struct tupfile *tf, char *p, int lno);
@@ -1130,7 +1129,7 @@ int import(struct tupfile *tf, const char *cmdline, const char **retvar, const c
 /* If a .gitignore directive is removed, we need to either revert back to the
  * user's explicit .gitignore file, or remove it entirely.
  */
-static int remove_tup_gitignore(FILE *err, struct graph *g, struct tup_entry *tent)
+int remove_tup_gitignore(FILE *err, struct graph *g, struct tup_entry *tent)
 {
 	int dfd;
 	int fdold;

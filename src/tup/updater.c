@@ -1529,17 +1529,6 @@ static int process_create_nodes(void)
 	tup_lua_parser_cleanup();
 
 	if(rc == 0) {
-		if(g.gen_delete_root.count) {
-			tup_main_progress("Deleting files...\n");
-		} else {
-			tup_main_progress("No files to delete.\n");
-		}
-		rc = delete_files(&g);
-		if(rc == 0 && group_need_circ_check()) {
-			tup_show_message("Checking circular dependencies among groups...\n");
-			if(group_circ_check() < 0)
-				rc = -1;
-		}
 		if(rc == 0 && !RB_EMPTY(&g.normal_dir_root)) {
 			int msg_shown = 0;
 			while(!RB_EMPTY(&g.normal_dir_root)) {
@@ -1569,8 +1558,30 @@ static int process_create_nodes(void)
 					 */
 					if(tent_tree_add_dup(&g.parse_gitignore_root, tent->parent) < 0)
 						return -1;
+					/* And remove extra gitignore file in
+					 * the generated folder (t2245)
+					 */
+					struct tup_entry *gitignore_tent;
+					if(tup_db_select_tent(tent, ".gitignore", &gitignore_tent) < 0)
+						return -1;
+					if(gitignore_tent && gitignore_tent->type == TUP_NODE_GENERATED) {
+						tent_tree_add(&g.gen_delete_root, gitignore_tent);
+						if(remove_tup_gitignore(stderr, &g, gitignore_tent) < 0)
+							return -1;
+					}
 				}
 			}
+		}
+		if(g.gen_delete_root.count) {
+			tup_main_progress("Deleting files...\n");
+		} else {
+			tup_main_progress("No files to delete.\n");
+		}
+		rc = delete_files(&g);
+		if(rc == 0 && group_need_circ_check()) {
+			tup_show_message("Checking circular dependencies among groups...\n");
+			if(group_circ_check() < 0)
+				rc = -1;
 		}
 		if(rc == 0 && !RB_EMPTY(&g.parse_gitignore_root) && !refactoring) {
 			tup_show_message("Generating .gitignore files...\n");
