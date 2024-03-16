@@ -90,7 +90,6 @@ static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno);
-static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent);
 static int gitignore(struct tupfile *tf, struct tup_entry *dtent);
 static int check_toplevel_gitignore(struct tupfile *tf);
 static int parse_rule(struct tupfile *tf, char *p, int lno);
@@ -313,7 +312,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 				fprintf(tf.f, "tup refactoring error: Attempting to remove the .gitignore file.\n");
 				goto out_free_bs;
 			}
-			if(remove_tup_gitignore(&tf, tent) < 0)
+			if(remove_tup_gitignore(tf.g, tent) < 0)
 				goto out_free_bs;
 		}
 	}
@@ -1130,7 +1129,7 @@ int import(struct tupfile *tf, const char *cmdline, const char **retvar, const c
 /* If a .gitignore directive is removed, we need to either revert back to the
  * user's explicit .gitignore file, or remove it entirely.
  */
-static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
+int remove_tup_gitignore(struct graph *g, struct tup_entry *tent)
 {
 	int dfd;
 	int fdold;
@@ -1207,8 +1206,8 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
 			return -1;
-		tent_tree_remove(&tf->g->gen_delete_root, tent);
-		tent_tree_remove(&tf->g->save_root, tent);
+		tent_tree_remove(&g->gen_delete_root, tent);
+		tent_tree_remove(&g->save_root, tent);
 	} else {
 		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
 			perror("unlinkat");

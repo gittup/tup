@@ -175,6 +175,7 @@ void init_rule(struct rule *r);
 int execute_rule(struct tupfile *tf, struct rule *r, struct name_list *output_nl);
 int parser_include_file(struct tupfile *tf, const char *file);
 int parser_include_rules(struct tupfile *tf, const char *tuprules);
+int remove_tup_gitignore(struct graph *g, struct tup_entry *tent); // HACK
 
 struct node;
 struct graph;
