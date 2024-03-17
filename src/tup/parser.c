@@ -90,7 +90,7 @@ static int eval_eq(struct tupfile *tf, char *expr, char *eol);
 static int error_directive(struct tupfile *tf, char *cmdline);
 static int preload(struct tupfile *tf, char *cmdline);
 static int run_script(struct tupfile *tf, char *cmdline, int lno);
-static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent);
+static int remove_tup_gitignore(FILE *err, struct graph *g, struct tup_entry *tent);
 static int gitignore(struct tupfile *tf, struct tup_entry *dtent);
 static int check_toplevel_gitignore(struct tupfile *tf);
 static int parse_rule(struct tupfile *tf, char *p, int lno);
@@ -313,7 +313,7 @@ int parse(struct node *n, struct graph *g, struct timespan *retts, int refactori
 				fprintf(tf.f, "tup refactoring error: Attempting to remove the .gitignore file.\n");
 				goto out_free_bs;
 			}
-			if(remove_tup_gitignore(&tf, tent) < 0)
+			if(remove_tup_gitignore(tf.f, tf.g, tent) < 0)
 				goto out_free_bs;
 		}
 	}
@@ -1130,7 +1130,7 @@ int import(struct tupfile *tf, const char *cmdline, const char **retvar, const c
 /* If a .gitignore directive is removed, we need to either revert back to the
  * user's explicit .gitignore file, or remove it entirely.
  */
-static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
+static int remove_tup_gitignore(FILE *err, struct graph *g, struct tup_entry *tent)
 {
 	int dfd;
 	int fdold;
@@ -1148,17 +1148,17 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 	fdold = openat(dfd, ".gitignore", O_RDONLY);
 	if(fdold < 0) {
 		perror(".gitignore");
-		fprintf(stderr, "tup error: Unable to open gitignore file in directory: ");
-		print_tup_entry(stderr, tent->parent);
-		fprintf(stderr, "\n");
+		fprintf(err, "tup error: Unable to open gitignore file in directory: ");
+		print_tup_entry(err, tent->parent);
+		fprintf(err, "\n");
 		return -1;
 	}
 	fdnew = openat(dfd, ".gitignore.new", O_CREAT | O_WRONLY | O_TRUNC, 0666);
 	if(fdnew < 0) {
 		perror(".gitignore.new");
-		fprintf(stderr, "tup error: Unable to create new gitignore file in directory: ");
-		print_tup_entry(stderr, tent->parent);
-		fprintf(stderr, "\n");
+		fprintf(err, "tup error: Unable to create new gitignore file in directory: ");
+		print_tup_entry(err, tent->parent);
+		fprintf(err, "\n");
 		return -1;
 	}
 	while(1) {
@@ -1185,7 +1185,7 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 		bytes_copied -= tg_str_len;
 		if(ftruncate(fdnew, bytes_copied) < 0) {
 			perror("ftruncate");
-			fprintf(stderr, "tup error: Unable to truncate .gitignore.new file\n");
+			fprintf(err, "tup error: Unable to truncate .gitignore.new file\n");
 			return -1;
 		}
 	}
@@ -1200,21 +1200,21 @@ static int remove_tup_gitignore(struct tupfile *tf, struct tup_entry *tent)
 	if(bytes_copied) {
 		if(renameat(dfd, ".gitignore.new", dfd, ".gitignore") < 0) {
 			perror("renameat");
-			fprintf(stderr, "tup error: Unable to move .gitignore.new file over .gitignore");
+			fprintf(err, "tup error: Unable to move .gitignore.new file over .gitignore");
 			return -1;
 		}
 		if(tup_db_set_type(tent, TUP_NODE_FILE) < 0)
 			return -1;
 		if(tup_db_set_srcid(tent, -1) < 0)
 			return -1;
-		tent_tree_remove(&tf->g->gen_delete_root, tent);
-		tent_tree_remove(&tf->g->save_root, tent);
+		tent_tree_remove(&g->gen_delete_root, tent);
+		tent_tree_remove(&g->save_root, tent);
 	} else {
 		if(unlinkat(dfd, ".gitignore.new", 0) < 0) {
 			perror("unlinkat");
-			fprintf(stderr, "tup error: Unable to unlink .gitignore.new file in directory: ");
-			print_tup_entry(stderr, tent->parent);
-			fprintf(stderr, "\n");
+			fprintf(err, "tup error: Unable to unlink .gitignore.new file in directory: ");
+			print_tup_entry(err, tent->parent);
+			fprintf(err, "\n");
 			return -1;
 		}
 		/* The .gitignore tent is in the delete root, so the updater
@@ -2728,7 +2728,7 @@ static int nl_add_path(struct tupfile *tf, struct path_list *pl,
 					mtime = MTIME(buf);
 				}
 				if(tup_db_node_insert_tent(dtent, pl->pel->path, pl->pel->len, TUP_NODE_GHOST, mtime, -1, &tent) < 0) {
-					fprintf(stderr, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pl->pel->len, pl->pel->path, pl->dt);
+					fprintf(tf->f, "tup error: Node '%.*s' doesn't exist in directory %lli, and no luck creating a ghost node there.\n", pl->pel->len, pl->pel->path, pl->dt);
 					return -1;
 				}
 			} else {
@@ -3409,7 +3409,7 @@ struct command_split {
 	const char *cmd;
 };
 
-static int split_command_string(const char *cmd, struct command_split *cs)
+static int split_command_string(struct tupfile *tf, const char *cmd, struct command_split *cs)
 {
 	cs->flags = "";
 	cs->flagslen = 0;
@@ -3423,7 +3423,7 @@ static int split_command_string(const char *cmd, struct command_split *cs)
 			cs->flags = s;
 			do {
 				if(!*s) {
-					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
+					fprintf(tf->f, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
 					return -1;
 				}
 				if(*s == ' ')
@@ -3445,7 +3445,7 @@ static int split_command_string(const char *cmd, struct command_split *cs)
 			cs->display = s;
 			do {
 				if(!*s) {
-					fprintf(stderr, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
+					fprintf(tf->f, "tup error: Missing ending '^' flag in command string: %s\n", cmd);
 					return -1;
 				}
 				if(s[0] == '^')
@@ -3500,7 +3500,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		return 0;
 	}
 
-	if(split_command_string(r->command, &cs) < 0)
+	if(split_command_string(tf, r->command, &cs) < 0)
 		return -1;
 	if(memchr(cs.flags, 't', cs.flagslen) != NULL)
 		transient_outputs = 1;
