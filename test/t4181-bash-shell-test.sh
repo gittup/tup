@@ -30,7 +30,7 @@ check_exist bash.txt
 # Check that bash is not "empty" i.e. $BASH was defined
 if echo | cmp - bash.txt > /dev/null 2>&1; then
 	echo "[31m*** \$BASH was undefined in bash :-rule.[0m"
-    exit 1
+	exit 1
 fi
 
 eotup

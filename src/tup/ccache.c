@@ -35,7 +35,7 @@ int is_ccache_path(const char *path)
 		return 1;
 #endif
 
-	/* icecream file lcok. This file gets created if icecream falls back
+	/* icecream file lock. This file gets created if icecream falls back
 	 * to local compilation mode.
 	 */
 	if(strncmp(path, "/tmp/.icecream-", 15) == 0)
