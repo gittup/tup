@@ -137,7 +137,13 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			struct name_list *ooinput_nl,
 			const char *ext, int extlen,
-			const char *extra_command);
+			const char *extra_command,
+			int percpercflag);
+
+enum {
+	NOEXPAND_PERCPERC,
+	EXPAND_PERCPERC,
+};
 
 static int glob_parse(const char *base, int baselen, char *expanded, int *globidx);
 
@@ -2425,7 +2431,7 @@ static int eval_path_list(struct tupfile *tf, struct path_list_head *plist, stru
 		char *tinput;
 
 		if(input_nl) {
-			tinput = tup_printf(tf, pl->mem, -1, input_nl, NULL, NULL, NULL, 0, NULL);
+			tinput = tup_printf(tf, pl->mem, -1, input_nl, NULL, NULL, NULL, 0, NULL, EXPAND_PERCPERC);
 			if(!tinput)
 				return -1;
 		} else {
@@ -3221,7 +3227,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		struct path_list *newpl;
 		char *toutput;
 
-		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL, NOEXPAND_PERCPERC);
 		if(!toutput)
 			return -1;
 		newpl = new_pl(tf, toutput, -1, NULL, pl->orderid);
@@ -3243,7 +3249,7 @@ static int do_rule_outputs(struct tupfile *tf, struct path_list_head *oplist, st
 		struct path_list *newpl;
 		char *toutput;
 
-		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL);
+		toutput = tup_printf(tf, pl->mem, -1, nl, use_onl, NULL, ext, extlen, NULL, EXPAND_PERCPERC);
 		if(!toutput)
 			return -1;
 		newpl = new_pl(tf, toutput, -1, NULL, pl->orderid);
@@ -3540,7 +3546,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 		}
 	}
 
-	tcmd = tup_printf(tf, cs.cmd, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command);
+	tcmd = tup_printf(tf, cs.cmd, -1, nl, &onl, &r->order_only_inputs, ext, extlen, r->extra_command, EXPAND_PERCPERC);
 	if(!tcmd)
 		return -1;
 	cmd = eval(tf, tcmd, EXPAND_NODES);
@@ -3549,7 +3555,7 @@ static int do_rule(struct tupfile *tf, struct rule *r, struct name_list *nl,
 	free(tcmd);
 
 	if(cs.display) {
-		real_display = tup_printf(tf, cs.display, cs.displaylen, nl, &onl, &r->order_only_inputs, ext, extlen, NULL);
+		real_display = tup_printf(tf, cs.display, cs.displaylen, nl, &onl, &r->order_only_inputs, ext, extlen, NULL, EXPAND_PERCPERC);
 		if(!real_display)
 			return -1;
 		real_displaylen = strlen(real_display);
@@ -3833,7 +3839,8 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			struct name_list *nl, struct name_list *onl,
 			struct name_list *ooinput_nl,
 			const char *ext, int extlen,
-			const char *extra_command)
+			const char *extra_command,
+			int expand_percperc)
 {
 	struct name_list_entry *nle;
 	const char *p;
@@ -4122,6 +4129,12 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 			estring_append(&e, "%<", 2);
 		} else if(*next == '%') {
 			estring_append(&e, "%", 1);
+			if(expand_percperc == NOEXPAND_PERCPERC) {
+				/* If we aren't expanding %% into % yet, keep
+				 * it as %% in the output.
+				 */
+				estring_append(&e, "%", 1);
+			}
 		} else {
 			fprintf(tf->f, "tup error: Unknown %%-flag: '%c'\n", *next);
 			return NULL;
@@ -4132,7 +4145,7 @@ static char *tup_printf(struct tupfile *tf, const char *cmd, int cmd_len,
 	if(extra_command) {
 		char *textra;
 
-		textra = tup_printf(tf, extra_command, strlen(extra_command), nl, onl, ooinput_nl, ext, extlen, NULL);
+		textra = tup_printf(tf, extra_command, strlen(extra_command), nl, onl, ooinput_nl, ext, extlen, NULL, EXPAND_PERCPERC);
 		if(!textra)
 			return NULL;
 		estring_append(&e, " ", 1);
