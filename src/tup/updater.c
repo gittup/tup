@@ -1173,6 +1173,32 @@ static struct tup_entry *get_rel_tent(struct tup_entry *base, struct tup_entry *
 	if(!new)
 		return NULL;
 
+	if(tup_db_select_tent(new, tent->name.s, &sub) < 0)
+		return NULL;
+	if(sub) {
+		if(sub->type == TUP_NODE_GENERATED) {
+			/* If we have a generated file in the variant that is
+			 * now a directory, we need to force deleting that
+			 * output now so we can create the directory there
+			 * (t8115).
+			 */
+			if(delete_file(sub) < 0)
+				return NULL;
+			if(tup_del_id_force(sub->tnode.tupid, sub->type) < 0)
+				return NULL;
+		} else if(sub->type == TUP_NODE_GENERATED_DIR) {
+			/* If we have a generated output dir inside the
+			 * variant, just set its type to TUP_NODE_DIR since
+			 * that won't happen in tup_db_create_node_srcid()
+			 * below because of some logic to avoid changing
+			 * generated dir types during the scanning phase
+			 * (t8116).
+			 */
+			if(tup_db_set_type(sub, TUP_NODE_DIR) < 0)
+				return NULL;
+		}
+	}
+
 	sub = tup_db_create_node_srcid(new, tent->name.s, TUP_NODE_DIR, tent->tnode.tupid, &do_mkdir);
 	if(!sub) {
 		fprintf(stderr, "tup error: Unable to create tup node for variant directory: ");
