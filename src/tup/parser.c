@@ -1382,7 +1382,7 @@ int parser_include_file(struct tupfile *tf, const char *file)
 		fprintf(tf->f, "tup error: Unable to include file with hidden path element.\n");
 		goto out_del_pg;
 	}
-	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, 0, 0);
+	newdt = find_dir_tupid_dt_pg(tf->curtent->tnode.tupid, &pg, &pel, SOTGV_NO_GHOST, 0);
 	if(newdt <= 0) {
 		fprintf(tf->f, "tup error: Unable to find directory for include file '%s' relative to '", file);
 		print_tup_entry(tf->f, tf->curtent);
@@ -2473,7 +2473,7 @@ skip_empty_space:
 static int path_list_fill_dt_pel(struct tupfile *tf, struct path_list *pl, tupid_t dt, int create_output_dirs)
 {
 	struct pel_group pg;
-	int sotgv = 0;
+	int sotgv = SOTGV_NO_GHOST;
 
 	/* Bins get skipped. */
 	if(pl->bin)

@@ -643,7 +643,7 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 				struct timespec mtime = {-1, 0};
 
 				/* Secret of the ghost valley! */
-				if(sotgv == 0) {
+				if(sotgv == SOTGV_NO_GHOST) {
 					return -1;
 				}
 				if(sotgv == SOTGV_CREATE_DIRS)

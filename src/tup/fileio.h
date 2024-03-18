@@ -30,8 +30,12 @@ struct tup_entry;
 struct path_element;
 struct pel_group;
 
-#define SOTGV_CREATE_DIRS 2
-#define SOTGV_IGNORE_DIRS 3
+enum {
+	SOTGV_NO_GHOST,
+	SOTGV_CREATE_GHOSTS,
+	SOTGV_CREATE_DIRS,
+	SOTGV_IGNORE_DIRS,
+};
 
 int create_name_file(tupid_t dt, const char *file, struct timespec mtime,
 		     struct tup_entry **entry);

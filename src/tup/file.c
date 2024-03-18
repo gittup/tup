@@ -343,7 +343,7 @@ static int add_node_to_tree(tupid_t dt, const char *filename,
 	if(get_path_elements(filename, &pg) < 0)
 		return -1;
 
-	new_dt = find_dir_tupid_dt_pg(dt, &pg, &pel, 1, full_deps);
+	new_dt = find_dir_tupid_dt_pg(dt, &pg, &pel, SOTGV_CREATE_GHOSTS, full_deps);
 	if(new_dt < 0)
 		return -1;
 	if(new_dt == 0) {
@@ -739,7 +739,7 @@ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
 		}
 
 		tent = NULL;
-		newdt = find_dir_tupid_dt_pg(DOT_DT, &pg, &pel, 0, 0);
+		newdt = find_dir_tupid_dt_pg(DOT_DT, &pg, &pel, SOTGV_NO_GHOST, 0);
 		del_pel_group(&pg);
 		if(newdt > 0) {
 			struct tup_entry *dtent;
