@@ -90,7 +90,7 @@ for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/$monitor ../src
 	echo "  bootstrap CC $CFLAGS $i"
 	# Put -I. first so we find our new luabuiltin.h file, not one built
 	# by a previous invocation of 'tup'.
-	$CC $CFLAGS -c $i -I. -I../src -I../src/pcre $plat_cflags
+	$CC $CFLAGS -c $i -I. -I../src -I../src/pcre -I../src/inih $plat_cflags
 done
 
 echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"

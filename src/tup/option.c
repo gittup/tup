@@ -30,8 +30,11 @@
 #include "compat.h"
 #include "option.h"
 #include "vardb.h"
-#include "inih/ini.h"
 #include "init.h"
+
+/* inih's ini.h */
+#include "ini.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

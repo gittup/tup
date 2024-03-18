@@ -6,4 +6,6 @@ CFLAGS += -Wno-cast-qual
 # Don't need multiline support - we just set some ints.
 CFLAGS += -DINI_ALLOW_MULTILINE=0
 
+ifneq (@(TUP_USE_SYSTEM_INIH),y)
 : foreach *.c |> !cc |>
+endif

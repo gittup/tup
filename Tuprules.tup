@@ -105,6 +105,10 @@ CFLAGS += -I$(TUP_CWD)/src/pcre
 CFLAGS += -DPCRE_STATIC
 endif
 
+ifneq (@(TUP_USE_SYSTEM_INIH),y)
+CFLAGS += -I$(TUP_CWD)/src/inih
+endif
+
 ifeq ($(TUP_SERVER),ldpreload)
 FPIC = -fpic
 SHARED = -shared
