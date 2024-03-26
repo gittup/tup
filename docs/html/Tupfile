@@ -17,6 +17,7 @@ examples += ex_a_first_tupfile.html
 examples += ex_dependencies.html
 examples += ex_generated_header.html
 examples += ex_multiple_directories.html
+examples += ex_explicit_variants.html
 
 luaexamples += ex_lua_examples.html
 

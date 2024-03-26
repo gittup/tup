@@ -51,6 +51,7 @@ span.samefileheader {
 span.filename {
 	font-style: normal;
 	background-color: #ddddff;
+	white-space:nowrap;
 }
 
 span.keyword {
@@ -59,6 +60,7 @@ span.keyword {
 	background-color: #bbbbbb;
 	color: #ffff00;
 	padding: 2px;
+	white-space:nowrap;
 }
 
 span.removed {

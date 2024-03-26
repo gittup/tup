@@ -31,7 +31,7 @@ cat $1
 cat << HERE
 <div style="clear:both;"></div>
 </div>
-<div id="footer">&copy; 2008-2021 Mike Shal. All Rights Reserved.</div>
+<div id="footer">&copy; 2008-2024 Mike Shal. All Rights Reserved.</div>
 HERE
 
 cat << HERE

@@ -1,0 +1,115 @@
+<p>In tup-v0.8, tup changed how it builds variants. This allows variants to work on operating systems without FUSE (eg: Windows), as well as better support external tools like debuggers. Unfortunately this results in a backwards-incompatibility in Tupfiles that were built with variants in prior versions of tup. Users of tup without variants should be unaffected by this change.</p>
+
+<p>In general, Tupfiles that use variants need to do the following:</p>
+<ol>
+  <li>Always use <span class="keyword">%f</span> and <span class="keyword">%o</span> flags when referencing inputs and outputs in the command string of a rule.</li>
+  <li>For cases where you need tell a program where to find generated files that aren't passed explicitly in the command-line (for example, compiler include paths), use <span class="keyword">$(TUP_VARIANTDIR)</span> (or in lua, <span class="keyword">tup.getvariantdir()</span>).
+</ol>
+
+Both of these are covered in more detail in the Explicit Variants section below.
+
+Note that the files listed as the inputs and outputs in a rule do not need to use <span class="keyword">$(TUP_VARIANTDIR)</span> or otherwise reference a build directory.
+
+<h3>Background - old FUSE variants</h3>
+<p>In v0.7.X, tup used a FUSE filesystem overlay to redirect where the output files from a sub-program would actually be written on an underlying filesystem. For example, consider a simple compilation rule:</p>
+<span class="fileheader">sub/Tupfile</span>
+<pre class="code">: foreach *.c |&gt; gcc -c %f -o %o |&gt; %B.o</pre>
+<p>Without variants, this rule will compile all *.c files in the directory <span class="filename">sub/</span> and output the *.o files into the same directory. The actual gcc commands look like the following:</p>
+<pre>
+gcc -c foo.c -o foo.o
+gcc -c bar.c -o bar.o
+</pre>
+
+<p>With v0.7.X variants, the build directory was overlayed on top of the source directory. The FUSE overlay meant that the outputs were written to <span class="filename">build/sub/</span> instead of <span class="filename">sub/</span>, but the gcc commands are identical to the non-variant case. This disconnect between what the program (gcc) thought it was writing to and what it was actually writing to caused issues with other external programs like gdb that would look in the wrong place for source &amp; object files.</p>
+
+<h3>Explicit Variants (v0.8+)</h3>
+<p>Now in v0.8, variants are more explicit in terms of how the sub-program sees the inputs and outputs. Tup will automatically translate variant paths at the when parsing Tupfiles, and pass along the correct filenames to the subprocess. However, the Tupfile rules may need to be variant-aware in order to work properly.</p>
+
+<h4>Using %f and %o</h4>
+<p>Without variants, use of <span class="keyword">%f</span> and <span class="keyword">%o</span> to reference inputs and outputs is optional. For example, the following two Tupfile fragments are equivalent when building in-tree:</p>
+<pre class="code">: |&gt; touch foo |&gt; foo</pre>
+<pre class="code">: |&gt; touch %o |&gt; foo</pre>
+
+<p>Both of these work fine without a variant, but with explicit variants the first case will fail:</p>
+<pre>
+* 0) [build] touch foo
+ *** tup messages ***
+tup error: File '[...]/foo' was written to, but is not in .tup/db.
+You probably should specify it as an output
+tup error: Expected to write to file 'foo' from cmd 12 but didn't
+ *** Command failed due to errors processing the output dependencies.
+ [ ] 100%
+ *** tup: 1 job failed.
+</pre>
+<p>Using <span class="keyword">touch %o</span> instead will pass along the correct <span class="filename">build/foo</span> path to the touch command:</p>
+<pre>
+0) [0.002s] [build] touch build/foo
+[ tup ] [0.028s] Updated.
+</pre>
+
+<p>Note that tup will adjust the paths for both inputs an outputs. For example:</p>
+<pre class="code">
+: |&gt; touch %o |&gt; foo
+: foo |&gt; cat %f &gt; %o |&gt; bar
+</pre>
+
+<p>Without variants, the following commands are run:</p>
+<pre>
+touch foo
+cat foo &gt; bar
+</pre>
+<p>With explicit variants, the commands look like this:</p>
+<pre>
+touch build/foo
+cat build/foo &gt; build/bar
+</pre>
+
+<h4>$(TUP_VARIANTDIR)</h4>
+<p>In some cases, the rules you write won't reference a generated file directly. For example, a script might generate a header file that later compiler commands will consume. However, only the directory for the header file is referenced on the command-line, which you can specify with <span class="keyword">$(TUP_VARIANTDIR)</span>.</p>
+
+<p>In this example, we have a header file that is generated in the <span class="filename">include</span> directory, along with a statically created header file in the same directory. A C file in the <span class="filename">src</span> directory includes both of these headers. With explicit variants, we need to pass include flags for both the regular <span class="filename">include</span> directory as well as the one inside the variant.</p>
+
+<span class="fileheader">Tuprules.tup</span>
+<pre class="code">
+# Add include path for the auto-generated headers inside the variant.
+CFLAGS += -I$(TUP_VARIANTDIR)/include
+
+# Add include path for the statically created headers inside the source tree.
+CFLAGS += -I$(TUP_CWD)/include
+</pre>
+<span class="fileheader">include/Tupfile</span>
+<pre class="code">
+: |&gt; echo '#define GENERATED' &gt; %o |&gt; generated.h
+</pre>
+<span class="fileheader">include/static.h</span>
+<pre class="code">
+#define STATIC 3
+</pre>
+<span class="fileheader">src/Tupfile</span>
+<pre class="code">
+include_rules
+
+: foreach *.c | ../include/generated.h |&gt; gcc $(CFLAGS) -c %f -o %o |&gt; %B.o
+</pre>
+<span class="fileheader">src/foo.c</span>
+<pre class="code">
+#include "static.h"
+#include "generated.h"
+</pre>
+
+
+<p>Without variants, the following commands are run:</p>
+<pre>
+include: echo '#define GENERATED' &gt; generated.h
+src: gcc -I../include -I../include -c foo.c -o foo.o
+</pre>
+
+<p>Note the duplicate (but innocuous) include flags. This is because <span class="keyword">$(TUP_VARIANTDIR)</span> evaluates to the same as <span class="keyword">$(TUP_CWD)</span> when variants are not in use.</p>
+
+<p>With variants, this is the result:</p>
+<pre>
+[build] include: echo '#define GENERATED' &gt; ../build/include/generated.h
+[build] src: gcc -I../build/include -I../include -c foo.c -o ../build/src/foo.o
+</pre>
+
+<p>The generated header file ends up in the <span class="filename">build/include</span> directory while the statically created file remains in the source tree's <span class="filename">include</span> directory. By passing in both include paths we can include both files without any FUSE overlay trickery.</p>
