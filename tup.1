@@ -521,6 +521,9 @@ The filenames from the "order-only inputs" section. This includes the path and e
 .B %b
 Like %f, but is just the basename of the file. The directory part is stripped off. For example, "src/foo.c" would become "foo.c". Individual files can be referenced with %1b, %2b, etc.
 .TP
+.B %D
+Like %f, but is just the dirname of the file. The basename is stripped off. For example, "src/foo.c" would become "src/"
+.TP
 .B %B
 Like %b, but strips the extension. This is most useful in converting an input file into an output file of the same name but with a different extension, since the output file needs to be in the same directory. For example, "src/foo.c" would become "foo". Individual files can be referenced with %1B, %2B, etc.
 .TP
