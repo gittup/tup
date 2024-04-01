@@ -4,36 +4,8 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - run: sudo apt-get install ccache libfuse3-dev build-essential flex bison gperf libncurses5-dev libncursesw5-dev gawk libmpfr-dev libgpm-dev zlib1g-dev yasm graphviz
     - run: pip3 install sh
     - run: ./bootstrap.sh
     - run: cd test && ./test.sh --keep-going
-
-# Currently bootstrap.sh is not supported on Windows, since build.sh is not supported on Windows.
-# However, when it is, this commented-out github action below can be used.
-
-# windows:
-#   runs-on: windows-latest
-#   defaults:
-#     run:
-#       shell: msys2 {0}
-#   steps:
-#   - uses: msys2/setup-msys2@v2
-#     with:
-#       msystem: MINGW64
-#       update: true
-#       install: >-
-#         base-devel
-#   - uses: actions/checkout@v2
-#   - run: ./bootstrap.sh
-#   - run: cd test && ./test.sh --keep-going
-
-#  macos:
-#    runs-on: macos-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - run: brew install macfuse ccache
-#    - run: pip3 install sh
-#    - run: ./bootstrap.sh
-#    - run: cd test && ./test.sh --keep-going
