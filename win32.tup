@@ -1,6 +1,5 @@
-ifdef CC32
-CC32 = @(CC32)
-endif
+CC = x86_64-w64-mingw32-gcc
+CC32 = i686-w64-mingw32-gcc
 
 # Compatibility function prototypes and include path for wrapper functions
 CFLAGS += -include $(TUP_CWD)/src/compat/win32/mingw.h

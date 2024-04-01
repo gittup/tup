@@ -6,17 +6,6 @@ else
 TARGET = @(TUP_PLATFORM)
 endif
 
-ifdef CC
-CC = @(CC)
-else
-ifeq ($(TARGET),win32)
-CC = x86_64-w64-mingw32-gcc
-CC32 = i686-w64-mingw32-gcc
-else
-CC = gcc
-endif
-endif
-
 ifeq (@(TUP_DEBUG),y)
 CFLAGS += -Og
 else
@@ -88,10 +77,23 @@ endif
 !dot = |> ^ DOT %f^ dot -Efontname="Vernada, serif" -Nfontname="Vernada, serif" -Efontsize=10 -Nfontsize=10 -Tpng %f > %o |>
 !cp = |> ^ CP %f -> %o^ cp %f %o |>
 
+# Default to using gcc to compile. This is overridden on some OSes in the
+# included $(TARGET).tup file, and can be overridden by the user in the
+# tup.config file by setting CONFIG_CC (and/or CONFIG_CC32 on Windows).
+CC = gcc
+
 TUP_MONITOR = null
 TUP_SUID_GROUP = root
 TUP_USE_SYSTEM_PCRE = y
 include $(TARGET).tup
+
+ifdef CC
+CC = @(CC)
+endif
+
+ifdef CC32
+CC32 = @(CC32)
+endif
 
 ifdef TUP_USE_SYSTEM_PCRE
 use_system_pcre = @(TUP_USE_SYSTEM_PCRE)
