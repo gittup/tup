@@ -5061,7 +5061,6 @@ int tup_db_read_vars(struct tup_entry *tent, struct tup_entry *vartent, const ch
 int tup_db_delete_tup_config(struct tup_entry *tent)
 {
 	struct half_entry_head subdir_list;
-	char vardict_file[PATH_MAX];
 
 	LIST_INIT(&subdir_list);
 	if(get_dir_entries(tent->tnode.tupid, &subdir_list) < 0)
@@ -5073,18 +5072,6 @@ int tup_db_delete_tup_config(struct tup_entry *tent)
 			return -1;
 		LIST_REMOVE(he, list);
 		free(he);
-	}
-	if(tent->dt == DOT_DT) {
-		snprintf(vardict_file, sizeof(vardict_file), ".tup/vardict");
-	} else {
-		snprintf(vardict_file, sizeof(vardict_file), ".tup/vardict-%s", tent->parent->name.s);
-	}
-	if(unlink(vardict_file) < 0) {
-		if(errno != ENOENT) {
-			perror(vardict_file);
-			fprintf(stderr, "tup error: Unable to remove old vardict file from .tup directory.\n");
-			return -1;
-		}
 	}
 	return 0;
 }

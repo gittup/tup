@@ -21,9 +21,12 @@
 #include "variant.h"
 #include "entry.h"
 #include "db.h"
+#include "config.h"
 #include "container.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
 
 static struct variant_head variant_list = LIST_HEAD_INITIALIZER(&variant_list);
 static struct variant_head disabled_list = LIST_HEAD_INITIALIZER(&disabled_list);
@@ -118,6 +121,13 @@ int variant_rm(struct variant *variant)
 	LIST_REMOVE(variant, list);
 	vardb_close(&variant->vdb);
 	LIST_INSERT_HEAD(&disabled_list, variant, list);
+	if(unlinkat(tup_top_fd(), variant->vardict_file, 0) < 0) {
+		if(errno != ENOENT) {
+			perror(variant->vardict_file);
+			fprintf(stderr, "tup error: Unable to remove old vardict file '%s' from .tup directory.\n", variant->vardict_file);
+			return -1;
+		}
+	}
 	return 0;
 }
 
