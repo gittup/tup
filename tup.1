@@ -1,4 +1,4 @@
-.TH "tup" "1" "2024/05/18" "http://gittup.org/tup" "tup manual"
+.TH "tup" "1" "2024/05/19" "http://gittup.org/tup" "tup manual"
 .\" disable hyphenation/justification
 .nh
 .ad l
@@ -142,7 +142,7 @@ Temporarily override the monitor.autoparse option to 0. This will prevent the mo
 Kills the monitor if it is running. Basically it saves you the trouble of looking up the PID and killing it that way.
 .TP
 .B variant foo.config [bar.config] [...]
-For each argument, this command creates a variant directory with tup.config symlinked to the specified config file. For example, if a directory contained several variant configurations, one could easily create a variant for each config file:
+For each argument, this command creates a variant directory with tup.config symlinked (Windows: copied) to the specified config file. For example, if a directory contained several variant configurations, one could easily create a variant for each config file:
 
 .nf
 $ ls configs/

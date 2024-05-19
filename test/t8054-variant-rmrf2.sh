@@ -18,7 +18,6 @@
 
 # Try to rm -rf multiple variants.
 . ./tup.sh
-check_no_windows tup variant
 
 mkdir sub
 mkdir configs

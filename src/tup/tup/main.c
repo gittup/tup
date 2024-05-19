@@ -65,7 +65,7 @@ static struct help {
 	{"refactor", "ref", "", "The refactor command can be used to help refactor Tupfiles. This will cause tup to run through the parsing phase, but not execute any commands. If any Tupfiles that are parsed result in changes to the database, these are reported as errors."},
 	{"monitor", NULL, "", "*LINUX ONLY* Starts the inotify-based file monitor. The monitor must scan the filesystem once and initialize watches on each directory. Then when you make changes to the files, the monitor will see them and write them directly into the database. With the monitor running, 'tup' does not need to do the initial scan, and can start constructing the build graph immediately."},
 	{"stop", NULL, "", "Kills the monitor if it is running."},
-	{"variant", NULL, "foo.config [bar.config] [...]", "For each argument, this command creates a variant directory with tup.config symlinked to the specified config file."},
+	{"variant", NULL, "foo.config [bar.config] [...]", "For each argument, this command creates a variant directory with tup.config symlinked (Windows: copied) to the specified config file."},
 	{"dbconfig", NULL, "", "Displays the current tup database configuration. These are internal values used by tup."},
 	{"options", NULL, "", "Displays all of the current tup options, as well as where they originated."},
 	{"graph", NULL, "[--dirs] [--ghosts] [--env] [--combine] [--stickies] [<output_1> ... <output_n>]", "Prints out a graphviz .dot format graph of the tup database to stdout. By default it only displays the parts of the graph that have changes. If you provide additional arguments, they are assumed to be files that you want to graph."},
@@ -847,11 +847,23 @@ static int create_variant(const char *config_path)
 		fprintf(stderr, "tup error: linkdest is too small to fit the tup.config symlink destination.\n");
 		return -1;
 	}
+#ifdef _WIN32
+	char srcpath[PATH_MAX];
+	if(snprintf(srcpath, sizeof(srcpath), "%s/%s", get_sub_dir(), config_path) >= (signed)sizeof(srcpath)) {
+		fprintf(stderr, "tup error: srcpath is too small to fit the tup.config source path.\n");
+		return -1;
+	}
+	if(CopyFileA(srcpath, linkdest, TRUE) == 0) {
+		fprintf(stderr, "tup error: Unable to copy the config file %s to destination: %s\n", srcpath, linkdest);
+		return -1;
+	}
+#else
 	if(symlink(linkpath, linkdest) < 0) {
 		perror(linkdest);
 		fprintf(stderr, "tup error: Unable to create tup.config symlink for config file: %s\n", config_path);
 		return -1;
 	}
+#endif
 	printf("tup: Added variant '%s' using config file '%s'\n", dirname, config_path);
 	return 0;
 }

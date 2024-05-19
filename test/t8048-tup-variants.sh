@@ -18,7 +18,6 @@
 
 # Use the 'tup variant' command to create variants from existing config files.
 . ./tup.sh
-check_no_windows tup variant
 
 mkdir configs
 
@@ -43,6 +42,9 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > configs/debug.config
+if [ "$in_windows" = "1" ]; then
+	cp configs/debug.config build-debug/tup.config
+fi
 update
 
 check_exist build-default/bar

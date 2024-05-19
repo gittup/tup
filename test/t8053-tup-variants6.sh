@@ -19,7 +19,6 @@
 # Use the 'tup variant' command on config files further down in the
 # directory structure.
 . ./tup.sh
-check_no_windows tup variant
 
 mkdir sub
 mkdir sub/foo
@@ -48,6 +47,9 @@ tup_object_no_exist build-default build-debug
 tup_object_no_exist build-debug build-default
 
 echo "" > sub/foo/configs/debug
+if [ "$in_windows" = "1" ]; then
+	cp sub/foo/configs/debug build-debug/tup.config
+fi
 update
 
 check_exist build-default/bar

@@ -19,7 +19,6 @@
 # Use the 'tup variant' command when a variant directory already exists and
 # is not empty..
 . ./tup.sh
-check_no_windows tup variant
 
 mkdir build-debug
 mkdir configs

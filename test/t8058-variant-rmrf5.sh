@@ -19,7 +19,6 @@
 # Make sure that if we just scan the removal of a variant, re-create it and
 # scan, then remove it again and update, we go back to an in-tree build.
 . ./tup.sh
-check_no_windows tup variant
 
 mkdir sub
 mkdir configs
