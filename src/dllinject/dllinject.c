@@ -422,7 +422,7 @@ static NtSetInformationFile_t		NtSetInformationFile_orig;
 static access_t				_access_orig;
 static rename_t				rename_orig;
 
-#define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES)
+#define TUP_CREATE_WRITE_FLAGS (GENERIC_WRITE | FILE_APPEND_DATA | FILE_WRITE_DATA)
 /* Including ddk/wdm.h causes other issues, and this is all we need... */
 #define FILE_OPEN_FOR_BACKUP_INTENT 0x00004000
 
@@ -787,10 +787,43 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 	DWORD len = 0;
 	int failed = 0;
 
+	/* * A value of 0 in any field preserves the file's current value for this
+	 *   specific attribute.
+	 * * -1 or -2 in the timestamp fields disable or enable the default
+	 *  timestamp updates for file I/O:
+	 *
+	 *      https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_file_basic_information
+	 *
+	 * * SetFileInformationByHandle() returns ERROR_INVALID_PARAMETER for any
+	 *   other negative number.
+	 *
+	 * * Only process regular files, as calling handle_file_w() on a directory
+	 *   would turn it into a file in tup's database.
+	 */
+	FILE_BASIC_INFORMATION* basic = FileInformation;
+	int relevant_basic_change = (FileInformationClass == FileBasicInformation) && (
+		(int64_t)(basic->CreationTime.QuadPart) >= 1 ||
+		(int64_t)(basic->LastAccessTime.QuadPart) >= 1 ||
+		(int64_t)(basic->LastWriteTime.QuadPart) >= 1 ||
+		(int64_t)(basic->ChangeTime.QuadPart) >= 1 ||
+		basic->FileAttributes != 0
+	);
+	if(relevant_basic_change) {
+		BY_HANDLE_FILE_INFORMATION handle_info;
+		relevant_basic_change = GetFileInformationByHandle(FileHandle, &handle_info);
+		if(!relevant_basic_change) {
+			DEBUG_HOOK("NtSetInformationFile Error - failed to GetFileInformationByHandle\n");
+			failed = 1;
+		} else {
+			relevant_basic_change = !(handle_info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+		}
+	}
+
 	/* We need to get the old path before calling NtSetInformationFile in
 	 * case of a rename, in which case that information is lost.
 	 */
-	if(FileInformationClass == FileRenameInformation ||
+	if(relevant_basic_change ||
+	   FileInformationClass == FileRenameInformation ||
 	   FileInformationClass == FileRenameInformationEx ||
 	   FileInformationClass == FileDispositionInformation) {
 		len = GetFinalPathNameByHandleW(FileHandle, widepath, WIDE_PATH_MAX, FILE_NAME_NORMALIZED);
@@ -831,6 +864,9 @@ NTSTATUS WINAPI NtSetInformationFile_hook(
 			DEBUG_HOOK("NtSetInformationFile[%i]: dont delete on close '%S'\n", FileInformationClass, widepath);
 			handle_file_w(widepath, len, NULL, ACCESS_WRITE);
 		}
+	} else if(relevant_basic_change) {
+		DEBUG_HOOK("NtSetInformationFile[%i]: set basic information '%S'\n", FileInformationClass, widepath);
+		handle_file_w(widepath, len, NULL, ACCESS_WRITE);
 	}
 
 out_exit:
