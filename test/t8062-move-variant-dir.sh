@@ -34,13 +34,18 @@ update
 tup_object_exist build-foo/tup.config FOO
 
 mv build-foo sub
+update_fail_msg "tup error: Please clean out the variant directory of extra files"
+
+# Now remove the extra files from the moved variant so it can be rebuilt.
+rm -rf sub/build-foo/configs
+rm -rf sub/build-foo/sub
 update
 
-# When we move the variant directory and detect with the scanner, all of the
-# generated nodes become normal nodes.
-check_exist sub/foo.o sub/bar.o
+# Now we get files built in the new variant.
 check_exist sub/build-foo/sub/foo.o sub/build-foo/sub/bar.o
 
+# The new tup.config is actually an invalid symlink since it was created with
+# 'tup variant', so we can't read any config variables from it.
 tup_object_no_exist sub/build-foo/tup.config FOO
 
 eotup

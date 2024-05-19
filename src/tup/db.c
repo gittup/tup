@@ -4889,14 +4889,9 @@ static int save_vardict_file(struct vardb *vdb, const char *vardict_file)
 	if(tup_db_var_changed == 0)
 		return 0;
 
-	if(chdir(get_tup_top()) < 0) {
-		perror(get_tup_top());
-		fprintf(stderr, "tup error: Unable to change directory to project root.\n");
-		return -1;
-	}
-	fd = open(vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+	fd = openat(tup_top_fd(), vardict_file, O_CREAT|O_WRONLY|O_TRUNC, 0666);
 	if(fd < 0) {
-		perror("openat");
+		perror(vardict_file);
 		fprintf(stderr, "tup error: Unable to create the vardict file: '%s'\n", vardict_file);
 		return -1;
 	}

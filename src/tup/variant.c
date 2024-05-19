@@ -94,7 +94,16 @@ int variant_add(struct tup_entry *tent, int enabled, struct variant **dest)
 		variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict") + 1;
 	} else {
 		variant->root_variant = 0;
-		variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict-%s", variant->variant_dir+1) + 1;
+
+		/* The vardict naming here could all be vardict-%lli, but for
+		 * backwards compatbility, top-level variants
+		 * (tent->parent->dt == DOT_DT) use the name of the variant.
+		 */
+		if(tent->parent->dt == DOT_DT) {
+			variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict-%s", variant->variant_dir+1) + 1;
+		} else {
+			variant->vardict_len = snprintf(variant->vardict_file, sizeof(variant->vardict_file), ".tup/vardict-%lli", variant->dtnode.tupid) + 1;
+		}
 	}
 	if(variant->vardict_len >= (signed)sizeof(variant->vardict_file)) {
 		fprintf(stderr, "tup error: variant vardict_file is sized incorrectly.\n");

@@ -865,13 +865,6 @@ static int is_valid_variant_tent(struct tup_entry *tent)
 	 */
 	if(tent->type == TUP_NODE_GHOST)
 		return 0;
-
-	/* If the variant directory was moved with the monitor running, the
-	 * build directory no longer has DOT_DT as a parent. We can also remove
-	 * the variant in this case (t8063).
-	 */
-	if(tent->parent && tent->parent->dt != DOT_DT)
-		return 0;
 	return 1;
 }
 

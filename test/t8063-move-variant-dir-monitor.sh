@@ -40,10 +40,11 @@ mv build-foo sub
 update
 
 # When we move the variant directory and detect with the monitor, all of the
-# generated nodes become normal nodes.
-check_exist sub/foo.o sub/bar.o
+# files simply get rebuilt.
 check_exist sub/build-foo/sub/foo.o sub/build-foo/sub/bar.o
 
+# Even though the variant is valid, there are no variables because tup.config
+# is now an invalid symlink.
 tup_object_no_exist sub/build-foo/tup.config FOO
 
 stop_monitor

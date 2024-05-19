@@ -199,17 +199,12 @@ tupid_t tup_file_mod_mtime(tupid_t dt, const char *file, struct timespec mtime,
 	if(new || changed) {
 		if(modified) *modified = 1;
 		if(strcmp(file, TUP_CONFIG) == 0) {
-			/* tup.config only counts if it's at the project root, or if
-			 * it's in a top-level subdirectory for a variant.
+			/* If tup.config was modified, put the node in the
+			 * config list so we can import any variables that
+			 * have changed.
 			 */
-			if(tent->dt == DOT_DT || tent->parent->dt == DOT_DT) {
-				/* If tup.config was modified, put the node in
-				 * the config list so we can import any
-				 * variables that have changed.
-				 */
-				if(tup_db_add_config_list(tent->tnode.tupid) < 0)
-					return -1;
-			}
+			if(tup_db_add_config_list(tent->tnode.tupid) < 0)
+				return -1;
 		}
 	}
 

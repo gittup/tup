@@ -195,16 +195,14 @@ void tup_entry_set_verbose(int verbose)
 /* Returns 0 in case if a root tup entry has been passed and thus nothing has
  * been printed, otherwise 1 is returned.
  */
-static int print_tup_entry_internal(FILE *f, struct tup_entry *tent)
+static int print_tup_entry_internal(FILE *f, struct tup_entry *tent, struct tup_entry *stop_at_tent)
 {
-	/* Skip empty entries, and skip '.' here (tent->parent == NULL) */
-	if(!tent || !tent->parent)
+	/* Skip empty entries, and skip '.' here (tent->parent == NULL), and
+	 * stop if we get to the start of the variant part (stop_at_tent)
+	 */
+	if(!tent || !tent->parent || tent == stop_at_tent)
 		return 0;
-	if(tup_entry_variant_null(tent) != tup_entry_variant_null(tent->parent)) {
-		fprintf(f, "[%s] ", tent->name.s);
-		return 0;
-	}
-	if(print_tup_entry_internal(f, tent->parent))
+	if(print_tup_entry_internal(f, tent->parent, stop_at_tent))
 		fprintf(f, "%c", path_sep());
 	/* Don't print anything for the slash root entry */
 	if(tent->name.s[0] != '/')
@@ -216,23 +214,45 @@ void print_tup_entry(FILE *f, struct tup_entry *tent)
 {
 	const char *name;
 	int name_sz = 0;
+	struct variant *variant;
+	struct tup_entry *variant_part = NULL;
 
 	if(!tent)
 		return;
-	if(print_tup_entry_internal(f, tent->parent)) {
-		if(tent->type == TUP_NODE_CMD) {
-			fprintf(f, ": ");
-		} else {
-			fprintf(f, "%c", path_sep());
+
+	/* If we're in a variant, first print the variant part of the path in
+	 * brackets, like: [build/debug]
+	 */
+	variant = tup_entry_variant_null(tent);
+	if(tent->parent && variant && !variant->root_variant) {
+		fprintf(f, "[");
+		variant_part = tent;
+		while(variant_part && variant_part->parent && tup_entry_variant_null(variant_part->parent) == variant) {
+			variant_part = variant_part->parent;
 		}
+		print_tup_entry_internal(f, variant_part, NULL);
+		fprintf(f, "] ");
 	}
-	if(tent->parent && tup_entry_variant_null(tent) != tup_entry_variant_null(tent->parent)) {
-		fprintf(f, "[%s] ", tent->name.s);
-		name = ".";
-		name_sz = 1;
-	} else {
+
+	/* Now print the rest of the path */
+	if(tent != variant_part) {
+		if(print_tup_entry_internal(f, tent->parent, variant_part)) {
+			if(tent->type == TUP_NODE_CMD) {
+				fprintf(f, ": ");
+			} else {
+				fprintf(f, "%c", path_sep());
+			}
+		}
 		name = tent->name.s;
 		name_sz = tent->name.len;
+	} else {
+		/* If we're printing the variant directory itself (like the
+		 * path to build-debug or builds/debug, then print just a "."
+		 * since the whole path itself will be included in the variant
+		 * brackets earlier.
+		 */
+		name = ".";
+		name_sz = 1;
 	}
 	if(!do_verbose && tent->display) {
 		name = tent->display;
