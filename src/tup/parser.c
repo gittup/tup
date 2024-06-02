@@ -1032,10 +1032,6 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 	while(p[0]) {
 		char *newline;
 		rslno++;
-		if(p[0] != ':') {
-			fprintf(tf->f, "tup error: run-script line %i is not a :-rule - '%s'\n", rslno, p);
-			goto out_err;
-		}
 		newline = strchr(p, '\n');
 		if(!newline) {
 			fprintf(tf->f, "tup error: Missing newline from :-rule in run script: '%s'\n", p);
@@ -1044,8 +1040,18 @@ int exec_run_script(struct tupfile *tf, const char *cmdline, int lno)
 		*newline = 0;
 		if(debug_run)
 			fprintf(tf->f, "%s\n", p);
-		if(parse_rule(tf, p+1, lno) < 0) {
-			fprintf(tf->f, "tup error: Unable to parse :-rule from run script: '%s'\n", p);
+		if(p[0] == ':') {
+			if(parse_rule(tf, p+1, lno) < 0) {
+				fprintf(tf->f, "tup error: Unable to parse :-rule from run script: '%s'\n", p);
+				goto out_err;
+			}
+		} else if(p[0] == '#' || p[0] == 0) {
+			/* Skip comments and blank lines */
+			if(debug_run) {
+				fprintf(tf->f, "Skipping non :-rule line %i: %s\n", rslno, p);
+			}
+		} else {
+			fprintf(tf->f, "tup error: run-script line %i is not a :-rule - '%s'\n", rslno, p);
 			goto out_err;
 		}
 		p = newline + 1;
