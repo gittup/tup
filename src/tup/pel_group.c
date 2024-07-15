@@ -47,6 +47,8 @@ int pel_ignored(const char *path, int len)
 		return 1;
 	if(len == 4 && strncmp(path, ".svn", 4) == 0)
 		return 1;
+	if(len == 6 && strncmp(path, "_darcs", 6) == 0)
+		return 1;
 	if(len == 7 && strncmp(path, ".ccache", 7) == 0)
 		return 1;
 	/* See also fuse_fs.c:is_hidden() */
@@ -169,7 +171,7 @@ int get_path_elements(const char *path, struct pel_group *pg)
 	}
 
 	TAILQ_FOREACH(pel, &pg->path_list, list) {
-		if(pel->path[0] == '.') {
+		if(pel->path[0] == '.' || pel->path[0] == '_') {
 			if(pel->len == 2 && strncmp(pel->path, "..", 2) == 0) {
 				/* .. paths are ignored */
 			} else if(pel_ignored(pel->path,  pel->len)) {
