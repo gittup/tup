@@ -47,6 +47,8 @@ int pel_ignored(const char *path, int len)
 		return 1;
 	if(len == 4 && strncmp(path, ".svn", 4) == 0)
 		return 1;
+	if(len == 6 && strncmp(path, ".pijul", 6) == 0)
+		return 1;
 	if(len == 6 && strncmp(path, "_darcs", 6) == 0)
 		return 1;
 	if(len == 7 && strncmp(path, ".ccache", 7) == 0)
