@@ -724,6 +724,14 @@ static int ignore_file(const char *file)
 		return 1;
 	if(strncmp(file, "/proc/", 6) == 0)
 		return 1;
+	if(strncmp(file, "/var/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/run/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/tmp/", 5) == 0)
+		return 1;
+	if(strncmp(file, "/usr/", 5) == 0)
+		return 1;
 	if(is_ccache_path(file))
 		return 1;
 	return 0;

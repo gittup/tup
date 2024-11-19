@@ -255,7 +255,11 @@ static int db_open(void)
 
 	if(tup_db)
 		return 0;
+#ifdef USE_DOTLOCK
+	if(sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, "unix-dotfile") != 0) {
+#else
 	if(sqlite3_open_v2(TUP_DB_FILE, &tup_db, SQLITE_OPEN_READWRITE, NULL) != 0) {
+#endif
 		fprintf(stderr, "Unable to open database: %s\n",
 			sqlite3_errmsg(tup_db));
 		return -1;
@@ -334,7 +338,11 @@ int tup_db_create(int db_sync, int memory_db)
 	} else {
 		dbname = TUP_DB_FILE;
 	}
-	rc = sqlite3_open(dbname, &tup_db);
+#ifdef USE_DOTLOCK
+	rc = sqlite3_open_v2(dbname, &tup_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, "unix-dotfile");
+#else
+	rc = sqlite3_open_v2(dbname, &tup_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
+#endif
 	if(rc == 0) {
 		printf(".tup repository initialized: %s\n", dbname);
 	} else {
