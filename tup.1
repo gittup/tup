@@ -683,7 +683,7 @@ endif
 Same as 'ifeq', but with the logic inverted.
 .TP
 .B ifdef VARIABLE
-Tests of the @-variable named VARIABLE is defined at all in tup.config. If so, all lines between the 'ifdef' and following 'endif' statement are processed; otherwise, they are ignored. For example, suppose tup.config contains:
+Tests if the @-variable named VARIABLE is defined at all in tup.config. If so, all lines between the 'ifdef' and following 'endif' statement are processed; otherwise, they are ignored. For example, suppose tup.config contains:
 .nf
 
 CONFIG_FOO=n
