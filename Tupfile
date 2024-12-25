@@ -45,10 +45,12 @@ suid = ; chown root:$(TUP_SUID_GROUP) tup; chmod u+s tup
 endif
 
 ifeq ($(TUP_SERVER),fuse)
+export PKG_CONFIG_PATH
 LDFLAGS += `pkg-config fuse --libs`
 endif
 
 ifeq ($(TUP_SERVER),fuse3)
+export PKG_CONFIG_PATH
 LDFLAGS += `pkg-config fuse3 --libs`
 endif
 
