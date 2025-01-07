@@ -38,6 +38,15 @@ brew install tup
 <p>If you use <a href="http://www.macports.org/"/>MacPorts</a> install tup as:</p>
 <pre>sudo port install tup</pre>
 
+<h4>Flatpak</h4>
+<p>Tup is available as a Freedesktop SDK extension for use during the build process of a Flatpak package:</p>
+<pre>
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.tup
+build-options:
+  - append-path: /usr/lib/sdk/tup/bin
+</pre>
+
 <h2>Why tup?</h2>
 <p>You can use tup anywhere you would use another build system (like make, or any of its derivatives). One reason you would want to use tup is if you like to update things very quickly. For example, if you typically execute a build in a subdirectory because it takes too long to figure out what to do when you execute the build from the top, you might want to look into tup. Unfortunately, tup is so fast that your <a href="http://xkcd.com/303/">chair mounted jousting</a> might suffer. I apologize in advance if someone besmirches your honor and you are unable to properly defend yourself as a result.</p>
 
