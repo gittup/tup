@@ -25,8 +25,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define USE_DOTLOCK
-
 #ifdef USE_DOTLOCK
 #include "tup/config.h"
 #include <sys/stat.h>
