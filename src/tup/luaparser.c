@@ -815,9 +815,10 @@ int tup_lua_parser_new_state(void)
 
 int parse_lua_include_rules(struct tupfile *tf)
 {
+	int top = lua_gettop(gls);
 	if(parser_include_rules(tf, "Tuprules.lua") < 0) {
 		if(tf->luaerror == TUPLUA_PENDINGERROR) {
-			assert(lua_gettop(gls) == 2);
+			assert(lua_gettop(gls) == top + 2);
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(gls, -1));
 			lua_pop(gls, 1);
 			tf->luaerror = TUPLUA_ERRORSHOWN;
@@ -830,13 +831,14 @@ int parse_lua_include_rules(struct tupfile *tf)
 int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 {
 	struct tuplua_reader_data lrd = {b, 0};
+	int top = lua_gettop(gls);
 
 	lua_getfield(gls, LUA_REGISTRYINDEX, "tup_traceback");
 
 	if(lua_load(gls, &tuplua_reader, &lrd, name, 0) != LUA_OK) {
 		fprintf(tf->f, "tup error %s\n", tuplua_tostring(gls, -1));
 		tf->luaerror = TUPLUA_PENDINGERROR;
-		assert(lua_gettop(gls) == 2);
+		assert(lua_gettop(gls) == top + 2);
 		return -1;
 	}
 
@@ -849,7 +851,7 @@ int parse_lua_tupfile(struct tupfile *tf, struct buf *b, const char *name)
 			fprintf(tf->f, "tup error %s\n", tuplua_tostring(gls, -1));
 		tf->luaerror = TUPLUA_ERRORSHOWN;
 		lua_pop(gls, 2);
-		assert(lua_gettop(gls) == 0);
+		assert(lua_gettop(gls) == top);
 		return -1;
 	}
 
