@@ -857,6 +857,7 @@ static int tup_fs_unlink(const char *path)
 {
 	struct mapping *map;
 	struct file_info *finfo;
+	struct tup_entry *match = NULL;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -870,10 +871,16 @@ static int tup_fs_unlink(const char *path)
 			put_finfo(finfo);
 			tup_fuse_handle_file(path, NULL, ACCESS_UNLINK);
 			return 0;
+		} else {
+			const char *peeled = peel(path);
+			if(exclusion_match(stderr, &finfo->exclusion_root, peeled, &match) < 0) {
+				put_finfo(finfo);
+				return -ENOSYS;
+			}
 		}
 		put_finfo(finfo);
 	}
-	if(strstr(path, ".fuse_hidden") != NULL) {
+	if(match || strstr(path, ".fuse_hidden") != NULL) {
 		/* Similar to the rename check for .fuse_hidden, this shows up
 		 * in Arch sometimes.
 		 */
@@ -892,9 +899,10 @@ static int tup_fs_unlink(const char *path)
 static int tup_fs_rmdir(const char *path)
 {
 	struct tmpdir *tmpdir;
-	const char *peeled;
+	const char *peeled = NULL;
 	struct file_info *finfo;
 	struct mapping *map;
+	struct tup_entry *match = NULL;
 
 	if(context_check() < 0)
 		return -EPERM;
@@ -928,7 +936,19 @@ static int tup_fs_rmdir(const char *path)
 				return 0;
 			}
 		}
+
+		if(exclusion_match(stderr, &finfo->exclusion_root, peeled, &match) < 0) {
+			put_finfo(finfo);
+			return -ENOSYS;
+		}
+
 		put_finfo(finfo);
+	}
+	if (match) {
+		int res = rmdir(peeled);
+		if(res < 0)
+			return -errno;
+		return 0;
 	}
 	fprintf(stderr, "tup error: Unable to rmdir a directory not created during this job: %s\n", peel(path));
 	return -EPERM;
