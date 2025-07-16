@@ -1480,9 +1480,17 @@ static void *tup_fs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
 static void *tup_fs_init(struct fuse_conn_info *conn)
 #endif
 {
-	(void) conn;
 #ifdef FUSE3
 	(void) cfg;
+
+	/* Tup doesn't support readdirplus. tup_fs_readdir() could be changed
+	 * to be similar to fuse/example/passthrough_fh.c (along with
+	 * simple opendir() / releasedir() wrappers), but I'm not sure how to
+	 * support the mapped files & tmpdirs correctly.
+	 */
+	conn->want = conn->want & ~FUSE_CAP_READDIRPLUS;
+#else
+	(void) conn;
 #endif
 	pthread_mutex_lock(&init_lock);
 	fuse_inited = 1;
