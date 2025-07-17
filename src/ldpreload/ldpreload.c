@@ -640,6 +640,13 @@ static void handle_file_locked(const char *dirname, int dirlen, const char *file
 		return;
 	if(ignore_file(file2))
 		return;
+	if(depfd < 0) {
+		/* Skip any files read before our static initializer is
+		 * called. This can happen if another library has a static
+		 * initializer that does file opens.
+		 */
+		return;
+	}
 
 	if(tup_flock(depfd) < 0) {
 		fprintf(stderr, "tup error: Unable to lock dependency file for writing [%i]: (file event = %s)\n", depfd, file);
