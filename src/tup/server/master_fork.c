@@ -101,13 +101,12 @@ static int deny_setgroups(pid_t pid)
 			 */
 			return 0;
 		}
-		perror(filename);
-		fprintf(stderr, "tup error: Unable to deny setgroups when setting up user namespace.\n");
+		fprintf(stderr, "tup warning: Unable to deny setgroups when setting up the user namespace.\n");
 		return -1;
 	}
 	if(write(fd, "deny", 4) < 0) {
 		perror(filename);
-		fprintf(stderr, "tup error: Unable to write \"deny\" to setgroups.\n");
+		fprintf(stderr, "tup warning: Unable to write \"deny\" to setgroups.\n");
 		return -1;
 	}
 	close(fd);
@@ -139,7 +138,14 @@ static int update_map(pid_t pid, const char *mapfile, uid_t id)
 	close(fd);
 	return 0;
 }
+
 #endif
+
+static void disable_namespacing_hint(void)
+{
+	fprintf(stderr, "tup warning: Trying without namespacing enabled. Subprocesses will have '.tup/mnt' paths for the current working directory and some dependencies may be missed.\n");
+	fprintf(stderr, "You may need to update the apparmor profile in order to enable namespacing properly in tup (make sure the path in apparmor matches the path of the tup executable), or you can run tup with TUP_NO_NAMESPACING=1 to disable this warning.\n");
+}
 
 int server_pre_init(void)
 {
@@ -176,11 +182,27 @@ int server_pre_init(void)
 			uid_t origgid = getgid();
 			pid_t pid = getpid();
 			if(unshare(CLONE_NEWUSER) < 0) {
-				fprintf(stderr, "tup warning: unshare(CLONE_NEWUSER) failed, and tup is not privileged. Subprocesses will have '.tup/mnt' paths for the current working directory and some dependencies may be missed.\n");
+				fprintf(stderr, "tup warning: unshare(CLONE_NEWUSER) failed, and tup is not privileged.\n");
+				disable_namespacing_hint();
 				use_namespacing = 0;
 			} else {
-				if(deny_setgroups(pid) < 0)
-					return -1;
+				if(deny_setgroups(pid) < 0) {
+					/* If apparmor is preventing
+					 * unshare(CLONE_NEWUSER) from getting
+					 * CAP_SYS_ADMIN, we will fail here.
+					 *
+					 * See https://github.com/gittup/tup/issues/502
+					 */
+					/* Write a special "2" token to the socket so the parent will
+					 * know to retry without namespacing.
+					 */
+					close(msd[1]);
+					if(write(msd[0], "2", 1) < 0) {
+						perror("write");
+					}
+					/* Exit out of this child process, the parent process will try to re-create another. */
+					exit(1);
+				}
 				if(update_map(pid, "uid_map", origuid) < 0)
 					return -1;
 				if(update_map(pid, "gid_map", origgid) < 0)
@@ -202,6 +224,7 @@ int server_pre_init(void)
 		}
 		exit(master_fork_loop());
 	}
+
 	if(close(msd[0]) < 0) {
 		perror("close(msd[0])");
 		return -1;
@@ -212,6 +235,18 @@ read_rc_again:
 		if(errno == EINTR) goto read_rc_again;
 		perror("read");
 		return -1;
+	}
+	if(c == '2' && use_namespacing) {
+		int status;
+		close(msd[1]);
+		if(waitpid(master_fork_pid, &status, 0) < 0) {
+			perror("waitpid");
+			return -1;
+		}
+
+		disable_namespacing_hint();
+		use_namespacing = 0;
+		return server_pre_init();
 	}
 	if(rc == 0 || c != '1') {
 		fprintf(stderr, "tup error: master_fork server did not start up correctly.\n");

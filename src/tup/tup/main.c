@@ -202,12 +202,33 @@ int main(int argc, char **argv)
 		tup_valgrind_cleanup();
 		return 0;
 	} else if(strcmp(cmd, "privileged") == 0) {
-#ifdef __linux__
-		if(unshare(CLONE_NEWUSER) == 0) {
+		if(tup_privileged())
 			return 1;
+#ifdef __linux__
+		/* If we're not privileged, we can still pretend that we are
+		 * if we can create a new user namespace.
+		 */
+		if(unshare(CLONE_NEWUSER) < 0) {
+			return 0;
 		}
+		int fd;
+		char filename[PATH_MAX];
+
+		/* Even if we can create a new user namespace, apparmor may
+		 * prevent it from getting CAP_SYS_ADMIN. The easiest way to
+		 * check (and the actual failure path in master_fork.c) is to
+		 * see if we can open the setgroups file for write.
+		 */
+		snprintf(filename, sizeof(filename), "/proc/%i/setgroups", getpid());
+		filename[sizeof(filename)-1] = 0;
+		fd = open(filename, O_WRONLY);
+		if(fd < 0) {
+			return 0;
+		}
+		return 1;
+#else
+		return 0;
 #endif
-		return tup_privileged();
 	} else if(strcmp(cmd, "server") == 0) {
 		printf("%s\n", TUP_SERVER);
 		return 0;
