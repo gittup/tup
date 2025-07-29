@@ -101,6 +101,12 @@ static int is_hidden(const char *path)
 		return 1;
 	if(strstr(path, "/.bzr") != NULL)
 		return 1;
+	if(strstr(path, "/.pijul") != NULL)
+		return 1;
+	if(strstr(path, "/_darcs") != NULL)
+		return 1;
+	if(strstr(path, "/.direnv") != NULL)
+		return 1;
 	if(is_ccache_path(path))
 		return 1;
 	return 0;
