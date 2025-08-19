@@ -44,9 +44,9 @@ const char *tup_platform = "netbsd";
 const char *tup_arch = "x86_64";
 #elif __i386__
 const char *tup_arch = "i386";
-#elif __powerpc__
+#elif __powerpc__ || __ppc__
 const char *tup_arch = "powerpc";
-#elif __powerpc64__
+#elif __powerpc64__ || __ppc64__
 const char *tup_arch = "powerpc64";
 #elif __ia64__
 const char *tup_arch = "ia64";
