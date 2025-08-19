@@ -274,6 +274,7 @@ The options are read in the following precedence order:
 .nf
   command-line overrides (eg: -j flag passed to 'tup')
   \&.tup/options file
+  ${XDG_CONFIG_HOME:-$HOME/.config}/tup/options
   ~/.tupoptions file
   /etc/tup/options file
   tup's compiled in defaults
