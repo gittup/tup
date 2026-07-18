@@ -46,7 +46,12 @@ static int add_parser_files_locked(struct file_info *finfo,
 				   struct tent_entries *root, tupid_t vardt,
 				   int full_deps);
 
-static _Thread_local struct mempool pool = MEMPOOL_INITIALIZER(struct file_entry);
+// Note it will not work with per-thread pools here because all the allocation
+// is done by the fuse server thread while all the free is done by the
+// worker threads. Thus the free'd memory cannot be reused by the fuse server 
+// thread so the memory usage just keeps growing.
+static struct mempool pool = MEMPOOL_INITIALIZER(struct file_entry);
+static pthread_mutex_t pool_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int init_file_info(struct file_info *info, int do_unlink)
 {
@@ -549,7 +554,9 @@ static struct file_entry *new_entry(const char *filename)
 {
 	struct file_entry *fent;
 
+	pthread_mutex_lock(&pool_lock);
 	fent = mempool_alloc(&pool);
+	pthread_mutex_unlock(&pool_lock);
 	if(!fent) {
 		return NULL;
 	}
@@ -557,7 +564,9 @@ static struct file_entry *new_entry(const char *filename)
 	fent->filename = strdup(filename);
 	if(!fent->filename) {
 		perror("strdup");
+		pthread_mutex_lock(&pool_lock);
 		mempool_free(&pool, fent);
+		pthread_mutex_unlock(&pool_lock);
 		return NULL;
 	}
 	return fent;
@@ -567,7 +576,9 @@ void del_file_entry(struct file_entry_head *head, struct file_entry *fent)
 {
 	TAILQ_REMOVE(head, fent, list);
 	free(fent->filename);
+	pthread_mutex_lock(&pool_lock);
 	mempool_free(&pool, fent);
+	pthread_mutex_unlock(&pool_lock);
 }
 
 int handle_rename(const char *from, const char *to, struct file_info *info)

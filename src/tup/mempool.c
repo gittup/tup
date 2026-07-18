@@ -48,7 +48,7 @@ void *mempool_alloc(struct mempool *pool)
 		 * memory allocated here is not freed until the program quits.
 		 */
 		if(pool->item_size < sizeof(struct mementry)) {
-			fprintf(stderr, "tup internal error: mempool item size too small: %i\n", pool->item_size);
+			fprintf(stderr, "tup internal error: mempool item size too small: %zu\n", pool->item_size);
 			return NULL;
 		}
 
@@ -79,7 +79,7 @@ void *mempool_alloc(struct mempool *pool)
 	 * next item from the pool's memory.
 	 */
 	if(((uintptr_t)pool->mem & (pool->alignment-1)) != 0) {
-		fprintf(stderr, "tup internal error: memory address in mempool (%p) not aligned to %u bytes.\n", pool->mem, pool->alignment);
+		fprintf(stderr, "tup internal error: memory address in mempool (%p) not aligned to %zu bytes.\n", pool->mem, pool->alignment);
 		return NULL;
 	}
 	ret = (void*)pool->mem;

@@ -23,6 +23,8 @@
 
 #include "bsd/queue.h"
 
+#include <stddef.h>
+
 struct mementry {
 	SLIST_ENTRY(mementry) list;
 };
@@ -30,10 +32,10 @@ SLIST_HEAD(mementry_head, mementry);
 
 struct mempool {
 	struct mementry_head free_list;
-	unsigned int item_size;
-	unsigned int next_alloc_size;
-	unsigned int alignment;
-	int free_count;
+	size_t item_size;
+	size_t next_alloc_size;
+	size_t alignment;
+	size_t free_count;
 	char *mem;
 };
 TAILQ_HEAD(mempool_head, mempool);
