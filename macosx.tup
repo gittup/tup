@@ -6,3 +6,6 @@ CFLAGS += -include compat/macosx.h
 TUP_SUID_GROUP = wheel
 
 TUP_SERVER = fuse
+TUP_MONITOR = fsevents
+TUP_LOCKING = flock
+LDFLAGS += -framework CoreServices

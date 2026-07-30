@@ -123,6 +123,30 @@ void tup_lock_closeall(void)
 	tup_lock_close(sh_lock);
 }
 
+int tup_lock_reopen(void)
+{
+	/* After fork(), flock(2) locks are shared with the parent because
+	 * they are per-file-description. Re-open the lock files to get
+	 * independent file descriptions, then close the inherited ones.
+	 * Open first so we never lack an fd for any lock file.
+	 */
+	tup_lock_t old_sh = sh_lock;
+	tup_lock_t old_obj = obj_lock;
+	tup_lock_t old_tri = tri_lock;
+
+	if(tup_lock_open(tup_top_fd(), TUP_SHARED_LOCK, &sh_lock) < 0)
+		return -1;
+	if(tup_lock_open(tup_top_fd(), TUP_OBJECT_LOCK, &obj_lock) < 0)
+		return -1;
+	if(tup_lock_open(tup_top_fd(), TUP_TRI_LOCK, &tri_lock) < 0)
+		return -1;
+
+	tup_lock_close(old_sh);
+	tup_lock_close(old_obj);
+	tup_lock_close(old_tri);
+	return 0;
+}
+
 tup_lock_t tup_sh_lock(void)
 {
 	return sh_lock;

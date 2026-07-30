@@ -49,7 +49,7 @@
 #include <sys/stat.h>
 #include "sqlite3/sqlite3.h"
 
-#define DB_VERSION 19
+#define DB_VERSION 20
 #define PARSER_VERSION 16
 
 enum {
@@ -71,6 +71,8 @@ enum {
 	DB_SET_FLAGS,
 	DB_SET_TYPE,
 	DB_SET_MTIME,
+	DB_SET_INUM,
+	DB_SELECT_BY_INUM,
 	DB_SET_SRCID,
 	DB_PRINT,
 	DB_REBUILD_ALL,
@@ -310,7 +312,7 @@ int tup_db_create(int db_sync, int memory_db)
 	int x;
 	const char *dbname;
 	const char *sql[] = {
-		"create table node (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, mtime_ns integer not null, srcid integer not null, name varchar(4096), display varchar(4096), flags varchar(256), unique(dir, name))",
+		"create table node (id integer primary key not null, dir integer not null, type integer not null, mtime integer not null, mtime_ns integer not null, srcid integer not null, name varchar(4096), display varchar(4096), flags varchar(256), inum integer not null default 0, unique(dir, name))",
 		"create table normal_link (from_id integer, to_id integer, unique(from_id, to_id))",
 		"create table sticky_link (from_id integer, to_id integer, unique(from_id, to_id))",
 		"create table group_link (from_id integer, to_id integer, cmdid integer, unique(from_id, to_id, cmdid))",
@@ -326,7 +328,7 @@ int tup_db_create(int db_sync, int memory_db)
 		"create index group_index2 on group_link(cmdid)",
 		"create index srcid_index on node(srcid)",
 		"insert into config values('db_version', 0)",
-		"insert into node values(1, 0, 2, -1, 0, -1, '.', NULL, NULL)",
+		"insert into node values(1, 0, 2, -1, 0, -1, '.', NULL, NULL, 0)",
 	};
 
 	if(memory_db) {
@@ -660,6 +662,13 @@ static int version_check(void)
 			"Added an mtime_ns column for nanosecond timestamp resolution.",
 			{
 				"alter table node add column mtime_ns integer default 0",
+			}
+		},
+		{
+			/* Upgrade to version 20 */
+			"Added an inum column to record each node's inode so the scanner can detect renames (mv a b) instead of treating the moved entries as a delete+create. The macOS FSEvents monitor needs this — its bulk-rescan model cannot otherwise preserve TUP_NODE_GENERATED identity for files carried across a directory rename.",
+			{
+				"alter table node add column inum integer not null default 0",
 			}
 		},
 	};
@@ -2276,6 +2285,114 @@ int tup_db_set_mtime(struct tup_entry *tent, struct timespec mtime)
 
 	tent->mtime = mtime;
 	return 0;
+}
+
+int tup_db_set_inum(tupid_t tupid, ino_t inum)
+{
+	int rc;
+	sqlite3_stmt **stmt = &stmts[DB_SET_INUM];
+	static char s[] = "update node set inum=? where id=?";
+
+	transaction_check("%s [%llu, %lli]", s, (unsigned long long)inum, tupid);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, (sqlite3_int64)inum) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(sqlite3_bind_int64(*stmt, 2, tupid) != 0) {
+		fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+
+	rc = sqlite3_step(*stmt);
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc != SQLITE_DONE) {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	return 0;
+}
+
+/* Look up a tup_entry by inode. Returns 0 with *tent set on success
+ * (or NULL if no match). Excludes inum=0 — that's the migration
+ * default for nodes whose inode hasn't been captured yet, and would
+ * otherwise produce a false rename-match against any unrecorded node.
+ *
+ * Scoped to TUP_NODE_FILE / TUP_NODE_GENERATED / TUP_NODE_DIR /
+ * TUP_NODE_GENERATED_DIR: those are the types the scanner stats and
+ * records inodes for. Other types (CMD, VAR, GHOST, GROUP, ROOT)
+ * have inum=0 by construction.
+ */
+int tup_db_select_tent_by_inum(ino_t inum, struct tup_entry **tent)
+{
+	int rc;
+	int dbrc;
+	sqlite3_stmt **stmt = &stmts[DB_SELECT_BY_INUM];
+	static char s[] = "select id from node where inum=? and (type=? or type=? or type=? or type=?) limit 1";
+	tupid_t tupid;
+
+	*tent = NULL;
+	if(inum == 0)
+		return 0;
+
+	transaction_check("%s [%llu]", s, (unsigned long long)inum);
+	if(!*stmt) {
+		if(sqlite3_prepare_v2(tup_db, s, sizeof(s), stmt, NULL) != 0) {
+			fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(tup_db));
+			fprintf(stderr, "Statement was: %s\n", s);
+			return -1;
+		}
+	}
+
+	if(sqlite3_bind_int64(*stmt, 1, (sqlite3_int64)inum) != 0) goto bind_err;
+	if(sqlite3_bind_int(*stmt, 2, TUP_NODE_FILE) != 0) goto bind_err;
+	if(sqlite3_bind_int(*stmt, 3, TUP_NODE_GENERATED) != 0) goto bind_err;
+	if(sqlite3_bind_int(*stmt, 4, TUP_NODE_DIR) != 0) goto bind_err;
+	if(sqlite3_bind_int(*stmt, 5, TUP_NODE_GENERATED_DIR) != 0) goto bind_err;
+
+	dbrc = sqlite3_step(*stmt);
+	if(dbrc == SQLITE_ROW) {
+		tupid = sqlite3_column_int64(*stmt, 0);
+		rc = 0;
+	} else if(dbrc == SQLITE_DONE) {
+		tupid = -1;
+		rc = 0;
+	} else {
+		fprintf(stderr, "SQL step error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		rc = -1;
+	}
+
+	if(msqlite3_reset(*stmt) != 0) {
+		fprintf(stderr, "SQL reset error: %s\n", sqlite3_errmsg(tup_db));
+		fprintf(stderr, "Statement was: %s\n", s);
+		return -1;
+	}
+	if(rc < 0)
+		return -1;
+	if(tupid >= 0) {
+		if(tup_entry_add(tupid, tent) < 0)
+			return -1;
+	}
+	return 0;
+bind_err:
+	fprintf(stderr, "SQL bind error: %s\n", sqlite3_errmsg(tup_db));
+	fprintf(stderr, "Statement was: %s\n", s);
+	return -1;
 }
 
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid)

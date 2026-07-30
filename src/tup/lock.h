@@ -43,6 +43,12 @@ void tup_lock_exit(void);
 /** Just closes the locks. This should by called by any forked processes. */
 void tup_lock_closeall(void);
 
+/** Re-opens lock files after fork to get independent file descriptions.
+ * Required when using flock(2) because flock locks are per-file-description
+ * and are shared across fork.
+ */
+int tup_lock_reopen(void);
+
 /* Tri-lock functions */
 tup_lock_t tup_sh_lock(void);
 tup_lock_t tup_obj_lock(void);

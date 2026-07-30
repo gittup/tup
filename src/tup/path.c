@@ -39,8 +39,82 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+/* Set by the FSEvents monitor around do_scan. tup_scan and the
+ * one-shot updater leave it off.
+ */
+static int detect_rename_enabled = 0;
+
+void watch_path_set_detect_rename(int enable)
+{
+	detect_rename_enabled = enable;
+}
+
+/* If the on-disk entry at (dt, file) has no matching tent but its
+ * inode matches a tent elsewhere in the db, this is a rename (mv).
+ * Reparent the existing tent here so its type and history (e.g.
+ * TUP_NODE_GENERATED, dependent commands) are preserved instead of
+ * blown away.
+ *
+ * Returns 0 on success (whether or not a rename was detected),
+ * -1 on error. Sets *renamed=1 when reparenting happened; the
+ * caller can then short-circuit the normal create path.
+ */
+static int detect_rename(tupid_t dt, const char *file, ino_t inum,
+                         enum TUP_NODE_TYPE expected_type, int *renamed)
+{
+	struct tup_entry *dtent;
+	struct tup_entry *existing;
+	struct tup_entry *here;
+
+	if(renamed)
+		*renamed = 0;
+	if(!detect_rename_enabled)
+		return 0;
+	if(inum == 0)
+		return 0;
+	if(dt == 0)
+		return 0;
+	if(tup_entry_add(dt, &dtent) < 0)
+		return -1;
+	if(tup_db_select_tent(dtent, file, &here) < 0)
+		return -1;
+	if(here)
+		return 0;
+	if(tup_db_select_tent_by_inum(inum, &existing) < 0)
+		return -1;
+	if(!existing)
+		return 0;
+	/* Only reparent like-kinds: a file move maps file→file, a dir
+	 * move maps dir→dir. Cross-kind matches (inode reuse after a
+	 * delete) would corrupt the db.
+	 */
+	if(expected_type == TUP_NODE_DIR) {
+		if(existing->type != TUP_NODE_DIR &&
+		   existing->type != TUP_NODE_GENERATED_DIR)
+			return 0;
+	} else {
+		if(existing->type != TUP_NODE_FILE &&
+		   existing->type != TUP_NODE_GENERATED)
+			return 0;
+	}
+	if(existing->dt == dt && strcmp(existing->name.s, file) == 0)
+		return 0;
+	/* tup_db_change_node does the rename plus recurse_modify_dir,
+	 * which flags every descendant for re-evaluation and propagates
+	 * dependent flags through the variant mirrors. This is needed
+	 * for cases like t8038 where the parent's Tupfile globs the
+	 * renamed dir's old name and must be re-parsed to catch the
+	 * broken reference.
+	 */
+	if(tup_db_change_node(existing->tnode.tupid, file, dtent) < 0)
+		return -1;
+	if(renamed)
+		*renamed = 1;
+	return 0;
+}
+
 static int watch_path_internal(tupid_t dt, const char *file,
-			       int (*callback)(tupid_t newdt, const char *file, int *skip))
+                               int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
 	struct flist f = FLIST_INITIALIZER;
 	struct stat buf;
@@ -48,7 +122,7 @@ static int watch_path_internal(tupid_t dt, const char *file,
 	if(lstat(file, &buf) != 0) {
 		if(errno == ENOENT) {
 			/* The file may have been created and then removed before
-			 * we got here. Assume the file is now gone (t7037).
+			 * we got here. Assume the file is now gone.
 			 */
 			return 0;
 		} else {
@@ -60,8 +134,15 @@ static int watch_path_internal(tupid_t dt, const char *file,
 
 	if(S_ISREG(buf.st_mode) || S_ISLNK(buf.st_mode)) {
 		tupid_t tupid;
+		/* Reparenting the existing tent would keep bar.o tied to
+		 * the renamed source. Only DIR renames preserve identity
+		 * (below) — one filesystem event spans many node
+		 * relations there.
+		 */
 		tupid = tup_file_mod_mtime(dt, file, MTIME(buf), 0, 0, NULL);
 		if(tupid < 0)
+			return -1;
+		if(tup_db_set_inum(tupid, buf.st_ino) < 0)
 			return -1;
 		return 0;
 	} else if(S_ISDIR(buf.st_mode)) {
@@ -69,6 +150,7 @@ static int watch_path_internal(tupid_t dt, const char *file,
 		struct tup_entry *tent;
 		struct tup_entry *dtent;
 		int skip = 0;
+		int dir_renamed = 0;
 
 		if(dt == 0) {
 			if(tup_entry_add(DOT_DT, &tent) < 0)
@@ -76,8 +158,12 @@ static int watch_path_internal(tupid_t dt, const char *file,
 		} else {
 			if(tup_entry_add(dt, &dtent) < 0)
 				return -1;
+			if(detect_rename(dt, file, buf.st_ino, TUP_NODE_DIR, &dir_renamed) < 0)
+				return -1;
 			tent = tup_db_create_node(dtent, file, TUP_NODE_DIR);
 			if(!tent)
+				return -1;
+			if(tup_db_set_inum(tent->tnode.tupid, buf.st_ino) < 0)
 				return -1;
 		}
 
@@ -130,6 +216,19 @@ static int watch_path_internal(tupid_t dt, const char *file,
 			}
 			if(watch_path_internal(tent->tnode.tupid, f.filename, callback) < 0)
 				return -1;
+			/* If the entry didn't exist by name when we looked just
+			 * above, the recursive call may have inode-matched it
+			 * to a node renamed in from elsewhere. Re-look so the
+			 * still-expected-children tree (root) reflects that
+			 * tupid as "found"; otherwise the cleanup below would
+			 * mark the renamed-in node missing and delete it.
+			 */
+			if(!subtent) {
+				if(tup_entry_find_name_in_dir(tent, f.filename, -1, &subtent) < 0)
+					return -1;
+				if(subtent)
+					tupid_tree_remove(&root, subtent->tnode.tupid);
+			}
 		}
 		if(chdir("..") < 0) {
 			perror("..");
@@ -158,7 +257,7 @@ static int watch_path_internal(tupid_t dt, const char *file,
 }
 
 int watch_path(tupid_t dt, const char *file,
-	       int (*callback)(tupid_t newdt, const char *file, int *skip))
+               int (*callback)(tupid_t newdt, const char *file, int *skip))
 {
 	int rc;
 	rc = watch_path_internal(dt, file, callback);

@@ -11,7 +11,11 @@ endif
 ifneq ($(TARGET),win32)
 client_objs += src/tup/vardict.o
 client_objs += src/tup/send_event.o
+ifeq ($(TARGET),macosx)
+client_objs += src/tup/flock/flock.o
+else
 client_objs += src/tup/flock/fcntl.o
+endif
 : $(client_objs) |> !ar |> libtup_client.a
 : src/tup/vardict.h |> !cp |> tup_client.h
 endif

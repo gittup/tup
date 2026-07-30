@@ -66,6 +66,7 @@ CC = gcc
 AR = ar
 
 TUP_MONITOR = null
+TUP_LOCKING = fcntl
 TUP_SUID_GROUP = root
 TUP_USE_SYSTEM_PCRE = y
 include $(TARGET).tup

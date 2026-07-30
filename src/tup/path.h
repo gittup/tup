@@ -29,4 +29,10 @@ int watch_path(tupid_t dt, const char *file,
 int tup_scan(void);
 int tup_external_scan(void);
 
+/* Toggle inode-based rename detection in the scanner. Off by default.
+ * The FSEvents monitor turns it on around do_scan so that
+ * user-initiated moves preserve node identity like inotify does.
+ */
+void watch_path_set_detect_rename(int enable);
+
 #endif

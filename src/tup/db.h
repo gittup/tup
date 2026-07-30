@@ -28,6 +28,7 @@
 #include "estring.h"
 #include <stdio.h>
 #include <time.h>
+#include <sys/types.h>
 
 #define TUP_CONFIG "tup.config"
 
@@ -98,6 +99,8 @@ int tup_db_set_display(struct tup_entry *tent, const char *display, int displayl
 int tup_db_set_flags(struct tup_entry *tent, const char *flags, int flagslen);
 int tup_db_set_type(struct tup_entry *tent, enum TUP_NODE_TYPE type);
 int tup_db_set_mtime(struct tup_entry *tent, struct timespec mtime);
+int tup_db_set_inum(tupid_t tupid, ino_t inum);
+int tup_db_select_tent_by_inum(ino_t inum, struct tup_entry **tent);
 int tup_db_set_srcid(struct tup_entry *tent, tupid_t srcid);
 int tup_db_normal_dir_to_generated(struct tup_entry *tent);
 int tup_db_print(FILE *stream, tupid_t tupid);

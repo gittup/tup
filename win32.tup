@@ -16,5 +16,6 @@ LDFLAGS += -static-libgcc
 PROGRAM_SUFFIX=.exe
 
 TUP_SERVER = windepfile
+TUP_LOCKING = lock_file
 
 TUP_USE_SYSTEM_PCRE = n
