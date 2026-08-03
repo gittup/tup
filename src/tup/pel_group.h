@@ -43,6 +43,7 @@ struct pel_group {
 
 void init_pel_group(struct pel_group *pg);
 int pel_ignored(const char *path, int len);
+int is_appledouble(const char *path);
 int get_path_elements(const char *dir, struct pel_group *pg);
 void free_pel(struct path_element *pel);
 void del_pel(struct path_element *pel, struct pel_group *pg);

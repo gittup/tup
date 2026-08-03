@@ -27,6 +27,7 @@
 #include "config.h"
 #include "entry.h"
 #include "option.h"
+#include "pel_group.h"
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -62,6 +63,8 @@ int init_file_info(struct file_info *info, int do_unlink)
 	tent_tree_init(&info->used_groups_root);
 	tent_tree_init(&info->output_root);
 	tent_tree_init(&info->exclusion_root);
+	RB_INIT(&info->readdir_sticky);
+	RB_INIT(&info->open_readdir_sticky);
 	pthread_mutex_init(&info->lock, NULL);
 	pthread_cond_init(&info->cond, NULL);
 	info->server_fail = 0;
@@ -72,6 +75,8 @@ int init_file_info(struct file_info *info, int do_unlink)
 
 void cleanup_file_info(struct file_info *info)
 {
+	free_string_tree(&info->open_readdir_sticky);
+	free_string_tree(&info->readdir_sticky);
 	free_tent_tree(&info->exclusion_root);
 	free_tent_tree(&info->output_root);
 	free_tent_tree(&info->used_groups_root);
@@ -816,18 +821,32 @@ out_skip:
 
 		map = TAILQ_FIRST(&info->mapping_list);
 
-		/* TODO: strcmp only here for win32 support */
-		if(strcmp(map->tmpname, map->realname) != 0) {
-			if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
-				perror(map->realname);
-				fprintf(f, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+		if(is_appledouble(map->realname)) {
+			/* macOS NFS / Fuse-T creates "._<name>" AppleDouble
+			 * sidecars next to any file with xattrs. They reach
+			 * us via the FUSE create path, so a tmpfile was
+			 * already opened — discard it instead of putting an
+			 * unwanted artifact in the source tree.
+			 */
+			if(unlinkat(tup_top_fd(), map->tmpname, 0) < 0 && errno != ENOENT) {
+				perror(map->tmpname);
+				fprintf(f, "tup error: Unable to remove AppleDouble tmp file '%s'\n", map->tmpname);
 				write_bork = 1;
 			}
-		}
-		if(map->tent) {
-			/* tent may not be set (in the case of hidden files) */
-			if(file_set_mtime(map->tent, map->realname) < 0)
-				return -1;
+		} else {
+			/* TODO: strcmp only here for win32 support */
+			if(strcmp(map->tmpname, map->realname) != 0) {
+				if(renameat(tup_top_fd(), map->tmpname, tup_top_fd(), map->realname) < 0) {
+					perror(map->realname);
+					fprintf(f, "tup error: Unable to rename temporary file '%s' to destination '%s'\n", map->tmpname, map->realname);
+					write_bork = 1;
+				}
+			}
+			if(map->tent) {
+				/* tent may not be set (in the case of hidden files) */
+				if(file_set_mtime(map->tent, map->realname) < 0)
+					return -1;
+			}
 		}
 		del_map(&info->mapping_list, map);
 	}

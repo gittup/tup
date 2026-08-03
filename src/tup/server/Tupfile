@@ -3,6 +3,12 @@ include_rules
 ifeq ($(TUP_SERVER),fuse)
 export PKG_CONFIG_PATH
 CFLAGS += `pkg-config fuse --cflags`
+ifeq (@(TUP_PLATFORM),macosx)
+# Fuse-T (kext-free FUSE) uses NFS internally, which stats every
+# directory entry after readdir. Compile in a runtime check for
+# this behavior that activates a workaround.
+CFLAGS += -DFUSE_NFS_WORKAROUND
+endif
 : foreach fuse_server.c fuse_fs.c master_fork.c symlink.c |> !cc |>
 endif
 

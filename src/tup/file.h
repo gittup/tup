@@ -27,6 +27,7 @@
 #include "tupid_tree.h"
 #include "tent_tree.h"
 #include "thread_tree.h"
+#include "string_tree.h"
 #include "pel_group.h"
 #include "entry.h"
 #include <stdio.h>
@@ -70,6 +71,8 @@ struct file_info {
 	struct tent_entries used_groups_root;
 	struct tent_entries output_root;
 	struct tent_entries exclusion_root;
+	struct string_entries readdir_sticky;
+	struct string_entries open_readdir_sticky;
 	int server_fail;
 	int open_count;
 	int do_unlink;

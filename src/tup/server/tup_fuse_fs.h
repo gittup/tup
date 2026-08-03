@@ -41,7 +41,10 @@ int tup_fuse_add_group(int id, struct file_info *finfo);
 int tup_fuse_rm_group(struct file_info *finfo);
 void tup_fuse_set_parser_mode(int mode);
 int tup_fuse_server_get_dir_entries(const char *path, void *buf,
-				    fuse_fill_dir_t filler);
+				    fuse_fill_dir_t filler,
+				    void (*on_entry)(const char *name, void *ctx),
+				    void *ctx);
+int tup_fuse_server_has_dir(const char *path);
 void tup_fuse_fs_init(void);
 int tup_fs_inited(void);
 extern struct fuse_operations tup_fs_oper;

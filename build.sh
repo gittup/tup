@@ -47,6 +47,12 @@ case "$os" in
 	plat_files="$plat_files ../src/compat/dummy.c"
 	plat_files="$plat_files ../src/compat/clearenv.c "
 	plat_cflags="$plat_cflags -include ../src/compat/macosx.h"
+	# Fuse-T (kext-free FUSE) uses NFS internally, which stats every
+	# directory entry after readdir. Compile in a runtime check for
+	# this behavior that activates a workaround.
+	if [ "$server" = "fuse" ]; then
+		plat_cflags="$plat_cflags -DFUSE_NFS_WORKAROUND"
+	fi
 	default_cc=clang
 	;;
 	FreeBSD)

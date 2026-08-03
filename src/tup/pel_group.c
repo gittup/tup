@@ -29,6 +29,25 @@
 
 static struct mempool pool = MEMPOOL_INITIALIZER(struct path_element);
 
+int is_appledouble(const char *path)
+{
+	/* macOS writes AppleDouble sidecar files ("._<name>") next to any
+	 * file with extended attributes when the underlying filesystem
+	 * doesn't store xattrs natively — notably Fuse-T's NFS-backed
+	 * mount used by tup itself. They are an OS-level side effect, not
+	 * a build output. Accepts both leading-slash FUSE paths and
+	 * relative paths (e.g. peeled `realname`s).
+	 */
+	if(path[0] == '.' && path[1] == '_')
+		return 1;
+	while((path = strchr(path, '/')) != NULL) {
+		if(path[1] == '.' && path[2] == '_')
+			return 1;
+		path++;
+	}
+	return 0;
+}
+
 int pel_ignored(const char *path, int len)
 {
 	if(len < 0)

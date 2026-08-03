@@ -33,6 +33,7 @@
 #include "tup/server.h"
 #include "tup/container.h"
 #include "tup/entry.h"
+#include "tup/pel_group.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,15 +44,49 @@
 #include <limits.h>
 #include <sys/resource.h>
 
+#ifdef FUSE_NFS_WORKAROUND
+#include <dlfcn.h>
+#endif
+
 static struct thread_root troot = THREAD_ROOT_INITIALIZER;
 static int server_mode = 0;
 static pid_t ourpgid;
 static int max_open_files = 128;
 
+#ifdef FUSE_NFS_WORKAROUND
+static int readdir_getattr_workaround = 0;
+
+/* Some FUSE implementations (e.g. Fuse-T) use NFS internally, where the
+ * NFS client will stat every directory entry of each readdir.
+ *
+ * The exact conditions of this behavior are not known, and we therefore
+ * probe for it at startup. By listing a virtual directory, we watch for
+ * whether a stat is issued for a sentinel file from that listing. If
+ * this stat occurs, the workaround is enabled. The main thread then
+ * stats a separate "done" file to finalize the probe.
+ *
+ * UNCHECKED -> readdir on probe dir           -> SENTINEL
+ * SENTINEL  -> getattr on sentinel            -> enable workaround
+ *              getattr on done file           -> DONE
+ */
+enum nfs_probe_state {
+	NFS_PROBE_UNCHECKED,
+	NFS_PROBE_SENTINEL,
+	NFS_PROBE_DONE
+};
+
+static volatile enum nfs_probe_state nfs_probe = NFS_PROBE_UNCHECKED;
+
+#define NFS_PROBE_DIR_NAME "@nfs_probe@"
+#define NFS_PROBE_SENTINEL_NAME ".nfs_sentinel"
+#define NFS_PROBE_DONE_NAME ".nfs_done"
+#endif
+
 void tup_fuse_fs_init(void)
 {
 	struct rlimit rlim;
 	ourpgid = getpgid(0);
+
 	if(getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
 		int x;
 		for(x=0; x<10; x++) {
@@ -106,6 +141,8 @@ static int is_hidden(const char *path)
 	if(strstr(path, "/.bzr") != NULL)
 		return 1;
 	if(is_ccache_path(path))
+		return 1;
+	if(is_appledouble(path))
 		return 1;
 	return 0;
 }
@@ -294,6 +331,8 @@ static int ignore_file(const char *path)
 		return 1;
 	if(is_ccache_path(path))
 		return 1;
+	if(is_appledouble(path))
+		return 1;
 	return 0;
 }
 
@@ -358,12 +397,41 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	const char *var;
 	const char *stripped = NULL;
 	int rc;
+	int skip_read = 0;
+#ifdef FUSE_NFS_WORKAROUND
+	int from_sticky = 0;
+#endif
 
 #ifdef FUSE3
 	(void) fi;
 #endif
 	if(context_check() < 0)
 		return -EPERM;
+
+#ifdef FUSE_NFS_WORKAROUND
+	if(nfs_probe != NFS_PROBE_DONE) {
+		const char *base = strrchr(path, '/');
+		if(base) base++; else base = path;
+		if(strcmp(base, NFS_PROBE_DIR_NAME) == 0) {
+			memset(stbuf, 0, sizeof(*stbuf));
+			stbuf->st_mode = S_IFDIR | 0555;
+			stbuf->st_nlink = 2;
+			return 0;
+		}
+		if(nfs_probe == NFS_PROBE_SENTINEL) {
+			if(strcmp(base, NFS_PROBE_SENTINEL_NAME) == 0) {
+				readdir_getattr_workaround = 1;
+				memset(stbuf, 0, sizeof(*stbuf));
+				stbuf->st_mode = S_IFREG | 0444;
+				return 0;
+			}
+			if(strcmp(base, NFS_PROBE_DONE_NAME) == 0) {
+				nfs_probe = NFS_PROBE_DONE;
+				return -ENOENT;
+			}
+		}
+	}
+#endif
 
 	peeled = peel(path);
 
@@ -393,6 +461,21 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 		map = find_mapping(finfo, path);
 		if(map)
 			peeled = map->tmpname;
+#ifdef FUSE_NFS_WORKAROUND
+		/* Under Fuse-T NFS, readdir is followed by automatic stat of
+		 * each directory entry. If this path was recorded in
+		 * readdir_sticky, consume it and skip ACCESS_READ later.
+		 */
+		if(readdir_getattr_workaround) {
+			struct string_tree *st;
+			st = string_tree_search(&finfo->readdir_sticky, path, strlen(path));
+			if(st) {
+				string_tree_remove(&finfo->readdir_sticky, st);
+				skip_read = 1;
+				from_sticky = 1;
+			}
+		}
+#endif
 		put_finfo(finfo);
 	}
 
@@ -433,7 +516,30 @@ static int tup_fs_getattr(const char *path, struct stat *stbuf)
 	} else {
 		rc = 0;
 	}
-	tup_fuse_handle_file(path, stripped, ACCESS_READ);
+
+#ifdef FUSE_NFS_WORKAROUND
+	/* If this getattr was triggered by the NFS auto-stat that follows
+	 * a parser-mode readdir, and the underlying file does not exist on
+	 * disk (it's a virtual entry from parser_directory, e.g. a not-yet-
+	 * built *.o output), synthesize a successful stat so the kernel's
+	 * NFS layer keeps the entry in its readdir result. Otherwise the
+	 * shell running the run-script filters virtual entries out of glob
+	 * expansion and they never reach the script's output. We also skip
+	 * read recording for virtual entries — they're synthetic, not user
+	 * intent. Real on-disk entries fall through and record normally.
+	 */
+	if(from_sticky && rc == -ENOENT) {
+		if(fstat(tup_top_fd(), stbuf) == 0) {
+			stbuf->st_mode = (stbuf->st_mode & ~S_IFMT) | S_IFREG;
+			stbuf->st_size = 0;
+			stbuf->st_nlink = 1;
+			rc = 0;
+		}
+	}
+#endif
+
+	if(!skip_read)
+		tup_fuse_handle_file(path, stripped, ACCESS_READ);
 
 	return rc;
 }
@@ -576,11 +682,101 @@ static int fill_actual_directory(const char *peeled, void *buf,
 	return 0;
 }
 
-static int readdir_parser(const char *path, void *buf, fuse_fill_dir_t filler)
+#ifdef FUSE_NFS_WORKAROUND
+/* Parser-mode readdir is served from parser_directory, not the real fs,
+ * so the readdir_sticky population path in tup_fs_readdir (which walks
+ * the on-disk directory) never sees these entries. Snapshot the names
+ * as the parser fills them and feed them into readdir_sticky in the
+ * caller, so the kernel's post-readdir auto-getattr on each virtual
+ * entry is recognized as a stat-only access and not recorded as a read
+ * of a generated file.
+ */
+struct readdir_sticky_collect {
+	char **names;
+	int count;
+	int cap;
+};
+
+static void collect_readdir_sticky(const char *name, void *vctx)
+{
+	struct readdir_sticky_collect *c = vctx;
+	char *dup;
+
+	if(c->count == c->cap) {
+		int newcap = c->cap ? c->cap * 2 : 16;
+		char **newnames = realloc(c->names, newcap * sizeof(*newnames));
+		if(!newnames)
+			return;
+		c->names = newnames;
+		c->cap = newcap;
+	}
+	dup = strdup(name);
+	if(!dup)
+		return;
+	c->names[c->count++] = dup;
+}
+#endif
+
+static int readdir_parser(const char *fuse_path, const char *path, void *buf,
+			  fuse_fill_dir_t filler, struct file_info *finfo)
 {
 	if(strncmp(path, get_tup_top(), get_tup_top_len()) == 0) {
-		if(tup_fuse_server_get_dir_entries(path + get_tup_top_len(),
-						   buf, filler) < 0)
+		void (*on_entry)(const char *, void *) = NULL;
+		void *ctx_ptr = NULL;
+		int rc;
+#ifdef FUSE_NFS_WORKAROUND
+		struct readdir_sticky_collect collect = { NULL, 0, 0 };
+		if(readdir_getattr_workaround && finfo) {
+			on_entry = collect_readdir_sticky;
+			ctx_ptr = &collect;
+		}
+#else
+		(void) fuse_path;
+		(void) finfo;
+#endif
+		rc = tup_fuse_server_get_dir_entries(
+			path + get_tup_top_len(), buf, filler,
+			on_entry, ctx_ptr);
+#ifdef FUSE_NFS_WORKAROUND
+		if(on_entry) {
+			int fuse_pathlen = strlen(fuse_path);
+			int i;
+			if(rc == 0 && collect.count > 0) {
+				for(i = 0; i < collect.count; i++) {
+					const char *name = collect.names[i];
+					struct string_tree *st;
+					char *fullpath;
+					int namelen = strlen(name);
+					int fulllen = fuse_pathlen + 1 + namelen;
+
+					fullpath = malloc(fulllen + 1);
+					if(!fullpath)
+						continue;
+					memcpy(fullpath, fuse_path, fuse_pathlen);
+					fullpath[fuse_pathlen] = '/';
+					memcpy(fullpath + fuse_pathlen + 1,
+					       name, namelen + 1);
+
+					st = malloc(sizeof(*st));
+					if(!st) {
+						free(fullpath);
+						continue;
+					}
+					st->s = fullpath;
+					st->len = fulllen;
+					if(string_tree_insert(
+						&finfo->readdir_sticky, st) < 0) {
+						free(fullpath);
+						free(st);
+					}
+				}
+			}
+			for(i = 0; i < collect.count; i++)
+				free(collect.names[i]);
+			free(collect.names);
+		}
+#endif
+		if(rc < 0)
 			return -EPERM;
 	} else {
 		/* t4052 */
@@ -610,6 +806,21 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if(context_check() < 0)
 		return -EPERM;
 
+#ifdef FUSE_NFS_WORKAROUND
+	if(nfs_probe == NFS_PROBE_UNCHECKED) {
+		const char *base = strrchr(path, '/');
+		if(base) base++; else base = path;
+		if(strcmp(base, NFS_PROBE_DIR_NAME) == 0) {
+			struct stat st;
+			memset(&st, 0, sizeof(st));
+			st.st_mode = S_IFREG | 0444;
+			filler(buf, NFS_PROBE_SENTINEL_NAME, &st, 0);
+			nfs_probe = NFS_PROBE_SENTINEL;
+			return 0;
+		}
+	}
+#endif
+
 	peeled = peel(path);
 	finfo = get_finfo(path);
 	if(finfo) {
@@ -622,7 +833,48 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		 */
 		if(server_mode == SERVER_PARSER_MODE) {
 			int rc;
-			rc = readdir_parser(peeled, buf, filler);
+#ifdef FUSE_NFS_WORKAROUND
+			/* If this readdir is the kernel's post-exec bundle-root
+			 * probe (predicted by tup_fs_read on a shebang script)
+			 * AND the path is NOT a directory the parser knows
+			 * about, fulfill it silently from the real filesystem
+			 * so the exec syscall proceeds. parser_directory does
+			 * not contain these bundle-root paths and would
+			 * normally fail with -EPERM, which would set
+			 * server_fail and trip an access-violation error.
+			 *
+			 * We only bypass when the path is OUTSIDE
+			 * parser_directory because passing real-fs contents
+			 * to a path the parser owns would pollute the NFS
+			 * readdir cache with stale entries (missing virtual
+			 * outputs) for the script's own later readdir of the
+			 * same path. See t8079-run-variant where the script
+			 * is at the parser dir's root.
+			 */
+			struct string_tree *bundle_st;
+			bundle_st = string_tree_search(
+				&finfo->open_readdir_sticky,
+				path, strlen(path));
+			if(bundle_st) {
+				const char *rel = peeled + get_tup_top_len();
+				int peeled_in_tup_top = strncmp(peeled, get_tup_top(), get_tup_top_len()) == 0;
+				int in_parser_dir = peeled_in_tup_top &&
+					tup_fuse_server_has_dir(rel);
+				/* string_tree_remove() frees bundle_st->s
+				 * internally; we own the wrapper struct.
+				 */
+				string_tree_remove(
+					&finfo->open_readdir_sticky,
+					bundle_st);
+				free(bundle_st);
+				if(!in_parser_dir) {
+					rc = fill_actual_directory(peeled, buf, filler, 0);
+					put_finfo(finfo);
+					return rc;
+				}
+			}
+#endif
+			rc = readdir_parser(path, peeled, buf, filler, finfo);
 			if(rc < 0) {
 				finfo->server_fail = 1;
 			}
@@ -723,7 +975,60 @@ static int tup_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	/* If finfo is NULL, we're outside of tup, so we don't need to ignore
 	 * any files called '.tup' in that case.
 	 */
-	return fill_actual_directory(peeled, buf, filler, finfo != NULL);
+	int rc = fill_actual_directory(peeled, buf, filler, finfo != NULL);
+
+#ifdef FUSE_NFS_WORKAROUND
+	/* Under Fuse-T NFS, readdir causes an immediate stat to each
+	 * directory entry, so add them to a tree that tells getattr to
+	 * avoid dispatching one ACCESS_READ for each.
+	 */
+	if(finfo != NULL && rc >= 0 && readdir_getattr_workaround) {
+		finfo_lock(finfo);
+		int fd;
+		fd = openat(tup_top_fd(), peeled, O_RDONLY);
+		if(fd >= 0) {
+			DIR *dp;
+			dp = fdopendir(fd);
+			if(dp) {
+				struct dirent *de;
+				int pathlen = strlen(path);
+
+				while((de = readdir(dp)) != NULL) {
+					struct string_tree *st;
+					char *fullpath;
+					int namelen = strlen(de->d_name);
+					int fulllen = pathlen + 1 + namelen;
+
+					fullpath = malloc(fulllen + 1);
+					if(!fullpath)
+						break;
+					memcpy(fullpath, path, pathlen);
+					fullpath[pathlen] = '/';
+					memcpy(fullpath + pathlen + 1, de->d_name, namelen + 1);
+
+					st = malloc(sizeof(*st));
+					if(!st) {
+						free(fullpath);
+						break;
+					}
+					st->s = fullpath;
+					st->len = fulllen;
+					if(string_tree_insert(&finfo->readdir_sticky, st) < 0) {
+						/* Duplicate entry, already in set */
+						free(fullpath);
+						free(st);
+					}
+				}
+				closedir(dp);
+			} else {
+				close(fd);
+			}
+		}
+		finfo_unlock(finfo);
+	}
+#endif
+
+	return rc;
 }
 
 static int mknod_internal(const char *path, mode_t mode, int flags, int close_fd)
@@ -1320,11 +1625,162 @@ static int tup_fs_open(const char *path, struct fuse_file_info *fi)
 	return res;
 }
 
+#ifdef FUSE_NFS_WORKAROUND
+/* Compute the directory the kernel will readdir() after exec'ing a
+ * shebang script at `path`. The rule is purely structural (no Launch
+ * Services consultation):
+ *
+ *   cand = parent(path)
+ *   while parent(cand) exists:
+ *     - if cand.basename == "MacOS" and parent.basename == "Contents":
+ *         cand = parent.parent (jump past the Contents/MacOS chain)
+ *     - elif cand.basename has a dot:
+ *         - if parent.basename == "MacOS" and parent.parent.basename ==
+ *           "Contents":  cand = parent.parent.parent
+ *         - elif parent.basename has a dot:  cand = parent
+ *         - else: stop
+ *     - else: stop
+ *
+ * See repro/SUMMARY.md for the full forensic evidence (29 scenarios).
+ * `out` is filled with the predicted directory's FUSE-mount-relative
+ * path (same shape as `path` — e.g. /@tupjob-N/abs/...).
+ */
+static int has_dot(const char *seg, int seglen)
+{
+	int i;
+	for(i = 0; i < seglen; i++)
+		if(seg[i] == '.')
+			return 1;
+	return 0;
+}
+
+static void last_segment(const char *path, int pathlen,
+			 const char **seg_out, int *seglen_out)
+{
+	int i = pathlen;
+	while(i > 0 && path[i-1] == '/')
+		i--;
+	int end = i;
+	while(i > 0 && path[i-1] != '/')
+		i--;
+	*seg_out = path + i;
+	*seglen_out = end - i;
+}
+
+static int parent_path(const char *path, int pathlen)
+{
+	int i = pathlen;
+	while(i > 0 && path[i-1] == '/')
+		i--;
+	while(i > 0 && path[i-1] != '/')
+		i--;
+	while(i > 1 && path[i-1] == '/')
+		i--;
+	return i;
+}
+
+static int compute_bundle_root(const char *path, char *out, size_t out_size)
+{
+	int cand_len, parent_len, grand_len;
+	const char *seg;
+	int seglen;
+	const char *psg;
+	int pseglen;
+
+	cand_len = parent_path(path, strlen(path));
+	if(cand_len <= 0)
+		return -1;
+
+	while(1) {
+		parent_len = parent_path(path, cand_len);
+		if(parent_len <= 0)
+			break;
+
+		last_segment(path, cand_len, &seg, &seglen);
+		last_segment(path, parent_len, &psg, &pseglen);
+
+		if(seglen == 5 && memcmp(seg, "MacOS", 5) == 0 &&
+		   pseglen == 8 && memcmp(psg, "Contents", 8) == 0) {
+			grand_len = parent_path(path, parent_len);
+			if(grand_len <= 0)
+				break;
+			cand_len = grand_len;
+			continue;
+		}
+
+		if(has_dot(seg, seglen)) {
+			if(pseglen == 5 && memcmp(psg, "MacOS", 5) == 0) {
+				int gp_len = parent_path(path, parent_len);
+				const char *gpsg;
+				int gpseglen;
+				last_segment(path, gp_len, &gpsg, &gpseglen);
+				if(gpseglen == 8 && memcmp(gpsg, "Contents", 8) == 0) {
+					int ggp_len = parent_path(path, gp_len);
+					if(ggp_len <= 0)
+						break;
+					cand_len = ggp_len;
+					continue;
+				}
+			}
+			if(has_dot(psg, pseglen)) {
+				cand_len = parent_len;
+				continue;
+			}
+		}
+
+		break;
+	}
+
+	if((size_t)cand_len >= out_size)
+		return -1;
+	memcpy(out, path, cand_len);
+	out[cand_len] = '\0';
+	return 0;
+}
+
+static void maybe_record_shebang(const char *path, const char *buf,
+				 int res, struct file_info *finfo)
+{
+	char bundle_root[PATH_MAX];
+	struct string_tree *st;
+	int len;
+
+	if(server_mode != SERVER_PARSER_MODE)
+		return;
+	if(res < 2)
+		return;
+	if(buf[0] != '#' || buf[1] != '!')
+		return;
+	if(compute_bundle_root(path, bundle_root, sizeof(bundle_root)) < 0)
+		return;
+
+	len = strlen(bundle_root);
+	st = malloc(sizeof(*st));
+	if(!st)
+		return;
+	st->s = strdup(bundle_root);
+	if(!st->s) {
+		free(st);
+		return;
+	}
+	st->len = len;
+	/* finfo_lock is already held by get_finfo() in our caller. */
+	if(string_tree_insert(&finfo->open_readdir_sticky, st) < 0) {
+		/* duplicate, OK */
+		free(st->s);
+		free(st);
+	}
+}
+#endif
+
 static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
 		       struct fuse_file_info *fi)
 {
 	int res;
 	int fd;
+#ifdef FUSE_NFS_WORKAROUND
+	struct file_info *predict_finfo = NULL;
+#endif
 
 	if(fi->fh == 0) {
 		struct file_info *finfo;
@@ -1351,6 +1807,16 @@ static int tup_fs_read(const char *path, char *buf, size_t size, off_t offset,
 	res = pread(fd, buf, size, offset);
 	if (res == -1)
 		res = -errno;
+
+#ifdef FUSE_NFS_WORKAROUND
+	if(offset == 0 && res >= 2 && server_mode == SERVER_PARSER_MODE) {
+		predict_finfo = get_finfo(path);
+		if(predict_finfo) {
+			maybe_record_shebang(path, buf, res, predict_finfo);
+			put_finfo(predict_finfo);
+		}
+	}
+#endif
 
 	if(fi->fh == 0) {
 		close(fd);

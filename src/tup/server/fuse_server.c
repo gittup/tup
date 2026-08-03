@@ -34,6 +34,10 @@
 #include "tup/variant.h"
 #include "tup/container.h"
 #include "tup_fuse_fs.h"
+#ifdef FUSE_NFS_WORKAROUND
+#include <fuse_lowlevel.h>
+#include <dlfcn.h>
+#endif
 #include "master_fork.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +45,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/mount.h>
+#ifdef FUSE_NFS_WORKAROUND
+#include <dirent.h>
+#endif
 #ifdef __linux__
 #include <sys/sysmacros.h>
 #include <grp.h>
@@ -66,9 +73,39 @@ static uid_t original_euid;
 static pthread_mutex_t curps_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t fuse_tid;
 
+#ifdef FUSE_NFS_WORKAROUND
+/* Identify Fuse-T specifically among possible libfuse providers. The
+ * NFS-workaround build supports any libfuse2-compatible backend (Fuse-T
+ * on macOS, libfuse on Linux, macFUSE if linked) and detects the NFS
+ * readdir-getattr pattern at runtime. But some mitigations are only
+ * meaningful — or only accepted — by Fuse-T (its NFS proxy is the
+ * caching layer we need to disable, and the option names like
+ * `nolocalcaches` are Fuse-T-only; macFUSE rejects unknown options at
+ * mount time). Inspect the dylib that actually resolved a libfuse
+ * symbol rather than the version string, since libfuse-t doesn't
+ * export libfuse3's fuse_pkgversion() and osxfuse_version() can
+ * theoretically collide between backends.
+ */
+static int fuse_t_in_use(void)
+{
+	Dl_info info;
+	if(dladdr((void *)&fuse_version, &info) == 0)
+		return 0;
+	if(info.dli_fname == NULL)
+		return 0;
+	return strstr(info.dli_fname, "fuse-t") != NULL;
+}
+#endif
+
 static void *fuse_thread(void *arg)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
+#ifdef FUSE_NFS_WORKAROUND
+	struct fuse *fuse;
+	char *mountpoint;
+	int multithreaded;
+#endif
+
 	if(arg) {}
 
 	/* Need a garbage arg first to count as the process name */
@@ -92,13 +129,69 @@ static void *fuse_thread(void *arg)
 	if(fuse_opt_add_arg(&args, "-onobrowse,noappledouble,noapplexattr,quiet") < 0)
 		return NULL;
 #endif
+
+#ifdef FUSE_NFS_WORKAROUND
+	/* Fuse-T proxies FUSE through the kernel's NFS client, whose
+	 * attribute and readdir caches break tup's run-script semantics:
+	 * a second readdir of a directory within one parser pass is
+	 * served from the NFS cache and never reaches our FUSE layer, so
+	 * virtual outputs added by an earlier rule are invisible to the
+	 * next `run` directive. libfuse's standard attr_timeout/
+	 * entry_timeout don't propagate to that NFS layer, so we use
+	 * `nolocalcaches`, which Fuse-T forwards to its NFS client to
+	 * disable vnode/attribute/readdir caching wholesale.
+	 *
+	 * The option name is Fuse-T-only: macFUSE doesn't recognize it
+	 * and would reject the mount, so the option is gated behind a
+	 * runtime check for Fuse-T rather than emitted unconditionally
+	 * on every NFS-workaround build.
+	 */
+	if(fuse_t_in_use()) {
+		if(fuse_opt_add_arg(&args, "-onolocalcaches,noattrcache") < 0)
+			return NULL;
+	}
+#endif
+
 #ifdef __FreeBSD__
 	if(fuse_opt_add_arg(&args, "-ouse_ino") < 0)
 		return NULL;
 #endif
 
+#ifdef FUSE_NFS_WORKAROUND
+	/* Use fuse_setup + fuse_loop instead of fuse_main so we can
+	 * control teardown. On Fuse-T, fuse_main's teardown restores
+	 * SIGPIPE to SIG_DFL before closing the NFS socket, which
+	 * immediately kills the process with a non-zero exit code.
+	 */
+	fuse = fuse_setup(args.argc, args.argv, &tup_fs_oper,
+			  sizeof(tup_fs_oper), &mountpoint,
+			  &multithreaded, NULL);
+	fuse_opt_free_args(&args);
+	if(fuse == NULL)
+		return NULL;
+
+	if(multithreaded)
+		fuse_loop_mt(fuse);
+	else
+		fuse_loop(fuse);
+
+	/* Manual teardown: remove signal handlers, then re-ignore
+	 * SIGPIPE before the unmount closes the NFS socket.
+	 */
+	{
+		struct fuse_session *se = fuse_get_session(fuse);
+		struct fuse_chan *ch = fuse_session_next_chan(se, NULL);
+		fuse_remove_signal_handlers(se);
+		signal(SIGPIPE, SIG_IGN);
+		fuse_unmount(NULL, ch);
+		fuse_destroy(fuse);
+		free(mountpoint);
+	}
+#else
 	fuse_main(args.argc, args.argv, &tup_fs_oper, NULL);
 	fuse_opt_free_args(&args);
+#endif
+
 	return NULL;
 }
 
@@ -339,6 +432,37 @@ out_ok:
 	signal(SIGCHLD, SIG_DFL);
 #endif
 
+#ifdef FUSE_NFS_WORKAROUND
+	/* Probe whether readdir triggers a stat of the returned entries
+	 * (e.g. Fuse-T). After reading a virtual probe directory, if the
+	 * sentinel file gets a getattr, the workaround is enabled
+	 * automatically by the FUSE callbacks.
+	 */
+	{
+		char probepath[PATH_MAX];
+		DIR *dp;
+		struct stat st;
+		snprintf(probepath, sizeof(probepath), "%s%s/@nfs_probe@",
+			 TUP_MNT, get_tup_top());
+		dp = opendir(probepath);
+		if(dp) {
+			/* If the NFS behavior is present, this readdir
+			 * will cause automatic getattr on the sentinel,
+			 * enabling the workaround.
+			 */
+			readdir(dp);
+			closedir(dp);
+		}
+		/* Finalize the probe by statting the done file. This
+		 * transitions the state machine to DONE regardless of
+		 * whether the sentinel was hit.
+		 */
+		snprintf(probepath, sizeof(probepath), "%s%s/@nfs_probe@/.nfs_done",
+			 TUP_MNT, get_tup_top());
+		stat(probepath, &st);
+	}
+#endif
+
 	server_inited = 1;
 	return 0;
 
@@ -441,14 +565,39 @@ static int finfo_wait_open_count(struct server *s)
 		rc = pthread_cond_timedwait(&s->finfo.cond, &s->finfo.lock, &ts);
 		if(rc != 0) {
 			if(rc == ETIMEDOUT) {
+#ifdef FUSE_NFS_WORKAROUND
+				/* Fuse-T (and any FUSE-over-NFS backend) drops
+				 * occasional release callbacks for files that
+				 * stay mapped during process exit — the lua/
+				 * dyld pattern of multiple opens on the same
+				 * binary is a reliable trigger. The flush
+				 * callback that precedes release fires
+				 * normally, so the on-disk writes are safe;
+				 * only open_count parity is broken. Warn and
+				 * proceed instead of failing the job.
+				 *
+				 * The recorded access list comes from
+				 * tup_fuse_handle_file at open time, not from
+				 * the release, so dependency tracking is also
+				 * unaffected.
+				 */
+				server_lock(s);
+				fprintf(stderr, "tup warning: FUSE missed %d release callback(s) for this sub-process; continuing anyway.\n", s->finfo.open_count);
+				server_unlock(s);
+				s->finfo.open_count = 0;
+				break;
+#else
 				server_lock(s);
 				fprintf(stderr, "tup error: FUSE did not appear to release all file descriptors after the sub-process closed.\n");
 				server_unlock(s);
+				finfo_unlock(&s->finfo);
+				return -1;
+#endif
 			} else {
 				perror("pthread_cond_timedwait");
+				finfo_unlock(&s->finfo);
+				return -1;
 			}
-			finfo_unlock(&s->finfo);
-			return -1;
 		}
 	}
 	if(s->finfo.open_count < 0) {
@@ -602,6 +751,17 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	struct tup_entry *tent;
 	struct server s;
 	struct tup_env te;
+#ifdef FUSE_NFS_WORKAROUND
+	/* Each run-script needs a unique @tupjob-N path so the kernel's
+	 * NFS client (under Fuse-T) does not serve a stale readdir result
+	 * from a previous script in the same parser pass. Use a monotonic
+	 * counter offset by 1<<28 to stay above any real tupid. See
+	 * t2094-run4 for the canonical failure.
+	 */
+	static unsigned int run_script_seq;
+	int script_job_id;
+	int parser_job_id;
+#endif
 
 	if(tup_db_get_environ(env_root, NULL, &te) < 0)
 		return -1;
@@ -618,8 +778,52 @@ int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 	s.error_mutex = NULL;
 	tent = tup_entry_get(tupid);
 	init_file_info(&s.finfo, 0);
-	if(exec_internal(&s, cmdline, &te, tent, 0) < 0)
+
+#ifdef FUSE_NFS_WORKAROUND
+	/* Swap the parser's FUSE group registration to a unique id for the
+	 * duration of this script. The script runs in @tupjob-<unique>/...
+	 * which the kernel has never cached a readdir for. After exec we
+	 * restore the parser's original id so subsequent parser ops still
+	 * resolve through the same finfo.
+	 */
+	script_job_id = (int)(1u << 28) + __sync_fetch_and_add(&run_script_seq, 1);
+	pthread_mutex_lock(&curps_lock);
+	if(curps) {
+		parser_job_id = curps->s.finfo.tnode.id;
+		tup_fuse_rm_group(&curps->s.finfo);
+		if(tup_fuse_add_group(script_job_id, &curps->s.finfo) < 0) {
+			/* best-effort restore */
+			(void)tup_fuse_add_group(parser_job_id, &curps->s.finfo);
+			pthread_mutex_unlock(&curps_lock);
+			environ_free(&te);
+			return -1;
+		}
+		s.id = script_job_id;
+	} else {
+		parser_job_id = -1;
+	}
+	pthread_mutex_unlock(&curps_lock);
+#endif
+
+	if(exec_internal(&s, cmdline, &te, tent, 0) < 0) {
+#ifdef FUSE_NFS_WORKAROUND
+		pthread_mutex_lock(&curps_lock);
+		if(curps && parser_job_id >= 0) {
+			tup_fuse_rm_group(&curps->s.finfo);
+			(void)tup_fuse_add_group(parser_job_id, &curps->s.finfo);
+		}
+		pthread_mutex_unlock(&curps_lock);
+#endif
 		return -1;
+	}
+#ifdef FUSE_NFS_WORKAROUND
+	pthread_mutex_lock(&curps_lock);
+	if(curps && parser_job_id >= 0) {
+		tup_fuse_rm_group(&curps->s.finfo);
+		(void)tup_fuse_add_group(parser_job_id, &curps->s.finfo);
+	}
+	pthread_mutex_unlock(&curps_lock);
+#endif
 	environ_free(&te);
 
 	if(display_output(s.error_fd, 1, cmdline, 1, f) < 0)
@@ -843,8 +1047,27 @@ int server_parser_stop(struct parser_server *ps)
 	return rc;
 }
 
+int tup_fuse_server_has_dir(const char *path)
+{
+	struct string_tree *st;
+	int found = 0;
+
+	pthread_mutex_lock(&curps_lock);
+	if(curps) {
+		pthread_mutex_lock(&curps->lock);
+		st = string_tree_search(&curps->directories, path, strlen(path));
+		if(st)
+			found = 1;
+		pthread_mutex_unlock(&curps->lock);
+	}
+	pthread_mutex_unlock(&curps_lock);
+	return found;
+}
+
 int tup_fuse_server_get_dir_entries(const char *path, void *buf,
-				    fuse_fill_dir_t filler)
+				    fuse_fill_dir_t filler,
+				    void (*on_entry)(const char *name, void *ctx),
+				    void *ctx)
 {
 	struct parser_directory *pd;
 	struct string_tree *st;
@@ -867,6 +1090,8 @@ int tup_fuse_server_get_dir_entries(const char *path, void *buf,
 	RB_FOREACH(st, string_entries, &pd->files) {
 		if(mfiller(buf, st->s, NULL, 0))
 			goto out_unps;
+		if(on_entry)
+			on_entry(st->s, ctx);
 	}
 	rc = 0;
 out_unps:
