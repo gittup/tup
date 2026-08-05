@@ -22,6 +22,17 @@ tupcurdir=$PWD
 PATH=$PWD/..:$PATH
 export PATH
 
+# Verify that the correct tup binary is in PATH
+tup_path=$(command -v tup)
+expected_path="$PWD/../tup"
+if [ "$tup_path" != "$expected_path" ]; then
+	echo "Error: Wrong tup binary in PATH." 1>&2
+	echo "Expected: $expected_path" 1>&2
+	echo "Found: $tup_path" 1>&2
+	echo "Perhaps you forgot to run bootstrap.sh?" 1>&2
+	exit 1
+fi
+
 testname=`echo $0 | sed 's/.*\///; s/\.sh//'`
 tuptestdir="tuptesttmp-$testname"
 
