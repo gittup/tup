@@ -900,7 +900,14 @@ static int autoupdate(const char *cmd)
 			}
 		}
 		args[update_argc+3] = NULL;
-		execvp("tup", args);
+		char path[1024];
+		ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+		if (len != -1) {
+			path[len] = '\0'; // Null-terminate the string
+		} else {
+			perror("readlink");
+		}
+		execvp(path, args);
 		perror("execvp");
 		exit(1);
 	} else {
