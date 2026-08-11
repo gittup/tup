@@ -1657,6 +1657,8 @@ static int ignore_file_w(const wchar_t *file)
 		return 1;
 	if (wcscasestr(file, L"SQM\\sqmcpp.log") != NULL)
 		return 1;
+	if (wcsstr(file, L"-pipe-nt-0x") != NULL)
+		return 1;
 	return 0;
 }
 
