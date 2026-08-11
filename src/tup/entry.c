@@ -359,7 +359,19 @@ static int entry_openat_internal(int root_dfd, struct tup_entry *tent)
 	if(!tent)
 		return -1;
 	if(tent->parent == NULL) {
-		return fcntl(root_dfd, F_DUPFD_CLOEXEC, 0);
+#ifdef F_DUPFD_CLOEXEC
+		int fd = fcntl(root_dfd, F_DUPFD_CLOEXEC, 0);
+		if(fd != -1 || errno != EINVAL)
+			return fd;
+#endif
+		int fd = fcntl(root_dfd, F_DUPFD, 0);
+		if(fd == -1)
+			return -1;
+		if(fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+			close(fd);
+			return -1;
+		}
+		return fd;
 	}
 
 	dfd = entry_openat_internal(root_dfd, tent->parent);
