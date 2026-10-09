@@ -1732,7 +1732,7 @@ static int delete_variant_dir(struct tup_entry *tent, void *arg, int (*callback)
 		if(tup_entry_add(he->tupid, &subtent) < 0)
 			return -1;
 
-		if(he->type == TUP_NODE_DIR) {
+		if(he->type == TUP_NODE_DIR || he->type == TUP_NODE_GENERATED_DIR) {
 			flags = AT_REMOVEDIR;
 			if(delete_variant_dir(subtent, arg, callback) < 0)
 				return -1;

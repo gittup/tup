@@ -632,6 +632,15 @@ tupid_t find_dir_tupid_dt_pg(tupid_t dt, struct pel_group *pg,
 						fprintf(stderr, "' is a %s\n", tup_db_type(tent->type));
 						return -1;
 					}
+				} else if(sotgv == SOTGV_IGNORE_DIRS && !(pg->pg_flags & PG_OUTSIDE_TUP) &&
+					  tent->type == TUP_NODE_GHOST) {
+					/* Ignored files inside the project are normal files,
+					 * so their ancestors must be normal directories even
+					 * when a previous missing-path read created ghosts.
+					 */
+					if(tup_db_set_type(tent, TUP_NODE_DIR) < 0)
+						return -1;
+					tup_db_del_ghost_tree(tent);
 				}
 			} else {
 				int type = TUP_NODE_GHOST;
