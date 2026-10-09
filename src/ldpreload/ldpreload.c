@@ -61,6 +61,8 @@ static void handle_file(const char *file, const char *file2, int at);
 static void handle_file_dirfd(int dirfd, const char *file, const char *file2, int at);
 static int ignore_file(const char *file);
 static int update_cwd(void);
+static int get_dirfd_path(int dirfd, char *buf, size_t buflen);
+static int join_dirfd_path(int dirfd, const char *path, char *out, size_t outlen);
 
 static int (*s_open)(const char *, int, ...);
 static int (*s_open64)(const char *, int, ...);
@@ -391,42 +393,52 @@ int rename(const char *old, const char *new)
 
 int renameat(int oldfd, const char *old, int newfd, const char *new)
 {
-	int rc;
+    int rc;
+    char oldfull[PATH_MAX];
+    char newfull[PATH_MAX];
 
-	/* This shouldn't be too hard to implement, but at the moment we only
-	 * need renameat() with AT_FDCWD for 'ln -s' on arch and fedora.
-	 */
-	if(oldfd != AT_FDCWD || newfd != AT_FDCWD) {
-		fprintf(stderr, "tup error: renameat() with fd != AT_FDCWD is not yet supported.\n");
-		errno = ENOSYS;
-		return -1;
-	}
-	WRAP(s_renameat, "renameat");
-	rc = s_renameat(oldfd, old, newfd, new);
-	if(rc == 0) {
-		handle_file(old, new, ACCESS_RENAME);
-	}
-	return rc;
+    WRAP(s_renameat, "renameat");
+    rc = s_renameat(oldfd, old, newfd, new);
+
+    if(rc == 0) {
+        /* Resolve paths so we can log a proper ACCESS_RENAME event. */
+        if(join_dirfd_path(oldfd, old, oldfull, sizeof(oldfull)) < 0) {
+            /* Fall back; better to record something than nothing. */
+            strncpy(oldfull, old ? old : "", sizeof(oldfull));
+            oldfull[sizeof(oldfull) - 1] = '\0';
+        }
+        if(join_dirfd_path(newfd, new, newfull, sizeof(newfull)) < 0) {
+            strncpy(newfull, new ? new : "", sizeof(newfull));
+            newfull[sizeof(newfull) - 1] = '\0';
+        }
+
+        handle_file(oldfull, newfull, ACCESS_RENAME);
+    }
+    return rc;
 }
 
 int renameat2(int oldfd, const char *old, int newfd, const char *new, unsigned int flags)
 {
-	int rc;
+    int rc;
+    char oldfull[PATH_MAX];
+    char newfull[PATH_MAX];
 
-	/* This shouldn't be too hard to implement, but at the moment we only
-	 * need renameat() with AT_FDCWD for 'ln -s' on arch and fedora.
-	 */
-	if(oldfd != AT_FDCWD || newfd != AT_FDCWD) {
-		fprintf(stderr, "tup error: renameat2() with fd != AT_FDCWD is not yet supported.\n");
-		errno = ENOSYS;
-		return -1;
-	}
-	WRAP(s_renameat2, "renameat2");
-	rc = s_renameat2(oldfd, old, newfd, new, flags);
-	if(rc == 0) {
-		handle_file(old, new, ACCESS_RENAME);
-	}
-	return rc;
+    WRAP(s_renameat2, "renameat2");
+    rc = s_renameat2(oldfd, old, newfd, new, flags);
+
+    if(rc == 0) {
+        if(join_dirfd_path(oldfd, old, oldfull, sizeof(oldfull)) < 0) {
+            strncpy(oldfull, old ? old : "", sizeof(oldfull));
+            oldfull[sizeof(oldfull) - 1] = '\0';
+        }
+        if(join_dirfd_path(newfd, new, newfull, sizeof(newfull)) < 0) {
+            strncpy(newfull, new ? new : "", sizeof(newfull));
+            newfull[sizeof(newfull) - 1] = '\0';
+        }
+
+        handle_file(oldfull, newfull, ACCESS_RENAME);
+    }
+    return rc;
 }
 
 int mkstemp(char *template)
@@ -761,3 +773,68 @@ static int update_cwd(void)
 	cwdlen = strlen(cwd);
 	return 0;
 }
+
+static int get_dirfd_path(int dirfd, char *buf, size_t buflen)
+{
+    ssize_t rc;
+    char procpath[64];
+
+    /* If AT_FDCWD, use cached cwd (ldpreload.c already maintains this). */
+    if(dirfd == AT_FDCWD) {
+        if(update_cwd() < 0)
+            return -1;
+        if((size_t)(cwdlen + 1) > buflen) {
+            errno = ENAMETOOLONG;
+            return -1;
+        }
+        memcpy(buf, cwd, cwdlen + 1);
+        return 0;
+    }
+
+    snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", dirfd);
+    rc = readlink(procpath, buf, buflen - 1);
+    if(rc < 0)
+        return -1;
+    buf[rc] = '\0';
+    return 0;
+}
+
+static int join_dirfd_path(int dirfd, const char *path, char *out, size_t outlen)
+{
+    char base[PATH_MAX];
+    size_t blen, plen;
+
+    if(!path || !*path) {
+        errno = ENOENT;
+        return -1;
+    }
+
+    /* Absolute paths ignore dirfd semantics. */
+    if(path[0] == '/') {
+        plen = strlen(path);
+        if(plen + 1 > outlen) {
+            errno = ENAMETOOLONG;
+            return -1;
+        }
+        memcpy(out, path, plen + 1);
+        return 0;
+    }
+
+    if(get_dirfd_path(dirfd, base, sizeof(base)) < 0)
+        return -1;
+
+    blen = strlen(base);
+    plen = strlen(path);
+
+    /* base + '/' + path + '\0' */
+    if(blen + 1 + plen + 1 > outlen) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    memcpy(out, base, blen);
+    out[blen] = '/';
+    memcpy(out + blen + 1, path, plen + 1);
+    return 0;
+}
+

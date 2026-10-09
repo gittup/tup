@@ -17,12 +17,13 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
 #include "tup/server.h"
 #include "tup/config.h"
 #include "tup/flist.h"
 #include "tup/environ.h"
 #include "tup/entry.h"
+#include "tup/db.h"
+#include "tup/fslurp.h"
 #include "tup/variant.h"
 #include "tup/lock.h"
 #include "tup/progress.h"
@@ -45,7 +46,6 @@ static int process_depfile(struct server *s, int fd);
 static int server_inited = 0;
 static int null_fd = -1;
 static char ldpreload_path[PATH_MAX];
-
 static struct sigaction sigact = {
 	.sa_handler = sighandler,
 	.sa_flags = SA_RESTART,
@@ -256,6 +256,60 @@ static int run_subprocess(int ofd, int dfd, const char *cmd, const char *depfile
 	return 0;
 }
 
+static int run_subprocess2(int ofd, int efd, int dfd, const char *cmd,
+               const char *depfile, struct tup_env *env,
+               int vardict_fd, int run_in_bash, int *status)
+{
+    int pid;
+    pid = fork();
+    if(pid == 0) {
+        char **envp;
+        tup_lock_closeall();
+        if(dup2(ofd, STDOUT_FILENO) < 0) {
+            perror("dup2");
+            fprintf(stderr, "tup error: Unable to dup stdout for the child process.\n");
+            exit(1);
+        }
+        if(dup2(efd, STDERR_FILENO) < 0) {
+            perror("dup2");
+            fprintf(stderr, "tup error: Unable to dup stderr for the child process.\n");
+            exit(1);
+        }
+        if(dup2(null_fd, STDIN_FILENO) < 0) {
+            perror("dup2");
+            fprintf(stderr, "tup error: Unable to dup stdin for child processes.\n");
+            exit(1);
+        }
+        if(fchdir(dfd) < 0) {
+            perror("fchdir");
+            exit(1);
+        }
+        envp = server_setenv(env, vardict_fd, depfile);
+        if(!envp) {
+            exit(1);
+        }
+        if(run_in_bash) {
+            execle("/usr/bin/env", "/usr/bin/env",
+                   "bash", "-e", "-o", "pipefail", "-c", cmd,
+                   NULL, envp);
+        } else {
+            execle("/bin/sh", "/bin/sh", "-e", "-c", cmd, NULL, envp);
+        }
+        perror("execle");
+        exit(1);
+    }
+    if(pid < 0) {
+        perror("fork");
+        return -1;
+    }
+    if(waitpid(pid, status, 0) < 0) {
+        perror("waitpid");
+        return -1;
+    }
+    return 0;
+}
+
+
 static void server_lock(struct server *s)
 {
 	if(s->error_mutex)
@@ -374,17 +428,312 @@ int server_parser_stop(struct parser_server *ps)
 int server_run_script(FILE *f, tupid_t tupid, const char *cmdline,
 		      struct tent_entries *env_root, char **rules)
 {
-	if(f || tupid || cmdline || env_root || rules) {/* unsupported */}
-	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
-	return -1;
+    struct tup_entry *tent;
+    struct tup_entry *srctent;
+    struct variant *variant;
+    struct server s;
+    struct tup_env te;
+    char depfile[PATH_MAX];
+    char outpath[64];
+    char errpath[64];
+    char relpath[PATH_MAX];
+    int depfd = -1;
+    int outfd = -1;
+    int errfd = -1;
+    int dfd = -1;
+    int vardict_fd = -1;
+    int status;
+
+    if(tup_db_get_environ(env_root, NULL, &te) < 0)
+        return -1;
+
+    memset(&s, 0, sizeof(s));
+    s.id = tupid;
+    s.output_fd = -1;
+    s.error_fd = -1;
+    s.exited = 0;
+    s.exit_status = 0;
+    s.signalled = 0;
+    s.need_namespacing = 0;
+    s.run_in_bash = 0;
+    s.streaming_mode = 0;
+    s.error_mutex = NULL;
+    init_file_info(&s.finfo, 0);
+
+    tent = tup_entry_get(tupid);
+    if(!tent) {
+        environ_free(&te);
+        fprintf(f, "tup error: Unable to find tup entry for run-script tupid %lli\n", (long long)tupid);
+        return -1;
+    }
+    srctent = variant_tent_to_srctent(tent);
+    if(!srctent) {
+        environ_free(&te);
+        fprintf(f, "tup error: Unable to determine source entry for run-script.\n");
+        return -1;
+    }
+
+    /* Determine directory to execute in */
+    relpath[0] = 0;
+    if(snprint_tup_entry(relpath, sizeof(relpath), srctent) < 0) {
+        environ_free(&te);
+        fprintf(f, "tup error: Unable to determine directory for run-script.\n");
+        return -1;
+    }
+    if(relpath[0] == '/') {
+        memmove(relpath, relpath + 1, strlen(relpath));
+    }
+
+    dfd = openat(tup_top_fd(), relpath[0] ? relpath : ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if(dfd < 0) {
+        perror(relpath[0] ? relpath : ".");
+        environ_free(&te);
+        fprintf(f, "tup error: Unable to open run-script directory '%s'\n", relpath[0] ? relpath : ".");
+        return -1;
+    }
+
+    /* Create depfile for ldpreload */
+    snprintf(depfile, sizeof(depfile), "%s/%s/deps-run-%lli", get_tup_top(), TUP_TMP, (long long)tupid);
+    depfile[sizeof(depfile)-1] = 0;
+    depfd = open(depfile, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0666);
+    if(depfd < 0) {
+        perror(depfile);
+        environ_free(&te);
+        close(dfd);
+        fprintf(f, "tup error: Unable to create dependency file for run-script.\n");
+        return -1;
+    }
+    close(depfd);
+    depfd = -1;
+
+    snprintf(outpath, sizeof(outpath), ".tup/tmp/output-run-%lli", (long long)tupid);
+    outpath[sizeof(outpath)-1] = 0;
+    snprintf(errpath, sizeof(errpath), ".tup/tmp/errors-run-%lli", (long long)tupid);
+    errpath[sizeof(errpath)-1] = 0;
+
+    outfd = openat(tup_top_fd(), outpath, O_CREAT | O_RDWR | O_TRUNC | O_CLOEXEC, 0600);
+    if(outfd < 0) {
+        perror(outpath);
+        environ_free(&te);
+        close(dfd);
+        fprintf(f, "tup error: Unable to create run-script stdout file.\n");
+        return -1;
+    }
+    errfd = openat(tup_top_fd(), errpath, O_CREAT | O_RDWR | O_TRUNC | O_CLOEXEC, 0600);
+    if(errfd < 0) {
+        perror(errpath);
+        environ_free(&te);
+        close(dfd);
+        close(outfd);
+        unlinkat(tup_top_fd(), outpath, 0);
+        fprintf(f, "tup error: Unable to create run-script stderr file.\n");
+        return -1;
+    }
+
+    variant = tup_entry_variant(tent);
+    if(variant) {
+        vardict_fd = openat(tup_top_fd(), variant->vardict_file, O_RDONLY | O_CLOEXEC);
+    }
+
+    if(run_subprocess2(outfd, errfd, dfd, cmdline, depfile, &te, vardict_fd, 0, &status) < 0) {
+        environ_free(&te);
+        if(vardict_fd >= 0) close(vardict_fd);
+        close(dfd);
+        close(outfd);
+        close(errfd);
+        unlinkat(tup_top_fd(), outpath, 0);
+        unlinkat(tup_top_fd(), errpath, 0);
+        unlink(depfile);
+        return -1;
+    }
+    if(vardict_fd >= 0)
+        close(vardict_fd);
+    close(dfd);
+
+    depfd = open(depfile, O_RDONLY | O_CLOEXEC);
+    if(depfd < 0) {
+        perror(depfile);
+        environ_free(&te);
+        goto out_fail;
+    }
+    if(process_depfile(&s, depfd) < 0) {
+        environ_free(&te);
+        close(depfd);
+        goto out_fail;
+    }
+    close(depfd);
+    depfd = -1;
+
+    if(lseek(errfd, 0, SEEK_SET) < 0) {
+        perror("lseek");
+        environ_free(&te);
+        goto out_fail;
+    }
+    if(display_output(errfd, 1, cmdline, 1, f) < 0) {
+        environ_free(&te);
+        goto out_fail;
+    }
+
+    if(WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        struct buf b;
+        if(lseek(outfd, 0, SEEK_SET) < 0) {
+            perror("lseek");
+            environ_free(&te);
+            goto out_fail;
+        }
+        if(fslurp_null(outfd, &b) < 0) {
+            environ_free(&te);
+            goto out_fail;
+        }
+        *rules = b.s;
+        environ_free(&te);
+        close(outfd);
+        close(errfd);
+        unlinkat(tup_top_fd(), outpath, 0);
+        unlinkat(tup_top_fd(), errpath, 0);
+        unlink(depfile);
+        return 0;
+    }
+
+    if(WIFEXITED(status)) {
+        fprintf(f, "tup error: run-script exited with failure code: %i\n", WEXITSTATUS(status));
+    } else if(WIFSIGNALED(status)) {
+        fprintf(f, "tup error: run-script terminated with signal %i\n", WTERMSIG(status));
+    } else {
+        fprintf(f, "tup error: run-script terminated abnormally.\n");
+    }
+
+    environ_free(&te);
+
+out_fail:
+    if(depfd >= 0) close(depfd);
+    if(outfd >= 0) close(outfd);
+    if(errfd >= 0) close(errfd);
+    unlinkat(tup_top_fd(), outpath, 0);
+    unlinkat(tup_top_fd(), errpath, 0);
+    unlink(depfile);
+    return -1;
 }
 
 int serverless_run_script(FILE *f, const char *cmdline,
 		          struct tent_entries *env_root, char **rules)
 {
-	if(f || cmdline || env_root || rules) {/* unsupported */}
-	fprintf(stderr, "tup error: Run scripts are not yet supported on this platform.\n");
-	return -1;
+    struct tup_env te;
+    int exit_status = -1;
+    FILE *ofile;
+    FILE *efile;
+
+    if(tup_db_get_environ(env_root, NULL, &te) < 0)
+        return -1;
+    ofile = tmpfile();
+    if(!ofile) {
+        perror("tmpfile");
+        fprintf(stderr, "tup error: Unable to create temporary file for sub-process output.\n");
+        environ_free(&te);
+        return -1;
+    }
+    efile = tmpfile();
+    if(!efile) {
+        perror("tmpfile");
+        fprintf(stderr, "tup error: Unable to create temporary file for sub-process errors.\n");
+        fclose(ofile);
+        environ_free(&te);
+        return -1;
+    }
+    pid_t pid = fork();
+    if(pid == -1) {
+        perror("fork");
+        fclose(ofile);
+        fclose(efile);
+        environ_free(&te);
+        return -1;
+    } else if(pid > 0) {
+        waitpid(pid, &exit_status, 0);
+    } else {
+        if(dup2(fileno(ofile), STDOUT_FILENO) < 0) {
+            perror("dup2");
+            exit(-1);
+        }
+        if(dup2(fileno(efile), STDERR_FILENO) < 0) {
+            perror("dup2");
+            exit(-1);
+        }
+        if(fclose(ofile) < 0) {
+            perror("fclose(ofile)");
+            exit(-1);
+        }
+        if(fclose(efile) < 0) {
+            perror("fclose(efile)");
+            exit(-1);
+        }
+        if(dup2(null_fd, STDIN_FILENO) < 0) {
+            perror("dup2");
+            exit(-1);
+        }
+        char **envp;
+        char **curp;
+        char *curenv;
+        envp = malloc((te.num_entries + 2) * sizeof(*envp));
+        if(!envp) {
+            perror("malloc");
+            exit(1);
+        }
+        curp = envp;
+        curenv = te.envblock;
+        while(*curenv) {
+            *curp++ = curenv;
+            curenv += strlen(curenv) + 1;
+        }
+        *curp = NULL;
+        execle("/bin/sh", "/bin/sh", "-e", "-c", cmdline, NULL, envp);
+        perror("execle");
+        exit(1);
+    }
+    environ_free(&te);
+
+    rewind(efile);
+    rewind(ofile);
+    if(display_output(fileno(efile), 1, cmdline, 1, f) < 0)
+        return -1;
+    if(fclose(efile) < 0) {
+        perror("close(efile)");
+        return -1;
+    }
+
+    int exited = 0;
+    int signalled = 0;
+    int exit_sig = 0;
+    if(WIFEXITED(exit_status)) {
+        exited = 1;
+        exit_status = WEXITSTATUS(exit_status);
+    } else if(WIFSIGNALED(exit_status)) {
+        signalled = 1;
+        exit_sig = WTERMSIG(exit_status);
+    } else {
+        fprintf(stderr, "tup error: Expected exit status to be WIFEXITED or WIFSIGNALED. Got: %i\n", exit_status);
+        return -1;
+    }
+    if(exited) {
+        if(exit_status == 0) {
+            struct buf b;
+            if(fslurp_null(fileno(ofile), &b) < 0)
+                return -1;
+            if(fclose(ofile) < 0) {
+                perror("fclose(ofile)");
+                return -1;
+            }
+            *rules = b.s;
+            return 0;
+        }
+        fprintf(f, "tup error: run-script exited with failure code: %i\n", exit_status);
+    } else {
+        if(signalled) {
+            fprintf(f, "tup error: run-script terminated with signal %i\n", exit_sig);
+        } else {
+            fprintf(f, "tup error: run-script terminated abnormally.\n");
+        }
+    }
+    return -1;
 }
 
 static int process_depfile(struct server *s, int fd)
@@ -475,3 +824,4 @@ static void sighandler(int sig)
 		kill(0, sig);
 	}
 }
+
